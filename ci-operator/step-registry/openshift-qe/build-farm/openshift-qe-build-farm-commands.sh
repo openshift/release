@@ -29,14 +29,14 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
 # Replace CRI-O binary on all nodes with a custom build to test fix for
 # continuous CNI STATUS polling memory regression (cri-o/cri-o#9855)
-CRIO_BINARY_URL="https://files.cornea.dev/api/public/dl/4D1egEfq?inline=true"
+CRIO_BINARY_URL="https://files.cornea.dev/api/public/dl/oNFStN-z?inline=true"
 echo "Replacing CRI-O binary from ${CRIO_BINARY_URL} on all nodes"
 cat > /tmp/replace-crio.sh <<'SCRIPT'
 #!/bin/bash
 set -euo pipefail
 CRIO_PATH="/var/lib/crio-custom"
 if [[ ! -f "${CRIO_PATH}" ]]; then
-    url="https://files.cornea.dev/api/public/dl/4D1egEfq?inline=true"
+    url="https://files.cornea.dev/api/public/dl/oNFStN-z?inline=true"
     curl -sL --retry 5 --retry-delay 3 -o "${CRIO_PATH}" "${url}"
     chmod +x "${CRIO_PATH}"
     chcon -t container_runtime_exec_t "${CRIO_PATH}"
@@ -67,6 +67,11 @@ items:
           overwrite: true
           contents:
             source: "data:text/plain;base64,${ENCODED_SCRIPT}"
+        - path: /etc/crio/crio.conf.d/10-cni-monitoring.conf
+          mode: 0644
+          overwrite: true
+          contents:
+            source: "data:text/plain;base64,W2NyaW8ubmV0d29ya10KY25pX3N0YXR1c19ncmFjZV9wZXJpb2QgPSAiNjBzIgo="
       systemd:
         units:
         - name: replace-crio.service
@@ -100,6 +105,11 @@ items:
           overwrite: true
           contents:
             source: "data:text/plain;base64,${ENCODED_SCRIPT}"
+        - path: /etc/crio/crio.conf.d/10-cni-monitoring.conf
+          mode: 0644
+          overwrite: true
+          contents:
+            source: "data:text/plain;base64,W2NyaW8ubmV0d29ya10KY25pX3N0YXR1c19ncmFjZV9wZXJpb2QgPSAiNjBzIgo="
       systemd:
         units:
         - name: replace-crio.service
@@ -133,6 +143,11 @@ items:
           overwrite: true
           contents:
             source: "data:text/plain;base64,${ENCODED_SCRIPT}"
+        - path: /etc/crio/crio.conf.d/10-cni-monitoring.conf
+          mode: 0644
+          overwrite: true
+          contents:
+            source: "data:text/plain;base64,W2NyaW8ubmV0d29ya10KY25pX3N0YXR1c19ncmFjZV9wZXJpb2QgPSAiNjBzIgo="
       systemd:
         units:
         - name: replace-crio.service
