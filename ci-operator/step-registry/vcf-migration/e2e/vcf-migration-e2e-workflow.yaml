@@ -1,0 +1,23 @@
+workflow:
+  as: vcf-migration-e2e
+  steps:
+    pre:
+    - chain: vcf-migration-pre
+    test:
+    - ref: vcf-migration-deploy
+    - ref: vcf-migration-execute
+    - ref: vcf-migration-verify
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-vsphere-post
+    env:
+      FEATURE_GATES: '["VSphereMultiVCenterDay2=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      POOLS: >-
+        vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster
+        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+  documentation: |-
+    Provisions a source vSphere cluster, deploys the vcf-migration-operator,
+    executes a full migration to a second vCenter chosen from a separate VCM
+    pool, and verifies the cluster is healthy afterwards.
