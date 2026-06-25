@@ -66,6 +66,39 @@ echo ""
 echo "============================================================"
 echo ""
 
+if [[ -n "${TUNNEL_URL}" && "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
+  echo "==> Posting staging URL to PR #${PULL_NUMBER}..."
+  GH_APP_DIR="/var/run/github-token"
+  if [[ -f "${GH_APP_DIR}/app-id" && -f "${GH_APP_DIR}/private-key" && -f "${GH_APP_DIR}/openshift-installation-id" ]]; then
+    set +x
+    APP_ID=$(cat "${GH_APP_DIR}/app-id")
+    PRIVATE_KEY="${GH_APP_DIR}/private-key"
+    INSTALL_ID=$(cat "${GH_APP_DIR}/openshift-installation-id")
+    NOW=$(date +%s)
+    HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    PAYLOAD=$(echo -n "{\"iat\":$((NOW - 60)),\"exp\":$((NOW + 600)),\"iss\":\"${APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "${PRIVATE_KEY}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    GITHUB_TOKEN=$(curl -sf -X POST \
+      -H "Authorization: Bearer ${HEADER}.${PAYLOAD}.${SIGNATURE}" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/app/installations/${INSTALL_ID}/access_tokens" \
+      | jq -r '.token')
+
+    MINUTES=$(( STAGING_TIMEOUT / 60 ))
+    COMMENT_BODY=$(jq -n --arg url "${TUNNEL_URL}" --arg min "${MINUTES}" \
+      '{body: "### Sippy Staging Environment\n\n**URL:** \($url)\n\nThis environment is built from this PR and will remain available for approximately \($min) minutes."}')
+
+    curl -sf -X POST \
+      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PULL_NUMBER}/comments" \
+      -d "${COMMENT_BODY}" > /dev/null && echo "    Comment posted." || echo "    WARNING: Failed to post comment."
+    set -x
+  else
+    echo "    WARNING: GitHub App credentials not found, skipping PR comment."
+  fi
+fi
+
 echo "==> Staging environment is live. Sleeping for ${STAGING_TIMEOUT} seconds..."
 sleep "${STAGING_TIMEOUT}"
 
