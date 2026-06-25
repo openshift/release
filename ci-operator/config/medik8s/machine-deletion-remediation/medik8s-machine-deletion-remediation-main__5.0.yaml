@@ -7,6 +7,10 @@ base_images:
     name: "4.17"
     namespace: origin
     tag: operator-sdk
+  tls-scanner-tool:
+    name: "5.0"
+    namespace: ocp
+    tag: tls-scanner-tool
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -80,6 +84,140 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: ipi-aws
+- always_run: false
+  as: tls-pqc-readiness
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      INSTALL_NAMESPACE: mdr-install
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: mdr-install
+      SCANNER_CPU: "2"
+    test:
+    - as: install-operator
+      cli: latest
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+        oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: machine-deletion-remediation-bundle
+      env:
+      - name: INSTALL_NAMESPACE
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- as: tls-pqc-readiness-periodic
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      INSTALL_NAMESPACE: mdr-install
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: mdr-install
+      SCANNER_CPU: "2"
+    test:
+    - as: install-operator
+      cli: latest
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+        oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: machine-deletion-remediation-bundle
+      env:
+      - name: INSTALL_NAMESPACE
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- always_run: false
+  as: tls13-adherence
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      INSTALL_NAMESPACE: mdr-install
+      PQC_CHECK: "false"
+      SCAN_NAMESPACE: mdr-install
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - as: install-operator
+      cli: latest
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+        oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: machine-deletion-remediation-bundle
+      env:
+      - name: INSTALL_NAMESPACE
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- as: tls13-adherence-periodic
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      INSTALL_NAMESPACE: mdr-install
+      PQC_CHECK: "false"
+      SCAN_NAMESPACE: mdr-install
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - as: install-operator
+      cli: latest
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+        oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: machine-deletion-remediation-bundle
+      env:
+      - name: INSTALL_NAMESPACE
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-13
+    - ref: tls-scanner-run
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
