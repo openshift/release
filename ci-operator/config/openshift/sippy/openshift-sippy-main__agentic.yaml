@@ -17,7 +17,8 @@ images:
       FROM src AS source
       FROM sippy-devcontainer
       USER root
-      RUN dnf install -y podman fuse-overlayfs shadow-utils openssl && dnf clean all
+      RUN curl -fsSL https://pkg.cloudflare.com/cloudflared.repo -o /etc/yum.repos.d/cloudflared.repo && \
+          dnf install -y podman fuse-overlayfs shadow-utils openssl cloudflared && dnf clean all
       COPY --from=podman /entrypoint.sh /entrypoint.sh
       RUN setcap cap_setuid+ep /usr/bin/newuidmap && \
           setcap cap_setgid+ep /usr/bin/newgidmap && \
@@ -72,6 +73,16 @@ tests:
       SETUP_SCRIPT: hack/agentic_setup.sh
       UPSTREAM_REPO: openshift/sippy
     workflow: openshift-agentic-trt-pr-followup
+- always_run: false
+  as: staging
+  capabilities:
+  - nested-podman
+  optional: true
+  steps:
+    env:
+      GITHUB_APP_TOKEN_OUTPUTS: openshift-installation-id:gh-upstream-token
+      STAGING_TIMEOUT: "3600"
+    workflow: sippy-staging
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -3,10 +3,6 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
-  nested-podman:
-    name: nested-podman
-    namespace: ci
-    tag: latest
   yamllint:
     name: yamllint
     namespace: ci
@@ -24,41 +20,11 @@ images:
     to: sippy-chat
   - dockerfile_path: .devcontainer/Dockerfile
     to: sippy-devcontainer
-  - dockerfile_literal: |
-      FROM nested-podman AS podman
-      FROM src AS source
-      FROM sippy-devcontainer
-      USER root
-      RUN curl -fsSL https://pkg.cloudflare.com/cloudflared.repo -o /etc/yum.repos.d/cloudflared.repo && \
-          dnf install -y podman fuse-overlayfs shadow-utils openssl cloudflared && dnf clean all
-      COPY --from=podman /entrypoint.sh /entrypoint.sh
-      RUN setcap cap_setuid+ep /usr/bin/newuidmap && \
-          setcap cap_setgid+ep /usr/bin/newgidmap && \
-          touch /etc/subgid /etc/subuid && \
-          chmod -R g=u /etc/subuid /etc/subgid /etc/passwd /etc/group && \
-          chmod +rx /entrypoint.sh
-      COPY --from=source /go/src/github.com/openshift/sippy /workspace
-      RUN chgrp -R 0 /workspace && chmod -R g=u /workspace
-      ENV BUILDAH_ISOLATION=chroot
-      USER vscode
-      WORKDIR /workspace
-      ENTRYPOINT ["/entrypoint.sh"]
-      CMD ["bash"]
-    from: sippy-devcontainer
-    inputs:
-      nested-podman:
-        as:
-        - nested-podman
-      src:
-        as:
-        - src
-    to: sippy-staging-dev
 promotion:
   to:
   - excluded_images:
     - sippy
     - sippy-chat
-    - sippy-staging-dev
     name: sippy
     namespace: ci
 resources:
@@ -98,15 +64,6 @@ tests:
     version: "4.18"
   steps:
     workflow: sippy-e2e
-- always_run: false
-  as: staging
-  capabilities:
-  - nested-podman
-  optional: true
-  steps:
-    env:
-      STAGING_TIMEOUT: "3600"
-    workflow: sippy-staging
 - as: security
   steps:
     env:

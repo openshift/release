@@ -84,9 +84,9 @@ if [[ -n "${TUNNEL_URL}" ]]; then
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>Sippy Staging</title></head>
-<body style="font-family: system-ui, sans-serif; padding: 20px;">
+<body style="font-family: system-ui, sans-serif; padding: 40px 20px 200px 20px;">
 <h2>Sippy Staging Environment</h2>
-<p><strong>URL:</strong> <a href="${TUNNEL_URL}" target="_blank">${TUNNEL_URL}</a></p>
+<p style="font-size: 18px;"><strong>URL:</strong> <a href="${TUNNEL_URL}" target="_blank">${TUNNEL_URL}</a></p>
 <p>This environment is built from this PR and will remain available for approximately ${MINUTES} minutes.</p>
 </body>
 </html>
@@ -103,48 +103,30 @@ HTMLEOF
     echo "==> GCS credentials not found, skipping Spyglass upload."
   fi
 
-  # --- Post PR comment via GitHub App ---
+  # --- Post PR comment via pre-generated GitHub token ---
   if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
     echo "==> Posting staging URL to PR ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER}..."
-    GH_APP_DIR="/var/run/github-token"
-    if [[ -f "${GH_APP_DIR}/app-id" && -f "${GH_APP_DIR}/private-key" && -f "${GH_APP_DIR}/openshift-installation-id" ]]; then
-      set +x
-      APP_ID=$(cat "${GH_APP_DIR}/app-id")
-      PRIVATE_KEY="${GH_APP_DIR}/private-key"
-      INSTALL_ID=$(cat "${GH_APP_DIR}/openshift-installation-id")
-      NOW=$(date +%s)
-      HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-      PAYLOAD=$(echo -n "{\"iat\":$((NOW - 60)),\"exp\":$((NOW + 600)),\"iss\":\"${APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-      SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "${PRIVATE_KEY}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-      TOKEN_RESPONSE=$(curl -s -X POST \
-        -H "Authorization: Bearer ${HEADER}.${PAYLOAD}.${SIGNATURE}" \
-        -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/app/installations/${INSTALL_ID}/access_tokens" 2>&1)
-      GITHUB_TOKEN=$(echo "${TOKEN_RESPONSE}" | jq -r '.token // empty')
-      set -euo pipefail
+    GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token" 2>/dev/null || true)
 
-      if [[ -z "${GITHUB_TOKEN}" ]]; then
-        echo "    WARNING: Failed to generate GitHub token, skipping PR comment."
-        echo "    (Expected for rehearsal jobs on repos where trt-agent-gh-app is not installed.)"
-      else
-        COMMENT_BODY=$(jq -n --arg url "${TUNNEL_URL}" --arg min "${MINUTES}" \
-          '{body: "### Sippy Staging Environment\n\n**URL:** \($url)\n\nThis environment is built from this PR and will remain available for approximately \($min) minutes."}')
-        COMMENT_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-          -H "Accept: application/vnd.github+json" \
-          "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PULL_NUMBER}/comments" \
-          -d "${COMMENT_BODY}" 2>&1)
-        HTTP_CODE=$(echo "${COMMENT_RESPONSE}" | tail -1)
-        if [[ "${HTTP_CODE}" == "201" ]]; then
-          echo "    Comment posted to ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER}."
-          URL_SURFACED=true
-        else
-          echo "    WARNING: Failed to post comment (HTTP ${HTTP_CODE})."
-          echo "    (Expected for rehearsal jobs on repos where trt-agent-gh-app is not installed.)"
-        fi
-      fi
+    if [[ -z "${GITHUB_TOKEN}" ]]; then
+      echo "    WARNING: No GitHub token found in SHARED_DIR, skipping PR comment."
+      echo "    (Expected for rehearsal jobs on repos where trt-agent-gh-app is not installed.)"
     else
-      echo "    WARNING: GitHub App credentials not found, skipping PR comment."
+      COMMENT_BODY=$(jq -n --arg url "${TUNNEL_URL}" --arg min "${MINUTES}" \
+        '{body: "### Sippy Staging Environment\n\n**URL:** \($url)\n\nThis environment is built from this PR and will remain available for approximately \($min) minutes."}')
+      COMMENT_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PULL_NUMBER}/comments" \
+        -d "${COMMENT_BODY}" 2>&1)
+      HTTP_CODE=$(echo "${COMMENT_RESPONSE}" | tail -1)
+      if [[ "${HTTP_CODE}" == "201" ]]; then
+        echo "    Comment posted to ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER}."
+        URL_SURFACED=true
+      else
+        echo "    WARNING: Failed to post comment (HTTP ${HTTP_CODE})."
+        echo "    (Expected for rehearsal jobs on repos where trt-agent-gh-app is not installed.)"
+      fi
     fi
   fi
 fi

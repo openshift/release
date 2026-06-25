@@ -1,0 +1,25 @@
+ref:
+  as: trt-github-app-auth
+  from: src
+  commands: trt-github-app-auth-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: trt-agent-gh-app
+    mount_path: /var/run/github-token
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 5m0s
+  env:
+  - name: GITHUB_APP_TOKEN_OUTPUTS
+    default: "installation-id:gh-fork-token,openshift-installation-id:gh-upstream-token"
+    documentation: |-
+      Comma-separated list of <installation-id-filename>:<output-name> pairs.
+      For each pair, reads the installation ID from the file in the credential
+      directory, generates a token, and writes it to ${SHARED_DIR}/<output-name>.
+  documentation: |-
+    Generate GitHub App installation tokens via JWT exchange using the
+    trt-agent-gh-app credential. Reads app-id and private-key, then
+    generates a token for each entry in GITHUB_APP_TOKEN_OUTPUTS,
+    writing results to SHARED_DIR for downstream steps.
