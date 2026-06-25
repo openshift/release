@@ -15,13 +15,13 @@ mkdir -p "${OCP__ABI__CLUSTER_DIR}"
 
 eval "$(
     typeset -a _fURL=()
-    type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
         "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
 )"
 eval "$(
     typeset -a _fURL=()
-    type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
         "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
 )"; EnsureReqs yq
@@ -60,7 +60,8 @@ function UpdateCfg () {
         [[ "${cfgFile}" == */* ]] &&
             mkdir -p "${OCP__ABI__CLUSTER_DIR}/${cfgFile%/*}"
         true 1>> "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"
-        exec 3< <(cat "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"); wait $!
+        # shellcheck disable=SC2188
+        exec 3< <(0< "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"); wait $!
         case ${cfgType} in
           (*+)  updateOp='select(fileIndex==0) *+ ' ;;
           (*-)  updateOp='select(fileIndex==0) * '  ;;
@@ -159,8 +160,8 @@ eval "$(BuildCustomScriptsFromYAML OCP__ABI__DAY0_SCRIPTS_YAML)"
 {
     yq -p yaml -o json eval . |
     jq \
-        --rawfile usr <(set +x; printf '%s' "$(cat "${CLUSTER_PROFILE_DIR}/cred--bmc--usr")") \
-        --rawfile pwd <(set +x; printf '%s' "$(cat "${CLUSTER_PROFILE_DIR}/cred--bmc--pwd")") \
+        --rawfile usr <(set +x; printf '%s' "$(0< "${CLUSTER_PROFILE_DIR}/cred--bmc--usr")") \
+        --rawfile pwd <(set +x; printf '%s' "$(0< "${CLUSTER_PROFILE_DIR}/cred--bmc--pwd")") \
         --argjson rIP "$(yq -o json '(select(
             (.rendezvousIP | length) > 0) | .rendezvousIP
         ) // ([
@@ -203,7 +204,8 @@ eval "$(BuildCustomScriptsFromYAML OCP__ABI__DAY0_SCRIPTS_YAML)"
 } 0< "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml" 1> "${SHARED_DIR}/ocp--bmc--info.json"
 
 # Strip BMC Credentials from `agent-config.yaml`.
-exec 3< <(cat "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"); wait $!
+# shellcheck disable=SC2188
+exec 3< <(0< "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"); wait $!
 {
     yq -p yaml -o json eval . |
     jq '.hosts[].bmc|=del(.username, .password)' |

@@ -21,19 +21,19 @@ export XDG_CACHE_HOME=/tmp/abi/.cache   # Used by `openshift-install agent creat
 
 eval "$(
     typeset -a _fURL=()
-    type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
         "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
 )"
 eval "$(
     typeset -a _fURL=()
-    type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
         "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/Vault--BitWarden.sh"
 )"
 eval "$(
     typeset -a _fURL=()
-    type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
         "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
 )"; EnsureReqs yq chisel bw
@@ -282,8 +282,8 @@ sshEOF
 
 # Chisel basic auth (disable `xtrace` while reading secrets).
 set +x
-chiselCrdUsr="$(cat "/var/run/secrets/chisel/chisel-usr--${OCP__ABI__TEAM_NAME}")"
-chiselCrdPwd="$(cat "/var/run/secrets/chisel/chisel-pwd--${OCP__ABI__TEAM_NAME}")"
+chiselCrdUsr="$(0< "/var/run/secrets/chisel/chisel-usr--${OCP__ABI__TEAM_NAME}")"
+chiselCrdPwd="$(0< "/var/run/secrets/chisel/chisel-pwd--${OCP__ABI__TEAM_NAME}")"
 set -x
 
 trap 'HandleSIGCHLD' CHLD
@@ -605,13 +605,13 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 [ -z "${BW__OBJ_NAME}" ] || {
     Vault--BitWarden--UploadAttachment \
         "${BW__OBJ_NAME}" /var/run/secrets/vault--bit-warden/SvcAcc-RW \
-        "${KUBECONFIG}"
+        "${OCP__ABI__CLUSTER_DIR}/auth/kubeconfig"
     Vault--BitWarden--UpdateCustomField \
         "${BW__OBJ_NAME}" /var/run/secrets/vault--bit-warden/SvcAcc-RW \
         cred.OCP <(
             jq -cnj \
                 --arg usr kubeadmin \
-                --rawfile pwd <(set +x; printf '%s' "$(cat "${KUBEADMIN_PASSWORD_FILE}")") \
+                --rawfile pwd <(set +x; printf '%s' "$(0< "${OCP__ABI__CLUSTER_DIR}/auth/kubeadmin-password")") \
                 '{usr: $usr, pwd: $pwd}'
         )
 }
