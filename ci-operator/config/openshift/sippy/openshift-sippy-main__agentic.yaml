@@ -17,8 +17,7 @@ images:
       FROM src AS source
       FROM sippy-devcontainer
       USER root
-      RUN curl -fsSL https://pkg.cloudflare.com/cloudflared.repo -o /etc/yum.repos.d/cloudflared.repo && \
-          dnf install -y podman fuse-overlayfs shadow-utils openssl cloudflared httpd && dnf clean all
+      RUN dnf install -y podman fuse-overlayfs shadow-utils openssl && dnf clean all
       COPY --from=podman /entrypoint.sh /entrypoint.sh
       RUN setcap cap_setuid+ep /usr/bin/newuidmap && \
           setcap cap_setgid+ep /usr/bin/newgidmap && \
@@ -41,6 +40,14 @@ images:
         as:
         - src
     to: sippy-agentic-dev
+  - dockerfile_literal: |
+      FROM sippy-agentic-dev
+      USER root
+      RUN curl -fsSL https://pkg.cloudflare.com/cloudflared.repo -o /etc/yum.repos.d/cloudflared.repo && \
+          dnf install -y cloudflared httpd && dnf clean all
+      USER vscode
+    from: sippy-agentic-dev
+    to: sippy-staging-dev
 resources:
   '*':
     requests:
