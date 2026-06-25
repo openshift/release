@@ -55,6 +55,71 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+- as: tests-extension
+  run_if_changed: ^(tests-extension/)
+  steps:
+    test:
+    - as: sanity
+      commands: |
+        cd tests-extension
+        make verify
+        make build
+        make verify-metadata
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- always_run: false
+  as: e2e-metal-ipi-tests-ext
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        cd tests-extension
+        make build
+        ./bin/ipfailover-tests-ext run-suite ipfailover/all --max-concurrency=1
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: baremetalds-e2e-ovn-ipv4
+- always_run: false
+  as: e2e-openstack-ipi-tests-ext
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        cd tests-extension
+        make build
+        ./bin/ipfailover-tests-ext run-suite ipfailover/all --max-concurrency=1
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+- always_run: false
+  as: e2e-vsphere-ovn-tests-ext
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        cd tests-extension
+        make build
+        ./bin/ipfailover-tests-ext run-suite ipfailover/all --max-concurrency=1
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere-ovn
 - as: verify-deps
   steps:
     env:
