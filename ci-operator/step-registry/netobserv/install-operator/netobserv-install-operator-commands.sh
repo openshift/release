@@ -71,12 +71,6 @@ EOF
 patch_csv_images(){
   CSV=$(oc get csv -n openshift-netobserv-operator | grep -iE "net.*observ" | awk '{print $1}')
 
-  # patch as Downstream to scrape metrics
-  OVERRIDE_VAR="DOWNSTREAM_DEPLOYMENT"
-  ENV_INDEX=$(oc get csv/$CSV -n openshift-netobserv-operator -o json | jq --arg override_var "$OVERRIDE_VAR" '.spec.install.spec.deployments[0].spec.template.spec.containers[0].env | map(.name) | index($override_var)')
-
-  oc patch csv/$CSV -n openshift-netobserv-operator --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/${ENV_INDEX}/value\", \"value\": \"true\"}]"
-
   if [[ $PATCH_EBPFAGENT_IMAGE ]]; then
     OVERRIDE_VAR="RELATED_IMAGE_EBPF_AGENT"
     echo "====> Patching eBPF image"
@@ -93,11 +87,11 @@ patch_csv_images(){
 
   if [[ $PATCH_CONSOLE_PLUGIN_IMAGE ]]; then
     if [[ $OCP_VERSION -ge "416" && $OCP_VERSION -le "421" ]]; then
-      OVERRIDE_VAR="RELATED_IMAGE_CONSOLE_PLUGIN_PF5"
+      OVERRIDE_VAR="RELATED_IMAGE_WEB_CONSOLE_PF5"
     elif [[ $OCP_VERSION -le "415" ]]; then
-      OVERRIDE_VAR="RELATED_IMAGE_CONSOLE_PLUGIN_PF4"
+      OVERRIDE_VAR="RELATED_IMAGE_WEB_CONSOLE_PF4"
     else
-      OVERRIDE_VAR="RELATED_IMAGE_CONSOLE_PLUGIN"
+      OVERRIDE_VAR="RELATED_IMAGE_WEB_CONSOLE"
     fi
     echo $OVERRIDE_VAR
 
