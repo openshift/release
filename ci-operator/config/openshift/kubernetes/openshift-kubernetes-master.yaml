@@ -39,6 +39,14 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: oc-rpms
+  rhel-coreos-9-base:
+    name: "5.0"
+    namespace: ocp
+    tag: rhel-coreos-9
+  base-rhel9:
+    name: "5.0"
+    namespace: ocp
+    tag: base-rhel9
   rhel-coreos-base:
     name: "5.0"
     namespace: ocp
@@ -63,6 +71,22 @@ images:
     to: kube-proxy
   - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
     to: kubernetes-tests
+  - dockerfile_literal: |
+      # RHEL 9 variant of kubernetes-tests for testing on RHEL 9
+      # Uses the same test binaries but on a RHEL 9 base
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.17 AS build
+      COPY --from=src /go/src/k8s.io/kubernetes /go/src/k8s.io/kubernetes
+      WORKDIR /go/src/k8s.io/kubernetes
+      RUN make WHAT=cmd/kubectl && \
+          make WHAT=test/e2e/e2e.test && \
+          make WHAT=vendor/github.com/onsi/ginkgo/v2/ginkgo
+      FROM registry.ci.openshift.org/ocp/4.17:base-rhel9
+      COPY --from=build /go/src/k8s.io/kubernetes/_output/local/bin/linux/amd64/kubectl /usr/bin/
+      COPY --from=build /go/src/k8s.io/kubernetes/_output/local/bin/linux/amd64/e2e.test /usr/bin/
+      COPY --from=build /go/src/k8s.io/kubernetes/_output/local/bin/linux/amd64/ginkgo /usr/bin/
+    inputs:
+      src: {}
+    to: kubernetes-tests-rhel9
   - dockerfile_literal: |
       # We want to test the PR using the code from it. Now, this repo ships RPMs
       # which are normally part of RHCOS. We need to make sure that RHCOS itself
@@ -103,6 +127,21 @@ images:
         as:
         - registry.ci.openshift.org/rhcos-devel/rhel-coreos
     to: rhel-coreos
+  - dockerfile_literal: |
+      # RHEL 9 variant: builds 5.0 kubernetes RPMs on RHEL 9 base
+      FROM quay.io/centos/centos:stream9 as build
+      RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-9
+      COPY --from=build /*.rpm /
+      RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+    inputs:
+      base-machine-with-rpms:
+        as:
+        - quay.io/centos/centos:stream9
+      rhel-coreos-9-base:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos-9
+    to: rhel-coreos-9
   - context_dir: build/pause
     dockerfile_path: Dockerfile.Rhel
     to: pod
@@ -185,6 +224,12 @@ releases:
       include_built_images: true
       name: "5.0"
       namespace: ocp
+  rhel9-os:
+    # 5.0 components with RHEL 9 OS - uses 4.22 nightly as base
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -513,6 +558,15 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-crun
+- as: e2e-aws-ovn-runc
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      RHCOS_IMAGE_OVERRIDE: rhel-coreos-9
+    workflow: openshift-e2e-aws-runc
 - always_run: false
   as: perfscale-control-plane-6nodes
   steps:
