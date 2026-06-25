@@ -1,5 +1,7 @@
 This directory contain the steps, chains and workflows implemented specifically for the Openshift Sandboxed Containers (OSC) jobs.
 
+*Note the prowjobs need **restrict_network_access: false** for konflux.  If doing a /pj-rehearse, it needs to be **true**.  If the PR is merged, it should be reverted to **false***
+
 ## Steps
 
 Here is the list of steps and their explanation.
@@ -209,7 +211,7 @@ for ``Running step launch-cucushift-installer-wait.`` line
 in there. Once it shows there the cluster is ready and waiting
 for you for the specified amount of time.
 
-Getting access to your testing cluster is slightly harder as first 
+Getting access to your testing cluster is slightly harder as first
 you need to get to the ``main build OCP``. To do so:
 
 1. open the ``job started...`` link by clusterbot
