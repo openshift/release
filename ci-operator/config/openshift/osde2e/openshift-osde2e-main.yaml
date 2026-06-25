@@ -34,26 +34,47 @@ tests:
 
     export GOFLAGS=""
     export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="hypershift"
+    export SHARED_DIR="${ARTIFACT_DIR}/shared"
+    export CONFIGS="hypershift,ephemeral-cluster"
     export CHANNEL="stable"
-    export SHARED_DIR="tmp/"
     export LOG_BUCKET="osde2e-logs"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-credentials"
 
     go mod tidy
     make build
-    echo "Provisioning and running e2e commands"
+
+    # shellcheck source=scripts/ephemeral-rosa-deploy.sh
+    source scripts/ephemeral-rosa-deploy.sh
+    trap ephemeral_rosa_release EXIT
+
+    echo "Provisioning ephemeral ROSA HCP cluster via bonfire"
+    ephemeral_rosa_deploy
+
+    # krkn-ai PreProcess requires CLUSTER_ID (env or --cluster-id); set from deploy output.
+    if [[ -z "${CLUSTER_ID:-}" && -f "${SHARED_DIR}/cluster-id" ]]; then
+      export CLUSTER_ID="$(tr -d '[:space:]' < "${SHARED_DIR}/cluster-id")"
+    fi
+    if [[ -z "${CLUSTER_ID:-}" ]]; then
+      echo "CLUSTER_ID is required but was not set after ephemeral deploy"
+      exit 1
+    fi
+    echo "Using CLUSTER_ID=${CLUSTER_ID}"
+
+    echo "Running osde2e hypershift tests against ephemeral cluster"
     out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --skip-destroy-cluster --skip-must-gather
 
-    echo "Copying cluster ID for krknai commands."
-    if [[ ! -f "${SHARED_DIR}/cluster-id" ]];
-    then
-        echo "'cluster-id' not found in shared dir. Cluster may not have been provisioned."
-        exit 1
-    fi
-    echo "Running krknai commands"
-    DRY_RUN=true out/osde2e krkn-ai --configs "${CONFIGS}" --secret-locations "${SECRET_LOCATIONS}" --cluster-id "$(cat "${SHARED_DIR}/cluster-id")"
-    echo "Finished osde2e pr checks on ROSA hypershift."
+    echo "Running krkn-ai (dry-run) with CLUSTER_ID"
+    export DRY_RUN=true
+    out/osde2e krkn-ai \
+      --secret-locations "${SECRET_LOCATIONS}" \
+      --configs "${CONFIGS}" \
+      --cluster-id "${CLUSTER_ID}" \
+      --skip-destroy-cluster \
+      --skip-must-gather
+    echo "Finished osde2e pr checks on ephemeral ROSA hypershift."
+
+    trap - EXIT
+    ephemeral_rosa_release
   container:
     from: src
   secrets:
@@ -63,6 +84,8 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-hypershift-credentials
     name: osde2e-hypershift-credentials
+  - mount_path: /usr/local/ci-secrets/ephemeral-cluster
+    name: bonfire-ephemeral-osci-svc-account
 - as: stage-clusters-cleanup
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
