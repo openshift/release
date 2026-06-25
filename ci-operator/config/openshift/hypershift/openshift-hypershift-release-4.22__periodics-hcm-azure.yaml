@@ -15,19 +15,21 @@ external_images:
     tag: latest
 releases:
   initial:
-    candidate:
-      product: ocp
+    release:
+      channel: fast
       relative: 1
-      stream: ci
       version: "4.22"
   initial-minor:
     release:
       channel: fast
       version: "4.21"
+  initial-zero:
+    release:
+      channel: fast
+      version: 4.22.0
   latest:
-    candidate:
-      product: ocp
-      stream: ci
+    release:
+      channel: fast
       version: "4.22"
 resources:
   '*':
@@ -41,6 +43,17 @@ tests:
     cluster_profile: hypershift-aks
     dependencies:
       OCP_IMAGE_PREVIOUS: release:initial-minor
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: ^TestUpgradeControlPlane$
+      HYPERSHIFT_AZURE_LOCATION: centralus
+    workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-upgrade-from-zero
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: hypershift-aks
+    dependencies:
+      OCP_IMAGE_PREVIOUS: release:initial-zero
     env:
       AUTH_THROUGH_CERTS: "true"
       CI_TESTS_RUN: ^TestUpgradeControlPlane$

@@ -20,8 +20,10 @@ images:
   items:
   - dockerfile_path: Containerfile
     to: osac-operator
-  - dockerfile_path: Containerfile
-    to: osac-operator-pr
+  - dockerfile_literal: |
+      FROM src
+    from: src
+    to: osac-operator-code
   - dockerfile_literal: |
       FROM osac-installer
       COPY config/ /installer/base/osac-operator/config/
@@ -34,7 +36,6 @@ images:
 promotion:
   to:
   - excluded_images:
-    - osac-operator-pr
     - osac-installer-with-pr
     name: latest
     namespace: osac-project
@@ -55,10 +56,10 @@ tests:
 - as: e2e-vmaas
   capabilities:
   - intranet
-  skip_if_only_changed: ^(README\.md|AGENTS\.md|CLAUDE\.md|docs/.*|\.ai-bot/.*|\.claude/rules/.*|\.golangci\.yml|\.yamllint\.yaml|\.pre-commit-config.*\.yaml|\.dockerignore|\.gitattributes|OWNERS|LICENSE|bin/.*)$
+  skip_if_only_changed: ^(README\.md|AGENTS\.md|CLAUDE\.md|docs/.*|\.ai-bot/.*|\.claude/.*|\.vscode/.*|\.idea/.*|\.github/.*|\.golangci\.yml|\.yamllint\.yaml|\.pre-commit-config.*\.yaml|\.dockerignore|\.gitattributes|\.gitignore|buf\.|OWNERS|LICENSE|bin/.*)$
   steps:
     dependencies:
-      COMPONENT_IMAGE: osac-operator-pr
+      COMPONENT_IMAGE: osac-operator
       OSAC_INSTALLER_IMAGE: osac-installer-with-pr
       OSAC_TEST_IMAGE: osac-test-infra
     env:

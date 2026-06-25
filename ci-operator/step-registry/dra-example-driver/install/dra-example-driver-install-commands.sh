@@ -73,7 +73,7 @@ echo "Installing dra-example-driver ${DRA_EXAMPLE_DRIVER_VERSION}..."
 GPU_PARTITION_ARGS=""
 if [ -n "${DRA_GPU_PARTITIONS:-}" ]; then
   echo "GPU partitions: ${DRA_GPU_PARTITIONS}"
-  GPU_PARTITION_ARGS="--set gpu.partitions=${DRA_GPU_PARTITIONS}"
+  GPU_PARTITION_ARGS="--set kubeletPlugin.gpuPartitions=${DRA_GPU_PARTITIONS}"
 fi
 
 helm upgrade --install \
@@ -135,6 +135,10 @@ done
 echo ""
 echo "ResourceSlices:"
 oc get resourceslice
+
+echo ""
+echo "ResourceSlice detail:"
+oc get "$(oc get resourceslice -o name | head -1)" -o yaml
 
 echo ""
 echo "========================================="

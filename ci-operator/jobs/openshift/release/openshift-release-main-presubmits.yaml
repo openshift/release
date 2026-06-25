@@ -257,6 +257,38 @@ presubmits:
     branches:
     - ^main$
     - ^main-
+    cluster: core-ci
+    context: ci/prow/cluster-manifest-verifier
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-cluster-manifest-verifier
+    rerun_command: /test cluster-manifest-verifier
+    run_if_changed: ^clusters/
+    spec:
+      containers:
+      - args:
+        - --release-repo-dir=.
+        command:
+        - cluster-manifest-verifier
+        env:
+        - name: ARGOCD_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: clientSecret
+              name: cluster-manifest-verifier-argocd
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_cluster-manifest-verifier_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )cluster-manifest-verifier,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
     cluster: build07
     context: ci/prow/clusterimageset-validate
     decorate: true

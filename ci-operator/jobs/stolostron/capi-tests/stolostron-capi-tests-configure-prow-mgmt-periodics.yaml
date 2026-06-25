@@ -11,8 +11,6 @@ periodics:
     org: stolostron
     repo: capi-tests
   labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
     ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -24,7 +22,8 @@ periodics:
       - success
       - failure
       - error
-      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      report_template: '{{if eq .Status.State "success"}}:slack-green: Job *{{.Spec.Job}}*
+        succeeded.{{else}}:failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.{{end}}
         <{{.Status.URL}}|View logs>'
   spec:
     containers:
