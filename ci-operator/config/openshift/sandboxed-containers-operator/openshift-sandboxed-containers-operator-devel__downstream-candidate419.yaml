@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
   tests-private:
     name: tests-private
     namespace: ci
@@ -7,6 +11,32 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.21
+images:
+  items:
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+      RUN microdnf install -y git tar gzip && microdnf clean all
+      RUN git clone --depth 1 --branch main \
+          https://github.com/confidential-devhub/charts /charts && \
+          rm -rf /charts/.git
+    to: trustee-charts
+  - dockerfile_literal: |
+      FROM this-is-ignored
+      USER root
+      RUN dnf install -y tar gzip jq skopeo git && dnf clean all
+      RUN curl -sL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz | tar xz && \
+          mv linux-amd64/helm /usr/local/bin/helm && \
+          rm -rf linux-amd64 && \
+          chmod +x /usr/local/bin/helm && \
+          helm version
+      USER 1000
+    from: cli
+    to: tools-with-helm
 prowgen:
   disable_sparse_checkout: true
 releases:
@@ -128,6 +158,8 @@ tests:
       TEST_RELEASE_TYPE: Pre-GA
       TEST_SCENARIOS: sig-kata.*Kata Author
       TEST_TIMEOUT: "90"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656
+      TRUSTEE_INSTALL: "true"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: coco
     workflow: sandboxed-containers-operator-e2e-azure
@@ -206,6 +238,8 @@ tests:
       TEST_RELEASE_TYPE: Pre-GA
       TEST_SCENARIOS: sig-kata.*Kata Author
       TEST_TIMEOUT: "90"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656
+      TRUSTEE_INSTALL: "true"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: coco
     workflow: sandboxed-containers-operator-e2e-aro
@@ -280,6 +314,8 @@ tests:
       TEST_RELEASE_TYPE: Pre-GA
       TEST_SCENARIOS: sig-kata.*Kata Author
       TEST_TIMEOUT: "90"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656
+      TRUSTEE_INSTALL: "true"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: coco
     workflow: sandboxed-containers-operator-e2e-aws
