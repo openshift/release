@@ -77,6 +77,16 @@ if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
   ocmtest_args+=(--reportJiraTicket)
 fi
 
+echo "=== ocmci image digest ==="
+podman pull \
+  --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+  quay.io/redhat-services-prod/ocmci/ocmci:latest
+podman inspect \
+  --format '{{index .RepoDigests 0}}' \
+  quay.io/redhat-services-prod/ocmci/ocmci:latest \
+  || echo "WARNING: failed to get ocmci image digest"
+echo "=========================="
+
 echo "Running ocmtest: ${ocmtest_args[*]}"
 exit_code=0
 podman run \
