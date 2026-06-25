@@ -4,6 +4,22 @@ This directory contains Python scripts used by slash commands in the `.claude/co
 
 ## Scripts
 
+### scaffold_step_registry.py
+
+Scaffold a new step-registry ref step (`*-ref.yaml` + `*-commands.sh`).
+
+**Used by**: `add-step-registry` skill (`.claude/skills/add-step-registry/`)
+
+**Usage**:
+```bash
+python3 .claude/scripts/scaffold_step_registry.py --name <step-name> --subdir <path> [--from cli] [--from-image-namespace NS --from-image-name NAME --from-image-tag TAG] [--documentation "..."] [--preview] [--write]
+```
+
+**Example**:
+```bash
+python3 .claude/scripts/scaffold_step_registry.py --name my-step --subdir myorg/action --write
+```
+
 ### migrate_periodic_file.py
 
 Migrates a periodic configuration file from one OpenShift release version to another.
