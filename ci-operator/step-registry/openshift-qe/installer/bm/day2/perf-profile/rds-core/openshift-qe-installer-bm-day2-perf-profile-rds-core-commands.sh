@@ -55,8 +55,13 @@ spec:
     userLevelNetworking: false
 EOF
 
-# Added a 5 minutes delay as Performance operator will take sometime to update updatedMachineCount
-sleep 300
+# Added a 5 minutes delay as Performance operator will take sometime to update updatedMachineCount in case of MNO cluster
+# Added a 15 minutes delay as SNO cluster will go for reboot after applying the performance profile
+if [[ $TYPE == "sno" ]]; then
+  sleep 900
+else
+  sleep 300
+fi
 
 kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/${MCP_NAME}= | wc -l)" --timeout=60m mcp ${MCP_NAME}
 oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
