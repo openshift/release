@@ -320,15 +320,16 @@ done
 ssh "${ssh_options[@]}" root@$BASTION_FIP '
   apt-get update &&
   apt-get install -y apache2 &&
-  systemctl enable apache2 &&
-  systemctl start apache2 &&
   echo "Configuring Web server with custom listeners on bastion" &&
-  if ! grep -q "8080" "/etc/apache2/ports.conf"; then
-     echo "Listen 8080" >> /etc/apache2/ports.conf
-  fi &&
-  if ! grep -q "8443" "/etc/apache2/ports.conf"; then
+  # Move apache2 off ports 80/443 so HAProxy can bind them (same intent as RHEL httpd sed).
+  sed -i "s/^Listen 80$/Listen 8080/" /etc/apache2/ports.conf &&
+  sed -i "s/^Listen 443$/Listen 8443/" /etc/apache2/ports.conf &&
+  if ! grep -q "^Listen 8443$" /etc/apache2/ports.conf; then
      echo "Listen 8443" >> /etc/apache2/ports.conf
   fi &&
+  sed -i "s/<VirtualHost \*:80>/<VirtualHost *:8080>/" /etc/apache2/sites-enabled/000-default.conf &&
+  a2dissite default-ssl 2>/dev/null || true &&
+  systemctl enable apache2 &&
   systemctl restart apache2 &&
   systemctl status apache2 --no-pager
 '
@@ -348,6 +349,17 @@ ssh "${ssh_options[@]}" root@$BASTION_FIP "apt-get install -y haproxy ; systemct
 # Configiring HAProxy on Bastion
 echo "Configuring HAProxy on Bastion"
 cat <<HAPROXY_CFG > haproxy.cfg
+global
+   daemon
+   maxconn 4096
+
+defaults
+   log global
+   mode tcp
+   timeout connect 5000ms
+   timeout client 50000ms
+   timeout server 50000ms
+
 listen stats
    bind :9000
    mode http
@@ -386,10 +398,11 @@ done
 
 # Sending haproxy file to bastion and restarting the service
 scp "${ssh_options[@]}" haproxy.cfg root@$BASTION_FIP:/etc/haproxy/haproxy.cfg
-ssh "${ssh_options[@]}" root@$BASTION_FIP "systemctl restart haproxy"
+ssh "${ssh_options[@]}" root@$BASTION_FIP "haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl restart haproxy"
 ssh "${ssh_options[@]}" root@$BASTION_FIP "systemctl is-active --quiet haproxy"
 if [ $? -ne 0 ]; then
   echo 'HAProxy configuration failed, haproxy serivce not running'
+  ssh "${ssh_options[@]}" root@$BASTION_FIP "journalctl -u haproxy --no-pager -n 50"
   exit 1
 else
   echo 'HAProxy configuration succeeded'
