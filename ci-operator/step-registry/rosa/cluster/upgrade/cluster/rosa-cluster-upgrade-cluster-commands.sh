@@ -14,6 +14,7 @@ cluster_id=$(head -n 1 "${SHARED_DIR}/cluster-id")
 HOSTED_CP=${HOSTED_CP:-false}
 UPGRADED_TO_VERSION=${UPGRADED_TO_VERSION:-}
 UPGRADE_CHANNEL=${UPGRADE_CHANNEL:-}
+UPGRADE_CHANNEL_PREFIX=${UPGRADE_CHANNEL_PREFIX:-candidate}
 CLUTER_UPGRADE_TIMEOUT=${CLUTER_UPGRADE_TIMEOUT:-"14400"}
 NODE_UPGRADE_TIMEOUT=${NODE_UPGRADE_TIMEOUT:-"7200"}
 
@@ -320,11 +321,20 @@ if [[ "$HOSTED_CP" == "true" ]]; then
   HCP_SWITCH="--control-plane"
 fi
 
-if [[ -z "${UPGRADED_TO_VERSION}" ]]; then
-  log "The UPGRADED_TO_VERSION is mandatory!"
-  exit 1
-fi
 current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
+
+# Auto-derive upgrade target from the cluster's current version when not explicitly set
+if [[ -z "${UPGRADED_TO_VERSION}" ]]; then
+  current_x=$(echo "$current_version" | cut -d '.' -f1)
+  current_y=$(echo "$current_version" | cut -d '.' -f2)
+  UPGRADED_TO_VERSION="${current_x}.$((current_y + 1))"
+  log "Auto-derived upgrade target: ${UPGRADED_TO_VERSION}"
+fi
+if [[ -z "${UPGRADE_CHANNEL}" ]]; then
+  UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${UPGRADED_TO_VERSION}"
+  log "Auto-derived upgrade channel: ${UPGRADE_CHANNEL}"
+fi
+
 if [[ "$current_version" == "$UPGRADED_TO_VERSION" ]]; then
   log "The cluster has been in the version $UPGRADED_TO_VERSION"
   exit 1
