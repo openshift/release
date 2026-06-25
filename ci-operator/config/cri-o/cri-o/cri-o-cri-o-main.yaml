@@ -73,7 +73,16 @@ tests:
     cluster_profile: openshift-org-gcp
     env:
       OS_IMAGE_STREAM: rhel-9
-    workflow: openshift-e2e-gcp
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: openshift-manifests-runc
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-gcp-post
 - always_run: false
   as: perfscale-control-plane-6nodes
   steps:
