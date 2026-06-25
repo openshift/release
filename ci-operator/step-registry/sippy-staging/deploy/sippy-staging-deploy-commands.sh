@@ -74,16 +74,19 @@ CONFEOF
   PROXY_PORT=8081
   echo "    httpd started on port ${PROXY_PORT}."
 else
-  echo "    WARNING: htpasswd file not found, running without auth."
-  PROXY_PORT=8080
+  echo "ERROR: htpasswd file not found. Refusing to run without auth."
+  exit 1
 fi
 
 echo "==> Starting cloudflared tunnel..."
 cloudflared tunnel --url http://localhost:${PROXY_PORT} > /tmp/cloudflared.log 2>&1 &
 
-sleep 10
-
-TUNNEL_URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log | head -1 || true)
+TUNNEL_URL=""
+for _ in $(seq 1 12); do
+  TUNNEL_URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/cloudflared.log | head -1 || true)
+  [[ -n "${TUNNEL_URL}" ]] && break
+  sleep 5
+done
 MINUTES=$(( STAGING_TIMEOUT / 60 ))
 EXPIRES_AT=$(date -u -d "+${STAGING_TIMEOUT} seconds" '+%H:%M UTC')
 
@@ -153,6 +156,8 @@ HTMLEOF
 
   # --- Post PR comment via gh CLI ---
   echo "==> Posting staging URL to PR ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER}..."
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
   GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token" 2>/dev/null || true)
 
   if [[ -z "${GITHUB_TOKEN}" ]]; then
@@ -175,6 +180,7 @@ This environment is built from this PR and will remain available for approximate
       echo "    (Expected for rehearsal jobs on repos where trt-agent-gh-app is not installed.)"
     fi
   fi
+  $WAS_TRACING && set -x
 fi
 
 if [[ "${URL_SURFACED}" != "true" ]]; then
