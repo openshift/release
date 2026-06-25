@@ -31,6 +31,182 @@ The [sandboxed-containers-operator-env-cm](./env-cm/) step creates the osc-confi
 
 Currently not all parameters are enabled. In particular, only GA release type is supported, meaning it doesn't install development builds of OSC.
 
+### sandboxed-containers-operator-install-trustee-operator
+
+The [sandboxed-containers-operator-install-trustee-operator](./install-trustee-operator/) step installs the Trustee operator for Confidential Containers (CoCo) workloads. This step is only needed for CoCo tests.
+
+## Catalog Source Configuration
+
+Both OSC and Trustee operators can be installed from different catalog sources depending on whether you're testing pre-release builds or using production catalogs.
+
+### OSC Catalog Source
+
+Controlled by environment variables in job configurations:
+
+- **`CATALOG_SOURCE_NAME`** - Name of the CatalogSource to use
+  - Default: `"redhat-operators"` (production catalog)
+  - For testing: `"brew-catalog"` or custom names
+
+- **`CATALOG_SOURCE_IMAGE`** - Custom FBC (File-Based Catalog) image
+  - Default: `""` (empty, uses existing catalog specified by `CATALOG_SOURCE_NAME`)
+  - For testing: `"quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest"`
+
+**Behavior:**
+- If `CATALOG_SOURCE_IMAGE` is empty: uses existing catalog specified by `CATALOG_SOURCE_NAME`
+- If `CATALOG_SOURCE_IMAGE` is set: creates a new CatalogSource with that image
+
+### Trustee Catalog Source
+
+Controlled by the Trustee helm chart and `TRUSTEE_CATALOG_SOURCE_IMAGE` environment variable:
+
+- **`TRUSTEE_CATALOG_SOURCE_IMAGE`** - Custom FBC image for Trustee operator
+  - Default: `""` (empty)
+  - For testing: `"quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656"`
+
+**Behavior:**
+- If `TRUSTEE_CATALOG_SOURCE_IMAGE` is **empty**:
+  - Helm chart sets `dev.enabled=false`
+  - Uses existing `redhat-operators` CatalogSource (production)
+  - No new CatalogSource is created
+
+- If `TRUSTEE_CATALOG_SOURCE_IMAGE` is **set**:
+  - Helm chart sets `dev.enabled=true`
+  - Creates new CatalogSource named `trustee-operator-dev-catalog` (hardcoded in helm chart)
+  - Uses the specified custom image
+  - **Note:** CatalogSource name cannot be overridden - it's always `trustee-operator-dev-catalog`
+
+**Example job configuration for CoCo testing:**
+
+```yaml
+tests:
+- as: azure-ipi-coco
+  steps:
+    env:
+      # OSC operator catalog
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
+      CATALOG_SOURCE_NAME: brew-catalog
+
+      # Trustee operator catalog (CatalogSource name is hardcoded to trustee-operator-dev-catalog)
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656
+      TRUSTEE_INSTALL: "true"
+
+      # Test configuration
+      WORKLOAD_TO_TEST: coco
+      ENABLEPEERPODS: "true"
+      RUNTIMECLASS: kata-remote
+```
+
+**Why the different approaches?**
+- OSC workflow was designed with flexibility to use any catalog name
+- Trustee uses upstream helm charts from [confidential-devhub/charts](https://github.com/confidential-devhub/charts) which hardcode the dev CatalogSource name
+- This keeps Trustee CI aligned with upstream tooling
+
+### Image Tag Resolution: `:latest` vs Specific Build Tags
+
+Catalog images can be referenced using different tag strategies with distinct tradeoffs:
+
+#### Using `:latest` Tags
+
+```yaml
+CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
+```
+
+**How it resolves:**
+1. At job execution time, container runtime queries Quay.io registry
+2. Registry returns the current image digest that `:latest` points to
+3. That specific digest is pulled and used for the job
+4. Different jobs can get different images if builds happen between runs
+
+**Managed by:** Konflux/RHTAP automatically updates `:latest` after each successful build
+
+**Advantages:**
+- ✅ Automatically tests newest builds without config changes
+- ✅ Good for continuous validation of rolling builds
+- ✅ No manual maintenance needed
+
+**Disadvantages:**
+- ❌ Non-reproducible (different runs may use different builds)
+- ❌ Hard to bisect regressions ("which build broke this?")
+- ❌ Can break unexpectedly if bad build gets tagged
+
+#### Using Specific Build Tags
+
+```yaml
+TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656
+```
+
+**Tag format:** `<version>-<konflux-build-id>`
+- Version: `1.1.0` (semantic version from project)
+- Build ID: `1776506656` (Konflux pipeline run identifier)
+
+**How it resolves:**
+- Tag is **immutable** - always points to the same image digest
+- Never changes after creation
+- Reproducible across all job runs
+
+**Advantages:**
+- ✅ Reproducible test results
+- ✅ Easy to bisect issues (pin to specific builds)
+- ✅ Stable - won't break from new builds
+- ✅ Direct traceability to Konflux pipeline runs
+
+**Disadvantages:**
+- ❌ Requires manual config updates to test new builds
+- ❌ Can become stale if not maintained
+
+#### How Konflux Creates Multiple Tags
+
+When a catalog build completes in Konflux, multiple tags point to the same image:
+
+```bash
+# All these reference the same image digest:
+quay.io/.../osc-test-fbc:latest              # Moves to newest build
+quay.io/.../osc-test-fbc:1.2.0-1776506656   # Immutable build-specific tag
+quay.io/.../osc-test-fbc:1.2.0              # Moves within version series
+quay.io/.../osc-test-fbc:sha256-abc123...   # Direct digest reference
+```
+
+#### Finding Specific Build Tags
+
+To find the current build tag that `:latest` points to:
+
+```bash
+# Option 1: Query Quay.io API
+curl -s https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc/tag/ | \
+  jq -r '.tags[] | select(.name | startswith("1.1.0")) | .name' | sort -V | tail -5
+
+# Option 2: Pull and inspect
+podman pull quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:latest
+podman inspect quay.io/.../trustee-test-fbc:latest | jq '.[0].RepoTags[]'
+
+# Option 3: Check Konflux pipeline runs
+# Navigate to Konflux UI → Application → Component → Pipeline Runs
+# Find successful run ID and use format: <version>-<pipeline-run-id>
+```
+
+#### Strategy Comparison
+
+| Aspect | `:latest` | `1.1.0-1776506656` (Specific build) |
+|--------|----------------|------------------------------|
+| **Resolution** | Dynamic (query registry each time) | Static (immutable) |
+| **Reproducibility** | ❌ Different builds over time | ✅ Always same build |
+| **Maintenance** | Automatic | Manual updates |
+| **Traceability** | Hard (logs needed) | Easy (build ID in tag) |
+| **Use Case** | Daily/nightly rolling tests | Stable/release validation |
+
+#### When to Use Each Strategy
+
+**Use `:latest` when:**
+- Running frequent jobs (daily/nightly) that should pick up new builds automatically
+- Testing the latest code is more important than reproducibility
+- You have good monitoring/alerting for failures
+
+**Use specific build tags when:**
+- You need reproducible results for debugging
+- Testing specific release candidates or milestones
+- You want to correlate failures to specific builds
+- Running less frequently (weekly/release gates)
+
 ## Chains
 
 Here is the list of chains.
@@ -209,7 +385,7 @@ for ``Running step launch-cucushift-installer-wait.`` line
 in there. Once it shows there the cluster is ready and waiting
 for you for the specified amount of time.
 
-Getting access to your testing cluster is slightly harder as first 
+Getting access to your testing cluster is slightly harder as first
 you need to get to the ``main build OCP``. To do so:
 
 1. open the ``job started...`` link by clusterbot
