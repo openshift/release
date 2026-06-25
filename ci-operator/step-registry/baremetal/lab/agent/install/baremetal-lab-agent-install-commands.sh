@@ -8,7 +8,8 @@ set -o nounset
 # Trap to kill children processes
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 # Save exit code for must-gather to generate junit
-trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
 [ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
