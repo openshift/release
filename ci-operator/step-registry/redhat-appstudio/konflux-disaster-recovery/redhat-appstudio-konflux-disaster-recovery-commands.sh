@@ -111,6 +111,22 @@ GIT_CREDS_PATH="${HOME}/creds/file"
 git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
 echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
+# Set UPGRADE_BRANCH and UPGRADE_FORK_ORGANIZATION for the backwards-compat
+# DR test's Konflux upgrade phase (performKonfluxUpgrade).
+export UPGRADE_BRANCH UPGRADE_FORK_ORGANIZATION
+
+if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
+    UPGRADE_BRANCH=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PULL_NUMBER}" | jq -r .head.ref)
+    REPO_URL=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PULL_NUMBER}" | jq -r .head.repo.html_url)
+    UPGRADE_FORK_ORGANIZATION=$(echo "$REPO_URL" | sed 's|https://github.com/||' | sed 's|/infra-deployments||')
+else
+    UPGRADE_BRANCH=main
+    UPGRADE_FORK_ORGANIZATION=redhat-appstudio
+fi
+
+echo "[INFO] UPGRADE_BRANCH: $UPGRADE_BRANCH"
+echo "[INFO] UPGRADE_FORK_ORGANIZATION: $UPGRADE_FORK_ORGANIZATION"
+
 # Clone infra-deployments for DR test code
 # TODO(manish-jangra): revert to upstream/main once infra-deployments PR is merged
 INFRA_DIR="/tmp/infra-deployments"
