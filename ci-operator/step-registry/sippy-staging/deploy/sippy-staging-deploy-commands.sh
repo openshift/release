@@ -66,37 +66,94 @@ echo ""
 echo "============================================================"
 echo ""
 
-if [[ -n "${TUNNEL_URL}" && "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
-  echo "==> Posting staging URL to PR #${PULL_NUMBER}..."
-  GH_APP_DIR="/var/run/github-token"
-  if [[ -f "${GH_APP_DIR}/app-id" && -f "${GH_APP_DIR}/private-key" && -f "${GH_APP_DIR}/openshift-installation-id" ]]; then
-    set +x
-    APP_ID=$(cat "${GH_APP_DIR}/app-id")
-    PRIVATE_KEY="${GH_APP_DIR}/private-key"
-    INSTALL_ID=$(cat "${GH_APP_DIR}/openshift-installation-id")
-    NOW=$(date +%s)
-    HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-    PAYLOAD=$(echo -n "{\"iat\":$((NOW - 60)),\"exp\":$((NOW + 600)),\"iss\":\"${APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-    SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "${PRIVATE_KEY}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-    GITHUB_TOKEN=$(curl -sf -X POST \
-      -H "Authorization: Bearer ${HEADER}.${PAYLOAD}.${SIGNATURE}" \
-      -H "Accept: application/vnd.github+json" \
-      "https://api.github.com/app/installations/${INSTALL_ID}/access_tokens" \
-      | jq -r '.token')
+MINUTES=$(( STAGING_TIMEOUT / 60 ))
+URL_SURFACED=false
 
-    MINUTES=$(( STAGING_TIMEOUT / 60 ))
-    COMMENT_BODY=$(jq -n --arg url "${TUNNEL_URL}" --arg min "${MINUTES}" \
-      '{body: "### Sippy Staging Environment\n\n**URL:** \($url)\n\nThis environment is built from this PR and will remain available for approximately \($min) minutes."}')
+if [[ -n "${TUNNEL_URL}" ]]; then
+  # --- Upload HTML to GCS for Spyglass visibility ---
+  GCS_SA="/tmp/gcs/service-account.json"
+  if [[ -f "${GCS_SA}" ]]; then
+    echo "==> Uploading staging URL to Spyglass..."
+    if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
+      GCS_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/staging/sippy-staging-deploy"
+    else
+      GCS_PATH="logs/${JOB_NAME}/${BUILD_ID}/artifacts/staging/sippy-staging-deploy"
+    fi
 
-    curl -sf -X POST \
-      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-      -H "Accept: application/vnd.github+json" \
-      "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PULL_NUMBER}/comments" \
-      -d "${COMMENT_BODY}" > /dev/null && echo "    Comment posted." || echo "    WARNING: Failed to post comment."
-    set -x
+    cat > /tmp/custom-link-staging.html <<HTMLEOF
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Sippy Staging</title></head>
+<body style="font-family: system-ui, sans-serif; padding: 20px;">
+<h2>Sippy Staging Environment</h2>
+<p><strong>URL:</strong> <a href="${TUNNEL_URL}" target="_blank">${TUNNEL_URL}</a></p>
+<p>This environment is built from this PR and will remain available for approximately ${MINUTES} minutes.</p>
+</body>
+</html>
+HTMLEOF
+
+    if gcloud auth activate-service-account --quiet --key-file "${GCS_SA}" 2>/dev/null && \
+       gsutil -q cp /tmp/custom-link-staging.html "gs://test-platform-results/${GCS_PATH}/custom-link-staging.html"; then
+      echo "    Uploaded to Spyglass."
+      URL_SURFACED=true
+    else
+      echo "    WARNING: Failed to upload to GCS."
+    fi
   else
-    echo "    WARNING: GitHub App credentials not found, skipping PR comment."
+    echo "==> GCS credentials not found, skipping Spyglass upload."
   fi
+
+  # --- Post PR comment via GitHub App ---
+  if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
+    echo "==> Posting staging URL to PR ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER}..."
+    GH_APP_DIR="/var/run/github-token"
+    if [[ -f "${GH_APP_DIR}/app-id" && -f "${GH_APP_DIR}/private-key" && -f "${GH_APP_DIR}/openshift-installation-id" ]]; then
+      set +x
+      APP_ID=$(cat "${GH_APP_DIR}/app-id")
+      PRIVATE_KEY="${GH_APP_DIR}/private-key"
+      INSTALL_ID=$(cat "${GH_APP_DIR}/openshift-installation-id")
+      NOW=$(date +%s)
+      HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+      PAYLOAD=$(echo -n "{\"iat\":$((NOW - 60)),\"exp\":$((NOW + 600)),\"iss\":\"${APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+      SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "${PRIVATE_KEY}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+      TOKEN_RESPONSE=$(curl -s -X POST \
+        -H "Authorization: Bearer ${HEADER}.${PAYLOAD}.${SIGNATURE}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/${INSTALL_ID}/access_tokens" 2>&1)
+      GITHUB_TOKEN=$(echo "${TOKEN_RESPONSE}" | jq -r '.token // empty')
+      set -euo pipefail
+
+      if [[ -z "${GITHUB_TOKEN}" ]]; then
+        echo "    WARNING: Failed to generate GitHub token, skipping PR comment."
+        echo "    (Expected for rehearsal jobs on repos where trt-agent-gh-app is not installed.)"
+      else
+        COMMENT_BODY=$(jq -n --arg url "${TUNNEL_URL}" --arg min "${MINUTES}" \
+          '{body: "### Sippy Staging Environment\n\n**URL:** \($url)\n\nThis environment is built from this PR and will remain available for approximately \($min) minutes."}')
+        COMMENT_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${PULL_NUMBER}/comments" \
+          -d "${COMMENT_BODY}" 2>&1)
+        HTTP_CODE=$(echo "${COMMENT_RESPONSE}" | tail -1)
+        if [[ "${HTTP_CODE}" == "201" ]]; then
+          echo "    Comment posted to ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER}."
+          URL_SURFACED=true
+        else
+          echo "    WARNING: Failed to post comment (HTTP ${HTTP_CODE})."
+          echo "    (Expected for rehearsal jobs on repos where trt-agent-gh-app is not installed.)"
+        fi
+      fi
+    else
+      echo "    WARNING: GitHub App credentials not found, skipping PR comment."
+    fi
+  fi
+fi
+
+if [[ "${URL_SURFACED}" != "true" ]]; then
+  echo "ERROR: Could not surface staging URL via Spyglass or PR comment. Shutting down."
+  kill "${TUNNEL_PID}" 2>/dev/null || true
+  kill "${SIPPY_PID}" 2>/dev/null || true
+  exit 1
 fi
 
 echo "==> Staging environment is live. Sleeping for ${STAGING_TIMEOUT} seconds..."
