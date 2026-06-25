@@ -1,0 +1,36 @@
+ref:
+  as: rosa-hyperfleet-teardown
+  from_image:
+    namespace: ci
+    name: rosa-hyperfleet-ci
+    tag: latest
+  commands: rosa-hyperfleet-teardown-commands.sh
+  timeout: 3600s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: rosa-regional-platform-ephemeral-creds
+    mount_path: /var/run/rosa-credentials
+  env:
+  - name: AWS_CONFIG_FILE
+    default: "/var/run/rosa-credentials/aws_config"
+    documentation: |-
+      Path to the AWS CLI config file with named profiles from the mounted
+      credential secret.
+  - name: ROSA_REGIONAL_TEARDOWN_FIRE_AND_FORGET
+    default: "true"
+    documentation: |-
+      When "true", teardown runs asynchronously (fire-and-forget) so the job
+      finishes quickly. Set to "false" for full synchronous teardown (nightly jobs).
+  - name: ROSA_REGIONAL_PLATFORM_REF
+    default: "main"
+    documentation: |-
+      Git ref of openshift-online/rosa-hyperfleet to clone for teardown.
+  documentation: |-
+    Tears down an ephemeral rosa-hyperfleet environment provisioned
+    by the rosa-hyperfleet-provision step. Defaults to fire-and-forget
+    mode; set ROSA_REGIONAL_TEARDOWN_FIRE_AND_FORGET=false for synchronous
+    teardown.
