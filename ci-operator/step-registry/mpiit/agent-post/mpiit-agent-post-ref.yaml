@@ -1,0 +1,39 @@
+ref:
+  as: mpiit-agent-post
+  from: mpiit-agent-post-runner
+  commands: mpiit-agent-post-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  timeout: 900s
+  best_effort: true
+  credentials:
+  - namespace: test-credentials
+    name: mpiit-agent-post
+    mount_path: /var/run/ci-secrets/mpiit-agent-post
+  env:
+  - name: PI_MODEL
+    default: "cursor/claude-sonnet"
+    documentation: Model to use for the Pi orchestrator agent.
+  - name: PI_TIMEOUT
+    default: "600"
+    documentation: Execution timeout in seconds for the Pi orchestrator.
+  - name: CONVERGENCE_MAX_ROUNDS
+    default: "6"
+    documentation: Maximum number of convergence rounds for multi-agent agreement.
+  - name: CONVERGENCE_CONFIDENCE_THRESHOLD
+    default: "0.7"
+    documentation: Confidence threshold (0-1) for agent convergence agreement.
+  documentation: |-
+    Runs the Pi-based multi-agent triage system as a post-step after firewatch.
+    Reads firewatch-created Jira tickets from SHARED_DIR, orchestrates
+    Chai Bot and Sourcebot agents in a convergence protocol, and posts
+    root cause analysis back to Jira.
+
+    Requires the mpiit-agent-post-runner image (built from
+    https://github.com/CSPI-QE/mpiit-agent-post) and the mpiit-agent-post
+    Vault secret in test-credentials containing API keys for Cursor,
+    Chai MCP, and Sourcebot MCP.
+
+    This step is best_effort=true so it never blocks the pipeline.
