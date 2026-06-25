@@ -33,10 +33,40 @@ tests:
   container:
     from: operator-sdk-vcf
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+- as: fmt
+  commands: NO_DOCKER=1 make fmt && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+- as: generate
+  commands: NO_DOCKER=1 make generate && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+- as: lint
+  commands: NO_DOCKER=1 make lint
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+- as: manifests
+  commands: NO_DOCKER=1 make manifests && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
 - as: unit
   commands: make test
   container:
     from: src
+- as: vendor
+  commands: NO_DOCKER=1 make vendor && make verify-diff
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+- as: vet
+  commands: NO_DOCKER=1 make vet
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
 zz_generated_metadata:
   branch: main
   org: openshift
