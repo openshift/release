@@ -34,6 +34,46 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: rosa-classic-sts-upgrade-staging-4-18-to-4-19
+  cron: 0 2 * * 4
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_TOPOLOGY: classic
+      HOSTED_CP: "false"
+      LABEL_FILTER: Platform:Classic
+      MULTI_AZ: "false"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.18"
+      REPLICAS: "2"
+      STS: "true"
+      UPGRADE_CHANNEL: candidate-4.19
+      UPGRADED_TO_VERSION: "4.19"
+    test:
+    - ref: rosa-cluster-upgrade-cluster
+    - ref: rosa-e2e-test
+    workflow: rosa-e2e-classic
+- as: rosa-classic-sts-upgrade-staging-4-19-to-4-20
+  cron: 0 2 * * 2
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_TOPOLOGY: classic
+      HOSTED_CP: "false"
+      LABEL_FILTER: Platform:Classic
+      MULTI_AZ: "false"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.19"
+      REPLICAS: "2"
+      STS: "true"
+      UPGRADE_CHANNEL: candidate-4.20
+      UPGRADED_TO_VERSION: "4.20"
+    test:
+    - ref: rosa-cluster-upgrade-cluster
+    - ref: rosa-e2e-test
+    workflow: rosa-e2e-classic
 - as: rosa-classic-sts-upgrade-staging-4-20-to-4-21
   cron: 0 2 * * 0
   steps:
@@ -54,6 +94,52 @@ tests:
     - ref: rosa-cluster-upgrade-cluster
     - ref: rosa-e2e-test
     workflow: rosa-e2e-classic
+- as: rosa-hcp-upgrade-staging-4-18-to-4-19
+  cron: 30 2 * * 5
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      MULTI_AZ: "false"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.18"
+      REGION: us-west-2
+      REPLICAS: "2"
+      UPGRADE_CHANNEL: candidate-4.19
+      UPGRADED_TO_VERSION: "4.19"
+      ZONES_COUNT: "1"
+    test:
+    - ref: rosa-cluster-upgrade-hcp
+    - ref: rosa-cluster-upgrade-machinepool
+    - ref: rosa-e2e-test
+    workflow: rosa-e2e-hcp
+- as: rosa-hcp-upgrade-staging-4-19-to-4-20
+  cron: 30 2 * * 3
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      MULTI_AZ: "false"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.19"
+      REGION: us-west-2
+      REPLICAS: "2"
+      UPGRADE_CHANNEL: candidate-4.20
+      UPGRADED_TO_VERSION: "4.20"
+      ZONES_COUNT: "1"
+    test:
+    - ref: rosa-cluster-upgrade-hcp
+    - ref: rosa-cluster-upgrade-machinepool
+    - ref: rosa-e2e-test
+    workflow: rosa-e2e-hcp
 - as: rosa-hcp-upgrade-staging-4-20-to-4-21
   cron: 30 2 * * 1
   steps:
