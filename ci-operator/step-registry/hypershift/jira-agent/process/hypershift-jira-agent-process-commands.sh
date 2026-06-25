@@ -12,43 +12,59 @@ fi
 # State file for sharing results with report step
 STATE_FILE="${SHARED_DIR}/processed-issues.txt"
 
-# Clone ai-helpers repository (contains /jira-solve command)
-echo "Cloning ai-helpers repository..."
-git clone https://github.com/openshift-eng/ai-helpers /tmp/ai-helpers
-
 # Clone HyperShift fork (we push here and create PRs to upstream)
 echo "Cloning HyperShift repository..."
 git clone https://github.com/hypershift-community/hypershift /tmp/hypershift
 
-# Copy jira-solve command from ai-helpers to hypershift
-echo "Setting up Claude commands..."
-mkdir -p /tmp/hypershift/.claude/commands
-cp /tmp/ai-helpers/plugins/jira/commands/solve.md /tmp/hypershift/.claude/commands/jira-solve.md
+cd /tmp/hypershift
 
-# Check if code-review plugin is available for Phase 2
-REVIEW_PLUGIN_DIR="/tmp/ai-helpers/plugins/code-review"
-if [ ! -d "${REVIEW_PLUGIN_DIR}/.claude-plugin" ]; then
-  echo "ERROR: code-review plugin not found at ${REVIEW_PLUGIN_DIR}/.claude-plugin"
-  exit 1
-fi
-echo "Code-review plugin found"
+# Force HTTPS for all github.com git operations (plugin install defaults to SSH which lacks host keys in CI)
+git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+# Install openshift-developer plugin bundle (provides jira, code-review, and PR skills)
+echo "Installing openshift-developer plugin bundle..."
+claude plugin marketplace add openshift-eng/ai-helpers
+claude plugin install gopls-lsp@ai-helpers
+claude plugin install openshift-developer@ai-helpers
 
 # Install tool dependencies
 echo "Installing tool dependencies..."
 GOFLAGS="" go install golang.org/x/tools/gopls@v0.21.0
 python3.9 -m ensurepip --user 2>/dev/null || true
-python3.9 -m pip install --user pre-commit 2>&1 | tail -1
+python3.9 -m pip install --user pre-commit gitlint 2>&1 | tail -1
 export PATH="${GOPATH:-$HOME/go}/bin:$HOME/.local/bin:$PATH"
 
-# Install plugins
-echo "Installing Claude Code plugins..."
-claude plugin marketplace add openshift-eng/ai-helpers
-claude plugin install utils@ai-helpers
-claude plugin install golang@ai-helpers
-claude plugin marketplace add enxebre/ai-scripts
-claude plugin install git@enxebre
+# Validate dependencies are available
+echo ""
+echo "=== Validating Claude environment ==="
+VALIDATION_FAILED=false
 
-cd /tmp/hypershift
+for tool in gopls pre-commit gitlint; do
+  if command -v "$tool" &>/dev/null; then
+    echo "  ✅ Tool: ${tool}"
+  else
+    echo "  ❌ Tool: ${tool} not found in PATH"
+    VALIDATION_FAILED=true
+  fi
+done
+
+SKILL_LIST=$(claude -p "list your available slash commands" --max-turns 1 --allowedTools "" 2>/dev/null || true)
+for skill in "jira:solve" "code-review:pre-commit-review" "openshift-developer:address-review-precommit" "openshift-developer:create-pr"; do
+  if echo "$SKILL_LIST" | grep -q "$skill"; then
+    echo "  ✅ Skill: /${skill}"
+  else
+    echo "  ❌ Skill: /${skill} not found"
+    VALIDATION_FAILED=true
+  fi
+done
+
+if [[ "$VALIDATION_FAILED" == true ]]; then
+  echo ""
+  echo "ERROR: Claude environment validation failed — see above"
+  exit 1
+fi
+echo "=== All dependencies validated ==="
+echo ""
 
 # Configure git
 git config user.name "OpenShift CI Bot"
@@ -175,7 +191,7 @@ else
   echo "Slack notifications will be skipped"
   SLACK_WEBHOOK_URL=""
 fi
-$_SLACK_WAS_TRACING && set -x
+$_SLACK_WAS_TRACING && set -x || true
 
 # Load GitHub-to-Slack user ID mapping
 GITHUB_SLACK_MAP_FILE="/var/run/claude-code-service-account/gh-to-slack-ids"
@@ -317,7 +333,7 @@ send_slack_notification() {
     "$SLACK_WEBHOOK_URL")
   local CURL_EXIT_CODE=$?
   set -e
-  $_was_tracing && set -x
+  $_was_tracing && set -x || true
 
   if [ $CURL_EXIT_CODE -ne 0 ]; then
     echo "   Warning: Failed to send Slack notification (curl exit $CURL_EXIT_CODE)"
@@ -395,26 +411,22 @@ while IFS= read -r line; do
   echo "Summary: $ISSUE_SUMMARY"
   echo "=========================================="
 
-  # Run jira-solve command non-interactively using --system-prompt
-  # (Claude's -p mode doesn't support slash commands directly)
   TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-  echo "Running: jira-solve $ISSUE_KEY origin --ci"
+  echo "Running: /jira:solve $ISSUE_KEY origin --ci"
 
   PHASE1_START=$(date +%s)
 
-  # Load the skill content as system prompt
-  SKILL_CONTENT=$(cat /tmp/hypershift/.claude/commands/jira-solve.md)
-
-  # Additional context for fork-based workflow
-  # Git push uses fork token (configured via credential helper), gh CLI uses upstream token (GITHUB_TOKEN env var)
-  FORK_CONTEXT="IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After creating commits on your feature branch, push the branch to origin. Do NOT create a Pull Request - the PR will be created in a subsequent automated step after code review. SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'. ${SUBAGENT_PROMPT}"
+  SECURITY_PROMPT="SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
+  SOLVE_PROMPT="/jira:solve ${ISSUE_KEY} origin --ci
+IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After creating commits on your feature branch, push the branch to origin. Do NOT create a Pull Request - the PR will be created in a subsequent automated step after code review.
+${SECURITY_PROMPT}
+${SUBAGENT_PROMPT}"
 
   set +e  # Don't exit on error for individual issues
   echo "Starting Claude processing with streaming output..."
-  claude -p "$ISSUE_KEY origin --ci. $FORK_CONTEXT" \
-    --system-prompt "$SKILL_CONTENT" \
-    --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
+  claude -p "$SOLVE_PROMPT" \
+    --allowedTools "Bash Read Write Edit Grep Glob WebFetch Skill" \
     --max-turns 300 \
     --effort max \
     --model "$CLAUDE_MODEL" \
@@ -479,9 +491,8 @@ while IFS= read -r line; do
 
       set +e
       claude -p "$REVIEW_PROMPT" \
-        --plugin-dir "${REVIEW_PLUGIN_DIR}" \
         --append-system-prompt "SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'. ${SUBAGENT_PROMPT}" \
-        --allowedTools "Bash Read Grep Glob Task" \
+        --allowedTools "Bash Read Grep Glob Task Skill" \
         --max-turns 225 \
         --effort max \
         --model "$CLAUDE_MODEL" \
@@ -551,22 +562,14 @@ while IFS= read -r line; do
       PHASE3_START=$(date +%s)
 
       if [ -n "$REVIEW_FINDINGS" ]; then
-        FIX_PROMPT="A code review was performed on the changes in the current branch. Below are the review findings. Address all actions and improvements by editing the code. After making all fixes, commit the changes (amend existing commits or create new commits as appropriate) and push the branch to origin.
-
-REVIEW FINDINGS:
-${REVIEW_FINDINGS}
-
-IMPORTANT:
-- Fix every issue identified in the review — all actions and improvements.
-- Run 'make test' and 'make verify' after fixes to verify nothing is broken.
-- If 'make verify' generates new files, commit those too and run 'make verify' again to confirm it passes.
-- Commit all fixes and push to origin.
-- SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'.
-- ${SUBAGENT_PROMPT}"
+        SECURITY_PROMPT="SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
+        FIX_PROMPT="/openshift-developer:address-review-precommit ${REVIEW_FINDINGS}
+${SECURITY_PROMPT}
+${SUBAGENT_PROMPT}"
 
         set +e
         claude -p "$FIX_PROMPT" \
-          --allowedTools "Bash Read Write Edit Grep Glob" \
+          --allowedTools "Bash Read Write Edit Grep Glob Skill" \
           --max-turns 225 \
           --effort max \
           --model "$CLAUDE_MODEL" \
@@ -641,23 +644,14 @@ IMPORTANT:
 
       PHASE4_START=$(date +%s)
 
-      PR_PROMPT="Create a pull request for the changes on branch '${BRANCH_NAME}'. Details:
-- Jira issue: ${ISSUE_KEY}
-- Jira summary: ${ISSUE_SUMMARY}
-- Jira URL: https://redhat.atlassian.net/browse/${ISSUE_KEY}
-- Read the PR template at .github/PULL_REQUEST_TEMPLATE.md and use it to structure the PR body.
-- Use 'git log main..HEAD' to understand what changed and write a meaningful description.
-- PR title must start with '${ISSUE_KEY}: '.
-- The PR body MUST end with the following two lines:
-  Always review AI generated responses prior to use.
-  Generated with [Claude Code](https://claude.com/claude-code) via \`/jira:solve ${ISSUE_KEY}\`
-- Create the PR by running: gh pr create --repo openshift/hypershift --head hypershift-community:${BRANCH_NAME} --no-maintainer-edit --title '<title>' --body '<body>'
-- SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'.
-- ${SUBAGENT_PROMPT}"
+      SECURITY_PROMPT="SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
+      PR_PROMPT="/openshift-developer:create-pr ${ISSUE_KEY} --upstream openshift/hypershift --head hypershift-community:${BRANCH_NAME}
+${SECURITY_PROMPT}
+${SUBAGENT_PROMPT}"
 
       set +e
       claude -p "$PR_PROMPT" \
-        --allowedTools "Bash Read Grep Glob" \
+        --allowedTools "Bash Read Grep Glob Skill" \
         --max-turns 90 \
         --effort max \
         --model "$CLAUDE_MODEL" \
