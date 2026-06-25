@@ -78,11 +78,10 @@ oc apply -f "$ARTIFACT_DIR"/flowcollector.yaml
 
 
 oc patch flowcollector/cluster --type=merge -p '{
-  "spec": {
+"spec": {
     "processor": {
-      "informers": {
+      "informerCacheProxy": {
         "enabled": true
-        }
       }
     }
   }
