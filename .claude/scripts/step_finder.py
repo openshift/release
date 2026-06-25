@@ -19,6 +19,7 @@ except ImportError:
 REF_LINE = re.compile(r"^\s*-\s+ref:\s+(\S+)\s*$", re.MULTILINE)
 CHAIN_LINE = re.compile(r"^\s*-\s+chain:\s+(\S+)\s*$", re.MULTILINE)
 WORKFLOW_LINE = re.compile(r"^\s*workflow:\s+(\S+)\s*$", re.MULTILINE)
+CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f\x1b]")
 
 
 @dataclass
@@ -167,6 +168,8 @@ def filter_components(
     repo_root: Path,
 ) -> list[Component]:
     """Return registry components matching the query, up to limit."""
+    if limit == 0:
+        return []
     exact = exact_name_match(components, query, kind)
     if exact is not None:
         return [exact]
@@ -255,6 +258,11 @@ def truncate(text: str, max_len: int = 240) -> str:
     return text[: max_len - 3] + "..."
 
 
+def sanitize_terminal(text: str) -> str:
+    """Strip control and ANSI escape characters from repo-sourced terminal output."""
+    return CONTROL_CHARS.sub("", text)
+
+
 def non_negative_int(value: str) -> int:
     """Argparse type that rejects negative integers."""
     parsed = int(value)
@@ -281,11 +289,11 @@ def render_results(
     print(f"Found {len(matches)} matching component(s):\n")
     for comp in matches:
         rel = comp.path.relative_to(repo_root)
-        print(f"### {comp.name} (type: {comp.kind})")
-        print(f"**File**: `{rel}`")
+        print(f"### {sanitize_terminal(comp.name)} (type: {comp.kind})")
+        print(f"**File**: `{sanitize_terminal(str(rel))}`")
         if comp.documentation:
-            print(f"**Description**: {truncate(comp.documentation)}")
-        print(f"**Usage**: `{usage_hint(comp)}`")
+            print(f"**Description**: {sanitize_terminal(truncate(comp.documentation))}")
+        print(f"**Usage**: `{sanitize_terminal(usage_hint(comp))}`")
         if show_usage:
             total, examples = lookup_config_usage(index, comp, config_dir)
             if total:
@@ -293,13 +301,13 @@ def render_results(
             else:
                 print("**Config usage**: 0 direct config references (may be used via workflows/chains)")
             for path in examples:
-                print(f"- `{Path(path).relative_to(repo_root)}`")
+                print(f"- `{sanitize_terminal(str(Path(path).relative_to(repo_root)))}`")
         if show_reverse_deps:
             deps = lookup_reverse_deps(index, comp, registry_dir, config_dir)
             level = impact_label(len(deps))
             print(f"**Reverse deps**: {len(deps)} ({level} impact)")
             for path in deps[:reverse_limit]:
-                print(f"- `{Path(path).relative_to(repo_root)}`")
+                print(f"- `{sanitize_terminal(str(Path(path).relative_to(repo_root)))}`")
             if len(deps) > reverse_limit:
                 print(f"- ... and {len(deps) - reverse_limit} more")
         print()
@@ -351,7 +359,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     """CLI entrypoint."""
     args = parse_args()
-    repo_root = args.repo_root or repo_root_from_script()
+    repo_root = (args.repo_root or repo_root_from_script()).resolve()
     registry_dir = repo_root / "ci-operator" / "step-registry"
     config_dir = repo_root / "ci-operator" / "config"
     if not registry_dir.is_dir():
@@ -361,7 +369,7 @@ def main() -> int:
     matches = filter_components(components, args.query, args.type, args.limit, repo_root)
 
     index = ReferenceIndex()
-    if args.show_usage or not args.no_reverse_deps:
+    if matches and (args.show_usage or not args.no_reverse_deps):
         index = build_reference_index(
             read_yaml_corpus(config_dir),
             read_yaml_corpus(registry_dir),

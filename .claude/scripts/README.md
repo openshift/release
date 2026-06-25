@@ -36,6 +36,26 @@ python3 .claude/scripts/scaffold_step_registry.py --name <step-name> --subdir <p
 python3 .claude/scripts/scaffold_step_registry.py --name my-step --subdir myorg/action --write
 ```
 
+### effective_env_lookup.py
+
+Find ci-operator config(s) for a job name and print resolved environment variables.
+
+**Used by**: `effective-env` skill (`.claude/skills/effective-env/`)
+
+**Usage**:
+```bash
+python3 .claude/scripts/effective_env_lookup.py <job-name> [--component NAME] [--version 4.21] [--filter PATTERN] [--include-priv] [--max-configs N] [--repo-root PATH] [--json]
+```
+
+**Example**:
+```bash
+python3 .claude/scripts/effective_env_lookup.py e2e-aws-minimal --component hypershift --version 4.21
+```
+
+### effective_env.py
+
+Low-level resolver (JSON output). Used by `effective_env_lookup.py` and callable directly when the config file is known.
+
 ### migrate_periodic_file.py
 
 Migrates a periodic configuration file from one OpenShift release version to another.
