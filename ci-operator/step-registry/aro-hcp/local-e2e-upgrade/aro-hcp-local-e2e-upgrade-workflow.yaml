@@ -11,10 +11,8 @@ workflow:
       - ref: aro-hcp-write-config
       - ref: aro-hcp-provision-environment
     test:
-      - ref: aro-hcp-test-local-pre-upgrade
       - ref: aro-hcp-git-checkout-head
-      - ref: aro-hcp-upgrade-infra
-      - ref: aro-hcp-test-local-post-upgrade
+      - ref: aro-hcp-test-local-upgrade
     post:
       - ref: aro-hcp-gather-provision-failure
       - ref: aro-hcp-gather-visualization
@@ -25,9 +23,7 @@ workflow:
       - ref: aro-hcp-deprovision-environment
       - ref: aro-hcp-lease-release
   documentation: |-
-    Acquire runtime leases, checkout main (or GIT_REF override), provision regional infrastructure, run upgrade/create tests, checkout the PR head,
-    rerun pipeline/RP.HypershiftOperator using hypershift.image and hypershift.sharedIngressImage
-    digests from PR-head config/config.yaml, then run upgrade/post-infra tests.
-    Uses the dedicated aro-hcp-dev-upgrade-westus3-slot pool (Dev - 03, slot_count: 1)
-    so the provisioned cluster persists isolated across both upgrade suite phases.
-    Override GIT_REF on git-checkout steps via job env when needed.
+    Acquire runtime leases, checkout main (or GIT_REF override), provision regional
+    infrastructure, checkout the PR head, build a hypershift override from PR
+    config/config.yaml, then run upgrade/in-place: create hosted cluster, run
+    pipeline/RP.HypershiftOperator in the test, validate node pool hash change, cleanup.

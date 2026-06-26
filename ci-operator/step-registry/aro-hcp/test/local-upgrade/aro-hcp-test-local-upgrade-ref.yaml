@@ -1,7 +1,7 @@
 ref:
-  as: aro-hcp-test-local-post-upgrade
+  as: aro-hcp-test-local-upgrade
   from: aro-hcp-e2e-tests
-  commands: aro-hcp-test-local-post-upgrade-commands.sh
+  commands: aro-hcp-test-local-upgrade-commands.sh
   credentials:
     - namespace: test-credentials
       name: aro-hcp-qe-pull-secret
@@ -10,7 +10,7 @@ ref:
       name: cluster-secrets-aro-hcp-dev
       mount_path: /var/run/aro-hcp-dev
   grace_period: 30s
-  timeout: 4h0m0s
+  timeout: 8h0m0s
   resources:
     requests:
       cpu: 1000m
@@ -28,25 +28,17 @@ ref:
       default: "true"
       documentation: Whether to use pooled identities for the test.
     - name: ARO_HCP_DEPLOY_ENV
-      default: "prow"
+      default: "ci01"
       documentation: Config environment name.
     - name: ARO_HCP_SUITE_NAME
-      default: "upgrade/post-infra"
+      default: "upgrade/in-place"
       documentation: |-
-        Suite to run via aro-hcp-tests run-suite after the infra upgrade step.
-    - name: SETUP_FILEPATH
-      default: ""
-      documentation: |-
-        Path to e2e-setup.json written by upgrade/create in the pre-upgrade step. When
-        empty, the step uses ${SHARED_DIR}/e2e-setup.json (same as pre-upgrade).
-    - name: E2E_JUNIT_SHARED_NAME
-      default: "junit-e2e-post-upgrade.xml.gz"
-      documentation: |-
-        Gzip junit artifact filename under SHARED_DIR (avoids clobbering baseline junit).
+        One-shot suite: create hosted cluster, run pipeline/RP.HypershiftOperator with
+        OVERRIDE_CONFIG_FILE, validate node pool hash change, cleanup.
     - name: COMPRESS_TIMING_METADATA
       default: "true"
       documentation: Whether to compress timing metadata files with gzip.
   documentation: |-
-    Same local e2e harness as aro-hcp-test-local, run after infra upgrade.
-    Defaults to the upgrade/post-infra suite, loading e2e-setup.json from
-    ${SHARED_DIR} written by the pre-upgrade step.
+    After PR-head checkout, builds a hypershift override from config/config.yaml, fetches
+    svc kubeconfig for frontend discovery and mgmt kubeconfig for pipeline/RP.HypershiftOperator,
+    then runs the upgrade/in-place suite. Cluster state stays in-process.

@@ -3,6 +3,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+: "${ARO_HCP_SUITE_NAME:?ARO_HCP_SUITE_NAME must be set}"
+
 if [[ ! -f "${SHARED_DIR}/config.yaml" ]]; then
   echo "ERROR: ${SHARED_DIR}/config.yaml missing; run aro-hcp-provision-environment first"
   exit 1
@@ -25,8 +27,7 @@ export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
-INFRA_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-${ARO_HCP_DEPLOY_ENV}-subscription-id")
-export INFRA_SUBSCRIPTION_ID
+export INFRA_SUBSCRIPTION_ID; INFRA_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-${ARO_HCP_DEPLOY_ENV}-subscription-id")
 export DEPLOY_ENV="${ARO_HCP_DEPLOY_ENV}"
 export AZURE_TOKEN_CREDENTIALS=prod
 export SKIP_CONFIRM=true
@@ -34,14 +35,13 @@ export PERSIST=true
 export DETECT_DIRTY_GIT_WORKTREE=0
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
-az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 
 if ! yq -e ".clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift" config/config.yaml >/dev/null; then
   echo "ERROR: hypershift defaults missing in config/config.yaml for DEPLOY_ENV=${DEPLOY_ENV}" >&2
   exit 1
 fi
 
-OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override-upgrade.yaml"
+export OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override-upgrade.yaml"
 
 yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift = (
@@ -61,16 +61,25 @@ yq ".clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.sharedIngressImag
 
 unset GOFLAGS
 
-run_pipeline() {
-  local target="$1"
-  echo "Running pipeline/${target}"
-  make "pipeline/${target}" \
-    DEPLOY_ENV="${DEPLOY_ENV}" \
-    OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}"
-}
+# Prepare svc cluster access for the test harness (customer tests run below).
+az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
+make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV="${DEPLOY_ENV}"
+export KUBECONFIG=kubeconfig
+FRONTEND_ADDRESS="https://$(kubectl get virtualservice -n aro-hcp aro-hcp-vs-frontend -o jsonpath='{.spec.hosts[0]}')"
+make frontend-grant-ingress DEPLOY_ENV="${DEPLOY_ENV}"
 
-cd dev-infrastructure && make mgmt.aks.kubeconfig DEPLOY_ENV="${DEPLOY_ENV}" && cd ..
-run_pipeline RP.HypershiftOperator
+# HypershiftOperator runs on the management cluster; upgrade/in-place invokes
+# make pipeline/RP.HypershiftOperator and requires mgmt kubeconfig in KUBECONFIG.
+make -C dev-infrastructure/ mgmt.aks.kubeconfig MGMT_KUBECONFIG_FILE=../mgmt-kubeconfig DEPLOY_ENV="${DEPLOY_ENV}"
+export KUBECONFIG=mgmt-kubeconfig
 
-echo "upgrade" > "${SHARED_DIR}/provision-phase"
-date -u +"%Y-%m-%dT%H:%M:%SZ" > "${SHARED_DIR}/infra-upgrade-timestamp-rfc3339"
+az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
+
+# Single suite: create cluster, run pipeline/RP.HypershiftOperator, hash watch, cleanup.
+./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" \
+  --junit-path="${ARTIFACT_DIR}/junit.xml" \
+  --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" \
+  --max-concurrency 100
+
+gzip -c "${ARTIFACT_DIR}/junit.xml" > "${SHARED_DIR}/junit-e2e-upgrade.xml.gz"
