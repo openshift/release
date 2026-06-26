@@ -55,6 +55,17 @@ tests:
     clone: true
     from: root
   run_if_changed: (SKILL\.md|^scripts/lint-skills\.py|^Makefile|^plugins/.*/skills/)
+- always_run: false
+  as: eval-skills
+  optional: true
+  run_if_changed: ^plugins/.*/(skills|evals)
+  steps:
+    env:
+      EVAL_REPO_DIR: /opt/app-root/src/edge-tooling
+      EVAL_MODEL: claude-sonnet-4-6
+      EVAL_SETUP_SCRIPT: scripts/eval-setup-ci.sh
+    test:
+    - ref: openshift-claude-agent-eval
 - as: ocp-ci-monitor
   cron: 0 7 * * 1-5
   reporter_config:

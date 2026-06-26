@@ -31,34 +31,10 @@ else
     echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH:-<unset>}. gh CLI will run unauthenticated."
 fi
 
-# The repo is at /opt/ai-helpers; WORKDIR is /workspace
-cd /opt/ai-helpers
+cd "${EVAL_REPO_DIR}"
 
 echo "Config: ${EVAL_CONFIG}"
 echo "Skill model: ${EVAL_MODEL}"
-
-# -----------------------------------------------------------------------
-# Verify eval config exists
-# -----------------------------------------------------------------------
-if [[ ! -f "${EVAL_CONFIG}" ]]; then
-    echo "ERROR: EVAL_CONFIG not found at ${EVAL_CONFIG}"
-    exit 1
-fi
-
-# -----------------------------------------------------------------------
-# Run optional setup script (e.g. extract snapshots, populate fixtures)
-# -----------------------------------------------------------------------
-if [[ -n "${EVAL_SETUP_SCRIPT}" ]]; then
-    if [[ ! -f "${EVAL_SETUP_SCRIPT}" ]]; then
-        echo "ERROR: EVAL_SETUP_SCRIPT not found: ${EVAL_SETUP_SCRIPT}"
-        exit 1
-    fi
-    echo ""
-    echo "=== Running setup script: ${EVAL_SETUP_SCRIPT} ==="
-    EVAL_SNAPSHOT_DIR=$(bash "${EVAL_SETUP_SCRIPT}")
-    export EVAL_SNAPSHOT_DIR
-    echo "Snapshot dir: ${EVAL_SNAPSHOT_DIR}"
-fi
 
 # -----------------------------------------------------------------------
 # Install plugins
@@ -68,6 +44,36 @@ echo "=== Installing plugins ==="
 EVAL_HARNESS_DIR="/tmp/agent-eval-harness"
 git clone --depth 1 https://github.com/opendatahub-io/agent-eval-harness.git "${EVAL_HARNESS_DIR}"
 echo "agent-eval-harness cloned."
+
+# -----------------------------------------------------------------------
+# Run optional setup script (e.g. extract snapshots, generate cases)
+# -----------------------------------------------------------------------
+if [[ -n "${EVAL_SETUP_SCRIPT}" ]]; then
+    if [[ ! -f "${EVAL_SETUP_SCRIPT}" ]]; then
+        echo "ERROR: EVAL_SETUP_SCRIPT not found: ${EVAL_SETUP_SCRIPT}"
+        exit 1
+    fi
+    echo ""
+    echo "=== Running setup script: ${EVAL_SETUP_SCRIPT} ==="
+    EVAL_SETUP_OUTPUT=$(bash "${EVAL_SETUP_SCRIPT}")
+    if [[ -n "${EVAL_SETUP_OUTPUT}" ]]; then
+        if [[ -f "${EVAL_SETUP_OUTPUT}" ]]; then
+            EVAL_CONFIG="${EVAL_SETUP_OUTPUT}"
+            echo "Setup script overrode EVAL_CONFIG: ${EVAL_CONFIG}"
+        else
+            export EVAL_SNAPSHOT_DIR="${EVAL_SETUP_OUTPUT}"
+            echo "Snapshot dir: ${EVAL_SNAPSHOT_DIR}"
+        fi
+    fi
+fi
+
+# -----------------------------------------------------------------------
+# Verify eval config exists
+# -----------------------------------------------------------------------
+if [[ ! -f "${EVAL_CONFIG}" ]]; then
+    echo "ERROR: EVAL_CONFIG not found at ${EVAL_CONFIG}"
+    exit 1
+fi
 
 # -----------------------------------------------------------------------
 # Artifact copy trap
