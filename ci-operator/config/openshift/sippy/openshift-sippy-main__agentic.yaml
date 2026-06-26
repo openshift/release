@@ -52,6 +52,14 @@ images:
         as:
         - src
     to: sippy-agentic-dev
+  - dockerfile_literal: |
+      FROM sippy-agentic-dev
+      USER root
+      RUN curl -fsSL https://pkg.cloudflare.com/cloudflared.repo -o /etc/yum.repos.d/cloudflared.repo && \
+          dnf install -y cloudflared httpd && dnf clean all
+      USER vscode
+    from: sippy-agentic-dev
+    to: sippy-staging-dev
 resources:
   '*':
     requests:
@@ -84,6 +92,16 @@ tests:
       SETUP_SCRIPT: hack/agentic_setup.sh
       UPSTREAM_REPO: openshift/sippy
     workflow: openshift-agentic-trt-pr-followup
+- always_run: false
+  as: staging
+  capabilities:
+  - nested-podman
+  optional: true
+  steps:
+    env:
+      GITHUB_APP_TOKEN_OUTPUTS: openshift-installation-id:gh-upstream-token
+      STAGING_TIMEOUT: "3600"
+    workflow: sippy-staging
 zz_generated_metadata:
   branch: main
   org: openshift
