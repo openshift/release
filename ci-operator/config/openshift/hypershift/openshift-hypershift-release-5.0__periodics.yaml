@@ -245,6 +245,28 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance-cilium
+- as: e2e-aws-conformance-cilium-private
+  cron: 0 0 * * 0
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability
+    workflow: hypershift-aws-conformance-cilium-private
+- as: e2e-aws-conformance-calico
+  minimum_interval: 168h
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-conformance-calico
+- as: e2e-aws-conformance-calico-private
+  minimum_interval: 168h
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability
+    workflow: hypershift-aws-conformance-calico-private
 - as: e2e-aws-external-oidc
   minimum_interval: 12h
   steps:
