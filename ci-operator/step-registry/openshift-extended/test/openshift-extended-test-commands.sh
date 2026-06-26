@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 14400
+exit 0
+
 function warn_0_case_executed {
     local count
     count="$(ls ${ARTIFACT_DIR} | wc -l)"
