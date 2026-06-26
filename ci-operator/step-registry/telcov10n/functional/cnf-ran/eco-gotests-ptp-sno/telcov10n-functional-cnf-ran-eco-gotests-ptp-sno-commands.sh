@@ -50,9 +50,10 @@ cd /eco-ci-cd
 
 printf 'ptp_cycle_configs: %s\n' "${PTP_CONFIGS}" > /tmp/ptp_cycle_configs.yml
 
-echo "Run eco-gotests PTP suite — all cycles"
+echo "Run eco-gotests PTP suite — deploy test script on bastion"
 ansible-playbook -vv ./playbooks/ran/deploy-run-eco-gotests-ptp.yaml \
   -i ./inventories/ocp-deployment/build-inventory.py \
+  --tags setup \
   --extra-vars "kubeconfig=${SPOKE_KUBECONFIG_PATH} \
     spoke_kubeconfig=${SPOKE_KUBECONFIG_PATH} \
     hub_clusterconfigs_path=/home/telcov10n/project/generated/${CLUSTER_NAME} \
@@ -60,7 +61,7 @@ ansible-playbook -vv ./playbooks/ran/deploy-run-eco-gotests-ptp.yaml \
     labels='!no-container' \
     eco_gotest_base_dir=/tmp/eco_gotests_ptp \
     eco_gotests_tag=latest \
-    test_timeout=10m \
+    test_timeout=3h \
     mirror_registry=${MIRROR_REGISTRY} \
     pull_container_image=true \
     additional_test_env_variables='-e ECO_TEST_TRACE=true -e ECO_VERBOSE_SCRIPT=true'" \
@@ -74,20 +75,21 @@ ssh -o ServerAliveInterval=30 \
   -i "${PROJECT_DIR}/temp_ssh_key" \
   "cd /tmp/eco_gotests_ptp && ./eco-gotests-ptp-run.sh || true"
 
-echo "Gather artifacts from bastion"
-CYCLE_NAMES=("BC-OC" "OC2port" "T-TSC" "T-BC")
+echo "Gather artifacts from bastion to ARTIFACT_DIR (for GCS)"
+# SCP all XML files to ARTIFACT_DIR so Prow uploads them to GCS for debugging.
+# This is the only transfer from bastion to CI pod — processing happens on the bastion.
 for i in 0 1 2 3; do
-  CYCLE_NAME="${CYCLE_NAMES[$i]}"
   mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}"
   scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     -i "${PROJECT_DIR}/temp_ssh_key" \
     "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_ptp_${i}/report/*.xml" \
     "${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}/" || true
-
-  if [ -f "${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}/report_testrun.xml" ]; then
-    mv "${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}/report_testrun.xml" \
-       "${SHARED_DIR}/polarion_testrun_ptp_${i}.xml"
-    cp "${SHARED_DIR}/polarion_testrun_ptp_${i}.xml" \
-       "${SHARED_DIR}/junit_${CYCLE_NAME}__${REPORTER_LAUNCH_NAME}__ptp_suite_test_junit.xml"
-  fi
 done
+
+echo "Process report files on bastion"
+BASTION_REPORT_DIR="/tmp/ptp_reports"
+ansible-playbook ./playbooks/ran/deploy-run-eco-gotests-ptp.yaml \
+  -i ./inventories/ocp-deployment/build-inventory.py \
+  --tags process \
+  --extra-vars "eco_gotest_base_dir=/tmp/eco_gotests_ptp \
+    ptp_report_dir=${BASTION_REPORT_DIR}"

@@ -109,6 +109,8 @@ function populate_artifact_dir() {
 
   current_time=$(date +%s)
   cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+  mkdir -p "${ARTIFACT_DIR}/expanded-log-bundle"
+  tar -xzf "${dir}"/log-bundle-*.tar.gz -C "${ARTIFACT_DIR}/expanded-log-bundle/" 2>/dev/null
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
@@ -653,7 +655,6 @@ fi
 
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov|aws-eusc)
-    export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
     if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
         echo "Setting AWS credential with minimal permision for installer"
         export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission

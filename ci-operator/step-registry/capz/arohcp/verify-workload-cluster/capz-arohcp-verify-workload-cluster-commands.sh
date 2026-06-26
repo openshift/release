@@ -1,0 +1,1 @@
+../../test/verify-workload-cluster/capz-test-verify-workload-cluster-commands.sh

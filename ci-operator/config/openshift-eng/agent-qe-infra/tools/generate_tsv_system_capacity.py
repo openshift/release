@@ -1,145 +1,115 @@
 #!/usr/bin/env python3
-import sys
-import argparse
-import re
+import argparse, re
 from pathlib import Path
+from collections import defaultdict
 
-YEAR = 2026
-MONTH = 6
-PAD_MONTH = f"{MONTH:02d}"
-
+YEAR, MONTH, PAD_MONTH = 2026, 6, "06"
 RE_VERSION = re.compile(r"[45]\.[0-9]+")
-RE_NON_DIGIT = re.compile(r"\D+")
+RE_DIGIT = re.compile(r"\D+")
 
-def clean_name(base: str) -> str:
-    versions = RE_VERSION.findall(base)
-    version = versions[-1] if versions else ""
-    suffix = base.partition("__")[-1] if "__" in base else base
-    return f"{version}__{suffix}"
+def get_unique_files(input_paths: list) -> list:
+    """Collects target files from directory and file inputs."""
+    unique_files = {}
+    for path_str in input_paths:
+        path = Path(path_str)
+        if not path.exists():
+            continue
 
-def process_file(file_path: Path, base_output_dir: Path):
-    file_name_lower = file_path.name.lower()
+        items_to_check = path.iterdir() if path.is_dir() else [path]
 
-    if "arm" in file_name_lower:
-        output_dir = base_output_dir / "arm64"
-    elif "amd" in file_name_lower:
-        output_dir = base_output_dir / "amd64"
-    elif "multi" in file_name_lower:
-        output_dir = base_output_dir / "multi"
-    else:
-        output_dir = base_output_dir
+        for item in items_to_check:
+            if item.is_file():
+                unique_files[item.resolve()] = item
 
-    job = cron = ""
-    aux = False
-    masters = workers = add_workers = 0
-    records = []
-    clean = clean_name(file_path.stem)
+    return list(unique_files.values())
 
-    append_record = records.append
-    strip_non_digits = RE_NON_DIGIT.sub
+def determine_architecture(filename_lower: str, job_name_lower: str) -> str:
+    """Explicit architecture detection logic based on name matching priority."""
+    if "arm" in filename_lower or "arm" in job_name_lower:
+        return "arm64"
+    if "amd" in filename_lower or "amd" in job_name_lower:
+        return "amd64"
+    return "multi"
+
+def process_file(file_path: Path) -> list:
+    """Parses a test configuration file to extract scheduled jobs."""
+    v_match = RE_VERSION.search(file_path.stem)
+    version_prefix = v_match.group(0) if v_match else ""
+
+    base_stem = file_path.name
+    for ext in ['.tsv', '.yaml', '.yml']:
+        if base_stem.endswith(ext): base_stem = base_stem[:-len(ext)]
+
+    clean_name = f"{version_prefix}__{base_stem.partition('__')[-1] if '__' in base_stem else base_stem}"
+    records, job, cron, aux = [], "", "", False
+    masters = workers = additional_workers = 0
+
+    def save_record():
+        if job:
+            if not re.match(r'^(metal|baremetal)', job) or any(x in job for x in ["360", "999", "metal-ds"]):
+                return
+        parts = cron.split()
+        if job and cron and aux and len(parts) >= 3:
+            total_sys = masters + workers + additional_workers
+            sys_out = total_sys if total_sys > 0 else 4
+
+            for d in parts[2].split(","):
+                if d.isdigit():
+                    records.append(
+                        f"{job}\t\"{cron}\"\t{parts[0]}\t{parts[1]}\t"
+                        f"{YEAR}-{PAD_MONTH}-{int(d):02d}\t\"\"\t{sys_out}\t\"\"\t{clean_name}"
+                    )
 
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-
-            if "cron:" in line:
-                cron = line.partition("cron:")[-1].strip()
-
-            elif "masters:" in line:
-                val = strip_non_digits("", line)
-                masters = int(val) if val else 0
-
-            elif "workers:" in line:
-                val = strip_non_digits("", line)
-                workers = int(val) if val else 0
-
-            elif "ADDITIONAL_WORKERS:" in line:
-                val = strip_non_digits("", line)
-                add_workers = int(val) if val else 0
-
-            elif "AUX_HOST:" in line:
-                aux = True
-
+        for line in map(str.strip, f):
+            if not line: continue
+            if "cron:" in line: cron = line.partition("cron:")[-1].strip()
+            elif "masters:" in line: masters = int(RE_DIGIT.sub("", line) or 0)
+            elif "workers:" in line: workers = int(RE_DIGIT.sub("", line) or 0)
+            elif "ADDITIONAL_WORKERS:" in line: additional_workers = int(RE_DIGIT.sub("", line) or 0)
+            elif "AUX_HOST:" in line: aux = True
             elif line.startswith("tests:") or line.startswith("- as:"):
-                if job and cron and aux:
-                    parts = cron.split()
-                    if len(parts) >= 3:
-                        minute, hour, days_str = parts[0], parts[1], parts[2]
-                        systems = masters + workers + add_workers
-
-                        for d in days_str.split(","):
-                            if d.isdigit():
-                                append_record(
-                                    f"{job}\t\"{cron}\"\t{minute}\t{hour}\t{YEAR}-{PAD_MONTH}-{int(d):02d}\t\"\"\t{systems}\t\"\"\t{clean}"
-                                )
-
+                save_record()
                 job = line.partition("- as:")[-1].strip() if "- as:" in line else ""
-                cron = ""
-                aux = False
-                masters = workers = add_workers = 0
-
-        if job and cron and aux:
-            parts = cron.split()
-            if len(parts) >= 3:
-                minute, hour, days_str = parts[0], parts[1], parts[2]
-                systems = masters + workers + add_workers
-                for d in days_str.split(","):
-                    if d.isdigit():
-                        append_record(
-                            f"{job}\t\"{cron}\"\t{minute}\t{hour}\t{YEAR}-{PAD_MONTH}-{int(d):02d}\t\"\"\t{systems}\t\"\"\t{clean}"
-                        )
-
-    if not records:
-        print(f"  -> No jobs found in {file_path.name}, skipping")
-        return
-
-    # Create the targeted architecture subfolder on-demand safely
-    output_dir.mkdir(parents=True, exist_ok=True)
-    out_file = output_dir / f"{file_path.name}.tsv"
-
-    # Overwrites the target file path in the chosen subfolder
-    with open(out_file, "w", encoding="utf-8") as out:
-        out.write("\n".join(records) + "\n")
-
-    print(f"  -> Created: {out_file}")
+                cron, aux, masters, workers, additional_workers = "", False, 0, 0, 0
+        save_record()
+    return records
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Process test configuration files to extract schedule details into architectural TSV subfolders."
-    )
-    parser.add_argument(
-        "-i", "--input",
-        default=".",
-        help="Path to a single input file or directory containing config files (Default: current directory)"
-    )
-    parser.add_argument(
-        "-o", "--output",
-        default=".",
-        help="Directory where .tsv files will be saved (Default: current directory)"
-    )
+    parser = argparse.ArgumentParser(description="Process test configuration files to extract schedule details into architectural TSV subfolders.")
+    parser.add_argument("-i", "--input", nargs="+", default=["../../agent-qe-infra", "../../../openshift/openshift-tests-private"], help="One or more input directories (Default: agent-qe-infra, openshift-tests-private)")
+    parser.add_argument("-o", "--output", default="./processed_jobs", help="Directory where .tsv files will be saved (Default: processed_jobs)")
+    parser.add_argument("-a", "--arch", nargs="+", choices=["amd64", "arm64"], help="Filter architectures.")
 
     args = parser.parse_args()
+    allowed_archs = args.arch if args.arch else ["arm64", "amd64"]
+    grouped = defaultdict(lambda: defaultdict(list))
 
-    input_path = Path(args.input)
-    base_output_dir = Path(args.output)
+    files = get_unique_files(args.input)
 
-    if not input_path.exists():
-        print(f"Error: Input path '{input_path}' does not exist.", file=sys.stderr)
-        sys.exit(1)
+    for file_path in sorted(files, key=lambda f: f.name):
+        records = process_file(file_path)
+        if not records: continue
 
-    if input_path.is_file():
-        print(f"Processing single file: {input_path.name}")
-        process_file(input_path, base_output_dir)
-    elif input_path.is_dir():
-        for file in input_path.iterdir():
-            if not file.is_file():
-                continue
-            print(f"Processing: {file.name}")
-            process_file(file, base_output_dir)
+        v_match = RE_VERSION.search(file_path.name)
+        version = v_match.group(0) if v_match else "unknown"
+        f_lower = file_path.name.lower()
 
-    print("Done. All files are processed.")
+        for row in records:
+            j_lower = row.split("\t")[0].lower()
+            arch = determine_architecture(f_lower, j_lower)
+
+            if arch and arch not in allowed_archs: continue
+
+            target_dir = Path(args.output) / arch if arch else Path(args.output)
+            grouped[target_dir][version].append(row)
+
+    for target_dir, version_dict in grouped.items():
+        target_dir.mkdir(parents=True, exist_ok=True)
+        for version, rows in sorted(version_dict.items()):
+            out_file = target_dir / f"{version} Jobs.tsv"
+            out_file.write_text("\n".join(rows) + "\n", encoding="utf-8")
+            print(f"Created Merged TSV: {out_file} ({len(rows)} lines)")
 
 if __name__ == "__main__":
     main()

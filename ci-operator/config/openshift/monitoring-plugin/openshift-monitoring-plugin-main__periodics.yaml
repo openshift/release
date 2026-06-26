@@ -148,6 +148,23 @@ tests:
     test:
     - ref: monitoring-plugin-tests-perses-dev-ui
     workflow: ipi-aws
+- as: e2e-perses-ivt
+  cron: 0 5 * * *
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - ref: monitoring-plugin-tests-perses-ui-ivt
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift

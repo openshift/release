@@ -348,6 +348,89 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-root-disk-staging-main
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-osd-gcp-root-disk-staging-main
+      - --variant=ocm-fvt-osd-gcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 0 9 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-osd-gcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-osd-gcp-staging-ocm-fvt-periodic-cs-osd-gcp-wif-sv-staging-main
   spec:
     containers:
@@ -1095,6 +1178,89 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-ad-integration-regional-main
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-ad-integration-regional-main
+      - --variant=ocm-fvt-rosa-hcp-integration
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 0 8 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-integration
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-integration-ocm-fvt-periodic-cs-rosa-hcp-autonode-integration-main
   spec:
     containers:
@@ -1584,6 +1750,89 @@ periodics:
     - name: cs-qe-credentials
       secret:
         secretName: cs-qe-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 0 3 * * 1
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-production
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-production-ocm-fvt-periodic-cs-rosa-hcp-ad-production-main
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-rosa-hcp-ad-production-main
+      - --variant=ocm-fvt-rosa-hcp-production
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -2674,6 +2923,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build02
+  cron: 0 0 31 2 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2682,7 +2932,89 @@ periodics:
   - base_ref: main
     org: openshift-online
     repo: rosa-e2e
-  interval: 168h
+  labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-ocm-fvt-rosa-hcp-staging-ocm-fvt-periodic-cs-sanity-jira-staging-main
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=ocm-fvt-periodic-cs-sanity-jira-staging-main
+      - --variant=ocm-fvt-rosa-hcp-staging
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 0 0 31 2 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 5h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
   labels:
     capability/nested-podman: nested-podman
     ci-operator.openshift.io/variant: ocm-fvt-rosa-hcp-staging
@@ -2775,7 +3107,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-e2e-stable-4-22
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-e2e-staging-stable-4-22
   spec:
     containers:
     - args:
@@ -2784,7 +3116,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=osd-gcp-e2e-stable-4-22
+      - --target=osd-gcp-e2e-staging-stable-4-22
       - --variant=periodics
       command:
       - ci-operator
@@ -2861,7 +3193,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-fips-e2e-stable-4-22
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-osd-gcp-fips-e2e-staging-stable-4-22
   spec:
     containers:
     - args:
@@ -2870,7 +3202,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=osd-gcp-fips-e2e-stable-4-22
+      - --target=osd-gcp-fips-e2e-staging-stable-4-22
       - --variant=periodics
       command:
       - ci-operator
@@ -2947,7 +3279,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-19
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-19
   spec:
     containers:
     - args:
@@ -2956,7 +3288,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-classic-sts-e2e-stable-4-19
+      - --target=rosa-classic-sts-e2e-staging-stable-4-19
       - --variant=periodics
       command:
       - ci-operator
@@ -3033,7 +3365,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-20
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-20
   spec:
     containers:
     - args:
@@ -3042,7 +3374,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-classic-sts-e2e-stable-4-20
+      - --target=rosa-classic-sts-e2e-staging-stable-4-20
       - --variant=periodics
       command:
       - ci-operator
@@ -3119,7 +3451,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-21
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-21
   spec:
     containers:
     - args:
@@ -3128,7 +3460,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-classic-sts-e2e-stable-4-21
+      - --target=rosa-classic-sts-e2e-staging-stable-4-21
       - --variant=periodics
       command:
       - ci-operator
@@ -3205,7 +3537,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-stable-4-22
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-e2e-staging-stable-4-22
   spec:
     containers:
     - args:
@@ -3214,7 +3546,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-classic-sts-e2e-stable-4-22
+      - --target=rosa-classic-sts-e2e-staging-stable-4-22
       - --variant=periodics
       command:
       - ci-operator
@@ -3291,7 +3623,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-stable-4-19
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-staging-stable-4-19
   spec:
     containers:
     - args:
@@ -3300,7 +3632,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-classic-sts-fips-e2e-stable-4-19
+      - --target=rosa-classic-sts-fips-e2e-staging-stable-4-19
       - --variant=periodics
       command:
       - ci-operator
@@ -3377,7 +3709,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-stable-4-20
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-staging-stable-4-20
   spec:
     containers:
     - args:
@@ -3386,7 +3718,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-classic-sts-fips-e2e-stable-4-20
+      - --target=rosa-classic-sts-fips-e2e-staging-stable-4-20
       - --variant=periodics
       command:
       - ci-operator
@@ -3463,7 +3795,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-stable-4-21
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-staging-stable-4-21
   spec:
     containers:
     - args:
@@ -3472,7 +3804,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-classic-sts-fips-e2e-stable-4-21
+      - --target=rosa-classic-sts-fips-e2e-staging-stable-4-21
       - --variant=periodics
       command:
       - ci-operator
@@ -3549,7 +3881,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-stable-4-22
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-classic-sts-fips-e2e-staging-stable-4-22
   spec:
     containers:
     - args:
@@ -3558,7 +3890,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-classic-sts-fips-e2e-stable-4-22
+      - --target=rosa-classic-sts-fips-e2e-staging-stable-4-22
       - --variant=periodics
       command:
       - ci-operator
@@ -3635,7 +3967,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-nightly-5-0
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-nightly-5-0
   spec:
     containers:
     - args:
@@ -3644,7 +3976,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-e2e-nightly-5-0
+      - --target=rosa-hcp-e2e-staging-nightly-5-0
       - --variant=periodics
       command:
       - ci-operator
@@ -3721,7 +4053,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-19
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-19
   spec:
     containers:
     - args:
@@ -3730,7 +4062,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-e2e-stable-4-19
+      - --target=rosa-hcp-e2e-staging-stable-4-19
       - --variant=periodics
       command:
       - ci-operator
@@ -3807,7 +4139,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-20
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-20
   spec:
     containers:
     - args:
@@ -3816,7 +4148,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-e2e-stable-4-20
+      - --target=rosa-hcp-e2e-staging-stable-4-20
       - --variant=periodics
       command:
       - ci-operator
@@ -3893,7 +4225,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-21
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-21
   spec:
     containers:
     - args:
@@ -3902,7 +4234,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-e2e-stable-4-21
+      - --target=rosa-hcp-e2e-staging-stable-4-21
       - --variant=periodics
       command:
       - ci-operator
@@ -3979,7 +4311,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-stable-4-22
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-e2e-staging-stable-4-22
   spec:
     containers:
     - args:
@@ -3988,7 +4320,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-e2e-stable-4-22
+      - --target=rosa-hcp-e2e-staging-stable-4-22
       - --variant=periodics
       command:
       - ci-operator
@@ -4065,7 +4397,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-nightly-5-0
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-staging-nightly-5-0
   spec:
     containers:
     - args:
@@ -4074,7 +4406,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-fips-e2e-nightly-5-0
+      - --target=rosa-hcp-fips-e2e-staging-nightly-5-0
       - --variant=periodics
       command:
       - ci-operator
@@ -4151,7 +4483,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-stable-4-19
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-staging-stable-4-19
   spec:
     containers:
     - args:
@@ -4160,7 +4492,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-fips-e2e-stable-4-19
+      - --target=rosa-hcp-fips-e2e-staging-stable-4-19
       - --variant=periodics
       command:
       - ci-operator
@@ -4237,7 +4569,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-stable-4-20
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-staging-stable-4-20
   spec:
     containers:
     - args:
@@ -4246,7 +4578,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-fips-e2e-stable-4-20
+      - --target=rosa-hcp-fips-e2e-staging-stable-4-20
       - --variant=periodics
       command:
       - ci-operator
@@ -4323,7 +4655,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-stable-4-21
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-staging-stable-4-21
   spec:
     containers:
     - args:
@@ -4332,7 +4664,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-fips-e2e-stable-4-21
+      - --target=rosa-hcp-fips-e2e-staging-stable-4-21
       - --variant=periodics
       command:
       - ci-operator
@@ -4409,7 +4741,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-stable-4-22
+  name: periodic-ci-openshift-online-rosa-e2e-main-periodics-rosa-hcp-fips-e2e-staging-stable-4-22
   spec:
     containers:
     - args:
@@ -4418,7 +4750,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-fips-e2e-stable-4-22
+      - --target=rosa-hcp-fips-e2e-staging-stable-4-22
       - --variant=periodics
       command:
       - ci-operator
@@ -4495,7 +4827,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-4-20-to-4-21
+  name: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-1
   spec:
     containers:
     - args:
@@ -4504,7 +4836,179 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-classic-sts-upgrade-4-20-to-4-21
+      - --target=rosa-classic-sts-upgrade-staging-y-minus-1
+      - --variant=upgrade
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  cron: 0 2 * * 2
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - Containerfile
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+    sparse_checkout_files:
+    - Containerfile
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: rosa-e2e-01
+    ci-operator.openshift.io/variant: upgrade
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-2
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=rosa-classic-sts-upgrade-staging-y-minus-2
+      - --variant=upgrade
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  cron: 0 2 * * 4
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - Containerfile
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+    sparse_checkout_files:
+    - Containerfile
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: rosa-e2e-01
+    ci-operator.openshift.io/variant: upgrade
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-classic-sts-upgrade-staging-y-minus-3
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=rosa-classic-sts-upgrade-staging-y-minus-3
       - --variant=upgrade
       command:
       - ci-operator
@@ -4581,7 +5085,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-4-20-to-4-21
+  name: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-1
   spec:
     containers:
     - args:
@@ -4590,7 +5094,179 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rosa-hcp-upgrade-4-20-to-4-21
+      - --target=rosa-hcp-upgrade-staging-y-minus-1
+      - --variant=upgrade
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  cron: 30 2 * * 3
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - Containerfile
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+    sparse_checkout_files:
+    - Containerfile
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: rosa-e2e-01
+    ci-operator.openshift.io/variant: upgrade
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-2
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=rosa-hcp-upgrade-staging-y-minus-2
+      - --variant=upgrade
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  cron: 30 2 * * 5
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - Containerfile
+  extra_refs:
+  - base_ref: main
+    org: openshift-online
+    repo: rosa-e2e
+    sparse_checkout_files:
+    - Containerfile
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: rosa-e2e-01
+    ci-operator.openshift.io/variant: upgrade
+    ci.openshift.io/generator: prowgen
+    job-release: "4.22"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-online-rosa-e2e-main-upgrade-rosa-hcp-upgrade-staging-y-minus-3
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=rosa-hcp-upgrade-staging-y-minus-3
       - --variant=upgrade
       command:
       - ci-operator

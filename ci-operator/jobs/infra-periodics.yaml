@@ -790,6 +790,122 @@ periodics:
         secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
+  cron: 15 2,10 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-rosa-enhancements-pr-stale
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift-online/rosa-enhancements
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:lifecycle/stale
+        -label:tide/merge-blocker
+        -label:do-not-merge/hold
+      - --updated=672h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - |-
+        --comment=Inactive PRs go stale after 28d of inactivity.
+
+        Mark the PR as fresh by commenting `/remove-lifecycle stale`.
+        Stale PRs close after an additional 7d of inactivity.
+        Exclude this PR from closing by commenting `/lifecycle frozen`.
+
+        If this PR is safe to close now please do so with `/close`.
+
+        /lifecycle stale
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
+  cron: 45 2,10 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-rosa-enhancements-pr-close
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift-online/rosa-enhancements
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:tide/merge-blocker
+        -label:do-not-merge/hold
+        label:lifecycle/stale
+      - --updated=168h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - |-
+        --comment=Stale PRs close after 7d of inactivity.
+
+        Reopen the PR by commenting `/reopen`.
+        Mark the PR as fresh by commenting `/remove-lifecycle stale`.
+        Exclude this PR from closing again by commenting `/lifecycle frozen`.
+
+        /close
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
   cron: 0 0 * * 3
   decorate: true
   decoration_config:
@@ -1201,6 +1317,7 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --github-hourly-tokens=2000
       - --github-enabled-org=openshift
+      - --enable-apps-restrictions
       command:
       - /ko-app/branchprotector
       env:
@@ -1258,6 +1375,7 @@ periodics:
       - --github-client.max-retries=10
       - --github-client.max-404-retries=3
       - --github-client.initial-delay=5s
+      - --enable-apps-restrictions
       command:
       - /ko-app/branchprotector
       env:

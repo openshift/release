@@ -21,6 +21,16 @@ set -o pipefail
 
 echo "Starting claude-agent-eval"
 
+# Load GitHub token for gh CLI access (same secret as payload-agent)
+set +x
+if [ -f "${GITHUB_TOKEN_PATH:-}" ]; then
+    export GITHUB_TOKEN
+    GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+    echo "GitHub token loaded."
+else
+    echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH:-<unset>}. gh CLI will run unauthenticated."
+fi
+
 # The repo is at /opt/ai-helpers; WORKDIR is /workspace
 cd /opt/ai-helpers
 
@@ -84,6 +94,28 @@ trap copy_artifacts EXIT TERM INT
 # Workaround: --continue + -p is broken (anthropics/claude-code#42376).
 # -----------------------------------------------------------------------
 export CLAUDE_CODE_ENTRYPOINT=sdk-cli
+
+# -----------------------------------------------------------------------
+# Auto-detect changed eval cases from PR diff
+# -----------------------------------------------------------------------
+if [[ "${EVAL_CHANGED_ONLY}" == "true" ]] && [[ -n "${EVAL_CASES_DIR}" ]] && [[ -z "${EVAL_CASES}" ]]; then
+    echo ""
+    echo "=== Detecting changed eval cases ==="
+    if [[ -z "${PULL_BASE_SHA:-}" ]]; then
+        echo "PULL_BASE_SHA not set, running all cases."
+    else
+        if ! CHANGED_FILES=$(git diff --name-only "${PULL_BASE_SHA}...HEAD" -- "${EVAL_CASES_DIR}"); then
+            echo "Failed to diff against PULL_BASE_SHA (${PULL_BASE_SHA}); running all cases."
+        elif [[ -n "${CHANGED_FILES}" ]]; then
+            DETECTED_CASES=$(echo "${CHANGED_FILES}" | sed "s|^${EVAL_CASES_DIR}/||" | cut -d'/' -f1 | sort -u | paste -sd, -)
+            echo "Changed cases: ${DETECTED_CASES}"
+            EVAL_CASES="${DETECTED_CASES}"
+        else
+            echo "No changed cases detected in ${EVAL_CASES_DIR}, skipping eval."
+            exit 0
+        fi
+    fi
+fi
 
 # -----------------------------------------------------------------------
 # Build arguments

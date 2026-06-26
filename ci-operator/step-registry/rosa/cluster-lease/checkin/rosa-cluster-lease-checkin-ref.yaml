@@ -1,0 +1,28 @@
+ref:
+  as: rosa-cluster-lease-checkin
+  from: cli
+  best_effort: true
+  grace_period: 1m
+  commands: rosa-cluster-lease-checkin-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  timeout: 5m0s
+  credentials:
+  - namespace: test-credentials
+    name: rosa-cluster-lease-manager
+    mount_path: /etc/rosa-cluster-lease-manager
+  env:
+  - name: LEASE_NAMESPACE
+    default: "rosa-cluster-lease"
+    documentation: Namespace on the lease host cluster where lease ConfigMaps live.
+  documentation: |-
+    Returns a ROSA cluster to the lease inventory after testing.
+
+    Reads the lease claim from SHARED_DIR/lease-claim (written by
+    rosa-cluster-lease-checkout) and patches the ConfigMap back to
+    available status, clearing the holder and build-id annotations.
+
+    Runs as best_effort so job cleanup always proceeds even if
+    checkin fails. The periodic controller recovers stale leases.

@@ -61,6 +61,7 @@ function wait_for_power_down() {
 
 function reset_pdu() {
   local pdu_uri="${1}"
+  local host="${2}"
   timeout -s 9 3m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" pdu_reboot.sh "${pdu_uri}" "${host}"
 }
 
@@ -104,7 +105,7 @@ function bmc_reset() {
   POLL_INTERVAL=10
   temp="warm"
   [ "${vendor}" = "dell" ] && temp="cold"
-  echo "$(date): Reseting BMC of host #$host"
+  echo "$(date): Resetting BMC of host #${host}"
   ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" -U "$bmc_user" -P "$bmc_pass" mc reset "$temp"
 
   echo -e "Waiting 5 min for #${host} BMC to reset..\n"
@@ -124,7 +125,7 @@ function reset_host() {
   host="${host##0}"
   if [ -n "${pdu_uri}" ] && ! check_power_status; then
     echo -e "\n-- #${host} PDU is unreachable, resetting before proceeding to wipe disk --"
-    reset_pdu "${pdu_uri}"
+    reset_pdu "${pdu_uri}" "${host}"
     echo -e "Waiting for PDU reset of host #${host}..."
     local max_try=20
     while [ "$max_try" -gt 0 ] && ! check_power_status; do
@@ -134,7 +135,7 @@ function reset_host() {
     done
     if [ $max_try -le 0 ]; then
       echo "#${host} PDU is unreachable, contact @metal-qe-team"
-      echo "$bmc_host:$bmc_forwarded_port" >> /tmp/failed
+      echo "$bmc_address:$bmc_forwarded_port" >> "/tmp/failed.${bmc_forwarded_port}"
       return 1
     fi
   fi
@@ -142,18 +143,18 @@ function reset_host() {
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
   sleep 120
   if ! wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"; then
-    echo "$bmc_host:$bmc_forwarded_port" >> /tmp/failed
+    echo "$bmc_address:$bmc_forwarded_port" >> "/tmp/failed.${bmc_forwarded_port}"
   fi
   [ -z "${pdu_uri}" ] && return 0
 
   check_power_status && echo "#${host} PDU is reachable, doing a routine reset..." || \
     echo "#${host} PDU is unreachable, it needs a reset"
   echo "$(date): Reset host #${host} PDU"
-  reset_pdu "${pdu_uri}"
+  reset_pdu "${pdu_uri}" "${host}"
 
   echo "Checking #${host} is reachable after PDU reset ..."
   if ! wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"; then
-    echo "$bmc_address:$bmc_forwarded_port" >> /tmp/failed
+    echo "$bmc_address:$bmc_forwarded_port" >> "/tmp/failed.${bmc_forwarded_port}"
   fi
 }
 
@@ -164,7 +165,9 @@ function reset_host() {
 # Then, this step waits for the hosts to power down again at the end of the wiping process, so that the releasing step
 # can happen safely, i.e., a concurrent reservation job has to wait until the disk of host X is wiped before being allowed
 # to reserve X
-touch /tmp/failed
+
+# Clean up any old failed.* files
+rm -f /tmp/failed /tmp/failed.* 2>/dev/null || true
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -209,8 +212,11 @@ done
 
 echo "Disk wipe completed"
 
+# Combine all per-host failure files into one
+cat /tmp/failed.* 2>/dev/null > /tmp/failed || true
+
 if [ -s /tmp/failed ]; then
-  echo The following nodes failed to power off:
+  echo "The following nodes failed to power off:"
   cat /tmp/failed
   exit 1
 fi

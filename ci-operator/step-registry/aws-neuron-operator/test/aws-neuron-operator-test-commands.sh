@@ -112,11 +112,23 @@ export ECO_TEST_LABELS="${ECO_TEST_LABELS:-neuron}"
 echo "Running tests with features: ${ECO_TEST_FEATURES}"
 echo "Running tests with labels: ${ECO_TEST_LABELS}"
 
+TEST_EXIT_CODE=0
+
+if [[ "${ECO_HWACCEL_NEURON_IN_CLUSTER_BUILD:-false}" == "true" ]]; then
+    echo "=== Phase 0: In-cluster build tests ==="
+    ginkgo --label-filter="${ECO_TEST_LABELS} && in-cluster-build" \
+        --timeout=1h \
+        --v \
+        --junit-report=junit_neuron_inclusterbuild.xml \
+        --output-dir="${ARTIFACT_DIR}" \
+        ./tests/hw-accel/neuron/... || TEST_EXIT_CODE=$?
+    dump_debug_info "phase0-inclusterbuild"
+fi
+
 # Run test suites in explicit order: vllm -> metrics -> upgrade
 # Each suite gets its own jUnit report for granular results.
 # The vLLM workload is kept alive through the metrics phase so neuron-monitor
 # has an active Neuron runtime and emits neuroncore_utilization_ratio.
-TEST_EXIT_CODE=0
 
 echo "=== Phase 1: vLLM inference tests ==="
 export ECO_SKIP_VLLM_CLEANUP=true

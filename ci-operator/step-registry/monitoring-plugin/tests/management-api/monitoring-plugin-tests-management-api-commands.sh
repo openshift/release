@@ -26,7 +26,8 @@ echo "Starting monitoring-plugin backend on port ${PORT}..."
 /tmp/plugin-backend \
   -port="${PORT}" \
   -config-path="./config" \
-  -static-path="./web/dist" &
+  -static-path="./web/dist" \
+  -features='alert-management-api' &
 BACKEND_PID=$!
 trap 'kill ${BACKEND_PID} 2>/dev/null || true' EXIT
 

@@ -2,9 +2,23 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
+source "${SHARED_DIR}/capz-test-env.sh"
 
-source openshift-ci/capz-test-env.sh
+export INIT_KIND=false
+export USE_KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+if [[ -f "${SHARED_DIR}/dev_endpoint" ]]; then
+  DEV_ENDPOINT=$(cat "${SHARED_DIR}/dev_endpoint")
+  export DEV_ENDPOINT
+  echo "DEV_ENDPOINT loaded: ${DEV_ENDPOINT}"
+fi
+
+if [[ -d "${ARO_REPO_DIR}" ]]; then
+  echo "Repository already exists at ${ARO_REPO_DIR}"
+else
+  echo "Cloning ${ARO_REPO_URL} branch ${ARO_REPO_BRANCH} into ${ARO_REPO_DIR}"
+  git clone -b "${ARO_REPO_BRANCH}" "${ARO_REPO_URL}" "${ARO_REPO_DIR}"
+fi
 
 # Phase 03: Management Cluster
 # With USE_KUBECONFIG set, skips Kind creation and validates the external cluster

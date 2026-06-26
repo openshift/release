@@ -148,6 +148,10 @@ while IFS= read -r i; do
   queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/audit.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --path=audit/audit.log
+  mcd=$( oc --insecure-skip-tls-verify --request-timeout=20s -n openshift-machine-config-operator get pod --field-selector=spec.nodeName=${i} -l k8s-app=machine-config-daemon -o name 2>/dev/null | head -1 )
+  if [[ -n "${mcd}" ]]; then
+    queue ${ARTIFACT_DIR}/nodes/$i/lsmod oc --insecure-skip-tls-verify -n openshift-machine-config-operator exec ${mcd} -c machine-config-daemon -- chroot /rootfs lsmod
+  fi
 done < /tmp/nodes
 
 echo "INFO: gathering the audit logs for each master"
