@@ -22,7 +22,7 @@ echo ""
 # Copy inventory from SHARED_DIR (already processed by earlier hub-deploy step)
 echo "=== Copying inventory for seed hub ${CLUSTER_NAME} from SHARED_DIR ==="
 
-# Set up ocp-deployment inventory (used by prepare-ibu-seed-sno.yml and ibu-poweroff-seed-spoke.yml)
+# Set up ocp-deployment inventory (used by ibu-prepare-seed-sno.yml and ibu-poweroff-seed-spoke.yml)
 # Use seed- prefixed files explicitly to avoid ambiguity with target hub files in SHARED_DIR
 mkdir -p "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars"
 mkdir -p "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars"
@@ -56,7 +56,7 @@ echo "=== Step 1: Prepare IBU seed SNO and retrieve kubeconfig ==="
 SEED_VM_NAME="master-0.${CLUSTER_NAME}"
 
 cd /eco-ci-cd
-ansible-playbook playbooks/ran/prepare-ibu-seed-sno.yml \
+ansible-playbook playbooks/ran/ibu-prepare-seed-sno.yml \
   -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
   --extra-vars "hub_cluster=${CLUSTER_NAME}" \
   --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}" \

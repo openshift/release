@@ -259,6 +259,20 @@ fi
 versionList=$(eval $version_cmd)
 echo -e "Available cluster versions:\n${versionList}"
 
+# Resolve version from offset when OPENSHIFT_VERSION is not explicitly set
+if [[ -z "$OPENSHIFT_VERSION" && -n "${VERSION_OFFSET_FROM_LATEST:-}" ]]; then
+  readarray -t y_streams < <(echo "$versionList" | cut -d'.' -f1,2 | sort -Vu)
+  total=${#y_streams[@]}
+  offset=${VERSION_OFFSET_FROM_LATEST}
+  source_index=$((total - offset - 1))
+  if (( source_index < 0 )); then
+    log "ERROR: Not enough Y-streams for offset ${offset}. Have ${total}: ${y_streams[*]}"
+    exit 1
+  fi
+  OPENSHIFT_VERSION=${y_streams[$source_index]}
+  log "Resolved version from offset ${offset}: ${OPENSHIFT_VERSION} (available Y-streams: ${y_streams[*]})"
+fi
+
 # If account-roles-create fell back to a different version, use it. This overrides
 # release:latest resolution so the cluster version matches the account roles.
 if [[ -f "${SHARED_DIR}/openshift_version" ]]; then

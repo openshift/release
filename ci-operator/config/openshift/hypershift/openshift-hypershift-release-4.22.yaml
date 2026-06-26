@@ -11,10 +11,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator-init:
+  hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  hypershift-operator-init:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: "4.22"
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -24,15 +28,21 @@ build_root:
   use_build_cache: true
 images:
   items:
-  - to: hypershift-operator
+  - to: hypershift-operator-422
   - dockerfile_path: Dockerfile.control-plane
     to: hypershift
 promotion:
   to:
   - excluded_images:
-    - hypershift-operator
+    - hypershift-operator-422
     name: "4.22"
     namespace: ocp
+  - additional_images:
+      hypershift-operator: hypershift-operator-422
+    excluded_images:
+    - '*'
+    namespace: hypershift
+    tag: "4.22"
 releases:
   initial:
     candidate:

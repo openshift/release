@@ -4,6 +4,43 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# fetch_with_backoff: curl wrapper with exponential backoff for release controller API.
+# Retries up to 6 times with delays of 1, 2, 4, 8, 16, 32 minutes.
+# Usage: fetch_with_backoff <url> [extra_curl_args...]
+# Output is written to stdout on success; returns non-zero after all retries exhausted.
+fetch_with_backoff() {
+    local url="$1"; shift
+    local max_retries=6
+    local base_delay=60  # 1 minute in seconds
+    local attempt=0
+    local http_code
+    local tmpfile
+    tmpfile=$(mktemp)
+
+    while true; do
+        attempt=$((attempt + 1))
+        # Use --write-out to capture HTTP status code separately
+        http_code=$(curl --connect-timeout 30 --max-time 120 -sf -w '%{http_code}' -o "${tmpfile}" "$@" "${url}" 2>/dev/null) || http_code="${http_code:-000}"
+
+        if [[ "${http_code}" =~ ^2[0-9][0-9]$ ]]; then
+            cat "${tmpfile}"
+            rm -f "${tmpfile}"
+            return 0
+        fi
+
+        if [[ "${attempt}" -gt "${max_retries}" ]]; then
+            echo "ERROR: fetch_with_backoff: All ${max_retries} retries exhausted for ${url} (last HTTP ${http_code})" >&2
+            rm -f "${tmpfile}"
+            return 1
+        fi
+
+        local delay=$(( base_delay * (1 << (attempt - 1)) ))
+        local delay_min=$(( delay / 60 ))
+        echo "  fetch_with_backoff: Attempt ${attempt}/${max_retries} failed (HTTP ${http_code}). Retrying in ${delay_min} minute(s)..." >&2
+        sleep "${delay}"
+    done
+}
+
 CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 export CLAUDE_CONFIG_DIR
 
@@ -21,7 +58,7 @@ if [[ -z "${PAYLOAD_TAG:-}" ]]; then
         exit 1
     fi
     LATEST_STREAM="${LATEST_VERSION}.0-0.nightly"
-    PAYLOAD_TAG=$(curl -sf "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${LATEST_STREAM}/tags" \
+    PAYLOAD_TAG=$(fetch_with_backoff "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${LATEST_STREAM}/tags" \
         | jq -r '[.tags[] | select(.phase == "Rejected")] | .[0].name // empty')
     if [[ -z "${PAYLOAD_TAG}" ]]; then
         echo "ERROR: No rejected nightly found for ${LATEST_STREAM}."
