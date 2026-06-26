@@ -60,9 +60,12 @@ if [[ -n "${EVAL_SETUP_SCRIPT}" ]]; then
         if [[ -f "${EVAL_SETUP_OUTPUT}" ]]; then
             EVAL_CONFIG="${EVAL_SETUP_OUTPUT}"
             echo "Setup script overrode EVAL_CONFIG: ${EVAL_CONFIG}"
-        else
+        elif [[ -d "${EVAL_SETUP_OUTPUT}" ]]; then
             export EVAL_SNAPSHOT_DIR="${EVAL_SETUP_OUTPUT}"
             echo "Snapshot dir: ${EVAL_SNAPSHOT_DIR}"
+        else
+            echo "ERROR: Setup script output is not a file or directory: ${EVAL_SETUP_OUTPUT}"
+            exit 1
         fi
     fi
 fi
