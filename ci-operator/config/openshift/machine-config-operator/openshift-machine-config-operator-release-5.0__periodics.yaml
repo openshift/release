@@ -420,6 +420,23 @@ tests:
     test:
     - chain: mco-e2e-test
     workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-mco-tp-disc-proxy-longduration
+  cron: 30 6 * * 0
+  shard_count: 2
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-8n7xf7k/release:latest
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      TEST_SUITE: openshift/machine-config-operator/longduration
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: mco-e2e-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disc-proxy
 - always_run: false
   as: e2e-aws-mco-fips-proxy-longduration
   interval: 168h
