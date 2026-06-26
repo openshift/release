@@ -1,5 +1,7 @@
 This directory contain the steps, chains and workflows implemented specifically for the Openshift Sandboxed Containers (OSC) jobs.
 
+*Note the prowjobs need **restrict_network_access: false** for konflux.  If doing a /pj-rehearse, it needs to be **true**.  If the PR is merged, it should be reverted to **false***
+
 ## Steps
 
 Here is the list of steps and their explanation.
