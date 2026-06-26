@@ -1,0 +1,28 @@
+ref:
+  as: acm-interop-p2p-spoke-upgrade-prehealthcheck
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  grace_period: 10m
+  commands: acm-interop-p2p-spoke-upgrade-prehealthcheck-commands.sh
+  timeout: 2h0m0s
+  cli: latest
+  resources:
+    limits:
+      cpu: "1"
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: ACM_INTEROP_P2P__PREHEALTHCHECK__SPOKE_CLUSTERS
+    default: ""
+    documentation: Optional comma-separated ManagedCluster names. When empty, all managed spokes except local-cluster are checked.
+  documentation: |-
+    Pre-upgrade health check on ACM managed spoke cluster(s). Uses the same logic as
+    cucushift-upgrade-prehealthcheck per spoke (MCP not updating/degraded, cluster
+    operators stable, all nodes Ready). Discovers spokes from the hub or from
+    ACM_INTEROP_P2P__PREHEALTHCHECK__SPOKE_CLUSTERS. Reuses
+    ${SHARED_DIR}/managed-cluster-kubeconfig when the spoke name matches
+    ${SHARED_DIR}/managed-cluster-name. On failure, writes
+    spoke-<name>-upgrade-prehealthcheck-failure.txt to ${ARTIFACT_DIR}.

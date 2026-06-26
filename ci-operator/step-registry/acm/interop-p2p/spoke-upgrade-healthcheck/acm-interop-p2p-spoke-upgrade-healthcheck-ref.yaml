@@ -1,0 +1,37 @@
+ref:
+  as: acm-interop-p2p-spoke-upgrade-healthcheck
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  grace_period: 10m
+  commands: acm-interop-p2p-spoke-upgrade-healthcheck-commands.sh
+  timeout: 5h0m0s
+  cli: latest
+  resources:
+    limits:
+      cpu: "1"
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: ACM_INTEROP_P2P__HEALTHCHECK__SPOKE_CLUSTERS
+    default: ""
+    documentation: Optional comma-separated ManagedCluster names. When empty, all managed spokes except local-cluster are checked.
+  - name: ACM_SPOKE_MCP_MINUTES_PER_NODE
+    default: "35"
+    documentation: Minutes of MCP wait budget per node (cucushift default 20). Rehearsal #2065916519451201536 needed ~33m/node on a 6-node spoke.
+  - name: ACM_SPOKE_MCP_READY_TIMEOUT_MINUTES
+    default: "210"
+    documentation: Minimum MCP wait budget in minutes regardless of node count. Floor above rehearsal failure (~196m) before cucushift 20m/node cap (120m on 6 nodes).
+  - name: ACM_SPOKE_CO_READY_TIMEOUT_MINUTES
+    default: "45"
+    documentation: Cluster operator stability wait budget in minutes (cucushift default 30). Poll interval is 60s.
+  documentation: |-
+    Post-upgrade health check on ACM managed spoke cluster(s). Uses the same logic as
+    cucushift-upgrade-healthcheck per spoke (MCP, cluster operators, nodes, pods).
+    Discovers spokes from the hub or from ACM_INTEROP_P2P__HEALTHCHECK__SPOKE_CLUSTERS.
+    Reuses ${SHARED_DIR}/managed-cluster-kubeconfig when the spoke name matches
+    ${SHARED_DIR}/managed-cluster-name. Step timeout (5h) covers sequential checks;
+    increase job timeout when many spokes are registered.
+    On failure, writes spoke-<name>-upgrade-healthcheck-failure.txt to ${ARTIFACT_DIR}.
