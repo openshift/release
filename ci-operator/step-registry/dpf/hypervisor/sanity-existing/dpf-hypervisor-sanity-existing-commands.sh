@@ -20,9 +20,6 @@ chmod 600 /tmp/id_rsa
 # Define SSH command with explicit options (don't rely on ~/.ssh/config)
 SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
-### DEBUG: add a long timeout to troubleshoot from pod
-## echo "Sleeping for 999999999 seconds ...."
-## sleep 999999999
 
 # Test SSH connection
 echo "Testing SSH connection to ${REMOTE_HOST}..."
@@ -49,10 +46,8 @@ datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
 SANITY_TESTS_RESULT=""
 REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
 
-### Debug: testing scp:
 # Extract the kubeconfig from the last DPF openshift-dpf install dir on hypervisor
 echo "=== SCP the kubeconfig from the last DPF openshift-dpf install dir on hypervisor ==="
-### debug:
 
 scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION} /tmp
 
@@ -90,10 +85,6 @@ export KUBECONFIG=/tmp/kubeconfig.doca8
 # latest main clone should be mounted in /root/dpf-ci
 echo "=== Checking if the openshift-dpf latest PR clone is mounted in /root/dpf-ci dir on this running pod"
 ls -ltr /root/dpf-ci
-
-####### Debug:
-echo "=== DEBUG:  sleeping for 20 mins in case we need to oc rhs to this pod remotely"
-sleep 1200
 
 which oc
 echo "=== Running oc commands on the DPF cluster from extracted kubeconfig"
@@ -205,8 +196,7 @@ else
 
 fi
 
-# parse sanity test file and return pass/fail
-# Add code here
+# To Do: parse sanity test file and return pass/fail
 
 scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/log-dpf-sanity-checks-${datetime_string} /tmp
 
