@@ -184,6 +184,13 @@ fi
 init_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
 
 UPGRADE_CHANNEL=${UPGRADE_CHANNEL:-}
+UPGRADE_CHANNEL_PREFIX=${UPGRADE_CHANNEL_PREFIX:-candidate}
+if [[ -z "${UPGRADE_CHANNEL}" && "${Z_STREAM_UPGRADE:-false}" != "true" ]]; then
+  current_x=$(echo "$init_version" | cut -d '.' -f1)
+  current_y=$(echo "$init_version" | cut -d '.' -f2)
+  UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${current_x}.$((current_y + 1))"
+  log "Auto-derived upgrade channel: ${UPGRADE_CHANNEL}"
+fi
 if [[ -n "${UPGRADE_CHANNEL}" ]]; then
   log "Changing cluster channel to ${UPGRADE_CHANNEL}"
   rosa edit cluster -c $cluster_id --channel "${UPGRADE_CHANNEL}"
