@@ -132,6 +132,11 @@ echo "[INFO] UPGRADE_FORK_ORGANIZATION: $UPGRADE_FORK_ORGANIZATION"
 INFRA_DIR="/tmp/infra-deployments"
 git clone --branch K-2236-03 "https://github.com/manish-jangra/infra-deployments.git" "$INFRA_DIR"
 
+# The clone is from a fork — add upstream so performKonfluxUpgrade can merge
+# remotes/upstream/main during the upgrade phase.
+git -C "$INFRA_DIR" remote add upstream https://github.com/redhat-appstudio/infra-deployments.git
+git -C "$INFRA_DIR" fetch upstream
+
 # If this is an infra-deployments PR, merge the PR changes
 if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
     pushd "$INFRA_DIR"
