@@ -151,7 +151,6 @@ while true; do
             --model "${CLAUDE_MODEL}" \
             --allowedTools "${ALLOWED_TOOLS}" \
             --output-format stream-json \
-            --max-turns 50 \
             --append-system-prompt-file "/workspace/.apm/prompts/agentic-followup.prompt.md" \
             -p "Address the review comments and fix any failing CI checks for ${JIRA_ISSUE_KEY}. The PR is #${PR_NUM} on ${UPSTREAM_REPO}.
 
