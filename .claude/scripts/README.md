@@ -4,6 +4,22 @@ This directory contains Python scripts used by slash commands in the `.claude/co
 
 ## Scripts
 
+### step_finder.py
+
+Search step-registry steps, workflows, and chains by keyword.
+
+**Used by**: `step-finder` skill (`.claude/skills/step-finder/`)
+
+**Usage**:
+```bash
+python3 .claude/scripts/step_finder.py "<query>" [--type step|workflow|chain|all] [--show-usage] [--no-reverse-deps] [--limit N]
+```
+
+**Example**:
+```bash
+python3 .claude/scripts/step_finder.py "aws upgrade" --type workflow --show-usage
+```
+
 ### scaffold_step_registry.py
 
 Scaffold a new step-registry ref step (`*-ref.yaml` + `*-commands.sh`).
