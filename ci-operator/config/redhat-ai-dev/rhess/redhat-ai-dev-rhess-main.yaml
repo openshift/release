@@ -1,0 +1,59 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.20
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: rhess
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rhess-e2e
+  optional: true
+  steps:
+    cluster_profile: aws-devfile
+    env:
+      BASE_DOMAIN: devfile-ci.com
+    test:
+    - as: rhess-e2e-steps
+      commands: |
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl -L --fail https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/candidate-4.18/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+        .ci/openshift_e2e.sh
+      dependencies:
+      - env: RHESS_IMAGE
+        name: rhess
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: redhat-ai-dev
+  repo: rhess
