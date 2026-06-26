@@ -140,10 +140,10 @@ if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
     popd
 fi
 
-# performKonfluxUpgrade expects the repo at ./tmp/infra-deployments (relative
-# to CWD). Symlink so the upgrade phase can find the clone.
-mkdir -p ./tmp
-ln -sfn "$INFRA_DIR" ./tmp/infra-deployments
+# Export INFRA_DEPLOYMENTS_DIR so performKonfluxUpgrade can find the clone.
+# Ginkgo runs the test binary from the package directory, so relative paths
+# like ./tmp/infra-deployments won't resolve correctly.
+export INFRA_DEPLOYMENTS_DIR="$INFRA_DIR"
 
 # Point ginkgo at the infra-deployments test directory
 export E2E_BIN_PATH="${INFRA_DIR}/tests/disaster-recovery"
