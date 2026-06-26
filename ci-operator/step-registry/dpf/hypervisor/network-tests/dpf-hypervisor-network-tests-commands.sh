@@ -67,7 +67,6 @@ else
   exit 1
 fi
 
-##if ssh ${SSH_OPTS} root@${REMOTE_HOST} "
 
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -a; \
     pwd; \
@@ -101,7 +100,6 @@ fi
 
 
 echo "=== Run DPF Kubernetes Traffic Flow Tests on Existing Cluster ==="
-# Run kubernetes traffic flow test
 
 # Need to export the doca8 dpu-workers after they are renamed, on hypervisor:
 # export TFT_SERVER_NODE=worker-303ea713ea90
