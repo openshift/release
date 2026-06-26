@@ -68,4 +68,4 @@ export API_CHART_REF="${API_CHART_REF:-main}"
 export API_CHART_PATH="${API_CHART_PATH:-charts}"
 
 # Run e2e tests via --label-filter
-"${E2E_BIN}" test --label-filter="${LABEL_FILTER}" --junit-report "${ARTIFACT_DIR}/junit.xml"
+"${E2E_BIN}" test --label-filter="${LABEL_FILTER}" --flake-attempts="${FLAKE_ATTEMPTS:-2}" --junit-report "${ARTIFACT_DIR}/junit.xml"
