@@ -48,8 +48,6 @@ oc wait DataImportCron -n openshift-virtualization-os-images \
 echo "Golden images ready. Available PVCs:"
 oc get pvc -n openshift-virtualization-os-images
 
-START_TIME=$(date "+%s")
-
 export OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapper.log"
 
 rc=0
@@ -69,14 +67,5 @@ uv --verbose --cache-dir /tmp/uv-cache \
   --tb=native \
   --junitxml="${ARTIFACT_DIR}/xunit_results.xml" \
   --pytest-log-file="${ARTIFACT_DIR}/pytest-tests.log" || rc=$?
-
-FINISH_TIME=$(date "+%s")
-DIFF_TIME=$((FINISH_TIME - START_TIME))
-
-if [[ ${DIFF_TIME} -le 600 ]]; then
-    echo ""
-    echo "The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give time to debug"
-    sleep 7200
-fi
 
 exit "${rc}"
