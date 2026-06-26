@@ -173,7 +173,7 @@ case "${BOOT_MODE}" in
     if [ "${transfer_protocol_type}" == "NFS" ]; then
       IP_ADDRESS="$(dig +short "${AUX_HOST}")"
       timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" ln -s "${DATA_STORAGE}/html/${CLUSTER_NAME}.${gnu_arch}.iso" "/opt/nfs/${CLUSTER_NAME}.${gnu_arch}.iso"
-      iso_path="${IP_ADDRESS}/${CLUSTER_NAME}.${arch}.iso"
+      iso_path="${IP_ADDRESS}/${CLUSTER_NAME}.${gnu_arch}.iso"
     else
       # Assuming HTTP or HTTPS
       iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"
