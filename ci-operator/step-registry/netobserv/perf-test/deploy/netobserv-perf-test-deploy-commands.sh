@@ -68,7 +68,7 @@ if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
 fi
 
 if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
-    patch_netobserv "flp" "quay.io/netobserv/flowlogs-pipeline:08e411a2"
+    patch_netobserv "flp" "quay.io/netobserv/flowlogs-pipeline:2abed7f5"
 fi
 
 
