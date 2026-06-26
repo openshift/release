@@ -137,6 +137,19 @@ git clone --branch K-2236-03 "https://github.com/manish-jangra/infra-deployments
 git -C "$INFRA_DIR" remote add upstream https://github.com/redhat-appstudio/infra-deployments.git
 git -C "$INFRA_DIR" fetch upstream
 
+# Add the QE fork remote (same repo the install step pushed the preview branch to).
+# performKonfluxUpgrade pushes merged changes here so ArgoCD picks them up.
+git -C "$INFRA_DIR" remote add qe https://github.com/redhat-appstudio-qe/infra-deployments.git
+git -C "$INFRA_DIR" fetch qe
+
+# Discover the preview branch ArgoCD is watching. The install step created a
+# preview-* branch and configured ArgoCD's all-application-sets to track it.
+export ARGO_TARGET_REVISION
+ARGO_TARGET_REVISION=$(oc get applications.argoproj.io all-application-sets \
+    -n openshift-gitops \
+    -o jsonpath='{.spec.source.targetRevision}' 2>/dev/null || echo "")
+echo "[INFO] ARGO_TARGET_REVISION: ${ARGO_TARGET_REVISION:-<not found>}"
+
 # If this is an infra-deployments PR, merge the PR changes
 if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
     pushd "$INFRA_DIR"
