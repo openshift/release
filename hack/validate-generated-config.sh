@@ -22,6 +22,7 @@ ci_operator_dir="${base_dir}/ci-operator"
 cp -r "${ci_operator_dir}" "${workdir}"
 
 ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/ci-operator/jobs" \
+--registry "${ci_operator_dir}/step-registry" \
 --known-infra-file infra-build-farm-periodics.yaml \
 --known-infra-file infra-periodics.yaml \
 --known-infra-file infra-periodics-migrated.yaml \
