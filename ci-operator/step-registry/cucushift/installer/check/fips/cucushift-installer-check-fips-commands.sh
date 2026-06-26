@@ -28,15 +28,24 @@ fi
 check_result=0
 node_lists=$(oc get nodes -ojson | jq -r '.items[].metadata.name' | xargs)
 for node in $node_lists; do
-    result=""
     echo "**********Check fips on node ${node}**********"
-    result=$(oc debug node/${node} -n openshift-infra -- chroot /host fips-mode-setup --check)
-    if [[ "${result}" == "FIPS mode is enabled." ]]; then
-        echo "Check passed on node ${node}"
+    fips_value=""
+    attempt=0
+    while [[ -z "${fips_value}" ]] && [[ $attempt -lt 3 ]]; do
+        fips_value=$(oc debug node/${node} -n openshift-infra -- cat /proc/sys/crypto/fips_enabled 2>/dev/null || true)
+        fips_value=$(echo "${fips_value}" | grep -oE '^[01]$' || true)
+        attempt=$(( attempt + 1 ))
+        if [[ -z "${fips_value}" ]] && [[ $attempt -lt 3 ]]; then
+            echo "Retry $attempt: failed to read fips_enabled on node ${node}"
+            sleep 5
+        fi
+    done
+    if [[ "${fips_value}" == "1" ]]; then
+        echo "Check passed on node ${node}: FIPS mode is enabled"
     else
-        echo "Check failed on node ${node}"
-        oc debug node/${node} -n openshift-infra -- chroot /host fips-mode-setup --check
-        oc debug node/${node} -n openshift-infra -- chroot /host grep -i fips /proc/cmdline
+        echo "Check failed on node ${node}: expected fips_enabled=1, got '${fips_value}'"
+        oc debug node/${node} -n openshift-infra -- cat /proc/sys/crypto/fips_enabled || true
+        oc debug node/${node} -n openshift-infra -- grep -i fips /proc/cmdline || true
         check_result=1
     fi
 done
