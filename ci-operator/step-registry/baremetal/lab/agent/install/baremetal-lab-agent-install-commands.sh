@@ -170,7 +170,7 @@ case "${BOOT_MODE}" in
       # on a single-arch payload migrated to a multi-arch cluster)
       continue
     fi
-    if [ "${transfer_protocol_type}" == "cifs" ]; then
+    if [ "${transfer_protocol_type}" == "CIFS" ]; then
       IP_ADDRESS="$(dig +short "${AUX_HOST}")"
       iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.${arch}.iso"
     else
