@@ -561,6 +561,116 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# Apply kernel scheduler tuning on all nodes to test EEVDF regression workaround.
+# Disables DELAY_DEQUEUE, DELAY_ZERO and sets preempt=voluntary to restore CFS-like
+# scheduling behavior on kernel 6.12 (RHCOS 10). This reduces OVN CPU regression
+# caused by delayed task dequeue and lazy preemption in the EEVDF scheduler.
+APPLY_KERNEL_SCHED_TUNING=${APPLY_KERNEL_SCHED_TUNING:-false}
+if [[ "${APPLY_KERNEL_SCHED_TUNING}" == "true" ]]; then
+echo "Applying kernel scheduler tuning (NO_DELAY_DEQUEUE, NO_DELAY_ZERO, preempt=voluntary)"
+cat > /tmp/tune-kernel-sched.sh <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+DEBUGFS="/sys/kernel/debug/sched"
+if [[ ! -d "${DEBUGFS}" ]]; then
+    mount -t debugfs none /sys/kernel/debug 2>/dev/null || true
+fi
+if [[ -f "${DEBUGFS}/features" ]]; then
+    echo NO_DELAY_DEQUEUE > "${DEBUGFS}/features"
+    echo NO_DELAY_ZERO > "${DEBUGFS}/features"
+fi
+if [[ -f "${DEBUGFS}/preempt" ]]; then
+    echo voluntary > "${DEBUGFS}/preempt"
+fi
+echo "Kernel scheduler tuning applied"
+SCRIPT
+ENCODED_SCHED_SCRIPT=$(base64 -w 0 /tmp/tune-kernel-sched.sh)
+
+oc apply -f- <<EOF
+apiVersion: v1
+kind: List
+items:
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: worker
+    name: kernel-sched-tuning-worker
+  spec:
+    config:
+      ignition:
+        version: 3.2.0
+      storage:
+        files:
+        - path: /usr/local/bin/tune-kernel-sched.sh
+          mode: 0755
+          overwrite: true
+          contents:
+            source: "data:text/plain;base64,${ENCODED_SCHED_SCRIPT}"
+      systemd:
+        units:
+        - name: tune-kernel-sched.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Apply kernel scheduler tuning (disable DELAY_DEQUEUE, DELAY_ZERO, set preempt=voluntary)
+            After=sys-kernel-debug.mount
+            Wants=sys-kernel-debug.mount
+            [Service]
+            Type=oneshot
+            ExecStart=/usr/local/bin/tune-kernel-sched.sh
+            RemainAfterExit=true
+            [Install]
+            WantedBy=multi-user.target
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: master
+    name: kernel-sched-tuning-master
+  spec:
+    config:
+      ignition:
+        version: 3.2.0
+      storage:
+        files:
+        - path: /usr/local/bin/tune-kernel-sched.sh
+          mode: 0755
+          overwrite: true
+          contents:
+            source: "data:text/plain;base64,${ENCODED_SCHED_SCRIPT}"
+      systemd:
+        units:
+        - name: tune-kernel-sched.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Apply kernel scheduler tuning (disable DELAY_DEQUEUE, DELAY_ZERO, set preempt=voluntary)
+            After=sys-kernel-debug.mount
+            Wants=sys-kernel-debug.mount
+            [Service]
+            Type=oneshot
+            ExecStart=/usr/local/bin/tune-kernel-sched.sh
+            RemainAfterExit=true
+            [Install]
+            WantedBy=multi-user.target
+metadata:
+  resourceVersion: ""
+EOF
+sleep 30
+echo "Waiting for MachineConfigPools to finish updating..."
+for i in $(seq 1 90); do
+    if oc wait mcp --all --for=condition=Updated=True --timeout=30s 2>/dev/null; then
+        echo "All MachineConfigPools updated successfully"
+        break
+    fi
+    echo "MachineConfigPools still updating (attempt ${i}/90)..."
+    oc get mcp
+    sleep 30
+done
+echo "Kernel scheduler tuning applied on all nodes"
+fi
+
 IF_INSTALL_INFRA_WORKLOAD=${IF_INSTALL_INFRA_WORKLOAD:=true}
 if [[ ${IF_INSTALL_INFRA_WORKLOAD} != "true" ]];then
    echo "No need to install infra and workload for this OCP cluster"
