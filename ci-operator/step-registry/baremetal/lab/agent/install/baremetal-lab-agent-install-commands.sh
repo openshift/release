@@ -170,9 +170,10 @@ case "${BOOT_MODE}" in
       # on a single-arch payload migrated to a multi-arch cluster)
       continue
     fi
-    if [ "${transfer_protocol_type}" == "CIFS" ]; then
+    if [ "${transfer_protocol_type}" == "NFS" ]; then
       IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-      iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.${arch}.iso"
+      timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" ln -s "${DATA_STORAGE}/html/${CLUSTER_NAME}.${gnu_arch}.iso" "/opt/nfs/${CLUSTER_NAME}.${gnu_arch}.iso"
+      iso_path="${IP_ADDRESS}/${CLUSTER_NAME}.${arch}.iso"
     else
       # Assuming HTTP or HTTPS
       iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"
