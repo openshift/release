@@ -132,7 +132,8 @@ fi
 # workflows provision without leases and should use the default sizing.
 if [[ -n "${LEASED_MSI_CONTAINERS:-}" ]]; then
   yq -i "
-    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.userAgentPool.minCount = 7 |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.userAgentPool.minCount = 4 |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.userAgentPool.vmSize = \"Standard_E16ds_v6\" |
     .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.infraAgentPool.vmSize = \"Standard_D8ds_v6\"
   " "${OVERRIDE_CONFIG_FILE}"
 else
