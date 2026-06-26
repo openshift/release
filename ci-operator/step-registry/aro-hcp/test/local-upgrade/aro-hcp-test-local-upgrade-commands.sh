@@ -49,9 +49,6 @@ yq eval -n "
   )
 " > "${OVERRIDE_CONFIG_FILE}"
 
-echo "Created upgrade override at: ${OVERRIDE_CONFIG_FILE}"
-cat "${OVERRIDE_CONFIG_FILE}"
-
 cp "${OVERRIDE_CONFIG_FILE}" "${SHARED_DIR}/config-override.yaml"
 
 echo "Hypershift operator image (in override, sourced from PR-head config/config.yaml):"
