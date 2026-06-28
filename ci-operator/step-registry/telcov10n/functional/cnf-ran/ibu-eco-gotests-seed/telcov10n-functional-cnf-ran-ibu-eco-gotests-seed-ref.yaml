@@ -10,7 +10,7 @@ ref:
     seed spoke VM.
 
     Flow:
-    1. Retrieve seed spoke kubeconfig from hub cluster ACM
+    1. Run ibu-prepare-spoke-sno.yml to retrieve seed spoke kubeconfig from hub cluster ACM
     2. Attach container storage disk to seed SNO VM
     3. Configure shared container storage mount on seed SNO
     4. Run eco-gotests IBU seedgeneration test suite
@@ -25,6 +25,9 @@ ref:
       memory: 200Mi
 
   env:
+  - name: CLUSTER_NAME
+    default: "kni-qe-108"
+    documentation: Seed hub cluster name (manages the seed spoke via ACM)
   - name: SEED_SPOKE_CLUSTER
     default: "ibu-seed"
     documentation: Seed spoke SNO cluster name (where seed image is generated)
@@ -34,3 +37,11 @@ ref:
   - name: MIRROR_REGISTRY
     default: "disconnected.registry.local:5000"
     documentation: Disconnected mirror registry address for seed image
+  - name: VERSION
+    default: "4.20"
+    documentation: OCP version used to tag the seed image
+
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-kni-qe-108-spoke-master0
+    mount_path: /var/host_variables/kni-qe-108/spoke-master0
