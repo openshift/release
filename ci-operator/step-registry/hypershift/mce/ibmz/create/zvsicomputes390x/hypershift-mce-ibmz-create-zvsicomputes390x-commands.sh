@@ -530,29 +530,54 @@ echo "$(date) Checking the compute nodes in the hosted control plane"
 oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
 
-# Configuring proxy server on bastion 
+# Configuring proxy server on bastion
+set -e
 echo "Getting management cluster basedomain to allow traffic to proxy server"
-mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
+mgmt_api_host=$(oc whoami --show-server | sed 's|https://||; s|:.*||')
+mgmt_domain=$(echo "${mgmt_api_host}" | awk -F'.' '{print $(NF-1)"."$NF}')
+no_proxy_list="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,nip.io,${mgmt_domain},${mgmt_api_host},${hcp_domain},${HYPERSHIFT_BASEDOMAIN},${BASTION_FIP},${BASTION_RIP},cluster.local,.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,localhost,127.0.0.1"
 
-echo "Getting the proxy setup script"
-cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
+echo "Configuring squid proxy on Ubuntu bastion"
+ssh "${ssh_options[@]}" root@$BASTION_FIP bash -s <<'EOF'
+set -euo pipefail
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y squid
+cat > /etc/squid/squid.conf <<'SQUID'
+acl SSL_ports port 443
+acl Safe_ports port 80
+acl Safe_ports port 443
+acl Safe_ports port 1025-65535
+acl CONNECT method CONNECT
+acl localnet src 10.0.0.0/8
+acl localnet src 172.16.0.0/12
+acl localnet src 192.168.0.0/16
+http_port 3128
+http_access allow CONNECT SSL_ports localnet
+http_access allow CONNECT SSL_ports localhost
+http_access allow localnet
+http_access allow localhost
+http_access deny all
+SQUID
+systemctl enable squid
+systemctl restart squid
+systemctl is-active --quiet squid
+EOF
 
-sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
-sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
-chmod 700 $HOME/setup_proxy.sh
-
-echo "Transferring the setup script to Bastion"
-scp "${ssh_options[@]}" $HOME/setup_proxy.sh root@$BASTION_FIP:/root/setup_proxy.sh
-echo "Triggering the proxy server setup on Bastion"
-ssh "${ssh_options[@]}" root@$BASTION_FIP "/root/setup_proxy.sh"
+ssh "${ssh_options[@]}" root@$BASTION_FIP "ss -lntp | grep ':3128 '"
+if [ $? -ne 0 ]; then
+  echo "Squid proxy failed to listen on port 3128"
+  ssh "${ssh_options[@]}" root@$BASTION_FIP "journalctl -u squid --no-pager -n 50"
+  exit 1
+fi
+echo "Squid proxy is running on bastion ${BASTION_FIP}:3128"
 
 cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${BASTION_FIP}:3128/
 export HTTPS_PROXY=http://${BASTION_FIP}:3128/
-export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export NO_PROXY="${no_proxy_list}"
 export http_proxy=http://${BASTION_FIP}:3128/
 export https_proxy=http://${BASTION_FIP}:3128/
-export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export no_proxy="${no_proxy_list}"
 EOF
 
 
@@ -562,7 +587,8 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-
+echo "Verifying management cluster API is reachable with proxy settings"
+oc whoami --show-server >/dev/null
 
 # Verifying the compute nodes status
 echo "$(date) Checking the compute nodes in the hosted control plane"
