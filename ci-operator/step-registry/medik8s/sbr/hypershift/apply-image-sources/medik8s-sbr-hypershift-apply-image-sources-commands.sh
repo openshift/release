@@ -25,6 +25,7 @@ fi
 
 # Fetch IDMS yaml from rhwa-fbc
 idms_file=$(mktemp)
+trap 'rm -f "$idms_file"' EXIT
 # --insecure: gitlab.cee uses internal RH CA not trusted by CI pods
 curl --insecure -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 60 \
     "${GITLAB_RAW}/${FBC_COMMIT_SHA}/.tekton/images-mirror-set.yaml" -o "$idms_file"
@@ -33,8 +34,13 @@ log "Fetched IDMS from rhwa-fbc commit ${FBC_COMMIT_SHA}"
 # Convert imageDigestMirrors → imageContentSources (same structure, drop mirrorSourcePolicy).
 # Use yq to convert YAML→JSON then jq to reshape, avoiding yq version compatibility issues.
 image_content_sources=$(yq-v4 -o=json '.' "$idms_file" | \
-    jq '[.spec.imageDigestMirrors[] | {source: .source, mirrors: .mirrors}]')
-log "Extracted $(echo "$image_content_sources" | jq 'length') image mirror entries"
+    jq '[(.spec.imageDigestMirrors // [])[] | {source: .source, mirrors: .mirrors}]')
+entry_count=$(echo "$image_content_sources" | jq 'length')
+if [[ "$entry_count" -eq 0 ]]; then
+    log "ERROR: no imageDigestMirrors entries found in IDMS file — upstream YAML may have changed"
+    exit 1
+fi
+log "Extracted ${entry_count} image mirror entries"
 
 # HostedCluster name written by hypershift-aws-create; namespace is always "clusters"
 HC_NAME="$(cat "${SHARED_DIR}/cluster-name")"
