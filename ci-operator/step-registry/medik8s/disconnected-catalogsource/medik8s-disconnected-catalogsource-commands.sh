@@ -232,43 +232,6 @@ spec:
 EOF
 }
 
-wait_for_catalogsource() {
-    log "Waiting for CatalogSource ${CATALOG_SOURCE_NAME} to be READY..."
-    local -i deadline=$(( SECONDS + 600 ))
-    local status=""
-
-    while (( SECONDS < deadline )); do
-        status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE_NAME" \
-            -o=jsonpath="{.status.connectionState.lastObservedState}" 2>/dev/null || true)
-        log "  $(( SECONDS ))s - status: ${status:-pending}"
-        [[ "$status" == "READY" ]] && {
-            log "CatalogSource ${CATALOG_SOURCE_NAME} is READY"
-            return 0
-        }
-        sleep 20
-    done
-
-    log "ERROR: CatalogSource not READY after 600s"
-    log "--- Debug info ---"
-    run oc get pods -o wide -n openshift-marketplace
-    run oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE_NAME" -o yaml
-    run oc -n openshift-marketplace get pods -l "olm.catalogSource=$CATALOG_SOURCE_NAME" -o yaml
-    log "--- Marketplace events ---"
-    oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
-
-    local node_name
-    node_name=$(oc -n openshift-marketplace get pods -l "olm.catalogSource=$CATALOG_SOURCE_NAME" \
-        -o=jsonpath='{.items[0].spec.nodeName}' 2>/dev/null || true)
-    if [[ -n "$node_name" ]]; then
-        local catalog_image="${MIRROR_REGISTRY_HOST}/${FBC_IMAGE_REPO#quay.io/}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
-        log "Attempting node-side pull diagnostic on ${node_name}..."
-        run oc debug "node/$node_name" -- chroot /host podman pull --authfile /var/lib/kubelet/config.json "${catalog_image}" || true
-    fi
-
-    run oc get mcp,node
-    return 1
-}
-
 main() {
     log "=== medik8s Disconnected CatalogSource Setup ==="
     trap 'collect_artifacts' EXIT
@@ -296,6 +259,8 @@ main() {
     create_idms_disconnected
     ensure_marketplace
     create_catalogsource
+    # shellcheck disable=SC2034 # used by medik8s-lib.sh wait_for_catalogsource()
+    CATALOG_IMAGE="${MIRROR_REGISTRY_HOST}/${FBC_IMAGE_REPO#quay.io/}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
     wait_for_catalogsource
 
     echo "${FBC_COMMIT_SHA}" > "${SHARED_DIR}/rhwa_fbc_commit_sha"
