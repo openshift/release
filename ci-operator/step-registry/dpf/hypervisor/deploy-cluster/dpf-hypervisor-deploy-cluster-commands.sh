@@ -90,6 +90,19 @@ else
   exit 1
 fi
 
+# If running in a PR job for openshift-dpf, checkout the PR branch
+if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "openshift-dpf" ]]; then
+  echo "PR job detected: checking out PR #${PULL_NUMBER} on the remote host"
+  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; \
+    git pull origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER} --rebase; \
+    git switch pr-${PULL_NUMBER}"; then
+    echo "Successfully checked out PR #${PULL_NUMBER}"
+  else
+    echo "ERROR: Failed to checkout PR #${PULL_NUMBER}"
+    exit 1
+  fi
+fi
+
 REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
 echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
 
