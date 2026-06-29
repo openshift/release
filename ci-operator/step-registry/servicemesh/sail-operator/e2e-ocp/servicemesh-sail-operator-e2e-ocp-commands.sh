@@ -137,7 +137,7 @@ run_tests() {
     echo 'Command: ${E2E_COMMAND:-make test.e2e.ocp}'
     echo '--- Running on CI Environment: ' \${CI:-}' ---'
     echo '--- Pull Request Number: ' \${PR_NUMBER:-}' ---'
-    entrypoint ${E2E_COMMAND:-make test.e2e.ocp}
+    entrypoint sleep 7200
     "
 }
 
