@@ -1,0 +1,38 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 300Mi
+tests:
+- as: rosa-cluster-lease-controller
+  cron: '*/15 * * * *'
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      OCM_LOGIN_ENV: staging
+    test:
+    - ref: rosa-cluster-lease-controller
+- as: rosa-cluster-lease-health
+  cron: 7,37 * * * *
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      OCM_LOGIN_ENV: staging
+    test:
+    - ref: rosa-cluster-lease-health
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: rosa-cluster-lease
