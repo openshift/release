@@ -105,7 +105,7 @@ cd "${SRC_DIR}"
 # Run analysis on all releases.
 # Time-box analysis and limit turns to avoid uncontrolled billable minutes.
 echo "Running Claude to analyze LVMS CI jobs..."
-timeout 3000 claude \
+timeout 4800 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 100 \
     --output-format stream-json \
