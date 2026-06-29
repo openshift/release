@@ -1,0 +1,158 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - context_dir: .
+    dockerfile_path: image/container/ocp-test/Dockerfile.lp-chaos--ocp-test
+    from: cli
+    to: lp-chaos--ocp-test
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cr--cnv--krkn-hub-tests--aws
+  cron: 0 22 * * 1
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CHAOS_TEAM_NAME: lp-chaos
+      CNV_VERSION: "4.22"
+      COMPUTE_NODE_TYPE: m5.metal
+      CONTAINER_ETCD_RECOVERY_TIME: "120"
+      LPC_LP_CNV__VM__REPLICA_COUNT: "3"
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      TELEMETRY_GROUP: ocp4.22-nightly--cnv-4.22-stable--aws
+    test:
+    - ref: redhat-lp-chaos-lp-cnv-vm-create
+    - chain: redhat-chaos-krkn-hub-tests
+    - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-lp-chaos-lp-cnv-vm-clean
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 6h0m0s
+- as: cr--cnv--krkn-hub-node-tests--aws
+  cron: 0 8 * * 2
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CHAOS_TEAM_NAME: lp-chaos
+      CNV_VERSION: "4.22"
+      COMPUTE_NODE_TYPE: m5.metal
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      NODE_OUTAGE_TIMEOUT: "1200"
+      POWER_OUTAGE_TIMEOUT: "1200"
+      TELEMETRY_GROUP: ocp4.22-nightly--cnv-4.22-stable--aws
+    test:
+    - ref: redhat-lp-chaos-lp-cnv-vm-create
+    - chain: redhat-chaos-krkn-hub-node-tests
+    - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-lp-chaos-lp-cnv-vm-clean
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 8h0m0s
+- as: cr--cnv--kubevirt-outage--aws
+  cron: 0 4 * * 2
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CHAOS_TEAM_NAME: lp-chaos
+      CNV_VERSION: "4.22"
+      COMPUTE_NODE_TYPE: m5.metal
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      TARGET_NAMESPACE: cnv-chaos-test-ns
+      TELEMETRY_GROUP: ocp4.22-nightly--cnv-4.22-stable--aws
+    test:
+    - ref: redhat-lp-chaos-lp-cnv-vm-create
+    - ref: redhat-chaos-kubevirt-outage
+    - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-lp-chaos-lp-cnv-vm-clean
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 4h0m0s
+- as: cr--cnv--snapshot--kill--controller--aws
+  cron: 0 6 * * 3
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CHAOS_TEAM_NAME: lp-chaos
+      CNV_VERSION: "4.22"
+      COMPUTE_NODE_TYPE: m5.metal
+      LPC_LP_CNV__VM__REPLICA_COUNT: "1"
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      TELEMETRY_GROUP: ocp-4.22-lpGA-lp-chaos
+    test:
+    - chain: redhat-lp-chaos-lp-cnv-outage-pod-snapshot-kill--controller
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 4h0m0s
+- as: cr--cnv--snapshot--kill--apiserver--aws
+  cron: 30 6 * * 3
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CHAOS_TEAM_NAME: lp-chaos
+      CNV_VERSION: "4.22"
+      COMPUTE_NODE_TYPE: m5.metal
+      LPC_LP_CNV__VM__REPLICA_COUNT: "1"
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      TELEMETRY_GROUP: ocp-4.22-lpGA-lp-chaos
+    test:
+    - chain: redhat-lp-chaos-lp-cnv-outage-pod-snapshot-kill--apiserver
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 4h0m0s
+- as: cr--cnv--snapshot--kill--virt-api--aws
+  cron: 0 7 * * 3
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CHAOS_TEAM_NAME: lp-chaos
+      CNV_VERSION: "4.22"
+      COMPUTE_NODE_TYPE: m5.metal
+      LPC_LP_CNV__VM__REPLICA_COUNT: "1"
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      TELEMETRY_GROUP: ocp-4.22-lpGA-lp-chaos
+    test:
+    - chain: redhat-lp-chaos-lp-cnv-outage-pod-snapshot-kill--virt-api
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 4h0m0s
+- as: cr--cnv--snapshot--kill--csi-driver--aws
+  cron: 30 7 * * 3
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CHAOS_TEAM_NAME: lp-chaos
+      CNV_VERSION: "4.22"
+      COMPUTE_NODE_TYPE: m5.metal
+      LPC_LP_CNV__VM__REPLICA_COUNT: "1"
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      TELEMETRY_GROUP: ocp-4.22-lpGA-lp-chaos
+    test:
+    - chain: redhat-lp-chaos-lp-cnv-outage-pod-snapshot-kill--csi-driver
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: ocp-4.22-lpGA-lp-chaos

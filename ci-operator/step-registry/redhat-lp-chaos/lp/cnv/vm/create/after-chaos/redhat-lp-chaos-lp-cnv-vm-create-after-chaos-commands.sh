@@ -1,1 +1,139 @@
-../redhat-lp-chaos-lp-cnv-vm-create-commands.sh
+#!/bin/bash
+
+set -euxo pipefail; shopt -s inherit_errexit
+
+eval "$(
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+)"; EnsureReqs uv
+
+eval "$(
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/TestReport--JUnit.sh
+)"
+
+typeset startTime="${SECONDS}"
+typeset tcMsg='-Unknown Error'
+
+function UpdJUnit() {
+    typeset tcMsg="${1}"; (($#)) && shift
+    typeset stepId="${BASH_SOURCE[0]##*/}"; stepId="${stepId%-commands.sh}"
+    typeset tcRes=''
+    case ${tcMsg} in
+      (-*)  tcRes=-e; tcMsg="${tcMsg#-}";;
+      ('')  ;;
+      (*)   tcRes=-f;;
+    esac
+    TestReport--JUnit--AddTC \
+        "${ARTIFACT_DIR}/junit--${stepId}.xml" \
+        "${LPC_LP_CNV__RPT_NAME}" \
+        "${LPC_LP_CNV__TS_NAME}" \
+        "${LPC_LP_CNV__TC_NAME}" \
+        "$((SECONDS - startTime))" \
+        "${tcRes}" "${tcMsg}" || :
+}
+
+trap 'UpdJUnit "${tcMsg}"' EXIT
+
+typeset -a vmList=()
+typeset -a vmNamesForWait=()
+
+# Create namespace
+{
+    oc create namespace "${LPC_LP_CNV__VM__NS}" \
+        --dry-run=client -o yaml --save-config
+} | oc apply -f -
+
+oc wait "Namespace/${LPC_LP_CNV__VM__NS}" --for jsonpath='{.status.phase}'=Active --timeout 60s 1> /dev/null
+
+# Create vms
+function VmCreate() {
+    typeset vmIndex="${1}"; (($#)) && shift
+    typeset currentVmName="${LPC_LP_CNV__VM__PREFIX}-${vmIndex}"
+    {
+        oc create -f- --dry-run=client -o json --save-config |
+        jq -c \
+            --arg vmName "${currentVmName}" \
+            --arg vmNamespace "${LPC_LP_CNV__VM__NS}" \
+            --arg instanceType "${LPC_LP_CNV__VM__INSTANCE_TYPE}" \
+            --arg dvSourceName "${LPC_LP_CNV__VM__DV_SOURCE_NAME}" \
+            --arg dvSourceNs "${LPC_LP_CNV__VM__DV_SOURCE_NS}" \
+            --arg vmPreference "${LPC_LP_CNV__VM__PREFERENCE}" \
+            '
+            .metadata.name = $vmName |
+            .metadata.namespace = $vmNamespace |
+            .spec.template.metadata.labels.special = $vmName |
+
+            .spec.instancetype.name = $instanceType |
+            .spec.preference.name = $vmPreference |
+
+            .spec.dataVolumeTemplates[0].metadata.name = ($vmName + "-volume") |
+            .spec.dataVolumeTemplates[0].spec.sourceRef.name = $dvSourceName |
+            .spec.dataVolumeTemplates[0].spec.sourceRef.namespace = $dvSourceNs |
+
+            .spec.template.spec.volumes[0].dataVolume.name = ($vmName + "-volume")
+            ' | \
+        yq -p json -o yaml eval .
+    } 0<<'EOF' | oc apply -f -
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: ""
+  namespace: ""
+spec:
+  # Dynamic DataVolume Template: Triggers PVC creation and image cloning
+  dataVolumeTemplates:
+    - metadata:
+        name: ""
+      spec:
+        sourceRef:
+          kind: DataSource
+          name: ""
+          namespace: ""
+        storage: {}
+  # InstanceType and Preference replace manual CPU/Memory configuration
+  instancetype:
+    name: ""
+  preference:
+    name: ""
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        app: chaos-target
+    spec:
+      domain:
+        devices:
+          interfaces:
+            - masquerade: {}
+              name: default
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        # References the dynamically created DataVolume
+        - dataVolume:
+            name: ""
+          name: rootdisk
+EOF
+
+    true
+}
+
+for ((i=1; i<=LPC_LP_CNV__VM__REPLICA_COUNT; i++)); do
+    VmCreate "${i}" || { tcMsg="VM creation failed for index ${i}"; false; }
+    vmList+=("${LPC_LP_CNV__VM__PREFIX}-${i}")
+    vmNamesForWait+=("vm/${LPC_LP_CNV__VM__PREFIX}-${i}")
+done
+
+oc wait "${vmNamesForWait[@]}" -n "${LPC_LP_CNV__VM__NS}" --for=condition=Ready --timeout="${LPC_LP_CNV__VM__WAIT_TIMEOUT}" \
+    || { tcMsg="VM(s) did not reach Ready state within ${LPC_LP_CNV__VM__WAIT_TIMEOUT}"; false; }
+
+printf '%s\n' "${vmList[*]}" > "${SHARED_DIR}/target-vm-name.txt"
+
+tcMsg=''
+true

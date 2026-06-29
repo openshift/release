@@ -1,10 +1,8 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
-typeset vmList
-vmList=$(< "${SHARED_DIR}/target-vm-name.txt")
-read -r -a vmArray <<< "${vmList}"
-
+typeset -a vmArray
+read -r -a vmArray 0< "${SHARED_DIR}/target-vm-name.txt"
 
 function DeleteAllVms() {
     typeset -i failedCount=0
@@ -13,12 +11,12 @@ function DeleteAllVms() {
             --ignore-not-found=true \
             --grace-period=0 || {
             : "WARNING: Failed to delete VM ${vmName}."
-            failedCount+=1
+            ((++failedCount))
         }
     done
 
-    oc wait --for=delete pod -l app=chaos-target -n "${LPC_LP_CNV__VM__NS}" --timeout=2m || :
-    if [[ ${failedCount} -gt 0 ]]; then
+    oc wait --for=delete pod -l app=chaos-target -n "${LPC_LP_CNV__VM__NS}" --timeout=2m
+    if ((failedCount > 0)); then
         : "WARNING: Failed to delete ${failedCount} VM(s)."
         return 1
     fi
@@ -30,7 +28,9 @@ function DeleteNamespace() {
     oc delete namespace "${LPC_LP_CNV__VM__NS}" --ignore-not-found=true
 }
 
-DeleteAllVms
+typeset _vmDelFailed=0
+DeleteAllVms || _vmDelFailed=1
 DeleteNamespace
+((_vmDelFailed == 0))
 
 true
