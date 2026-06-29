@@ -1,0 +1,97 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: dev-cluster-aws
+  optional: true
+  steps:
+    cluster_profile: aws-observability
+    env:
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
+      TIMEOUT: +8 hours
+    test:
+    - ref: wait
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: dev-cluster-aws-sts
+  optional: true
+  steps:
+    cluster_profile: aws-observability
+    env:
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      TIMEOUT: +8 hours
+    test:
+    - ref: wait
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: dev-cluster-gcp
+  optional: true
+  steps:
+    cluster_profile: gcp-observability
+    env:
+      COMPUTE_NODE_TYPE: e2-standard-8
+      TIMEOUT: +8 hours
+    test:
+    - ref: wait
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: dev-cluster-gcp-wif
+  optional: true
+  steps:
+    cluster_profile: gcp-observability
+    env:
+      COMPUTE_NODE_TYPE: e2-standard-8
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      TIMEOUT: +8 hours
+    test:
+    - ref: wait
+    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
+- as: dev-cluster-azure
+  optional: true
+  steps:
+    cluster_profile: azure-observability
+    env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v3
+      TIMEOUT: +8 hours
+    test:
+    - ref: wait
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: dev-cluster-azure-wif
+  optional: true
+  steps:
+    cluster_profile: azure-observability
+    env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v3
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      TIMEOUT: +8 hours
+    test:
+    - ref: wait
+    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: loki
+  variant: dev-cluster
