@@ -50,6 +50,13 @@ fi
 cd "$(mktemp -d)"
 git clone --branch main https://github.com/openshift-pipelines/performance.git .
 
+# If this is a PR check of the performance repo (not rehearse job), switch to PR branch
+if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
+    echo "[INFO] Presubmit job detected - switching to PR #${PULL_NUMBER}"
+    git fetch origin "pull/${PULL_NUMBER}/head"
+    git checkout -b "pr-${PULL_NUMBER}" FETCH_HEAD
+fi
+
 # Delete all benchmark namespaces used for testing
 function cleanup_namespaces() {
     echo "Cleaning up benchmark namespaces"
