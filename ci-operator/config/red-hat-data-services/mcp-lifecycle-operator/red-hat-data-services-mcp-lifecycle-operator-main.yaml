@@ -1,8 +1,9 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.26
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: mcp-lifecycle-operator
 resources:
   '*':
     limits:
@@ -12,7 +13,7 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: make test
+  commands: GOFLAGS='-mod=readonly' make test
   container:
     from: src
 zz_generated_metadata:
