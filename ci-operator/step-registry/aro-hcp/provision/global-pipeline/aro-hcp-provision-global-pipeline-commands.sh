@@ -24,7 +24,7 @@ resolve_config_from_templatize() {
     fi
 
     resolved_value="$(
-        tooling/templatize/templatize inspect \
+        "tooling/templatize/templatize-$(uname -m)" inspect \
         --config-file "config/config.yaml" \
         "${override_args[@]}" \
         --dev-settings-file "tooling/templatize/settings.yaml" \
@@ -78,7 +78,7 @@ GLOBAL_SUBSCRIPTION_ID="$(resolve_subscription_id_from_name "${GLOBAL_SUBSCRIPTI
 # Keep generated bicepparam under dev-infrastructure/configurations so the
 # relative "using '../templates/dev-acr.bicep'" path resolves correctly.
 ACR_PARAMETERS_FILE="${ACR_PARAMETERS_FILE:-dev-infrastructure/configurations/acr-svc-ci-$(date +%s).bicepparam}"
-tooling/templatize/templatize generate \
+"tooling/templatize/templatize-$(uname -m)" generate \
     --config-file "config/config.yaml" \
     --dev-settings-file "tooling/templatize/settings.yaml" \
     --dev-environment "${DEPLOY_ENV}" \
