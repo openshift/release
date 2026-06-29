@@ -359,6 +359,9 @@ CONFIG = {
     'fleet-manager-qe-quota-slice': {
         'ap-northeast-1': 3,
     },
+    'gcd-quota-slice': {
+        'u-germany-northeast1': 2,
+    },
     'gcp-qe-quota-slice': {
         'us-central1': 45,
     },
