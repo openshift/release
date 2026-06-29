@@ -16,6 +16,7 @@ declare -A OCP_TO_ACM=(
   ["4.20"]="2.15"
   ["4.21"]="2.16"
   ["4.22"]="2.17"
+  ["5.0"]="5.0"
 )
 
 OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d'.' -f1,2)
@@ -25,7 +26,8 @@ ACM_VERSION=$(oc get multiclusterhub -A -o jsonpath='{.items[0].status.currentVe
 if [[ -z "${ACM_VERSION}" ]]; then
   ACM_VERSION="${OCP_TO_ACM[${OCP_VERSION}]:-}"
   if [[ -z "${ACM_VERSION}" ]]; then
-    echo "WARNING: No ACM version mapping for OCP ${OCP_VERSION_FOR_ACM}, falling back to MCE must-gather"
+    echo "WARNING: No ACM version mapping for OCP ${OCP_VERSION}, falling back to 2.17"
+    ACM_VERSION="2.17"
   fi
 fi
 
