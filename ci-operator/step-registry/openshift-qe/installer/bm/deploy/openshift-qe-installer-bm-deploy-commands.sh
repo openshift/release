@@ -7,6 +7,7 @@ set -x
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
+# Check if target bastion is in maintenance mode
 if [[ ! -f "${SHARED_DIR}/assignment_id" ]]; then
   target_bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
   # Check if target bastion is in maintenance mode
@@ -78,6 +79,7 @@ sed -i "s|^smcipmitool_url:$|smcipmitool_url: \"file:///root/smcipmitool.tar.gz\
 # Variables with defaults that need overriding
 sed -i "s/^public_vlan: .*/public_vlan: $PUBLIC_VLAN/" /tmp/all.yml
 sed -i "s/^enable_fips: .*/enable_fips: $FIPS/" /tmp/all.yml
+sed -i "s/^enable_techpreview: .*/enable_techpreview: $ENABLE_TECHPREVIEW/" /tmp/all.yml
 
 # Variables NOT in sample — append
 cat <<EOF >>/tmp/all.yml
