@@ -14,9 +14,6 @@ kubectl wait --for=condition=available deployment/krkn-operator-operator \
   -n "${TARGET_NAMESPACE}" \
   --timeout=300s
 
-acm_version=$(oc -A get mch multiclusterhub -o jsonpath='{.status.currentVersion}{"\n"}')
-echo "Success! ACM ${acm_version} is Running"
-
 echo "# OCM Setup & krkn-operator Validation Summary"
 echo ""
 echo "## OCM ManagedClusters"
@@ -46,3 +43,5 @@ OPERATOR_NAMESPACE="${TARGET_NAMESPACE}" \
 KUBE_CONTEXT="$(kubectl config current-context)" \
   /tmp/krkn-operator/scripts/test-api.sh
 
+acm_version=$(oc -A get mch multiclusterhub -o jsonpath='{.status.currentVersion}{"\n"}')
+echo "Success! ACM ${acm_version} is Running"
