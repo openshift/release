@@ -1,0 +1,65 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: openshift-gitops-extra-alerts
+  namespace: openshift-gitops
+spec:
+  groups:
+  - name: OpenShiftGitOpsExtraAlerts
+    rules:
+    - alert: ArgoCDApplicationControllerNotFullyReady
+      expr: kube_statefulset_status_replicas_ready{namespace="openshift-gitops",statefulset="openshift-gitops-application-controller"} < kube_statefulset_replicas{namespace="openshift-gitops",statefulset="openshift-gitops-application-controller"}
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: Argo CD application controller replicas are not fully ready
+        description: One or more Argo CD application controller replicas have not been ready for at least 10 minutes.
+    - alert: ArgoCDServerUnavailable
+      expr: kube_deployment_status_replicas_available{namespace="openshift-gitops",deployment="openshift-gitops-server"} < 1
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: Argo CD server is unavailable
+        description: The Argo CD API server deployment has had no available replicas for at least 10 minutes.
+    - alert: ArgoCDRepoServerUnavailable
+      expr: kube_deployment_status_replicas_available{namespace="openshift-gitops",deployment="openshift-gitops-repo-server"} < 1
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: Argo CD repo server is unavailable
+        description: The Argo CD repo-server deployment has had no available replicas for at least 10 minutes.
+    - alert: ArgoCDSyncFailures
+      expr: sum(increase(argocd_app_sync_total{namespace="openshift-gitops",phase=~"Error|Failed"}[15m])) > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: Argo CD sync failures detected
+        description: Argo CD reported one or more failed application sync operations in the last 15 minutes.
+    - alert: ArgoCDApplicationDegraded
+      expr: argocd_app_info{namespace="openshift-gitops",health_status="Degraded"} > 0
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Argo CD application is degraded
+        description: At least one Argo CD application in openshift-gitops has stayed in Degraded state for 10 minutes.
+    - alert: ArgoCDApplicationControllerFrequentRestarts
+      expr: sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace="openshift-gitops",container="argocd-application-controller",pod=~"openshift-gitops-application-controller-.*"}[30m])) > 2
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Argo CD application controller is restarting frequently
+        description: Argo CD application controller pod {{ $labels.pod }} restarted more than 2 times in 30 minutes.
+    - alert: ArgoCDApplicationControllerOOMKilled
+      expr: max by (pod) (kube_pod_container_status_last_terminated_reason{namespace="openshift-gitops",container="argocd-application-controller",reason="OOMKilled",pod=~"openshift-gitops-application-controller-.*"}) == 1
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: Argo CD application controller was OOM-killed
+        description: Argo CD application controller pod {{ $labels.pod }} was terminated due to OOMKilled in the last restart cycle.

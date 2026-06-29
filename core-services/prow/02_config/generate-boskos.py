@@ -153,6 +153,12 @@ CONFIG = {
     'aws-konflux-qe-quota-slice': {
         'us-west-2': 10
     },
+    'aws-konflux-stg-quota-slice': {
+        'us-east-1': 25,
+        'us-east-2': 25,
+        'us-west-1': 25,
+        'us-west-2': 25
+    },
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
     },
@@ -353,6 +359,9 @@ CONFIG = {
     'fleet-manager-qe-quota-slice': {
         'ap-northeast-1': 3,
     },
+    'gcd-quota-slice': {
+        'u-germany-northeast1': 2,
+    },
     'gcp-qe-quota-slice': {
         'us-central1': 45,
     },
@@ -518,7 +527,7 @@ CONFIG = {
         'us-east': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'lon04': 3,
+        'eu-gb': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,

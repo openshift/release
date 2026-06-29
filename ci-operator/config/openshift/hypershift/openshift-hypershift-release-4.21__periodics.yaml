@@ -11,18 +11,6 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  manila-csi-driver-operator-test:
-    name: "4.21"
-    namespace: ocp
-    tag: manila-csi-driver-operator-test
-  openstack-cinder-csi-driver-operator-test:
-    name: "4.21"
-    namespace: ocp
-    tag: openstack-cinder-csi-driver-operator-test
-  openstack-installer:
-    name: "4.21"
-    namespace: ocp
-    tag: openstack-installer
   upi-installer:
     name: "4.21"
     namespace: ocp
@@ -157,6 +145,18 @@ tests:
     env:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-conformance-fips
+  cron: 0 4 1,15 * *
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      EXTRA_ARGS: --fips
+      PUBLIC_ONLY: "true"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
+    workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *
   steps:
@@ -275,6 +275,23 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
     workflow: hypershift-azure-aks-conformance
+- as: e2e-azure-aks-ovn-conformance-fips
+  cron: 0 5 1,15 * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      HYPERSHIFT_AZURE_FIPS: "true"
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+      TEST_SKIPS: 'etcd leader changes are not excessive\| In-tree Volumes \[Driver:
+        azure-disk\]\| In-tree Volumes \[Driver: azure-file\]\| FIPS TestFIPS'
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
+    workflow: hypershift-azure-aks-conformance
 - as: e2e-azure-aks-external-oidc
   cron: 0 9 * * *
   steps:
@@ -358,76 +375,6 @@ tests:
     env:
       HYPERSHIFT_NODE_COUNT: "2"
     workflow: hypershift-kubevirt-azure-conformance
-- as: e2e-openstack-aws
-  cron: 0 10 * * *
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vexxhost-quota-slice
-    test:
-    - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-nested
-- as: e2e-openstack-aws-nfv
-  minimum_interval: 96h
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-nfv
-      NFV_NODEPOOLS: "true"
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-nfv-quota-slice
-    workflow: hypershift-openstack-aws-nfv
-- as: e2e-openstack-aws-conformance
-  minimum_interval: 72h
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vexxhost-quota-slice
-    workflow: hypershift-openstack-aws-conformance
-- as: e2e-openstack-aws-csi-cinder
-  minimum_interval: 72h
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
-      TECH_PREVIEW_NO_UPGRADE: "true"
-      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-cinder.yaml
-      TEST_SUITE: openshift/csi
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vh-mecha-central-quota-slice
-    workflow: hypershift-openstack-aws-conformance
-- as: e2e-openstack-aws-csi-manila
-  minimum_interval: 72h
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
-      TECH_PREVIEW_NO_UPGRADE: "true"
-      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-manila.yaml
-      TEST_SUITE: openshift/csi
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vh-mecha-central-quota-slice
-    workflow: hypershift-openstack-aws-conformance
-- as: e2e-openstack-nested-conformance
-  minimum_interval: 240h
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-openstack-nested-conformance
 zz_generated_metadata:
   branch: release-4.21
   org: openshift

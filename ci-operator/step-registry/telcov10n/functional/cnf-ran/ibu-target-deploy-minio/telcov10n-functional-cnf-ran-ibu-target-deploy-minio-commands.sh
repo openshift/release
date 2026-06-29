@@ -20,5 +20,5 @@ cp "${SHARED_DIR}/bastion" /eco-ci-cd/inventories/ocp-deployment/host_vars/basti
 cd /eco-ci-cd/
 
 echo "Deploying MinIO on target bastion"
-ansible-playbook playbooks/ran/deploy-minio.yml \
+ansible-playbook playbooks/ran/ibu-deploy-minio.yml \
   -i inventories/ocp-deployment/build-inventory.py -vv

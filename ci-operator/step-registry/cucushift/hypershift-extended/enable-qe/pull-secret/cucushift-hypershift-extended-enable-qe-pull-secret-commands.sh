@@ -135,6 +135,18 @@ rm /tmp/global-pull-secret.json
 echo "{\"spec\":{\"pullSecret\":{\"name\":\"$CLUSTER_NAME-pull-secret-new\"}}}" > /tmp/patch.json
 oc patch hostedclusters -n "$HYPERSHIFT_NAMESPACE" "$CLUSTER_NAME" --type=merge -p="$(cat /tmp/patch.json)"
 
+# Patching the HostedCluster pullSecret triggers a MachineDeployment rolling update
+# (new ignition/user-data). Wait for the rollout to complete before proceeding,
+# otherwise conformance tests will run on a cluster with nodes being replaced.
+echo "Waiting for MachineDeployment rollouts"
+MD_NAMESPACE="${HYPERSHIFT_NAMESPACE}-${CLUSTER_NAME}"
+timeout 5m bash -c 'until oc get machinedeployments -n "'"${MD_NAMESPACE}"'" -l "cluster.x-k8s.io/cluster-name='"${CLUSTER_NAME}"'" --no-headers 2>/dev/null | grep -q .; do sleep 10; done'
+for md in $(oc get machinedeployments -n "${MD_NAMESPACE}" -l "cluster.x-k8s.io/cluster-name=${CLUSTER_NAME}" -o jsonpath='{.items[*].metadata.name}'); do
+  oc wait machinedeployment "${md}" -n "${MD_NAMESPACE}" --for=condition=RollingOut=True --timeout=5m
+  echo "Waiting for MachineDeployment ${md} to finish rolling out..."
+  oc wait machinedeployment "${md}" -n "${MD_NAMESPACE}" --for=condition=RollingOut=False --timeout=45m
+done
+
 echo "check day-2 pull-secret update"
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 RETRIES=45

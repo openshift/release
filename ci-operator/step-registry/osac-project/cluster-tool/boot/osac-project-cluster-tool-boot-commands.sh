@@ -15,7 +15,7 @@ echo "COMPONENT_IMAGE: ${COMPONENT_IMAGE:-<none>}"
 echo "COMPONENT_IMAGE_NAME: ${COMPONENT_IMAGE_NAME:-<none>}"
 echo "-------------------------------------------"
 
-CLONE_NAME="vmaas-helm"
+CLONE_NAME="vmaas"
 
 # === Create ssh_config from ofcir-acquire output ===
 IP=$(cat "${SHARED_DIR}/server-ip")
@@ -165,7 +165,7 @@ _timer $PULL_START "Pull flavor"
 
 CLUSTER_BOOT_START=$(date +%s)
 echo "=== Booting cluster ==="
-python3 /usr/local/bin/cluster-tool boot --flavor vmaas-helm --name "${CLONE}"
+python3 /usr/local/bin/cluster-tool boot --flavor vmaas --name "${CLONE}" --pull-secret /root/pull-secret
 _timer $CLUSTER_BOOT_START "Boot cluster"
 
 systemctl restart dnsmasq
@@ -185,9 +185,6 @@ podman run --authfile /root/pull-secret --rm \
     "${INSTALLER_IMAGE}" \
     cp /usr/local/bin/osac /target/osac
 
-echo "=== Updating cluster pull secret ==="
-oc set data secret/pull-secret -n openshift-config \
-    --from-file=.dockerconfigjson=/root/pull-secret
 
 # --- Phase 4: component override (conditional) ---
 COMPONENT_OVERRIDE_CMD=""

@@ -129,8 +129,12 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
   fi  
 
   ign_location="s3://${s3_bucket_name}/bastion.ign"
-  aws --region $REGION s3 mb "s3://${s3_bucket_name}"
-  echo "s3://${s3_bucket_name}" > "$SHARED_DIR/to_be_removed_s3_bucket_list"
+  if aws --region "${REGION}" s3api head-bucket --bucket "${s3_bucket_name}" 2>/dev/null; then
+    echo "WARNING: S3 bucket s3://${s3_bucket_name} already exists and is accessible to this account (likely a leaked bucket from a prior run). Reusing it."
+  else
+    aws --region "${REGION}" s3 mb "s3://${s3_bucket_name}"
+  fi
+  echo "s3://${s3_bucket_name}" > "${SHARED_DIR}/to_be_removed_s3_bucket_list"
   aws --region $REGION s3 cp ${bastion_ignition_file} "${ign_location}"
   echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 else

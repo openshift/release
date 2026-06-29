@@ -35,7 +35,11 @@ images:
           source_path: /tmp/osac
     to: osac-cli
   - dockerfile_path: Containerfile
-    to: fulfillment-service-pr
+    to: fulfillment-service
+  - dockerfile_literal: |
+      FROM src
+    from: src
+    to: fulfillment-service-code
   - dockerfile_literal: |
       FROM osac-installer
       COPY manifests/ /installer/base/osac-fulfillment-service/manifests/
@@ -52,7 +56,6 @@ images:
 promotion:
   to:
   - excluded_images:
-    - fulfillment-service-pr
     - osac-installer-with-pr
     name: latest
     namespace: osac-project
@@ -74,14 +77,14 @@ tests:
   commands: echo "Test"
   container:
     from: src
-  skip_if_only_changed: ^.*\.(md|adoc)$|^LICENSE$|^charts/|^it/|^\.github/workflows/
+  skip_if_only_changed: ^.*\.(md|adoc)$|^LICENSE$|^charts/|^it/|^docs/|^\.ai-bot/|^\.claude/|^\.vscode/|^\.idea/|^\.pre-commit-config.*|^\.yamllint\.yaml$|^\.golangci\.yml$|^\.copr/|^\.goreleaser\.yaml$|^\.dockerignore$|^\.gitattributes$|^\.gitignore$|^\.gitleaks\.toml$|^pyproject\.toml$|^\.python-version$|^uv\.lock$|^buf\.|^CLAUDE\.md$|^AGENTS\.md$|^OWNERS$|^\.github/
 - as: e2e-vmaas
   capabilities:
   - intranet
-  skip_if_only_changed: ^.*\.(md|adoc)$|^LICENSE$|^\.github/workflows/
+  skip_if_only_changed: ^.*\.(md|adoc)$|^LICENSE$|^docs/|^\.ai-bot/|^\.claude/|^\.vscode/|^\.idea/|^\.pre-commit-config.*|^\.yamllint\.yaml$|^\.golangci\.yml$|^\.copr/|^\.goreleaser\.yaml$|^\.dockerignore$|^\.gitattributes$|^\.gitignore$|^\.gitleaks\.toml$|^pyproject\.toml$|^\.python-version$|^uv\.lock$|^buf\.|^CLAUDE\.md$|^AGENTS\.md$|^OWNERS$|^\.github/
   steps:
     dependencies:
-      COMPONENT_IMAGE: fulfillment-service-pr
+      COMPONENT_IMAGE: fulfillment-service
       OSAC_INSTALLER_IMAGE: osac-installer-with-pr
       OSAC_TEST_IMAGE: osac-test-infra
     env:

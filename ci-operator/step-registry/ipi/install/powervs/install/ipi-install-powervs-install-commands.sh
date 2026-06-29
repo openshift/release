@@ -704,8 +704,11 @@ function dump_resources() {
   fi
 }
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-trap 'prepare_next_steps' EXIT TERM
+# Separate traps for EXIT and TERM to handle cleanup properly
+# TERM: Kill children, run cleanup, then exit with proper signal status
+# EXIT: Just run cleanup (for normal termination)
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill -TERM ${CHILDREN} 2>/dev/null; fi; wait; trap - EXIT; prepare_next_steps; exit 143' TERM
+trap 'prepare_next_steps' EXIT
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
@@ -935,8 +938,12 @@ export TF_LOG=debug
 
 echo "8<--------8<--------8<--------8<-------- BEGIN: create cluster 8<--------8<--------8<--------8<--------"
 echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
-openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
-ret=${PIPESTATUS[0]}
+# Run openshift-install in background with process substitution to allow trap to execute on SIGTERM
+# Note: Redirect order matters - stdout first, then stderr to stdout, so both go through grep
+openshift-install --dir="${dir}" create cluster > >(grep --line-buffered -v 'password\|X-Auth-Token\|UserData:') 2>&1 &
+INSTALL_PID=$!
+wait $INSTALL_PID
+ret=$?
 echo "ret=${ret}"
 if [ ${ret} -gt 0 ]; then
   SKIP_WAIT_FOR=false
@@ -964,8 +971,12 @@ echo "SKIP_WAIT_FOR=${SKIP_WAIT_FOR}"
 if ! ${SKIP_WAIT_FOR}; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
   echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
-  openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
-  ret=${PIPESTATUS[0]}
+  # Run openshift-install in background with process substitution to allow trap to execute on SIGTERM
+  # Note: Redirect order matters - stdout first, then stderr to stdout, so both go through grep
+  openshift-install wait-for install-complete --dir="${dir}" > >(grep --line-buffered -v 'password\|X-Auth-Token\|UserData:') 2>&1 &
+  INSTALL_PID=$!
+  wait $INSTALL_PID
+  ret=$?
   echo "ret=${ret}"
   echo "8<--------8<--------8<--------8<-------- END: wait-for install-complete 8<--------8<--------8<--------8<--------"
 fi

@@ -14,7 +14,7 @@ base_images:
   hypershift-operator-init:
     name: hypershift-operator
     namespace: hypershift
-    tag: latest
+    tag: "4.20"
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -24,6 +24,7 @@ build_root:
   use_build_cache: true
 images:
   items:
+  - to: hypershift-operator-420
   - dockerfile_path: Dockerfile.control-plane
     to: hypershift
   - dockerfile_literal: |
@@ -33,8 +34,16 @@ images:
     to: custom-verify-src
 promotion:
   to:
-  - name: "4.20"
+  - excluded_images:
+    - hypershift-operator-420
+    name: "4.20"
     namespace: ocp
+  - additional_images:
+      hypershift-operator: hypershift-operator-420
+    excluded_images:
+    - '*'
+    namespace: hypershift
+    tag: "4.20"
 releases:
   initial:
     candidate:
