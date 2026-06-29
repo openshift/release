@@ -15,6 +15,11 @@ images:
   - dockerfile_path: Dockerfile
     from: base
     to: submariner-addon
+promotion:
+  to:
+  - disabled: true
+    name: "5.1"
+    namespace: stolostron
 prowgen:
   private: true
 releases:
@@ -46,13 +51,13 @@ tests:
     make verify -k --warn-undefined-variables
   container:
     from: bin
-- as: integration
-  commands: make test-integration
-  container:
-    from: test-bin
 - as: unit
   commands: |
     make test --warn-undefined-variables
+  container:
+    from: test-bin
+- as: integration
+  commands: make test-integration
   container:
     from: test-bin
 - as: sonarcloud
@@ -71,14 +76,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-- as: golangci-lint
-  commands: |
-    export GOCACHE=/tmp/
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    make golangci-lint SHELL=/bin/bash
-  container:
-    from: bin
 zz_generated_metadata:
-  branch: main
+  branch: release-5.1
   org: openshift-priv
   repo: stolostron-submariner-addon
