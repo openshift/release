@@ -1,0 +1,59 @@
+base_images:
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- as: e2e-sbr-weekly-aws-disconnected-nfs
+  capabilities:
+  - intranet
+  cron: 0 8 * * 0
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      ECO_TEST_FEATURES: sbr-operator
+      FBC_OCP_VERSION: "422"
+      MEDIK8S_PACKAGES: storage-based-remediation
+      OCP_VERSION: "421"
+      OO_CHANNEL: stable
+      OPERATORS: storage-based-remediation
+      SBR_STORAGE_CLASS: nfs-sbr
+    test:
+    - ref: medik8s-disconnected-catalogsource
+    - ref: medik8s-operator-subscribe
+    - ref: medik8s-sbr-nfs-bastion
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+        [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat "${SHARED_DIR}/sbr_watchdog_debug_image")
+        export ECO_TEST_LABELS='!test_id:88878 && !test_id:88737 && !test_id:88734 && !test_id:88880 && !test_id:89200 && !test_id:88877 && !test_id:88735 && !test_id:88738'
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: SBR_STORAGE_CLASS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-disconnected
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: system-tests
+  variant: 4.21-disconnected
