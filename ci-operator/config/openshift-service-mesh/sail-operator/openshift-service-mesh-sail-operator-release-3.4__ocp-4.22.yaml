@@ -97,8 +97,9 @@ tests:
   secrets:
   - mount_path: /creds-github
     name: ossm-github-simple-job
-- as: e2e-ocp
-  skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+- always_run: false
+  as: e2e-ocp
+  pipeline_skip_if_only_changed: (^(docs|\.github|\.claude|\.cursor)/)|(\.md$)|((^|/)OWNERS$)|(^\.gitignore$)|(^LICENSE$)
   steps:
     cluster_profile: ossm-aws
     env:
@@ -116,7 +117,14 @@ tests:
     - ref: servicemesh-sail-operator-e2e-ocp
     workflow: servicemesh-istio-e2e-profile
 - as: e2e-ocp-arm
-  skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+  postsubmit: true
+  reporter_config:
+    channel: '#team-ossm-qe'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: ossm-aws
     env:
@@ -135,8 +143,9 @@ tests:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-sail-operator-e2e-ocp
     workflow: servicemesh-istio-e2e-profile
-- as: scorecard
-  run_if_changed: ^bundle/
+- always_run: false
+  as: scorecard
+  pipeline_run_if_changed: ^bundle/
   steps:
     cluster_profile: ossm-aws
     env:
