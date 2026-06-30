@@ -282,9 +282,6 @@ EOF
 main() {
     log "=== medik8s Disconnected CatalogSource Setup ==="
     trap 'collect_artifacts' EXIT
-    set_proxy
-    run oc whoami
-    run oc version -o yaml
 
     if [[ ! "$OCP_VERSION" =~ ^[0-9]{2,4}$ ]]; then
         log "ERROR: OCP_VERSION must be a 2-4 digit string (e.g., '422' for OCP 4.22)"
@@ -296,12 +293,21 @@ main() {
     mkdir -p "${XDG_RUNTIME_DIR}/containers"
     cd "$TMP_DIR"
 
+    # Resolve GitLab refs and fetch IDMS BEFORE setting the proxy.
+    # set_proxy routes all traffic through the bastion Squid proxy
+    # (port 3128) in disconnected envs — that proxy cannot reliably
+    # reach gitlab.cee.redhat.com, causing 503 / timeout failures.
     resolve_commit_sha
     verify_fbc_image
+    create_registries_conf
+
+    set_proxy
+    run oc whoami
+    run oc version -o yaml
+
     check_mirror_registry
     configure_host_pull_secret
     install_oc_mirror
-    create_registries_conf
     mirror_catalog_and_operators
     create_idms_disconnected
     ensure_marketplace
