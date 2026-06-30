@@ -326,7 +326,24 @@ fi
 HYPERSHIFT_NAME=hcp
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
-  downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+  # The HCP CLI download route may not be ready immediately after the operator becomes available.
+  # Retry with backoff to avoid failing on a transient HTML error page instead of the binary.
+  downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
+  _hcp_downloaded=false
+  for i in $(seq 1 10); do
+    curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz "${downURL}"
+    if tar -tzf /tmp/${HYPERSHIFT_NAME}.tar.gz &>/dev/null; then
+      _hcp_downloaded=true
+      break
+    fi
+    echo "HCP CLI download is not a valid gzip archive, retrying in 30s... ($i/10)"
+    sleep 30
+  done
+  if [ "$_hcp_downloaded" = false ]; then
+    echo "ERROR: Failed to download HCP CLI after 5 minutes. Response content:"
+    cat /tmp/${HYPERSHIFT_NAME}.tar.gz
+    exit 1
+  fi
   cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
   chmod +x /tmp/${HYPERSHIFT_NAME}
   cd -
