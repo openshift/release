@@ -56,6 +56,13 @@ if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-cpo-overrides"
 fi
 
+# Some jobs (e.g. upgrade-hypershift-operator) run the install using a release-tagged
+# HyperShift image, not main. New CLI flags must be gated behind toggles so older
+# operator versions that lack those flags are not broken.
+if [ "${ENABLE_SCALE_FROM_ZERO}" == "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --scale-from-zero-provider aws --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials"
+fi
+
 OCP_VERSION="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep -oP '(?<=^  Version:  ).*$' | grep -oE '^[0-9]+\.[0-9]+')"
 EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=registry.ci.openshift.org/ocp/${OCP_VERSION}:cluster-api-provider-kubevirt"
 
@@ -73,8 +80,6 @@ case "${CLOUD_PROVIDER}" in
     --external-dns-provider=aws \
     --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
     --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
-    --scale-from-zero-provider aws \
-    --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials \
     --wait-until-available \
     ${EXTRA_ARGS}
     ;;
