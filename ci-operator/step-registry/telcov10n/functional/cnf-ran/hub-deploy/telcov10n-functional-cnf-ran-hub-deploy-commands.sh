@@ -67,7 +67,7 @@ fi
 cd /eco-ci-cd
 
 echo "Running deploy-ocp-sno for ${CLUSTER_NAME} (version=${VERSION})"
-EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true"
+EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true release_age_max_days=14"
 if [ "${DISABLE_INSIGHTS}" = "true" ]; then
   EXTRA_VARS="${EXTRA_VARS} disable_insights=true"
 fi
