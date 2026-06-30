@@ -15,10 +15,11 @@ images:
       COPY src/ /opt/app-root/src
       WORKDIR /opt/app-root/src/osd-fleet-manager
       USER root
-      RUN dnf install -y git make gcc jq unzip curl podman-docker && dnf clean all
-      RUN curl -LO https://go.dev/dl/go1.25.7.linux-amd64.tar.gz && \
-          tar -C /usr/local -xzf go1.25.7.linux-amd64.tar.gz && \
-          rm go1.25.7.linux-amd64.tar.gz
+      RUN dnf install -y git make gcc jq unzip && dnf clean all
+      RUN ln -s /usr/bin/podman /usr/bin/docker
+      RUN curl -LO https://go.dev/dl/go1.25.9.linux-amd64.tar.gz && \
+          tar -C /usr/local -xzf go1.25.9.linux-amd64.tar.gz && \
+          rm go1.25.9.linux-amd64.tar.gz
       ENV PATH="/usr/local/go/bin:${PATH}"
     from: nested-podman
     inputs:
@@ -51,32 +52,47 @@ tests:
   commands: |
     unset GOFLAGS
     echo "Go Version: $(go version)"
-    go install gotest.tools/gotestsum@latest
-    export PATH="$(go env GOPATH)/bin:${PATH}"
-    make setup/secrets/empty
-    make ocm/setup aws/setup
-    export OCM_ENV=testing
+    export DOCKER_PR_CHECK=true
+    export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
     make db/setup
     sleep 5
     make test
   container:
     from: golang-plus
   nested_podman: true
-- as: integration-test
+- as: integration-test-fedramp
   capabilities:
   - nested-podman
   commands: |
     unset GOFLAGS
     echo "Go Version: $(go version)"
-    go install gotest.tools/gotestsum@latest
-    export PATH="$(go env GOPATH)/bin:${PATH}"
-    make setup/secrets/empty
-    make ocm/setup aws/setup
+    export DOCKER_PR_CHECK=true
     export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
     make db/setup
     sleep 5
     make db/migrate
-    make test/integration
+    make test/integration/fedramp
+  container:
+    from: golang-plus
+  nested_podman: true
+- as: integration-test-osdfm
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    export DOCKER_PR_CHECK=true
+    export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
+    make db/setup
+    sleep 5
+    make db/migrate
+    make test/integration/osdfm
   container:
     from: golang-plus
   nested_podman: true
