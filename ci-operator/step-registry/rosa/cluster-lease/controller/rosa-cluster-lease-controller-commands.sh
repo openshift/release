@@ -32,6 +32,12 @@ dry_run_guard() {
     return 1
 }
 
+# Configure AWS credentials from cluster profile
+AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ -f "${AWSCRED}" ]]; then
+    export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+fi
+
 # Log in to OCM
 SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
 SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
@@ -135,7 +141,7 @@ log "Actual clusters: ${ACTUAL_COUNT}"
 # ---------------------------------------------------------------
 log "Phase 3: Checking for missing clusters"
 
-echo "${DESIRED_NAMES}" | while IFS= read -r cluster_json; do
+while IFS= read -r cluster_json; do
     [[ -z "${cluster_json}" ]] && continue
 
     NAME=$(echo "${cluster_json}" | jq -r '.name')
@@ -242,7 +248,7 @@ EARLY_EOF
     # Wait for cluster to be ready (up to 60 min)
     log "Waiting for ${NAME} to be ready..."
     for attempt in $(seq 1 60); do
-        STATE=$(rosa describe cluster -c "${NAME}" -o json 2>/dev/null | jq -r '.state // "unknown"')
+        STATE=$(rosa describe cluster -c "${NAME}" -o json 2>/dev/null | jq -r '.state // "unknown"' || echo "unknown")
         if [[ "${STATE}" == "ready" ]]; then
             break
         fi
@@ -285,7 +291,7 @@ EARLY_EOF
     }' || true
 
     log "Registered ${NAME} (${CLUSTER_ID}) in lease inventory"
-done
+done < <(echo "${DESIRED_NAMES}")
 
 # ---------------------------------------------------------------
 # Phase 4: Health check existing clusters
@@ -461,7 +467,7 @@ done
 # ---------------------------------------------------------------
 log "Phase 6: Checking for version upgrades"
 
-echo "${DESIRED_NAMES}" | while IFS= read -r cluster_json; do
+while IFS= read -r cluster_json; do
     [[ -z "${cluster_json}" ]] && continue
 
     NAME=$(echo "${cluster_json}" | jq -r '.name')
@@ -529,7 +535,7 @@ echo "${DESIRED_NAMES}" | while IFS= read -r cluster_json; do
                 "metadata": { "labels": { "rosa-cluster-lease/status": "available" } }
             }' || true
         }
-done
+done < <(echo "${DESIRED_NAMES}")
 
 # ---------------------------------------------------------------
 # Phase 7: Decommission unwanted clusters
