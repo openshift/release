@@ -51,6 +51,7 @@ echo "Running Claude Code CI failure analysis..."
 timeout 7200 claude \
     --model "${CLAUDE_MODEL}" \
     --allowedTools "Read Grep Glob WebFetch" \
+    --verbose \
     --output-format stream-json \
     --max-turns 150 \
     -p "Analyze the test logs for this specific failed Prow job: https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_cluster-ingress-operator/1487/pull-ci-openshift-cluster-ingress-operator-release-4.16-e2e-hypershift/2071913985023676416. Identify the root cause and leave a descriptive summary with proposed fixes."
