@@ -7,6 +7,10 @@ base_images:
     name: centos
     namespace: openshift
     tag: stream10
+  base-machine-rhel9:
+    name: centos
+    namespace: openshift
+    tag: stream9
   cli:
     name: "5.1"
     namespace: ocp
@@ -43,6 +47,10 @@ base_images:
     name: "5.1"
     namespace: ocp
     tag: rhel-coreos-10
+  rhel-coreos-base-rhel9:
+    name: "5.1"
+    namespace: ocp
+    tag: rhel-coreos
   tools:
     name: "5.1"
     namespace: ocp
@@ -85,6 +93,20 @@ images:
         as:
         - registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
     to: rhel-coreos-10
+  - dockerfile_literal: |
+      FROM quay.io/centos/centos:stream9 as build
+      RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
+      COPY --from=build /*.rpm /
+      RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+    inputs:
+      base-machine-rhel9-with-rpms:
+        as:
+        - quay.io/centos/centos:stream9
+      rhel-coreos-base-rhel9:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos
+    to: rhel-coreos
   - context_dir: build/pause
     dockerfile_path: Dockerfile.Rhel
     to: pod
@@ -96,6 +118,7 @@ promotion:
       artifacts: artifacts
     excluded_images:
     - rhel-coreos-10
+    - rhel-coreos
     name: "5.1"
     namespace: ocp
 raw_steps:
@@ -144,6 +167,9 @@ raw_steps:
 - rpm_image_injection_step:
     from: base-machine
     to: base-machine-with-rpms
+- rpm_image_injection_step:
+    from: base-machine-rhel9
+    to: base-machine-rhel9-with-rpms
 releases:
   initial:
     integration:
