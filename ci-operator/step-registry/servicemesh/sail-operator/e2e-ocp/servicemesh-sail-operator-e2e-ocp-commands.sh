@@ -85,7 +85,7 @@ check_cluster_operators() {
 
   while [ "$(date +%s)" -lt $end_time ]; do
     local oc_output
-    if ! oc_output=$(oc get clusteroperator -o json 2>&1); then
+    if ! oc_output=$(oc get clusteroperator -o json); then
       echo "Warning: API connection dropped, retrying in next loop..." >&2
       stable_checks_count=0
       sleep "$sleep_interval"
