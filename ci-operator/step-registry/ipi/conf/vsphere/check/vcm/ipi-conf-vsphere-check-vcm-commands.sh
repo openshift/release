@@ -489,6 +489,21 @@ EOF
     done
   fi
 
+  # When pools > 1, each pool's portgroup is in status.poolInfo[N].topology.networks[0]
+  # rather than the top-level status.topology.networks. Populate vcenter_portgroups
+  # for each additional pool so the platformSpec loop can find them by pool name.
+  pool_info_count=$(jq '.status.poolInfo | length' < /tmp/lease.json)
+  if [[ "${pool_info_count}" != "null" && "${pool_info_count}" -gt 1 ]]; then
+    log "Multi-pool lease detected (${pool_info_count} pools) — extracting per-pool portgroups from poolInfo"
+    for ((pi = 0; pi < pool_info_count; pi++)); do
+      pi_pool_name=$(jq -r ".status.poolInfo[${pi}].name" < /tmp/lease.json)
+      pi_network_path=$(jq -r ".status.poolInfo[${pi}].topology.networks[0]" < /tmp/lease.json)
+      pi_portgroup=$(echo "${pi_network_path}" | cut -d '/' -f 4)
+      log "Pool ${pi_pool_name}: portgroup ${pi_portgroup}"
+      vcenter_portgroups[${pi_pool_name}]="${pi_portgroup}"
+    done
+  fi
+
   cp /tmp/lease.json "${SHARED_DIR}/LEASE_$LEASE.json"
 done
 
@@ -505,16 +520,39 @@ log "building local variables and failure domains"
 
 # Iterate through each lease and generate the failure domain and vcenters information
 for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
-  RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
-  PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
+  # Skip the LEASE_single copy to avoid double-processing — the original named file
+  # is iterated separately and covers the same content.
+  if [[ ${_leaseJSON} =~ "single" ]]; then
+    continue
+  fi
 
+  PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
   if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then
     log "storing primary lease as LEASE_single"
     cp "${_leaseJSON}" "${SHARED_DIR}"/LEASE_single.json
   fi
 
-  log "building local variables and platform spec for pool ${RESOURCE_POOL}"
-  oc get pools.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers "${RESOURCE_POOL}" -o json > /tmp/pool.json
+  # Determine how many pools are in this lease.  When pools > 1, VCM returns all
+  # pools in status.poolInfo[].  When pools == 1, fall back to status.name.
+  lease_pool_count=$(jq '.status.poolInfo | length' < "${_leaseJSON}")
+  if [[ "${lease_pool_count}" == "null" || "${lease_pool_count}" -eq 0 ]]; then
+    lease_pool_count=0
+  fi
+
+  if [[ ${lease_pool_count} -gt 0 ]]; then
+    log "Multi-pool lease: processing ${lease_pool_count} pool(s) from poolInfo"
+    pool_names=()
+    for ((lpi = 0; lpi < lease_pool_count; lpi++)); do
+      pool_names+=("$(jq -r ".status.poolInfo[${lpi}].name" < "${_leaseJSON}")")
+    done
+  else
+    log "Single-pool lease: processing pool from status.name"
+    pool_names=("$(jq -r .status.name < "${_leaseJSON}")")
+  fi
+
+  for RESOURCE_POOL in "${pool_names[@]}"; do
+    log "building local variables and platform spec for pool ${RESOURCE_POOL}"
+    oc get pools.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers "${RESOURCE_POOL}" -o json > /tmp/pool.json
   VCENTER_AUTH_PATH=$(jq -r '.metadata.annotations["ci-auth-path"]' < /tmp/pool.json)
 
   declare vcenter_usernames
@@ -570,8 +608,9 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
     platformSpec=$(echo "${platformSpec}" | jq -r '.vcenters += [{"server": "'"${VCENTER}"'", "user": "'"${pool_usernames[$VCENTER]}"'", "password": "'"${pool_passwords[$VCENTER]}"'", "datacenters": ["'"${datacenter}"'"]}]')
   fi
 
-  cp /tmp/pool.json "${SHARED_DIR}"/POOL_"${RESOURCE_POOL}".json
-done
+    cp /tmp/pool.json "${SHARED_DIR}"/POOL_"${RESOURCE_POOL}".json
+  done  # end for RESOURCE_POOL
+done  # end for _leaseJSON
 
 # For legacy spec, the below will merge the following json to the existing json.
 if [ -n "${POPULATE_LEGACY_SPEC}" ]; then
@@ -616,7 +655,7 @@ cp "${SHARED_DIR}/govc.sh" "${SHARED_DIR}/vsphere_context.sh"
 
 log "Creating individual govc files for each pool..."
 for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
-  # Skip the single lease file - we already processed it
+  # Skip the LEASE_single copy — the original named lease file covers the same content
   if [[ ${_leaseJSON} =~ "single" ]]; then
     continue
   fi
