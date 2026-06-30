@@ -31,6 +31,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: sriov-network-metrics-exporter
+  tls-scanner-tool:
+    name: "5.0"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -238,6 +242,43 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: telco5g-sriov
+- always_run: false
+  as: install-bundle-tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
+      OO_PACKAGE: sriov-network-operator
+      OO_TARGET_NAMESPACES: '!install'
+      SCAN_NAMESPACE: openshift-sriov-network-operator
+    test:
+    - ref: optional-operators-subscribe
+    - as: start-sriov-operator
+      cli: latest
+      commands: |
+        oc apply -f - <<EOF
+        apiVersion: sriovnetwork.openshift.io/v1
+        kind: SriovOperatorConfig
+        metadata:
+          name: default
+          namespace: openshift-sriov-network-operator
+        spec:
+          enableInjector: true
+          enableOperatorWebhook: true
+          logLevel: 2
+        EOF
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 - as: verify-deps
   steps:
     env:
