@@ -3,6 +3,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
+echo "Testing kube-burner fix/missing-iteration-progress branch - grouped iteration progress logging"
 cat /etc/os-release
 
 # For disconnected or otherwise unreachable environments, we want to
@@ -67,6 +68,30 @@ EXTRA_FLAGS+="${KB_FLAGS} --local-indexing --layer3=${ENABLE_LAYER_3} --namespac
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 export EXTRA_FLAGS UUID
+
+# Build kube-burner-ocp from source with custom kube-burner fork (fix/missing-iteration-progress)
+echo "Building custom kube-burner-ocp binary with fix/missing-iteration-progress branch"
+GO_TAR="go1.25.0.linux-amd64.tar.gz"
+curl -sL "https://go.dev/dl/${GO_TAR}" | tar -xz -C /tmp/
+export PATH="/tmp/go/bin:$PATH"
+export GOPATH="/tmp/gopath"
+go version
+
+git clone --depth 1 https://github.com/kube-burner/kube-burner-ocp.git /tmp/kube-burner-ocp-src
+pushd /tmp/kube-burner-ocp-src
+go mod edit -replace github.com/kube-burner/kube-burner/v2=github.com/mmnabeel317/kube-burner/v2@fix/missing-iteration-progress
+go mod tidy
+go build -o /tmp/kube-burner-ocp .
+popd
+echo "Custom kube-burner-ocp binary built successfully"
+/tmp/kube-burner-ocp version || true
+
+# Safeguard: neutralize the wrapper's kube-burner-ocp download so it uses our pre-built binary
+for f in common.sh run.sh env.sh; do
+  if [[ -f "$f" ]]; then
+    sed -i 's|curl.*kube-burner-ocp.*tar.*gz|echo "SKIPPED: using pre-built /tmp/kube-burner-ocp"|g' "$f"
+  fi
+done
 
 set +o errexit
 ./run.sh
