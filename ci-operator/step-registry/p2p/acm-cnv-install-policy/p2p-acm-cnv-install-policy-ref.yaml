@@ -1,14 +1,69 @@
 ref:
   as: p2p-acm-cnv-install-policy
   timeout: 3h0m0s
-  from_image:
-    namespace: ocp
-    name: cli-jq
-    tag: latest
+  from: cli
   commands: p2p-acm-cnv-install-policy-commands.sh
+  grace_period: 30m0s
   resources:
     requests:
       cpu: '1'
       memory: 500Mi
   documentation: |-
-    Installs CNV on spoke/managed cluster deploying policy from ACM hub targeted towards managed cluster
+    Installs CNV on spoke/managed cluster(s) via ACM ConfigurationPolicy, deploying
+    Namespace, OperatorGroup, Subscription, and HyperConverged resources on each target.
+
+    When CNV_ENABLE_CCLM=true (default), the HyperConverged spec.featureGates.decentralizedLiveMigration
+    flag is enabled and the step additionally waits for the DecentralizedLiveMigration feature gate
+    on KubeVirt and virt-synchronization-controller Available on each spoke (required for CCLM sync).
+    Set CNV_ENABLE_CCLM=false for upgrade/non-CCLM scenarios to skip those checks.
+
+    When CNV_POLICY_INSTALL_MAJOR_MINOR is non-empty, the step resolves the latest
+    startingCSV for that major.minor from the hub PackageManifest and pins it on the
+    Subscription. Combine with CNV_POLICY_UPGRADE_APPROVAL=Manual to prevent OLM from
+    auto-upgrading past the pinned version.
+
+    Reads spoke names and kubeconfigs from ${SHARED_DIR} (managed-cluster-names or managed-cluster-name).
+    Waits in parallel for HyperConverged Available on each spoke.
+  env:
+  - name: CNV_ENABLE_CCLM
+    default: "false"
+    documentation: |-
+      Enable CCLM-specific behaviour: inject decentralizedLiveMigration=true into HCO featureGates
+      and wait for DecentralizedLiveMigration gate on KubeVirt and virt-synchronization-controller
+      Available on each spoke. Set to "true" for CCLM scenarios; leave "false" (default) for
+      upgrade or other non-CCLM use cases.
+  - name: CNV_POLICY_NAMESPACE
+    default: "install-cnv"
+    documentation: Namespace on the hub for Policy, Placement, and PlacementBinding resources.
+  - name: CNV_POLICY_CHANNEL
+    default: "stable"
+    documentation: OLM channel for the kubevirt-hyperconverged Subscription (e.g. "stable").
+  - name: CNV_POLICY_SOURCE
+    default: "redhat-operators"
+    documentation: OLM CatalogSource name for the kubevirt-hyperconverged Subscription.
+  - name: CNV_POLICY_SOURCE_NAMESPACE
+    default: "openshift-marketplace"
+    documentation: Namespace of the OLM CatalogSource for the kubevirt-hyperconverged Subscription.
+  - name: CNV_POLICY_UPGRADE_APPROVAL
+    default: "Automatic"
+    documentation: |-
+      OLM installPlanApproval for the Subscription ("Automatic" or "Manual").
+      "Automatic" installs and upgrades CNV without manual intervention (default).
+      "Manual" holds install plan approval at each upgrade step; combine with
+      CNV_POLICY_INSTALL_MAJOR_MINOR to prevent auto-upgrades past a pinned version.
+  - name: CNV_POLICY_INSTALL_MAJOR_MINOR
+    default: ""
+    documentation: |-
+      Target CNV major.minor version to pin via startingCSV (e.g. "4.21").
+      When non-empty, the step queries the hub PackageManifest for
+      kubevirt-hyperconverged, filters channel entries to those matching
+      "kubevirt-hyperconverged.vMAJOR.MINOR.*", takes the latest by name sort,
+      and sets startingCSV on the Subscription. Falls back to the channel
+      currentCSV when no matching entry is found.
+      Leave empty (default) to install the latest available version from the channel.
+  - name: CNV_WAIT_TIMEOUT_MINUTES
+    default: "30"
+    documentation: Per-spoke timeout in minutes for HyperConverged CR creation and Available condition.
+  - name: CNV_POLL_INTERVAL_SECONDS
+    default: "30"
+    documentation: Sleep interval between HyperConverged status polls on each spoke.
