@@ -395,7 +395,7 @@ else
   echo "Version is 4.19 or greater"
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
   # Only run tgm and dualfollower tests from 4.19 onwards
-  TEST_MODES=("tgm" "tbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+  TEST_MODES=("tgm" "tgmoc" "tgmbc" "tbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
 
   # T-BC test mode is only supported from 4.20 onwards,
   # so if the version is 4.19 then, remove it from the list
