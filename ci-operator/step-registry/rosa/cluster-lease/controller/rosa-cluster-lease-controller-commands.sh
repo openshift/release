@@ -88,10 +88,27 @@ if ! DESIRED_YAML=$(echo "${DESIRED_CM}" | jq -er '.data["desired-clusters"]'); 
 fi
 
 if ! DESIRED_NAMES=$(echo "${DESIRED_YAML}" | python3 -c "
-import sys, yaml, json
-clusters = yaml.safe_load(sys.stdin.read()) or []
-for c in clusters:
-    print(json.dumps(c))
+import sys, json, re
+lines = sys.stdin.read().strip().split('\n')
+clusters, current = [], {}
+def scalar(v):
+    v = v.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in ('\"', \"'\"):
+        v = v[1:-1]
+    return v
+for line in lines:
+    m = re.match(r'\s*-\s+(\w[\w-]*):\s*(.*)', line)
+    if m:
+        if current: clusters.append(current)
+        current = {m.group(1): scalar(m.group(2))}
+    else:
+        m = re.match(r'\s+(\w[\w-]*):\s*(.*)', line)
+        if m:
+            current[m.group(1)] = scalar(m.group(2))
+        elif line.strip() and not line.lstrip().startswith('#'):
+            raise ValueError(f'Unsupported desired-clusters line: {line!r}')
+if current: clusters.append(current)
+for c in clusters: print(json.dumps(c))
 "); then
     log "ERROR: Failed to parse desired-clusters YAML"
     exit 1
