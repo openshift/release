@@ -11,7 +11,7 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  hypershift-operator-init:
+  hypershift-operator-420-latest:
     name: hypershift-operator
     namespace: hypershift
     tag: "4.20"
@@ -25,7 +25,7 @@ build_root:
 canonical_go_repository: github.com/openshift/hypershift
 images:
   items:
-  - to: hypershift-operator-420
+  - to: hypershift-operator-pr
   - dockerfile_path: Dockerfile.control-plane
     to: hypershift
   - dockerfile_literal: |
@@ -36,11 +36,11 @@ images:
 promotion:
   to:
   - excluded_images:
-    - hypershift-operator-420
+    - hypershift-operator-pr
     name: 4.20-priv
     namespace: ocp-private
   - additional_images:
-      hypershift-operator: hypershift-operator-420
+      hypershift-operator: hypershift-operator-pr
     disabled: true
     excluded_images:
     - '*'
@@ -197,7 +197,8 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+      CI_HYPERSHIFT_OPERATOR: hypershift-operator-pr
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-420-latest
     env:
       CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
       ENABLE_SCALE_FROM_ZERO: "false"
