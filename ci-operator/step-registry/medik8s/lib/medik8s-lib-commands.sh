@@ -50,7 +50,7 @@ resolve_commit_sha() {
 
     log "Resolving latest commit from ${GITLAB_PROJECT_NAME} ${GIT_REF} ref..."
     # --insecure: gitlab.cee uses internal RH CA not trusted by CI pods
-    FBC_COMMIT_SHA=$(curl --insecure -sSf --retry 3 --retry-delay 2 --retry-connrefused --connect-timeout 10 --max-time 30 \
+    FBC_COMMIT_SHA=$(curl --insecure -sSf --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 \
         "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" | jq -r .id) || true
 
     if [[ -z "$FBC_COMMIT_SHA" || "$FBC_COMMIT_SHA" == "null" ]]; then
