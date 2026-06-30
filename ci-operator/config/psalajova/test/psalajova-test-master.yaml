@@ -16,6 +16,36 @@ tests:
 - as: test-credentials
   steps:
     workflow: psalajova-test
+- as: test-gsm-secrets
+  commands: ls -la /var/my-secrets && cat /var/my-secrets/*
+  container:
+    from: src
+  cron: 0 0 1 1 *
+  secrets:
+  - collection: psalajova-first-secret
+    group: group1
+    mount_path: /var/my-secrets
+- as: test-gsm-secrets-mixed
+  commands: |
+    echo "--- collection ---"
+    ls -la /var/my-secrets
+    echo "--- bundle ---"
+    ls -la /var/bundle-secrets
+    echo "--- k8s secret ---"
+    ls -la /usr/local/osde2e-common
+  container:
+    from: src
+  cron: 0 0 1 1 *
+  secrets:
+  - collection: psalajova-first-secret
+    group: group1
+    mount_path: /var/my-secrets
+  - collection: psalajova-first-secret
+    field: first-secret
+    group: test
+    mount_path: /var/my-secrets2
+  - bundle: insights-live
+    mount_path: /var/bundle-secrets
 zz_generated_metadata:
   branch: master
   org: psalajova
