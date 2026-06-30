@@ -35,6 +35,9 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+log "POOLS: ${POOLS}"
+log "POOL_COUNT: ${POOL_COUNT}"
+
 # Make sure POOLS and POOL_COUNT are not both configured
 if [[ "${POOL_COUNT}" != "1" && "${POOLS}" != "" ]]; then
   echo "Cannot set both POOL_COUNT and POOLS"
@@ -399,7 +402,7 @@ spec:
   vcpus: ${OPENSHIFT_REQUIRED_CORES}
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
   network-type: \"${NETWORK_TYPE}\"
-  pool-count: ${POOL_COUNT}
+  pools: ${POOL_COUNT}
   ${requiredPool}
   ${poolSelector}
   networks: $networks_number" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
