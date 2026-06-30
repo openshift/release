@@ -278,6 +278,29 @@ create_sg_rule() {
     fi
 }
 
+patch_nested_kubeconfig_for_ci() {
+    local hosted_kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+    local nodeport
+
+    nodeport=$(oc get svc kube-apiserver -n "${hcp_ns}" \
+        -o jsonpath="{.spec.ports[?(@.port==6443)].nodePort}" 2>/dev/null || true)
+    if [[ -z "${nodeport}" ]]; then
+        nodeport=$(grep -E 'server:' "${hosted_kubeconfig}" | sed -n 's/.*:\([0-9]*\)".*/\1/p' | head -1)
+    fi
+    if [[ -z "${nodeport}" ]]; then
+        echo "ERROR: could not determine kube-apiserver NodePort"
+        exit 1
+    fi
+
+    local cluster_name
+    cluster_name=$(oc --kubeconfig "${hosted_kubeconfig}" config view -o jsonpath='{.clusters[0].name}')
+    oc --kubeconfig "${hosted_kubeconfig}" config set-cluster "${cluster_name}" \
+        --server="https://${BASTION_FIP}:${nodeport}"
+    oc --kubeconfig "${hosted_kubeconfig}" config set-cluster "${cluster_name}" \
+        --insecure-skip-tls-verify=true
+    echo "Updated nested_kubeconfig server to https://${BASTION_FIP}:${nodeport}"
+}
+
 # Create security group rules to open the port range 30000-33000 for TCP traffic
 sg_name="$MGMT_CLUSTER_NAME-sg"
 create_sg_rule $sg_name inbound tcp 30000 33000
@@ -521,9 +544,17 @@ done
 oc -n $HC_NS scale nodepool $HC_NAME --replicas $HYPERSHIFT_NODE_COUNT
 
 # Waiting for compute nodes to get ready
+set -e
 echo "$(date) Patched the agents, waiting for the installation to get completed on them"
-oc wait --all=true agent -n $hcp_ns --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=45m
+if ! oc wait --all=true agent -n $hcp_ns --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=45m; then
+  echo "$(date) ERROR: agents did not reach added-to-existing-cluster state within 45m"
+  oc get agents -n $hcp_ns -o wide || true
+  exit 1
+fi
 echo "$(date) All the agents are attached as compute nodes to the hosted control plane"
+
+# CI pods use cluster DNS and cannot resolve IBM Cloud private DNS for the hosted cluster API.
+patch_nested_kubeconfig_for_ci
 
 # Verifying the compute nodes status
 echo "$(date) Checking the compute nodes in the hosted control plane"
