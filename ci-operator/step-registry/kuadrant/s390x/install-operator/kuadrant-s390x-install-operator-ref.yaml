@@ -1,0 +1,76 @@
+ref:
+  as: kuadrant-s390x-install-operator
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: kuadrant-s390x-install-operator-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 40m0s
+  env:
+  - name: KUADRANT_NAMESPACE
+    default: "kuadrant-system"
+    documentation: |-
+      Namespace where the Kuadrant operator and the Kuadrant CR are installed.
+  - name: CERT_MANAGER_CATALOG_SOURCE
+    default: "redhat-operators"
+    documentation: |-
+      Catalog source used to subscribe the cert-manager operator.
+  - name: CERT_MANAGER_SUBSCRIPTION_NAME
+    default: "openshift-cert-manager-operator"
+    documentation: |-
+      Package name of the cert-manager operator to subscribe to.
+  - name: CERT_MANAGER_CHANNEL
+    default: "stable-v1"
+    documentation: |-
+      Subscription channel for the cert-manager operator.
+  - name: KUADRANT_CATALOG_SOURCE_IMAGE
+    default: "quay.io/kuadrant/kuadrant-operator-catalog:latest"
+    documentation: |-
+      Kuadrant operator catalog image. The quay.io/kuadrant/kuadrant-operator-catalog
+      images are published multi-arch including linux/s390x. When set, a grpc
+      CatalogSource named "kuadrant-operator-catalog" is created in KUADRANT_NAMESPACE
+      and used as the subscription source. Set to empty to instead use an existing
+      catalog named by KUADRANT_CATALOG_SOURCE.
+  - name: KUADRANT_CATALOG_SOURCE
+    default: "kuadrant-operator-catalog"
+    documentation: |-
+      Catalog source name used to subscribe the Kuadrant operator when
+      KUADRANT_CATALOG_SOURCE_IMAGE is empty (assumed to already exist in KUADRANT_NAMESPACE).
+  - name: KUADRANT_SUBSCRIPTION_NAME
+    default: "kuadrant-operator"
+    documentation: |-
+      Package name of the Kuadrant operator. Installing it pulls in the Authorino,
+      Limitador and DNS operators as dependencies.
+  - name: KUADRANT_CHANNEL
+    default: "stable"
+    documentation: |-
+      Subscription channel for the Kuadrant operator. Set to "!default" to use the package default channel.
+  - name: DNS_PROVIDER_SECRET_NAME
+    default: "coredns-credentials"
+    documentation: |-
+      Name of the DNS provider Secret referenced by control_plane.provider_secret
+      in the testsuite config. Created in the test namespaces from a mounted
+      credentials directory when available, otherwise a placeholder is created.
+  - name: DNS_CREDS_DIR
+    default: "/var/run/secrets/kuadrant-dns"
+    documentation: |-
+      Optional directory containing a "secret.yaml" file with the full DNS provider
+      Secret manifest (omitting metadata.namespace). When the file is present it is
+      applied into the kuadrant and kuadrant2 namespaces; otherwise a placeholder
+      Secret is created so DNS-independent tests can still run. To supply real
+      credentials, add a `credentials:` mount for a test-credentials secret in the
+      consuming ci-operator config and point DNS_CREDS_DIR at its mount_path.
+  - name: CLUSTER_ISSUER_NAME
+    default: "selfsigned-cluster-issuer"
+    documentation: |-
+      Name of the cert-manager self-signed ClusterIssuer created for TLSPolicy tests.
+  documentation: |-
+    Installs cert-manager and the Kuadrant operator (which deploys the Authorino,
+    Limitador and DNS operators) via OLM on a provisioned s390x OCP cluster,
+    creates the Kuadrant CR, a self-signed ClusterIssuer, the test namespaces
+    (kuadrant, kuadrant2) and the DNS provider Secret, and waits for everything to
+    become ready.

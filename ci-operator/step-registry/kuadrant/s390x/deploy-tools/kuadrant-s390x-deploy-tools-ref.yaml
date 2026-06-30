@@ -1,0 +1,47 @@
+ref:
+  as: kuadrant-s390x-deploy-tools
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: kuadrant-s390x-deploy-tools-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 20m0s
+  env:
+  - name: TOOLS_NAMESPACE
+    default: "tools"
+    documentation: |-
+      Namespace where the testing tools (Keycloak, Mockserver, Jaeger) are deployed.
+  - name: KEYCLOAK_IMAGE
+    default: "registry.redhat.io/rhbk/keycloak-rhel9:26.0"
+    documentation: |-
+      Keycloak container image. Defaults to the Red Hat build of Keycloak (RHBK),
+      which is published multi-arch including s390x. Pulling from registry.redhat.io
+      relies on the cluster global pull secret.
+  - name: KEYCLOAK_ADMIN_USERNAME
+    default: "admin"
+    documentation: |-
+      Keycloak bootstrap admin username.
+  - name: KEYCLOAK_ADMIN_PASSWORD
+    default: "admin"
+    documentation: |-
+      Keycloak bootstrap admin password.
+  - name: MOCKSERVER_IMAGE
+    default: "quay.io/vray_rh/rhcl_testsuite_dependencies:mockserver-s390x-fixed"
+    documentation: |-
+      Mockserver container image (s390x).
+  - name: JAEGER_IMAGE
+    default: "quay.io/jaegertracing/all-in-one:1.62.0"
+    documentation: |-
+      Jaeger all-in-one container image (must support s390x).
+  documentation: |-
+    Deploys the Kuadrant testsuite tooling (Keycloak, Mockserver and Jaeger) into
+    the tools namespace on a provisioned s390x OCP cluster using s390x-compatible
+    images, and exposes Keycloak, Mockserver and the Jaeger query UI via Routes so
+    the testsuite config can be generated dynamically. The Jaeger collector is
+    reachable in-cluster at jaeger-collector.<TOOLS_NAMESPACE>.svc.cluster.local:4317.
+    Tools that the testsuite self-deploys per test (httpbin, spicedb, llm_sim) are
+    not created here; only their images are referenced in the generated config.

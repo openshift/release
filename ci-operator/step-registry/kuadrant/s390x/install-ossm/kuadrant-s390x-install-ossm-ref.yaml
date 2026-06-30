@@ -1,0 +1,52 @@
+ref:
+  as: kuadrant-s390x-install-ossm
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: kuadrant-s390x-install-ossm-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 30m0s
+  env:
+  - name: GATEWAY_API_CHANNEL
+    default: "standard"
+    documentation: |-
+      Gateway API release channel to install ("standard" or "experimental").
+  - name: GATEWAY_API_VERSION
+    default: "v1.2.1"
+    documentation: |-
+      Gateway API CRD bundle version to install from the kubernetes-sigs/gateway-api releases.
+  - name: OSSM_CATALOG_SOURCE
+    default: "redhat-operators"
+    documentation: |-
+      Catalog source (in openshift-marketplace) used to subscribe the OpenShift Service Mesh 3 operator.
+  - name: OSSM_SUBSCRIPTION_NAME
+    default: "servicemeshoperator3"
+    documentation: |-
+      Package name of the OpenShift Service Mesh 3.x (Sail) operator to subscribe to.
+  - name: OSSM_CHANNEL
+    default: "stable"
+    documentation: |-
+      Subscription channel for the OpenShift Service Mesh 3.x operator. Set to "!default" to use the package default channel.
+  - name: OSSM_STARTING_CSV
+    default: "servicemeshoperator3.v3.3.4"
+    documentation: |-
+      Exact ClusterServiceVersion to pin the OpenShift Service Mesh operator to
+      (e.g. "servicemeshoperator3.v3.3.4"). When set, the subscription uses Manual
+      install-plan approval and only the install plan for this CSV is approved, so
+      the operator lands on this version and is not auto-upgraded. Set to empty to
+      track the channel head with Automatic approval.
+  - name: ISTIO_VERSION
+    default: ""
+    documentation: |-
+      Optional spec.version for the Sail Istio CR (e.g. "v1.24.1"). When empty the
+      operator's default supported version is used.
+  documentation: |-
+    Installs the Gateway API CRDs and OpenShift Service Mesh 3.x (the Sail
+    operator) via OLM on a provisioned s390x OCP cluster, then creates the
+    IstioCNI and Istio custom resources and waits for them to become ready.
+    This provides the Gateway API implementation that the Kuadrant operator
+    builds on top of.

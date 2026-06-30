@@ -1,0 +1,61 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  libvirt-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: libvirt-installer
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-s390x
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.22"
+      COMPUTE_COUNT: "2"
+      CONTROL_COUNT: "3"
+      ETCD_DISK_SPEED: slow
+      KUADRANT_CATALOG_SOURCE_IMAGE: quay.io/kuadrant/kuadrant-operator-catalog:latest
+      KUADRANT_CHANNEL: stable
+      NODE_TUNING: "true"
+      OSSM_STARTING_CSV: servicemeshoperator3.v3.3.4
+      PYTEST_FLAGS: -n1
+      TESTSUITE_GITREF: main
+      USE_EXTERNAL_DNS: "true"
+    workflow: kuadrant-s390x
+zz_generated_metadata:
+  branch: main
+  org: Kuadrant
+  repo: testsuite

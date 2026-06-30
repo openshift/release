@@ -1,0 +1,82 @@
+ref:
+  as: kuadrant-s390x-run-testsuite
+  from: cli
+  commands: kuadrant-s390x-run-testsuite-commands.sh
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+    limits:
+      memory: 8Gi
+  timeout: 3h0m0s
+  env:
+  - name: TESTSUITE_REPO
+    default: "https://github.com/Kuadrant/testsuite.git"
+    documentation: |-
+      Git URL of the Kuadrant testsuite repository to clone.
+  - name: TESTSUITE_GITREF
+    default: "main"
+    documentation: |-
+      Git branch, tag or commit of the testsuite to check out.
+  - name: TESTSUITE_DIR
+    default: "/tmp/kuadrant-testsuite"
+    documentation: |-
+      Directory where the testsuite is cloned and executed.
+  - name: PYTEST_FLAGS
+    default: "-n1"
+    documentation: |-
+      Extra pytest flags passed to make targets via the `flags` variable (e.g. "-n1" for serial execution on s390x).
+  - name: RUN_SMOKE
+    default: "true"
+    documentation: |-
+      When "true", run `make smoke` before the single-cluster tests.
+  - name: RUN_KUADRANT
+    default: "true"
+    documentation: |-
+      When "true", run `make kuadrant` (single-cluster Kuadrant tests, excludes ui/playwright).
+  - name: HTTPBIN_IMAGE
+    default: "quay.io/vray_rh/rhcl_testsuite_dependencies:httpbin-s390x"
+    documentation: |-
+      httpbin image referenced in the generated testsuite config (deployed by the testsuite per test).
+  - name: MOCKSERVER_IMAGE
+    default: "quay.io/vray_rh/rhcl_testsuite_dependencies:mockserver-s390x-fixed"
+    documentation: |-
+      Mockserver image referenced in the generated testsuite config.
+  - name: LLM_SIM_IMAGE
+    default: "quay.io/vray_rh/rhcl_testsuite_dependencies:llm-d-inference-sim-s390x-v091-fixed"
+    documentation: |-
+      LLM simulator image referenced in the generated testsuite config.
+  - name: SPICEDB_IMAGE
+    default: "quay.io/vray_rh/rhcl_testsuite_dependencies:spicedb-s390x"
+    documentation: |-
+      SpiceDB image referenced in the generated testsuite config.
+  - name: DNS_PROVIDER_SECRET_NAME
+    default: "coredns-credentials"
+    documentation: |-
+      DNS provider Secret name written into control_plane.provider_secret in the config.
+  - name: CLUSTER_ISSUER_NAME
+    default: "selfsigned-cluster-issuer"
+    documentation: |-
+      cert-manager ClusterIssuer name written into the testsuite config for TLSPolicy tests.
+  - name: KUADRANT_NAMESPACE
+    default: "kuadrant-system"
+    documentation: |-
+      Namespace where the Kuadrant CR resides (service_protection.system_project).
+  - name: TOOLS_NAMESPACE
+    default: "tools"
+    documentation: |-
+      Namespace where testing tools are deployed (tools.project).
+  - name: KEYCLOAK_ADMIN_USERNAME
+    default: "admin"
+    documentation: |-
+      Keycloak admin username written into the testsuite config.
+  - name: KEYCLOAK_ADMIN_PASSWORD
+    default: "admin"
+    documentation: |-
+      Keycloak admin password written into the testsuite config.
+  documentation: |-
+    Clones the Kuadrant testsuite, installs Python dependencies with Poetry (no dev deps,
+    no Playwright), generates config/settings.local.yaml dynamically from the cluster
+    (tool Routes created by kuadrant-s390x-deploy-tools and s390x tool images), runs
+    smoke tests and then `make kuadrant` (single-cluster tests, excluding ui/playwright),
+    polishes JUnit XML and copies reports to ${ARTIFACT_DIR}.
