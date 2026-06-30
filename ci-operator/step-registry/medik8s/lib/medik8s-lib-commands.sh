@@ -50,11 +50,20 @@ resolve_commit_sha() {
 
     log "Resolving latest commit from ${GITLAB_PROJECT_NAME} ${GIT_REF} ref..."
     # --insecure: gitlab.cee uses internal RH CA not trusted by CI pods
-    FBC_COMMIT_SHA=$(curl --insecure -sSf --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 \
-        "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" | jq -r .id) || true
+    # Shell-level exponential backoff (2+4+8+16+32 = 62s window) because
+    # gitlab.cee regularly returns 503s lasting 30+ seconds.
+    local attempt delay
+    for attempt in 1 2 3 4 5 6; do
+        FBC_COMMIT_SHA=$(curl --insecure -sSf --connect-timeout 10 --max-time 30 \
+            "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" | jq -r .id) && break
+        FBC_COMMIT_SHA=""
+        delay=$(( 2 ** attempt ))
+        log "WARNING: GitLab API attempt ${attempt}/6 failed (retrying in ${delay}s)..."
+        sleep "$delay"
+    done
 
     if [[ -z "$FBC_COMMIT_SHA" || "$FBC_COMMIT_SHA" == "null" ]]; then
-        log "ERROR: Failed to resolve rhwa-fbc commit SHA from GitLab API"
+        log "ERROR: Failed to resolve rhwa-fbc commit SHA from GitLab API after 6 attempts"
         exit 1
     fi
 
