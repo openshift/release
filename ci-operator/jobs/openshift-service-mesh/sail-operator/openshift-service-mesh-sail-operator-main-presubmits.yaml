@@ -320,17 +320,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.22-istio-pr-perfscale
     optional: true
-    reporter_config:
-      slack:
-        channel: '#ossm-qe-ci'
-        job_states_to_report:
-        - success
-        - failure
-        - error
-        report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-          ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-          Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-          logs> {{end}}'
     rerun_command: /test ocp-4.22-istio-pr-perfscale
     spec:
       containers:
@@ -620,7 +609,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/ocp-4.23-e2e-ocp-retest
+    context: ci/prow/ocp-4.23-e2e-next-ocp-retest
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -631,9 +620,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.23"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.23-e2e-ocp-retest
+    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.23-e2e-next-ocp-retest
     optional: true
-    rerun_command: /test ocp-4.23-e2e-ocp-retest
+    rerun_command: /test ocp-4.23-e2e-next-ocp-retest
     spec:
       containers:
       - args:
@@ -642,7 +631,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-retest
+        - --target=e2e-next-ocp-retest
         - --variant=ocp-4.23
         command:
         - ci-operator
@@ -699,4 +688,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.23-e2e-ocp-retest,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.23-e2e-next-ocp-retest,?($|\s.*)
