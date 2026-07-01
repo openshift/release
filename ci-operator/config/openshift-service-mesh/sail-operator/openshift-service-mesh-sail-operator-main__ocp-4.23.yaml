@@ -25,7 +25,14 @@ resources:
       memory: 2Gi
 tests:
 - as: e2e-ocp
-  skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+  postsubmit: true
+  reporter_config:
+    channel: '#team-ossm-qe'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: ossm-aws
     env:
