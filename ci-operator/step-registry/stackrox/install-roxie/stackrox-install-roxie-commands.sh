@@ -11,6 +11,19 @@ export KUBECONFIG
 SCRATCH=$(mktemp -d)
 trap 'rm -rf "${SCRATCH}"' EXIT
 
+ROXIE_VERSION=${ROXIE_VERSION:-0.4.2}
+
+function install_roxie() {
+  local roxie_path="${SCRATCH}/roxie"
+  echo ">>> Installing roxie ${ROXIE_VERSION}"
+  curl -fsSL --retry 5 --retry-all-errors -o "${roxie_path}" \
+    "https://github.com/stackrox/roxie/releases/download/v${ROXIE_VERSION}/roxie-linux-amd64"
+  chmod +x "${roxie_path}"
+  export PATH="${SCRATCH}:${PATH}"
+}
+
+install_roxie
+
 function fetch_last_nightly_tag() {
   local acs_tag_suffix=""
   for days_in_past in {1..14}; do
