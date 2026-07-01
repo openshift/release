@@ -856,6 +856,142 @@ ${REPORT_SECTION}"
 
 done <<< "$ISSUES"
 
+# Generate conversation transcript HTML from stream-json files in /tmp
+echo "Generating conversation transcript..."
+python3 - "$STATE_FILE" "$ARTIFACT_DIR" << 'TRANSCRIPT_PY'
+import json, html, sys, os
+
+state_file = sys.argv[1]
+artifact_dir = sys.argv[2]
+output_file = os.path.join(artifact_dir, "jira-agent-transcript.html")
+
+PHASES = [
+    ("output", "Phase 1: Solve"),
+    ("review", "Phase 2: Review"),
+    ("fix", "Phase 3: Fix"),
+    ("pr", "Phase 4: PR Creation"),
+]
+
+def parse_stream_json(path):
+    blocks = []
+    cost = turns = inp = outp = duration = 0
+    model = session = "unknown"
+    for line in open(path):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            m = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        t = m.get("type", "")
+        if t == "system" and m.get("subtype") == "init":
+            model = m.get("model", "unknown")
+            session = m.get("session_id", "unknown")
+        if t == "result":
+            cost = m.get("total_cost_usd", 0)
+            turns = m.get("num_turns", 0)
+            u = m.get("usage", {})
+            inp = u.get("input_tokens", 0)
+            outp = u.get("output_tokens", 0)
+            duration = m.get("duration_ms", 0)
+        if t == "assistant":
+            for c in m.get("message", {}).get("content", []):
+                ct = c.get("type", "")
+                if ct == "text":
+                    blocks.append(("assistant", c.get("text", "")))
+                elif ct == "tool_use":
+                    name = c.get("name", "")
+                    inp_str = json.dumps(c.get("input", {}))
+                    blocks.append(("tool_use", f"{name}: {inp_str[:300]}"))
+        if t == "user":
+            r = m.get("tool_use_result", "")
+            if isinstance(r, str) and r:
+                blocks.append(("tool_result", r[:1000]))
+            elif isinstance(r, list):
+                for item in r:
+                    if isinstance(item, dict) and item.get("type") == "text":
+                        blocks.append(("tool_result", item.get("text", "")[:1000]))
+    return blocks, {"cost": cost, "turns": turns, "input": inp, "output": outp,
+                    "duration": duration, "model": model, "session": session}
+
+def render_blocks(blocks):
+    out = []
+    for kind, text in blocks:
+        escaped = html.escape(text)
+        if kind == "assistant":
+            out.append(f'<div class="msg a"><div class="label">Assistant</div><pre>{escaped}</pre></div>')
+        elif kind == "tool_use":
+            out.append(f'<div class="msg t"><div class="label">Tool Call</div><code>{escaped}</code></div>')
+        elif kind == "tool_result":
+            cls = "e" if text.startswith("Error:") else "r"
+            label = "Error" if cls == "e" else "Result"
+            out.append(f'<div class="msg {cls}"><div class="label">{label}</div><pre>{escaped}</pre></div>')
+    return "\n".join(out)
+
+if not os.path.exists(state_file):
+    print("No state file, skipping transcript")
+    sys.exit(0)
+
+issues = [l.strip().split()[0] for l in open(state_file) if l.strip()]
+sections = []
+total_cost = 0
+
+for issue_key in issues:
+    issue_sections = []
+    for phase_key, phase_label in PHASES:
+        stream_file = f"/tmp/claude-{issue_key}-{phase_key}.json"
+        if not os.path.exists(stream_file):
+            continue
+        blocks, stats = parse_stream_json(stream_file)
+        if not blocks:
+            continue
+        total_cost += stats["cost"]
+        dur_s = stats["duration"] // 1000
+        dur_str = f"{dur_s // 60}m {dur_s % 60}s" if dur_s >= 60 else f"{dur_s}s"
+        is_open = "open" if phase_key == "output" else ""
+        issue_sections.append(f'''
+<details {is_open}>
+<summary>{phase_label} — {stats["turns"]} turns, ${stats["cost"]:.4f}, {dur_str}</summary>
+<div class="phase">{render_blocks(blocks)}</div>
+</details>''')
+    if issue_sections:
+        sections.append(f'<div class="issue"><h2>{issue_key}</h2>{"".join(issue_sections)}</div>')
+
+with open(output_file, "w") as f:
+    f.write(f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Jira Agent Transcript</title>
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 1100px; margin: 0 auto; padding: 2em; background: #f5f5f5; color: #333; }}
+h1 {{ border-bottom: 2px solid #333; padding-bottom: 0.3em; }}
+h2 {{ margin-top: 2em; }}
+details {{ margin: 0.5em 0; }}
+details summary {{ cursor: pointer; font-weight: 600; color: #555; padding: 0.5em 0; font-size: 1.05em; }}
+details[open] summary {{ margin-bottom: 0.5em; }}
+.phase {{ border-left: 2px solid #ddd; padding-left: 1em; margin-left: 0.5em; }}
+.msg {{ margin: 0.4em 0; padding: 0.6em; border-radius: 6px; }}
+.msg .label {{ font-size: 0.7em; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 0.2em; }}
+.msg pre, .msg code {{ margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 0.82em; }}
+.msg pre {{ max-height: 250px; overflow-y: auto; }}
+.a {{ background: #e8f4fd; border-left: 3px solid #0366d6; }}
+.t {{ background: #f6f8fa; border-left: 3px solid #6f42c1; }}
+.r {{ background: #f6f8fa; border-left: 3px solid #28a745; }}
+.e {{ background: #fff5f5; border-left: 3px solid #cb2431; }}
+</style>
+</head>
+<body>
+<p><a href="../../hypershift-jira-agent-report/artifacts/jira-agent-report.html">Back to summary report</a></p>
+<h1>Conversation Transcript</h1>
+<p style="color:#666">Total cost: ${total_cost:.4f}</p>
+{"".join(sections) if sections else "<p>No transcript data available.</p>"}
+</body>
+</html>''')
+print(f"Transcript written: {len(sections)} issue(s)")
+TRANSCRIPT_PY
+
 echo ""
 echo "=== Processing Summary ==="
 echo "Processed: $PROCESSED_COUNT"
