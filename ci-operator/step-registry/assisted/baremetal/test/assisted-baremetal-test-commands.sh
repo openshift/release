@@ -157,6 +157,7 @@ cat > "${MAIN_PLAYBOOK}" <<-EOF
     test_list_file:          "/tmp/test-list"
     test_skips_file:         "/tmp/test-skips"
     raw_test_list_file:      "/tmp/test-list-raw"
+    minimal_test_filter:     ""
     filtered_list_file:      "/tmp/test-list-filtered"
     pull_secret_file:        "/root/pull-secret"
 
@@ -239,12 +240,7 @@ cat > "${SINGLE_TEST_TASKS}" <<-EOF
         - name: "Set filter for minimal test suite"
           when: test_type == 'minimal'
           ansible.builtin.set_fact:
-            minimal_test_filter: >-
-              {%- if test_type == 'minimal' -%}
-              --run minimal
-              {%- else -%}
-              ""
-              {%- endif -%}
+            minimal_test_filter: "--run minimal"
 
         - name: "Generate suite list via dry-run"
           when: test_type == 'suite' or test_type == 'minimal'
