@@ -35,18 +35,18 @@ else
   exit 1
 fi
 
-# Check if target bastion is in maintenance mode
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f /root/${CLUSTER_NAME}/pause"; then
-  echo "The cluster is in maintenance mode. Remove the file /root/${CLUSTER_NAME}/pause in the bastion host when the maintenance is over"
-  exit 1
-fi
-
 # Bypassing env vars set in prepare-environment for now
 # This needs to be main branch
 OPENSHIFT_DPF_BRANCH="main"
 OPENSHIFT_DPF_GITHUB_REPO_URL="https://github.com/rh-ecosystem-edge/openshift-dpf.git"
 CLUSTER_NAME="doca8"
 REMOTE_MAIN_WORK_DIR="/root/${CLUSTER_NAME}/ci"
+
+# Check if target bastion is in maintenance mode
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f /root/${CLUSTER_NAME}/pause"; then
+  echo "The cluster is in maintenance mode. Remove the file /root/${CLUSTER_NAME}/pause in the bastion host when the maintenance is over"
+  exit 1
+fi
 
 # store last openshift-dpf install dir on hypervisor
 REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
