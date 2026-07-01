@@ -59,7 +59,6 @@ central:
   namespace: stackrox
   resourceProfile: small
   earlyReadiness: false
-  deployTimeout: 60m
   exposure: loadbalancer
   spec:
     customize:
@@ -71,7 +70,6 @@ securedCluster:
   namespace: stackrox
   resourceProfile: small
   earlyReadiness: false
-  deployTimeout: 60m
 EOF
 
 ROXIE_ENVRC="${SCRATCH}/roxie-envrc"
@@ -80,7 +78,9 @@ echo ">>> Deploying ACS with roxie (tag: ${ACS_VERSION_TAG})"
 roxie deploy \
   --config "${SCRATCH}/roxie-config.yaml" \
   --tag "${ACS_VERSION_TAG}" \
-  --envrc "${ROXIE_ENVRC}"
+  --envrc "${ROXIE_ENVRC}" \
+  --central-wait 60m \
+  --secured-cluster-wait 60m
 
 echo ">>> Verifying deployment"
 # shellcheck disable=SC1090
