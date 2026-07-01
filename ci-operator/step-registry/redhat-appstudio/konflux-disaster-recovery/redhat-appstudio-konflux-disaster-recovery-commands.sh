@@ -50,6 +50,16 @@ CODEBERG_BOT_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/c
 DR_TIMEOUT=185m
 DR_LABEL="disaster-recovery"
 
+# Install velero CLI — required by DR tests for RestoreMethodVeleroCLI.
+# Match the version deployed by OADP in the target cluster.
+VELERO_VERSION="${VELERO_VERSION:-v1.14.1}"
+echo "[INFO] Installing velero CLI ${VELERO_VERSION}"
+curl -fsSL "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz" \
+    | tar xz -C /tmp
+cp "/tmp/velero-${VELERO_VERSION}-linux-amd64/velero" /usr/local/bin/velero
+chmod +x /usr/local/bin/velero
+velero version --client-only
+
 # user stored: username:token,username:token
 IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github_accounts)"
 for account in "${GITHUB_ACCOUNTS_ARRAY[@]}"
@@ -128,14 +138,12 @@ echo "[INFO] UPGRADE_BRANCH: $UPGRADE_BRANCH"
 echo "[INFO] UPGRADE_FORK_ORGANIZATION: $UPGRADE_FORK_ORGANIZATION"
 
 # Clone infra-deployments for DR test code
-# TODO(manish-jangra): revert to upstream/main once infra-deployments PR is merged
 INFRA_DIR="/tmp/infra-deployments"
-git clone --branch K-2236-03 "https://github.com/manish-jangra/infra-deployments.git" "$INFRA_DIR"
+git clone --branch main "https://github.com/redhat-appstudio/infra-deployments.git" "$INFRA_DIR"
 
-# The clone is from a fork — add upstream so performKonfluxUpgrade can merge
-# remotes/upstream/main during the upgrade phase.
-git -C "$INFRA_DIR" remote add upstream https://github.com/redhat-appstudio/infra-deployments.git
-git -C "$INFRA_DIR" fetch upstream
+# performKonfluxUpgrade merges from remotes/upstream/<branch>.
+# Since we cloned from upstream, rename origin → upstream for consistency.
+git -C "$INFRA_DIR" remote rename origin upstream
 
 # Add the QE fork remote (same repo the install step pushed the preview branch to).
 # performKonfluxUpgrade pushes merged changes here so ArgoCD picks them up.
@@ -153,7 +161,7 @@ echo "[INFO] ARGO_TARGET_REVISION: ${ARGO_TARGET_REVISION:-<not found>}"
 # If this is an infra-deployments PR, merge the PR changes
 if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
     pushd "$INFRA_DIR"
-    git fetch origin "refs/pull/${PULL_NUMBER}/head"
+    git fetch https://github.com/redhat-appstudio/infra-deployments.git "refs/pull/${PULL_NUMBER}/head"
     git merge --no-edit FETCH_HEAD
     popd
 fi
@@ -162,6 +170,13 @@ fi
 # Ginkgo runs the test binary from the package directory, so relative paths
 # like ./tmp/infra-deployments won't resolve correctly.
 export INFRA_DEPLOYMENTS_DIR="$INFRA_DIR"
+
+# Create relative path symlink expected by performKonfluxUpgrade.
+# Go code (dr_backwards_compat.go:183) opens "./tmp/infra-deployments" relative
+# to ginkgo's CWD (the test suite directory). Symlink resolves it to the clone.
+mkdir -p "${INFRA_DIR}/tests/disaster-recovery/tmp"
+ln -sf "$INFRA_DIR" "${INFRA_DIR}/tests/disaster-recovery/tmp/infra-deployments"
+echo "[INFO] Symlink: ${INFRA_DIR}/tests/disaster-recovery/tmp/infra-deployments -> ${INFRA_DIR}"
 
 # Point ginkgo at the infra-deployments test directory
 export E2E_BIN_PATH="${INFRA_DIR}/tests/disaster-recovery"
