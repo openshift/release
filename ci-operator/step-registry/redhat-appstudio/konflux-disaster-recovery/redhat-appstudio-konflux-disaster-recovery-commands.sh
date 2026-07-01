@@ -138,12 +138,14 @@ echo "[INFO] UPGRADE_BRANCH: $UPGRADE_BRANCH"
 echo "[INFO] UPGRADE_FORK_ORGANIZATION: $UPGRADE_FORK_ORGANIZATION"
 
 # Clone infra-deployments for DR test code
+# TODO(manish-jangra): revert to upstream/main once infra-deployments PR is merged
 INFRA_DIR="/tmp/infra-deployments"
-git clone --branch main "https://github.com/redhat-appstudio/infra-deployments.git" "$INFRA_DIR"
+git clone --branch K-2236-03 "https://github.com/manish-jangra/infra-deployments.git" "$INFRA_DIR"
 
-# performKonfluxUpgrade merges from remotes/upstream/<branch>.
-# Since we cloned from upstream, rename origin → upstream for consistency.
-git -C "$INFRA_DIR" remote rename origin upstream
+# The clone is from a fork — add upstream so performKonfluxUpgrade can merge
+# remotes/upstream/main during the upgrade phase.
+git -C "$INFRA_DIR" remote add upstream https://github.com/redhat-appstudio/infra-deployments.git
+git -C "$INFRA_DIR" fetch upstream
 
 # Add the QE fork remote (same repo the install step pushed the preview branch to).
 # performKonfluxUpgrade pushes merged changes here so ArgoCD picks them up.
@@ -161,7 +163,7 @@ echo "[INFO] ARGO_TARGET_REVISION: ${ARGO_TARGET_REVISION:-<not found>}"
 # If this is an infra-deployments PR, merge the PR changes
 if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
     pushd "$INFRA_DIR"
-    git fetch https://github.com/redhat-appstudio/infra-deployments.git "refs/pull/${PULL_NUMBER}/head"
+    git fetch origin "refs/pull/${PULL_NUMBER}/head"
     git merge --no-edit FETCH_HEAD
     popd
 fi
