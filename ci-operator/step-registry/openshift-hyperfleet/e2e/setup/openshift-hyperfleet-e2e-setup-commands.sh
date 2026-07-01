@@ -30,6 +30,10 @@ NAMESPACE_PREFIX="${MULTISTAGE_PARAM_OVERRIDE_NAMESPACE_PREFIX:-e2e}"
 
 # Generate namespace name with build_id suffix
 NAMESPACE_NAME=${NAMESPACE_PREFIX}-${BUILD_ID}
+
+# Export run-id for labeling resourecs and cleanup
+export RUN_ID="${NAMESPACE_NAME}"
+echo "${RUN_ID}" > "${SHARED_DIR}/run_id"
 # Saves namespace and project id to shared dir so test and cleanup have shared values
 echo "${NAMESPACE_NAME}" > "${SHARED_DIR}/namespace_name"
 echo "${PROJECT_ID}" > "${SHARED_DIR}/gcp_project_id"
