@@ -94,6 +94,7 @@ for ((i=1; i<=5; i++)); do
 
   if [ "$STATUS_HTTP" -eq 200 ]; then
     JOB_URL=$(echo "$STATUS_BODY" | jq -r '.job_url // empty')
+    # shellcheck disable=SC2034
     JOB_STATUS=$(echo "$STATUS_BODY" | jq -r '.job_status // "UNKNOWN"')
     if [ -n "$JOB_URL" ]; then
       echo "Job URL: ${JOB_URL}"
