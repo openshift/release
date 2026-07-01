@@ -52,6 +52,10 @@ export NAMESPACE
 GCP_PROJECT_ID=$(cat "${SHARED_DIR}/gcp_project_id")
 export GCP_PROJECT_ID
 
+# Extract run id from shared dir
+RUN_ID=$(cat "${SHARED_DIR}/run_id")
+export RUN_ID
+
 # Extract kubeconfig from shared dir
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # Export adapter parameters for the test
