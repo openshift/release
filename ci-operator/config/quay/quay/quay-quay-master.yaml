@@ -67,13 +67,39 @@ tests:
           - admin
         GLOBAL_READONLY_SUPER_USERS:
           - readonly
-      QUAY_OPERATOR_CHANNEL: stable-3.17
+      QUAY_OPERATOR_CHANNEL: stable-3.18
       QUAY_OPERATOR_SOURCE: redhat-operators
       REGION: us-east-1
       REPLICAS: "3"
     test:
     - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-deploy-quay-custom-image
+    - ref: quay-tests-test-quay-playwright
+    workflow: rosa-aws-sts-hcp
+  timeout: 4h0m0s
+- as: playwright-e2e-quay318-ocp421
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      COMPUTE_MACHINE_TYPE: m5.4xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-21@sha256:dc85edf1095b3be72cf2a3f4e727857944c0538d56face1f3b96700dc0846053
+      OCM_LOGIN_ENV: production
+      QUAY_EXTRA_CONFIG: |
+        FEATURE_REPO_MIRROR: true
+        FEATURE_USER_METADATA: true
+        FEATURE_IMMUTABLE_TAGS: true
+        SUPER_USERS:
+          - admin
+        GLOBAL_READONLY_SUPER_USERS:
+          - readonly
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      REGION: us-east-1
+      REPLICAS: "3"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-test-quay-playwright
     workflow: rosa-aws-sts-hcp
   timeout: 4h0m0s
