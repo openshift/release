@@ -61,7 +61,7 @@ cat $SHARED_DIR/all | grep ansible_ssh_private_key -A 100 | sed 's/ansible_ssh_p
 chmod 600 $PROJECT_DIR/temp_ssh_key
 BASTION_IP=$(cat /eco-ci-cd/inventories/cnf/host_vars/bastion | grep -oP '(?<=ansible_host: ).*' | sed "s/'//g")
 BASTION_USER=$(cat /eco-ci-cd/inventories/cnf/group_vars/all | grep -oP '(?<=ansible_user: ).*'| sed "s/'//g")
-
+exit 1
 echo "Run cnf-tests via ssh tunnel"
 ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no $BASTION_USER@$BASTION_IP -i /tmp/temp_ssh_key "cd /tmp/cnf-features-deploy;./cnf-tests-run.sh || true"
 
