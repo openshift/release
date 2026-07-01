@@ -6,10 +6,6 @@ base_images:
   base-machine:
     name: centos
     namespace: openshift
-    tag: stream10
-  base-machine-rhel9:
-    name: centos
-    namespace: openshift
     tag: stream9
   cli:
     name: "5.0"
@@ -76,7 +72,7 @@ images:
       # installs the RPMs into RHCOS (this uses the fact that RHCOS is now a native
       # bootable container).
       # See also: https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
-      FROM quay.io/centos/centos:stream10 as build
+      FROM quay.io/centos/centos:stream9 as build
       # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
       # in a container https://github.com/coreos/rpm-ostree/issues/4034
       RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
@@ -88,7 +84,7 @@ images:
     inputs:
       base-machine-with-rpms:
         as:
-        - quay.io/centos/centos:stream10
+        - quay.io/centos/centos:stream9
       rhel-coreos-base:
         as:
         - registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
@@ -100,7 +96,7 @@ images:
       COPY --from=build /*.rpm /
       RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
     inputs:
-      base-machine-rhel9-with-rpms:
+      base-machine-with-rpms:
         as:
         - quay.io/centos/centos:stream9
       rhel-coreos-base-rhel9:
@@ -168,9 +164,6 @@ raw_steps:
 - rpm_image_injection_step:
     from: base-machine
     to: base-machine-with-rpms
-- rpm_image_injection_step:
-    from: base-machine-rhel9
-    to: base-machine-rhel9-with-rpms
 releases:
   initial:
     integration:
