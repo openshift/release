@@ -199,6 +199,150 @@ EOF
 
 }
 
+#create ImageDigestMirrorSet (for ROSA HCP clusters where ICSP is blocked)
+function create_idms () {
+  cat <<EOF | oc apply -f -
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: konflux-quay-registry
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-9
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-10
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-11
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-12
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-13
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-14
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-15
+    source: registry.redhat.io/quay/quay-operator-rhel8
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-16
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-17
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-18
+    source: registry.redhat.io/quay/quay-operator-rhel9
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-9
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-10
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-11
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-12
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-13
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-14
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-15
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-16
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-17
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-18
+    source: registry.redhat.io/quay/quay-operator-bundle
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-9
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-10
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-11
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-12
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-13
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-14
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-15
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-16
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-17
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-18
+    source: registry.redhat.io/quay/quay-container-security-operator-bundle
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-9
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-10
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-11
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-12
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-13
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-14
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-15
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-16
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-17
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-18
+    source: registry.redhat.io/quay/quay-bridge-operator-bundle
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-9
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-10
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-11
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-12
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-13
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-14
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-15
+    source: registry.redhat.io/quay/quay-rhel8
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-16
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-17
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-18
+    source: registry.redhat.io/quay/quay-rhel9
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-9
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-10
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-11
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-12
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-13
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-14
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-15
+    source: registry.redhat.io/quay/quay-bridge-operator-rhel8
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-16
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-17
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-18
+    source: registry.redhat.io/quay/quay-bridge-operator-rhel9
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-9
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-10
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-11
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-12
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-13
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-14
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-15
+    source: registry.redhat.io/quay/quay-container-security-operator-rhel8
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-16
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-17
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-18
+    source: registry.redhat.io/quay/quay-container-security-operator-rhel9
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-9
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-10
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-11
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-12
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-13
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-14
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-15
+    source: registry.redhat.io/quay/container-security-operator-rhel8
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-16
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-17
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-18
+    source: registry.redhat.io/quay/container-security-operator-rhel9
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-9
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-10
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-11
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-12
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-13
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-14
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-15
+    source: registry.redhat.io/quay/clair-rhel8
+  - mirrors:
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-16
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-17
+    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-18
+    source: registry.redhat.io/quay/clair-rhel9
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry.stage.redhat.io
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry-proxy.engineering.redhat.com
+EOF
+  if [ $? == 0 ]; then
+    echo "Create the IDMS successfully"
+  else
+    echo "!!! Fail to create the IDMS"
+    return 1
+  fi
+}
+
 #Create custom catalog source
 function create_catalog_source(){
   cat <<EOF | oc apply -f -
@@ -248,9 +392,15 @@ elif [ -z "$MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE" ]; then
 else #Install Quay operator with fbc image
   echo "Installing Quay from unreleased fbc image: $MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"
   update_pull_secret
-  create_icsp
+  if [[ "$QUAY_CLUSTER_TYPE" == "rosahcp" ]]; then
+    create_idms
+  else
+    create_icsp
+  fi
   create_catalog_source
   check_catalog_source_status
-  wait_mcp_ready
-  
+  if [[ "$QUAY_CLUSTER_TYPE" != "rosahcp" ]]; then
+    wait_mcp_ready
+  fi
+
 fi
