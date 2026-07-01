@@ -31,6 +31,7 @@ echo "Installing Claude Code plugins..."
 claude plugin marketplace add openshift-eng/ai-helpers
 claude plugin marketplace add RedHatProductSecurity/prodsec-skills
 claude plugin install openshift-developer@ai-helpers
+claude plugin install prow-agent@ai-helpers
 
 cd /tmp/hypershift
 
@@ -321,6 +322,127 @@ send_slack_notification() {
   fi
 }
 
+# OTEL / BigQuery telemetry support
+EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+
+# Wrapper: run claude via agentic-ci for native OTEL collection
+# Uses --no-streaming so stdout passes through raw for tee/reports.
+# Filters to JSON lines only (agentic-ci log lines are stripped).
+# Captures OTEL JSONL per invocation and appends to the consolidated log.
+run_claude() {
+  local phase=$1; shift
+  local issue_key=$1; shift
+  local prompt="$1"; shift
+
+  local phase_otel="/tmp/claude-${issue_key}-${phase}-otel.jsonl"
+
+  agentic-ci run \
+    --backend local \
+    --harness claude-code \
+    --model "${CLAUDE_MODEL}" \
+    --workdir /tmp/hypershift \
+    --no-streaming \
+    "${prompt}" \
+    -- \
+    --permission-mode default \
+    --verbose \
+    --output-format stream-json \
+    "$@" \
+    | grep '^{'
+  local rc=${PIPESTATUS[0]}
+
+  # Collect OTEL JSONL from agentic-ci temp dirs into per-phase and consolidated logs
+  for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
+    if [ -f "$f" ]; then
+      cat "$f" >> "${phase_otel}"
+      cat "$f" >> "${OTEL_LOG}"
+    fi
+  done
+  rm -rf /tmp/agentic-ci-run.*
+  return $rc
+}
+
+# Extract session metrics from OTEL data and produce BigQuery autodl
+extract_session_metrics() {
+  local issue_key=$1
+  local phase=$2
+
+  if [ ! -f "${EXTRACT_METRICS}" ]; then
+    echo "Warning: extract_metrics.py not found, skipping session metrics"
+    return 0
+  fi
+
+  local phase_otel="/tmp/claude-${issue_key}-${phase}-otel.jsonl"
+  if [ ! -f "$phase_otel" ] || [ ! -s "$phase_otel" ]; then
+    echo "Warning: No OTEL data for ${phase}, skipping session metrics"
+    return 0
+  fi
+
+  python3 "${EXTRACT_METRICS}" "$phase_otel" \
+    "${ARTIFACT_DIR}/claude-${issue_key}-${phase}-session-metrics-autodl.json" \
+    2>&1 || echo "Warning: Failed to extract session metrics for ${phase}"
+}
+
+# Generate domain-specific autodl for the jira_agent BigQuery table
+generate_autodl() {
+  local issue_key=$1
+  local phase=$2
+  local result=$3
+  local pr_url=${4:-}
+  local session_id=${5:-}
+  local analyzed_at
+  analyzed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  local autodl_file="${ARTIFACT_DIR}/jira-agent-${issue_key}-${phase}-autodl.json"
+
+  jq -n \
+    --arg issue_key "$issue_key" \
+    --arg phase "$phase" \
+    --arg result "$result" \
+    --arg pr_url "$pr_url" \
+    --arg session_id "$session_id" \
+    --arg analyzed_at "$analyzed_at" \
+    --arg job_name "${JOB_NAME:-}" \
+    --arg build_id "${BUILD_ID:-}" \
+    '{
+      table_name: "jira_agent",
+      schema: {
+        session_id: "string",
+        agent: "string",
+        phase: "string",
+        issue_key: "string",
+        pr_url: "string",
+        result: "string",
+        analyzed_at: "string",
+        job_name: "string",
+        build_id: "string"
+      },
+      schema_mapping: null,
+      rows: [{
+        session_id: $session_id,
+        agent: "jira-agent",
+        phase: $phase,
+        issue_key: $issue_key,
+        pr_url: $pr_url,
+        result: $result,
+        analyzed_at: $analyzed_at,
+        job_name: $job_name,
+        build_id: $build_id
+      }],
+      chunk_size: 0,
+      expiration_days: 0,
+      partition_column: ""
+    }' > "$autodl_file"
+  echo "Generated autodl: ${autodl_file}"
+}
+
+# Helper: extract session_id from stream-json output
+get_session_id() {
+  local json_file=$1
+  grep '"type":"result"' "$json_file" 2>/dev/null | head -1 | jq -r '.session_id // ""' 2>/dev/null || echo ""
+}
+
 # Helper: extract token usage from stream-json output and save to SHARED_DIR
 extract_tokens() {
   local JSON_FILE=$1
@@ -423,22 +545,22 @@ while IFS= read -r line; do
   FORK_CONTEXT="IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After creating commits on your feature branch, push the branch to origin. Do NOT create a Pull Request - the PR will be created in a subsequent automated step after code review. ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
 
   set +e
-  claude -p "/jira:solve $ISSUE_KEY origin --ci" \
+  run_claude "solve" "$ISSUE_KEY" "/jira:solve $ISSUE_KEY origin --ci" \
     --append-system-prompt "$FORK_CONTEXT" \
     --allowedTools "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task" \
     --max-turns 300 \
     --effort max \
-    --model "$CLAUDE_MODEL" \
-    --verbose \
-    --output-format stream-json \
     2> "/tmp/claude-${ISSUE_KEY}-output.log" \
     | tee "/tmp/claude-${ISSUE_KEY}-output.json"
   EXIT_CODE=$?
   set -e
 
   extract_artifacts "/tmp/claude-${ISSUE_KEY}-output.json" "claude-${ISSUE_KEY}-output"
+  extract_session_metrics "$ISSUE_KEY" "solve"
   extract_tokens "/tmp/claude-${ISSUE_KEY}-output.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json"
   echo "Phase 1 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json")"
+  SOLVE_SESSION_ID=$(get_session_id "/tmp/claude-${ISSUE_KEY}-output.json")
+  generate_autodl "$ISSUE_KEY" "solve" "$([ $EXIT_CODE -eq 0 ] && echo success || echo failed)" "" "$SOLVE_SESSION_ID"
 
   PHASE1_END=$(date +%s)
   PHASE1_DURATION=$((PHASE1_END - PHASE1_START))
@@ -472,22 +594,21 @@ while IFS= read -r line; do
       PHASE2_START=$(date +%s)
 
       set +e
-      claude -p "/code-review:pre-commit-review --language go --profile hypershift" \
+      run_claude "review" "$ISSUE_KEY" "/code-review:pre-commit-review --language go --profile hypershift" \
         --append-system-prompt "${SECURITY_PROMPT} ${SUBAGENT_PROMPT}" \
         --allowedTools "Bash Read Grep Glob Task Agent Skill" \
         --max-turns 225 \
         --effort max \
-        --model "$CLAUDE_MODEL" \
-        --verbose \
-        --output-format stream-json \
         2> "/tmp/claude-${ISSUE_KEY}-review.log" \
         | tee "/tmp/claude-${ISSUE_KEY}-review.json"
       REVIEW_EXIT_CODE=$?
       set -e
 
       extract_artifacts "/tmp/claude-${ISSUE_KEY}-review.json" "claude-${ISSUE_KEY}-review"
+      extract_session_metrics "$ISSUE_KEY" "review"
       extract_tokens "/tmp/claude-${ISSUE_KEY}-review.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json"
       echo "Phase 2 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json")"
+      generate_autodl "$ISSUE_KEY" "review" "$([ $REVIEW_EXIT_CODE -eq 0 ] && echo success || echo failed)" "" "$(get_session_id "/tmp/claude-${ISSUE_KEY}-review.json")"
 
       PHASE2_END=$(date +%s)
       PHASE2_DURATION=$((PHASE2_END - PHASE2_START))
@@ -529,7 +650,7 @@ while IFS= read -r line; do
 
       if [ -n "$REVIEW_FINDINGS" ]; then
         set +e
-        claude -p "/openshift-developer:address-review-precommit" \
+        run_claude "fix" "$ISSUE_KEY" "/openshift-developer:address-review-precommit" \
           --append-system-prompt "REVIEW FINDINGS:
 ${REVIEW_FINDINGS}
 
@@ -537,17 +658,16 @@ ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}" \
           --allowedTools "Bash Read Write Edit Grep Glob Agent Skill Task" \
           --max-turns 225 \
           --effort max \
-          --model "$CLAUDE_MODEL" \
-          --verbose \
-          --output-format stream-json \
           2> "/tmp/claude-${ISSUE_KEY}-fix.log" \
           | tee "/tmp/claude-${ISSUE_KEY}-fix.json"
         FIX_EXIT_CODE=$?
         set -e
 
         extract_artifacts "/tmp/claude-${ISSUE_KEY}-fix.json" "claude-${ISSUE_KEY}-fix"
+        extract_session_metrics "$ISSUE_KEY" "fix"
         extract_tokens "/tmp/claude-${ISSUE_KEY}-fix.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json"
         echo "Phase 3 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json")"
+        generate_autodl "$ISSUE_KEY" "fix" "$([ $FIX_EXIT_CODE -eq 0 ] && echo success || echo failed)" "" "$(get_session_id "/tmp/claude-${ISSUE_KEY}-fix.json")"
 
         if [ $FIX_EXIT_CODE -eq 0 ]; then
           echo "✅ Phase 3 (address review) completed for $ISSUE_KEY"
@@ -591,20 +711,18 @@ ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}" \
       PHASE4_START=$(date +%s)
 
       set +e
-      claude -p "/openshift-developer:create-pr ${ISSUE_KEY} --upstream openshift/hypershift --head hypershift-community:${BRANCH_NAME}" \
+      run_claude "pr-creation" "$ISSUE_KEY" "/openshift-developer:create-pr ${ISSUE_KEY} --upstream openshift/hypershift --head hypershift-community:${BRANCH_NAME}" \
         --append-system-prompt "${SECURITY_PROMPT} ${SUBAGENT_PROMPT}" \
         --allowedTools "Bash Read Grep Glob" \
         --max-turns 90 \
         --effort max \
-        --model "$CLAUDE_MODEL" \
-        --verbose \
-        --output-format stream-json \
         2> "/tmp/claude-${ISSUE_KEY}-pr.log" \
         | tee "/tmp/claude-${ISSUE_KEY}-pr.json"
       PR_EXIT_CODE=$?
       set -e
 
       extract_artifacts "/tmp/claude-${ISSUE_KEY}-pr.json" "claude-${ISSUE_KEY}-pr"
+      extract_session_metrics "$ISSUE_KEY" "pr-creation"
       extract_tokens "/tmp/claude-${ISSUE_KEY}-pr.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json"
       echo "Phase 4 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json")"
 
@@ -624,6 +742,7 @@ ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}" \
         echo "❌ Phase 4 (PR creation) failed for $ISSUE_KEY (exit code: $PR_EXIT_CODE)"
         PR_URL=""
       fi
+      generate_autodl "$ISSUE_KEY" "pr-creation" "$([ $PR_EXIT_CODE -eq 0 ] && echo success || echo failed)" "$PR_URL" "$(get_session_id "/tmp/claude-${ISSUE_KEY}-pr.json")"
 
       # Append report link to PR description
       if [ -n "$PR_URL" ]; then
