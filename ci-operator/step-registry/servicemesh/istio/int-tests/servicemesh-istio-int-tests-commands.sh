@@ -12,6 +12,11 @@ readonly RETRY_SLEEP_INTERVAL=30
 
 # run_tests executes the main test command inside the test pod
 run_tests() {
+  # Wait for kube-apiserver to be fully stable before opening a WebSocket session (oc rsh).
+  # A rolling kube-apiserver update drops WebSocket connections mid-stream (close 1006),
+  # causing spurious failures even when the tests themselves are healthy.
+  ./prow/check-cluster-ready.sh
+
   if [ "${TEST_SUITE}" = "helm" ]
   then
     HELM_ENV_VAR_EXPORT="export VARIANT=distroless;export GCP_REGISTRIES=' '"
