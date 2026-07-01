@@ -21,6 +21,42 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
     ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
 fi
 
+echo "mcornea patching rhcos10 with el9 kernel and wait"
+# Apply the changes
+oc apply -f- <<EOF
+apiVersion: v1
+items:
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: worker
+    name: os-layer-custom-worker
+  spec:
+    osImageURL: quay.io/mcornea/rhel-coreos-10@sha256:214f79c33bd68cc670aad6935ce8456909f1248a86e77b87aa9a2691903bf878
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: master
+    name: os-layer-custom-master
+  spec:
+    osImageURL: quay.io/mcornea/rhel-coreos-10@sha256:214f79c33bd68cc670aad6935ce8456909f1248a86e77b87aa9a2691903bf878
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: infra
+    name: os-layer-custom-infra
+  spec:
+    osImageURL: quay.io/mcornea/rhel-coreos-10@sha256:214f79c33bd68cc670aad6935ce8456909f1248a86e77b87aa9a2691903bf878
+kind: List
+metadata:
+  resourceVersion: ""
+EOF
+
+oc adm wait-for-stable-cluster --minimum-stable-period 5m
+
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
