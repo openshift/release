@@ -12,7 +12,11 @@ run_tls_scan() {
   local ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 
   if [[ -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ]]; then
-    SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner/${TLS_SCANNER_CLUSTER_LABEL}"
+    if [[ "${TLS_SCANNER_PQC_PASS:-false}" == "true" ]]; then
+      SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner/pqc-${TLS_SCANNER_CLUSTER_LABEL}"
+    else
+      SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner/${TLS_SCANNER_CLUSTER_LABEL}"
+    fi
     case "${TLS_SCANNER_CLUSTER_LABEL}" in
       management)
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -46,8 +50,10 @@ run_tls_scan() {
       SCANNER_ARGS="--all-pods"
   fi
 
-  # Enable post-quantum cryptography checks when requested by the step ref.
-  if [[ "${PQC_CHECK:-false}" == "true" ]]; then
+  # Enable post-quantum cryptography checks only during the dedicated PQC pass.
+  # On the first (TLS compliance) pass, PQC_CHECK is ignored so normal compliance
+  # results are produced. The second pass sets TLS_SCANNER_PQC_PASS=true.
+  if [[ "${TLS_SCANNER_PQC_PASS:-false}" == "true" ]]; then
       SCANNER_ARGS="${SCANNER_ARGS} --pqc-check"
       echo "PQC readiness mode enabled: checks TLS 1.3 support and mlkem or mlkem25519 support per target."
   fi
@@ -232,7 +238,9 @@ EOF
   oc cp "${NAMESPACE}/tls-scanner:/results/." "${SCANNER_ARTIFACT_DIR}/" || echo "Warning: Failed to copy some artifacts"
 
   if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
-      if [[ -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ]]; then
+      if [[ "${TLS_SCANNER_PQC_PASS:-false}" == "true" && -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ]]; then
+        junit_artifact="${ARTIFACT_DIR}/junit_pqc_scan_${TLS_SCANNER_CLUSTER_LABEL}.xml"
+      elif [[ -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ]]; then
         junit_artifact="${ARTIFACT_DIR}/junit_tls_scan_${TLS_SCANNER_CLUSTER_LABEL}.xml"
       else
         junit_artifact="${ARTIFACT_DIR}/junit_tls_scan.xml"
@@ -274,6 +282,23 @@ if [[ "${TLS_SCANNER_RUN_HYPERSHIFT:-false}" == "true" ]]; then
     ) || OVERALL_EXIT_CODE=1
     echo "=== TLS scanner: ${label} cluster complete ==="
   done
+
+  # Run PQC readiness check as a second pass if enabled.
+  if [[ "${PQC_CHECK:-false}" == "true" ]]; then
+    echo "=== TLS scanner: PQC readiness pass ==="
+    for label in management guest; do
+      echo "=== PQC scanner: ${label} cluster ==="
+      (
+        export TLS_SCANNER_CLUSTER_LABEL="${label}"
+        export PQC_CHECK="true"
+        export TLS_SCANNER_PQC_PASS="true"
+        run_tls_scan
+      ) || OVERALL_EXIT_CODE=1
+      echo "=== PQC scanner: ${label} cluster complete ==="
+    done
+    echo "=== PQC readiness pass complete ==="
+  fi
+
   echo "=== HyperShift TLS scanner complete (management + guest) ==="
   exit "${OVERALL_EXIT_CODE}"
 fi
