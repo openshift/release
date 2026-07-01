@@ -166,9 +166,9 @@ execute_and_collect_artifacts() {
   echo "Copying artifacts from test pod after attempt ${attempt}..."
   oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
 
-  # share artifacts with next job step which is uploading results to report portal
+  # share artifacts with next job step which is uploading results to report portal, use only xml files as there is a 1MB limit
   echo "Copying artifacts to SHARED_DIR after attempt ${attempt}..."
-  cp "${ARTIFACT_DIR}/"* "${SHARED_DIR}"
+  cp "${ARTIFACT_DIR}/"*.xml "${SHARED_DIR}"
 
   set -o errexit
 
