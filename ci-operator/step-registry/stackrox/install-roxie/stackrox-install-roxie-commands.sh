@@ -37,6 +37,7 @@ fi
 
 cat > "${SCRATCH}/roxie-config.yaml" <<'EOF'
 roxie:
+  # TODO(https://github.com/stackrox/roxie/issues/216)
   clusterType: InfraOpenShift4
   featureFlags:
     ROX_SCANNER_V4_ENABLED: true
