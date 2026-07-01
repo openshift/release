@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo ">>> Install ACS using roxie [$(date -u || true)]"
+
+SHARED_DIR=${SHARED_DIR:-/tmp}
+KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
+export KUBECONFIG
+
+SCRATCH=$(mktemp -d)
+trap 'rm -rf "${SCRATCH}"' EXIT
+
+function fetch_last_nightly_tag() {
+  local acs_tag_suffix=""
+  for days_in_past in {1..14}; do
+    acs_tag_suffix="$(date -d "-${days_in_past} day" +"%Y%m%d" || gdate -d "-${days_in_past} day" +"%Y%m%d")"
+    ACS_VERSION_TAG=$(curl --silent "https://quay.io/api/v1/repository/stackrox-io/main/tag/?onlyActiveTags=true&limit=1&filter_tag_name=like:%-nightly-${acs_tag_suffix}" | jq '.tags[0].name' --raw-output)
+    if [[ "${ACS_VERSION_TAG}" != "" && "${ACS_VERSION_TAG}" != "null" ]]; then
+      break
+    fi
+  done
+  if [[ "${ACS_VERSION_TAG}" == "" || "${ACS_VERSION_TAG}" == "null" ]]; then
+    echo "Error: Unable to fetch the last nightly tag"
+    exit 1
+  fi
+  echo "ACS_VERSION_TAG=${ACS_VERSION_TAG}"
+}
+
+ACS_VERSION_TAG=""
+if [[ -f "${SHARED_DIR}/acs_image_tag" ]]; then
+  ACS_VERSION_TAG="$(cat "${SHARED_DIR}/acs_image_tag")"
+  echo "Using PR image tag from previous step: ${ACS_VERSION_TAG}"
+else
+  fetch_last_nightly_tag
+fi
+
+cat > "${SCRATCH}/roxie-config.yaml" <<'EOF'
+roxie:
+  featureFlags:
+    ROX_SCANNER_V4_ENABLED: true
+
+central:
+  namespace: stackrox
+  resourceProfile: small
+  earlyReadiness: false
+  deployTimeout: 60m
+  exposure: loadbalancer
+  spec:
+    customize:
+      envVars:
+      - name: SCANNER_V4_MATCHER_READINESS
+        value: vulnerability
+
+securedCluster:
+  namespace: stackrox
+  resourceProfile: small
+  earlyReadiness: false
+  deployTimeout: 60m
+EOF
+
+ROXIE_ENVRC="${SCRATCH}/roxie-envrc"
+
+echo ">>> Deploying ACS with roxie (tag: ${ACS_VERSION_TAG})"
+roxie deploy \
+  --config "${SCRATCH}/roxie-config.yaml" \
+  --tag "${ACS_VERSION_TAG}" \
+  --envrc "${ROXIE_ENVRC}"
+
+echo ">>> Verifying deployment"
+# shellcheck disable=SC1090
+source "${ROXIE_ENVRC}"
+kubectl get nodes -o wide
+kubectl get pods -o wide --namespace stackrox
+
+echo ">>> ACS installation complete [$(date -u || true)]"
