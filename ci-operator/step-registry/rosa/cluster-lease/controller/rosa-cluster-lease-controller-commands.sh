@@ -32,6 +32,47 @@ dry_run_guard() {
     return 1
 }
 
+ocm_get_cluster() {
+    local name="$1" response=""
+    if ! response=$(ocm get /api/clusters_mgmt/v1/clusters --parameter search="name = '${name}'" 2>&1); then
+        log "ERROR: OCM lookup failed for ${name}: ${response}"
+        return 1
+    fi
+    echo "${response}" | jq '.items[0] // empty | select(.aws.tags["rosa-cluster-lease"] == "true")' 2>/dev/null
+}
+
+register_lease() {
+    local name="$1" status="$2" cluster_id="$3" type="$4" env="$5" region="$6" version="$7"
+    local api_url="${8:-}" actual_version="${9:-}"
+    lease_oc apply -n "${LEASE_NAMESPACE}" -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${name}
+  namespace: ${LEASE_NAMESPACE}
+  labels:
+    rosa-cluster-lease/managed: "true"
+    rosa-cluster-lease/type: ${type}
+    rosa-cluster-lease/env: ${env}
+    rosa-cluster-lease/region: ${region}
+    rosa-cluster-lease/version: "${version}"
+    rosa-cluster-lease/status: ${status}
+  annotations:
+    rosa-cluster-lease/holder: ""
+    rosa-cluster-lease/build-id: ""
+    rosa-cluster-lease/acquired-at: ""
+    rosa-cluster-lease/released-at: ""
+    rosa-cluster-lease/registered-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+data:
+  cluster-id: "${cluster_id}"
+  cluster-name: "${name}"
+  api-url: "${api_url}"
+  region: "${region}"
+  version: "${actual_version}"
+  ocm-env: "${env}"
+EOF
+}
+
 # Configure AWS credentials from cluster profile
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
@@ -95,26 +136,25 @@ fi
 
 if ! DESIRED_NAMES=$(echo "${DESIRED_YAML}" | python3 -c "
 import sys, json, re
-lines = sys.stdin.read().strip().split('\n')
-clusters, current = [], {}
-def scalar(v):
-    v = v.strip()
-    if len(v) >= 2 and v[0] == v[-1] and v[0] in ('\"', \"'\"):
-        v = v[1:-1]
-    return v
-for line in lines:
-    m = re.match(r'\s*-\s+(\w[\w-]*):\s*(.*)', line)
-    if m:
-        if current: clusters.append(current)
-        current = {m.group(1): scalar(m.group(2))}
-    else:
-        m = re.match(r'\s+(\w[\w-]*):\s*(.*)', line)
+
+def parse_yaml_list(text):
+    clusters, current = [], {}
+    for line in text.strip().split('\n'):
+        m = re.match(r'\s*-\s+([\w][\w-]*):\s*(.*)', line)
         if m:
-            current[m.group(1)] = scalar(m.group(2))
+            if current: clusters.append(current)
+            current = {m.group(1): m.group(2).strip().strip('\"')}
+            continue
+        m = re.match(r'\s+([\w][\w-]*):\s*(.*)', line)
+        if m:
+            current[m.group(1)] = m.group(2).strip().strip('\"')
         elif line.strip() and not line.lstrip().startswith('#'):
-            raise ValueError(f'Unsupported desired-clusters line: {line!r}')
-if current: clusters.append(current)
-for c in clusters: print(json.dumps(c))
+            raise ValueError(f'Unexpected line: {line!r}')
+    if current: clusters.append(current)
+    return clusters
+
+for c in parse_yaml_list(sys.stdin.read()):
+    print(json.dumps(c))
 "); then
     log "ERROR: Failed to parse desired-clusters YAML"
     exit 1
@@ -153,9 +193,52 @@ while IFS= read -r cluster_json; do
     COMPUTE_NODES=$(echo "${cluster_json}" | jq -r '.["compute-nodes"] // "2"')
     MACHINE_TYPE=$(echo "${cluster_json}" | jq -r '.["machine-type"] // "m5.xlarge"')
 
-    # Check if cluster already exists
+    # Check if cluster already tracked in lease inventory
     EXISTING=$(echo "${ACTUAL_CMS}" | jq -r ".items[] | select(.metadata.name == \"${NAME}\") | .metadata.name" 2>/dev/null || true)
     if [[ -n "${EXISTING}" ]]; then
+        continue
+    fi
+
+    # Log in to the right OCM environment for this cluster
+    ocm_ensure_env "${ENV}"
+
+    # Check if cluster already exists in OCM (e.g. previous run timed out before registering)
+    if ! OCM_CLUSTER_JSON=$(ocm_get_cluster "${NAME}"); then
+        log "WARNING: OCM lookup failed for ${NAME}, skipping to avoid duplicate provisioning"
+        continue
+    fi
+    OCM_CLUSTER_ID=$(echo "${OCM_CLUSTER_JSON}" | jq -r '.id // empty' 2>/dev/null || true)
+
+    if [[ -n "${OCM_CLUSTER_ID}" ]]; then
+        OCM_STATE=$(echo "${OCM_CLUSTER_JSON}" | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unknown")
+        log "FOUND: ${NAME} already exists in OCM (id=${OCM_CLUSTER_ID}, state=${OCM_STATE})"
+
+        if [[ "${OCM_STATE}" == "ready" ]]; then
+            API_URL=$(echo "${OCM_CLUSTER_JSON}" | jq -r '.api.url // ""')
+            ACTUAL_VERSION=$(echo "${OCM_CLUSTER_JSON}" | jq -r '.openshift_version // ""')
+            VERSION_LABEL=$(echo "${ACTUAL_VERSION}" | cut -d. -f1,2)
+            log "REGISTER: ${NAME} is ready, registering in lease inventory"
+            if ! dry_run_guard "Would register ${NAME}"; then
+                register_lease "${NAME}" "available" "${OCM_CLUSTER_ID}" "${TYPE}" "${ENV}" "${REGION}" "${VERSION_LABEL}" "${API_URL}" "${ACTUAL_VERSION}"
+                log "Registered ${NAME} (${OCM_CLUSTER_ID}) in lease inventory"
+            fi
+            echo "REGISTERED: ${NAME} (already ready in OCM)" >> "${REPORT}"
+        elif [[ "${OCM_STATE}" == "installing" || "${OCM_STATE}" == "pending" || "${OCM_STATE}" == "waiting" ]]; then
+            log "WAITING: ${NAME} is ${OCM_STATE}, registering as provisioning"
+            if ! dry_run_guard "Would register ${NAME} as provisioning"; then
+                register_lease "${NAME}" "provisioning" "${OCM_CLUSTER_ID}" "${TYPE}" "${ENV}" "${REGION}" "${VERSION}"
+            fi
+            echo "PROVISIONING: ${NAME} (already ${OCM_STATE} in OCM)" >> "${REPORT}"
+        elif [[ "${OCM_STATE}" == "error" || "${OCM_STATE}" == "uninstalling" ]]; then
+            log "ERROR: ${NAME} is in ${OCM_STATE} state, registering as error for replacement"
+            if ! dry_run_guard "Would register ${NAME} as error"; then
+                register_lease "${NAME}" "error" "${OCM_CLUSTER_ID}" "${TYPE}" "${ENV}" "${REGION}" "${VERSION}"
+            fi
+            echo "ERROR: ${NAME} state=${OCM_STATE}" >> "${REPORT}"
+        else
+            log "WARNING: ${NAME} exists in OCM with unexpected state ${OCM_STATE}"
+            echo "UNEXPECTED: ${NAME} state=${OCM_STATE}" >> "${REPORT}"
+        fi
         continue
     fi
 
@@ -165,9 +248,6 @@ while IFS= read -r cluster_json; do
     if dry_run_guard "Would provision ${NAME}"; then
         continue
     fi
-
-    # Log in to the right OCM environment for this cluster
-    ocm_ensure_env "${ENV}"
 
     # Resolve latest version
     FULL_VERSION=$(rosa list versions --channel-group "${CHANNEL}" -o json 2>/dev/null \
@@ -216,39 +296,16 @@ while IFS= read -r cluster_json; do
         --tags "rosa-cluster-lease:true,lease-managed:true" \
         || { log "ERROR: Failed to create cluster ${NAME}"; continue; }
 
-    # Get cluster ID immediately after create
-    CLUSTER_JSON_EARLY=$(rosa describe cluster -c "${NAME}" -o json 2>/dev/null || true)
-    CLUSTER_ID=$(echo "${CLUSTER_JSON_EARLY}" | jq -r '.id // empty')
-
+    # Register immediately as provisioning
+    CLUSTER_ID=$(ocm_get_cluster "${NAME}" | jq -r '.id // empty' 2>/dev/null || true)
     if [[ -n "${CLUSTER_ID}" ]]; then
-        # Register early so the controller can track it
-        cat <<EARLY_EOF | lease_oc apply -n "${LEASE_NAMESPACE}" -f -
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: ${NAME}
-  namespace: ${LEASE_NAMESPACE}
-  labels:
-    rosa-cluster-lease/managed: "true"
-    rosa-cluster-lease/type: ${TYPE}
-    rosa-cluster-lease/env: ${ENV}
-    rosa-cluster-lease/region: ${REGION}
-    rosa-cluster-lease/version: "${VERSION}"
-    rosa-cluster-lease/status: provisioning
-  annotations:
-    rosa-cluster-lease/registered-at: "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-data:
-  cluster-id: "${CLUSTER_ID}"
-  cluster-name: "${NAME}"
-  region: "${REGION}"
-  ocm-env: "${ENV}"
-EARLY_EOF
+        register_lease "${NAME}" "provisioning" "${CLUSTER_ID}" "${TYPE}" "${ENV}" "${REGION}" "${VERSION}"
     fi
 
     # Wait for cluster to be ready (up to 60 min)
     log "Waiting for ${NAME} to be ready..."
     for attempt in $(seq 1 60); do
-        STATE=$(rosa describe cluster -c "${NAME}" -o json 2>/dev/null | jq -r '.state // "unknown"' || echo "unknown")
+        STATE=$(ocm_get_cluster "${NAME}" | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unknown")
         if [[ "${STATE}" == "ready" ]]; then
             break
         fi
@@ -265,31 +322,22 @@ EARLY_EOF
         continue
     fi
 
-    # Get cluster details
-    CLUSTER_JSON=$(rosa describe cluster -c "${NAME}" -o json 2>/dev/null)
-    CLUSTER_ID=$(echo "${CLUSTER_JSON}" | jq -r '.id')
-    API_URL=$(echo "${CLUSTER_JSON}" | jq -r '.api.url')
-    ACTUAL_VERSION=$(echo "${CLUSTER_JSON}" | jq -r '.openshift_version')
+    # Update lease to available with full cluster details
+    if ! CLUSTER_JSON=$(ocm_get_cluster "${NAME}"); then
+        log "WARNING: OCM lookup failed after cluster became ready. Will retry next reconcile."
+        continue
+    fi
+    CLUSTER_ID=$(echo "${CLUSTER_JSON}" | jq -r '.id // empty')
+    API_URL=$(echo "${CLUSTER_JSON}" | jq -r '.api.url // empty')
+    ACTUAL_VERSION=$(echo "${CLUSTER_JSON}" | jq -r '.openshift_version // empty')
     VERSION_LABEL=$(echo "${ACTUAL_VERSION}" | cut -d. -f1,2)
 
-    # Update the early-registered ConfigMap to available with full details
-    lease_oc patch configmap "${NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
-        "metadata": {
-            "labels": { "rosa-cluster-lease/version": "'"${VERSION_LABEL}"'", "rosa-cluster-lease/status": "available" },
-            "annotations": {
-                "rosa-cluster-lease/holder": "",
-                "rosa-cluster-lease/build-id": "",
-                "rosa-cluster-lease/acquired-at": "",
-                "rosa-cluster-lease/released-at": ""
-            }
-        },
-        "data": {
-            "cluster-id": "'"${CLUSTER_ID}"'",
-            "api-url": "'"${API_URL}"'",
-            "version": "'"${ACTUAL_VERSION}"'"
-        }
-    }' || true
+    if [[ -z "${CLUSTER_ID}" || -z "${API_URL}" || -z "${ACTUAL_VERSION}" ]]; then
+        log "WARNING: Incomplete cluster data for ${NAME} (id=${CLUSTER_ID}, api=${API_URL}, version=${ACTUAL_VERSION}). Will retry."
+        continue
+    fi
 
+    register_lease "${NAME}" "available" "${CLUSTER_ID}" "${TYPE}" "${ENV}" "${REGION}" "${VERSION_LABEL}" "${API_URL}" "${ACTUAL_VERSION}"
     log "Registered ${NAME} (${CLUSTER_ID}) in lease inventory"
 done < <(echo "${DESIRED_NAMES}")
 
