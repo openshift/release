@@ -61,6 +61,13 @@ EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PRO
 
 case "${CLOUD_PROVIDER}" in
   AWS)
+    # Some jobs (e.g. upgrade-hypershift-operator) install from a release-tagged
+    # HyperShift image, not main. New CLI flags must be gated behind toggles so
+    # older operator versions that lack those flags are not broken.
+    if [ "${ENABLE_SCALE_FROM_ZERO}" == "true" ]; then
+      EXTRA_ARGS="${EXTRA_ARGS} --scale-from-zero-provider aws --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials"
+    fi
+
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
     --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
     --oidc-storage-provider-s3-bucket-name=hypershift-ci-oidc \
@@ -73,8 +80,6 @@ case "${CLOUD_PROVIDER}" in
     --external-dns-provider=aws \
     --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
     --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
-    --scale-from-zero-provider aws \
-    --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials \
     --wait-until-available \
     ${EXTRA_ARGS}
     ;;

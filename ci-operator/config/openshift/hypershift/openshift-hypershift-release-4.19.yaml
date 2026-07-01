@@ -11,7 +11,7 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  hypershift-operator-init:
+  hypershift-operator-419-latest:
     name: hypershift-operator
     namespace: hypershift
     tag: "4.19"
@@ -24,17 +24,17 @@ build_root:
   use_build_cache: true
 images:
   items:
-  - to: hypershift-operator-419
+  - to: hypershift-operator-pr
   - dockerfile_path: Dockerfile.control-plane
     to: hypershift
 promotion:
   to:
   - excluded_images:
-    - hypershift-operator-419
+    - hypershift-operator-pr
     name: "4.19"
     namespace: ocp
   - additional_images:
-      hypershift-operator: hypershift-operator-419
+      hypershift-operator: hypershift-operator-pr
     excluded_images:
     - '*'
     namespace: hypershift
@@ -188,9 +188,11 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+      CI_HYPERSHIFT_OPERATOR: hypershift-operator-pr
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-419-latest
     env:
       CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
+      ENABLE_SCALE_FROM_ZERO: "false"
       INSTALL_FROM_LATEST: "true"
       RUN_UPGRADE_TEST: "true"
     workflow: hypershift-aws-e2e-nested
