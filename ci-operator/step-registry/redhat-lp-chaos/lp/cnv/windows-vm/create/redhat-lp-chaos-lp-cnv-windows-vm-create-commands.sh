@@ -3,6 +3,13 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 [ -s "${KUBECONFIG}" ]
 
+# Required by benchmark-runner
+( set +x; KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password") )
+export KUBEADMIN_PASSWORD
+
+( set +x; WINDOWS_URL=$(cat /var/run/secrets/windows-vm/S3-bucket-url) )
+export WINDOWS_URL
+
 # Ensure benchmark-runner namespace exists (idempotent).
 oc create namespace benchmark-runner --dry-run=client -o json --save-config | oc apply -f -
 
@@ -36,9 +43,6 @@ buildVersion=$(
 )
 export BUILD_VERSION="${buildVersion}"
 
-( set +x; WINDOWS_URL=$(cat /var/run/secrets/windows-vm/S3-bucket-url) )
-export WINDOWS_URL
-
 # benchmark-runner's Windows templates default to ODF storage (ocs-storagecluster-ceph-rbd-virtualization)
 # This cluster uses AWS EBS only (gp3-csi), so patch the templates to use a compatible storage class
 oc apply -f - <<'SCEOF'
@@ -66,8 +70,8 @@ sed -i 's/ReadWriteMany/ReadWriteOnce/' \
 sed -i '/evictionStrategy: LiveMigrate/d' \
     "${brTmplDir}/windows_vm_template.yaml"
 
-# SCALE_NODES is required by benchmark-runner whenever SCALE is set.
-# Derive from KubeVirt-schedulable nodes, which are confirmed present by the pre-flight check above.
+# SCALE_NODES is required by benchmark-runner whenever SCALE is set
+# If empty, fall back to all workers
 typeset scaleNodes
 scaleNodes=$(
     oc get nodes -l kubevirt.io/schedulable=true \
