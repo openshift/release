@@ -427,7 +427,55 @@ tests:
     cluster_profile: vsphere-dis-2
     env:
       COMPUTE_NODE_REPLICAS: "2"
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-8n7xf7k/release:latest
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-gwnh2jt/release:latest
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      TEST_SUITE: openshift/machine-config-operator/longduration
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: mco-e2e-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disc-proxy
+- as: e2e-vsphere-mco-tp-disc-proxy-longduration-v2
+  cron: 30 6 * * 0
+  shard_count: 2
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      REGISTER_MIRROR_REGISTRY_DNS: "yes"
+      TEST_SUITE: openshift/machine-config-operator/longduration
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    post:
+    - chain: cucushift-installer-rehearse-vsphere-ipi-disconnected-deprovision
+    pre:
+    - chain: ipi-conf-vsphere
+    - ref: ipi-install-rbac
+    - chain: vsphere-provision-bastionhost
+    - ref: mirror-images-by-oc-adm-in-bastion
+    - ref: ipi-conf-proxy
+    - ref: ipi-conf-mirror
+    - ref: ipi-install-install
+    - ref: ipi-install-vsphere-registry
+    - ref: enable-qe-catalogsource-disconnected
+    - ref: mirror-images-tag-images
+    - ref: set-sample-operator-disconnected
+    - chain: cucushift-installer-check
+    test:
+    - chain: mco-e2e-test
+- as: e2e-vsphere-mco-tp-proxy-longduration
+  cron: 30 6 * * 0
+  shard_count: 2
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-xqns19b/release:latest
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
       TEST_SUITE: openshift/machine-config-operator/longduration
