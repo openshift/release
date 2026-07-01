@@ -11,7 +11,7 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  hypershift-operator-init:
+  hypershift-operator-421-latest:
     name: hypershift-operator
     namespace: hypershift
     tag: "4.21"
@@ -24,7 +24,7 @@ build_root:
   use_build_cache: true
 images:
   items:
-  - to: hypershift-operator-421
+  - to: hypershift-operator-pr
   - dockerfile_path: Dockerfile.control-plane
     to: hypershift
   - dockerfile_literal: |
@@ -35,11 +35,11 @@ images:
 promotion:
   to:
   - excluded_images:
-    - hypershift-operator-421
+    - hypershift-operator-pr
     name: "4.21"
     namespace: ocp
   - additional_images:
-      hypershift-operator: hypershift-operator-421
+      hypershift-operator: hypershift-operator-pr
     excluded_images:
     - '*'
     namespace: hypershift
@@ -213,9 +213,11 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+      CI_HYPERSHIFT_OPERATOR: hypershift-operator-pr
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-421-latest
     env:
       CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
+      ENABLE_SCALE_FROM_ZERO: "false"
       INSTALL_FROM_LATEST: "true"
       RUN_UPGRADE_TEST: "true"
     workflow: hypershift-aws-e2e-nested
