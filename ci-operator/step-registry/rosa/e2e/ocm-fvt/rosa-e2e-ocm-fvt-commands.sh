@@ -77,13 +77,15 @@ if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
   ocmtest_args+=(--reportJiraTicket)
 fi
 
+OCMCI_IMAGE="${OCM_FVT_IMAGE:-quay.io/redhat-services-prod/ocmci/ocmci@sha256:9b574147728785a7f4ec4df52d7036fd1bbdd76e4aa8d7c88626cc9fac5e860c}"
+
 echo "=== ocmci image digest ==="
 podman pull \
   --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
-  quay.io/redhat-services-prod/ocmci/ocmci:latest
+  "${OCMCI_IMAGE}"
 podman inspect \
   --format '{{index .RepoDigests 0}}' \
-  quay.io/redhat-services-prod/ocmci/ocmci:latest \
+  "${OCMCI_IMAGE}" \
   || echo "WARNING: failed to get ocmci image digest"
 echo "=========================="
 
@@ -91,7 +93,7 @@ echo "Running ocmtest: ${ocmtest_args[*]}"
 exit_code=0
 podman run \
   "${podman_args[@]}" \
-  quay.io/redhat-services-prod/ocmci/ocmci:latest \
+  "${OCMCI_IMAGE}" \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 
 # Copy only the merged report.xml to avoid inflated test counts from
