@@ -14,17 +14,14 @@ function BenchmarkRunnerDebug () {
 
 trap BenchmarkRunnerDebug ERR TERM EXIT
 
-# Required by benchmark-runner
-( set +x; KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password") )
-export KUBEADMIN_PASSWORD
-
-( set +x; WINDOWS_URL=$(cat /var/run/secrets/windows-vm/S3-bucket-url) )
-export WINDOWS_URL
-
-# SCALE_NODES is required by benchmark-runner whenever SCALE is set
-# If empty, fall back to all workers
-( set +x; SCALE_NODES=$(oc get nodes -l kubevirt.io/schedulable=true -o jsonpath-as-json='{.items[*].metadata.name}' | jq -r '[ .[] | "'"'"'" + . + "'"'"'" ] | "[" + join(", ") + "]"'))
-export SCALE_NODES
+# Required by benchmark-runner; disable tracing to avoid leaking secrets into CI logs
+set +x
+KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+WINDOWS_URL=$(cat /var/run/secrets/windows-vm/S3-bucket-url)
+# SCALE_NODES is required by benchmark-runner whenever SCALE is set if empty, fall back to all workers  
+SCALE_NODES=$(oc get nodes -l kubevirt.io/schedulable=true -o jsonpath-as-json='{.items[*].metadata.name}' | jq -r '[ .[] | "'"'"'" + . + "'"'"'" ] | "[" + join(", ") + "]"')
+set -x
+export KUBEADMIN_PASSWORD WINDOWS_URL SCALE_NODES
 
 # CREATE_VMS_ONLY instructs benchmark-runner to provision the VM and exit
 # without running a benchmark workload, leaving the VM running for chaos steps
