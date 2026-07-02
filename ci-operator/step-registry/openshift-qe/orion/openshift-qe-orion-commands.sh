@@ -9,26 +9,48 @@ MAX_RETRIES=5
 
 python --version
 pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
 
-if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
+ORION_CACHE_DIR="${SHARED_DIR}/orion-cache"
+
+if [[ -d "$ORION_CACHE_DIR" ]]; then
+    echo "Restoring orion from cache..."
+    rm -rf ./venv_qe ./orion
+    cp -a "$ORION_CACHE_DIR/venv_qe" ./venv_qe
+    cp -a "$ORION_CACHE_DIR/orion" ./orion
+    source ./venv_qe/bin/activate
 else
-    LATEST_TAG=$TAG
+    python -m virtualenv ./venv_qe
+    source ./venv_qe/bin/activate
+
+    if [[ $TAG == "latest" ]]; then
+        LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
+    else
+        LATEST_TAG=$TAG
+    fi
+
+    for attempt in $(seq 1 "$MAX_RETRIES"); do
+      if git clone -q --branch "$LATEST_TAG" "$ORION_REPO" --depth 1; then
+        break
+      fi
+      if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
+        echo "git clone failed after $MAX_RETRIES attempts, exiting..." >&2
+        exit 1
+      fi
+      echo "git clone failed (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
+      sleep 10
+    done
+
+    pushd orion
+    pip install -q --retries "$MAX_RETRIES" -r requirements.txt
+    pip install -q --retries "$MAX_RETRIES" .
+    popd
+
+    mkdir -p "$ORION_CACHE_DIR"
+    cp -a ./venv_qe "$ORION_CACHE_DIR/venv_qe"
+    cp -a ./orion "$ORION_CACHE_DIR/orion"
+    echo "Orion cached to $ORION_CACHE_DIR"
 fi
 
-for attempt in $(seq 1 "$MAX_RETRIES"); do
-  if git clone -q --branch "$LATEST_TAG" "$ORION_REPO" --depth 1; then
-    break
-  fi
-  if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
-    echo "git clone failed after $MAX_RETRIES attempts, exiting..." >&2
-    exit 1
-  fi
-  echo "git clone failed (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
-  sleep 10
-done
 pushd orion
 
 # Invoked from orion repo by the openshift-ci bot
@@ -37,18 +59,6 @@ if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
   git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
   git switch ${PULL_NUMBER}
 fi
-
-for attempt in $(seq 1 "$MAX_RETRIES"); do
-  if pip install -q -r requirements.txt && pip install -q .; then
-    break
-  fi
-  if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
-    echo "orion failed to install after $MAX_RETRIES attempts, exiting..." >&2
-    exit 1
-  fi
-  echo "orion failed to install (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
-  sleep 10
-done
 
 case "$ES_TYPE" in
   qe)
@@ -95,11 +105,19 @@ fi
 
 EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
 
-if ! curl -fsSL --fail --retry 8 --retry-all-errors https://github.com/cloud-bulldozer/go-commons/releases/latest/download/ocp-metadata-linux-amd64 -o ocp-metadata; then
-    echo "Error: Failed to download ocp-metadata binary"
-    exit 1
+if [[ -f "${SHARED_DIR}/ocp-metadata" ]]; then
+    echo "Restoring ocp-metadata from cache..."
+    rm -f ocp-metadata
+    cp "${SHARED_DIR}/ocp-metadata" ocp-metadata
+else
+    if ! curl -fsSL --fail --retry 8 --retry-all-errors https://github.com/cloud-bulldozer/go-commons/releases/latest/download/ocp-metadata-linux-amd64 -o ocp-metadata; then
+        echo "Error: Failed to download ocp-metadata binary"
+        exit 1
+    fi
+    chmod +x ocp-metadata
+    cp ocp-metadata "${SHARED_DIR}/ocp-metadata"
+    echo "ocp-metadata cached to ${SHARED_DIR}/ocp-metadata"
 fi
-chmod +x ocp-metadata
 CLUSTER_METADATA=$(./ocp-metadata)
 EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 
@@ -307,36 +325,19 @@ cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 # Experimental: run orion with original e-divisive binary (safe block, never breaks main execution)
 (
     EXP_DIR="/tmp/orion-original-edivisive"
+    rm -rf "$EXP_DIR"
     mkdir -p "$EXP_DIR"
     pushd "$EXP_DIR"
     python -m virtualenv ./venv_exp
     source ./venv_exp/bin/activate
-    
-    for attempt in $(seq 1 "$MAX_RETRIES"); do
-      if git clone -q --branch orig-edivisive-exp "$ORION_REPO" --depth 1; then
-        break
-      fi
-      if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
-        echo "experimental git clone failed after $MAX_RETRIES attempts, skipping..." >&2
-        exit 1
-      fi
-      echo "experimental git clone failed (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
-      sleep 10
-    done
 
+    cp -a "$ORION_CACHE_DIR/orion" ./orion
     pushd orion
+    git fetch origin orig-edivisive-exp
+    git checkout orig-edivisive-exp
 
-    for attempt in $(seq 1 "$MAX_RETRIES"); do
-      if pip install -q -r requirements.txt && pip install -q .; then
-        break
-      fi
-      if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
-        echo "experimental orion failed to install after $MAX_RETRIES attempts, skipping..." >&2
-        exit 1
-      fi
-      echo "experimental orion failed to install (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
-      sleep 10
-    done
+    pip install -q --retries "$MAX_RETRIES" -r requirements.txt
+    pip install -q --retries "$MAX_RETRIES" .
 
     echo "Running experimental orion (original e-divisive)..."
     # Strip JIRA flags for experimental run
