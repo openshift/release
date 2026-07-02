@@ -414,7 +414,7 @@ process_release() {
         --arg snap "${snapshot}" \
         --argjson triggered "${triggered}" \
         --argjson failed "${failed}" \
-        --argjson jobs "$(printf '%s\n' "${triggered_jobs[@]}" | jq -R . | jq -s .)" \
+        --argjson jobs "$(if [[ ${#triggered_jobs[@]} -gt 0 ]]; then printf '%s\n' "${triggered_jobs[@]}" | jq -R . | jq -s .; else echo '[]'; fi)" \
         '{($r): {status: "triggered", pr: ("#" + $pr), pr_title: $title, image: $img, snapshot: $snap, jobs_triggered: $triggered, jobs_failed: $failed, jobs: $jobs}}' \
         > "${WORKDIR}/zstream-${release}.json"
 }
