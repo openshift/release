@@ -74,13 +74,25 @@ EOF
 
 ROXIE_ENVRC="${SCRATCH}/roxie-envrc"
 
+PUBLIC_REGISTRY="quay.io/stackrox-io"
+
 echo ">>> Deploying ACS with roxie (tag: ${ACS_VERSION_TAG})"
 roxie deploy \
   --config "${SCRATCH}/roxie-config.yaml" \
   --tag "${ACS_VERSION_TAG}" \
   --envrc "${ROXIE_ENVRC}" \
   --central-wait 60m \
-  --secured-cluster-wait 60m
+  --secured-cluster-wait 60m \
+  --operator-env "RELATED_IMAGE_MAIN=${PUBLIC_REGISTRY}/main:${ACS_VERSION_TAG}" \
+  --operator-env "RELATED_IMAGE_CENTRAL_DB=${PUBLIC_REGISTRY}/central-db:${ACS_VERSION_TAG}" \
+  --operator-env "RELATED_IMAGE_SCANNER=${PUBLIC_REGISTRY}/scanner:${ACS_VERSION_TAG}" \
+  --operator-env "RELATED_IMAGE_SCANNER_SLIM=${PUBLIC_REGISTRY}/scanner-slim:${ACS_VERSION_TAG}" \
+  --operator-env "RELATED_IMAGE_SCANNER_DB=${PUBLIC_REGISTRY}/scanner-db:${ACS_VERSION_TAG}" \
+  --operator-env "RELATED_IMAGE_SCANNER_DB_SLIM=${PUBLIC_REGISTRY}/scanner-db-slim:${ACS_VERSION_TAG}" \
+  --operator-env "RELATED_IMAGE_COLLECTOR=${PUBLIC_REGISTRY}/collector:${ACS_VERSION_TAG}" \
+  --operator-env "RELATED_IMAGE_SCANNER_V4=${PUBLIC_REGISTRY}/scanner-v4:${ACS_VERSION_TAG}" \
+  --operator-env "RELATED_IMAGE_SCANNER_V4_DB=${PUBLIC_REGISTRY}/scanner-v4-db:${ACS_VERSION_TAG}" \
+  --operator-env "RELATED_IMAGE_FACT=${PUBLIC_REGISTRY}/fact:${ACS_VERSION_TAG}"
 
 echo ">>> Verifying deployment"
 # shellcheck disable=SC1090
