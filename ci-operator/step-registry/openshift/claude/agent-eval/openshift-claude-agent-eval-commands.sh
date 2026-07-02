@@ -156,8 +156,26 @@ OVERALL_EXIT=0
 JUNIT_TESTCASES=""
 TOTAL_DURATION=0
 FAILURE_COUNT=0
+CONFIGS_RUN=0
+JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-eval.xml"
+STEP_START=${SECONDS}
+STEP_TIMEOUT=10200  # 2h50m — leave margin within the 3h step limit
+
+write_junit() {
+    cat > "${JUNIT_FILE}" <<JEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="claude-eval" tests="${CONFIGS_RUN}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
+${JUNIT_TESTCASES}
+</testsuite>
+JEOF
+}
 
 for config in "${CONFIGS_TO_RUN[@]}"; do
+    ELAPSED=$(( SECONDS - STEP_START ))
+    if [[ ${ELAPSED} -ge ${STEP_TIMEOUT} ]]; then
+        echo "WARNING: approaching step timeout (${ELAPSED}s elapsed), skipping remaining configs."
+        break
+    fi
     config_name=$(basename "${config}" .yaml)
     echo ""
     echo "========================================"
@@ -228,21 +246,11 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
   <testcase name=\"${TESTCASE}\" time=\"${THIS_DURATION}\"/>"
     fi
 
+    CONFIGS_RUN=$(( CONFIGS_RUN + 1 ))
     echo "=== ${config_name}: completed in ${THIS_DURATION}s (exit ${THIS_EXIT}) ==="
+
+    write_junit
 done
-
-# -----------------------------------------------------------------------
-# Generate JUnit XML
-# -----------------------------------------------------------------------
-JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-eval.xml"
-TEST_COUNT=${#CONFIGS_TO_RUN[@]}
-
-cat > "${JUNIT_FILE}" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="claude-eval" tests="${TEST_COUNT}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
-${JUNIT_TESTCASES}
-</testsuite>
-EOF
 
 echo "JUnit XML written to ${JUNIT_FILE}"
 
