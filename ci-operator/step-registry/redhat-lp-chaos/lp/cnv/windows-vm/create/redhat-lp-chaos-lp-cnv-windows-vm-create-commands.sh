@@ -14,9 +14,9 @@ function BenchmarkRunnerDebug () {
 # ERR omitted — double-fires with EXIT on failure
 # TERM ($? may be 0 at signal time): always collect debug regardless
 trap BenchmarkRunnerDebug TERM
-trap 'exit_code=$?; [[ ${exit_code} -eq 0 ]] || BenchmarkRunnerDebug' EXIT
+trap '[[ $? -eq 0 ]] || BenchmarkRunnerDebug' EXIT
 
-set +x  # avoid leaking secrets into CI logs
+set +x
 KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
 WINDOWS_URL=$(cat /var/run/secrets/windows-vm/S3-bucket-url)
 SCALE_NODES=$(oc get nodes -l kubevirt.io/schedulable=true -o jsonpath-as-json='{.items[*].metadata.name}' | jq -r '[ .[] | "'"'"'" + . + "'"'"'" ] | "[" + join(", ") + "]"')
