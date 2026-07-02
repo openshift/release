@@ -54,9 +54,10 @@ DR_LABEL="disaster-recovery"
 # Match the version deployed by OADP in the target cluster.
 VELERO_VERSION="${VELERO_VERSION:-v1.14.1}"
 echo "[INFO] Installing velero CLI ${VELERO_VERSION}"
+VELERO_TMP_DIR="$(mktemp -d)"
 curl -fsSL "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz" \
-    | tar xz -C /tmp
-cp "/tmp/velero-${VELERO_VERSION}-linux-amd64/velero" /usr/local/bin/velero
+    | tar xz -C "$VELERO_TMP_DIR"
+cp "${VELERO_TMP_DIR}/velero-${VELERO_VERSION}-linux-amd64/velero" /usr/local/bin/velero
 chmod +x /usr/local/bin/velero
 velero version --client-only
 
@@ -126,8 +127,14 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 export UPGRADE_BRANCH UPGRADE_FORK_ORGANIZATION
 
 if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
-    UPGRADE_BRANCH=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PULL_NUMBER}" | jq -r .head.ref)
-    REPO_URL=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PULL_NUMBER}" | jq -r .head.repo.html_url)
+    PR_JSON=$(curl -sf -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+        "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PULL_NUMBER}")
+    UPGRADE_BRANCH=$(echo "$PR_JSON" | jq -r '.head.ref // empty')
+    REPO_URL=$(echo "$PR_JSON" | jq -r '.head.repo.html_url // empty')
+    if [[ -z "$UPGRADE_BRANCH" || -z "$REPO_URL" ]]; then
+        echo "[ERROR] Failed to resolve PR head ref/repo for PR #${PULL_NUMBER}"
+        exit 1
+    fi
     UPGRADE_FORK_ORGANIZATION=$(echo "$REPO_URL" | sed 's|https://github.com/||' | sed 's|/infra-deployments||')
 else
     UPGRADE_BRANCH=main
@@ -138,9 +145,9 @@ echo "[INFO] UPGRADE_BRANCH: $UPGRADE_BRANCH"
 echo "[INFO] UPGRADE_FORK_ORGANIZATION: $UPGRADE_FORK_ORGANIZATION"
 
 # Clone infra-deployments for DR test code
-# TODO(manish-jangra): revert to upstream/main once infra-deployments PR is merged
+# TODO: revert to upstream/main once DR test code is stable
 INFRA_DIR="/tmp/infra-deployments"
-git clone --branch K-2236-03 "https://github.com/manish-jangra/infra-deployments.git" "$INFRA_DIR"
+git clone --branch K-2236-dr-debug "https://github.com/meyrevived/infra-deployments.git" "$INFRA_DIR"
 
 # The clone is from a fork — add upstream so performKonfluxUpgrade can merge
 # remotes/upstream/main during the upgrade phase.
@@ -163,7 +170,8 @@ echo "[INFO] ARGO_TARGET_REVISION: ${ARGO_TARGET_REVISION:-<not found>}"
 # If this is an infra-deployments PR, merge the PR changes
 if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
     pushd "$INFRA_DIR"
-    git fetch origin "refs/pull/${PULL_NUMBER}/head"
+    # TODO: Once this prow job is completely successful, this needs to switch back to fetch from origin
+    git fetch upstream "refs/pull/${PULL_NUMBER}/head"
     git merge --no-edit FETCH_HEAD
     popd
 fi
