@@ -1,0 +1,70 @@
+base_images:
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.21"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- as: e2e-far-upgrade-aws
+  capabilities:
+  - intranet
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: medik8s-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: tier:upgrade
+      OCP_VERSION: "422"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    test:
+    - ref: medik8s-lib
+    - ref: medik8s-catalogsource
+    - as: create-operator-namespace
+      cli: latest
+      commands: oc create namespace openshift-workload-availability --dry-run=client
+        -o yaml | oc apply -f -
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: medik8s-aws-credentials
+    - as: e2e-upgrade-test
+      cli: latest
+      commands: make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: system-tests
+  variant: 4.22-upgrade
