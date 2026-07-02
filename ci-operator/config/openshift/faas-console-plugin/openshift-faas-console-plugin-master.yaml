@@ -1,12 +1,33 @@
+base_images:
+  ocp_builder_rhel-9-base-nodejs-openshift-4.22:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-nodejs-openshift-4.22
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: tectonic-console-builder-v29
+  from_repository: true
 images:
   items:
   - dockerfile_path: Dockerfile
     to: faas-console-plugin
+  - dockerfile_literal: |
+      FROM ocp_builder_rhel-9-base-nodejs-openshift-4.22
+      USER root
+      RUN dnf install -y --nodocs --setopt=install_weak_deps=False \
+          alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
+          libXdamage libXrandr mesa-libgbm pango nss \
+          libxkbcommon libwayland-client && \
+          dnf clean all && rm -rf /var/cache/dnf
+      COPY . /go/src/github.com/openshift/faas-console-plugin/
+      WORKDIR /go/src/github.com/openshift/faas-console-plugin
+      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+      RUN corepack enable
+    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/faas-console-plugin/.
+    to: faas-console-playwright-runner
 promotion:
   to:
   - name: "5.0"
@@ -49,6 +70,21 @@ tests:
         requests:
           cpu: 200m
           memory: 300Mi
+- as: e2e
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh
+      from: faas-console-playwright-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: "4"
+          memory: 10Gi
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift
