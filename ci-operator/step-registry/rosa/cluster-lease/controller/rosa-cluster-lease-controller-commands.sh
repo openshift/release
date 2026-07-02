@@ -392,8 +392,8 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         continue
     fi
 
-    # Skip health checks for in-use clusters
-    if [[ "${STATUS}" == "in-use" ]]; then
+    # Skip health checks for in-use and provisioning clusters
+    if [[ "${STATUS}" == "in-use" || "${STATUS}" == "provisioning" ]]; then
         HEALTHY=$((HEALTHY + 1))
         continue
     fi
