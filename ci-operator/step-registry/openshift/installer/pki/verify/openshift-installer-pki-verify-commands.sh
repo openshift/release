@@ -17,6 +17,8 @@ declare -a SIGNERS=(
   "kube-apiserver-lb-signer|loadbalancer-serving-signer|openshift-kube-apiserver-operator|tls.crt"
   "kube-control-plane-signer|kube-control-plane-signer|openshift-kube-apiserver-operator|tls.crt"
   "aggregator-signer|aggregator-client-signer|openshift-kube-apiserver-operator|tls.crt"
+  "etcd-signer|etcd-signer|openshift-etcd|tls.crt"
+  "etcd-metrics-signer|etcd-metrics-signer|openshift-etcd|tls.crt"
 )
 
 # Map expected algorithm to openssl output strings
@@ -126,10 +128,10 @@ else
 
   # Check mode
   mode=$(echo "${pki_cr}" | grep "mode:" | head -1 | awk '{print $2}' || true)
-  if [[ "${mode}" == "Custom" ]]; then
-    echo "  Mode: Custom - OK"
+  if [[ "${mode}" == "${EXPECTED_PKI_MODE}" ]]; then
+    echo "  Mode: ${EXPECTED_PKI_MODE} - OK"
   else
-    echo "  FAIL: Expected mode 'Custom', got '${mode:-not set}'" | tee -a "${ARTIFACT_LOG}"
+    echo "  FAIL: Expected mode '${EXPECTED_PKI_MODE}', got '${mode:-not set}'" | tee -a "${ARTIFACT_LOG}"
     pki_status="FAIL"
   fi
 
