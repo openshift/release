@@ -58,7 +58,7 @@ roxie:
 central:
   namespace: stackrox
   resourceProfile: small
-  earlyReadiness: true
+  earlyReadiness: false
   exposure: loadbalancer
   spec:
     customize:
@@ -69,7 +69,7 @@ central:
 securedCluster:
   namespace: stackrox
   resourceProfile: small
-  earlyReadiness: true
+  earlyReadiness: false
 EOF
 
 ROXIE_ENVRC="${SCRATCH}/roxie-envrc"
