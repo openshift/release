@@ -44,13 +44,23 @@ echo "JOB_URL=${JOB_URL}" >> /tmp/prow.env
 echo "Copying the env to the bastion host"
 scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/tmp/${CLUSTER_NAME}.prow.env"
 
+if [ -z "${VENDOR}" ]; then
+  VENDOR="any"
+fi
+
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" "${JOB_URL}" \
-  "${ADDITIONAL_WORKERS:-0}" "${gnu_additional_arch:-x86_64}" "${VENDOR}" << 'EOF'
+  "${ADDITIONAL_WORKERS:-0}" "${gnu_additional_arch:-x86_64}" "${VENDOR}" "${ADDITIONAL_WORKERS_VENDOR:-$VENDOR}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
+
+# Normalize vendor value: convert "any" to empty string for no filtering
+normalize_vendor() {
+  local vendor="$1"
+  [ "${vendor}" = "any" ] && echo "" || echo "${vendor}"
+}
 
 export BUILD_USER=ci-op BUILD_ID="${1}"
 
@@ -61,7 +71,8 @@ ARCH="${5}"
 JOB_URL="${6}"
 ADDITIONAL_WORKERS="${7}"
 ADDITIONAL_WORKER_ARCHITECTURE="${8}"
-VENDOR="${9:-}"
+VENDOR=$(normalize_vendor "${9}")
+ADDITIONAL_WORKERS_VENDOR=$(normalize_vendor "${10}")
 
 systemd-cat -t "${BUILD_ID}" -p5 echo "Starting new job (${BUILD_ID}). Link: ${JOB_URL}"
 # shellcheck disable=SC2174
@@ -77,7 +88,7 @@ N_MASTERS=${N_MASTERS} N_WORKERS=${N_WORKERS} \
 # If the number of requested ADDITIONAL_WORKERS is greater than 0, we need to reserve the additional workers
 if [ "${ADDITIONAL_WORKERS}" -gt 0 ]; then
   N_WORKERS="${ADDITIONAL_WORKERS}" N_MASTERS=0 REQUEST_BOOTSTRAP_HOST=false \
-   ARCH="${ADDITIONAL_WORKER_ARCHITECTURE}" APPEND="true" REQUEST_VIPS=false VENDOR="${VENDOR}" reserve-hosts.sh
+   ARCH="${ADDITIONAL_WORKER_ARCHITECTURE}" APPEND="true" REQUEST_VIPS=false VENDOR="${ADDITIONAL_WORKERS_VENDOR}" /usr/bin/reserve-hosts.sh
 fi
 EOF
 
