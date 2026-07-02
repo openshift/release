@@ -72,6 +72,7 @@ load_previous_summary() {
     local prev_build_id
     prev_build_id=$(curl -sSL --connect-timeout 10 --max-time 30 \
         "https://prow.ci.openshift.org/prowjobs.js?omit=annotations,labels,decoration_config,pod_spec&job=${TRIGGER_JOB_NAME}" 2>/dev/null \
+        | sed 's/^var allBuilds = //; s/;$//' \
         | jq -r '[.items[] | select(.status.state == "success")] | sort_by(.status.completionTime) | last | .status.build_id // empty' 2>/dev/null || true)
 
     if [[ -z "${prev_build_id}" ]]; then
@@ -102,6 +103,15 @@ get_last_digest() {
         return
     fi
     jq -r --arg r "${release}" '.[$r].image // "" | split("@") | if length > 1 then .[1] else "" end' "${PREV_SUMMARY}" 2>/dev/null || echo ""
+}
+
+get_last_pr() {
+    local release="$1"
+    if [[ -z "${PREV_SUMMARY}" ]]; then
+        echo ""
+        return
+    fi
+    jq -r --arg r "${release}" '.[$r].pr // "" | ltrimstr("#")' "${PREV_SUMMARY}" 2>/dev/null || echo ""
 }
 
 # ---------------------------------------------------------------------------
@@ -184,14 +194,22 @@ resolve_snapshot_to_digest() {
     snap_sec=${time_str:4:2}
     snap_epoch=$(date -d "${snap_year}-${snap_month}-${snap_day}T${snap_hour}:${snap_min}:${snap_sec}Z" +%s 2>/dev/null || echo 0)
 
+    # Convert version prefix (lvm-operator-catalog-4-16) to v4.16 for tag matching
+    local version_dot
+    version_dot=$(echo "${version_prefix}" | sed 's/lvm-operator-catalog-//; s/-/./')
+
+    # Query quay for v{version} commit tags (not -on-push, which expire)
     local tags_json
     tags_json=$(curl -sSL --connect-timeout 10 --max-time 30 \
-        "${QUAY_API}/repository/${QUAY_REPO}/tag/?limit=50&filter_tag_name=like:${version_prefix}-on-push")
+        "${QUAY_API}/repository/${QUAY_REPO}/tag/?limit=50&filter_tag_name=like:v${version_dot}-")
 
+    # Select only raw commit tags (v4.16-{40-hex}), exclude auxiliary suffixes
+    # Pick the closest one after the snapshot timestamp (smallest positive delta)
     local result
-    result=$(echo "${tags_json}" | jq -r --arg snap_epoch "${snap_epoch}" '
+    result=$(echo "${tags_json}" | jq -r --arg snap_epoch "${snap_epoch}" --arg vpfx "v${version_dot}-" '
         [.tags[]
-         | select(.name | endswith("build-image-index"))
+         | select(.name | startswith($vpfx))
+         | select(.name | test("^v[0-9]+\\.[0-9]+-[a-f0-9]{40}$"))
          | .tag_epoch = (.last_modified | strptime("%a, %d %b %Y %H:%M:%S %z") | mktime)
          | .delta = (.tag_epoch - ($snap_epoch | tonumber))
          | select(.delta >= 0 and .delta < 1800)
@@ -231,6 +249,7 @@ trigger_job() {
     fi
 
     local http_code
+    [[ $- == *x* ]] && local _was_tracing=true || local _was_tracing=false
     set +x
     http_code=$(curl -sSL -X POST -o /dev/stderr -w '%{http_code}' \
         --connect-timeout 10 --max-time 30 \
@@ -238,7 +257,7 @@ trigger_job() {
         -H "Content-Type: application/json" \
         -d "${body}" \
         "${GANGWAY_API}/v1/executions/${job_name}" 2>/dev/null)
-    set -x
+    $_was_tracing && set -x
 
     if [[ "${http_code}" == "200" ]]; then
         info "  triggered: ${job_name}"
