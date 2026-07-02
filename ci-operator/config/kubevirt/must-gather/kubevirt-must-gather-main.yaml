@@ -116,6 +116,20 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - as: test-incident
+      cli: latest
+      commands: |
+        INCIDENT_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-incident-output -- NS=ns001 VM=testvm-ns001-vm001 /usr/bin/gather --vm-incident --incident-time=${INCIDENT_TIME}
+        mkdir -p ${ARTIFACT_DIR}/junit
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} INCIDENT_NS=ns001 MG_INCIDENT_OUTPUT_DIR=must-gather-incident-output /go/bin/must-gather.test --ginkgo.label-filter=level:incident --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
     - as: test-all-images
       cli: latest
       commands: |
@@ -228,6 +242,20 @@ tests:
         oc adm must-gather --since-time=$(date -d '-10 minutes' +%Y-%m-%dT%T.%9N%:z ) --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- /usr/bin/gather --vms_details --images
         mkdir -p ${ARTIFACT_DIR}/junit
         (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:workloads --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-incident
+      cli: latest
+      commands: |
+        INCIDENT_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-incident-output -- NS=ns001 VM=testvm-ns001-vm001 /usr/bin/gather --vm-incident --incident-time=${INCIDENT_TIME}
+        mkdir -p ${ARTIFACT_DIR}/junit
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} INCIDENT_NS=ns001 MG_INCIDENT_OUTPUT_DIR=must-gather-incident-output /go/bin/must-gather.test --ginkgo.label-filter=level:incident --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
       dependencies:
       - env: KMG_IMAGE
         name: kubevirt-must-gather
