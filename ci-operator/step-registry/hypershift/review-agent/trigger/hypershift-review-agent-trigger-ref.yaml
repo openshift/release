@@ -1,0 +1,26 @@
+ref:
+  as: hypershift-review-agent-trigger
+  from: cli
+  commands: hypershift-review-agent-trigger-commands.sh
+  env:
+  - name: GANGWAY_API
+    default: "https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
+    documentation: |-
+      Gangway API endpoint for triggering periodic jobs.
+  - name: PERIODIC_JOB_NAME
+    default: "periodic-ci-openshift-hypershift-main-periodic-review-agent"
+    documentation: |-
+      Name of the periodic job to trigger via gangway.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  documentation: |-
+    Trigger step for the HyperShift Review Agent.
+    Instead of running the review agent inline (which aborts the presubmit
+    when it pushes), this step triggers the periodic review-agent job via
+    gangway and posts a comment on the PR with a link to the triggered job.
