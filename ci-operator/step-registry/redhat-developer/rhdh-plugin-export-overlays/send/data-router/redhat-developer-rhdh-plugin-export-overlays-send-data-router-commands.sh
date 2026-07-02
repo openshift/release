@@ -1,7 +1,8 @@
 #!/bin/bash
 
+# This post step must never fail the overall CI job — it is a reporting step.
+# errexit is disabled so errors are handled internally (retries, warnings, graceful skips).
 set +o errexit
-set +o nounset
 
 # Skip data router reporting when job was triggered via Gangway API with overrides
 OVERRIDE_VARS=(
@@ -87,8 +88,20 @@ get_artifacts_url() {
 process_junit_file() {
   echo "Processing JUnit file for Data Router compatibility..."
 
-  local junit_file="${SHARED_DIR}/junit-results.xml"
-  if [[ ! -f "$junit_file" ]]; then
+  mkdir -p "${ARTIFACT_DIR}/data-router"
+
+  local junit_gz="${SHARED_DIR}/junit-results.xml.gz"
+  local junit_shared="${SHARED_DIR}/junit-results.xml"
+  local junit_file="${ARTIFACT_DIR}/data-router/junit-results.xml"
+
+  # Decompress gzipped junit to ARTIFACT_DIR (new format); fall back to plain XML (backward compat)
+  if [[ -f "$junit_gz" ]]; then
+    gunzip -c "$junit_gz" > "$junit_file"
+    echo "Decompressed junit-results.xml.gz -> ${junit_file}"
+  elif [[ -f "$junit_shared" ]]; then
+    cp "$junit_shared" "$junit_file"
+    echo "Copied junit-results.xml from SHARED_DIR to ARTIFACT_DIR"
+  else
     echo "WARNING: junit-results.xml not found in ${SHARED_DIR}, skipping processing"
     return
   fi
@@ -96,7 +109,6 @@ process_junit_file() {
   echo "Processing: junit-results.xml"
 
   # Create backup in ARTIFACT_DIR
-  mkdir -p "${ARTIFACT_DIR}/data-router"
   cp "$junit_file" "${ARTIFACT_DIR}/data-router/junit-results.xml.original.xml"
 
   # Construct artifacts URL for attachment placeholder replacement
@@ -253,9 +265,10 @@ main() {
   local output=""
   local DATA_ROUTER_REQUEST_ID=""
 
-  if [[ ! -f "${SHARED_DIR}/junit-results.xml" ]]; then
-    echo "ERROR: No JUnit results file (junit-results.xml) found in ${SHARED_DIR}"
-    return
+  local junit_for_send="${ARTIFACT_DIR}/data-router/junit-results.xml"
+  if [[ ! -f "$junit_for_send" ]]; then
+    echo "WARNING: No JUnit results file found (processed by process_junit_file), skipping Data Router upload"
+    return 0
   fi
 
   for ((i = 1; i <= max_attempts; i++)); do
@@ -265,7 +278,7 @@ main() {
         --url "${DATA_ROUTER_URL}" \
         --username "${DATA_ROUTER_USERNAME}" \
         --password "${DATA_ROUTER_PASSWORD}" \
-        --results "${SHARED_DIR}/junit-results.xml" \
+        --results "$junit_for_send" \
         --verbose --wirelog 2>&1) && \
       DATA_ROUTER_REQUEST_ID=$(echo "$output" | grep "request:" | awk '{print $2}') &&
       [ -n "$DATA_ROUTER_REQUEST_ID" ]; then
@@ -320,3 +333,6 @@ main() {
 }
 
 main
+
+# Ensure this reporting step never fails the CI job regardless of what main() returned
+exit 0
