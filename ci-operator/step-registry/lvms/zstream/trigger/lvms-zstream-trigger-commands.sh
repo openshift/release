@@ -292,6 +292,7 @@ fetch_last_runs() {
         entry=$(echo "${prow_json}" | sed 's/^var allBuilds = //' | \
             jq -r --arg n "${test_name}" '
                 [.items[] | select(.status.state == "success" or .status.state == "failure" or .status.state == "error" or .status.state == "aborted")] |
+                sort_by(.status.startTime) | reverse |
                 if length > 0 then .[0] else null end |
                 if . then {name: $n, state: .status.state, url: .status.url, started: .status.startTime} else {name: $n, state: "unknown"} end
             ' 2>/dev/null || echo "{\"name\": \"${test_name}\", \"state\": \"unknown\"}")
