@@ -35,6 +35,21 @@ else
     exit 1
 fi
 
+CURRENT_OCM_ENV="${OCM_LOGIN_ENV}"
+
+ocm_ensure_env() {
+    local target_env="$1"
+    if [[ "${CURRENT_OCM_ENV}" == "${target_env}" ]]; then
+        return 0
+    fi
+    if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+        ocm login --url "${target_env}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+    elif [[ -n "${OCM_TOKEN}" ]]; then
+        ocm login --url "${target_env}" --token "${OCM_TOKEN}"
+    fi
+    CURRENT_OCM_ENV="${target_env}"
+}
+
 ALL_CMS=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/managed=true" -o json)
 TOTAL=$(echo "${ALL_CMS}" | jq '.items | length')
 
@@ -101,84 +116,27 @@ for i in $(seq 0 $((TOTAL - 1))); do
         continue
     fi
 
-    OCM_STATUS=$(ocm describe cluster "${CLUSTER_ID}" --json 2>/dev/null | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unreachable")
+    # Skip health checks for provisioning clusters
+    if [[ "${STATUS}" == "provisioning" ]]; then
+        HEALTHY=$((HEALTHY + 1))
+        echo "  Provisioning (skipped)" >> "${REPORT}"
+        continue
+    fi
+
+    CLUSTER_OCM_ENV=$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')
+    ocm_ensure_env "${CLUSTER_OCM_ENV}"
+
+    OCM_STATUS=$(ocm get /api/clusters_mgmt/v1/clusters/"${CLUSTER_ID}" 2>/dev/null | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unreachable")
+    echo "  OCM status: ${OCM_STATUS}" >> "${REPORT}"
 
     if [[ "${OCM_STATUS}" != "ready" ]]; then
         log "UNHEALTHY: ${CM_NAME} OCM status is ${OCM_STATUS}"
-        echo "  OCM status: ${OCM_STATUS} (UNHEALTHY)" >> "${REPORT}"
 
         if [[ "${STATUS}" != "error" ]]; then
             lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
                 "metadata": {
                     "labels": { "rosa-cluster-lease/status": "error" },
                     "annotations": { "rosa-cluster-lease/error-reason": "OCM status: '"${OCM_STATUS}"'", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
-                }
-            }' || true
-        fi
-        UNHEALTHY=$((UNHEALTHY + 1))
-        continue
-    fi
-
-    if ocm backplane login "${CLUSTER_ID}" --multi 2>/dev/null; then
-        BACKPLANE_KC="${HOME}/.kube/backplane/${CLUSTER_ID}/config"
-        if [[ ! -f "${BACKPLANE_KC}" ]]; then
-            log "UNHEALTHY: ${CM_NAME} backplane kubeconfig not found"
-            echo "  Backplane: kubeconfig missing (UNHEALTHY)" >> "${REPORT}"
-            if [[ "${STATUS}" != "error" ]]; then
-                lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
-                    "metadata": {
-                        "labels": { "rosa-cluster-lease/status": "error" },
-                        "annotations": { "rosa-cluster-lease/error-reason": "Backplane kubeconfig missing", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
-                    }
-                }' || true
-            fi
-            UNHEALTHY=$((UNHEALTHY + 1))
-            continue
-        fi
-
-        if ! NODES_OUTPUT=$(oc --kubeconfig="${BACKPLANE_KC}" get nodes --no-headers 2>/dev/null); then
-            log "UNHEALTHY: ${CM_NAME} failed to query nodes"
-            echo "  Nodes: query failed (UNHEALTHY)" >> "${REPORT}"
-            if [[ "${STATUS}" != "error" ]]; then
-                lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
-                    "metadata": {
-                        "labels": { "rosa-cluster-lease/status": "error" },
-                        "annotations": { "rosa-cluster-lease/error-reason": "Node query failed", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
-                    }
-                }' || true
-            fi
-            UNHEALTHY=$((UNHEALTHY + 1))
-            continue
-        fi
-
-        NODE_COUNT=$(printf "%s\n" "${NODES_OUTPUT}" | sed '/^$/d' | wc -l | tr -d ' ')
-        READY_NODES=$(printf "%s\n" "${NODES_OUTPUT}" | grep -c " Ready" || true)
-
-        echo "  OCM status: ready" >> "${REPORT}"
-        echo "  Nodes: ${READY_NODES}/${NODE_COUNT} ready" >> "${REPORT}"
-
-        if [[ "${READY_NODES}" -eq 0 ]]; then
-            log "UNHEALTHY: ${CM_NAME} has no ready nodes"
-            if [[ "${STATUS}" != "error" ]]; then
-                lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
-                    "metadata": {
-                        "labels": { "rosa-cluster-lease/status": "error" },
-                        "annotations": { "rosa-cluster-lease/error-reason": "No ready nodes", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
-                    }
-                }' || true
-            fi
-            UNHEALTHY=$((UNHEALTHY + 1))
-            continue
-        fi
-    else
-        log "UNHEALTHY: ${CM_NAME} backplane login failed"
-        echo "  Backplane: FAILED" >> "${REPORT}"
-
-        if [[ "${STATUS}" != "error" ]]; then
-            lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
-                "metadata": {
-                    "labels": { "rosa-cluster-lease/status": "error" },
-                    "annotations": { "rosa-cluster-lease/error-reason": "Backplane login failed", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
                 }
             }' || true
         fi
