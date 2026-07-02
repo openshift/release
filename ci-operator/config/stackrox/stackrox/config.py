@@ -767,6 +767,17 @@ def check_configs(data):
             if not check_config(config, data):
                 configs_ok = False
 
+        # Check that release branch configs do not use the "latest" floating
+        # tag for the rox-ci-image (apollo-ci). The "latest" tag is a moving
+        # target and should only be used for validation, not for release jobs.
+        if config.branch.startswith('release-'):
+            tag = config.build_root_tag
+            if tag and 'latest' in tag:
+                check_error(f"{config.short_filename}: release branch '{config.branch}' "
+                            f"must not use 'latest' build root tag '{tag}'. "
+                            f"Pin to a specific version (e.g. stackrox-ui-test-0.5.7).")
+                configs_ok = False
+
     return configs_ok
 
 
