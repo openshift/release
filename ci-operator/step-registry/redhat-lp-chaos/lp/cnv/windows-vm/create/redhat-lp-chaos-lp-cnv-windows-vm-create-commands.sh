@@ -3,12 +3,32 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 [ -s "${KUBECONFIG}" ]
 
+function BenchmarkRunnerDebug () {
+    sleep 2h
+    oc get all -n benchmark-runner 2>&1 || true
+    oc get events -n benchmark-runner --sort-by='.lastTimestamp' 2>&1 || true
+    oc get vmi -n benchmark-runner -o yaml 2>&1 || true
+    oc get dv -n benchmark-runner 2>&1 || true
+    oc describe dv -n benchmark-runner 2>&1 || true
+}
+
+trap BenchmarkRunnerDebug ERR TERM EXIT
+
 # Required by benchmark-runner
 ( set +x; KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password") )
 export KUBEADMIN_PASSWORD
 
 ( set +x; WINDOWS_URL=$(cat /var/run/secrets/windows-vm/S3-bucket-url) )
 export WINDOWS_URL
+
+# SCALE_NODES is required by benchmark-runner whenever SCALE is set
+# If empty, fall back to all workers
+( set +x; SCALE_NODES=$(oc get nodes -l kubevirt.io/schedulable=true -o jsonpath-as-json='{.items[*].metadata.name}' | jq -r '[ .[] | "'"'"'" + . + "'"'"'" ] | "[" + join(", ") + "]"'))
+export SCALE_NODES
+
+# CREATE_VMS_ONLY instructs benchmark-runner to provision the VM and exit
+# without running a benchmark workload, leaving the VM running for chaos steps
+export CREATE_VMS_ONLY=True
 
 # Ensure benchmark-runner namespace exists (idempotent).
 oc create namespace benchmark-runner --dry-run=client -o json --save-config | oc apply -f -
@@ -30,10 +50,6 @@ if oc get daemonset virt-handler -n openshift-cnv --ignore-not-found -o name | g
     : "${schedulableNodeCnt} nodes with kubevirt.io/schedulable=true"
 fi
 
-# CREATE_VMS_ONLY instructs benchmark-runner to provision the VM and exit
-# without running a benchmark workload, leaving the VM running for chaos steps
-export CREATE_VMS_ONLY=True
-
 # BUILD_VERSION is required by benchmark-runner; fall back to 1.0.0 on fetch failure
 typeset buildVersion
 buildVersion=$(
@@ -43,54 +59,7 @@ buildVersion=$(
 )
 export BUILD_VERSION="${buildVersion}"
 
-# benchmark-runner's Windows templates default to ODF storage (ocs-storagecluster-ceph-rbd-virtualization)
-# This cluster uses AWS EBS only (gp3-csi), so patch the templates to use a compatible storage class
-oc apply -f - <<'SCEOF'
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: gp3-csi-immediate
-provisioner: ebs.csi.aws.com
-parameters:
-  type: gp3
-reclaimPolicy: Delete
-allowVolumeExpansion: true
-volumeBindingMode: Immediate
-SCEOF
-
-typeset brTmplDir
-brTmplDir="$(python3 -c "import benchmark_runner, os; \
-print(os.path.dirname(benchmark_runner.__file__))")/common/template_operations/templates/windows/internal_data"
-sed -i 's/storageClassName: ocs-storagecluster-ceph-rbd-virtualization/storageClassName: gp3-csi-immediate/' \
-    "${brTmplDir}/windows_dv_template.yaml" \
-    "${brTmplDir}/windows_vm_template.yaml"
-sed -i 's/ReadWriteMany/ReadWriteOnce/' \
-    "${brTmplDir}/windows_dv_template.yaml" \
-    "${brTmplDir}/windows_vm_template.yaml"
-sed -i '/evictionStrategy: LiveMigrate/d' \
-    "${brTmplDir}/windows_vm_template.yaml"
-
-# SCALE_NODES is required by benchmark-runner whenever SCALE is set
-# If empty, fall back to all workers
-typeset scaleNodes
-scaleNodes=$(
-    oc get nodes -l kubevirt.io/schedulable=true \
-        -o jsonpath='{.items[*].metadata.name}' |
-    tr ' ' ','
-)
-export SCALE_NODES="${scaleNodes}"
-
-function BenchmarkRunnerDebug () {
-    oc get all -n benchmark-runner 2>&1 || true
-    oc get events -n benchmark-runner --sort-by='.lastTimestamp' 2>&1 || true
-    oc get vmi -n benchmark-runner -o yaml 2>&1 || true
-    oc get dv -n benchmark-runner 2>&1 || true
-    oc describe dv -n benchmark-runner 2>&1 || true
-    true
-}
-
 : "Creating Windows VM: workload=${WORKLOAD} scale=${SCALE} image=${WINDOWS_IMAGE}"
-trap BenchmarkRunnerDebug ERR
-python3.14 /benchmark_runner/main/main.py
+python3 /benchmark_runner/main/main.py
 
 true

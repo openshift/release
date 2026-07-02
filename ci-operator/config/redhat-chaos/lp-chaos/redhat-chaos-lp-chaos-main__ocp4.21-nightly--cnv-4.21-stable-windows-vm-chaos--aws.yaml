@@ -23,7 +23,7 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: windows-vm-chaos-debug
+  as: windows-vm-chaos
   cron: 0 22 * * 0
   steps:
     cluster_profile: aws-lp-chaos
@@ -32,12 +32,14 @@ tests:
       CHAOS_TEAM_NAME: lp-chaos
       CNV_VERSION: "4.21"
       COMPUTE_NODE_TYPE: m5.metal
+      OPERATORS: '[{"name": "odf-operator", "install_namespace": "openshift-storage",
+        "channel": "stable-4.21", "target_namespaces": "!install", "operator_group":
+        "openshift-storage-operator-group"}]'
       TARGET_NAMESPACE: benchmark-runner
       TELEMETRY_GROUP: ocp4.21-nightly--cnv-4.21-stable-windows-vm-chaos--aws
     test:
-    - ref: redhat-lp-chaos-lp-cnv-windows-vm-create
+    - chain: redhat-lp-chaos-lp-cnv-odf-windows-vm-create
     - ref: redhat-chaos-kubevirt-outage
-    - ref: redhat-lp-chaos-lp-cnv-windows-vm-clean
     workflow: redhat-lp-chaos-ocp-installer-aws-cnv
   timeout: 6h0m0s
 zz_generated_metadata:
