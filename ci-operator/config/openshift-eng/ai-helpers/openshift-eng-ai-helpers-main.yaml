@@ -67,6 +67,41 @@ tests:
       EVAL_SETUP_SCRIPT: plugins/ci/evals/scripts/extract-payload-analysis-snapshots.sh
     workflow: openshift-claude-agent-eval
 - always_run: false
+  as: eval-prow-job-analysis
+  optional: true
+  steps:
+    env:
+      EVAL_CONFIG: plugins/ci/evals/eval-prow-job-analysis.yaml
+      EVAL_MAX_TURNS: "2500"
+      EVAL_MODEL: claude-opus-4-6
+      EVAL_PARALLELISM: "5"
+      EVAL_SETUP_SCRIPT: plugins/ci/evals/scripts/setup-prow-job-analysis.sh
+    workflow: openshift-claude-agent-eval
+- as: eval-prow-job-analysis-changed
+  optional: true
+  run_if_changed: ^plugins/ci/evals/cases/prow-job-analysis/
+  steps:
+    env:
+      EVAL_CASES_DIR: plugins/ci/evals/cases/prow-job-analysis
+      EVAL_CHANGED_ONLY: "true"
+      EVAL_CONFIG: plugins/ci/evals/eval-prow-job-analysis.yaml
+      EVAL_MAX_TURNS: "2500"
+      EVAL_MODEL: claude-opus-4-6
+      EVAL_PARALLELISM: "5"
+      EVAL_SETUP_SCRIPT: plugins/ci/evals/scripts/setup-prow-job-analysis.sh
+    workflow: openshift-claude-agent-eval
+- always_run: false
+  as: eval-prow-job-analysis-minimal
+  optional: true
+  steps:
+    env:
+      EVAL_CASES: case-001
+      EVAL_CONFIG: plugins/ci/evals/eval-prow-job-analysis.yaml
+      EVAL_MAX_TURNS: "250"
+      EVAL_MODEL: claude-opus-4-6
+      EVAL_SETUP_SCRIPT: plugins/ci/evals/scripts/setup-prow-job-analysis.sh
+    workflow: openshift-claude-agent-eval
+- always_run: false
   as: eval-classify-review-comment
   optional: true
   steps:
