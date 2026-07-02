@@ -223,6 +223,36 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-test-gcp-sts
+  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
+  steps:
+    cluster_profile: openshift-org-gcp
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: dev
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    post:
+    - chain: ipi-gcp-post-manual-oidc-workload-identity
+    pre:
+    - chain: ipi-gcp-pre-manual-oidc-workload-identity
+    - ref: optional-operators-subscribe
+    test:
+    - as: e2e
+      cli: latest
+      commands: make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
 zz_generated_metadata:
   branch: oadp-dev
   org: openshift
