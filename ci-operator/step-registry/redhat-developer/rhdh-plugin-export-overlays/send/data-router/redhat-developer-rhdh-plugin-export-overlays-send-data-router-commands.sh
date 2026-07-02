@@ -1,7 +1,8 @@
 #!/bin/bash
 
+# This post step must never fail the overall CI job — it is a reporting step.
+# errexit is disabled so errors are handled internally (retries, warnings, graceful skips).
 set +o errexit
-set +o nounset
 
 # Skip data router reporting when job was triggered via Gangway API with overrides
 OVERRIDE_VARS=(
@@ -266,8 +267,8 @@ main() {
 
   local junit_for_send="${ARTIFACT_DIR}/data-router/junit-results.xml"
   if [[ ! -f "$junit_for_send" ]]; then
-    echo "ERROR: No JUnit results file found (processed by process_junit_file)"
-    return
+    echo "WARNING: No JUnit results file found (processed by process_junit_file), skipping Data Router upload"
+    return 0
   fi
 
   for ((i = 1; i <= max_attempts; i++)); do
@@ -332,3 +333,6 @@ main() {
 }
 
 main
+
+# Ensure this reporting step never fails the CI job regardless of what main() returned
+exit 0

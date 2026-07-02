@@ -1,7 +1,8 @@
 #!/bin/bash
 
+# This post step must never fail the overall CI job — it is a reporting step.
+# errexit is disabled so errors are handled internally (retries, warnings, graceful skips).
 set +o errexit
-set +o nounset
 
 # Skip data router reporting when job was triggered via Gangway API with overrides
 OVERRIDE_VARS=(
@@ -227,9 +228,9 @@ save_data_router_metadata() {
     --arg name "$JOB_NAME" \
     --arg description "[View job run details](${JOB_URL})" \
     --arg job_type "$JOB_TYPE" \
-    --arg pr "$GIT_PR_NUMBER" \
+    --arg pr "${GIT_PR_NUMBER:-}" \
     --arg job_name "$JOB_NAME" \
-    --arg tag_name "$TAG_NAME" \
+    --arg tag_name "${TAG_NAME:-}" \
     --arg install_method "$install_method" \
     --arg cluster_type "$cluster_type" \
     --arg container_platform "$CONTAINER_PLATFORM" \
@@ -303,8 +304,8 @@ main() {
       done
 
       if [[ "$junit_files_found" == false ]]; then
-        echo "ERROR: No JUnit results files (junit-*.xml) found in ${ARTIFACT_DIR}/data-router"
-        return
+        echo "WARNING: No JUnit results files (junit-*.xml) found in ${ARTIFACT_DIR}/data-router, skipping Data Router upload"
+        return 0
       fi
 
       if output=$(droute send --metadata "$(get_metadata_output_path)" \
@@ -372,3 +373,6 @@ main() {
 }
 
 main
+
+# Ensure this reporting step never fails the CI job regardless of what main() returned
+exit 0
