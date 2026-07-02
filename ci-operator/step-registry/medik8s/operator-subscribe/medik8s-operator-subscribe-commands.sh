@@ -25,6 +25,18 @@ collect_artifacts() {
             > "${ARTIFACT_DIR}/operatorgroup.yaml"
         oc get events -n "$INSTALL_NAMESPACE" --sort-by='.lastTimestamp' 2>/dev/null \
             > "${ARTIFACT_DIR}/namespace-events.txt"
+        # Bundle unpack jobs run in openshift-marketplace — capture for debugging
+        oc get jobs -n openshift-marketplace -o yaml 2>/dev/null \
+            > "${ARTIFACT_DIR}/marketplace-jobs.yaml"
+        oc get pods -n openshift-marketplace -o wide 2>/dev/null \
+            > "${ARTIFACT_DIR}/marketplace-pods.txt"
+        oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>/dev/null \
+            > "${ARTIFACT_DIR}/marketplace-events.txt"
+        # Pod logs for bundle unpack jobs
+        for pod in $(oc get pods -n openshift-marketplace -o name 2>/dev/null | grep -v "catalog\|registry"); do
+            oc logs -n openshift-marketplace "$pod" --all-containers 2>/dev/null \
+                > "${ARTIFACT_DIR}/$(echo "$pod" | tr '/' '-').log" || true
+        done
     } || true
 }
 
