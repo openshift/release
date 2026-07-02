@@ -9,14 +9,10 @@ POLL_INTERVAL="${POLL_INTERVAL:-60}"
 STALL_WINDOW="${STALL_WINDOW:-10}"
 OPP_OPERATORS="${OPP_OPERATORS:-advanced-cluster-management,rhacs-operator,odf-operator,quay-operator}"
 
-trap 'EXIT_CODE=$?; debug_on_exit' EXIT TERM
-
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman
 mkdir -p "${XDG_RUNTIME_DIR}"
-
-KUBECONFIG="" oc --loglevel=8 registry login
 
 debug_on_exit() {
     if (( EXIT_CODE != 0 )); then
@@ -46,6 +42,10 @@ debug_on_exit() {
         echo -e "\n# OPP Operator CSVs\n$(oc get csv -A 2>/dev/null || echo 'unavailable')"
     fi
 }
+
+trap 'EXIT_CODE=$?; debug_on_exit' EXIT TERM
+
+KUBECONFIG="" oc --loglevel=8 registry login
 
 resolve_target_image() {
     local target="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
@@ -185,7 +185,6 @@ initiate_upgrade() {
 }
 
 monitor_upgrade() {
-    local remaining="${UPGRADE_TIMEOUT}"
     local poll_count=0
     local last_progress_change
     last_progress_change=$(date +%s)
@@ -201,12 +200,12 @@ monitor_upgrade() {
 
     echo "Monitoring upgrade (timeout: ${UPGRADE_TIMEOUT}m, poll: ${POLL_INTERVAL}s)"
     echo "Upgrade monitoring start: $(date '+%F %T')"
-    local start_time
+    local start_time deadline
     start_time=$(date +%s)
+    deadline=$(( start_time + UPGRADE_TIMEOUT * 60 ))
 
-    while (( remaining > 0 )); do
+    while (( $(date +%s) < deadline )); do
         sleep "${POLL_INTERVAL}"
-        remaining=$(( remaining - 1 ))
         (( poll_count += 1 ))
 
         local current_status
@@ -296,9 +295,8 @@ validate_platform_health() {
 
 validate_opp_operators() {
     echo "Validating OPP operator health"
-    local IFS=','
     local operators
-    read -ra operators <<< "${OPP_OPERATORS}"
+    IFS=',' read -ra operators <<< "${OPP_OPERATORS}"
 
     echo "Waiting 5 minutes for operator settling"
     sleep 300
