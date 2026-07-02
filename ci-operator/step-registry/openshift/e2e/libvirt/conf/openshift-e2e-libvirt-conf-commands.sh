@@ -284,6 +284,7 @@ EOF
 # Skipping the DRA test case due to its current failure in libvirt CI. It will be re-enabled once the issue is resolved.
 elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($1 == 4) && ($2 >= 13))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs"
 "[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
