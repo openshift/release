@@ -199,148 +199,106 @@ EOF
 
 }
 
-#create ImageDigestMirrorSet (for ROSA HCP clusters where ICSP is blocked)
-function create_idms () {
-  cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: konflux-quay-registry
-spec:
-  imageDigestMirrors:
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-9
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-10
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-11
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-12
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-13
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-14
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-15
-    source: registry.redhat.io/quay/quay-operator-rhel8
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-16
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-17
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-18
-    source: registry.redhat.io/quay/quay-operator-rhel9
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-9
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-10
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-11
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-12
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-13
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-14
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-15
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-16
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-17
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-18
-    source: registry.redhat.io/quay/quay-operator-bundle
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-9
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-10
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-11
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-12
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-13
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-14
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-15
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-16
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-17
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-18
-    source: registry.redhat.io/quay/quay-container-security-operator-bundle
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-9
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-10
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-11
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-12
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-13
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-14
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-15
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-16
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-17
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-18
-    source: registry.redhat.io/quay/quay-bridge-operator-bundle
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-9
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-10
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-11
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-12
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-13
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-14
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-15
-    source: registry.redhat.io/quay/quay-rhel8
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-16
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-17
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-18
-    source: registry.redhat.io/quay/quay-rhel9
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-9
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-10
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-11
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-12
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-13
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-14
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-15
-    source: registry.redhat.io/quay/quay-bridge-operator-rhel8
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-16
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-17
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-18
-    source: registry.redhat.io/quay/quay-bridge-operator-rhel9
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-9
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-10
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-11
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-12
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-13
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-14
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-15
-    source: registry.redhat.io/quay/quay-container-security-operator-rhel8
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-16
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-17
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-18
-    source: registry.redhat.io/quay/quay-container-security-operator-rhel9
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-9
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-10
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-11
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-12
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-13
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-14
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-15
-    source: registry.redhat.io/quay/container-security-operator-rhel8
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-16
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-17
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-18
-    source: registry.redhat.io/quay/container-security-operator-rhel9
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-9
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-10
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-11
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-12
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-13
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-14
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-15
-    source: registry.redhat.io/quay/clair-rhel8
-  - mirrors:
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-16
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-17
-    - ${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-18
-    source: registry.redhat.io/quay/clair-rhel9
-  - mirrors:
-    - brew.registry.redhat.io
-    source: registry.stage.redhat.io
-  - mirrors:
-    - brew.registry.redhat.io
-    source: registry-proxy.engineering.redhat.com
-EOF
-  if [ $? == 0 ]; then
-    echo "Create the IDMS successfully"
+#create image mirrors via rosa CLI (for ROSA HCP clusters where ICSP/IDMS are blocked)
+function create_rosa_image_mirrors () {
+  echo "Downloading rosa CLI..."
+  curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/rosa/latest/rosa-linux.tar.gz \
+    | tar xzf - -C /tmp/
+  chmod +x /tmp/rosa
+
+  echo "Logging into ROSA..."
+  set +x
+  local sso_client_id sso_client_secret rosa_token
+  sso_client_id=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
+  sso_client_secret=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
+  rosa_token=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
+
+  if [[ -n "${sso_client_id}" && -n "${sso_client_secret}" ]]; then
+    /tmp/rosa login --env "${OCM_LOGIN_ENV}" \
+      --client-id "${sso_client_id}" --client-secret "${sso_client_secret}"
+  elif [[ -n "${rosa_token}" ]]; then
+    /tmp/rosa login --env "${OCM_LOGIN_ENV}" --token "${rosa_token}"
   else
-    echo "!!! Fail to create the IDMS"
+    echo "!!! No ROSA credentials found in cluster profile"
     return 1
   fi
+  set -x
+
+  local cluster_name
+  cluster_name=$(cat "${SHARED_DIR}/cluster-name")
+  echo "Creating image mirrors for cluster: ${cluster_name}"
+
+  local R="${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/quay-operator-rhel8 \
+    --mirrors="${R}/quay-operator-v3-9,${R}/quay-operator-v3-10,${R}/quay-operator-v3-11,${R}/quay-operator-v3-12,${R}/quay-operator-v3-13,${R}/quay-operator-v3-14,${R}/quay-operator-v3-15"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/quay-operator-rhel9 \
+    --mirrors="${R}/quay-operator-v3-16,${R}/quay-operator-v3-17,${R}/quay-operator-v3-18"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/quay-operator-bundle \
+    --mirrors="${R}/quay-operator-bundle-v3-9,${R}/quay-operator-bundle-v3-10,${R}/quay-operator-bundle-v3-11,${R}/quay-operator-bundle-v3-12,${R}/quay-operator-bundle-v3-13,${R}/quay-operator-bundle-v3-14,${R}/quay-operator-bundle-v3-15,${R}/quay-operator-bundle-v3-16,${R}/quay-operator-bundle-v3-17,${R}/quay-operator-bundle-v3-18"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/quay-container-security-operator-bundle \
+    --mirrors="${R}/container-security-operator-bundle-v3-9,${R}/container-security-operator-bundle-v3-10,${R}/container-security-operator-bundle-v3-11,${R}/container-security-operator-bundle-v3-12,${R}/container-security-operator-bundle-v3-13,${R}/container-security-operator-bundle-v3-14,${R}/container-security-operator-bundle-v3-15,${R}/container-security-operator-bundle-v3-16,${R}/container-security-operator-bundle-v3-17,${R}/container-security-operator-bundle-v3-18"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/quay-bridge-operator-bundle \
+    --mirrors="${R}/quay-bridge-operator-bundle-v3-9,${R}/quay-bridge-operator-bundle-v3-10,${R}/quay-bridge-operator-bundle-v3-11,${R}/quay-bridge-operator-bundle-v3-12,${R}/quay-bridge-operator-bundle-v3-13,${R}/quay-bridge-operator-bundle-v3-14,${R}/quay-bridge-operator-bundle-v3-15,${R}/quay-bridge-operator-bundle-v3-16,${R}/quay-bridge-operator-bundle-v3-17,${R}/quay-bridge-operator-bundle-v3-18"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/quay-rhel8 \
+    --mirrors="${R}/quay-quay-v3-9,${R}/quay-quay-v3-10,${R}/quay-quay-v3-11,${R}/quay-quay-v3-12,${R}/quay-quay-v3-13,${R}/quay-quay-v3-14,${R}/quay-quay-v3-15"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/quay-rhel9 \
+    --mirrors="${R}/quay-quay-v3-16,${R}/quay-quay-v3-17,${R}/quay-quay-v3-18"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/quay-bridge-operator-rhel8 \
+    --mirrors="${R}/quay-bridge-operator-v3-9,${R}/quay-bridge-operator-v3-10,${R}/quay-bridge-operator-v3-11,${R}/quay-bridge-operator-v3-12,${R}/quay-bridge-operator-v3-13,${R}/quay-bridge-operator-v3-14,${R}/quay-bridge-operator-v3-15"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/quay-bridge-operator-rhel9 \
+    --mirrors="${R}/quay-bridge-operator-v3-16,${R}/quay-bridge-operator-v3-17,${R}/quay-bridge-operator-v3-18"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/quay-container-security-operator-rhel8 \
+    --mirrors="${R}/container-security-operator-v3-9,${R}/container-security-operator-v3-10,${R}/container-security-operator-v3-11,${R}/container-security-operator-v3-12,${R}/container-security-operator-v3-13,${R}/container-security-operator-v3-14,${R}/container-security-operator-v3-15"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/quay-container-security-operator-rhel9 \
+    --mirrors="${R}/container-security-operator-v3-16,${R}/container-security-operator-v3-17,${R}/container-security-operator-v3-18"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/container-security-operator-rhel8 \
+    --mirrors="${R}/container-security-operator-v3-9,${R}/container-security-operator-v3-10,${R}/container-security-operator-v3-11,${R}/container-security-operator-v3-12,${R}/container-security-operator-v3-13,${R}/container-security-operator-v3-14,${R}/container-security-operator-v3-15"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/container-security-operator-rhel9 \
+    --mirrors="${R}/container-security-operator-v3-16,${R}/container-security-operator-v3-17,${R}/container-security-operator-v3-18"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/clair-rhel8 \
+    --mirrors="${R}/quay-clair-v3-9,${R}/quay-clair-v3-10,${R}/quay-clair-v3-11,${R}/quay-clair-v3-12,${R}/quay-clair-v3-13,${R}/quay-clair-v3-14,${R}/quay-clair-v3-15"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.redhat.io/quay/clair-rhel9 \
+    --mirrors="${R}/quay-clair-v3-16,${R}/quay-clair-v3-17,${R}/quay-clair-v3-18"
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry.stage.redhat.io \
+    --mirrors=brew.registry.redhat.io
+
+  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+    --source=registry-proxy.engineering.redhat.com \
+    --mirrors=brew.registry.redhat.io
+
+  echo "Image mirrors created successfully"
 }
 
 #Create custom catalog source
@@ -393,7 +351,7 @@ else #Install Quay operator with fbc image
   echo "Installing Quay from unreleased fbc image: $MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"
   update_pull_secret
   if [[ "$QUAY_CLUSTER_TYPE" == "rosahcp" ]]; then
-    create_idms
+    create_rosa_image_mirrors
   else
     create_icsp
   fi
