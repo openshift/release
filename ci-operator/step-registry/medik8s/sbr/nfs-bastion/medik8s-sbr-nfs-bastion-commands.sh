@@ -34,6 +34,7 @@ NFS_EXPORT="/srv/nfs/sbr"
 # nfs-utils installed). The bastion already runs services as podman containers
 # (squid proxy, mirror registry), so we do the same for NFS.
 # Uses the upstream Kubernetes e2e NFS test image (Fedora-based, multi-arch).
+# Digest of the 1.6.0 tag — pinned to prevent tag mutation.
 NFS_IMAGE="registry.k8s.io/e2e-test-images/volume/nfs@sha256:fd050af01687ef04d87bcef58b9e27f8e74cde52293113cfb35e63a0253e29c2"
 
 # AWS credentials for security group update
