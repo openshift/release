@@ -4,6 +4,13 @@
 # loss surfaces as I/O errors for SBR fault detection.
 set -euo pipefail
 
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/medik8s-lib.sh" || {
+    echo "ERROR: medik8s-lib.sh not found in SHARED_DIR." >&2
+    echo "Include the medik8s-lib ref before this step." >&2
+    exit 1
+}
+
 # OpenShift assigns a random UID to the step pod; if it has no /etc/passwd
 # entry, ssh fails with "No user exists for uid NNNN". Add one if needed.
 if ! whoami &>/dev/null; then
@@ -27,7 +34,7 @@ NFS_EXPORT="/srv/nfs/sbr"
 # nfs-utils installed). The bastion already runs services as podman containers
 # (squid proxy, mirror registry), so we do the same for NFS.
 # Uses the upstream Kubernetes e2e NFS test image (Fedora-based, multi-arch).
-NFS_IMAGE="registry.k8s.io/e2e-test-images/volume/nfs:1.6.0"
+NFS_IMAGE="registry.k8s.io/e2e-test-images/volume/nfs@sha256:fd050af01687ef04d87bcef58b9e27f8e74cde52293113cfb35e63a0253e29c2"
 
 # AWS credentials for security group update
 REGION="${REGION:-${LEASED_RESOURCE}}"
@@ -44,11 +51,11 @@ ssh_bastion() {
         "$@"
 }
 
-echo "Configuring NFS server on bastion (containerized, FCOS-compatible)"
+log "Configuring NFS server on bastion (containerized, FCOS-compatible)"
 
 # Open port 2049 (NFS) on the bastion security group — not present by default.
 # Cluster nodes need this to mount the NFS export.
-echo "Opening NFS port 2049 on bastion security group..."
+log "Opening NFS port 2049 on bastion security group..."
 INSTANCE_ID=$(aws ec2 describe-instances \
     --filters "Name=dns-name,Values=${BASTION_PUBLIC}" \
     --query "Reservations[0].Instances[0].InstanceId" --output text)
@@ -58,7 +65,7 @@ SG_ID=$(aws ec2 describe-instances --instance-ids "${INSTANCE_ID}" \
     --query "Reservations[0].Instances[0].SecurityGroups[0].GroupId" --output text)
 VPC_CIDR=$(aws ec2 describe-vpcs --vpc-ids "${VPC_ID}" \
     --query "Vpcs[0].CidrBlock" --output text)
-echo "  bastion instance=${INSTANCE_ID} sg=${SG_ID} vpc_cidr=${VPC_CIDR}"
+log "  bastion instance=${INSTANCE_ID} sg=${SG_ID} vpc_cidr=${VPC_CIDR}"
 aws ec2 authorize-security-group-ingress \
     --group-id "${SG_ID}" --protocol tcp --port 2049 --cidr "${VPC_CIDR}" \
     || true  # idempotent — ignore "already exists" error
@@ -81,21 +88,21 @@ ssh_bastion "sudo podman run -d \
 # Give the server a moment to start, then verify it is exporting
 sleep 5
 ssh_bastion "sudo podman exec nfs-sbr showmount -e localhost 2>/dev/null || true"
-echo "NFS server ready"
+log "NFS server ready"
 
 # Pre-create SBR device files on the NFS export so the operator's init Job
 # (registry.access.redhat.com/ubi8/ubi-minimal:latest) exits 0 immediately
 # upon finding existing files — bypassing any image pull timing issue.
 # Filenames match agent.SharedStorageSBRDeviceFile / SharedStorageFenceDeviceSuffix
 # / SharedStorageNodeMappingSuffix as defined in internal/agent/flags.go.
-echo "Pre-creating SBR device files on NFS export..."
+log "Pre-creating SBR device files on NFS export..."
 ssh_bastion "
     sudo dd if=/dev/zero of=${NFS_EXPORT}/sbr-device bs=1024 count=1024 2>/dev/null
     sudo dd if=/dev/zero of=${NFS_EXPORT}/sbr-device-fence bs=1024 count=1024 2>/dev/null
     printf '{\"pre-created\":true}\n' | sudo tee ${NFS_EXPORT}/sbr-device-nodemap >/dev/null
     sudo chmod 664 ${NFS_EXPORT}/sbr-device ${NFS_EXPORT}/sbr-device-fence ${NFS_EXPORT}/sbr-device-nodemap
 "
-echo "SBR device files pre-created"
+log "SBR device files pre-created"
 
 # Create StorageClass backed by the bastion NFS export.
 # soft + timeo=50: if the NFS server becomes unreachable the kernel returns
@@ -166,7 +173,7 @@ spec:
   persistentVolumeReclaimPolicy: Delete
 EOF
 
-echo "StorageClass 'nfs-sbr' and PersistentVolumes created"
+log "StorageClass 'nfs-sbr' and PersistentVolumes created"
 oc get sc nfs-sbr
 oc get pv nfs-sbr-pv nfs-sbr-pv-test
 
@@ -176,14 +183,14 @@ oc get pv nfs-sbr-pv nfs-sbr-pv-test
 # operator's relatedImages (so oc-mirror never mirrors it) and uses a tag
 # reference which IDMS cannot redirect. We mirror it manually and create an ITMS.
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
-echo "Mirroring ubi8/ubi-minimal to disconnected registry ${MIRROR_REGISTRY_HOST}..."
+log "Mirroring ubi8/ubi-minimal to disconnected registry ${MIRROR_REGISTRY_HOST}..."
 ssh_bastion "sudo skopeo copy --retry-times 3 \
     --src-tls-verify=true --dest-tls-verify=false \
     --authfile=/tmp/new_pull_secret \
     docker://registry.access.redhat.com/ubi8/ubi-minimal:latest \
     docker://${MIRROR_REGISTRY_HOST}/ubi8/ubi-minimal:latest" \
-    || { echo "ERROR: failed to mirror ubi8/ubi-minimal"; exit 1; }
-echo "UBI image mirrored"
+    || { log "ERROR: failed to mirror ubi8/ubi-minimal"; exit 1; }
+log "UBI image mirrored"
 
 # Create an ImageTagMirrorSet so CRI-O redirects the tag-based pull to the mirror.
 oc apply -f - <<EOF
@@ -202,7 +209,7 @@ EOF
 # The previous approach (watching MCP rendered config names) is unreliable: ITMS may
 # update CRI-O config via a path that does not change the rendered MachineConfig name.
 # Active verification is the only reliable signal that nodes have picked up the mirror.
-echo "Waiting for ubi8/ubi-minimal to be pullable via ITMS mirror (up to 12m)..."
+log "Waiting for ubi8/ubi-minimal to be pullable via ITMS mirror (up to 12m)..."
 UBI_PULLABLE=false
 for i in $(seq 1 24); do
     sleep 30
@@ -214,18 +221,18 @@ for i in $(seq 1 24); do
         timeout 30 bash -c 'until [[ $(oc get pod sbr-ubi-preflight -o jsonpath="{.status.phase}" 2>/dev/null) =~ ^(Succeeded|Failed)$ ]]; do sleep 2; done; oc get pod sbr-ubi-preflight -o jsonpath="{.status.phase}"' \
         2>/dev/null || true)
     if [[ "$POD_PHASE" == "Succeeded" ]]; then
-        echo "  ubi8/ubi-minimal pullable after $((i * 30))s"
+        log "  ubi8/ubi-minimal pullable after $((i * 30))s"
         UBI_PULLABLE=true
         oc delete pod sbr-ubi-preflight --ignore-not-found 2>/dev/null || true
         break
     fi
-    echo "  attempt ${i}/24: image not yet pullable (phase=${POD_PHASE:-pending}), retrying in 30s..."
+    log "  attempt ${i}/24: image not yet pullable (phase=${POD_PHASE:-pending}), retrying in 30s..."
     oc delete pod sbr-ubi-preflight --ignore-not-found --wait=false 2>/dev/null || true
 done
 
 if [[ "${UBI_PULLABLE}" != "true" ]]; then
-    echo "WARNING: ubi8/ubi-minimal not pullable after 12m — ITMS may not have propagated."
-    echo "  SBR init Job may fail; device files are pre-created so it will retry quickly."
+    log "WARNING: ubi8/ubi-minimal not pullable after 12m — ITMS may not have propagated."
+    log "  SBR init Job may fail; device files are pre-created so it will retry quickly."
     oc get mcp 2>/dev/null || true
 fi
 
@@ -233,10 +240,10 @@ fi
 # as part of the release payload and has the basic tools the probe pods need.
 WATCHDOG_IMAGE=$(oc adm release info --image-for=cli 2>/dev/null || true)
 if [[ -n "$WATCHDOG_IMAGE" ]]; then
-    echo "Using release cli image for watchdog probes: ${WATCHDOG_IMAGE}"
+    log "Using release cli image for watchdog probes: ${WATCHDOG_IMAGE}"
     echo "${WATCHDOG_IMAGE}" > "${SHARED_DIR}/sbr_watchdog_debug_image"
 else
-    echo "WARNING: could not resolve release cli image, watchdog probes will use default"
+    log "WARNING: could not resolve release cli image, watchdog probes will use default"
 fi
 
-echo "UBI mirror setup complete"
+log "UBI mirror setup complete"

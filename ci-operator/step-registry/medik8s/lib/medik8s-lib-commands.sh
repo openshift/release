@@ -12,6 +12,7 @@ cat <<'MEDIK8S_LIB_EOF' > "${SHARED_DIR}/medik8s-lib.sh"
 #   ensure_marketplace: (none)
 #   wait_for_catalogsource: CATALOG_SOURCE_NAME; CATALOG_IMAGE (optional, for debug)
 #   set_proxy: SHARED_DIR
+#   gitlab_fetch: (none - takes url, output_file, [max_attempts])
 #   log, run: (none)
 
 GITLAB_PROJECT="dragonfly%2Frhwa-fbc"
@@ -29,6 +30,26 @@ log() { echo "[$(date --utc +%FT%T.%3NZ)] $*"; }
 run() {
     log "running: $*"
     "$@"
+}
+
+# gitlab.cee regularly returns 503s lasting 30+ seconds; shell-level
+# exponential backoff (2+4+8+16+32 = 62s window) is more reliable
+# than curl's built-in --retry which doesn't retry on HTTP 5xx.
+# Usage: gitlab_fetch <url> <output_file> [max_attempts]
+gitlab_fetch() {
+    local url="$1" output="$2" max_attempts="${3:-6}"
+    local attempt delay
+    for attempt in $(seq 1 "$max_attempts"); do
+        if curl --insecure -sSf --connect-timeout 10 --max-time 60 \
+            "$url" -o "$output" 2>/dev/null; then
+            return 0
+        fi
+        delay=$(( 2 ** attempt ))
+        log "WARNING: GitLab fetch attempt ${attempt}/${max_attempts} failed (retrying in ${delay}s)..."
+        sleep "$delay"
+    done
+    log "ERROR: Failed to fetch ${url} after ${max_attempts} attempts"
+    return 1
 }
 
 set_proxy() {
@@ -49,21 +70,17 @@ resolve_commit_sha() {
     encoded_ref=$(jq -rn --arg ref "$GIT_REF" '$ref | @uri') || encoded_ref="$GIT_REF"
 
     log "Resolving latest commit from ${GITLAB_PROJECT_NAME} ${GIT_REF} ref..."
-    # --insecure: gitlab.cee uses internal RH CA not trusted by CI pods
-    # Shell-level exponential backoff (2+4+8+16+32 = 62s window) because
-    # gitlab.cee regularly returns 503s lasting 30+ seconds.
-    local attempt delay
-    for attempt in 1 2 3 4 5 6; do
-        FBC_COMMIT_SHA=$(curl --insecure -sSf --connect-timeout 10 --max-time 30 \
-            "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" | jq -r .id) && break
-        FBC_COMMIT_SHA=""
-        delay=$(( 2 ** attempt ))
-        log "WARNING: GitLab API attempt ${attempt}/6 failed (retrying in ${delay}s)..."
-        sleep "$delay"
-    done
+    local tmp_commit
+    tmp_commit=$(mktemp)
+    gitlab_fetch "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" "$tmp_commit" || {
+        rm -f "$tmp_commit"
+        exit 1
+    }
+    FBC_COMMIT_SHA=$(jq -r .id "$tmp_commit")
+    rm -f "$tmp_commit"
 
     if [[ -z "$FBC_COMMIT_SHA" || "$FBC_COMMIT_SHA" == "null" ]]; then
-        log "ERROR: Failed to resolve rhwa-fbc commit SHA from GitLab API after 6 attempts"
+        log "ERROR: Failed to parse commit SHA from GitLab API response"
         exit 1
     fi
 

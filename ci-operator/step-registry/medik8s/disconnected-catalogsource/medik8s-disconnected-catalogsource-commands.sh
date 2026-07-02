@@ -18,6 +18,9 @@ declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-b
 
 collect_artifacts() {
     log "Collecting debug artifacts..."
+    for mcp in master worker; do
+        oc patch mcp "${mcp}" --type=merge --patch '{"spec":{"paused":false}}' 2>/dev/null || true
+    done
     {
         oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE_NAME" -o yaml 2>/dev/null \
             > "${ARTIFACT_DIR}/catalogsource.yaml"
@@ -81,19 +84,7 @@ create_registries_conf() {
     local idms_file="${TMP_DIR}/idms-source.yaml"
     local registries_conf="${TMP_DIR}/registries.conf"
 
-    # --insecure: gitlab.cee uses internal RH CA not trusted by CI pods
-    local attempt delay
-    for attempt in 1 2 3 4 5; do
-        curl --insecure -sSf --connect-timeout 10 --max-time 60 \
-            "$idms_url" -o "$idms_file" && break
-        delay=$(( 2 ** attempt ))
-        log "WARNING: GitLab raw fetch attempt ${attempt}/5 failed (retrying in ${delay}s)..."
-        sleep "$delay"
-    done
-    [[ -s "$idms_file" ]] || {
-        log "ERROR: Failed to fetch IDMS from $idms_url after 5 attempts"
-        exit 1
-    }
+    gitlab_fetch "$idms_url" "$idms_file" || exit 1
 
     awk '
         /^[[:space:]]*- mirrors:/ { in_mirrors=1; got_mirror=0 }
