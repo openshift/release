@@ -239,6 +239,8 @@ ${SUMMARY_ROWS}
 </tbody>
 </table>
 
+<p><a href="../../hypershift-review-agent-process/artifacts/review-agent-transcript.html">View full conversation transcript</a></p>
+
 <h2>Details</h2>
 ${DETAIL_SECTIONS}
 
