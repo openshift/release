@@ -11,4 +11,4 @@ AWS_SECRET_ACCESS_KEY=$(cat /usr/local/ci-secrets/konflux-devprod-rosa-credentia
 export AWS_REGION=us-east-1
 
 cd "$(mktemp -d)"
-curl -sSL https://raw.githubusercontent.com/konflux-ci/tekton-integration-catalog/main/scripts/mapt/delete-mapt-clusters.sh | bash
+curl -sSL https://raw.githubusercontent.com/psturc/tekton-integration-catalog/fix-mapt-deletion-script/scripts/mapt/delete-mapt-clusters.sh | bash
