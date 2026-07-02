@@ -12,6 +12,28 @@ build_root:
   from_repository: true
 images:
   items:
+  - dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/go-toolset
+      USER 0
+      RUN dnf install -y git make && \
+          dnf install -y 'dnf-command(config-manager)' && \
+          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo && \
+          dnf install -y gh python3.11 python3.11-pip && \
+          dnf clean all
+      WORKDIR /app
+      RUN git clone --depth 1 -b ci-monitor https://github.com/PillaiManish/oape-ai-e2e.git /tmp/oape && \
+          cp /tmp/oape/agent/requirements.txt . && \
+          python3.11 -m pip install --no-cache-dir -r requirements.txt && \
+          cp /tmp/oape/agent/agent.py /tmp/oape/agent/main.py /tmp/oape/agent/ci_monitor.py . && \
+          mkdir -p /config && \
+          printf '{"claude_allowed_tools":["Bash(*)","Read","Write","Edit","Glob","Grep","WebFetch","Task"]}\n' > /config/config.json && \
+          cp -r /tmp/oape/plugins /plugins && \
+          rm -rf /tmp/oape
+      RUN git config --global user.name "openshift-app-platform-shift-bot" && \
+          git config --global user.email "267347085+openshift-app-platform-shift-bot@users.noreply.github.com"
+      RUN chmod -R g=u /opt/app-root/src
+      USER 1001
+    to: ci-monitor-agent
   - dockerfile_path: Dockerfile.openshift
     from: base-rhel9
     to: must-gather-operator
@@ -28,7 +50,9 @@ operator:
     with: stable:must-gather
 promotion:
   to:
-  - name: "5.0"
+  - excluded_images:
+    - ci-monitor-agent
+    name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -197,6 +221,48 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
+- always_run: true
+  as: oape-ci-monitor
+  optional: true
+  steps:
+    test:
+    - as: monitor
+      commands: |
+        set -euo pipefail
+        APP_ID=$(cat /var/run/github-app/app-id)
+        PEM_PATH="/var/run/github-app/private-key.pem"
+        HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        NOW=$(date +%s); EXP=$((NOW + 300))
+        PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$NOW" "$EXP" "$APP_ID" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        SIGNATURE=$(printf '%s' "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$PEM_PATH" -binary | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
+        set +x
+        INST_ID=$(curl -sf -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          https://api.github.com/app/installations | python3.11 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")
+        export GH_TOKEN=$(curl -sf -X POST -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/app/installations/${INST_ID}/access_tokens" | python3.11 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+        export GOOGLE_APPLICATION_CREDENTIALS="/var/run/gcloud-adc/application_default_credentials.json"
+        export CLAUDE_CODE_USE_VERTEX="1"
+        export CLOUD_ML_REGION="global"
+        export ANTHROPIC_VERTEX_PROJECT_ID="itpc-gcp-hcm-pe-eng-claude"
+        export ANTHROPIC_MODEL="claude-opus-4-6"
+        export PYTHONUNBUFFERED=1
+        export WORKFLOW_TYPE="ci-monitor"
+        export PR_URLS="https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER} --ignore-context oape-ci-monitor --post-comment --max-fix-rounds 0 --no-auto-retest"
+        gh auth setup-git && python3.11 /app/main.py
+      credentials:
+      - mount_path: /var/run/gcloud-adc
+        name: oap-lts-claude-gcp-vertex-sa
+        namespace: test-credentials
+      - mount_path: /var/run/github-app
+        name: openshift-app-platform-shift-github-bot
+        namespace: test-credentials
+      from: ci-monitor-agent
+      resources:
+        requests:
+          cpu: "1"
+          memory: 500Mi
+      timeout: 2h30m0s
 zz_generated_metadata:
   branch: master
   org: openshift
