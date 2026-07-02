@@ -47,6 +47,16 @@ if oc get daemonset virt-handler -n openshift-cnv --ignore-not-found -o name | g
     : "${schedulableNodeCnt} nodes with kubevirt.io/schedulable=true"
 fi
 
+# Wait for the Ceph RBD CSI provisioner to be ready before creating VMs.
+# odf-apply-storage-cluster exits after StorageCluster Available, but Ceph OSD
+# pods and the CSI provisioner may still be initialising at that point.
+# Without this, DataVolume PVCs from ocs-storagecluster-ceph-rbd stay Pending.
+if oc get deployment csi-rbdplugin-provisioner -n openshift-storage \
+        --ignore-not-found -o name | grep -q .; then
+    oc rollout status deployment/csi-rbdplugin-provisioner \
+        -n openshift-storage --timeout=30m
+fi
+
 # BUILD_VERSION is required by benchmark-runner; fall back to 1.0.0 on fetch failure
 typeset buildVersion
 buildVersion=$(
