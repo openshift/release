@@ -57,8 +57,8 @@ echo "[INFO] Installing velero CLI ${VELERO_VERSION}"
 VELERO_TMP_DIR="$(mktemp -d)"
 curl -fsSL "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz" \
     | tar xz -C "$VELERO_TMP_DIR"
-cp "${VELERO_TMP_DIR}/velero-${VELERO_VERSION}-linux-amd64/velero" /usr/local/bin/velero
-chmod +x /usr/local/bin/velero
+cp "${VELERO_TMP_DIR}/velero-${VELERO_VERSION}-linux-amd64/velero" /tmp/bin/velero
+chmod +x /tmp/bin/velero
 velero version --client-only
 
 # user stored: username:token,username:token
