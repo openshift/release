@@ -247,24 +247,34 @@ trigger_job() {
         return 0
     fi
 
-    local http_code
+    local http_code attempt max_retries=3 delay=15
     [[ $- == *x* ]] && local _was_tracing=true || local _was_tracing=false
-    set +x
-    http_code=$(curl -sSL -X POST -o /dev/stderr -w '%{http_code}' \
-        --connect-timeout 10 --max-time 30 \
-        -H "Authorization: Bearer ${MY_APPCI_TOKEN}" \
-        -H "Content-Type: application/json" \
-        -d "${body}" \
-        "${GANGWAY_API}/v1/executions/${job_name}" 2>/dev/null)
-    $_was_tracing && set -x
 
-    if [[ "${http_code}" == "200" ]]; then
-        info "  triggered: ${job_name}"
-        return 0
-    else
+    for ((attempt = 1; attempt <= max_retries; attempt++)); do
+        set +x
+        http_code=$(curl -sSL -X POST -o /dev/stderr -w '%{http_code}' \
+            --connect-timeout 10 --max-time 30 \
+            -H "Authorization: Bearer ${MY_APPCI_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "${body}" \
+            "${GANGWAY_API}/v1/executions/${job_name}" 2>/dev/null)
+        $_was_tracing && set -x
+
+        if [[ "${http_code}" == "200" ]]; then
+            info "  triggered: ${job_name}"
+            return 0
+        fi
+
+        if [[ "${http_code}" == "429" && ${attempt} -lt ${max_retries} ]]; then
+            warn "  rate limited (attempt ${attempt}/${max_retries}), retrying in ${delay}s: ${job_name}"
+            sleep "${delay}"
+            delay=$((delay * 2))
+            continue
+        fi
+
         warn "  failed (HTTP ${http_code}): ${job_name}"
         return 1
-    fi
+    done
 }
 
 # ---------------------------------------------------------------------------
@@ -400,7 +410,7 @@ process_release() {
         else
             failed=$((failed + 1))
         fi
-        ${DRY_RUN} || sleep 5
+        ${DRY_RUN} || sleep 30
     done
 
     info "${release}: ${triggered} triggered, ${failed} failed"
