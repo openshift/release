@@ -3,16 +3,22 @@ set -euo pipefail
 
 echo "=== HyperShift Review Agent Process ==="
 
-# This step addresses review comments on a single PR (presubmit mode).
+# This step addresses review comments on a single PR.
 # It uses the /openshift-developer:address-review-pr skill which handles:
 # - Fetching and filtering PR comments (deduplication, bot filtering, authorization)
 # - Categorizing comments by priority (blocking, change requests, questions, suggestions)
 # - Making code changes, posting replies, and pushing
 
+# Apply Gangway API overrides (MULTISTAGE_PARAM_OVERRIDE_* prefix)
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_TARGET_PR:-}" ]]; then
+  echo "Applying Gangway override: REVIEW_AGENT_TARGET_PR=${MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_TARGET_PR}"
+  export REVIEW_AGENT_TARGET_PR="${MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_TARGET_PR}"
+fi
+
 # Determine which PR to process
 PR_NUMBER="${REVIEW_AGENT_TARGET_PR:-${PULL_NUMBER:-}}"
 if [ -z "$PR_NUMBER" ]; then
-  echo "ERROR: No PR number specified. Set PULL_NUMBER (presubmit) or REVIEW_AGENT_TARGET_PR."
+  echo "ERROR: No PR number specified. Set REVIEW_AGENT_TARGET_PR via gangway or PULL_NUMBER via presubmit."
   exit 1
 fi
 echo "Processing PR #$PR_NUMBER"
