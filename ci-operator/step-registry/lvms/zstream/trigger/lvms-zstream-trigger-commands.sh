@@ -204,16 +204,15 @@ resolve_snapshot_to_digest() {
         "${QUAY_API}/repository/${QUAY_REPO}/tag/?limit=50&filter_tag_name=like:v${version_dot}-")
 
     # Select only raw commit tags (v4.16-{40-hex}), exclude auxiliary suffixes
-    # Pick the closest one after the snapshot timestamp (smallest positive delta)
+    # Pick the tag closest to the snapshot timestamp (smallest absolute delta)
     local result
     result=$(echo "${tags_json}" | jq -r --arg snap_epoch "${snap_epoch}" --arg vpfx "v${version_dot}-" '
         [.tags[]
          | select(.name | startswith($vpfx))
          | select(.name | test("^v[0-9]+\\.[0-9]+-[a-f0-9]{40}$"))
          | .tag_epoch = (.last_modified | strptime("%a, %d %b %Y %H:%M:%S %z") | mktime)
-         | .delta = (.tag_epoch - ($snap_epoch | tonumber))
-         | select(.delta >= 0 and .delta < 1800)
-        ] | sort_by(.delta) | .[0] // empty |
+         | .abs_delta = ((.tag_epoch - ($snap_epoch | tonumber)) | fabs)
+        ] | sort_by(.abs_delta) | .[0] // empty |
         [.name, .manifest_digest] | @tsv
     ')
 
