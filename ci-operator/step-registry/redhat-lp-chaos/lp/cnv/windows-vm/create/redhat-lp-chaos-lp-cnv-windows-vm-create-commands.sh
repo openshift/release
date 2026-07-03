@@ -3,20 +3,32 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 [ -s "${KUBECONFIG}" ]
 
+# Flatten KUBECONFIG to embed certs inline — required by benchmark-runner Python client.
+oc config view --flatten > /tmp/config
+export KUBECONFIG=/tmp/config
+
 function BenchmarkRunnerDebug () {
-    sleep 5m
     oc get all -n benchmark-runner 2>&1 || true
     oc get events -n benchmark-runner --sort-by='.lastTimestamp' 2>&1 || true
     oc get vmi -n benchmark-runner -o yaml 2>&1 || true
     oc get dv -n benchmark-runner 2>&1 || true
     oc describe dv -n benchmark-runner 2>&1 || true
+    oc describe pod -n benchmark-runner -l cdi.kubevirt.io=importer 2>&1 || true
+    oc logs -n benchmark-runner -l cdi.kubevirt.io=importer --tail=200 --prefix 2>&1 || true
     oc get deployment -n openshift-storage 2>&1 || true
     oc get storageclass 2>&1 || true
 }
+_TERM_RECEIVED=false
+function _term_handler () { _TERM_RECEIVED=true; BenchmarkRunnerDebug; }
+function _on_exit () {
+    local _rc=$?
+    # Skip if TERM handler already ran BenchmarkRunnerDebug
+    ${_TERM_RECEIVED} && return
+    [[ ${_rc} -eq 0 ]] || BenchmarkRunnerDebug
+}
 # ERR omitted — double-fires with EXIT on failure
-# TERM ($? may be 0 at signal time): always collect debug regardless
-trap BenchmarkRunnerDebug TERM
-trap '[[ $? -eq 0 ]] || BenchmarkRunnerDebug' EXIT
+trap _term_handler TERM
+trap _on_exit EXIT
 
 set +x
 KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
@@ -53,10 +65,12 @@ oc get storageclass ocs-storagecluster-ceph-rbd-virtualization -o name
 
 buildVersion=$(
     curl -s "https://pypi.org/pypi/benchmark-runner/json" |
-    python3 -c "import json,sys; print(json.load(sys.stdin)['info']['version'])" ||
+    python3.14 -c "import json,sys; print(json.load(sys.stdin)['info']['version'])" ||
     echo "1.0.0"
 )
 export BUILD_VERSION="${buildVersion}"
+
+export RUN_TYPE="${RUN_TYPE:-test_ci}"
 
 : "Creating Windows VM: workload=${WORKLOAD} scale=${SCALE} image=${WINDOWS_IMAGE}"
 python3.14 /benchmark_runner/main/main.py
