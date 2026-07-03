@@ -1,9 +1,47 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  rhdh-e2e-runner:
+    name: rhdh-e2e-runner
+    namespace: ci
+    tag: main
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.20
   use_build_cache: true
+images:
+  items:
+  - dockerfile_literal: |
+      FROM rhdh-e2e-runner
+      USER root
+      COPY --from=nested-podman /entrypoint.sh /entrypoint.sh
+      RUN apt-get update && \
+          apt-get install -y --no-install-recommends uidmap catatonit fuse-overlayfs && \
+          apt-get clean && rm -rf /var/lib/apt/lists/* && \
+          chmod +x /entrypoint.sh && \
+          setcap cap_setuid+ep /usr/bin/newuidmap && \
+          setcap cap_setgid+ep /usr/bin/newgidmap && \
+          touch /etc/subuid /etc/subgid && \
+          chmod 666 /etc/subuid /etc/subgid && \
+          chmod g=u /etc/passwd /etc/group && \
+          mkdir -p /home/user /projects && \
+          chgrp -R 0 /home/user && \
+          chmod -R g=u /home/user /projects
+      ENV HOME=/home/user
+      ENV BUILDAH_ISOLATION=chroot
+      USER 1000
+      WORKDIR /projects
+      ENTRYPOINT ["/usr/bin/catatonit","--","/entrypoint.sh"]
+    from: rhdh-e2e-runner
+    inputs:
+      nested-podman:
+        as:
+        - nested-podman
+    to: rhdh-e2e-runner-podman
 releases:
   latest:
     release:
@@ -225,8 +263,11 @@ tests:
     workflow: openshift-e2e-aws-disconnected
 - always_run: false
   as: e2e-ocp-disconnected-operator-nightly
+  capabilities:
+  - nested-podman
   cron: 0 4 31 12 *
   max_concurrency: 4
+  nested_podman: true
   optional: true
   presubmit: true
   steps:
