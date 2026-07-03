@@ -123,15 +123,32 @@ find_zstream_pr() {
     local major minor
     major=$(echo "${release}" | cut -d. -f1)
     minor=$(echo "${release}" | cut -d. -f2)
+    local catalog_prefix="lvm-operator-catalog-${major}-${minor}"
 
     local prs_json
-    prs_json=$(github_curl "${GITHUB_API}/repos/openshift/lvm-operator/pulls?state=open&per_page=100")
+    prs_json=$(github_curl "${GITHUB_API}/repos/openshift/lvm-operator/pulls?state=open&base=release-management&per_page=100")
 
-    echo "${prs_json}" | jq -r --arg maj "${major}" --arg min "${minor}" '
-        [.[] | select(.title | test(": Release " + $maj + "\\." + $min + "\\."; "i"))] |
-        if length > 0 then .[0] else empty end |
-        [.number, .title] | @tsv
-    '
+    local pr_count
+    pr_count=$(echo "${prs_json}" | jq 'length')
+
+    local i
+    for ((i = 0; i < pr_count; i++)); do
+        local pr_number pr_title
+        pr_number=$(echo "${prs_json}" | jq -r ".[$i].number")
+        pr_title=$(echo "${prs_json}" | jq -r ".[$i].title")
+
+        local files_json snapshot
+        files_json=$(github_curl "${GITHUB_API}/repos/openshift/lvm-operator/pulls/${pr_number}/files")
+        snapshot=$(echo "${files_json}" | jq -r '
+            [.[] | select(.filename | contains("catalog")) | .patch // ""] |
+            join("\n")
+        ' | { grep -oP "(?<=snapshot: )${catalog_prefix}\\S*" || true; } | head -1)
+
+        if [[ -n "${snapshot}" ]]; then
+            printf '%s\t%s\t%s\n' "${pr_number}" "${pr_title}" "${snapshot}"
+            return 0
+        fi
+    done
 }
 
 # ---------------------------------------------------------------------------
@@ -150,22 +167,6 @@ check_pr_merged() {
     if [[ "${state}" == "closed" && -n "${merged_at}" && "${merged_at}" != "null" ]]; then
         echo "merged"
     fi
-}
-
-# ---------------------------------------------------------------------------
-# GitHub: extract snapshot name from PR diff
-# ---------------------------------------------------------------------------
-
-extract_snapshot() {
-    local pr_number="$1"
-
-    local files_json
-    files_json=$(github_curl "${GITHUB_API}/repos/openshift/lvm-operator/pulls/${pr_number}/files")
-
-    echo "${files_json}" | jq -r '
-        [.[] | select(.filename | contains("catalog")) | .patch // ""] |
-        join("\n")
-    ' | grep -oP '(?<=snapshot: )\S+' | head -1
 }
 
 # ---------------------------------------------------------------------------
@@ -348,23 +349,11 @@ process_release() {
         return 0
     fi
 
-    local pr_number pr_title
+    local pr_number pr_title snapshot
     pr_number=$(echo "${pr_info}" | cut -f1)
     pr_title=$(echo "${pr_info}" | cut -f2)
+    snapshot=$(echo "${pr_info}" | cut -f3)
     info "Found PR #${pr_number}: ${pr_title}"
-
-    # Extract snapshot from PR
-    local snapshot
-    snapshot=$(extract_snapshot "${pr_number}")
-
-    if [[ -z "${snapshot}" ]]; then
-        warn "Could not extract catalog snapshot from PR #${pr_number}"
-        jq -n --arg r "${release}" --arg pr "${pr_number}" \
-            '{($r): {status: "error", reason: "no snapshot in PR", pr: ("#" + $pr)}}' \
-            > "${WORKDIR}/zstream-${release}.json"
-        return 0
-    fi
-
     info "Snapshot: ${snapshot}"
 
     # Resolve to digest
