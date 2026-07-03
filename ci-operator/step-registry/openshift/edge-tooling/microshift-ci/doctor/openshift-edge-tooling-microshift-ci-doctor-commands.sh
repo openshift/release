@@ -262,8 +262,7 @@ echo "Automatic closing of duplicate rebase PRs completed"
 
 # Run the deterministic preparation phases outside Claude so the analysis
 # session spends its entire time budget on actual root cause analysis:
-# collect and download artifacts, generate PCP graphs, extract evidence,
-# fetch the previous run's outputs for carry-forward.
+# collect and download artifacts, generate PCP graphs, extract evidence.
 echo "Running deterministic data collection and analysis preparation..."
 bash "${PLUGIN_DIR}/scripts/doctor.sh" prepare \
     --component microshift --workdir "${WORKDIR}" \
@@ -274,8 +273,6 @@ bash "${PLUGIN_DIR}/scripts/doctor.sh" graphs \
 bash "${PLUGIN_DIR}/scripts/doctor.sh" evidence \
     --component microshift --workdir "${WORKDIR}" \
     || echo "WARNING: evidence extraction failed, agents will use raw artifacts"
-bash "${PLUGIN_DIR}/scripts/doctor.sh" fetch-previous \
-    --component microshift --workdir "${WORKDIR}" --job "${JOB_NAME}"
 
 # Run analysis on all releases and open rebase PRs (40m and 100 turns).
 # --prepared: the deterministic phases above already ran; finalize runs
