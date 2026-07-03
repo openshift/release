@@ -301,6 +301,28 @@ function create_rosa_image_mirrors () {
   echo "Image mirrors created successfully"
 }
 
+# On ROSA HCP, the global pull-secret update via "oc set data" takes time
+# to propagate through the HostedCluster controller to worker nodes.
+# Create a namespace-level pull secret so the CatalogSource pod can pull
+# immediately without waiting for node-level propagation.
+# (Same pattern as rosa-operator-install-commands.sh)
+function create_marketplace_pull_secret () {
+  echo "Creating pull secret in openshift-marketplace for immediate image access..."
+  oc get secret/pull-secret -n openshift-config \
+    --template='{{index .data ".dockerconfigjson" | base64decode}}' > /tmp/marketplace-pull-secret.json
+
+  oc create secret docker-registry marketplace-pull-secret \
+    -n openshift-marketplace \
+    --from-file=.dockerconfigjson=/tmp/marketplace-pull-secret.json \
+    --dry-run=client -o yaml | oc apply -f -
+
+  oc patch sa default -n openshift-marketplace \
+    --type json -p '[{"op":"add","path":"/imagePullSecrets/-","value":{"name":"marketplace-pull-secret"}}]' 2>/dev/null || true
+
+  rm -f /tmp/marketplace-pull-secret.json
+  echo "Marketplace pull secret created"
+}
+
 #Create custom catalog source
 function create_catalog_source(){
   cat <<EOF | oc apply -f -
@@ -352,6 +374,7 @@ else #Install Quay operator with fbc image
   update_pull_secret
   if [[ "$QUAY_CLUSTER_TYPE" == "rosahcp" ]]; then
     create_rosa_image_mirrors
+    create_marketplace_pull_secret
   else
     create_icsp
   fi
