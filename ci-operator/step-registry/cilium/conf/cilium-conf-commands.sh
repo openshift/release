@@ -10,6 +10,7 @@ CILIUM_REPOSITORY="${CILIUM_REPOSITORY:-oci://quay.io/cilium/charts/cilium}"
 CILIUM_CLI_VERSION="${CILIUM_CLI_VERSION:-0.19.2}"
 ENDPOINT_ROUTES="${ENDPOINT_ROUTES:-true}"
 HUBBLE="${HUBBLE:-true}"
+TUNNEL_PORT="${TUNNEL_PORT:-4790}"
 SHARED_DIR="${SHARED_DIR:-/tmp/shared_dir}"
 
 if [[ -f "${SHARED_DIR}/install-config.yaml" ]]; then
@@ -133,7 +134,7 @@ cilium install \
     --set sessionAffinity=true \
     --set endpointRoutes.enabled="${ENDPOINT_ROUTES}" \
     --set hubble.enabled="${HUBBLE}" \
-    --set tunnelPort=4789 \
+    --set tunnelPort="${TUNNEL_PORT}" \
     --set clusterHealthPort=9940 \
     --set socketLB.enabled=true \
     --set cni.readCniConf=/etc/cilium-cni/cilium-override.conf \
