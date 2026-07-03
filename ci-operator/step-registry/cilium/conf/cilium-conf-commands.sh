@@ -133,7 +133,7 @@ cilium install \
     --set sessionAffinity=true \
     --set endpointRoutes.enabled="${ENDPOINT_ROUTES}" \
     --set hubble.enabled="${HUBBLE}" \
-    --set tunnelPort=4789 \
+    --set tunnelPort=4790 \
     --set clusterHealthPort=9940 \
     --set socketLB.enabled=true \
     --set cni.readCniConf=/etc/cilium-cni/cilium-override.conf \
