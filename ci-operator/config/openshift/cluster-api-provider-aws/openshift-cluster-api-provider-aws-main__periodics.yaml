@@ -1,8 +1,20 @@
 base_images:
-  rebasebot:
-    name: rebasebot
+  nested-podman:
+    name: nested-podman
     namespace: ci
     tag: latest
+images:
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      USER root
+      RUN dnf install -y git go make tar gzip gpgme gpgme-devel pkgconfig jq python3.12 python3.12-devel python3.12-pip && dnf clean all
+      RUN ln -s /usr/bin/podman /usr/local/bin/docker
+      RUN mkdir -p /opt/app-root/src/ && git -C /opt/app-root/src/ clone https://github.com/openshift-eng/rebasebot.git
+      WORKDIR /opt/app-root/src/rebasebot
+      RUN python3.12 -m pip install --no-cache-dir uv && python3.12 -m pip install .
+    from: nested-podman
+    to: rebasebot-podman
 resources:
   '*':
     limits:
@@ -12,6 +24,8 @@ resources:
       memory: 200Mi
 tests:
 - as: rebasebot
+  capabilities:
+  - nested-podman
   cron: 0 12 * * Mon,Thu
   steps:
     test:
@@ -33,10 +47,8 @@ tests:
       - mount_path: /secrets/rebasebot
         name: rebasebot-credentials
         namespace: test-credentials
-      from_image:
-        name: rebasebot
-        namespace: ci
-        tag: latest
+      from: rebasebot-podman
+      nested_podman: true
       resources:
         limits:
           memory: 12Gi
