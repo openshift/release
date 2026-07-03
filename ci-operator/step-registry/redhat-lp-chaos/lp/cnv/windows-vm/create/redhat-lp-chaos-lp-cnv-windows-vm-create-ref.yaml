@@ -7,7 +7,7 @@ ref:
   commands: redhat-lp-chaos-lp-cnv-windows-vm-create-commands.sh
   credentials:
   - namespace: test-credentials
-    name: lp-chaos-windows-vm
+    name: lp-chaos-windows-vm-temp
     mount_path: /var/run/secrets/windows-vm
   env:
   - name: WORKLOAD
@@ -27,7 +27,12 @@ ref:
       memory: 200Mi
   documentation: >-
     Creates a Windows VM in the benchmark-runner namespace using the benchmark-runner
-    container image. Accesses the cluster via $KUBECONFIG from $SHARED_DIR (set by
-    the IPI installer), making it compatible with dynamically provisioned AWS clusters.
-    Sets CREATE_VMS_ONLY=True so benchmark-runner creates the VM and exits without
-    running a benchmark workload. The VM is left running for downstream chaos steps.
+    container image. Mirrors the Windows disk image from the Red Hat internal PaaS
+    registry (images.paas.redhat.com) into the cluster's internal image registry using
+    oc image mirror, then creates a CDI DataVolume with source.registry so that CDI
+    imports the image directly from the cluster-internal registry into an
+    ocs-storagecluster-ceph-rbd-virtualization PVC. Requires the lp-chaos-windows-vm-temp
+    secret to contain paas-username and paas-password keys with credentials for
+    images.paas.redhat.com. Sets CREATE_VMS_ONLY=True so benchmark-runner creates the
+    VM and exits without running a benchmark workload. The VM is left running for
+    downstream chaos steps.
