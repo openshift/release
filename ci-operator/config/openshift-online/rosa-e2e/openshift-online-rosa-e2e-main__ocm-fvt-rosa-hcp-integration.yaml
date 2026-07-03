@@ -79,6 +79,12 @@ tests:
       size: 1Gi
   cron: 0 8 * * *
   nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
     name: cs-qe-credentials
@@ -126,6 +132,12 @@ tests:
       size: 1Gi
   cron: 0 8 * * *
   nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
     name: cs-qe-credentials
@@ -173,10 +185,16 @@ tests:
       size: 1Gi
   cron: 0 8 * * *
   nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
     name: cs-qe-credentials
-- as: ocm-fvt-periodic-cs-rosa-hcp-backup-cp-up-2-integration-main
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-cpup-ip2-integration-main
   capabilities:
   - nested-podman
   commands: |
@@ -213,17 +231,23 @@ tests:
     -v /usr/local/cs-qe-credentials:/credentials:ro,z \
     --rm \
     quay.io/redhat-services-prod/ocmci/ocmci:latest \
-    ocmtest test --service cms --job cs-rosa-hcp-backup-cp-up-2-integration-main --reportJiraTicket
+    ocmtest test --service cms --job cs-rosa-hcp-backup-cpup-ip2-integration-main --reportJiraTicket
   container:
     from: nested-podman
     memory_backed_volume:
       size: 1Gi
   cron: 0 8 * * *
   nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
     name: cs-qe-credentials
-- as: ocm-fvt-periodic-cs-rosa-hcp-backup-cp-up-integration-main
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-cp-up-ip-integration-main
   capabilities:
   - nested-podman
   commands: |
@@ -260,13 +284,125 @@ tests:
     -v /usr/local/cs-qe-credentials:/credentials:ro,z \
     --rm \
     quay.io/redhat-services-prod/ocmci/ocmci:latest \
-    ocmtest test --service cms --job cs-rosa-hcp-backup-cp-up-integration-main --reportJiraTicket
+    ocmtest test --service cms --job cs-rosa-hcp-backup-cp-up-ip-integration-main --reportJiraTicket
   container:
     from: nested-podman
     memory_backed_volume:
       size: 1Gi
   cron: 0 8 * * *
   nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+  secrets:
+  - mount_path: /usr/local/cs-qe-credentials
+    name: cs-qe-credentials
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-cpupzfin-integration-main
+  capabilities:
+  - nested-podman
+  commands: |
+    old_umask=$(umask)
+    umask 077
+    podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
+    trap 'rm -f "${podman_env_file}"' EXIT
+    umask "$old_umask"
+
+    JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+
+    env -i bash --norc --noprofile << EOF > "${podman_env_file}"
+    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    export DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+    export ENABLE_JIRA_REPORTING=true
+    export OCM_ENV=integration
+    export JOB_LINK="${JOB_LINK}"
+    export SLACK_WEBHOOK_URL=\$(cat /usr/local/cs-qe-credentials/slack_webhook_url)
+    export CONSOLE_CLIENT_SECRET=\$(cat /usr/local/cs-qe-credentials/console_client_secret)
+    source /usr/local/cs-qe-credentials/ocm-tokens
+    source /usr/local/cs-qe-credentials/jira-cred
+    env | grep -v '^_='
+    EOF
+
+    podman run \
+    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+    --env-file "${podman_env_file}" \
+    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
+    --rm \
+    quay.io/redhat-services-prod/ocmci/ocmci:latest \
+    ocmtest test --service cms --job cs-rosa-hcp-backup-cpupzfin-integration-main --reportJiraTicket
+  container:
+    from: nested-podman
+    memory_backed_volume:
+      size: 1Gi
+  cron: 0 8 * * *
+  nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+  secrets:
+  - mount_path: /usr/local/cs-qe-credentials
+    name: cs-qe-credentials
+- as: ocm-fvt-periodic-cs-rosa-hcp-backup-cpupzfn2-integration-main
+  capabilities:
+  - nested-podman
+  commands: |
+    old_umask=$(umask)
+    umask 077
+    podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
+    trap 'rm -f "${podman_env_file}"' EXIT
+    umask "$old_umask"
+
+    JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+    if [ -n "${PULL_NUMBER:-}" ]; then
+      JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+      JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
+    fi
+
+    env -i bash --norc --noprofile << EOF > "${podman_env_file}"
+    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
+    export DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+    export ENABLE_JIRA_REPORTING=true
+    export OCM_ENV=integration
+    export JOB_LINK="${JOB_LINK}"
+    export SLACK_WEBHOOK_URL=\$(cat /usr/local/cs-qe-credentials/slack_webhook_url)
+    export CONSOLE_CLIENT_SECRET=\$(cat /usr/local/cs-qe-credentials/console_client_secret)
+    source /usr/local/cs-qe-credentials/ocm-tokens
+    source /usr/local/cs-qe-credentials/jira-cred
+    env | grep -v '^_='
+    EOF
+
+    podman run \
+    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+    --env-file "${podman_env_file}" \
+    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
+    --rm \
+    quay.io/redhat-services-prod/ocmci/ocmci:latest \
+    ocmtest test --service cms --job cs-rosa-hcp-backup-cpupzfn2-integration-main --reportJiraTicket
+  container:
+    from: nested-podman
+    memory_backed_volume:
+      size: 1Gi
+  cron: 0 8 * * *
+  nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
     name: cs-qe-credentials
@@ -314,6 +450,12 @@ tests:
       size: 1Gi
   cron: 0 8 * * *
   nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
   secrets:
   - mount_path: /usr/local/cs-qe-credentials
     name: cs-qe-credentials
