@@ -13,7 +13,6 @@ CLAUDE_DOCTOR_LOG="${WORKDIR}/claude-doctor.log"
 CLAUDE_CREATE_BUGS_LOG="${WORKDIR}/claude-create-bugs.log"
 CLAUDE_CLOSE_STALE_BUGS_LOG="${WORKDIR}/claude-close-stale-bugs.log"
 CLAUDE_FIX_TEST_BUGS_LOG="${WORKDIR}/claude-fix-test-bugs.log"
-CLAUDE_DOCTOR_REFRESH_LOG="${WORKDIR}/claude-doctor-refresh.log"
 MCP_JIRA_LOG="${WORKDIR}/mcp-jira.log"
 
 # The procedure to copy reports and session logs to artifacts, executed at exit
@@ -49,7 +48,7 @@ atexit_handler() {
     fi
 
     # Check if the Claude sessions were completed successfully
-    for log_file in "${CLAUDE_DOCTOR_LOG}" "${CLAUDE_CREATE_BUGS_LOG}" "${CLAUDE_CLOSE_STALE_BUGS_LOG}" "${CLAUDE_FIX_TEST_BUGS_LOG}" "${CLAUDE_DOCTOR_REFRESH_LOG}"; do
+    for log_file in "${CLAUDE_DOCTOR_LOG}" "${CLAUDE_CREATE_BUGS_LOG}" "${CLAUDE_CLOSE_STALE_BUGS_LOG}" "${CLAUDE_FIX_TEST_BUGS_LOG}"; do
         # If a session was terminated due to a timeout, report lack of
         # subsequent session log files as a warning and continue not
         # to mask the actual error
@@ -261,17 +260,42 @@ echo "Running automatic closing of duplicate rebase PRs..."
     --filter 'NO-ISSUE: rebase-release'
 echo "Automatic closing of duplicate rebase PRs completed"
 
-# Run analysis on all releases and open rebase PRs (45m and 100 turns).
+# Run the deterministic preparation phases outside Claude so the analysis
+# session spends its entire time budget on actual root cause analysis:
+# collect and download artifacts, generate PCP graphs, extract evidence,
+# fetch the previous run's outputs for carry-forward.
+echo "Running deterministic data collection and analysis preparation..."
+bash "${PLUGIN_DIR}/scripts/doctor.sh" prepare \
+    --component microshift --workdir "${WORKDIR}" \
+    "${RELEASE_VERSIONS}" --rebase --repo openshift/microshift
+bash "${PLUGIN_DIR}/scripts/doctor.sh" graphs \
+    --component microshift --workdir "${WORKDIR}" \
+    || echo "WARNING: PCP graph generation failed, continuing without graphs"
+bash "${PLUGIN_DIR}/scripts/doctor.sh" evidence \
+    --component microshift --workdir "${WORKDIR}" \
+    || echo "WARNING: evidence extraction failed, agents will use raw artifacts"
+bash "${PLUGIN_DIR}/scripts/doctor.sh" fetch-previous \
+    --component microshift --workdir "${WORKDIR}" --job "${JOB_NAME}"
+
+# Run analysis on all releases and open rebase PRs (40m and 100 turns).
+# --prepared: the deterministic phases above already ran; finalize runs
+# in this script after the session.
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
 CLAUDE_RC=0
-timeout 2700 claude \
+timeout 2400 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 100 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
+    -p "/microshift-ci:doctor ${RELEASE_VERSIONS} --prepared" \
     --verbose &> "${CLAUDE_DOCTOR_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "doctor" 45
+check_claude_rc "${CLAUDE_RC}" "doctor" 40
+
+# Aggregate results, update cross-run issue history, and generate the
+# HTML report — deterministic, no Claude session needed.
+echo "Running deterministic aggregation and HTML report generation..."
+bash "${PLUGIN_DIR}/scripts/doctor.sh" finalize \
+    --component microshift --workdir "${WORKDIR}" "${RELEASE_VERSIONS}"
 
 # Run bug creation for failed jobs (15m and 50 turns).
 echo "Running Claude to create bugs for failed jobs..."
@@ -310,17 +334,18 @@ timeout 900 claude \
     --verbose &> "${CLAUDE_FIX_TEST_BUGS_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "fix-test-bugs" 15
 
-# Run HTML report refresh to include the new bugs (10m and 20 turns).
-echo "Running Claude to refresh the HTML report..."
-CLAUDE_RC=0
-timeout 600 claude \
-    --model "${CLAUDE_MODEL}" \
-    --max-turns 20 \
-    --output-format stream-json \
-    --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:doctor-refresh ${RELEASE_VERSIONS}" \
-    --verbose &> "${CLAUDE_DOCTOR_REFRESH_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "doctor-refresh" 10
+# Refresh the HTML report to include the newly created bugs and exclude
+# bugs closed by close-stale-bugs — deterministic, no Claude session needed.
+echo "Refreshing the HTML report..."
+REFRESH_ARGS=(--component microshift --workdir "${WORKDIR}")
+CLOSED_BUGS_FILE="${WORKDIR}/close-stale-bugs/closed-bugs.json"
+if [ -f "${CLOSED_BUGS_FILE}" ]; then
+    IGNORE_KEYS="$(jq -r '(.closed // []) | join(",")' "${CLOSED_BUGS_FILE}" 2>/dev/null || true)"
+    if [ -n "${IGNORE_KEYS}" ]; then
+        REFRESH_ARGS+=(--ignore "${IGNORE_KEYS}")
+    fi
+fi
+bash "${PLUGIN_DIR}/scripts/doctor.sh" refresh "${REFRESH_ARGS[@]}" "${RELEASE_VERSIONS}"
 
 # Now attempt to restart failed rebase PRs tests. If the restarted tests
 # complete successfully, the PR will be automatically merged.
