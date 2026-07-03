@@ -211,6 +211,7 @@ resolve_snapshot_to_digest() {
         [.tags[]
          | select(.name | startswith($vpfx))
          | select(.name | test("^v[0-9]+\\.[0-9]+-[a-f0-9]{40}$"))
+         | select(.last_modified != null and .last_modified != "")
          | .tag_epoch = (.last_modified | strptime("%a, %d %b %Y %H:%M:%S %z") | mktime)
          | .abs_delta = ((.tag_epoch - ($snap_epoch | tonumber)) | fabs)
         ] | sort_by(.abs_delta) | .[0] // empty |
