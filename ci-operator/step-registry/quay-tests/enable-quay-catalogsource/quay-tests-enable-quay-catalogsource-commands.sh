@@ -199,6 +199,20 @@ EOF
 
 }
 
+# Retry wrapper for rosa commands that hit 409 ManifestWork conflicts
+function rosa_with_retry () {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if /tmp/rosa "$@" 2>&1; then
+      return 0
+    fi
+    echo "  Attempt ${attempt}/5 failed, retrying in 15s..."
+    sleep 15
+  done
+  echo "!!! Failed after 5 attempts: rosa $*"
+  return 1
+}
+
 #create image mirrors via rosa CLI (for ROSA HCP clusters where ICSP/IDMS are blocked)
 function create_rosa_image_mirrors () {
   echo "Downloading rosa CLI (v1.2.64+, required for image-mirror support)..."
@@ -230,71 +244,71 @@ function create_rosa_image_mirrors () {
 
   local R="${KONFLUX_REGISTRY}/redhat-user-workloads/quay-eng-tenant"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/quay-operator-rhel8 \
     --mirrors="${R}/quay-operator-v3-9,${R}/quay-operator-v3-10,${R}/quay-operator-v3-11,${R}/quay-operator-v3-12,${R}/quay-operator-v3-13,${R}/quay-operator-v3-14,${R}/quay-operator-v3-15"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/quay-operator-rhel9 \
     --mirrors="${R}/quay-operator-v3-16,${R}/quay-operator-v3-17,${R}/quay-operator-v3-18"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/quay-operator-bundle \
     --mirrors="${R}/quay-operator-bundle-v3-9,${R}/quay-operator-bundle-v3-10,${R}/quay-operator-bundle-v3-11,${R}/quay-operator-bundle-v3-12,${R}/quay-operator-bundle-v3-13,${R}/quay-operator-bundle-v3-14,${R}/quay-operator-bundle-v3-15,${R}/quay-operator-bundle-v3-16,${R}/quay-operator-bundle-v3-17,${R}/quay-operator-bundle-v3-18"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/quay-container-security-operator-bundle \
     --mirrors="${R}/container-security-operator-bundle-v3-9,${R}/container-security-operator-bundle-v3-10,${R}/container-security-operator-bundle-v3-11,${R}/container-security-operator-bundle-v3-12,${R}/container-security-operator-bundle-v3-13,${R}/container-security-operator-bundle-v3-14,${R}/container-security-operator-bundle-v3-15,${R}/container-security-operator-bundle-v3-16,${R}/container-security-operator-bundle-v3-17,${R}/container-security-operator-bundle-v3-18"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/quay-bridge-operator-bundle \
     --mirrors="${R}/quay-bridge-operator-bundle-v3-9,${R}/quay-bridge-operator-bundle-v3-10,${R}/quay-bridge-operator-bundle-v3-11,${R}/quay-bridge-operator-bundle-v3-12,${R}/quay-bridge-operator-bundle-v3-13,${R}/quay-bridge-operator-bundle-v3-14,${R}/quay-bridge-operator-bundle-v3-15,${R}/quay-bridge-operator-bundle-v3-16,${R}/quay-bridge-operator-bundle-v3-17,${R}/quay-bridge-operator-bundle-v3-18"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/quay-rhel8 \
     --mirrors="${R}/quay-quay-v3-9,${R}/quay-quay-v3-10,${R}/quay-quay-v3-11,${R}/quay-quay-v3-12,${R}/quay-quay-v3-13,${R}/quay-quay-v3-14,${R}/quay-quay-v3-15"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/quay-rhel9 \
     --mirrors="${R}/quay-quay-v3-16,${R}/quay-quay-v3-17,${R}/quay-quay-v3-18"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/quay-bridge-operator-rhel8 \
     --mirrors="${R}/quay-bridge-operator-v3-9,${R}/quay-bridge-operator-v3-10,${R}/quay-bridge-operator-v3-11,${R}/quay-bridge-operator-v3-12,${R}/quay-bridge-operator-v3-13,${R}/quay-bridge-operator-v3-14,${R}/quay-bridge-operator-v3-15"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/quay-bridge-operator-rhel9 \
     --mirrors="${R}/quay-bridge-operator-v3-16,${R}/quay-bridge-operator-v3-17,${R}/quay-bridge-operator-v3-18"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/quay-container-security-operator-rhel8 \
     --mirrors="${R}/container-security-operator-v3-9,${R}/container-security-operator-v3-10,${R}/container-security-operator-v3-11,${R}/container-security-operator-v3-12,${R}/container-security-operator-v3-13,${R}/container-security-operator-v3-14,${R}/container-security-operator-v3-15"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/quay-container-security-operator-rhel9 \
     --mirrors="${R}/container-security-operator-v3-16,${R}/container-security-operator-v3-17,${R}/container-security-operator-v3-18"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/container-security-operator-rhel8 \
     --mirrors="${R}/container-security-operator-v3-9,${R}/container-security-operator-v3-10,${R}/container-security-operator-v3-11,${R}/container-security-operator-v3-12,${R}/container-security-operator-v3-13,${R}/container-security-operator-v3-14,${R}/container-security-operator-v3-15"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/container-security-operator-rhel9 \
     --mirrors="${R}/container-security-operator-v3-16,${R}/container-security-operator-v3-17,${R}/container-security-operator-v3-18"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/clair-rhel8 \
     --mirrors="${R}/quay-clair-v3-9,${R}/quay-clair-v3-10,${R}/quay-clair-v3-11,${R}/quay-clair-v3-12,${R}/quay-clair-v3-13,${R}/quay-clair-v3-14,${R}/quay-clair-v3-15"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.redhat.io/quay/clair-rhel9 \
     --mirrors="${R}/quay-clair-v3-16,${R}/quay-clair-v3-17,${R}/quay-clair-v3-18"
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry.stage.redhat.io \
     --mirrors=brew.registry.redhat.io
 
-  /tmp/rosa create image-mirror --cluster="${cluster_name}" --type=digest \
+  rosa_with_retry create image-mirror --cluster="${cluster_name}" --type=digest \
     --source=registry-proxy.engineering.redhat.com \
     --mirrors=brew.registry.redhat.io
 
