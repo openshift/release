@@ -27,6 +27,8 @@ export CI_JOB_NAME="${JOB_NAME}"
 export GITHUB_TOKEN="\$(cat /tmp/token-git 2>/dev/null || echo '')"
 if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     ./test/bin/ci_phase_iso_build.sh -update_cache
+elif [[ "${SCENARIO_TYPE}" =~ ^rpm-presubmits.*$ ]] ; then
+    ./test/bin/ci_phase_iso_build.sh -rpm_only
 else
     ./test/bin/ci_phase_iso_build.sh
 fi
@@ -87,6 +89,12 @@ download_brew_rpms() {
 # This requires VPN access, which is only enabled for the cache jobs.
 if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     download_brew_rpms
+fi
+
+# Write SCENARIO_TYPE for RPM scenarios to read on the EC2 instance
+if [[ "${SCENARIO_TYPE}" =~ ^rpm-presubmits.*$ ]]; then
+    mkdir -p /go/src/github.com/openshift/microshift/_output
+    echo "${SCENARIO_TYPE}" > /go/src/github.com/openshift/microshift/_output/scenario_type
 fi
 
 # Archive the sources, potentially including MicroShift RPMs from brew
