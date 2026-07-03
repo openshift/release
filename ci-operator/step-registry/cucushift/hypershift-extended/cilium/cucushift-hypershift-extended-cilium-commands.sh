@@ -4,6 +4,7 @@ set -euo pipefail
 
 CILIUM_VERSION=${CILIUM_VERSION:-"1.19.4"}
 CILIUM_CLI_VERSION=${CILIUM_CLI_VERSION:-"0.19.2"}
+CILIUM_REPOSITORY=${CILIUM_REPOSITORY:-"oci://quay.io/cilium/charts/cilium"}
 
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
@@ -76,7 +77,7 @@ EOF
 # where <version> is a tag from https://quay.io/repository/cilium-charts-dev/cilium
 cilium install \
     --namespace cilium \
-    --repository oci://quay.io/cilium/charts/cilium \
+    --repository "${CILIUM_REPOSITORY}" \
     --version "${CILIUM_VERSION}" \
     --set debug.enabled=true \
     --set k8s.requireIPv4PodCIDR=true \
