@@ -21,6 +21,12 @@ set -o pipefail
 
 echo "Starting claude-agent-eval"
 
+# --- Gangway override ---
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_EVAL_MODEL:-}" ]]; then
+    echo "Applying Gangway override: EVAL_MODEL=${MULTISTAGE_PARAM_OVERRIDE_EVAL_MODEL}"
+    EVAL_MODEL="${MULTISTAGE_PARAM_OVERRIDE_EVAL_MODEL}"
+fi
+
 # Load GitHub token for gh CLI access (same secret as payload-agent)
 set +x
 if [ -f "${GITHUB_TOKEN_PATH:-}" ]; then
