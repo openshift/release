@@ -112,10 +112,14 @@ objects:
           - --one-time=true
           - --depth=1
           - --link=release
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout
+            mountPath: /etc/git-sync
+            readOnly: true
         containers:
         - name: deck
           image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260701-444074c65
@@ -203,10 +207,14 @@ objects:
           - --root=/tmp/git-sync
           - --max-failures=3
           - --link=release
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout
+            mountPath: /etc/git-sync
+            readOnly: true
           resources:
             requests:
               memory: "1Gi"
@@ -234,6 +242,12 @@ objects:
             secretName: cookie
         - name: release
           emptyDir: {}
+        - name: sparse-checkout
+          configMap:
+            name: git-sync-sparse-checkout
+            items:
+            - key: jobs-and-prow-config
+              path: sparse-checkout
         - name: build-farm-credentials
           secret:
             secretName: deck
@@ -321,10 +335,14 @@ objects:
           - --one-time=true
           - --depth=1
           - --link=release
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout
+            mountPath: /etc/git-sync
+            readOnly: true
         containers:
         - name: git-sync
           command:
@@ -336,10 +354,14 @@ objects:
           - --root=/tmp/git-sync
           - --max-failures=3
           - --link=release
+          - --sparse-checkout-file=/etc/git-sync/sparse-checkout
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
+          - name: sparse-checkout
+            mountPath: /etc/git-sync
+            readOnly: true
           resources:
             requests:
               memory: "1Gi"
@@ -478,6 +500,12 @@ objects:
             secretName: deck-internal-tls
         - name: release
           emptyDir: {}
+        - name: sparse-checkout
+          configMap:
+            name: git-sync-sparse-checkout
+            items:
+            - key: jobs-and-prow-config
+              path: sparse-checkout
         - name: build-farm-credentials
           secret:
             secretName: deck
