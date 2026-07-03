@@ -10,6 +10,8 @@ function BenchmarkRunnerDebug () {
     oc get vmi -n benchmark-runner -o yaml 2>&1 || true
     oc get dv -n benchmark-runner 2>&1 || true
     oc describe dv -n benchmark-runner 2>&1 || true
+    oc get deployment -n openshift-storage 2>&1 || true
+    oc get storageclass 2>&1 || true
 }
 # ERR omitted — double-fires with EXIT on failure
 # TERM ($? may be 0 at signal time): always collect debug regardless
@@ -42,27 +44,13 @@ if oc get daemonset virt-handler -n openshift-cnv --ignore-not-found -o name | g
     : "${schedulableNodeCnt} nodes with kubevirt.io/schedulable=true"
 fi
 
-# odf-apply-storage-cluster exits when StorageCluster is Available but OSD pods
-# and the CSI provisioner are still initialising — poll until the deployment appears
-timeout 15m bash -c '
-    until oc get deployment csi-rbdplugin-provisioner \
-            -n openshift-storage --ignore-not-found -o name 2>/dev/null | grep -q .; do
-        sleep 10
-    done
-'
-oc rollout status deployment/csi-rbdplugin-provisioner \
-    -n openshift-storage --timeout=30m
+# ODF 4.21 renamed csi-rbdplugin-provisioner to the FQDN form; created before
+# StorageCluster Available so rollout status completes immediately
+oc rollout status deployment/openshift-storage.rbd.csi.ceph.com-ctrlplugin \
+    -n openshift-storage --timeout=10m
 
-# CNV creates this storage class after detecting ODF — several minutes after
-# StorageCluster Available; DataVolume imports fail without it
-timeout 10m bash -c '
-    until oc get storageclass ocs-storagecluster-ceph-rbd-virtualization \
-            --ignore-not-found -o name 2>/dev/null | grep -q .; do
-        sleep 10
-    done
-'
+oc get storageclass ocs-storagecluster-ceph-rbd-virtualization -o name
 
-typeset buildVersion
 buildVersion=$(
     curl -s "https://pypi.org/pypi/benchmark-runner/json" |
     python3 -c "import json,sys; print(json.load(sys.stdin)['info']['version'])" ||
