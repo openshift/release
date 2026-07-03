@@ -1,4 +1,8 @@
 base_images:
+  opendatahub-tests:
+    name: opendatahub-tests
+    namespace: ci
+    tag: latest
   os:
     name: ubi
     namespace: ocp
@@ -20,14 +24,15 @@ releases:
     release:
       architecture: multi
       channel: stable
-      version: "4.14"
+      version: "4.22"
 resources:
   '*':
     requests:
       cpu: 1000m
       memory: 1Gi
 tests:
-- as: trustyai-service-operator-e2e
+- always_run: false
+  as: run-smoke-opendatahub-tests
   run_if_changed: ^(tests/*|config/*|controllers/*|hack/*|Dockerfile|main.go|go.mod|go.sum|api/*|.github/*)
   steps:
     cluster_profile: aws-opendatahub
@@ -35,14 +40,18 @@ tests:
       BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
+      OPERATORS: |
+        [
+            {"name": "authorino-operator", "source": "redhat-operators", "channel": "tech-preview-v1", "install_namespace": "openshift-operators"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group": "serverless-operator"},
+            {"name": "rhods-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "redhat-ods-operator", "operator_group": "rhods-ai-operator"}
+        ]
+      SET_AWS_ENV_VARS: "false"
     test:
-    - as: e2e
-      commands: PYTEST_MARKERS="openshift and not heavy" $HOME/peak/installandtest.sh
-      from: trustyai-service-operator-ci-tests
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 3Gi
+    - ref: install-operators
+    - ref: rhoai-deploy-dsc
+    - ref: rhoai-opendatahub-tests
     workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main
