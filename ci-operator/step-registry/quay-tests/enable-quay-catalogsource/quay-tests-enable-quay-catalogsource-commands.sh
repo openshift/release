@@ -201,8 +201,8 @@ EOF
 
 #create image mirrors via rosa CLI (for ROSA HCP clusters where ICSP/IDMS are blocked)
 function create_rosa_image_mirrors () {
-  echo "Downloading rosa CLI..."
-  curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/rosa/latest/rosa-linux.tar.gz \
+  echo "Downloading rosa CLI (v1.2.64+, required for image-mirror support)..."
+  curl -sL https://github.com/openshift/rosa/releases/latest/download/rosa_Linux_x86_64.tar.gz \
     | tar xzf - -C /tmp/
   chmod +x /tmp/rosa
 
