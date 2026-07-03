@@ -11,7 +11,11 @@ set -euo pipefail
 # Skips releases with no open PR or where the digest hasn't changed since
 # the last run (tracked via a state file).
 
-RELEASES="4.14,4.16,4.18,4.19,4.20,4.21"
+if [[ -z "${LVMS_ZSTREAM_RELEASES:-}" ]]; then
+    err "LVMS_ZSTREAM_RELEASES environment variable is required"
+    exit 1
+fi
+RELEASES="${LVMS_ZSTREAM_RELEASES}"
 DRY_RUN=false
 FORCE=false
 WORKDIR="${ARTIFACT_DIR}/zstream"
