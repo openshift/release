@@ -342,24 +342,39 @@ EOF
 
 #Check catalog source status to Ready
 function check_catalog_source_status(){
-    set +e 
+    set +e
     COUNTER=0
-    while [ $COUNTER -lt 600 ] #10 min at most
+    local timeout=600
+    if [[ "${QUAY_CLUSTER_TYPE:-ocp}" == "rosahcp" ]]; then
+      timeout=900
+    fi
+    while [ $COUNTER -lt $timeout ]
     do
-        COUNTER=`expr $COUNTER + 20`
+        COUNTER=$((COUNTER + 20))
         echo "waiting ${COUNTER}s"
         sleep 20
-        STATUS=`oc get catalogsources -n openshift-marketplace $QUAY_OPERATOR_SOURCE -o=jsonpath="{.status.connectionState.lastObservedState}"`
+        STATUS=$(oc get catalogsources -n openshift-marketplace $QUAY_OPERATOR_SOURCE -o=jsonpath="{.status.connectionState.lastObservedState}")
         if [[ $STATUS = "READY" ]]; then
             echo "Create Quay CatalogSource successfully"
             break
         fi
+        # On HCP, the global pull secret takes time to propagate to nodes.
+        # Delete stuck pods every 2 min to reset ImagePullBackOff backoff.
+        if [[ "${QUAY_CLUSTER_TYPE:-ocp}" == "rosahcp" && "$STATUS" == "TRANSIENT_FAILURE" && $((COUNTER % 120)) -eq 0 ]]; then
+          local pod_status
+          pod_status=$(oc get pods -n openshift-marketplace -l olm.catalogSource=$QUAY_OPERATOR_SOURCE \
+            -o jsonpath='{.items[0].status.containerStatuses[0].state.waiting.reason}' 2>/dev/null || true)
+          if [[ "$pod_status" == "ImagePullBackOff" || "$pod_status" == "ErrImagePull" ]]; then
+            echo "  Catalog pod in ${pod_status}, deleting to reset backoff..."
+            oc delete pod -n openshift-marketplace -l olm.catalogSource=$QUAY_OPERATOR_SOURCE 2>/dev/null || true
+          fi
+        fi
     done
     if [[ $STATUS != "READY" ]]; then
         echo "!!! Fail to create Quay CatalogSource"
-         return 1
+        return 1
     fi
-    set -e 
+    set -e
 }
 
 
