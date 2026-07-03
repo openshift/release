@@ -62,7 +62,7 @@ tests:
     env:
       EC2_INSTANCE_TYPE: t3.medium
     workflow: openshift-microshift-manage-versions-releases
-- as: e2e-aws-tests-cache-nightly
+- as: e2e-aws-tests-cache-nightly-x86
   capabilities:
   - intranet
   cron: 30 0 * * 1-5
@@ -99,43 +99,79 @@ tests:
       MICROSHIFT_OS: rhel-9.6
     workflow: openshift-microshift-e2e-metal-cache
   timeout: 4h0m0s
-- as: e2e-aws-tests-bootc-nightly-el9
+- as: e2e-aws-tests-bootc-x86-nightly-el9-lifecycle
   cron: 0 3 * * 1-5
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
-      SCENARIO_TYPE: bootc-periodics-el9
+      SCENARIO_TYPE: bootc-periodics-el9-lifecycle
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-nightly-el10
-  cron: 0 3 * * 1-5
+- as: e2e-aws-tests-bootc-x86-nightly-el9-functional
+  cron: 30 3 * * 1-5
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
-      SCENARIO_TYPE: bootc-periodics-el10
+      SCENARIO_TYPE: bootc-periodics-el9-functional
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-arm-nightly-el9
-  cron: 0 3 * * 1-5
+- as: e2e-aws-tests-bootc-x86-nightly-el10-lifecycle
+  cron: 0 4 * * 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics-el10-lifecycle
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-x86-nightly-el10-functional
+  cron: 30 4 * * 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics-el10-functional
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-arm-nightly-el9-lifecycle
+  cron: 15 3 * * 1-5
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
-      SCENARIO_TYPE: bootc-periodics-el9
+      SCENARIO_TYPE: bootc-periodics-el9-lifecycle
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-arm-nightly-el10
-  cron: 0 3 * * 1-5
+- as: e2e-aws-tests-bootc-arm-nightly-el9-functional
+  cron: 45 3 * * 1-5
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
-      SCENARIO_TYPE: bootc-periodics-el10
+      SCENARIO_TYPE: bootc-periodics-el9-functional
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-c2cc-nightly
+- as: e2e-aws-tests-bootc-arm-nightly-el10-lifecycle
+  cron: 15 4 * * 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics-el10-lifecycle
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-arm-nightly-el10-functional
+  cron: 45 4 * * 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-periodics-el10-functional
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-x86-nightly-c2cc
   cron: 30 4 * * 1-5
   steps:
     cluster_profile: openshift-org-aws
@@ -144,7 +180,7 @@ tests:
       MICROSHIFT_OS: rhel-9.6
       SCENARIO_TYPE: bootc-c2cc
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-c2cc-arm-nightly
+- as: e2e-aws-tests-bootc-arm-nightly-c2cc
   cron: 30 4 * * 1-5
   steps:
     cluster_profile: openshift-org-aws
@@ -153,37 +189,41 @@ tests:
       MICROSHIFT_OS: rhel-9.6
       SCENARIO_TYPE: bootc-c2cc
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-nightly
+- as: e2e-aws-tests-ostree-x86-nightly-el9-lifecycle
   cron: 30 3 * * 1-5
-  reporter_config:
-    channel: '#microshift-alerts'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.6
-      SCENARIO_TYPE: periodics
+      SCENARIO_TYPE: periodics-lifecycle
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-arm-nightly
-  cron: 30 3 * * 1-5
-  reporter_config:
-    channel: '#microshift-alerts'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
+- as: e2e-aws-tests-ostree-x86-nightly-el9-functional
+  cron: 0 4 * * 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: periodics-functional
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-ostree-arm-nightly-el9-lifecycle
+  cron: 45 3 * * 1-5
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
-      SCENARIO_TYPE: periodics
+      SCENARIO_TYPE: periodics-lifecycle
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-ostree-arm-nightly-el9-functional
+  cron: 15 4 * * 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: periodics-functional
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-ovn-ocp-conformance
   cron: 0 4 * * 1-5
@@ -261,7 +301,7 @@ tests:
       MICROSHIFT_OS: rhel-9.6
       SUITE: ai-model-serving
     workflow: openshift-microshift-e2e-bare-metal-tests
-- as: e2e-aws-tests-release-periodic
+- as: e2e-aws-tests-ostree-x86-release-periodic-el9
   cron: 0 3 * * 0,2,4
   steps:
     cluster_profile: openshift-org-aws
@@ -271,7 +311,7 @@ tests:
       SCENARIO_TYPE: releases
       TEST_EXECUTION_TIMEOUT: 60m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-release-arm-periodic
+- as: e2e-aws-tests-ostree-arm-release-periodic-el9
   cron: 0 3 * * 0,2,4
   steps:
     cluster_profile: openshift-org-aws
@@ -281,7 +321,7 @@ tests:
       SCENARIO_TYPE: releases
       TEST_EXECUTION_TIMEOUT: 60m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-release-periodic-el9
+- as: e2e-aws-tests-bootc-x86-release-periodic-el9
   cron: 0 3 * * 0,2,4
   steps:
     cluster_profile: openshift-org-aws
@@ -291,7 +331,7 @@ tests:
       SCENARIO_TYPE: bootc-releases-el9
       TEST_EXECUTION_TIMEOUT: 60m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-release-periodic-el10
+- as: e2e-aws-tests-bootc-x86-release-periodic-el10
   cron: 0 3 * * 0,2,4
   steps:
     cluster_profile: openshift-org-aws
@@ -301,7 +341,7 @@ tests:
       SCENARIO_TYPE: bootc-releases-el10
       TEST_EXECUTION_TIMEOUT: 60m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-release-arm-periodic-el9
+- as: e2e-aws-tests-bootc-arm-release-periodic-el9
   cron: 0 3 * * 0,2,4
   steps:
     cluster_profile: openshift-org-aws
@@ -311,7 +351,7 @@ tests:
       SCENARIO_TYPE: bootc-releases-el9
       TEST_EXECUTION_TIMEOUT: 60m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-release-arm-periodic-el10
+- as: e2e-aws-tests-bootc-arm-release-periodic-el10
   cron: 0 3 * * 0,2,4
   steps:
     cluster_profile: openshift-org-aws
