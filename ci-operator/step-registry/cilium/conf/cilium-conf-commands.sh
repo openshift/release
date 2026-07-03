@@ -6,6 +6,7 @@ set -o pipefail
 set -x
 
 CILIUM_VERSION="${CILIUM_VERSION:-1.19.4}"
+CILIUM_REPOSITORY="${CILIUM_REPOSITORY:-oci://quay.io/cilium/charts/cilium}"
 CILIUM_CLI_VERSION="${CILIUM_CLI_VERSION:-0.19.2}"
 ENDPOINT_ROUTES="${ENDPOINT_ROUTES:-true}"
 HUBBLE="${HUBBLE:-true}"
@@ -110,10 +111,13 @@ EOF
 
 WORKDIR=$(mktemp -d)
 
+# Note: In order to test with a development version, use:
+# --repository oci://quay.io/cilium-charts-dev/cilium --version <version>
+# where <version> is a tag from https://quay.io/repository/cilium-charts-dev/cilium
 cilium install \
     --dry-run \
     --namespace cilium \
-    --repository oci://quay.io/cilium/charts/cilium \
+    --repository "${CILIUM_REPOSITORY}" \
     --version "${CILIUM_VERSION}" \
     --set debug.enabled=true \
     --set k8s.requireIPv4PodCIDR=true \
