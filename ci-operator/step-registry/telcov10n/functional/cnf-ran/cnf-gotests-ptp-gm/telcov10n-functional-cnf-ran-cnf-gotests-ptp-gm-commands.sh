@@ -206,7 +206,7 @@ ssh "${SSH_OPTS_KEEPALIVE[@]}" "${BASTION_USER}@${BASTION_IP}" \
   "cd ${DOWNSTREAM_TEST_DIR}; ./cnf-gotests-ptp-gm-run.sh || true"
 
 echo "Process report files on bastion"
-BASTION_REPORT_DIR="/tmp/ptp_reports"
+BASTION_REPORT_DIR="/tmp/test_reports"
 ansible-playbook ./playbooks/ran/deploy-run-cnf-gotests-ptp-gm.yaml \
   -i ./inventories/cnf/run-tests.yaml \
   --tags process \
