@@ -71,10 +71,4 @@ cd /opt/netris-test-infra
 ${DEPLOY_CMD}
 EOF
 
-# === Copy kubeconfig back to Prow pod ===
-echo "Copying kubeconfig to shared dir..."
-scp -F "${SHARED_DIR}/ssh_config" \
-    "ci_machine:/root/.kube/config" \
-    "${SHARED_DIR}/kubeconfig"
-
 echo "netris-lab snapshot step finished successfully"
