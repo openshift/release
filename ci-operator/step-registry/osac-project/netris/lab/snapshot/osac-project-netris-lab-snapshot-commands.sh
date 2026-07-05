@@ -13,24 +13,6 @@ echo "REPO_NAME: ${REPO_NAME:-unknown}"
 echo "PULL_HEAD_REF: ${PULL_HEAD_REF:-none}"
 echo "-------------------------------------------"
 
-# === Restore OCP + OSAC snapshot (recert + refresh) ===
-timeout -s 9 140m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash - << 'EOF'
-set -o nounset
-set -o errexit
-set -o pipefail
-
-cd /opt/netris-test-infra
-make deploy-ocp-snapshot
-EOF
-
-# === Copy kubeconfig back to Prow pod ===
-echo "Copying kubeconfig to shared dir..."
-scp -F "${SHARED_DIR}/ssh_config" \
-    "ci_machine:/root/.kube/config" \
-    "${SHARED_DIR}/kubeconfig"
-
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-
 # === Extract installer from image ===
 echo "Extracting installer from image..."
 timeout -s 9 10m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash -s \
@@ -79,8 +61,7 @@ EXTRA_VARS+="}"
 DEPLOY_CMD="make deploy-ocp-snapshot EXTRA_VARS='${EXTRA_VARS}'"
 echo "Deploy command: ${DEPLOY_CMD}"
 
-# === SSH to remote host and deploy OSAC ===
-echo "Deploying OSAC via netris-test-infra..."
+# === Restore OCP + OSAC snapshot with component images ===
 timeout -s 9 170m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash - << EOF
 set -o nounset
 set -o errexit
@@ -89,5 +70,11 @@ set -o pipefail
 cd /opt/netris-test-infra
 ${DEPLOY_CMD}
 EOF
+
+# === Copy kubeconfig back to Prow pod ===
+echo "Copying kubeconfig to shared dir..."
+scp -F "${SHARED_DIR}/ssh_config" \
+    "ci_machine:/root/.kube/config" \
+    "${SHARED_DIR}/kubeconfig"
 
 echo "netris-lab snapshot step finished successfully"
