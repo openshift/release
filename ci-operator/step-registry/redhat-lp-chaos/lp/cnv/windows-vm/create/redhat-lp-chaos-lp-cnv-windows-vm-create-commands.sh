@@ -38,6 +38,8 @@ set -x
 export KUBEADMIN_PASSWORD WINDOWS_URL SCALE_NODES
 
 export CREATE_VMS_ONLY=True
+export DELETE_ALL=False
+export RUN_STRATEGY=True
 
 oc create namespace benchmark-runner --dry-run=client -o json --save-config | oc apply -f -
 
