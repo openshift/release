@@ -17,6 +17,8 @@ function BenchmarkRunnerDebug () {
     oc logs -n benchmark-runner -l cdi.kubevirt.io=importer --tail=200 --prefix 2>&1 || true
     oc get deployment -n openshift-storage 2>&1 || true
     oc get storageclass 2>&1 || true
+    oc describe pvc windows-clone-dv -n benchmark-runner 2>&1 || true
+    oc get storageprofile gp3-csi -o yaml 2>&1 || true  
 }
 _TERM_RECEIVED=false
 function _term_handler () { _TERM_RECEIVED=true; BenchmarkRunnerDebug; }
