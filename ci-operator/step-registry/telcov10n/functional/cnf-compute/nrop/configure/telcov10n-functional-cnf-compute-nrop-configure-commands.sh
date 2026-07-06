@@ -32,11 +32,11 @@ export CLUSTER_NAME=${CLUSTER_NAME}
 echo CLUSTER_NAME=${CLUSTER_NAME}
 
 EXTRA_VARS="kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
-EXTRA_VARS="${EXTRA_VARS} test_env=$STAGE_ENV"
+EXTRA_VARS="${EXTRA_VARS} test_env=${TEST_ENV}"
 
 
 cd /eco-ci-cd/
-ansible-playbook ./playbooks/configure-nrop-operator.yml -i ./inventories/ocp-deployment/build-inventory.py \
+ansible-playbook ./playbooks/compute/configure-nrop-operator.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "${EXTRA_VARS}"
 
 # Gather artifacts from bastion
