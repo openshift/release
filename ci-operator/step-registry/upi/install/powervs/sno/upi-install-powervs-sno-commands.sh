@@ -1,14 +1,35 @@
 #!/bin/bash
-
 set -euo pipefail
-
 CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
 POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
 BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
 CREDENTIALS_PATH="/etc/sno-power-credentials"
 
+# Read secrets into variables
+IBMCLOUD_API_KEY=$(cat /etc/sno-power-credentials/POWERVS_SNO_ibmcloud-api-key)
+BASTION="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-bastion")"
+export BASTION
 setup_env() {
   set +x
+  BASE_DOMAIN="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_BASE_DOMAIN")"
+  export BASE_DOMAIN
+  BASTION_IP="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-bastion-ip")"
+  export BASTION_IP
+  POWERVS_INSTANCE_CRN="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_INSTANCE_CRN")"
+  export POWERVS_INSTANCE_CRN
+  POWERVS_NETWORK="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_NETWORK")"
+  export POWERVS_NETWORK
+  CIS_INSTANCE="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_CIS_CRN")"
+  export CIS_INSTANCE
+  CIS_DOMAIN_ID="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-cis-domain-id")"
+  export CIS_DOMAIN_ID
+  POWERVS_IMAGE="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-powervs-image")"
+  export POWERVS_IMAGE
+  POWERVS_IMG_UUID="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-img-uuid")"
+  export POWERVS_IMG_UUID
+  POWERVS_NW_ID="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-nw-id")"
+  export POWERVS_NW_ID
+
   # Installing required tools
   echo "$(date) Installing required tools"
   mkdir /tmp/ibm_cloud_cli
@@ -21,7 +42,8 @@ setup_env() {
 
   # IBM cloud login
   ibmcloud config --check-version=false
-  echo | ibmcloud login --apikey @"${CREDENTIALS_PATH}/.powercreds" --no-region
+  ibmcloud login --apikey "${IBMCLOUD_API_KEY}" --no-region
+  # ibmcloud login --apikey @"${CREDENTIALS_PATH}/.powercreds" --no-region
 
   # Installing required ibmcloud plugins
   echo "$(date) Installing required ibmcloud plugins"
@@ -34,13 +56,13 @@ setup_env() {
 
   # Setting IBMCLOUD_TRACE to true to enable debug logs for pi and cis operations
   export IBMCLOUD_TRACE=true
-  set -x
+  #set -x
 }
 
 create_sno_node() {
   # Creating VSI in PowerVS instance
   echo "$(date) Creating VSI in PowerVS instance"
-  ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE}  --storage-tier tier0
+  ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMG_UUID} --subnets ${POWERVS_NW_ID} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE}  --storage-tier tier0
 
   instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.name == $serverName ) | .id')
 
@@ -419,6 +441,23 @@ cat > ${BASTION_CI_SCRIPTS_DIR}/grub-menu.template << EOF
     fi
 EOF
 
+cat > ${BASTION_CI_SCRIPTS_DIR}/grub.cfg.cicd << EOF
+set default=0
+set timeout=10
+
+menuentry "OpenShift ${CLUSTER_NAME} - ${HOSTNAME}" {
+    linux /boot/${CLUSTER_NAME}/rhcos-live-kernel-ppc64le \
+        coreos.live.rootfs_url=http://${PROVISIONING_HOST}/boot/${CLUSTER_NAME}/rhcos-live-rootfs.ppc64le.img \
+        coreos.inst.install_dev=${INSTALL_DEVICE} \
+        coreos.inst.ignition_url=http://${PROVISIONING_HOST}/ignition/${HOSTNAME}.ign \
+        ip=${NODE_IP}::${GATEWAY}:${NETMASK}:${HOSTNAME}:${INTERFACE}:none \
+        nameserver=${DNS_SERVER} \
+        rd.neednet=1
+
+    initrd /boot/${CLUSTER_NAME}/rhcos-live-initramfs.ppc64le.img
+}
+EOF
+
 cat > ${BASTION_CI_SCRIPTS_DIR}/setup-sno.sh << EOF
 #!/bin/bash
 
@@ -475,7 +514,7 @@ WWW_DIR="/var/www/html/\${CLUSTER_NAME}"
 mkdir -p \$IMAGES_DIR \$WWW_DIR \$CONFIG_DIR
 
 download_installer() {
-    echo "Dowmload openshift-install"
+    echo "Download openshift-install"
     install_tar_file="openshift-install-linux.tar.gz"
     if [[ ! -z \${INSTALLER_URL} ]]; then
         curl -s \${INSTALLER_URL} -o \${install_tar_file}
@@ -752,11 +791,11 @@ set +x
 ################################################################
 echo "If installation completed successfully Copying required artifacts to shared dir"
 # Powervs requires config.json
-IBMCLOUD_API_KEY=$(cat ${CREDENTIALS_PATH}/.powercreds)
+IBMCLOUD_API_KEY=$(cat /etc/sno-power-credentials/POWERVS_SNO_ibmcloud-api-key)
 POWERVS_SERVICE_INSTANCE_ID=$(echo ${POWERVS_INSTANCE_CRN} | cut -f8 -d":")
 POWERVS_REGION=$(echo ${POWERVS_INSTANCE_CRN} | cut -f6 -d":")
 POWERVS_ZONE=$(echo ${POWERVS_REGION} | sed 's/-*[0-9].*//')
-POWERVS_RESOURCE_GROUP=""
+POWERVS_RESOURCE_GROUP="${POWERVS_SNO_RESOURCE_GROUP:-}"
 cat > /tmp/powervs-config.json << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
