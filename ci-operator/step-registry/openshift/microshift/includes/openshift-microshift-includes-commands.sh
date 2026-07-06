@@ -749,12 +749,17 @@ function get_source_dir() {
     [bootc-releases-el10]="scenarios-bootc/el10/releases:scenarios-bootc"
     [bootc-presubmits-el9]="scenarios-bootc/el9/presubmits:scenarios-bootc"
     [bootc-presubmits-el10]="scenarios-bootc/el10/presubmits:scenarios-bootc"
-    [bootc-periodics-el9]="scenarios-bootc/el9/periodics:scenarios-bootc"
-    [bootc-periodics-el10]="scenarios-bootc/el10/periodics:scenarios-bootc"
+    [bootc-periodics-el9-lifecycle]="scenarios-bootc/el9/periodics-lifecycle:scenarios-bootc"
+    [bootc-periodics-el9-functional]="scenarios-bootc/el9/periodics-functional:scenarios-bootc"
+    [bootc-periodics-el10-lifecycle]="scenarios-bootc/el10/periodics-lifecycle:scenarios-bootc"
+    [bootc-periodics-el10-functional]="scenarios-bootc/el10/periodics-functional:scenarios-bootc"
     [bootc-c2cc]="scenarios-bootc/c2cc:scenarios-bootc"
-    [releases]="scenarios/releases:scenarios"
-    [presubmits]="scenarios/presubmits:scenarios"
-    [periodics]="scenarios/periodics:scenarios-periodics"
+    [releases]="scenarios-ostree/releases:scenarios-ostree"
+    [periodics-lifecycle]="scenarios-ostree/periodics-lifecycle:scenarios-ostree"
+    [periodics-functional]="scenarios-ostree/periodics-functional:scenarios-ostree"
+    # Both el9/el10 share the same scenarios — RHEL version is derived from SCENARIO_TYPE at runtime
+    [rpm-presubmits-el9]="scenarios-rpm/presubmits:scenarios-rpm"
+    [rpm-presubmits-el10]="scenarios-rpm/presubmits:scenarios-rpm"
   )
   local -r scenario_type=$1
   local -r base="/home/${HOST_USER}/microshift/test"

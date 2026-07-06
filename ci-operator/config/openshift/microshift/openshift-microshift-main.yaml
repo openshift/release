@@ -92,7 +92,7 @@ tests:
     env:
       DRY_RUN: "y"
     workflow: openshift-microshift-rebase
-- as: e2e-aws-tests-bootc-upstream-periodic
+- as: e2e-aws-tests-bootc-upstream-periodic-x86
   cron: 0 4 * * 5
   steps:
     cluster_profile: openshift-org-aws
@@ -110,7 +110,7 @@ tests:
       MICROSHIFT_OS: rhel-9.8
       SCENARIO_TYPE: bootc-upstream
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-cache-nightly
+- as: e2e-aws-tests-cache-nightly-x86
   capabilities:
   - intranet
   cron: 30 0 * * *
@@ -148,25 +148,25 @@ tests:
       MICROSHIFT_OS: rhel-9.8
     workflow: openshift-microshift-e2e-metal-cache
   timeout: 4h0m0s
-- as: e2e-aws-tests
+- as: e2e-aws-tests-rpm-presubmit-el9-arm
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
-      EC2_INSTANCE_TYPE: c5.metal
+      EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: presubmits
+      SCENARIO_TYPE: rpm-presubmits-el9
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-arm
+- as: e2e-aws-tests-rpm-presubmit-el10-arm
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
-      EC2_INSTANCE_TYPE: m7g.metal
+      EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: presubmits
+      SCENARIO_TYPE: rpm-presubmits-el10
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-cache
+- as: e2e-aws-tests-cache-x86
   capabilities:
   - intranet
   restrict_network_access: false
@@ -188,100 +188,124 @@ tests:
       EC2_INSTANCE_TYPE: c7g.8xlarge
       MICROSHIFT_OS: rhel-9.8
     workflow: openshift-microshift-e2e-metal-cache
-- as: e2e-aws-tests-periodic
-  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
+- as: e2e-aws-tests-ostree-periodic-el9-lifecycle-x86
+  run_if_changed: ^(test/bin/.*|test/scenarios-ostree/periodics-lifecycle/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: periodics
+      SCENARIO_TYPE: periodics-lifecycle
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-periodic-arm
-  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EC2_INSTANCE_TYPE: m7g.metal
-      MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: periodics
-      TEST_EXECUTION_TIMEOUT: 45m
-    workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-el9
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
+- as: e2e-aws-tests-ostree-periodic-el9-functional-x86
+  run_if_changed: ^(test/bin/.*|test/scenarios-ostree/periodics-functional/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-presubmits-el9
+      SCENARIO_TYPE: periodics-functional
+      TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-el10
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
+- as: e2e-aws-tests-ostree-periodic-el9-lifecycle-arm
+  run_if_changed: ^(test/bin/.*|test/scenarios-ostree/periodics-lifecycle/.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: m7g.metal
+      MICROSHIFT_OS: rhel-9.8
+      SCENARIO_TYPE: periodics-lifecycle
+      TEST_EXECUTION_TIMEOUT: 45m
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-ostree-periodic-el9-functional-arm
+  run_if_changed: ^(test/bin/.*|test/scenarios-ostree/periodics-functional/.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: m7g.metal
+      MICROSHIFT_OS: rhel-9.8
+      SCENARIO_TYPE: periodics-functional
+      TEST_EXECUTION_TIMEOUT: 45m
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-periodic-el9-lifecycle-x86
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el9/periodics-lifecycle/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-presubmits-el10
+      SCENARIO_TYPE: bootc-periodics-el9-lifecycle
+      TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-arm-el9
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EC2_INSTANCE_TYPE: m7g.metal
-      MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-presubmits-el9
-    workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-arm-el10
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EC2_INSTANCE_TYPE: m7g.metal
-      MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-presubmits-el10
-    workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-periodic-el9
-  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
+- as: e2e-aws-tests-bootc-periodic-el9-functional-x86
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el9/periodics-functional/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-periodics-el9
+      SCENARIO_TYPE: bootc-periodics-el9-functional
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-periodic-el10
-  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
+- as: e2e-aws-tests-bootc-periodic-el10-lifecycle-x86
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el10/periodics-lifecycle/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-periodics-el10
+      SCENARIO_TYPE: bootc-periodics-el10-lifecycle
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-periodic-arm-el9
-  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
+- as: e2e-aws-tests-bootc-periodic-el10-functional-x86
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el10/periodics-functional/.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.8
+      SCENARIO_TYPE: bootc-periodics-el10-functional
+      TEST_EXECUTION_TIMEOUT: 45m
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-periodic-el9-lifecycle-arm
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el9/periodics-lifecycle/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: m7g.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-periodics-el9
+      SCENARIO_TYPE: bootc-periodics-el9-lifecycle
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-periodic-arm-el10
-  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
+- as: e2e-aws-tests-bootc-periodic-el9-functional-arm
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el9/periodics-functional/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: m7g.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-periodics-el10
+      SCENARIO_TYPE: bootc-periodics-el9-functional
+      TEST_EXECUTION_TIMEOUT: 45m
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-periodic-el10-lifecycle-arm
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el10/periodics-lifecycle/.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: m7g.metal
+      MICROSHIFT_OS: rhel-9.8
+      SCENARIO_TYPE: bootc-periodics-el10-lifecycle
+      TEST_EXECUTION_TIMEOUT: 45m
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-periodic-el10-functional-arm
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el10/periodics-functional/.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: m7g.metal
+      MICROSHIFT_OS: rhel-9.8
+      SCENARIO_TYPE: bootc-periodics-el10-functional
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-full-conformance-rhel-eus
@@ -316,8 +340,8 @@ tests:
       MICROSHIFT_OS: rhel-9.8
       SUITE: ai-model-serving
     workflow: openshift-microshift-e2e-bare-metal-tests
-- as: e2e-aws-tests-release
-  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+- as: e2e-aws-tests-ostree-release-el9-x86
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios-ostree/releases/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -326,8 +350,8 @@ tests:
       SCENARIO_TYPE: releases
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-release-arm
-  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+- as: e2e-aws-tests-ostree-release-el9-arm
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios-ostree/releases/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -336,8 +360,8 @@ tests:
       SCENARIO_TYPE: releases
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-release-el9
-  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+- as: e2e-aws-tests-bootc-release-el9-x86
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios-ostree/releases/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -346,8 +370,8 @@ tests:
       SCENARIO_TYPE: bootc-releases-el9
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-release-el10
-  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+- as: e2e-aws-tests-bootc-release-el10-x86
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios-ostree/releases/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -356,8 +380,8 @@ tests:
       SCENARIO_TYPE: bootc-releases-el10
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-release-arm-el9
-  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+- as: e2e-aws-tests-bootc-release-el9-arm
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios-ostree/releases/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -366,8 +390,8 @@ tests:
       SCENARIO_TYPE: bootc-releases-el9
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-release-arm-el10
-  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios/releases/.*)$
+- as: e2e-aws-tests-bootc-release-el10-arm
+  run_if_changed: ^(test/scenarios-bootc/releases/.*|test/scenarios-ostree/releases/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -376,7 +400,7 @@ tests:
       SCENARIO_TYPE: bootc-releases-el10
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-upstream
+- as: e2e-aws-tests-bootc-presubmit-upstream-x86
   run_if_changed: ^(test/scenarios-bootc/upstream/.*)$
   steps:
     cluster_profile: openshift-org-aws
@@ -385,7 +409,7 @@ tests:
       MICROSHIFT_OS: rhel-9.8
       SCENARIO_TYPE: bootc-upstream
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-upstream-arm
+- as: e2e-aws-tests-bootc-presubmit-upstream-arm
   run_if_changed: ^(test/scenarios-bootc/upstream/.*)$
   steps:
     cluster_profile: openshift-org-aws
@@ -394,7 +418,7 @@ tests:
       MICROSHIFT_OS: rhel-9.8
       SCENARIO_TYPE: bootc-upstream
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-c2cc
+- as: e2e-aws-tests-bootc-presubmit-c2cc-x86
   run_if_changed: ^(test/scenarios-bootc/c2cc/.*|test/suites/c2cc/.*|test/resources/c2cc.*)$
   steps:
     cluster_profile: openshift-org-aws
@@ -403,7 +427,7 @@ tests:
       MICROSHIFT_OS: rhel-9.6
       SCENARIO_TYPE: bootc-c2cc
     workflow: openshift-microshift-e2e-metal-tests
-- as: e2e-aws-tests-bootc-c2cc-arm
+- as: e2e-aws-tests-bootc-presubmit-c2cc-arm
   run_if_changed: ^(test/scenarios-bootc/c2cc/.*|test/suites/c2cc/.*|test/resources/c2cc.*)$
   steps:
     cluster_profile: openshift-org-aws
