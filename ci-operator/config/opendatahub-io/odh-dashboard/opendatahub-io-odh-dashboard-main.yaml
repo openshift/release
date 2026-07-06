@@ -33,6 +33,9 @@ images:
     dockerfile_path: ./packages/agent-ops/Dockerfile.workspace
     to: odh-mod-arch-agent-ops-image
   - context_dir: .
+    dockerfile_path: ./distributions/core-bff/Dockerfile.workspace
+    to: odh-core-bff-image
+  - context_dir: .
     dockerfile_path: ./dashboard-operator/Dockerfile
     to: odh-dashboard-operator-image
 promotion:
@@ -203,6 +206,23 @@ tests:
       SOURCE_IMAGE_REF: odh-mod-arch-agent-ops-image
     env:
       IMAGE_REPO: odh-mod-arch-agent-ops
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-core-bff-pr-image-mirror
+  run_if_changed: ^distributions/core-bff/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-core-bff-image
+    env:
+      IMAGE_REPO: odh-core-bff
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-core-bff-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-core-bff-image
+    env:
+      IMAGE_REPO: odh-core-bff
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-dashboard-operator-pr-image-mirror
