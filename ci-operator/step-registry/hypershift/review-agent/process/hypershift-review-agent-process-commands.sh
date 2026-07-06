@@ -36,6 +36,9 @@ GOFLAGS="" go install golang.org/x/tools/gopls@v0.21.0
 python3.9 -m ensurepip --user 2>/dev/null || true
 python3.9 -m pip install --user pre-commit 2>&1 | tail -1
 export PATH="${GOPATH:-$HOME/go}/bin:$HOME/.local/bin:$PATH"
+# 20min bash timeout so pre-commit/pre-push hooks (make verify, make test) have time to complete
+export BASH_DEFAULT_TIMEOUT_MS=1200000
+export BASH_MAX_TIMEOUT_MS=1200000
 
 # Force HTTPS for all github.com git operations (plugin install defaults to SSH which lacks host keys in CI)
 git config --global url."https://github.com/".insteadOf "git@github.com:"
