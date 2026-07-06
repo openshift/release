@@ -27,10 +27,22 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  fulfillment-service-image:
+    name: latest
+    namespace: osac-project
+    tag: fulfillment-service
+  osac-aap-ee-image:
+    name: latest
+    namespace: osac-project
+    tag: osac-aap-ee
   osac-installer:
     name: latest
     namespace: osac-project
     tag: osac-installer
+  osac-operator-image:
+    name: latest
+    namespace: osac-project
+    tag: osac-operator
 build_root:
   image_stream_tag:
     name: release
@@ -93,6 +105,17 @@ tests:
       DEPLOY_MODE: helm
       NOTIFY_LABEL: Full Setup vmaas (helm)
     workflow: osac-project-ofcir-baremetal
+- as: e2e-netris-caas
+  capabilities:
+  - intranet
+  cron: 0 */6 * * *
+  steps:
+    dependencies:
+      FULFILLMENT_SERVICE_IMAGE: fulfillment-service-image
+      OSAC_AAP_EE_IMAGE: osac-aap-ee-image
+      OSAC_INSTALLER_IMAGE: osac-installer
+      OSAC_OPERATOR_IMAGE: osac-operator-image
+    workflow: osac-project-netris-caas
 zz_generated_metadata:
   branch: main
   org: osac-project
