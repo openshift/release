@@ -117,6 +117,7 @@ ec2:CreateNetworkInterface
 ec2:CreateRoute
 ec2:CreateRouteTable
 ec2:CreateSecurityGroup
+ec2:CreateSnapshot
 ec2:CreateSubnet
 ec2:CreateTags
 ec2:CreateVolume
@@ -155,6 +156,7 @@ ec2:DescribePrefixLists
 ec2:DescribeRegions
 ec2:DescribeRouteTables
 ec2:DescribeSecurityGroups
+ec2:DescribeSnapshots
 ec2:DescribeSubnets
 ec2:DescribeTags
 ec2:DescribeVolumes
