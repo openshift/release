@@ -42,17 +42,19 @@ echo DISCONNECTED=${DISCONNECTED}
 EXTRA_VARS="kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 EXTRA_VARS="${EXTRA_VARS} test_env=${TEST_ENV}"
 EXTRA_VARS="${EXTRA_VARS} disconnected=${DISCONNECTED}"
+EXTRA_VARS="${EXTRA_VARS} scope=${SCOPE}"
 
 if [[ $SCOPE == "Reboot" ]]; then
     EXTRA_VARS="${EXTRA_VARS} run_reboot_tests_only=true"
     EXTRA_VARS="${EXTRA_VARS} topology_manager_scope=container"
+    EXTRA_VARS="${EXTRA_VARS} scope=container"
 else
     EXTRA_VARS="${EXTRA_VARS} topology_manager_scope=${SCOPE}"
 fi
 
 
 cd /eco-ci-cd/
-ansible-playbook -vv ./playbooks/compute/nrop_testing.yml -i ./inventories/ocp-deployment/build-inventory.py \
+ansible-playbook -vv ./playbooks/compute/deploy_nrop_testing.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "${EXTRA_VARS}"
 
 echo "Set bastion ssh configuration"
@@ -88,10 +90,6 @@ echo "Copy must gather to artifacts directory"
 
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
   "${BASTION_USER}@${BASTION_IP}":/tmp/wip/artifacts/* "${ARTIFACT_DIR}"
-
-
-scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
-  "${BASTION_USER}@${BASTION_IP}":/tmp/wip/tests "${ARTIFACT_DIR}"
 
 
 echo "Copy junit test reports to shared directory for reporter step"
