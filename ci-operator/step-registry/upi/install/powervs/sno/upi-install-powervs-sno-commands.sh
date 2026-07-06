@@ -5,7 +5,10 @@ set -euox pipefail
 CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
 POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
 BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
-CREDENTIALS_PATH="/etc/sno-power-credentials"
+CREDENTIALS_PATH="/etc/cluster-secrets-powervs-sno-1"
+ls -lrt /etc/cluster-secrets-powervs-sno-1
+# Read secrets into variables
+IBMCLOUD_API_KEY=$(cat /etc/cluster-secrets-powervs-sno-1/POWERVS_SNO_ibmcloud-api-key)
 
 setup_env() {
   set +x
@@ -21,7 +24,8 @@ setup_env() {
 
   # IBM cloud login
   ibmcloud config --check-version=false
-  echo | ibmcloud login --apikey @"${CREDENTIALS_PATH}/.powercreds" --no-region
+  ibmcloud login --apikey "${IBMCLOUD_API_KEY}" --no-region
+  # ibmcloud login --apikey @"${CREDENTIALS_PATH}/.powercreds" --no-region
 
   # Installing required ibmcloud plugins
   echo "$(date) Installing required ibmcloud plugins"
@@ -34,7 +38,7 @@ setup_env() {
 
   # Setting IBMCLOUD_TRACE to true to enable debug logs for pi and cis operations
   export IBMCLOUD_TRACE=true
-  set -x
+  #set -x
 }
 
 create_sno_node() {
@@ -131,6 +135,7 @@ cp "${CREDENTIALS_PATH}/ssh-privatekey" ${SSH_PRIVATE}
 chmod 0600 ${SSH_PRIVATE}
 SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'ServerAliveInterval=60' -o 'ServerAliveCountMax=60' -o 'UserKnownHostsFile=/dev/null' -i "${SSH_PRIVATE}")
 # Save private-key, pull-secret and offline-token to bastion
+ssh -vvv "${SSH_OPTIONS[@]}" root@${BASTION} 'echo ok'
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "mkdir -p ~/.sno"
 scp "${SSH_OPTIONS[@]}" ${CREDENTIALS_PATH}/{ssh-publickey,pull-secret,pull-secret-ci,offline-token} root@${BASTION}:~/.sno/.
 scp "${SSH_OPTIONS[@]}" ${SSH_PRIVATE} root@${BASTION}:~/.sno/.
@@ -756,7 +761,7 @@ IBMCLOUD_API_KEY=$(cat ${CREDENTIALS_PATH}/.powercreds)
 POWERVS_SERVICE_INSTANCE_ID=$(echo ${POWERVS_INSTANCE_CRN} | cut -f8 -d":")
 POWERVS_REGION=$(echo ${POWERVS_INSTANCE_CRN} | cut -f6 -d":")
 POWERVS_ZONE=$(echo ${POWERVS_REGION} | sed 's/-*[0-9].*//')
-POWERVS_RESOURCE_GROUP=""
+POWERVS_RESOURCE_GROUP="${POWERVS_SNO_RESOURCE_GROUP:-}"
 cat > /tmp/powervs-config.json << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
