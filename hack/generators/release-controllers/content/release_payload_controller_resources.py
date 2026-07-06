@@ -240,6 +240,7 @@ def _deployment_resources(gendoc):
                                 'command': [
                                     '/usr/bin/release-payload-controller',
                                     'start',
+                                    '--release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml',
                                     '--namespace=ci',
                                     '-v=6',
                                 ],
@@ -265,6 +266,11 @@ def _deployment_resources(gendoc):
                                     {
                                         'mountPath': '/etc/gcs',
                                         'name': 'google-credentials',
+                                    },
+                                    {
+                                        'name': 'qualifiers-config',
+                                        'mountPath': '/etc/qualifiers-config',
+                                        'readOnly': True
                                     }
                                 ]
                             }
@@ -276,6 +282,12 @@ def _deployment_resources(gendoc):
                                 'secret': {
                                     'defaultMode': 420,
                                     'secretName': 'release-payload-controller-google-credentials',
+                                }
+                            },
+                            {
+                                'name': 'qualifiers-config',
+                                'configMap': {
+                                    'name': 'release-controller-release-qualifiers',
                                 }
                             }
                         ]

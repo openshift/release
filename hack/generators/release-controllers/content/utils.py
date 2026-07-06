@@ -32,6 +32,11 @@ def get_rcapi_volume_mounts():
             'mountPath': '/etc/jira',
             'name': 'jira',
             'readOnly': True
+        },
+        {
+            'name': 'qualifiers-config',
+            'mountPath': '/etc/qualifiers-config',
+            'readOnly': True
         }
     ] + get_kubeconfig_volume_mounts() + get_oc_volume_mounts()
 
@@ -112,6 +117,12 @@ def get_rcapi_volumes(context, secret_name=None):
             'secret': {
                 'defaultMode': 420,
                 'secretName': 'jira-credentials-openshift-jira-robot'
+            }
+        },
+        {
+            'name': 'qualifiers-config',
+            'configMap': {
+                'name': 'release-controller-release-qualifiers',
             }
         }
     ] + get_kubeconfig_volumes(context, secret_name) + get_oc_volumes()
