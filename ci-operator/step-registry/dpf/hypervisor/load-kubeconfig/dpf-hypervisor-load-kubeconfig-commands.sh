@@ -46,7 +46,5 @@ fi
 echo "=== Copying kubeconfig from ${LAST_OPENSHIFT_DPF} on hypervisor ==="
 scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.doca8 /tmp/kubeconfig.doca8
 
-grep 6443 /tmp/kubeconfig.doca8
-
 cp /tmp/kubeconfig.doca8 "${SHARED_DIR}/kubeconfig"
 echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig successfully"
