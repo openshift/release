@@ -32,6 +32,7 @@ spec:
       - command:
         - /usr/bin/release-payload-controller
         - start
+        - --release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml
         - --namespace=ci
         - -v=6
         env:
@@ -55,12 +56,18 @@ spec:
         volumeMounts:
         - mountPath: /etc/gcs
           name: google-credentials
+        - mountPath: /etc/qualifiers-config
+          name: qualifiers-config
+          readOnly: true
       serviceAccountName: release-payload-controller
       volumes:
       - name: google-credentials
         secret:
           defaultMode: 420
           secretName: release-payload-controller-google-credentials
+      - configMap:
+          name: release-controller-release-qualifiers
+        name: qualifiers-config
 ---
 #---------------------------------------------------------------------------------
 # release_payload_controller_resources.py added the following resource
