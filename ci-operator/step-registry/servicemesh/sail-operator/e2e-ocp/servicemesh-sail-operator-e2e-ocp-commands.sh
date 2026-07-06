@@ -84,14 +84,20 @@ check_cluster_operators() {
   local stable_checks_count=0
 
   while [ "$(date +%s)" -lt $end_time ]; do
-    local unstable_operators_json
-    unstable_operators_json=$(oc get clusteroperator -o json | jq -r '[.items[] | select(.status.conditions[] | (.type == "Available" and .status == "False") or (.type == "Progressing" and .status == "True") or (.type == "Degraded" and .status == "True")) | .metadata.name]')
+    local oc_output
+    if ! oc_output=$(oc get clusteroperator -o json); then
+      echo "Warning: API connection dropped, retrying in next loop..." >&2
+      stable_checks_count=0
+      sleep "$sleep_interval"
+      continue
+    fi
 
-    if [ $? -ne 0 ]; then
-        echo "WARN: 'oc get clusteroperator' command failed. Resetting stability count and retrying."
-        stable_checks_count=0
-        sleep "$sleep_interval"
-        continue
+    local unstable_operators_json
+    if ! unstable_operators_json=$(echo "$oc_output" | jq -r '[.items[] | select(.status.conditions[] | (.type == "Available" and .status == "False") or (.type == "Progressing" and .status == "True") or (.type == "Degraded" and .status == "True")) | .metadata.name]'); then
+      echo "Warning: Failed to parse cluster operator JSON, retrying in next loop..." >&2
+      stable_checks_count=0
+      sleep "$sleep_interval"
+      continue
     fi
 
     if [[ $(echo "$unstable_operators_json" | jq 'length') -eq 0 ]]; then
@@ -166,9 +172,9 @@ execute_and_collect_artifacts() {
   echo "Copying artifacts from test pod after attempt ${attempt}..."
   oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
 
-  # share artifacts with next job step which is uploading results to report portal
+  # share artifacts with next job step which is uploading results to report portal, use only xml files as there is a 1MB limit
   echo "Copying artifacts to SHARED_DIR after attempt ${attempt}..."
-  cp "${ARTIFACT_DIR}/"* "${SHARED_DIR}"
+  cp "${ARTIFACT_DIR}/"*.xml "${SHARED_DIR}"
 
   set -o errexit
 

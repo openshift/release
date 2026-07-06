@@ -1,7 +1,8 @@
 #!/bin/bash
 
+# This post step must never fail the overall CI job — it is a reporting step.
+# errexit is disabled so errors are handled internally (retries, warnings, graceful skips).
 set +o errexit
-set +o nounset
 
 # Skip data router reporting when job was triggered via Gangway API with overrides
 OVERRIDE_VARS=(
@@ -96,7 +97,30 @@ get_artifacts_url() {
 process_junit_files() {
   echo "📝 Processing JUnit files for Data Router compatibility..."
 
-  for junit_file in "${SHARED_DIR}"/junit-results-*.xml; do
+  mkdir -p "${ARTIFACT_DIR}/data-router"
+
+  # Decompress gzipped junit files to ARTIFACT_DIR (new format); copy plain XML as fallback (backward compat)
+  for junit_gz in "${SHARED_DIR}"/junit-results-*.xml.gz; do
+    if [[ -f "$junit_gz" ]]; then
+      local filename
+      filename=$(basename "${junit_gz%.gz}")
+      gunzip -c "$junit_gz" > "${ARTIFACT_DIR}/data-router/${filename}"
+      echo "Decompressed $(basename "$junit_gz") -> ${ARTIFACT_DIR}/data-router/${filename}"
+    fi
+  done
+  for junit_shared in "${SHARED_DIR}"/junit-results-*.xml; do
+    if [[ -f "$junit_shared" ]]; then
+      local filename
+      filename=$(basename "$junit_shared")
+      # Only copy if not already decompressed from .gz
+      if [[ ! -f "${ARTIFACT_DIR}/data-router/${filename}" ]]; then
+        cp "$junit_shared" "${ARTIFACT_DIR}/data-router/${filename}"
+        echo "Copied ${filename} from SHARED_DIR to ARTIFACT_DIR"
+      fi
+    fi
+  done
+
+  for junit_file in "${ARTIFACT_DIR}"/data-router/junit-results-*.xml; do
     if [[ ! -f "$junit_file" ]]; then
       continue
     fi
@@ -204,9 +228,9 @@ save_data_router_metadata() {
     --arg name "$JOB_NAME" \
     --arg description "[View job run details](${JOB_URL})" \
     --arg job_type "$JOB_TYPE" \
-    --arg pr "$GIT_PR_NUMBER" \
+    --arg pr "${GIT_PR_NUMBER:-}" \
     --arg job_name "$JOB_NAME" \
-    --arg tag_name "$TAG_NAME" \
+    --arg tag_name "${TAG_NAME:-}" \
     --arg install_method "$install_method" \
     --arg cluster_type "$cluster_type" \
     --arg container_platform "$CONTAINER_PLATFORM" \
@@ -270,9 +294,9 @@ main() {
     for ((i = 1; i <= max_attempts; i++)); do
       echo "Attempt ${i} of ${max_attempts} to send test results through Data Router."
 
-      # Check if JUnit results files exist in SHARED_DIR
+      # Check if JUnit results files exist in ARTIFACT_DIR (decompressed by process_junit_files)
       local junit_files_found=false
-      for file in "${SHARED_DIR}"/junit-*.xml; do
+      for file in "${ARTIFACT_DIR}"/data-router/junit-*.xml; do
         if [[ -f "$file" ]]; then
           junit_files_found=true
           break
@@ -280,15 +304,15 @@ main() {
       done
 
       if [[ "$junit_files_found" == false ]]; then
-        echo "ERROR: No JUnit results files (junit-*.xml) found in ${SHARED_DIR}"
-        return
+        echo "WARNING: No JUnit results files (junit-*.xml) found in ${ARTIFACT_DIR}/data-router, skipping Data Router upload"
+        return 0
       fi
 
       if output=$(droute send --metadata "$(get_metadata_output_path)" \
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
           --password "${DATA_ROUTER_PASSWORD}" \
-          --results "${SHARED_DIR}/junit-*.xml" \
+          --results "${ARTIFACT_DIR}/data-router/junit-*.xml" \
           --verbose --wirelog 2>&1) && \
         DATA_ROUTER_REQUEST_ID=$(echo "$output" | grep "request:" | awk '{print $2}') &&
         [ -n "$DATA_ROUTER_REQUEST_ID" ]; then
@@ -349,3 +373,6 @@ main() {
 }
 
 main
+
+# Ensure this reporting step never fails the CI job regardless of what main() returned
+exit 0

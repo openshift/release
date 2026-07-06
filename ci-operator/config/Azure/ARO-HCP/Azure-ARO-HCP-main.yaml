@@ -108,6 +108,7 @@ images:
       COPY /src /opt/app-root/src/github.com/Azure
       WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
       ENV GOFLAGS='-mod=readonly'
+      ENV GOSUMDB=off
       RUN make -C tooling/templatize templatize && \
           go clean -cache -modcache && rm -f go.work.sum
       RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
@@ -199,7 +200,7 @@ tests:
     test:
     - ref: aro-hcp-observability-verify
 - as: observability-prometheus
-  run_if_changed: ^observability/(alerts|prometheus)/
+  run_if_changed: ^(?:observability/|(?:.*\/)?alerts/|tooling/prometheus-rules/|dev-infrastructure/modules/metrics/rules/)
   steps:
     test:
     - ref: aro-hcp-observability-prometheus

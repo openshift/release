@@ -1,8 +1,8 @@
 base_images:
-  os-min8:
+  os-min9:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
+    tag: "9"
 binary_build_commands: make build
 build_root:
   project_image:
@@ -10,7 +10,7 @@ build_root:
 images:
   items:
   - dockerfile_path: Dockerfile
-    from: os-min8
+    from: os-min9
     inputs:
       bin:
         paths:
@@ -23,28 +23,31 @@ promotion:
     namespace: ocp-kni
 releases:
   initial:
-    integration:
-      name: "4.10"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
   latest:
-    integration:
-      include_built_images: true
-      name: "4.10"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 150m
+      memory: 250Mi
 tests:
 - as: ci-unit
   commands: make test-unit
   container:
     from: src
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
 - as: ci-e2e-test
   commands: make ci-job-e2e
   container:
     from: src
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
 zz_generated_metadata:
   branch: main
   org: openshift-kni

@@ -9,17 +9,58 @@ data:
   config.yaml: |
     default_branch:
       configs_promoting_to: "5.0"
-      targets:
-      - "5.0"
-      - "5.1"
-      ignore:
-      - Azure/ARO-HCP
+      forward:
+      - family: release
+        targets:
+        - "5.0"
+        - "5.1"
+        ignore:
+        - org: Azure
+          repo: ARO-HCP
+        - org: openshift-eng
+        - org: openshift-priv
+          repo: ocp-build-data
+      - family: openshift
+        targets:
+        - "5.0"
+        - "5.1"
+        only:
+        - org: openshift
+          repo: kubecsr
+        - org: openshift-priv
+          repo: kubecsr
+        ignore:
+        - org: Azure
+          repo: ARO-HCP
+        - org: openshift-eng
+        - org: openshift-priv
+          repo: ocp-build-data
     release_branches:
     - source: "5.0"
-      targets:
-      - "4.23"
-      ignore:
-      - Azure/ARO-HCP
+      forward:
+      - family: release
+        targets:
+        - "4.23"
+        ignore:
+        - org: Azure
+          repo: ARO-HCP
+        - org: openshift-eng
+        - org: openshift-priv
+          repo: ocp-build-data
+      - family: openshift
+        targets:
+        - "4.23"
+        only:
+        - org: openshift
+          repo: kubecsr
+        - org: openshift-priv
+          repo: kubecsr
+        ignore:
+        - org: Azure
+          repo: ARO-HCP
+        - org: openshift-eng
+        - org: openshift-priv
+          repo: ocp-build-data
 ---
 apiVersion: v1
 kind: Service
@@ -168,7 +209,12 @@ spec:
         - --forwarding-config=/etc/repo-brancher-controller/config.yaml
         - --plugin-config-dir=/var/repo/release/core-services/prow/02_config
         - --github-token-path=/etc/github/oauth
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
         - --hmac-secret-file=/etc/webhook/hmac.yaml
+        - --slack-token-path=/etc/slack/oauth_token
+        - --ops-channel-id=CHY2E1BL4
         - --endpoint=/
         - --port=8888
         command:
@@ -210,6 +256,9 @@ spec:
         - mountPath: /etc/webhook
           name: hmac
           readOnly: true
+        - mountPath: /etc/slack
+          name: slack
+          readOnly: true
         - mountPath: /etc/repo-brancher-controller
           name: config
           readOnly: true
@@ -222,6 +271,9 @@ spec:
       - name: hmac
         secret:
           secretName: github-webhook-credentials
+      - name: slack
+        secret:
+          secretName: slack-credentials-dptp-bot
       - configMap:
           name: repo-brancher-controller
         name: config

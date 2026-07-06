@@ -120,7 +120,7 @@ for i in $(seq 0 "${PTP_CYCLE_COUNT}"); do
 done
 
 echo "Process report files on bastion"
-BASTION_REPORT_DIR="/tmp/ptp_reports"
+BASTION_REPORT_DIR="/tmp/test_reports"
 ansible-playbook ./playbooks/ran/deploy-run-eco-gotests-ptp-gm.yaml \
   -i ./inventories/ocp-deployment/build-inventory.py \
   --tags process \

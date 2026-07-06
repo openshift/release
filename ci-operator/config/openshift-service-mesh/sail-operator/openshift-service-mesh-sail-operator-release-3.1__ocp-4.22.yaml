@@ -97,8 +97,9 @@ tests:
   secrets:
   - mount_path: /creds-github
     name: ossm-github-simple-job
-- as: e2e-ocp
-  skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+- always_run: false
+  as: e2e-ocp
+  pipeline_skip_if_only_changed: (^(docs|\.github|\.claude|\.cursor)/)|(\.md$)|((^|/)OWNERS$)|(^\.gitignore$)|(^LICENSE$)
   steps:
     cluster_profile: ossm-aws
     env:
@@ -117,7 +118,14 @@ tests:
     - ref: servicemesh-sail-operator-e2e-ocp
     workflow: servicemesh-istio-e2e-profile
 - as: e2e-ocp-arm
-  skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+  postsubmit: true
+  reporter_config:
+    channel: '#team-ossm-quality'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: ossm-aws
     env:
@@ -137,8 +145,31 @@ tests:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-sail-operator-e2e-ocp
     workflow: servicemesh-istio-e2e-profile
-- as: scorecard
-  run_if_changed: ^bundle/
+- always_run: false
+  as: e2e-ocp-arm-retest
+  optional: true
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      HUB: quay.io/sail-dev
+      INSTALLATION_METHOD: helm
+      MAISTRA_BUILDER_IMAGE: registry.istio.io/testing/build-tools:release-1.26-512a1e34a2bc63dd3c54ddcba27df1bcf95e7360
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      OCP_ARCH: arm64
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: report.xml
+      TEST_SUITE_DESC: Sail Operator e2e
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-sail-operator-e2e-ocp
+    workflow: servicemesh-istio-e2e-profile
+- always_run: false
+  as: scorecard
+  pipeline_run_if_changed: ^bundle/
   steps:
     cluster_profile: ossm-aws
     env:

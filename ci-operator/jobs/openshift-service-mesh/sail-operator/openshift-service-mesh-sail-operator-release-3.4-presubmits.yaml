@@ -2,6 +2,8 @@ presubmits:
   openshift-service-mesh/sail-operator:
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: (^(docs|\.github|\.claude|\.cursor)/)|(\.md$)|((^|/)OWNERS$)|(^\.gitignore$)|(^LICENSE$)
     branches:
     - ^release-3\.4$
     - ^release-3\.4-
@@ -18,7 +20,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-service-mesh-sail-operator-release-3.4-ocp-4.22-e2e-ocp
     rerun_command: /test ocp-4.22-e2e-ocp
-    skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
     spec:
       containers:
       - args:
@@ -91,7 +92,7 @@ presubmits:
     - ^release-3\.4$
     - ^release-3\.4-
     cluster: build01
-    context: ci/prow/ocp-4.22-e2e-ocp-arm
+    context: ci/prow/ocp-4.22-e2e-ocp-arm-retest
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -101,9 +102,9 @@ presubmits:
       ci-operator.openshift.io/variant: ocp-4.22
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-release-3.4-ocp-4.22-e2e-ocp-arm
-    rerun_command: /test ocp-4.22-e2e-ocp-arm
-    skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+    name: pull-ci-openshift-service-mesh-sail-operator-release-3.4-ocp-4.22-e2e-ocp-arm-retest
+    optional: true
+    rerun_command: /test ocp-4.22-e2e-ocp-arm-retest
     spec:
       containers:
       - args:
@@ -112,7 +113,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-arm
+        - --target=e2e-ocp-arm-retest
         - --variant=ocp-4.22
         command:
         - ci-operator
@@ -169,7 +170,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.22-e2e-ocp-arm,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.22-e2e-ocp-arm-retest,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -367,6 +368,8 @@ presubmits:
     trigger: (?m)^/test( | .* )ocp-4.22-lint,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^bundle/
     branches:
     - ^release-3\.4$
     - ^release-3\.4-
@@ -383,7 +386,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-service-mesh-sail-operator-release-3.4-ocp-4.22-scorecard
     rerun_command: /test ocp-4.22-scorecard
-    run_if_changed: ^bundle/
     spec:
       containers:
       - args:

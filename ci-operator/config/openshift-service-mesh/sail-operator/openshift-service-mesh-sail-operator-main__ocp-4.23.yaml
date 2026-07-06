@@ -24,8 +24,34 @@ resources:
       cpu: "2"
       memory: 2Gi
 tests:
-- as: e2e-ocp
-  skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+- as: e2e-next-ocp
+  postsubmit: true
+  reporter_config:
+    channel: '#team-ossm-quality'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      HUB: quay.io/sail-dev
+      INSTALLATION_METHOD: helm
+      MAISTRA_BUILDER_IMAGE: registry.istio.io/testing/build-tools:master-63fd6eec6f3df5a3ed4e190e60153ef3425f66b4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: report.xml
+      TEST_SUITE_DESC: Sail Operator e2e
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-sail-operator-e2e-ocp
+    workflow: servicemesh-istio-e2e-profile
+- always_run: false
+  as: e2e-next-ocp-retest
+  optional: true
   steps:
     cluster_profile: ossm-aws
     env:

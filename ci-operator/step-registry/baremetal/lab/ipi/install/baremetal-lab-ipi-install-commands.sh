@@ -157,6 +157,9 @@ echo "[INFO] Processing the platform.baremetal.hosts list in the install-config.
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  echo "Power off #${host} (${name}) and prepare host bmc conf for installation..."
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe" "no_power_on"
+
   if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
     # Do not add additional workers if we need to run them as day2 (e.g., to test cluster-api)
     echo "{INFO} Additional worker ${name} will be added as day2 operation"
@@ -216,8 +219,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # Patch the install-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
   yq --inplace eval-all 'select(fileIndex == 0).platform.baremetal.hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
     "$SHARED_DIR/install-config.yaml" - <<< "$ADAPTED_YAML"
-  echo "Power off #${host} (${name}) and prepare host bmc conf for installation..."
-  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe" "no_power_on"
 done
 
 echo "[INFO] Looking for patches to the install-config.yaml..."

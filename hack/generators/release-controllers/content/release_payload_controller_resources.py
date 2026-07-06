@@ -240,15 +240,57 @@ def _deployment_resources(gendoc):
                                 'command': [
                                     '/usr/bin/release-payload-controller',
                                     'start',
+                                    '--release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml',
                                     '--namespace=ci',
                                     '-v=6',
+                                ],
+                                'env': [
+                                    {
+                                        'name': 'GOOGLE_PROJECT_ID',
+                                        'valueFrom': {
+                                            'secretKeyRef': {
+                                                'key': 'project_id',
+                                                'name': 'release-payload-controller-google-credentials',
+                                            }
+                                        }
+                                    },
+                                    {
+                                        'name': 'GOOGLE_APPLICATION_CREDENTIALS',
+                                        'value': '/etc/gcs/credentials.json',
+                                    }
                                 ],
                                 'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-payload-controller_latest',
                                 'imagePullPolicy': 'Always',
                                 'name': 'controller',
+                                'volumeMounts': [
+                                    {
+                                        'mountPath': '/etc/gcs',
+                                        'name': 'google-credentials',
+                                    },
+                                    {
+                                        'name': 'qualifiers-config',
+                                        'mountPath': '/etc/qualifiers-config',
+                                        'readOnly': True
+                                    }
+                                ]
                             }
                         ],
                         'serviceAccountName': 'release-payload-controller',
+                        'volumes': [
+                            {
+                                'name': 'google-credentials',
+                                'secret': {
+                                    'defaultMode': 420,
+                                    'secretName': 'release-payload-controller-google-credentials',
+                                }
+                            },
+                            {
+                                'name': 'qualifiers-config',
+                                'configMap': {
+                                    'name': 'release-controller-release-qualifiers',
+                                }
+                            }
+                        ]
                     }
                 }
             }

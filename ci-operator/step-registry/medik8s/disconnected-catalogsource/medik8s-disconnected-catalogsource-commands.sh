@@ -9,7 +9,7 @@ source "${SHARED_DIR}/medik8s-lib.sh" || {
 
 declare CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-medik8s-catalog}"
 declare IDMS_NAME="${IDMS_NAME:-medik8s-disconnected}"
-declare OCP_VERSION="${OCP_VERSION:-}"
+declare OCP_VERSION="${FBC_OCP_VERSION:-${OCP_VERSION:-}}"
 declare GIT_REF="${GIT_REF:-main}"
 declare FBC_COMMIT_SHA="${FBC_COMMIT_SHA:-}"
 # shellcheck disable=SC2034 # used by medik8s-lib.sh verify_fbc_image()
@@ -18,6 +18,9 @@ declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-b
 
 collect_artifacts() {
     log "Collecting debug artifacts..."
+    for mcp in master worker; do
+        oc patch mcp "${mcp}" --type=merge --patch '{"spec":{"paused":false}}' 2>/dev/null || true
+    done
     {
         oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE_NAME" -o yaml 2>/dev/null \
             > "${ARTIFACT_DIR}/catalogsource.yaml"
@@ -81,12 +84,7 @@ create_registries_conf() {
     local idms_file="${TMP_DIR}/idms-source.yaml"
     local registries_conf="${TMP_DIR}/registries.conf"
 
-    # --insecure: gitlab.cee uses internal RH CA not trusted by CI pods
-    curl --insecure -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 60 \
-        "$idms_url" -o "$idms_file" || {
-        log "ERROR: Failed to fetch IDMS from $idms_url"
-        exit 1
-    }
+    gitlab_fetch "$idms_url" "$idms_file" || exit 1
 
     awk '
         /^[[:space:]]*- mirrors:/ { in_mirrors=1; got_mirror=0 }
@@ -141,15 +139,35 @@ EOF
     log "ImageSetConfiguration:"
     cat "${TMP_DIR}/imageset-config.yaml"
 
+    # Two-pass disk-based mirroring so oc-mirror rewrites catalog references.
+    # mirrorToMirror (single-pass) leaves bundle image refs as the original
+    # registry.redhat.io URLs inside the FBC; OLM's bundle unpack Job then
+    # tries to pull from the original source (unreachable in disconnected mode)
+    # and hangs until the 10-min activeDeadlineSeconds.
+    # mirrorToDisk → diskToMirror rewrites all refs to mirror URLs, so OLM
+    # reads the mirror URL directly from the catalog — no IDMS redirect needed.
+
+    log "Pass 1: mirror catalog and operator images to local disk..."
     run env CONTAINERS_REGISTRIES_CONF="${CONTAINERS_REGISTRIES_CONF}" \
         /tmp/oc-mirror --v2 \
         --config="${TMP_DIR}/imageset-config.yaml" \
-        --workspace="file://${TMP_DIR}" \
-        "docker://${MIRROR_REGISTRY_HOST}" \
-        --dest-tls-verify=false \
+        "file://${TMP_DIR}" \
         --src-tls-verify=false \
         --log-level=info || {
-        log "ERROR: oc-mirror failed"
+        log "ERROR: oc-mirror pass 1 (mirrorToDisk) failed"
+        tar --exclude='./run/containers' --exclude='./.dockerconfigjson' \
+            -czC "${TMP_DIR}" -f "${ARTIFACT_DIR}/mirror-debug.tar.gz" . 2>/dev/null || true
+        return 1
+    }
+
+    log "Pass 2: push images from disk to mirror registry (rewrites catalog refs to mirror URLs)..."
+    run /tmp/oc-mirror --v2 \
+        --config="${TMP_DIR}/imageset-config.yaml" \
+        --from "file://${TMP_DIR}" \
+        "docker://${MIRROR_REGISTRY_HOST}" \
+        --dest-tls-verify=false \
+        --log-level=info || {
+        log "ERROR: oc-mirror pass 2 (diskToMirror) failed"
         tar --exclude='./run/containers' --exclude='./.dockerconfigjson' \
             -czC "${TMP_DIR}" -f "${ARTIFACT_DIR}/mirror-debug.tar.gz" . 2>/dev/null || true
         return 1
@@ -169,36 +187,40 @@ create_idms_disconnected() {
         exit 1
     fi
 
+    # Pause MCPs before applying any mirror resources so all changes are batched
+    # into a single MCO rollout (pattern from cnv/deploy-cnv).
+    log "Pausing MCPs to batch mirror config changes into a single rollout..."
+    for mcp in master worker; do
+        oc patch mcp "${mcp}" --type=merge --patch '{"spec":{"paused":true}}' 2>/dev/null || true
+    done
+
     local mcp_configs_before
     mcp_configs_before=$(oc get mcp -o jsonpath="$MCP_CONFIG_JSONPATH" 2>/dev/null || true)
 
-    {
-        echo "apiVersion: config.openshift.io/v1"
-        echo "kind: ImageDigestMirrorSet"
-        echo "metadata:"
-        echo "  name: ${IDMS_NAME}"
-        echo "spec:"
-        echo "  imageDigestMirrors:"
-        awk -v mirror_host="${MIRROR_REGISTRY_HOST}" '
-            /^[[:space:]]*- mirrors:/ { in_mirrors=1; got_mirror=0 }
-            in_mirrors && /^[[:space:]]*- quay\.io/ && !got_mirror {
-                gsub(/^[[:space:]]*- /, "", $0); mirror=$0; got_mirror=1
-                gsub(/^quay\.io\//, "", mirror); mirror_path=mirror
-            }
-            /^[[:space:]]*source:/ {
-                source=$NF; in_mirrors=0
-                if (mirror_path != "" && source != "") {
-                    printf "  - source: %s\n    mirrors:\n    - %s/%s\n", source, mirror_host, mirror_path
-                }
-                mirror_path=""
-            }
-        ' "$idms_file"
-        local fbc_parent="${FBC_IMAGE_REPO%/*}"
-        local fbc_parent_path="${fbc_parent#quay.io/}"
-        echo "  - source: ${fbc_parent}"
-        echo "    mirrors:"
-        echo "    - ${MIRROR_REGISTRY_HOST}/${fbc_parent_path}"
-    } | oc apply -f -
+    # Apply ONLY the oc-mirror generated IDMS. It has the correct source→mirror
+    # mappings matching exactly where oc-mirror pushed the images:
+    #   registry.redhat.io/workload-availability → ec2-xxx:5000/workload-availability
+    #
+    # Do NOT apply the GitLab images-mirror-set.yaml IDMS. That file maps bundle
+    # images to their Konflux build locations (quay.io/redhat-user-workloads/rhwa-
+    # tenant/storage-based-remediation/sbr-bundle-0-3), which is a different path
+    # than where oc-mirror puts them. Applying it creates a more-specific IDMS
+    # entry that overrides the oc-mirror mapping with a wrong mirror path →
+    # "manifest unknown" when the bundle unpack Job tries to pull.
+    local ocmirror_idms="${TMP_DIR}/working-dir/cluster-resources/idms-oc-mirror.yaml"
+    if [[ -f "$ocmirror_idms" ]]; then
+        log "Applying oc-mirror generated IDMS (exact source→mirror mappings)..."
+        oc apply -f "$ocmirror_idms"
+    else
+        log "ERROR: oc-mirror IDMS not found at ${ocmirror_idms}"
+        exit 1
+    fi
+
+    # Resume MCPs — single consolidated rollout with only the correct IDMS.
+    log "Resuming MCPs to trigger MCO rollout..."
+    for mcp in master worker; do
+        oc patch mcp "${mcp}" --type=merge --patch '{"spec":{"paused":false}}' 2>/dev/null || true
+    done
 
     wait_for_mcp_rollout "$mcp_configs_before"
 }
@@ -207,6 +229,25 @@ create_catalogsource() {
     local original_image="${FBC_IMAGE_REPO}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
     local image_path="${original_image#quay.io/}"
     local catalog_image="${MIRROR_REGISTRY_HOST}/${image_path}"
+
+    # Create a pull secret in openshift-marketplace so OLM's bundle unpack Job
+    # has explicit credentials for the mirror registry. Without this, the Job
+    # relies solely on the cluster's global pull-secret for IDMS-redirected pulls,
+    # which consistently fails for the registry.redhat.io → mirror redirect path.
+    local mirror_secret_name="medik8s-mirror-pull-secret"
+    local mirror_registry_auth
+    mirror_registry_auth=$(head -n 1 /var/run/vault/mirror-registry/registry_creds | base64 -w 0)
+    log "Creating mirror pull secret ${mirror_secret_name} in openshift-marketplace..."
+    cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${mirror_secret_name}
+  namespace: openshift-marketplace
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: $(echo -n "{\"auths\":{\"${MIRROR_REGISTRY_HOST}\":{\"auth\":\"${mirror_registry_auth}\"}}}" | base64 -w 0)
+EOF
 
     log "Creating CatalogSource ${CATALOG_SOURCE_NAME} with mirrored image: ${catalog_image}"
 
@@ -218,13 +259,10 @@ metadata:
   namespace: openshift-marketplace
 spec:
   displayName: medik8s Catalog (disconnected)
-  grpcPodConfig:
-    extractContent:
-      cacheDir: /tmp/cache
-      catalogDir: /configs
-    memoryTarget: 30Mi
   image: "${catalog_image}"
   publisher: medik8s QE
+  secrets:
+  - ${mirror_secret_name}
   sourceType: grpc
   updateStrategy:
     registryPoll:
@@ -235,9 +273,6 @@ EOF
 main() {
     log "=== medik8s Disconnected CatalogSource Setup ==="
     trap 'collect_artifacts' EXIT
-    set_proxy
-    run oc whoami
-    run oc version -o yaml
 
     if [[ ! "$OCP_VERSION" =~ ^[0-9]{2,4}$ ]]; then
         log "ERROR: OCP_VERSION must be a 2-4 digit string (e.g., '422' for OCP 4.22)"
@@ -249,12 +284,21 @@ main() {
     mkdir -p "${XDG_RUNTIME_DIR}/containers"
     cd "$TMP_DIR"
 
+    # Resolve GitLab refs and fetch IDMS BEFORE setting the proxy.
+    # set_proxy routes all traffic through the bastion Squid proxy
+    # (port 3128) in disconnected envs — that proxy cannot reliably
+    # reach gitlab.cee.redhat.com, causing 503 / timeout failures.
     resolve_commit_sha
     verify_fbc_image
+    create_registries_conf
+
+    set_proxy
+    run oc whoami
+    run oc version -o yaml
+
     check_mirror_registry
     configure_host_pull_secret
     install_oc_mirror
-    create_registries_conf
     mirror_catalog_and_operators
     create_idms_disconnected
     ensure_marketplace
