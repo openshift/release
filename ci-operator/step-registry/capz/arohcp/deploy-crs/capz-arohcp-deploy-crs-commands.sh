@@ -1,0 +1,1 @@
+../../test/deploy-crs/capz-test-deploy-crs-commands.sh

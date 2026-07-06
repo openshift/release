@@ -1,2 +1,119 @@
+# Release Qualifiers Global Configuration
+#
+# This file defines all release qualifiers used by the release-controller. Each qualifier
+# represents a gate or signal that determines if a release payload is fit for promotion.
+# The file is hot-reloaded; changes take effect without restarting the controller.
+#
+# Type definitions: pkg/releasequalifiers/types.go
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# Schema Reference
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# qualifiers:
+#   <qualifier-id>:                      # Unique kebab-case identifier (e.g. "crt", "sdn-e2e")
+#
+#     enabled: true|false                # Whether this qualifier is active (optional, omit = unset)
+#
+#     approval: true|false               # Whether this qualifier is earned via team approval
+#                                        # rather than automated job results (optional, omit = unset)
+#
+#     badgeName: "<short name>"          # Short label displayed as a UI badge in job-level summaries
+#
+#     summary: "<brief description>"     # One-line description of what this qualifier represents
+#
+#     description: "<detailed text>"     # Longer description for tooltips or detailed views
+#
+#     payloadBadgeStatus: "<status>"     # Controls when the badge appears at the ReleasePayload level
+#                                        # Values: "Yes"       - always show
+#                                        #         "No"        - never show
+#                                        #         "OnSuccess" - show only when qualifying jobs pass
+#                                        #         "OnFailure" - show only when qualifying jobs fail
+#
+#     failureLabels:                     # Labels applied when qualifying jobs fail
+#       - "<label>"
+#
+#     notifications:                     # Notification channel configuration
+#       jira:                            # Jira ticket integration
+#         project: "<PROJECT_KEY>"       # Jira project key (e.g. "CRT", "TRT")
+#         component: "<component>"       # Jira component name
+#         assignee: "<user@example.com>" # Default ticket assignee
+#         summary: "<ticket summary>"    # Default Jira ticket summary text
+#         description: "<ticket body>"   # Default Jira ticket description text
+#         thread: "<thread-id>"          # Thread identifier; different values produce separate tickets
+#
+#         escalations:                   # Escalation rules (evaluated in order)
+#           - name: "<escalation-name>"  # Unique name for this escalation level
+#
+#             # ── Trigger conditions (pick one pattern) ──────────────────────
+#             #
+#             # Consecutive failures:
+#             failures: <n>              # Escalate after N consecutive failures
+#             #
+#             # Failures within a window:
+#             failures: <n>              # Total failure count threshold
+#             overLastRuns: <n>          # Window of recent runs to evaluate (min: 1)
+#             #
+#             # Pass-rate threshold (requires overLastRuns):
+#             passPercentage: <0-100>    # Escalate when pass rate drops below this %
+#             overLastRuns: <n>          # Window of recent runs to evaluate
+#             #
+#             # Time-bounded window (extends overLastRuns):
+#             overPeriod: "<duration>"   # Time window, e.g. "1h", "24h", "2d", "1w"
+#
+#             # ── Actions ────────────────────────────────────────────────────
+#             priority: "<jira priority>"  # Jira priority: Low, Normal, Major, High, Critical
+#             mentions:                    # Users to mention in the Jira ticket
+#               - "<user@example.com>"
+#             needsInfo:                   # Users to request information from
+#               - "<user@example.com>"
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# Example
+# ──────────────────────────────────────────────────────────────────────────────
+#
+#   qualifiers:
+#     my-qualifier:
+#       enabled: true
+#       badgeName: "MQ"
+#       summary: "My Qualifier"
+#       description: "Verifies that my-component passes end-to-end tests"
+#       payloadBadgeStatus: "OnFailure"
+#       failureLabels:
+#         - "my-component-failure"
+#       notifications:
+#         jira:
+#           project: "MYPROJ"
+#           component: "my-component"
+#           assignee: "oncall@example.com"
+#           summary: "my-qualifier job failures"
+#           description: "Automated ticket for my-qualifier failures"
+#           thread: "my-qualifier-thread"
+#           escalations:
+#             - name: "low"
+#               failures: 2
+#               priority: "Low"
+#             - name: "high"
+#               failures: 5
+#               priority: "High"
+#               mentions:
+#                 - "lead@example.com"
+#             - name: "critical"
+#               passPercentage: 50
+#               overLastRuns: 20
+#               overPeriod: "2d"
+#               priority: "Critical"
+#               mentions:
+#                 - "lead@example.com"
+#               needsInfo:
+#                 - "sme@example.com"
+#
 ---
-qualifiers: {}
+qualifiers:
+  qe:
+    enabled: true
+    approval: true
+    badgeName: "QE"
+    summary: "QE Approval"
+    description: "Automatically generated badge applied whenever QE approves a ReleasePayload"
+    payloadBadgeStatus: "Yes"

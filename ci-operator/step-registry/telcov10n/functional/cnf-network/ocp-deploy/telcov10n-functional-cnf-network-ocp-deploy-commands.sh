@@ -65,7 +65,6 @@ if [[ "$CLUSTER_NAME" == "hlxcl3" || "$CLUSTER_NAME" == "hlxcl7" ]]; then
   MOUNTED_HOST_INVENTORY="/tmp"
 fi
 
-
 find ${MOUNTED_HOST_INVENTORY}/"${CLUSTER_NAME}"/ -mindepth 1 -type d | while read -r dir; do
     echo "Process group inventory file: ${dir}"
     process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"

@@ -24,7 +24,7 @@ spec:
   tags:
   - from:
       kind: DockerImage
-      name: image-registry.openshift-image-registry.svc:5000/ocp/4.23:tools
+      name: image-registry.openshift-image-registry.svc:5000/ocp/5.0:tools
     importPolicy:
       scheduled: true
     name: tools
@@ -424,6 +424,7 @@ spec:
         - --jira-endpoint=https://redhat.atlassian.net
         - --jira-username=openshift-release-controller-jira-bot@redhat.com
         - --jira-password-file=/etc/jira/bot-password
+        - --release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml
         env:
         - name: HOME
           value: /tmp/home
@@ -451,6 +452,9 @@ spec:
         volumeMounts:
         - mountPath: /etc/jira
           name: jira
+          readOnly: true
+        - mountPath: /etc/qualifiers-config
+          name: qualifiers-config
           readOnly: true
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
@@ -492,6 +496,9 @@ spec:
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
+      - configMap:
+          name: release-controller-release-qualifiers
+        name: qualifiers-config
       - name: internal-tls
         secret:
           secretName: release-controller-api-s390x-priv-tls

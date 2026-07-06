@@ -1,16 +1,24 @@
 ref:
   as: openshift-claude-agent-eval
-  from: latest
+  from: claude-ai-helpers
   commands: openshift-claude-agent-eval-commands.sh
   credentials:
   - namespace: test-credentials
-    name: hypershift-team-claude-prow
+    name: sa-claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: claude-payload-agent-github-token
+    mount_path: /var/run/github-token
   env:
   - name: EVAL_CONFIG
     default: "eval.yaml"
   - name: EVAL_MODEL
     default: "claude-opus-4-6"
+  - name: MULTISTAGE_PARAM_OVERRIDE_EVAL_MODEL
+    default: ""
+    documentation: |-
+      Gangway API override for EVAL_MODEL. When triggering via
+      Gangway, pass as pod_spec_options.envs.
   - name: EVAL_BASELINE
     default: ""
   - name: EVAL_PARALLELISM
@@ -20,6 +28,10 @@ ref:
   - name: EVAL_EXTRA_ARGS
     default: ""
   - name: EVAL_SETUP_SCRIPT
+    default: ""
+  - name: EVAL_CASES_DIR
+    default: ""
+  - name: EVAL_CHANGED_ONLY
     default: ""
   - name: EVAL_MAX_TURNS
     default: "100"
@@ -32,7 +44,9 @@ ref:
   - name: ANTHROPIC_VERTEX_PROJECT_ID
     default: "itpc-gcp-hybrid-pe-eng-claude"
   - name: GOOGLE_APPLICATION_CREDENTIALS
-    default: "/var/run/claude-code-service-account/claude-prow"
+    default: "/var/run/claude-code-service-account/token"
+  - name: GITHUB_TOKEN_PATH
+    default: "/var/run/github-token/token"
   resources:
     requests:
       cpu: 1000m

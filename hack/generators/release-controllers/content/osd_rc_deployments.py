@@ -24,7 +24,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.23:tools'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/5.0:tools'
                     },
                     'importPolicy': {
                         'scheduled': True
@@ -468,6 +468,7 @@ def _add_osd_rc_deployment(gendoc):
                                         "--jira-endpoint=https://redhat.atlassian.net",
                                         "--jira-username=openshift-release-controller-jira-bot@redhat.com",
                                         "--jira-password-file=/etc/jira/bot-password",
+                                        '--release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml',
                                         ],
                             'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',
                             'imagePullPolicy': 'Always',

@@ -43,6 +43,10 @@ finished()
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
 
+  if [[ -d "${ARTIFACT_DIR}/root/dev-scripts/logs" ]]; then
+    touch "${SHARED_DIR}/devscripts-logs-collected"
+  fi
+
   # Save exit code for must-gather to generate junit. Make eats exit
   # codes, so we try to fetch it from the dev-scripts artifacts if we can.
   status_file=${ARTIFACT_DIR}/root/dev-scripts/logs/installer-status.txt

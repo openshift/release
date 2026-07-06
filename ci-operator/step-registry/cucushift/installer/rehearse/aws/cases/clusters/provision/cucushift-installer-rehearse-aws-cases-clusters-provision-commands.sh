@@ -80,7 +80,7 @@ function post_actions() {
   
   update_result "Region" "${REGION}"
   update_result "CPType" "${CONTROL_PLANE_INSTANCE_TYPE}"
-  update_result "CPamily" "${CONTROL_PLANE_INSTANCE_TYPE_FAMILY}"
+  update_result "CPFamily" "${CONTROL_PLANE_INSTANCE_TYPE_FAMILY}"
   update_result "CType" "${COMPUTE_INSTANCE_TYPE}"
   update_result "CFamily" "${COMPUTE_INSTANCE_TYPE_FAMILY}"
   update_result "Arch" "${ARCH}"

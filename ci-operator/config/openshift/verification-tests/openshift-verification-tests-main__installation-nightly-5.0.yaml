@@ -405,11 +405,16 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-usgov-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.gcp.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-custom-dns
@@ -464,6 +469,32 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-upi
+- as: azure-ipi-all-instance-types-f1
+  cron: 29 1 * * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_FILTERS: "57148"
+      TEST_OBJECT: InstanceTypes
+    test:
+    - ref: openshift-extended-test-longduration
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-cases-clusters
+- as: azure-ipi-all-regions-f1
+  cron: 2 4 * * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_OBJECT: Regions
+    workflow: cucushift-installer-rehearse-azure-cases-clusters
 - as: azure-ipi-arm-f28-ota
   cron: 26 8 12 * *
   steps:
@@ -1072,8 +1103,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-upi-proxy
-- as: gcp-ipi-all-regions-f3
-  cron: 32 7 2,5,8,11,14,17,20,23,26,29 * *
+- as: gcp-ipi-all-regions-f1
+  cron: 44 17 * * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
@@ -1102,8 +1133,8 @@ tests:
     - ref: openshift-extended-test-longduration
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-gcp-cases-clusters
-- as: gcp-ipi-all-regions-without-storage-test-f3
-  cron: 50 10 1,4,7,10,13,16,19,22,25,28 * *
+- as: gcp-ipi-all-regions-without-storage-test-f2
+  cron: 39 13 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe

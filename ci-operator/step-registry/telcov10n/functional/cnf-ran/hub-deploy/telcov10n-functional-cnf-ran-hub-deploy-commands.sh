@@ -56,10 +56,10 @@ find "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/" -mindepth 1 -type d | while re
   process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
 done
 
-# fthub-01 and kni-qe-106 share the same hypervisor (hv16), but ci-operator
+# fthub-01, kni-qe-106, kni-qe-110 and kni-qe-111 share the same hypervisor (hv16), but ci-operator
 # cannot mount the same secret twice.
-if [ "${CLUSTER_NAME}" = "kni-qe-106" ]; then
-  echo "Processing shared hypervisor inventory for kni-qe-106 from fthub-01 mount"
+if [ "${CLUSTER_NAME}" = "kni-qe-106" ] || [ "${CLUSTER_NAME}" = "kni-qe-110" ] || [ "${CLUSTER_NAME}" = "kni-qe-111" ]; then
+  echo "Processing shared hypervisor inventory for ${CLUSTER_NAME} from fthub-01 mount"
   process_inventory "${MOUNTED_HOST_INVENTORY}/fthub-01/hypervisor" \
     /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
 fi
@@ -67,7 +67,7 @@ fi
 cd /eco-ci-cd
 
 echo "Running deploy-ocp-sno for ${CLUSTER_NAME} (version=${VERSION})"
-EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true"
+EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true release_age_max_days=14"
 if [ "${DISABLE_INSIGHTS}" = "true" ]; then
   EXTRA_VARS="${EXTRA_VARS} disable_insights=true"
 fi
@@ -79,6 +79,11 @@ ansible-playbook ./playbooks/deploy-ocp-sno.yml \
 echo "Copying inventory to SHARED_DIR"
 cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/
 cp -r /eco-ci-cd/inventories/ocp-deployment/group_vars/* "${SHARED_DIR}"/
+
+echo "Preserving seed hub inventory with seed- prefix for later restore"
+for key in bastion hypervisor master0 all bastions hypervisors nodes masters; do
+  [[ -f "${SHARED_DIR}/${key}" ]] && cp "${SHARED_DIR}/${key}" "${SHARED_DIR}/seed-${key}"
+done
 
 echo "Getting hub cluster version"
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"

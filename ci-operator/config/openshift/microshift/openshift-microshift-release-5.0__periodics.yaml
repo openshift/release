@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.23
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 releases:
   latest:
     candidate:
@@ -77,6 +77,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      EC2_INSTANCE_TYPE: c7i.8xlarge
       MICROSHIFT_OS: rhel-9.6
     workflow: openshift-microshift-e2e-metal-cache
   timeout: 4h0m0s
@@ -95,7 +96,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      EC2_INSTANCE_TYPE: c7g.2xlarge
+      EC2_INSTANCE_TYPE: c7g.8xlarge
       MICROSHIFT_OS: rhel-9.6
     workflow: openshift-microshift-e2e-metal-cache
   timeout: 4h0m0s
@@ -134,6 +135,24 @@ tests:
       EC2_INSTANCE_TYPE: c7g.metal
       MICROSHIFT_OS: rhel-9.6
       SCENARIO_TYPE: bootc-periodics-el10
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-c2cc-nightly
+  cron: 30 4 * * 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-c2cc
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-c2cc-arm-nightly
+  cron: 30 4 * * 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-c2cc
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-nightly
   cron: 30 3 * * 1-5

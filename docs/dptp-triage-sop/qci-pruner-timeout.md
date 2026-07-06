@@ -32,7 +32,7 @@ Background
 
 The pruner script (`hack/qci_registry_pruner.py`) performs the following operations:
 
-1. **Tag Pruning**: Iterates through all tags in `quay.io/openshift/ci` and deletes tags matching the pattern `YYYYMMDDHHMMSS_prune_*` that are older than the TTL (default 5 days)
+1. **Tag Pruning**: Iterates through all tags in `quay.io/openshift/ci` and deletes tags matching the pattern `YYYYMMDDHHMMSS_prune_*` that are older than the TTL (default 60 days)
 2. **Release Payload Preservation**: Manages preservation tags for release payload component images to prevent premature garbage collection
 3. **Tag Listing**: Uses Quay.io V2 API with keyset-based pagination to fetch tags (recently optimized with WIP V2 API, but still slow due to large tag count)
 
@@ -94,7 +94,7 @@ Run without `--confirm` to see what would be pruned without making changes:
 
 ```bash
 cd /path/to/release
-./hack/qci_registry_pruner.py --ttl-days 5
+./hack/qci_registry_pruner.py --ttl-days 60
 ```
 
 This will:
@@ -110,7 +110,7 @@ Once you've verified the dry run output, run with `--confirm`:
 
 ```bash
 cd /path/to/release
-./hack/qci_registry_pruner.py --confirm --ttl-days 5
+./hack/qci_registry_pruner.py --confirm --ttl-days 60
 ```
 
 Extended Run for Backlog
@@ -127,7 +127,7 @@ tmux new -s qci-pruner
 # Run the script
 cd /path/to/release
 while true; do
-    ./hack/qci_registry_pruner.py --confirm --ttl-days 5
+    ./hack/qci_registry_pruner.py --confirm --ttl-days 60
     echo "Run completed at $(date). Sleeping for 1 hour before next run..."
     sleep 3600  # Wait 1 hour between runs
 done
@@ -139,7 +139,7 @@ Script Options
 --------------
 
 - `--confirm`: Actually delete tags (required for production runs)
-- `--ttl-days N`: Only prune tags older than N days (default: 5, use `-1` for all prunable tags)
+- `--ttl-days N`: Only prune tags older than N days (default: 60, use `-1` for all prunable tags)
 - `--token TOKEN`: Quay OAuth token (alternative to `QUAY_OAUTH_TOKEN` env var)
 
 Monitoring Local Runs
@@ -168,7 +168,7 @@ Long-term Solutions
 
 1. **Increase Job Timeout**: Consider increasing the timeout in `ci-operator/jobs/infra-periodics.yaml` if the repository continues to grow
 2. **Optimize Tag Listing**: The script was recently optimized with WIP V2 API, but further optimizations may be needed
-3. **Reduce TTL**: Consider reducing the default TTL (currently 5 days) if appropriate
+3. **Adjust TTL**: Consider changing the default `--ttl-days` in `hack/qci_registry_pruner.py` if prune backlog or GC window needs tuning
 4. **Parallel Processing**: The deletion is already parallelized, but tag listing is sequential - consider parallelizing tag fetching if Quay API supports it
 5. **Incremental Processing**: Consider implementing checkpoint/resume functionality to avoid reprocessing all tags on each run
 

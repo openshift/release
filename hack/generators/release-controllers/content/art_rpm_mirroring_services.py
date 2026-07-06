@@ -21,9 +21,7 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
         file_prefix = f'ocp-{hyphened_version}-'
         repo_key = bn[len(file_prefix):]  # strip off prefix => "default" or "openstack-beta"
 
-        if repo_key == 'openstack-beta':
-            service_name = f'{repo_key}-{hyphened_version}'
-        elif repo_key == 'default':
+        if repo_key == 'default':
             service_name = f'base-{hyphened_version}'
         elif repo_key == 'openstack':
             service_name = f'base-openstack-{hyphened_version}'

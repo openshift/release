@@ -16,10 +16,7 @@ base_images:
     namespace: ocp
     tag: upi-installer
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+  from_repository: true
 releases:
   latest:
     candidate:
@@ -42,10 +39,12 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{end}}'
+    report_template: |-
+      *COO image source:* FBC from Konflux
+      *OCP Version:* 4.12
+      *Environment:* Azure
+
+      {{if eq .Status.State "success"}} :slack-green: {{else}} :failed: {{end}}Job *{{.Spec.Job}}* with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
   steps:
     cluster_profile: azure-observability
     env:

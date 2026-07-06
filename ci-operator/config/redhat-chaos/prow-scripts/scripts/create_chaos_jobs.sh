@@ -21,6 +21,10 @@ PRIOR_VERSION=$(scripts/get_prior_minor_version.sh "$TARGET_VERSION")
 TARGET_MINOR=$(echo "$TARGET_VERSION" | cut -d. -f2)
 PRIOR_MINOR=$(echo "$PRIOR_VERSION" | cut -d. -f2)
 
+# Version strings without dots for image name substitution (e.g. 4.21 -> 421)
+TARGET_VERSION_NODOT=$(echo "$TARGET_VERSION" | tr -d '.')
+PRIOR_VERSION_NODOT=$(echo "$PRIOR_VERSION" | tr -d '.')
+
 echo "Creating chaos test configurations for OCP ${TARGET_VERSION} based on ${PRIOR_VERSION}..."
 
 # Create nightly chaos test config
@@ -32,8 +36,8 @@ if [ -f "$NIGHTLY_SOURCE" ]; then
         -e "s/prow-ocp-${PRIOR_VERSION}/prow-ocp-${TARGET_VERSION}/g" \
         -e "s/prow-ocp-azure-${PRIOR_VERSION}/prow-ocp-azure-${TARGET_VERSION}/g" \
         -e "s/TicketId ${PRIOR_MINOR}[0-9]*/TicketId ${TARGET_MINOR}0/g" \
-        -e "s/cerberus-main-prow-${PRIOR_MINOR}[0-9]*/cerberus-main-prow-${TARGET_MINOR}0/g" \
-        -e "s/prow-scripts-${PRIOR_MINOR}[0-9]*/prow-scripts-${TARGET_MINOR}0/g" \
+        -e "s/cerberus-main-prow-${PRIOR_VERSION_NODOT}/cerberus-main-prow-${TARGET_VERSION_NODOT}/g" \
+        -e "s/prow-scripts-${PRIOR_VERSION_NODOT}/prow-scripts-${TARGET_VERSION_NODOT}/g" \
         -e "s/variant: ${PRIOR_VERSION}-nightly/variant: ${TARGET_VERSION}-nightly/g" \
         "$NIGHTLY_SOURCE" > "$NIGHTLY_TARGET"
     echo "Created: $NIGHTLY_TARGET"
@@ -50,7 +54,7 @@ if [ -f "$ROSA_SOURCE" ]; then
         -e "s/OPENSHIFT_VERSION: \"${PRIOR_VERSION}\"/OPENSHIFT_VERSION: \"${TARGET_VERSION}\"/g" \
         -e "s/prow-rosa-${PRIOR_VERSION}/prow-rosa-${TARGET_VERSION}/g" \
         -e "s/TicketId:${PRIOR_MINOR}[0-9]*/TicketId:${TARGET_MINOR}0/g" \
-        -e "s/cerberus-main-prow-rosa-${PRIOR_MINOR}[0-9]*/cerberus-main-prow-rosa-${TARGET_MINOR}0/g" \
+        -e "s/cerberus-main-prow-rosa-${PRIOR_VERSION_NODOT}/cerberus-main-prow-rosa-${TARGET_VERSION_NODOT}/g" \
         -e "s/variant: rosa-${PRIOR_VERSION}-nightly/variant: rosa-${TARGET_VERSION}-nightly/g" \
         "$ROSA_SOURCE" > "$ROSA_TARGET"
     echo "Created: $ROSA_TARGET"
@@ -66,7 +70,7 @@ if [ -f "$CR_SOURCE" ]; then
     sed -e "s/\"${PRIOR_VERSION}\"/\"${TARGET_VERSION}\"/g" \
         -e "s/prow-ocp-${PRIOR_VERSION}-component-readiness/prow-ocp-${TARGET_VERSION}-component-readiness/g" \
         -e "s/TicketId ${PRIOR_MINOR}[0-9]*/TicketId ${TARGET_MINOR}0/g" \
-        -e "s/cerberus-main-prow-${PRIOR_MINOR}[0-9]*/cerberus-main-prow-${TARGET_MINOR}0/g" \
+        -e "s/cerberus-main-prow-${PRIOR_VERSION_NODOT}/cerberus-main-prow-${TARGET_VERSION_NODOT}/g" \
         -e "s/variant: cr-${PRIOR_VERSION}-nightly/variant: cr-${TARGET_VERSION}-nightly/g" \
         "$CR_SOURCE" > "$CR_TARGET"
     echo "Created: $CR_TARGET"

@@ -1,0 +1,43 @@
+ref:
+  as: openshift-agentic-trt-review-responder
+  from: sippy-agentic-dev
+  commands: openshift-agentic-trt-review-responder-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: trt-agent-gh-app
+    mount_path: /var/run/github-token
+  env:
+  - name: UPSTREAM_REPO
+  - name: FORK_REPO
+  - name: SETUP_SCRIPT
+    default: "hack/agentic_setup.sh"
+  - name: ALLOWED_TOOLS
+    default: "Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate TodoWrite ToolSearch"
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "global"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/claude-prow"
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+  nested_podman: true
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 3h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Polls for review comments and CI check failures on a PR, invoking
+    Claude to address them. Checks every 5 minutes until at least 6
+    iterations have passed AND 3 consecutive idle iterations occur.
+    Fetches inline review comments, PR reviews, and PR conversation
+    comments. Checks presubmit CI status and attempts to fix failures.
+    Filters to trusted users only (openshift org members + coderabbit).
+    Reads PR number from SHARED_DIR (written by jira-solver or pr-followup).

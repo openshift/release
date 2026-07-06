@@ -6,6 +6,8 @@ set -o pipefail
 MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-""}
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
 
+export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+
 if [ ! -f "${KUBECONFIG}" ]; then
 	echo "No kubeconfig, so no point in calling must-gather."
 	exit 0

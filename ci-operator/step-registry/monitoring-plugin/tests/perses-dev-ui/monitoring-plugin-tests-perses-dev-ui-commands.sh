@@ -79,7 +79,7 @@ function copyArtifacts {
 users=""
 htpass_file=/tmp/users.htpasswd
 
-for i in $(seq 1 5); do
+for i in $(seq 1 6); do
     username="uiauto-test-${i}"
     password=$(tr </dev/urandom -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)
     users+="${username}:${password},"

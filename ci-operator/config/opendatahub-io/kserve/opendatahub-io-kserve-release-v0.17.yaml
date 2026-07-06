@@ -39,6 +39,8 @@ images:
   - context_dir: .
     dockerfile_path: router.Dockerfile
     to: kserve-router
+  - dockerfile_path: kserve-module-controller.Dockerfile
+    to: kserve-module-controller
   - context_dir: python/
     dockerfile_path: storage-initializer.Dockerfile
     to: kserve-storage-initializer
@@ -77,7 +79,7 @@ resources:
 tests:
 - always_run: false
   as: e2e-graph
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^kserve-module/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-opendatahub
@@ -144,7 +146,7 @@ tests:
     workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: e2e-predictor
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^kserve-module/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-opendatahub
@@ -205,7 +207,7 @@ tests:
     workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: e2e-raw
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^kserve-module/|^cmd/llmisvc/|^pkg/controller/(.*/)?llmisvc/|^pkg/apis/serving/(.*/)?llm_inference_service|^config/crd/full/serving\.kserve\.io_llminferenceservice|^charts/llmisvc-|^config/llmisvc/|^config/rbac/llmisvc/|^llmisvc-controller\.Dockerfile$
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-opendatahub
@@ -275,7 +277,7 @@ tests:
     workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: e2e-llm-inference-service
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^kserve-module/
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-opendatahub
@@ -318,7 +320,8 @@ tests:
     - as: e2e-llm-inference-service
       cli: latest
       commands: ./test/scripts/openshift-ci/run-e2e-tests.sh "llminferenceservice
-        and cluster_cpu and not autoscaling" 2 "llm-d"
+        and cluster_cpu and not autoscaling and not tracing and not pvc_storage" 2
+        "llm-d"
       dependencies:
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller
@@ -336,8 +339,75 @@ tests:
           cpu: 100m
     workflow: hypershift-hostedcluster-workflow
 - always_run: false
+  as: e2e-kserve-module
+  run_if_changed: ^kserve-module/|^kserve-module-controller\.Dockerfile$|^Makefile\.kserve-module\.mk$
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_NODE_COUNT: "3"
+    post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: kserve-module-must-gather
+      best_effort: true
+      cli: latest
+      commands: |-
+        oc logs deployment/kserve-module-controller-manager -n opendatahub --tail=500 > "${ARTIFACT_DIR}/kserve-module-controller.log" 2>&1 || true
+        oc get kserve -A -o yaml > "${ARTIFACT_DIR}/kserve-cr.yaml" 2>&1 || true
+        oc get pods -n opendatahub -o wide > "${ARTIFACT_DIR}/pods-opendatahub.txt" 2>&1 || true
+        oc get events -n opendatahub --sort-by='.lastTimestamp' > "${ARTIFACT_DIR}/events-opendatahub.txt" 2>&1 || true
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 5m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - chain: hypershift-hostedcluster-destroy
+    test:
+    - as: e2e-kserve-module
+      cli: latest
+      commands: |-
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then ln -s oc kubectl; fi
+        cat > kustomize <<'WRAP'
+        #!/bin/sh
+        exec oc kustomize "$@"
+        WRAP
+        chmod +x kustomize
+        popd
+        pip install pytest pyyaml
+        make e2e-setup-kserve-module PLATFORM=ocp E2E_IMG=${KSERVE_MODULE_CONTROLLER_IMAGE}
+        make e2e-kserve-module
+      dependencies:
+      - env: KSERVE_MODULE_CONTROLLER_IMAGE
+        name: kserve-module-controller
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+- always_run: false
   as: pr-image-mirror-kserve-agent
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^kserve-module/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: kserve-agent
@@ -346,7 +416,7 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - always_run: false
   as: pr-image-mirror-kserve-router
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^kserve-module/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: kserve-router
@@ -355,7 +425,7 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - always_run: false
   as: pr-image-mirror-kserve-controller
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^kserve-module/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: kserve-controller
@@ -364,7 +434,7 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - always_run: false
   as: pr-image-mirror-llmisvc-controller
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^kserve-module/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: llmisvc-controller
@@ -373,7 +443,7 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - always_run: false
   as: pr-image-mirror-kserve-storage-initializer
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^kserve-module/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: kserve-storage-initializer
@@ -381,48 +451,12 @@ tests:
       IMAGE_REPO: kserve-storage-initializer
     workflow: opendatahub-io-ci-image-mirror
 - always_run: false
-  as: fast-image-mirror-kserve-agent
-  postsubmit: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  as: pr-image-mirror-kserve-module-controller
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: kserve-agent
+      SOURCE_IMAGE_REF: kserve-module-controller
     env:
-      IMAGE_REPO: kserve-agent
-      RELEASE_VERSION: fast
-    workflow: opendatahub-io-ci-image-mirror
-- always_run: false
-  as: fast-image-mirror-kserve-router
-  postsubmit: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: kserve-router
-    env:
-      IMAGE_REPO: kserve-router
-      RELEASE_VERSION: fast
-    workflow: opendatahub-io-ci-image-mirror
-- always_run: false
-  as: fast-image-mirror-kserve-controller
-  postsubmit: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: kserve-controller
-    env:
-      IMAGE_REPO: kserve-controller
-      RELEASE_VERSION: fast
-    workflow: opendatahub-io-ci-image-mirror
-- always_run: false
-  as: fast-image-mirror-kserve-storage-initializer
-  postsubmit: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: kserve-storage-initializer
-    env:
-      IMAGE_REPO: kserve-storage-initializer
-      RELEASE_VERSION: fast
+      IMAGE_REPO: kserve-module-controller
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: release-v0.17

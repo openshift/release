@@ -1,0 +1,76 @@
+ref:
+  as: p2p-install-odf-spokes
+  from: cli
+  commands: p2p-install-odf-spokes-commands.sh
+  timeout: 3h0m0s
+  grace_period: 30m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Install ODF on one or more ACM spoke clusters using the redhat-operators catalog.
+
+    Reads spoke cluster names and kubeconfigs from ${SHARED_DIR} (managed-cluster-names and
+    managed-cluster-kubeconfig-N files from acm-interop-p2p-cluster-install). Installs ODF in
+    parallel on each spoke: Subscription, StorageCluster (balanced profile with virtualization
+    StorageClass), waits for CephCluster and NooBaa Ready, then sets default StorageClass and
+    VolumeSnapshotClass for VM/CCLM workloads.
+
+    Requires ocs-storagecluster-ceph-rbd-virtualization on spokes before p2p-mtv-create-migration-maps.
+    Hub kubeconfig is not used; each spoke is targeted via --kubeconfig.
+  env:
+  - name: ODF_OPERATOR_CHANNEL
+    default: "stable-4.21"
+    documentation: ODF operator Subscription channel on each spoke (e.g. stable-4.21).
+  - name: ODF_BACKEND_STORAGE_CLASS
+    default: "gp3-csi"
+    documentation: AWS EBS StorageClass for OSD PVCs on spoke workers.
+  - name: ODF_VOLUME_SIZE
+    default: "2Ti"
+    documentation: OSD device PVC size per storageDeviceSet (e.g. 2Ti).
+  - name: ODF_INSTALL_NAMESPACE
+    default: "openshift-storage"
+    documentation: Namespace for ODF operator and StorageCluster on spokes.
+  - name: ODF_STORAGE_CLUSTER_NAME
+    default: "ocs-storagecluster"
+    documentation: StorageCluster metadata.name on each spoke.
+  - name: ODF_SUBSCRIPTION_NAME
+    default: "odf-operator"
+    documentation: ODF Subscription metadata.name.
+  - name: ODF_DEFAULT_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: StorageClass annotated as default for virtualization workloads after install.
+  - name: ODF_SNAPSHOT_CLASS
+    default: "ocs-storagecluster-rbdplugin-snapclass"
+    documentation: VolumeSnapshotClass annotated as default after install.
+  - name: ODF_PACKAGE_MANIFEST_POLL_INTERVAL_SECONDS
+    default: "10"
+    documentation: Sleep between packagemanifest startingCSV polls per spoke.
+  - name: ODF_PACKAGE_MANIFEST_POLL_TIMEOUT_SECONDS
+    default: "180"
+    documentation: Max seconds to resolve startingCSV from packagemanifest (18 x 10s).
+  - name: ODF_CSV_POLL_INTERVAL_SECONDS
+    default: "10"
+    documentation: Sleep between installedCSV/Succeeded polls per spoke.
+  - name: ODF_CSV_POLL_TIMEOUT_SECONDS
+    default: "900"
+    documentation: Max seconds to wait for ODF CSV Succeeded (15 min).
+  - name: ODF_OCS_OPERATOR_BUFFER_SECONDS
+    default: "90"
+    documentation: Sleep after CSV Succeeded before waiting for ocs-operator deployment.
+  - name: ODF_CEPH_INITIAL_DELAY_SECONDS
+    default: "60"
+    documentation: Sleep after StorageCluster create before CephCluster Ready polling.
+  - name: ODF_CEPH_POLL_INTERVAL_SECONDS
+    default: "30"
+    documentation: Sleep between CephCluster Ready polls.
+  - name: ODF_CEPH_POLL_TIMEOUT_SECONDS
+    default: "1800"
+    documentation: Max seconds to wait for CephCluster Ready (30 min).
+  - name: ODF_STORAGECLUSTER_POLL_INTERVAL_SECONDS
+    default: "30"
+    documentation: Sleep between StorageCluster/NooBaa Ready polls.
+  - name: ODF_STORAGECLUSTER_POLL_TIMEOUT_SECONDS
+    default: "5400"
+    documentation: Max seconds to wait for StorageCluster and NooBaa Ready (90 min).

@@ -12,6 +12,11 @@ readonly RETRY_SLEEP_INTERVAL=30
 
 # run_tests executes the main test command inside the test pod
 run_tests() {
+  # Wait for kube-apiserver to be fully stable before opening a WebSocket session (oc rsh).
+  # A rolling kube-apiserver update drops WebSocket connections mid-stream (close 1006),
+  # causing spurious failures even when the tests themselves are healthy.
+  ./prow/check-cluster-ready.sh
+
   if [ "${TEST_SUITE}" = "helm" ]
   then
     HELM_ENV_VAR_EXPORT="export VARIANT=distroless;export GCP_REGISTRIES=' '"
@@ -119,6 +124,8 @@ clean_test_run() {
     oc delete ztunnel --all -n ztunnel --wait=true --timeout=120s
     oc delete istio --all -n istio-system --wait=true --timeout=120s
     oc delete namespace istio-system istio-cni ztunnel
+
+    rm -rf sail-operator
   else
     curl -sL https://istio.io/downloadIstioctl | sh -
     export PATH=$HOME/.istioctl/bin:$PATH
@@ -145,19 +152,30 @@ set +o errexit
 run_tests
 TEST_RC=$?
 
-if [ "${TEST_RC}" -eq 0 ] && ! are_tests_done; then
-  echo "WARNING: oc rsh exited with 0 but /tmp/ISTIO_TESTS_DONE file was not found. This may indicate a known bug K8s #130885"
+if ! are_tests_done; then
+  echo "WARNING: oc rsh exited with ${TEST_RC} but /tmp/ISTIO_TESTS_DONE file was not found."
+  echo "This may indicate a websocket drop (1006) or known bug K8s #130885"
   print_debug_info
+  
   echo "Retrying test execution in ${RETRY_SLEEP_INTERVAL} seconds..."
   sleep "${RETRY_SLEEP_INTERVAL}"
+  
+  # Ensure clean_test_run wipes any partial state or stale files
   clean_test_run
+  
   echo "--- Running Istio int tests (attempt 2) ---"
   run_tests
-  TEST_RC=$?
-  if [ "${TEST_RC}" -eq 0 ] && ! are_tests_done; then
-    echo "WARNING: oc rsh exited with 0 but /tmp/ISTIO_TESTS_DONE file was not found. This may indicate a known bug K8s #130885"
+  TEST_RC=$? # Capture the fresh exit code
+  
+  # Evaluate the second attempt accurately
+  if [ "${TEST_RC}" -ne 0 ] || ! are_tests_done; then
+    echo "ERROR: Second attempt failed. Exit code: ${TEST_RC}, Marker file present: $(are_tests_done && echo "Yes" || echo "No")"
     print_debug_info
-    echo "Second attempt was not succesful"
+    # Explicitly ensure we report failure to the CI orchestrator
+    exit 1
+  else
+    echo "SUCCESS: Second attempt passed successfully."
+    exit 0
   fi
 fi
 

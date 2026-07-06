@@ -94,7 +94,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig: 
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260602-e7f2be80c --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260702-ef12e757d --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs:  ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -115,7 +115,7 @@ ci-operator-config:
 
 ci-operator-prowgen: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_auto-config-brancher_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/go/src/github.com/openshift/release$(VOLUME_MOUNT_FLAGS)" -e GOPATH=/go --entrypoint=/usr/bin/ci-operator-prowgen quay.io/openshift/ci-public:ci_auto-config-brancher_latest --from-release-repo --to-release-repo --known-infra-file infra-build-farm-periodics.yaml --known-infra-file infra-periodics.yaml --known-infra-file infra-image-mirroring.yaml --known-infra-file infra-periodics-origin-release-images.yaml $(WHAT)
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/go/src/github.com/openshift/release$(VOLUME_MOUNT_FLAGS)" -e GOPATH=/go --entrypoint=/usr/bin/ci-operator-prowgen quay.io/openshift/ci-public:ci_auto-config-brancher_latest --from-release-repo --to-release-repo --registry /go/src/github.com/openshift/release/ci-operator/step-registry --known-infra-file infra-build-farm-periodics.yaml --known-infra-file infra-periodics.yaml --known-infra-file infra-periodics-migrated.yaml --known-infra-file infra-image-mirroring.yaml --known-infra-file infra-periodics-origin-release-images.yaml $(WHAT)
 
 sanitize-prow-jobs: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_auto-config-brancher_latest

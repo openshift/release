@@ -7,6 +7,7 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
 REGION="${LEASED_RESOURCE}"
 
 function run_command() {

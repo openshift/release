@@ -12,26 +12,29 @@ fi
 # State file for sharing results with report step
 STATE_FILE="${SHARED_DIR}/processed-issues.txt"
 
-# Clone ai-helpers repository (contains /jira-solve command)
-echo "Cloning ai-helpers repository..."
-git clone https://github.com/openshift-eng/ai-helpers /tmp/ai-helpers
-
 # Clone HyperShift fork (we push here and create PRs to upstream)
 echo "Cloning HyperShift repository..."
 git clone https://github.com/hypershift-community/hypershift /tmp/hypershift
 
-# Copy jira-solve command from ai-helpers to hypershift
-echo "Setting up Claude commands..."
-mkdir -p /tmp/hypershift/.claude/commands
-cp /tmp/ai-helpers/plugins/jira/commands/solve.md /tmp/hypershift/.claude/commands/jira-solve.md
+# Install tool dependencies
+echo "Installing tool dependencies..."
+GOFLAGS="" go install golang.org/x/tools/gopls@v0.21.0
+python3.9 -m ensurepip --user 2>/dev/null || true
+python3.9 -m pip install --user pre-commit 2>&1 | tail -1
+export PATH="${GOPATH:-$HOME/go}/bin:$HOME/.local/bin:$PATH"
+# 20min bash timeout so pre-commit/pre-push hooks (make verify, make test) have time to complete
+export BASH_DEFAULT_TIMEOUT_MS=1200000
+export BASH_MAX_TIMEOUT_MS=1200000
 
-# Check if code-review plugin is available for Phase 2
-REVIEW_PLUGIN_DIR="/tmp/ai-helpers/plugins/code-review"
-if [ ! -d "${REVIEW_PLUGIN_DIR}/.claude-plugin" ]; then
-  echo "ERROR: code-review plugin not found at ${REVIEW_PLUGIN_DIR}/.claude-plugin"
-  exit 1
-fi
-echo "Code-review plugin found"
+# Force HTTPS for all github.com git operations (plugin install defaults to SSH which lacks host keys in CI)
+git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+# Install the openshift-developer plugin (bundles jira, ci, golang, prodsec-skills, git)
+echo "Installing Claude Code plugins..."
+claude plugin marketplace add openshift-eng/ai-helpers
+claude plugin marketplace add RedHatProductSecurity/prodsec-skills
+claude plugin install openshift-developer@ai-helpers
+claude plugin install prow-agent@ai-helpers
 
 cd /tmp/hypershift
 
@@ -132,6 +135,9 @@ echo "Configuration: MAX_ISSUES=$MAX_ISSUES"
 
 # Shared prompt instruction for subagent behavior
 SUBAGENT_PROMPT="SUBAGENTS: Launch ALL subagents in parallel (single message with multiple Task tool calls) for maximum speed. Each subagent should be given subagent_type: \"general-purpose\". Do NOT set the model parameter — let subagents inherit the parent model, as these analysis tasks require a capable model."
+
+# Security prompt appended to all Claude invocations
+SECURITY_PROMPT="SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
 
 # Load Jira API credentials for Atlassian Cloud (Basic Auth: email:api-token)
 JIRA_TOKEN_FILE="/var/run/claude-code-service-account/jira-pat"
@@ -319,6 +325,158 @@ send_slack_notification() {
   fi
 }
 
+# OTEL / BigQuery telemetry support
+EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+
+# Wrapper: run claude via agentic-ci for native OTEL collection
+# Uses --no-streaming so stdout passes through raw for tee/reports.
+# Filters to JSON lines only (agentic-ci log lines are stripped).
+# Captures OTEL JSONL per invocation and appends to the consolidated log.
+run_claude() {
+  local phase=$1; shift
+  local issue_key=$1; shift
+  local prompt="$1"; shift
+
+  local phase_otel="/tmp/claude-${issue_key}-${phase}-otel.jsonl"
+
+  agentic-ci run \
+    --backend local \
+    --harness claude-code \
+    --model "${CLAUDE_MODEL}" \
+    --workdir /tmp/hypershift \
+    --no-streaming \
+    "${prompt}" \
+    -- \
+    --permission-mode default \
+    --verbose \
+    --output-format stream-json \
+    "$@" \
+    | grep '^{'
+  local rc=${PIPESTATUS[0]}
+
+  # Collect OTEL JSONL from agentic-ci temp dirs into per-phase and consolidated logs
+  for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
+    if [ -f "$f" ]; then
+      cat "$f" >> "${phase_otel}"
+      cat "$f" >> "${OTEL_LOG}"
+    fi
+  done
+  rm -rf /tmp/agentic-ci-run.*
+  return $rc
+}
+
+# Extract session metrics from OTEL data and produce BigQuery autodl
+extract_session_metrics() {
+  local issue_key=$1
+  local phase=$2
+
+  if [ ! -f "${EXTRACT_METRICS}" ]; then
+    echo "Warning: extract_metrics.py not found, skipping session metrics"
+    return 0
+  fi
+
+  local phase_otel="/tmp/claude-${issue_key}-${phase}-otel.jsonl"
+  if [ ! -f "$phase_otel" ] || [ ! -s "$phase_otel" ]; then
+    echo "Warning: No OTEL data for ${phase}, skipping session metrics"
+    return 0
+  fi
+
+  python3 "${EXTRACT_METRICS}" "$phase_otel" \
+    "${ARTIFACT_DIR}/claude-${issue_key}-${phase}-session-metrics-autodl.json" \
+    2>&1 || echo "Warning: Failed to extract session metrics for ${phase}"
+}
+
+# Generate domain-specific autodl for the jira_agent BigQuery table
+generate_autodl() {
+  local issue_key=$1
+  local phase=$2
+  local result=$3
+  local pr_url=${4:-}
+  local session_id=${5:-}
+  local analyzed_at
+  analyzed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  local autodl_file="${ARTIFACT_DIR}/jira-agent-${issue_key}-${phase}-autodl.json"
+
+  jq -n \
+    --arg issue_key "$issue_key" \
+    --arg phase "$phase" \
+    --arg result "$result" \
+    --arg pr_url "$pr_url" \
+    --arg session_id "$session_id" \
+    --arg analyzed_at "$analyzed_at" \
+    --arg job_name "${JOB_NAME:-}" \
+    --arg build_id "${BUILD_ID:-}" \
+    '{
+      table_name: "jira_agent",
+      schema: {
+        session_id: "string",
+        agent: "string",
+        phase: "string",
+        issue_key: "string",
+        pr_url: "string",
+        result: "string",
+        analyzed_at: "string",
+        job_name: "string",
+        build_id: "string"
+      },
+      schema_mapping: null,
+      rows: [{
+        session_id: $session_id,
+        agent: "jira-agent",
+        phase: $phase,
+        issue_key: $issue_key,
+        pr_url: $pr_url,
+        result: $result,
+        analyzed_at: $analyzed_at,
+        job_name: $job_name,
+        build_id: $build_id
+      }],
+      chunk_size: 0,
+      expiration_days: 0,
+      partition_column: ""
+    }' > "$autodl_file"
+  echo "Generated autodl: ${autodl_file}"
+}
+
+# Helper: extract session_id from stream-json output
+get_session_id() {
+  local json_file=$1
+  grep '"type":"result"' "$json_file" 2>/dev/null | head -1 | jq -r '.session_id // ""' 2>/dev/null || echo ""
+}
+
+# Helper: extract token usage from stream-json output and save to SHARED_DIR
+extract_tokens() {
+  local JSON_FILE=$1
+  local OUTPUT_FILE=$2
+
+  grep '"type":"result"' "$JSON_FILE" \
+    | head -1 \
+    | jq '{
+        total_cost_usd: (.total_cost_usd // 0),
+        duration_ms: (.duration_ms // 0),
+        num_turns: (.num_turns // 0),
+        input_tokens: (.usage.input_tokens // 0),
+        output_tokens: (.usage.output_tokens // 0),
+        cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
+        cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
+        model_usage: (.modelUsage // {}),
+        model: ((.modelUsage // {} | keys | first) // "unknown")
+      }' > "$OUTPUT_FILE" 2>/dev/null \
+    || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "$OUTPUT_FILE"
+}
+
+# Helper: extract text, tool usage, and errors from stream-json output
+extract_artifacts() {
+  local JSON_FILE=$1
+  local PREFIX=$2
+
+  jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "$JSON_FILE" > "${SHARED_DIR}/${PREFIX}-text.txt" 2>/dev/null || true
+  jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "$JSON_FILE" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/${PREFIX}-tools.txt" 2>/dev/null || true
+  jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "$JSON_FILE" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/${PREFIX}-errors.txt" 2>/dev/null || true
+}
+
 # Query Jira for issues (excluding already processed ones via label)
 echo "Querying Jira for issues..."
 if [ -n "${JIRA_AGENT_ISSUE_KEY:-}" ]; then
@@ -380,54 +538,32 @@ while IFS= read -r line; do
   echo "Summary: $ISSUE_SUMMARY"
   echo "=========================================="
 
-  # Run jira-solve command non-interactively using --system-prompt
-  # (Claude's -p mode doesn't support slash commands directly)
   TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-  echo "Running: jira-solve $ISSUE_KEY origin --ci"
+  # === Phase 1: Solve (via /jira:solve skill) ===
+  echo "Phase 1: Running /jira:solve $ISSUE_KEY origin --ci"
 
   PHASE1_START=$(date +%s)
 
-  # Load the skill content as system prompt
-  SKILL_CONTENT=$(cat /tmp/hypershift/.claude/commands/jira-solve.md)
+  FORK_CONTEXT="IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After creating commits on your feature branch, push the branch to origin. Do NOT create a Pull Request - the PR will be created in a subsequent automated step after code review. ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
 
-  # Additional context for fork-based workflow
-  # Git push uses fork token (configured via credential helper), gh CLI uses upstream token (GITHUB_TOKEN env var)
-  FORK_CONTEXT="IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After creating commits on your feature branch, push the branch to origin. Do NOT create a Pull Request - the PR will be created in a subsequent automated step after code review. SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'. ${SUBAGENT_PROMPT}"
-
-  set +e  # Don't exit on error for individual issues
-  echo "Starting Claude processing with streaming output..."
-  claude -p "$ISSUE_KEY origin --ci. $FORK_CONTEXT" \
-    --system-prompt "$SKILL_CONTENT" \
-    --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
-    --max-turns 100 \
+  set +e
+  run_claude "solve" "$ISSUE_KEY" "/jira:solve $ISSUE_KEY origin --ci" \
+    --append-system-prompt "$FORK_CONTEXT" \
+    --allowedTools "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task" \
+    --max-turns 300 \
     --effort max \
-    --model "$CLAUDE_MODEL" \
-    --verbose \
-    --output-format stream-json \
     2> "/tmp/claude-${ISSUE_KEY}-output.log" \
     | tee "/tmp/claude-${ISSUE_KEY}-output.json"
   EXIT_CODE=$?
   set -e
-  jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "/tmp/claude-${ISSUE_KEY}-output.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-output-text.txt" 2>/dev/null || true
-  jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-output.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-output-tools.txt" 2>/dev/null || true
-  jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-output.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-output-errors.txt" 2>/dev/null || true
-  # Extract token usage for Phase 1
-  grep '"type":"result"' "/tmp/claude-${ISSUE_KEY}-output.json" \
-    | head -1 \
-    | jq '{
-        total_cost_usd: (.total_cost_usd // 0),
-        duration_ms: (.duration_ms // 0),
-        num_turns: (.num_turns // 0),
-        input_tokens: (.usage.input_tokens // 0),
-        output_tokens: (.usage.output_tokens // 0),
-        cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
-        cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
-        model_usage: (.modelUsage // {}),
-        model: ((.modelUsage // {} | keys | first) // "unknown")
-      }' > "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json" 2>/dev/null \
-    || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json"
+
+  extract_artifacts "/tmp/claude-${ISSUE_KEY}-output.json" "claude-${ISSUE_KEY}-output"
+  extract_session_metrics "$ISSUE_KEY" "solve"
+  extract_tokens "/tmp/claude-${ISSUE_KEY}-output.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json"
   echo "Phase 1 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json")"
+  SOLVE_SESSION_ID=$(get_session_id "/tmp/claude-${ISSUE_KEY}-output.json")
+  generate_autodl "$ISSUE_KEY" "solve" "$([ $EXIT_CODE -eq 0 ] && echo success || echo failed)" "" "$SOLVE_SESSION_ID"
 
   PHASE1_END=$(date +%s)
   PHASE1_DURATION=$((PHASE1_END - PHASE1_START))
@@ -435,7 +571,7 @@ while IFS= read -r line; do
   echo "$PHASE1_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-duration.txt"
 
   if [ $EXIT_CODE -eq 0 ]; then
-    echo "✅ Phase 1 (jira-solve) completed for $ISSUE_KEY"
+    echo "✅ Phase 1 (jira:solve) completed for $ISSUE_KEY"
 
     # Check if code changes were made (branch changed from main)
     BRANCH_NAME=$(git branch --show-current)
@@ -452,7 +588,7 @@ while IFS= read -r line; do
     fi
 
     if [ "$HAS_CODE_CHANGES" = true ]; then
-      # === Phase 2: Pre-commit quality review ===
+      # === Phase 2: Pre-commit quality review (via /code-review:pre-commit-review skill) ===
       echo ""
       echo "=========================================="
       echo "Phase 2: Pre-commit quality review for $ISSUE_KEY"
@@ -460,42 +596,22 @@ while IFS= read -r line; do
 
       PHASE2_START=$(date +%s)
 
-      REVIEW_PROMPT="/code-review:pre-commit-review --language go --profile hypershift"
-
       set +e
-      claude -p "$REVIEW_PROMPT" \
-        --plugin-dir "${REVIEW_PLUGIN_DIR}" \
-        --append-system-prompt "SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'. ${SUBAGENT_PROMPT}" \
-        --allowedTools "Bash Read Grep Glob Task" \
-        --max-turns 75 \
+      run_claude "review" "$ISSUE_KEY" "/code-review:pre-commit-review --language go --profile hypershift" \
+        --append-system-prompt "${SECURITY_PROMPT} ${SUBAGENT_PROMPT}" \
+        --allowedTools "Bash Read Grep Glob Task Agent Skill" \
+        --max-turns 225 \
         --effort max \
-        --model "$CLAUDE_MODEL" \
-        --verbose \
-        --output-format stream-json \
         2> "/tmp/claude-${ISSUE_KEY}-review.log" \
         | tee "/tmp/claude-${ISSUE_KEY}-review.json"
       REVIEW_EXIT_CODE=$?
       set -e
 
-      jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "/tmp/claude-${ISSUE_KEY}-review.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-text.txt" 2>/dev/null || true
-      jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-review.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tools.txt" 2>/dev/null || true
-      jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-review.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-errors.txt" 2>/dev/null || true
-      # Extract token usage for Phase 2
-      grep '"type":"result"' "/tmp/claude-${ISSUE_KEY}-review.json" \
-        | head -1 \
-        | jq '{
-            total_cost_usd: (.total_cost_usd // 0),
-            duration_ms: (.duration_ms // 0),
-            num_turns: (.num_turns // 0),
-            input_tokens: (.usage.input_tokens // 0),
-            output_tokens: (.usage.output_tokens // 0),
-            cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
-            cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
-            model_usage: (.modelUsage // {}),
-            model: ((.modelUsage // {} | keys | first) // "unknown")
-          }' > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json" 2>/dev/null \
-        || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json"
+      extract_artifacts "/tmp/claude-${ISSUE_KEY}-review.json" "claude-${ISSUE_KEY}-review"
+      extract_session_metrics "$ISSUE_KEY" "review"
+      extract_tokens "/tmp/claude-${ISSUE_KEY}-review.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json"
       echo "Phase 2 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json")"
+      generate_autodl "$ISSUE_KEY" "review" "$([ $REVIEW_EXIT_CODE -eq 0 ] && echo success || echo failed)" "" "$(get_session_id "/tmp/claude-${ISSUE_KEY}-review.json")"
 
       PHASE2_END=$(date +%s)
       PHASE2_DURATION=$((PHASE2_END - PHASE2_START))
@@ -509,7 +625,7 @@ while IFS= read -r line; do
         echo "Continuing with PR creation despite review failure..."
       fi
 
-      # === Phase 3: Address review findings ===
+      # === Phase 3: Address review findings (via /openshift-developer:address-review-precommit skill) ===
       echo ""
       echo "=========================================="
       echo "Phase 3: Addressing review findings for $ISSUE_KEY"
@@ -522,55 +638,39 @@ while IFS= read -r line; do
         REVIEW_FINDINGS=$(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-review-text.txt")
       fi
 
+      # Refresh tokens before Phase 3 since it pushes code.
+      # Phases 1-2 can exceed the 1-hour GitHub App token lifetime.
+      echo "Refreshing GitHub App tokens before Phase 3..."
+      GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
+      if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
+        echo "ERROR: Failed to refresh GitHub App token for fork"
+      else
+        git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
+        echo "Fork token refreshed"
+      fi
+
       PHASE3_START=$(date +%s)
 
       if [ -n "$REVIEW_FINDINGS" ]; then
-        FIX_PROMPT="A code review was performed on the changes in the current branch. Below are the review findings. Address all actions and improvements by editing the code. After making all fixes, commit the changes (amend existing commits or create new commits as appropriate) and push the branch to origin.
-
-REVIEW FINDINGS:
+        set +e
+        run_claude "fix" "$ISSUE_KEY" "/openshift-developer:address-review-precommit" \
+          --append-system-prompt "REVIEW FINDINGS:
 ${REVIEW_FINDINGS}
 
-IMPORTANT:
-- Fix every issue identified in the review — all actions and improvements.
-- Run 'make test' and 'make verify' after fixes to verify nothing is broken.
-- If 'make verify' generates new files, commit those too and run 'make verify' again to confirm it passes.
-- Commit all fixes and push to origin.
-- SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'.
-- ${SUBAGENT_PROMPT}"
-
-        set +e
-        claude -p "$FIX_PROMPT" \
-          --allowedTools "Bash Read Write Edit Grep Glob" \
-          --max-turns 75 \
+${SECURITY_PROMPT} ${SUBAGENT_PROMPT}" \
+          --allowedTools "Bash Read Write Edit Grep Glob Agent Skill Task" \
+          --max-turns 225 \
           --effort max \
-          --model "$CLAUDE_MODEL" \
-          --verbose \
-          --output-format stream-json \
           2> "/tmp/claude-${ISSUE_KEY}-fix.log" \
           | tee "/tmp/claude-${ISSUE_KEY}-fix.json"
         FIX_EXIT_CODE=$?
         set -e
 
-        # Extract fix phase output for report
-        jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "/tmp/claude-${ISSUE_KEY}-fix.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-text.txt" 2>/dev/null || true
-        jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-fix.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tools.txt" 2>/dev/null || true
-        jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-fix.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-errors.txt" 2>/dev/null || true
-        # Extract token usage for Phase 3
-        grep '"type":"result"' "/tmp/claude-${ISSUE_KEY}-fix.json" \
-          | head -1 \
-          | jq '{
-              total_cost_usd: (.total_cost_usd // 0),
-              duration_ms: (.duration_ms // 0),
-              num_turns: (.num_turns // 0),
-              input_tokens: (.usage.input_tokens // 0),
-              output_tokens: (.usage.output_tokens // 0),
-              cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
-              cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
-              model_usage: (.modelUsage // {}),
-              model: ((.modelUsage // {} | keys | first) // "unknown")
-            }' > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json" 2>/dev/null \
-          || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json"
+        extract_artifacts "/tmp/claude-${ISSUE_KEY}-fix.json" "claude-${ISSUE_KEY}-fix"
+        extract_session_metrics "$ISSUE_KEY" "fix"
+        extract_tokens "/tmp/claude-${ISSUE_KEY}-fix.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json"
         echo "Phase 3 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json")"
+        generate_autodl "$ISSUE_KEY" "fix" "$([ $FIX_EXIT_CODE -eq 0 ] && echo success || echo failed)" "" "$(get_session_id "/tmp/claude-${ISSUE_KEY}-fix.json")"
 
         if [ $FIX_EXIT_CODE -eq 0 ]; then
           echo "✅ Phase 3 (address review) completed for $ISSUE_KEY"
@@ -587,11 +687,8 @@ IMPORTANT:
       echo "Phase 3 duration: ${PHASE3_DURATION}s"
       echo "$PHASE3_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-duration.txt"
 
-      # Regenerate GitHub App tokens before push/PR operations.
-      # Installation tokens expire after 1 hour, and phases 1-3 can
-      # easily exceed that. Refreshing here ensures push and PR
-      # creation use a valid token.
-      echo "Refreshing GitHub App tokens before push/PR..."
+      # Regenerate GitHub App tokens before Phase 4.
+      echo "Refreshing GitHub App tokens before Phase 4..."
       GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
       if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
         echo "ERROR: Failed to refresh GitHub App token for fork"
@@ -616,51 +713,20 @@ IMPORTANT:
 
       PHASE4_START=$(date +%s)
 
-      PR_PROMPT="Create a pull request for the changes on branch '${BRANCH_NAME}'. Details:
-- Jira issue: ${ISSUE_KEY}
-- Jira summary: ${ISSUE_SUMMARY}
-- Jira URL: https://redhat.atlassian.net/browse/${ISSUE_KEY}
-- Read the PR template at .github/PULL_REQUEST_TEMPLATE.md and use it to structure the PR body.
-- Use 'git log main..HEAD' to understand what changed and write a meaningful description.
-- PR title must start with '${ISSUE_KEY}: '.
-- The PR body MUST end with the following two lines:
-  Always review AI generated responses prior to use.
-  Generated with [Claude Code](https://claude.com/claude-code) via \`/jira:solve ${ISSUE_KEY}\`
-- Create the PR by running: gh pr create --repo openshift/hypershift --head hypershift-community:${BRANCH_NAME} --no-maintainer-edit --title '<title>' --body '<body>'
-- SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'.
-- ${SUBAGENT_PROMPT}"
-
       set +e
-      claude -p "$PR_PROMPT" \
+      run_claude "pr-creation" "$ISSUE_KEY" "/openshift-developer:create-pr ${ISSUE_KEY} --upstream openshift/hypershift --head hypershift-community:${BRANCH_NAME}" \
+        --append-system-prompt "${SECURITY_PROMPT} ${SUBAGENT_PROMPT}" \
         --allowedTools "Bash Read Grep Glob" \
-        --max-turns 15 \
+        --max-turns 90 \
         --effort max \
-        --model "$CLAUDE_MODEL" \
-        --verbose \
-        --output-format stream-json \
         2> "/tmp/claude-${ISSUE_KEY}-pr.log" \
         | tee "/tmp/claude-${ISSUE_KEY}-pr.json"
       PR_EXIT_CODE=$?
       set -e
 
-      jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "/tmp/claude-${ISSUE_KEY}-pr.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-text.txt" 2>/dev/null || true
-      jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-pr.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tools.txt" 2>/dev/null || true
-      jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-pr.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-errors.txt" 2>/dev/null || true
-      # Extract token usage for Phase 4
-      grep '"type":"result"' "/tmp/claude-${ISSUE_KEY}-pr.json" \
-        | head -1 \
-        | jq '{
-            total_cost_usd: (.total_cost_usd // 0),
-            duration_ms: (.duration_ms // 0),
-            num_turns: (.num_turns // 0),
-            input_tokens: (.usage.input_tokens // 0),
-            output_tokens: (.usage.output_tokens // 0),
-            cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
-            cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
-            model_usage: (.modelUsage // {}),
-            model: ((.modelUsage // {} | keys | first) // "unknown")
-          }' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json" 2>/dev/null \
-        || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json"
+      extract_artifacts "/tmp/claude-${ISSUE_KEY}-pr.json" "claude-${ISSUE_KEY}-pr"
+      extract_session_metrics "$ISSUE_KEY" "pr-creation"
+      extract_tokens "/tmp/claude-${ISSUE_KEY}-pr.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json"
       echo "Phase 4 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json")"
 
       PHASE4_END=$(date +%s)
@@ -679,6 +745,7 @@ IMPORTANT:
         echo "❌ Phase 4 (PR creation) failed for $ISSUE_KEY (exit code: $PR_EXIT_CODE)"
         PR_URL=""
       fi
+      generate_autodl "$ISSUE_KEY" "pr-creation" "$([ $PR_EXIT_CODE -eq 0 ] && echo success || echo failed)" "$PR_URL" "$(get_session_id "/tmp/claude-${ISSUE_KEY}-pr.json")"
 
       # Append report link to PR description
       if [ -n "$PR_URL" ]; then
@@ -724,10 +791,12 @@ ${REPORT_SECTION}"
         -H "Content-Type: application/json" \
         -d '{"update":{"labels":[{"add":"agent-processed"}]}}')
       HTTP_CODE=$(echo "$LABEL_RESPONSE" | tail -1)
+      LABEL_BODY=$(echo "$LABEL_RESPONSE" | sed '$d')
       if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "200" ]; then
         echo "   Label added successfully"
       else
         echo "   Warning: Failed to add label (HTTP $HTTP_CODE)"
+        echo "   Response: $LABEL_BODY"
       fi
 
       # Transition issue to appropriate status based on project
@@ -789,6 +858,142 @@ ${REPORT_SECTION}"
   fi
 
 done <<< "$ISSUES"
+
+# Generate conversation transcript HTML from stream-json files in /tmp
+echo "Generating conversation transcript..."
+python3 - "$STATE_FILE" "$ARTIFACT_DIR" << 'TRANSCRIPT_PY'
+import json, html, sys, os
+
+state_file = sys.argv[1]
+artifact_dir = sys.argv[2]
+output_file = os.path.join(artifact_dir, "jira-agent-transcript.html")
+
+PHASES = [
+    ("output", "Phase 1: Solve"),
+    ("review", "Phase 2: Review"),
+    ("fix", "Phase 3: Fix"),
+    ("pr", "Phase 4: PR Creation"),
+]
+
+def parse_stream_json(path):
+    blocks = []
+    cost = turns = inp = outp = duration = 0
+    model = session = "unknown"
+    for line in open(path):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            m = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        t = m.get("type", "")
+        if t == "system" and m.get("subtype") == "init":
+            model = m.get("model", "unknown")
+            session = m.get("session_id", "unknown")
+        if t == "result":
+            cost = m.get("total_cost_usd", 0)
+            turns = m.get("num_turns", 0)
+            u = m.get("usage", {})
+            inp = u.get("input_tokens", 0)
+            outp = u.get("output_tokens", 0)
+            duration = m.get("duration_ms", 0)
+        if t == "assistant":
+            for c in m.get("message", {}).get("content", []):
+                ct = c.get("type", "")
+                if ct == "text":
+                    blocks.append(("assistant", c.get("text", "")))
+                elif ct == "tool_use":
+                    name = c.get("name", "")
+                    inp_str = json.dumps(c.get("input", {}))
+                    blocks.append(("tool_use", f"{name}: {inp_str[:300]}"))
+        if t == "user":
+            r = m.get("tool_use_result", "")
+            if isinstance(r, str) and r:
+                blocks.append(("tool_result", r[:1000]))
+            elif isinstance(r, list):
+                for item in r:
+                    if isinstance(item, dict) and item.get("type") == "text":
+                        blocks.append(("tool_result", item.get("text", "")[:1000]))
+    return blocks, {"cost": cost, "turns": turns, "input": inp, "output": outp,
+                    "duration": duration, "model": model, "session": session}
+
+def render_blocks(blocks):
+    out = []
+    for kind, text in blocks:
+        escaped = html.escape(text)
+        if kind == "assistant":
+            out.append(f'<div class="msg a"><div class="label">Assistant</div><pre>{escaped}</pre></div>')
+        elif kind == "tool_use":
+            out.append(f'<div class="msg t"><div class="label">Tool Call</div><code>{escaped}</code></div>')
+        elif kind == "tool_result":
+            cls = "e" if text.startswith("Error:") else "r"
+            label = "Error" if cls == "e" else "Result"
+            out.append(f'<div class="msg {cls}"><div class="label">{label}</div><pre>{escaped}</pre></div>')
+    return "\n".join(out)
+
+if not os.path.exists(state_file):
+    print("No state file, skipping transcript")
+    sys.exit(0)
+
+issues = [l.strip().split()[0] for l in open(state_file) if l.strip()]
+sections = []
+total_cost = 0
+
+for issue_key in issues:
+    issue_sections = []
+    for phase_key, phase_label in PHASES:
+        stream_file = f"/tmp/claude-{issue_key}-{phase_key}.json"
+        if not os.path.exists(stream_file):
+            continue
+        blocks, stats = parse_stream_json(stream_file)
+        if not blocks:
+            continue
+        total_cost += stats["cost"]
+        dur_s = stats["duration"] // 1000
+        dur_str = f"{dur_s // 60}m {dur_s % 60}s" if dur_s >= 60 else f"{dur_s}s"
+        is_open = "open" if phase_key == "output" else ""
+        issue_sections.append(f'''
+<details {is_open}>
+<summary>{phase_label} — {stats["turns"]} turns, ${stats["cost"]:.4f}, {dur_str}</summary>
+<div class="phase">{render_blocks(blocks)}</div>
+</details>''')
+    if issue_sections:
+        sections.append(f'<div class="issue"><h2>{issue_key}</h2>{"".join(issue_sections)}</div>')
+
+with open(output_file, "w") as f:
+    f.write(f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Jira Agent Transcript</title>
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 1100px; margin: 0 auto; padding: 2em; background: #f5f5f5; color: #333; }}
+h1 {{ border-bottom: 2px solid #333; padding-bottom: 0.3em; }}
+h2 {{ margin-top: 2em; }}
+details {{ margin: 0.5em 0; }}
+details summary {{ cursor: pointer; font-weight: 600; color: #555; padding: 0.5em 0; font-size: 1.05em; }}
+details[open] summary {{ margin-bottom: 0.5em; }}
+.phase {{ border-left: 2px solid #ddd; padding-left: 1em; margin-left: 0.5em; }}
+.msg {{ margin: 0.4em 0; padding: 0.6em; border-radius: 6px; }}
+.msg .label {{ font-size: 0.7em; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 0.2em; }}
+.msg pre, .msg code {{ margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 0.82em; }}
+.msg pre {{ max-height: 250px; overflow-y: auto; }}
+.a {{ background: #e8f4fd; border-left: 3px solid #0366d6; }}
+.t {{ background: #f6f8fa; border-left: 3px solid #6f42c1; }}
+.r {{ background: #f6f8fa; border-left: 3px solid #28a745; }}
+.e {{ background: #fff5f5; border-left: 3px solid #cb2431; }}
+</style>
+</head>
+<body>
+<p><a href="../../hypershift-jira-agent-report/artifacts/jira-agent-report.html">Back to summary report</a></p>
+<h1>Conversation Transcript</h1>
+<p style="color:#666">Total cost: ${total_cost:.4f}</p>
+{"".join(sections) if sections else "<p>No transcript data available.</p>"}
+</body>
+</html>''')
+print(f"Transcript written: {len(sections)} issue(s)")
+TRANSCRIPT_PY
 
 echo ""
 echo "=== Processing Summary ==="

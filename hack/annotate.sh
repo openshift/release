@@ -57,8 +57,8 @@ function annotate() {
 	local conf="${base}/core-services/release-controller/_releases/release-$3"
 
 	if [[ -n "${private}" ]]; then
-        conf="${base}/core-services/release-controller/_releases/priv/release-$3"
-    fi
+		conf="${base}/core-services/release-controller/_releases/priv/release-$3"
+	fi
 
 	if [[ -s "${conf}" ]]; then
 		echo "${conf}"
@@ -81,6 +81,7 @@ function annotate() {
 
 for release in ${releases[@]}; do
 	annotate "origin" "${release}" "okd-${release}.json"
+	annotate "origin" "scos-${release}" "okd-scos-${release}.json"
 	annotate "origin" "scos-${release}" "okd-scos-${release}-ci.json"
 	annotate "origin" "scos-${release}-art" "okd-scos-${release}-art.json"
 

@@ -8,7 +8,7 @@ set -o pipefail
 CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
 CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
 COLLECTOR_CONF_FILE="${ARTIFACT_DIR}/containerized-data-collector.yaml"
-OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/4.13.0/openshift-client-linux.tar.gz"
+OC_URL="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/amd64/clients/ocp/4.13.0/openshift-client-linux.tar.gz"
 # OC_URL="https://downloads-openshift-console.apps.${CLUSTER_NAME}.${CLUSTER_DOMAIN}/amd64/linux/oc.tar"
 IPV4_REGEX='^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)

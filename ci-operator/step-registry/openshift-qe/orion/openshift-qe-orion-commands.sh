@@ -5,8 +5,11 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
+MAX_RETRIES=5
+
 python --version
 pushd /tmp
+
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
@@ -15,7 +18,25 @@ if [[ $TAG == "latest" ]]; then
 else
     LATEST_TAG=$TAG
 fi
-git clone -q --branch $LATEST_TAG $ORION_REPO --depth 1
+
+for attempt in $(seq 1 "$MAX_RETRIES"); do
+  rm -rf orion
+  if git clone -q --branch "$LATEST_TAG" "$ORION_REPO" --depth 1; then
+    break
+  fi
+  if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
+    echo "git clone failed after $MAX_RETRIES attempts, exiting..." >&2
+    exit 1
+  fi
+  echo "git clone failed (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
+  sleep 10
+done
+
+pushd orion
+pip install -q --retries "$MAX_RETRIES" -r requirements.txt
+pip install -q --retries "$MAX_RETRIES" .
+popd
+
 pushd orion
 
 # Invoked from orion repo by the openshift-ci bot
@@ -24,8 +45,6 @@ if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
   git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
   git switch ${PULL_NUMBER}
 fi
-
-pip install -q -r requirements.txt
 
 case "$ES_TYPE" in
   qe)
@@ -65,56 +84,24 @@ esac
 
 export ES_SERVER
 
-pip install -q .
-
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     echo "Loading proxy settings from ${SHARED_DIR}/proxy-conf.sh"
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
+
+if ! curl -fsSL --fail --retry 8 --retry-all-errors https://github.com/cloud-bulldozer/go-commons/releases/latest/download/ocp-metadata-linux-amd64 -o ocp-metadata; then
+    echo "Error: Failed to download ocp-metadata binary"
+    exit 1
+fi
+chmod +x ocp-metadata
+CLUSTER_METADATA=$(./ocp-metadata)
+EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
+
 # Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
-    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
-    echo "Current worker count: $current_worker_count"
-
-    if [[ $current_worker_count -ge 200 ]]; then
-        scale_prefix="large-scale"
-    elif [[ $current_worker_count -ge 100 ]]; then
-        scale_prefix="med-scale"
-    elif [[ $current_worker_count -ge 20 ]]; then
-        scale_prefix="small-scale"
-    else
-        scale_prefix="trt-external-payload"
-    fi
-
-    export ORION_CONFIG="examples/${scale_prefix}-${ORION_WORKLOAD_TYPE}.yaml"
-    echo "Auto-selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix, workload: $ORION_WORKLOAD_TYPE)"
-fi
-
-# UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
-if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
-    # Get current worker count (excluding infra and workload nodes)
-    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
-    echo "Current worker count: $current_worker_count"
-
-    # Determine scale prefix based on worker count
-    if [[ $current_worker_count -ge 200 ]]; then
-        scale_prefix="large-scale"
-    elif [[ $current_worker_count -ge 100 ]]; then
-        scale_prefix="med-scale"
-    elif [[ $current_worker_count -ge 20 ]]; then
-        scale_prefix="small-scale"
-    else
-        scale_prefix="trt-external-payload"
-    fi
-
-    # Select orion config based on UDN layer mode
-    if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
-    else
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
-    fi
-    echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
+    ORION_CONFIG="examples/${ORION_WORKLOAD_TYPE}.yaml"
 fi
 
 export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')}"
@@ -124,7 +111,6 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
 fi
 
-EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
     EXTRA_FLAGS+=" --output-format junit --save-output-path=junit.xml"
@@ -137,15 +123,13 @@ else
     exit 1
 fi
 
-if [[ -n "$ORION_CONFIG" ]]; then
-    if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
-        fileBasename="$(basename ${ORION_CONFIG})"
-        if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
-            ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
-        else
-            echo "Error: Failed to download $ORION_CONFIG" >&2
-            exit 1
-        fi
+if [[ -n "${ORION_CONFIG}" ]] && [[ "${ORION_CONFIG}" =~ ^https?:// ]]; then
+    fileBasename="$(basename ${ORION_CONFIG})"
+    if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
+        ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
+    else
+        echo "Error: Failed to download $ORION_CONFIG" >&2
+        exit 1
     fi
 fi
 
@@ -212,11 +196,10 @@ fi
 set +e
 set -o pipefail
 export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="${job_type}"
-export fips="${fips:-$(oc get cm cluster-config-v1 -n kube-system -o jsonpath='{.data.install-config}' | yq -r '.fips // false')}"
 if [[ -n $pull_number ]]; then
     export pull_number=${pull_number}
 fi
-orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
+orion --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
 orion_exit_status=$?
 set -e
 
@@ -320,13 +303,19 @@ cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 # Experimental: run orion with original e-divisive binary (safe block, never breaks main execution)
 (
     EXP_DIR="/tmp/orion-original-edivisive"
+    rm -rf "$EXP_DIR"
     mkdir -p "$EXP_DIR"
     pushd "$EXP_DIR"
-    git clone -q --branch orig-edivisive-exp $ORION_REPO --depth 1
-    pushd orion
-    pip install -q -r requirements.txt
-    pip install -q .
+    python -m virtualenv ./venv_exp
+    source ./venv_exp/bin/activate
 
+    cp -a /tmp/orion ./orion
+    pushd orion
+    git fetch origin orig-edivisive-exp
+    git checkout FETCH_HEAD
+
+    pip install -q --retries "$MAX_RETRIES" -r requirements.txt
+    pip install -q --retries "$MAX_RETRIES" .
 
     echo "Running experimental orion (original e-divisive)..."
     # Strip JIRA flags for experimental run
@@ -336,6 +325,7 @@ cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
     # Copy all results except .xml files into the experimental artifacts subdirectory
     mkdir -p "$ARTIFACT_DIR/orion-original-edivisive"
     cp *.csv *.json *.txt *.html "$ARTIFACT_DIR/orion-original-edivisive/" 2>/dev/null || true
+    deactivate
     popd
     popd
     echo "Experimental orion run complete."

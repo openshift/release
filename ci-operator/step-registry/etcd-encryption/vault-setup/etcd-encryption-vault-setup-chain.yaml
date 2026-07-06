@@ -10,37 +10,46 @@ chain:
     reusable component that can be used across different platform workflows.
 
     What this chain does:
-    1. Installs HashiCorp Vault Enterprise via Helm (vault-install step)
-       - Deploys Vault in dev mode to vault-kms namespace
+    1. Installs two HashiCorp Vault Enterprise instances via Helm (vault-install step)
+       - Mirrors Vault Enterprise and vault-kube-kms plugin images to dev-scripts local registry on baremetalds jobs
+       - Applies ImageContentSourcePolicy/vault-mirror so kube-apiserver nodes can pull both images from the local mirror
+       - Deploys Vault in dev mode to vault-kms and vault-kms-secondary namespaces
        - Creates vault-license secret from mounted credentials
-       - Waits for Vault pod to be ready
+       - Waits for Vault pods to be ready
+       - Creates CA ConfigMaps (vault-ca-bundle and vault-ca-bundle-secondary) in openshift-config
 
-    2. Configures Vault for KMS encryption (vault-configure step)
+    2. Configures both Vault instances for KMS encryption (vault-configure step)
        - Creates Vault Enterprise namespace (default: admin)
        - Enables transit secret engine in the Enterprise namespace
        - Creates KMS encryption key in the Enterprise namespace
        - Configures AppRole authentication in the Enterprise namespace
-       - Stores credentials in vault-credentials secret
+       - Stores credentials in vault-credentials secret in each namespace
 
     Prerequisites:
     - OpenShift cluster with adequate resources
     - Vault Enterprise license secret named 'tests-private-account' in test-credentials namespace
       containing the license file at key 'kms-vault-license'
 
-    Outputs:
+    Outputs (primary instance):
     - Vault service: vault.vault-kms.svc:8200
-    - Vault pod: vault-0 (Ready state)
+    - Vault pod: vault-0 (Ready state) in vault-kms namespace
+    - CA ConfigMap: vault-ca-bundle in openshift-config namespace
     - Credentials secret: vault-credentials in vault-kms namespace
-      * role-id: AppRole role ID for KMS plugin
-      * secret-id: AppRole secret ID for KMS plugin
-      * root-token: Vault root token (dev mode)
+
+    Outputs (secondary instance):
+    - Vault service: vault-secondary.vault-kms-secondary.svc:8200
+    - Vault pod: vault-secondary-0 (Ready state) in vault-kms-secondary namespace
+    - CA ConfigMap: vault-ca-bundle-secondary in openshift-config namespace
+    - Credentials secret: vault-credentials in vault-kms-secondary namespace
 
     Environment variables (inherited from vault-install step):
-    - VAULT_VERSION: Vault Enterprise version (default: 2.0.0-ent)
+    - VAULT_ENTERPRISE_IMAGE: Vault Enterprise image for Helm install and baremetal mirroring
     - VAULT_CHART_VERSION: Helm chart version (default: 0.28.1)
-    - VAULT_NAMESPACE: Vault namespace (default: vault-kms)
-    - VAULT_IMAGE_REPOSITORY: Container image repo (default: docker.io/hashicorp/vault-enterprise)
+    - VAULT_NAMESPACE: Primary Vault namespace (default: vault-kms)
+    - VAULT_SECONDARY_NAMESPACE: Secondary Vault namespace (default: vault-kms-secondary)
+    - VAULT_KMS_PLUGIN_IMAGE: vault-kube-kms plugin image for encryption-kms tests and baremetal mirroring
 
     Environment variables (inherited from vault-configure step):
     - VAULT_KMS_KEY_NAME: Transit encryption key name (default: kms-key)
+    - VAULT_SECONDARY_KMS_KEY_NAME: Secondary transit encryption key name (default: kms-key-secondary)
     - VAULT_ENTERPRISE_NS: Vault Enterprise namespace (default: admin)

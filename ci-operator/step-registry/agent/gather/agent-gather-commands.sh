@@ -15,14 +15,6 @@ cd dev-scripts
 make agent_gather
 EOF
 
-if scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/agent-gather*.tar.xz" "${ARTIFACT_DIR}/" >& /dev/null ; then
+if scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/agent-gather*.tar.xz" "root@${IP}:/root/dev-scripts/ocp/*/installation-logs.tar" "${ARTIFACT_DIR}/" >& /dev/null ; then
   echo "agent logs published"
-fi
-
-echo "### Gather console screenshots..."
-
-screenshot_archive="agent-gather-console-screenshots.tar.xz"
-if [ -f "$screenshot_archive" ]; then
-  cp "$screenshot_archive" "${ARTIFACT_DIR}/"
-  echo "gathered $screenshot_archive"
 fi

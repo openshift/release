@@ -4,17 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Get OCP version from the installer binary itself.
-# This ensures the Glance image name matches the RHCOS content that the
-# installer embeds, which is important for upgrade jobs where the installer
-# version can differ from the release under test.
-OCP_VERSION="$(openshift-install version 2>/dev/null | sed -n 's/^release image\s\+.*:\([0-9]\+\.[0-9]\+\).*/\1/p')"
-if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-	echo "ERROR: Failed to extract OCP version from openshift-install:" >&2
-	openshift-install version >&2
-	exit 1
-fi
-
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 # For disconnected or otherwise unreachable environments, we want to
@@ -38,9 +27,15 @@ UNCOMPRESSED_SHA256="$(jq --raw-output '.architectures.x86_64.artifacts.openstac
 IMAGE_VERSION="$(jq --raw-output '.architectures.x86_64.artifacts.openstack.release' "$COREOS_JSON")"
 rm -f "$COREOS_JSON"
 
-IMAGE_NAME="${OPENSTACK_RHCOS_IMAGE_NAME}-${OCP_VERSION}"
+# Include the RHCOS stream version in the image name so that each
+# RHCOS build gets its own immutable Glance image (e.g.
+# "rhcos-422.94.202506120833-0"). The RHCOS version already encodes
+# the OCP minor version (422 = 4.22, 500 = 5.0), so it is unique
+# across releases. This makes each job pick their respective release.
+IMAGE_NAME="${OPENSTACK_RHCOS_IMAGE_NAME}-${IMAGE_VERSION}"
 
 echo "RHCOS version from installer: ${IMAGE_VERSION}"
+echo "Target image name: ${IMAGE_NAME}"
 echo "Image URL: ${IMAGE_URL}"
 
 # Use `openstack image list` instead of `openstack image show` for all
@@ -72,24 +67,10 @@ if [[ "$EXISTING_COUNT" -gt 1 ]]; then
 	fi
 fi
 
-# Check if the (single remaining) image is up-to-date
-CURRENT_SHA256=""
-CURRENT_ID=""
-if [[ "$EXISTING_COUNT" -ge 1 ]]; then
-	CURRENT_ID="$(echo "$EXISTING_IMAGES" | jq -r 'sort_by(.["Created At"]) | reverse | .[0].ID')"
-	if IMAGE_PROPS="$(openstack image show -c properties -f json "$CURRENT_ID" 2>/dev/null)"; then
-		CURRENT_SHA256="$(echo "$IMAGE_PROPS" | jq --raw-output '
-			.properties["owner_specified.openstack.sha256"] //
-			.properties["sha256"] //
-			empty
-		')"
-	fi
-fi
-
-if [[ "$CURRENT_SHA256" == "$UNCOMPRESSED_SHA256" ]]; then
-	echo "RHCOS image '${IMAGE_NAME}' already at the expected version (${IMAGE_VERSION}). Skipping upload."
+if [[ "$EXISTING_COUNT" -eq 1 ]]; then
+	echo "RHCOS image '${IMAGE_NAME}' already exists. Skipping upload."
 else
-	echo "RHCOS image '${IMAGE_NAME}' needs to be uploaded (current sha256: '${CURRENT_SHA256}', expected: '${UNCOMPRESSED_SHA256}')"
+	echo "RHCOS image '${IMAGE_NAME}' not found. Uploading..."
 
 	WORK_DIR="$(mktemp -d)"
 
@@ -108,36 +89,19 @@ else
 	echo "Verifying uncompressed image checksum..."
 	echo "${UNCOMPRESSED_SHA256}  ${UNCOMPRESSED_FILE}" | sha256sum --check --quiet
 
-	# Clean up leftover from any previous failed run (by ID to handle duplicates)
-	for id in $(openstack image list --name "${IMAGE_NAME}-new" -f value -c ID 2>/dev/null); do
-		openstack image delete "$id" 2>/dev/null || true
-	done
-
-	echo "Uploading image to '${OS_CLOUD}' as '${IMAGE_NAME}-new'..."
-	NEW_IMAGE_ID="$(openstack image create "${IMAGE_NAME}-new" \
+	echo "Uploading image to '${OS_CLOUD}' as '${IMAGE_NAME}'..."
+	IMAGE_ID=$(openstack image create "${IMAGE_NAME}" \
 		--container-format bare \
 		--disk-format qcow2 \
 		--file "$UNCOMPRESSED_FILE" \
 		--private \
 		--property sha256="$UNCOMPRESSED_SHA256" \
 		--property rhcos_version="$IMAGE_VERSION" \
-		--format value --column id)"
-
-	echo "Replacing old '${IMAGE_NAME}' image with new one..."
-	# Delete old images by ID
-	for id in $(openstack image list --name "${IMAGE_NAME}-old" -f value -c ID 2>/dev/null); do
-		openstack image delete "$id" 2>/dev/null || true
-	done
-	# Rename current image to -old (by ID, not name)
-	if [[ -n "$CURRENT_ID" ]]; then
-		openstack image set --name "${IMAGE_NAME}-old" "$CURRENT_ID" 2>/dev/null || true
-	fi
-	# Promote the new image (already using ID)
-	openstack image set --name "$IMAGE_NAME" "$NEW_IMAGE_ID"
+        --format value --column id)
 
 	rm -rf "$WORK_DIR"
 
-	echo "RHCOS image '${IMAGE_NAME}' updated to version ${IMAGE_VERSION}."
+	echo "RHCOS image '${IMAGE_NAME}' with ID '${IMAGE_ID}' uploaded."
 fi
 
 # Patch install-config.yaml to use the pre-uploaded image

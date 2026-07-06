@@ -77,6 +77,7 @@ fi
 if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 
 	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+	export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
 
 	RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_INITIAL:-}"
 	if [[ -z "${RELEASE_IMAGE_INSTALL}" ]]; then
@@ -116,7 +117,9 @@ ec2:CreateNetworkInterface
 ec2:CreateRoute
 ec2:CreateRouteTable
 ec2:CreateSecurityGroup
+ec2:CreateSnapshot
 ec2:CreateSubnet
+ec2:CreateSnapshot
 ec2:CreateTags
 ec2:CreateVolume
 ec2:CreateVpc
@@ -154,6 +157,7 @@ ec2:DescribePrefixLists
 ec2:DescribeRegions
 ec2:DescribeRouteTables
 ec2:DescribeSecurityGroups
+ec2:DescribeSnapshots
 ec2:DescribeSubnets
 ec2:DescribeTags
 ec2:DescribeVolumes
