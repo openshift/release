@@ -43,5 +43,5 @@ OPERATOR_NAMESPACE="${TARGET_NAMESPACE}" \
 KUBE_CONTEXT="$(kubectl config current-context)" \
   /tmp/krkn-operator/scripts/test-api.sh
 
-acm_version=$(oc -A get mch multiclusterhub -o jsonpath='{.status.currentVersion}{"\n"}')
+acm_version=$(oc get mch multiclusterhub -n ocm -o jsonpath='{.status.currentVersion}{"\n"}')
 echo "Success! ACM ${acm_version} is Running"
