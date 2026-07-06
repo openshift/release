@@ -324,6 +324,14 @@ function suite() {
         echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
         scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
+
+        # Warn about individual skip patterns that match nothing.
+        # Assumes \| is only used as a top-level OR (true for all known usages at the time of writing).
+        echo "${TEST_SKIPS}" | sed 's/\\|/\n/g' | while IFS= read -r pattern; do
+            [[ -z "${pattern}" ]] && continue
+            echo "${TESTS}" | grep -q "${pattern}" ||
+                echo "Warning: TEST_SKIPS pattern matched 0 tests (test renamed/removed or regex invalid): ${pattern}"
+        done
     fi
 
     set -x

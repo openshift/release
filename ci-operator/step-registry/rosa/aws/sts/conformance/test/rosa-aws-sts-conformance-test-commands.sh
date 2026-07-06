@@ -24,6 +24,14 @@ if [[ -n "${TEST_SKIPS:-}" ]]; then
     echo "Skipping tests:"
     echo "${TESTS}" | grep "${TEST_SKIPS}" || true
     TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+
+    # Warn about individual skip patterns that match nothing.
+    # Assumes \| is only used as a top-level OR (true for all known usages at the time of writing).
+    echo "${TEST_SKIPS}" | sed 's/\\|/\n/g' | while IFS= read -r pattern; do
+        [[ -z "${pattern}" ]] && continue
+        echo "${TESTS}" | grep -q "${pattern}" ||
+            echo "Warning: TEST_SKIPS pattern matched 0 tests (test renamed/removed or regex invalid): ${pattern}"
+    done
 fi
 
 set +e
