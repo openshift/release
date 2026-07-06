@@ -62,7 +62,7 @@ central:
   exposure: loadbalancer
   spec:
     scanner:
-      scannerComponent: AutoSense
+      scannerComponent: Enabled
       analyzer:
         scaling:
           autoScaling: Disabled
