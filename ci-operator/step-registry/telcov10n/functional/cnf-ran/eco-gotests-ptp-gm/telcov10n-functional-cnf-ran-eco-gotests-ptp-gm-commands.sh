@@ -70,6 +70,10 @@ BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/al
 
 cd "${ECO_CI_CD_DIR}"
 
+echo "Read BMC credentials from ansible group_all secret"
+[[ -f /var/group_variables/common/all/bmc_user ]] && BMC_USER=$(tr -d '[:space:]' < /var/group_variables/common/all/bmc_user)
+[[ -f /var/group_variables/common/all/bmc_password ]] && BMC_PASSWORD=$(tr -d '[:space:]' < /var/group_variables/common/all/bmc_password)
+
 MIRROR_REGISTRY_VAR=""
 if [[ -n "${MIRROR_REGISTRY}" ]]; then
   MIRROR_REGISTRY_VAR="mirror_registry=${MIRROR_REGISTRY}"
