@@ -243,12 +243,42 @@ def _deployment_resources(gendoc):
                                     '--namespace=ci',
                                     '-v=6',
                                 ],
+                                'env': [
+                                    {
+                                        'name': 'GOOGLE_PROJECT_ID',
+                                        'valueFrom': {
+                                            'secretKeyRef': {
+                                                'key': 'project_id',
+                                                'name': 'release-payload-controller-google-credentials',
+                                            }
+                                        }
+                                    },
+                                    {
+                                        'name': 'GOOGLE_APPLICATION_CREDENTIALS',
+                                        'value': '/etc/gcs/credentials.json',
+                                    }
+                                ],
                                 'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-payload-controller_latest',
                                 'imagePullPolicy': 'Always',
                                 'name': 'controller',
+                                'volumeMounts': [
+                                    {
+                                        'mountPath': '/etc/gcs',
+                                        'name': 'google-credentials',
+                                    }
+                                ]
                             }
                         ],
                         'serviceAccountName': 'release-payload-controller',
+                        'volumes': [
+                            {
+                                'name': 'google-credentials',
+                                'secret': {
+                                    'defaultMode': 420,
+                                    'secretName': 'release-payload-controller-google-credentials',
+                                }
+                            }
+                        ]
                     }
                 }
             }
