@@ -51,6 +51,21 @@ sed -e "s/\"${PRIOR_VERSION}\"/\"${TARGET_VERSION}\"/g" \
 
 echo "Created: $TARGET_FILE"
 echo ""
+
+# Validate YAML syntax
+echo "Validating YAML syntax..."
+if command -v python3 &> /dev/null; then
+    python3 -c "import yaml; yaml.safe_load(open('$TARGET_FILE'))" 2>&1
+    if [ $? -ne 0 ]; then
+        echo "Error: Generated YAML file has syntax errors"
+        exit 1
+    fi
+    echo "✓ YAML syntax valid"
+else
+    echo "Warning: python3 not found, skipping YAML validation"
+fi
+
+echo ""
 echo "Please verify the following in the new file:"
 echo "  - base_images.upi-installer.name is \"${TARGET_VERSION}\""
 echo "  - All releases.*.version are \"${TARGET_VERSION}\""
@@ -58,7 +73,7 @@ echo "  - zz_generated_metadata.variant is ${TARGET_VERSION}-nightly-control-pla
 echo "  - Review cron schedules (they may need manual adjustment to avoid conflicts)"
 echo ""
 
-# Navigate to release repo root and run make update
+# Navigate to release repo root and run make jobs
 echo "Running 'make jobs' to generate Prow jobs..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASE_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"

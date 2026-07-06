@@ -10,9 +10,9 @@ ocp-qe-perfscale-ci repository.
 **Purpose**: Automates creation of node-density-heavy test configurations for new OpenShift versions.
 
 **Usage**:
-```
-User: "Create node-density-heavy jobs for OCP 4.25"
-Claude: [Invokes create_node_density_heavy_jobs agent]
+```bash
+# User: "Create node-density-heavy jobs for OCP 4.25"
+# Claude: [Invokes create_node_density_heavy_jobs agent]
 ```
 
 **What it does**:
@@ -33,9 +33,9 @@ Claude: [Invokes create_node_density_heavy_jobs agent]
 **Purpose**: Automates creation of control-plane test configurations for new OpenShift versions.
 
 **Usage**:
-```
-User: "Create control-plane jobs for OCP 4.25"
-Claude: [Invokes create_control_plane_jobs agent]
+```bash
+# User: "Create control-plane jobs for OCP 4.25"
+# Claude: [Invokes create_control_plane_jobs agent]
 ```
 
 **What it does**:
@@ -56,9 +56,9 @@ Claude: [Invokes create_control_plane_jobs agent]
 **Purpose**: Automates creation of AWS loaded upgrade test configurations for new OpenShift versions.
 
 **Usage**:
-```
-User: "Create loaded upgrade jobs for OCP 4.25"
-Claude: [Invokes create_loaded_upgrade_jobs agent]
+```bash
+# User: "Create loaded upgrade jobs for OCP 4.25"
+# Claude: [Invokes create_loaded_upgrade_jobs agent]
 ```
 
 **What it does**:

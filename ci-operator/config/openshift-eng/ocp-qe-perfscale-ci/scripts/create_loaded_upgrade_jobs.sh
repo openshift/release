@@ -63,6 +63,21 @@ sed -e "s/lower: ${PRIOR_PRIOR_VERSION}.0-0/lower: ${PRIOR_VERSION}.0-0/g" \
 
 echo "Created: $TARGET_FILE"
 echo ""
+
+# Validate YAML syntax
+echo "Validating YAML syntax..."
+if command -v python3 &> /dev/null; then
+    python3 -c "import yaml; yaml.safe_load(open('$TARGET_FILE'))" 2>&1
+    if [ $? -ne 0 ]; then
+        echo "Error: Generated YAML file has syntax errors"
+        exit 1
+    fi
+    echo "✓ YAML syntax valid"
+else
+    echo "Warning: python3 not found, skipping YAML validation"
+fi
+
+echo ""
 echo "Please verify the following in the new file:"
 echo "  - releases.initial.version_bounds.lower is ${PRIOR_VERSION}.0-0"
 echo "  - releases.initial.version_bounds.upper is ${TARGET_VERSION}.0-0"
@@ -71,7 +86,7 @@ echo "  - zz_generated_metadata.variant is aws-${TARGET_VERSION}-nightly-x86-loa
 echo "  - Review cron schedules (they may need manual adjustment to avoid conflicts)"
 echo ""
 
-# Navigate to release repo root and run make update
+# Navigate to release repo root and run make jobs
 echo "Running 'make jobs' to generate Prow jobs..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASE_ROOT="$(cd "${SCRIPT_DIR}/../../../../.." && pwd)"
