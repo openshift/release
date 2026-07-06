@@ -358,6 +358,7 @@ spec:
         - --jira-endpoint=https://redhat.atlassian.net
         - --jira-username=openshift-release-controller-jira-bot@redhat.com
         - --jira-password-file=/etc/jira/bot-password
+        - --release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml
         env:
         - name: HOME
           value: /tmp/home
@@ -385,6 +386,9 @@ spec:
         volumeMounts:
         - mountPath: /etc/jira
           name: jira
+          readOnly: true
+        - mountPath: /etc/qualifiers-config
+          name: qualifiers-config
           readOnly: true
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
@@ -426,6 +430,9 @@ spec:
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
+      - configMap:
+          name: release-controller-release-qualifiers
+        name: qualifiers-config
       - name: release-controller-kubeconfigs
         secret:
           defaultMode: 420
