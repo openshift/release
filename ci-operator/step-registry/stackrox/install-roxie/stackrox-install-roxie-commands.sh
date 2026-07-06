@@ -61,6 +61,18 @@ central:
   earlyReadiness: false
   exposure: loadbalancer
   spec:
+    scanner:
+      scannerComponent: AutoSense
+      analyzer:
+        scaling:
+          autoScaling: Disabled
+          replicas: 1
+    scannerV4:
+      matcher:
+        scaling:
+          autoScaling: Enabled
+          replicas: 1
+          maxReplicas: 2
     customize:
       envVars:
       - name: SCANNER_V4_MATCHER_READINESS
@@ -83,6 +95,7 @@ roxie deploy \
   --envrc "${ROXIE_ENVRC}" \
   --central-wait 60m \
   --secured-cluster-wait 60m \
+  `# TODO(ROX-35434): simplify once roxie has 1st class support for community-branded repo` \
   --operator-env "RELATED_IMAGE_MAIN=${PUBLIC_REGISTRY}/main:${ACS_VERSION_TAG}" \
   --operator-env "RELATED_IMAGE_CENTRAL_DB=${PUBLIC_REGISTRY}/central-db:${ACS_VERSION_TAG}" \
   --operator-env "RELATED_IMAGE_SCANNER=${PUBLIC_REGISTRY}/scanner:${ACS_VERSION_TAG}" \
