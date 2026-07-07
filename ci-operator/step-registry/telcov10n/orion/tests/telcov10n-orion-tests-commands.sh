@@ -103,12 +103,12 @@ set +e
 set -o pipefail
 echo "Start orion test"
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-orion --config ${CONFIG} --es-server=${ES_SERVER} --benchmark-index=${ES_METADATA_INDEX} --metadata-index=${ES_METADATA_INDEX} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+orion --config ${CONFIG} --es-server=${ES_SERVER} --benchmark-index=${ES_METADATA_INDEX} --metadata-index=${ES_METADATA_INDEX} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
-  cp *.csv *.xml ${ARTIFACT_DIR}/
+  cp *.csv *.xml *.html ${ARTIFACT_DIR}/
 fi
 
 exit $orion_exit_status
