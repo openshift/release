@@ -291,6 +291,28 @@ spec:
     - ${trustee_catalog_dest}
     source: ${trustee_catalog_repo}
 EOFTITMS
+
+        # Mirror kbs-client image (used by install-trustee for KBS validation)
+        kbs_client_image="quay.io/confidential-containers/kbs-client:v0.17.0"
+        kbs_client_dest="${MIRROR_REGISTRY_HOST}/confidential-containers/kbs-client"
+        if skopeo inspect "docker://${kbs_client_dest}:v0.17.0" "${DEST_TLS_ARGS[@]}" &>/dev/null; then
+            echo "  kbs-client already mirrored, skipping"
+        else
+            echo "  Mirroring ${kbs_client_image} -> ${kbs_client_dest}:v0.17.0"
+            skopeo copy --all "docker://${kbs_client_image}" "docker://${kbs_client_dest}:v0.17.0" "${DEST_TLS_ARGS[@]}" || echo "WARNING: failed to copy kbs-client"
+        fi
+
+        cat <<EOFKBS | oc apply -f - || true
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: kbs-client-mirror
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - ${kbs_client_dest}
+    source: quay.io/confidential-containers/kbs-client
+EOFKBS
     fi
 
     cs_name="osc-pre-ga"
