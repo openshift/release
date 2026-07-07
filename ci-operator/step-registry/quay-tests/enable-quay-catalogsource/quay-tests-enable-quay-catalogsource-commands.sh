@@ -391,6 +391,54 @@ function check_catalog_source_status(){
     set -e
 }
 
+# Verify OLM can actually resolve packages from the catalog.
+# On ROSA HCP the catalog-operator runs on the management cluster and
+# connects to catalog pods on the guest cluster through a proxy layer.
+# The CatalogSource may report READY while the gRPC connection used by
+# the OLM resolver is broken (e.g. "http2: frame too large").
+# This function checks for the quay-operator packagemanifest and, if
+# absent, recycles the catalog pod to force a fresh gRPC connection.
+function verify_catalog_packages () {
+    echo "Verifying quay-operator package is resolvable from ${QUAY_OPERATOR_SOURCE}..."
+    set +e
+    local attempt=0
+    local max_attempts=3
+    local found=false
+
+    while [[ $attempt -lt $max_attempts ]]; do
+        attempt=$((attempt + 1))
+        echo "  Verification attempt ${attempt}/${max_attempts}..."
+        local wait_secs=0
+        while [[ $wait_secs -lt 180 ]]; do
+            wait_secs=$((wait_secs + 15))
+            if oc get packagemanifests -n openshift-marketplace 2>/dev/null \
+                 | grep -q "quay-operator.*${QUAY_OPERATOR_SOURCE}"; then
+                echo "quay-operator packagemanifest is available from ${QUAY_OPERATOR_SOURCE}"
+                found=true
+                break 2
+            fi
+            sleep 15
+        done
+
+        if [[ $attempt -lt $max_attempts ]]; then
+            echo "  quay-operator packagemanifest not found, recycling catalog pod..."
+            oc delete pod -n openshift-marketplace -l olm.catalogSource="${QUAY_OPERATOR_SOURCE}" 2>/dev/null || true
+            echo "  Waiting for CatalogSource to recover..."
+            sleep 30
+            check_catalog_source_status
+        fi
+    done
+
+    if [[ "$found" != "true" ]]; then
+        echo "!!! quay-operator packagemanifest not available from ${QUAY_OPERATOR_SOURCE} after ${max_attempts} attempts"
+        echo "=== PackageManifests ===" >&2
+        oc get packagemanifests -n openshift-marketplace 2>&1 || true
+        echo "=== CatalogSource pod logs ===" >&2
+        oc logs -n openshift-marketplace -l olm.catalogSource="${QUAY_OPERATOR_SOURCE}" --tail=50 2>&1 || true
+        return 1
+    fi
+    set -e
+}
 
 #"redhat-operators" is official catalog source for released build
 if [ $QUAY_OPERATOR_SOURCE == "redhat-operators" ]; then 
@@ -409,6 +457,7 @@ else #Install Quay operator with fbc image
   fi
   create_catalog_source
   check_catalog_source_status
+  verify_catalog_packages
   if [[ "$QUAY_CLUSTER_TYPE" != "rosahcp" ]]; then
     wait_mcp_ready
   fi
