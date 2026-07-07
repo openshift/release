@@ -45,6 +45,7 @@ tests:
 - as: cr--ocp--krkn-hub-tests--aws
   cron: 0 6,18 * * *
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: aws-lp-chaos
     env:
       BASE_DOMAIN: chaos.lp.devcluster.openshift.com
@@ -55,13 +56,18 @@ tests:
       TELEMETRY_GROUP: ocp4.22-nightly--aws
     post:
     - ref: mpiit-data-router-reporter
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    pre:
+    - chain: ipi-aws-pre
+    - ref: cucushift-installer-reportportal-marker
     test:
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: ipi-aws
   timeout: 6h0m0s
 - as: cr--ocp--krkn-hub-node-tests--aws
   cron: 0 3,15 * * *
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: aws-lp-chaos
     env:
       BASE_DOMAIN: chaos.lp.devcluster.openshift.com
@@ -73,9 +79,13 @@ tests:
       TELEMETRY_GROUP: ocp4.22-nightly--aws
     post:
     - ref: mpiit-data-router-reporter
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    pre:
+    - chain: ipi-aws-pre
+    - ref: cucushift-installer-reportportal-marker
     test:
     - chain: redhat-chaos-krkn-hub-node-tests
-    workflow: ipi-aws
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
