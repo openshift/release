@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if test -s "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 set -o nounset
 set -o errexit
 set -o pipefail

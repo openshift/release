@@ -31,6 +31,10 @@ set -euo pipefail
 # Configuration
 #========================================
 
+if test -s "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 export SHARED_DIR=${SHARED_DIR:-/tmp}
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 
@@ -280,17 +284,30 @@ function install_trustee_operator() {
     return 1
   fi
 
-  echo ">>> Rendered operator YAML:"
-  cat "${operator_yaml}"
-  echo ">>> Total YAML lines: $(wc -l < "${operator_yaml}")"
+  # Filter out ImageDigestMirrorSet and ImageTagMirrorSet from chart output.
+  # In disconnected, the chart's mirror sets point to quay.io which is unreachable.
+  # Our mirror-operator already created IDMS/ITMS pointing to ACR.
+  grep -v "ImageDigestMirrorSet\|ImageTagMirrorSet" "${operator_yaml}" > /dev/null 2>&1 || true
+  local filtered_yaml="${SCRATCH}/operator-manifests-filtered.yaml"
+  python3 -c "
+import sys
+docs = open('${operator_yaml}').read().split('---')
+for doc in docs:
+    if 'ImageDigestMirrorSet' not in doc and 'ImageTagMirrorSet' not in doc:
+        print('---')
+        print(doc)
+" > "${filtered_yaml}" 2>/dev/null || cp "${operator_yaml}" "${filtered_yaml}"
+
+  echo ">>> Rendered operator YAML (filtered, no mirror sets):"
+  grep "kind:" "${filtered_yaml}" | sort -u
+  echo ">>> Total YAML lines: $(wc -l < "${filtered_yaml}")"
 
   # Apply operator chart
   local apply_output
-  if ! apply_output=$(oc apply -f "${operator_yaml}" 2>&1); then
+  if ! apply_output=$(oc apply -f "${filtered_yaml}" 2>&1); then
     echo ">>> ERROR: Failed to apply operator manifests"
     echo "$apply_output"
-    echo ">>> Full operator YAML:"
-    cat "${operator_yaml}"
+    cat "${filtered_yaml}"
     return 1
   fi
 
@@ -441,6 +458,12 @@ function install_trustee_operands() {
   local charts_dir="$1"
 
   echo ">>> Installing Trustee operands (cluster domain: ${CLUSTER_DOMAIN})"
+
+  # Ensure kbsres1 secret exists (required by KbsConfig reconciliation)
+  if ! oc get secret kbsres1 -n "${TRUSTEE_NAMESPACE}" &>/dev/null; then
+    echo ">>> Creating kbsres1 test secret..."
+    oc create secret generic kbsres1 -n "${TRUSTEE_NAMESPACE}" --from-literal=key1=value1
+  fi
 
   # Render operands chart
   local operands_yaml="${SCRATCH}/operands-manifests.yaml"
