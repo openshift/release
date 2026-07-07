@@ -8,12 +8,12 @@ build_root:
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: '4.18'
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.18"
+      name: '4.18'
       namespace: ocp
 resources:
   '*':
@@ -22,69 +22,56 @@ resources:
       memory: 200Mi
 tests:
 - as: corenet-7217-udn-medium-with-sos
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-qe
-    product: ocp
-    timeout: 8h0m0s
-    version: "4.18"
   steps:
     env:
-      CUDN_ITERATION_MULTIPLIER: "20"
+      CUDN_ITERATION_MULTIPLIER: '20'
       EXTRA_MG_ARGS: --host-network
       MUST_GATHER_TIMEOUT: 35m
-      NAMESPACES_PER_CUDN: "5"
+      NAMESPACES_PER_CUDN: '5'
       POD_READY_THRESHOLD: 1400s
-      PPROF: "true"
-      SOS_COLLECT_ALL_NODES: "true"
-      SOS_MAX_PARALLEL: "10"
+      PPROF: 'true'
+      SOS_COLLECT_ALL_NODES: 'true'
+      SOS_MAX_PARALLEL: '10'
       SOS_PLUGIN_FILTER: ovs,openvswitch,ovn,process,systemd,cgroups
       SOS_TIMEOUT: 45m
     post:
     - ref: gather-must-gather
     test:
     - chain: openshift-qe-cudn-density-with-sos
+    cluster_profile: aws-qe
+    workflow: ipi-aws
+  cluster_profile: aws-qe
+  timeout: 8h0m0s
 - as: corenet-7217-udn-high-with-sos
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-qe
-    product: ocp
-    timeout: 10h0m0s
-    version: "4.18"
   steps:
     env:
-      CUDN_ITERATION_MULTIPLIER: "40"
+      CUDN_ITERATION_MULTIPLIER: '40'
       EXTRA_MG_ARGS: --host-network
       MUST_GATHER_TIMEOUT: 40m
-      NAMESPACES_PER_CUDN: "5"
+      NAMESPACES_PER_CUDN: '5'
       POD_READY_THRESHOLD: 2000s
-      PPROF: "true"
-      SOS_COLLECT_ALL_NODES: "true"
-      SOS_MAX_PARALLEL: "10"
+      PPROF: 'true'
+      SOS_COLLECT_ALL_NODES: 'true'
+      SOS_MAX_PARALLEL: '10'
       SOS_PLUGIN_FILTER: ovs,openvswitch,ovn,process,systemd,cgroups
       SOS_TIMEOUT: 60m
     post:
     - ref: gather-must-gather
     test:
     - chain: openshift-qe-cudn-density-with-sos
+    cluster_profile: aws-qe
+    workflow: ipi-aws
+  cluster_profile: aws-qe
+  timeout: 10h0m0s
 - as: corenet-7217-udn-quick
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-qe
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.18"
   steps:
     env:
-      CUDN_ITERATION_MULTIPLIER: "8"
+      CUDN_ITERATION_MULTIPLIER: '8'
       EXTRA_MG_ARGS: --host-network
       MUST_GATHER_TIMEOUT: 25m
-      NAMESPACES_PER_CUDN: "5"
+      NAMESPACES_PER_CUDN: '5'
       POD_READY_THRESHOLD: 1000s
-      SOS_MAX_PARALLEL: "15"
+      SOS_MAX_PARALLEL: '15'
       SOS_NODE_SELECTOR: node-role.kubernetes.io/worker=
       SOS_PLUGIN_FILTER: ovs,process
       SOS_TIMEOUT: 20m
@@ -92,19 +79,16 @@ tests:
     - ref: gather-must-gather
     test:
     - chain: openshift-qe-cudn-density-with-sos
+    cluster_profile: aws-qe
+    workflow: ipi-aws
+  cluster_profile: aws-qe
+  timeout: 4h0m0s
 - as: corenet-7217-baseline-sos
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-qe
-    product: ocp
-    timeout: 2h0m0s
-    version: "4.18"
   steps:
     env:
       EXTRA_MG_ARGS: --host-network
       MUST_GATHER_TIMEOUT: 25m
-      SOS_MAX_PARALLEL: "10"
+      SOS_MAX_PARALLEL: '10'
       SOS_NODE_SELECTOR: node-role.kubernetes.io/worker=
       SOS_PLUGIN_FILTER: ovs,openvswitch,ovn,process,systemd
       SOS_TIMEOUT: 20m
@@ -112,6 +96,10 @@ tests:
     - ref: gather-must-gather
     test:
     - ref: openshift-qe-sosreport
+    cluster_profile: aws-qe
+    workflow: ipi-aws
+  cluster_profile: aws-qe
+  timeout: 2h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift
