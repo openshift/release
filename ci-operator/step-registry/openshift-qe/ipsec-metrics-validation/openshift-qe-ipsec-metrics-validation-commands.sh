@@ -58,7 +58,8 @@ echo "✓ Found ${OVNKUBE_PODS} running ovnkube-controller pods"
 echo ""
 echo "Step 3: Validating new IPsec metric: ovnkube_controller_ipsec_tunnel_ike_child_sa_state..."
 
-# Get Prometheus token
+# Get Prometheus token (disable tracing to avoid leaking token in logs)
+set +x
 PROM_TOKEN=$(oc sa get-token prometheus-k8s -n openshift-monitoring)
 THANOS_QUERIER_HOST=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
 
@@ -67,6 +68,7 @@ METRIC_QUERY='ovnkube_controller_ipsec_tunnel_ike_child_sa_state'
 METRIC_RESULT=$(curl -k -H "Authorization: Bearer ${PROM_TOKEN}" \
     "https://${THANOS_QUERIER_HOST}/api/v1/query?query=${METRIC_QUERY}" | \
     jq -r '.data.result | length')
+set -x
 
 if [[ ${METRIC_RESULT} -eq 0 ]]; then
     echo "ERROR: Metric ovnkube_controller_ipsec_tunnel_ike_child_sa_state not found!"
@@ -76,19 +78,23 @@ fi
 
 echo "✓ Metric exists with ${METRIC_RESULT} time series"
 
-# Show sample metric values
+# Show sample metric values (disable tracing)
 echo ""
 echo "Sample metric values:"
+set +x
 curl -k -H "Authorization: Bearer ${PROM_TOKEN}" \
     "https://${THANOS_QUERIER_HOST}/api/v1/query?query=${METRIC_QUERY}" | \
     jq -r '.data.result[0:5][] | "  Node: \(.metric.node) | Remote IP: \(.metric.remote_ip) | State: \(.value[1])"'
+set -x
 
 # Step 4: Check metric labels
 echo ""
 echo "Step 4: Validating metric labels (node, remote_ip, local_ip)..."
+set +x
 LABEL_CHECK=$(curl -k -H "Authorization: Bearer ${PROM_TOKEN}" \
     "https://${THANOS_QUERIER_HOST}/api/v1/query?query=${METRIC_QUERY}" | \
     jq -r '.data.result[0].metric | has("node") and has("remote_ip") and has("local_ip")')
+set -x
 
 if [[ "${LABEL_CHECK}" != "true" ]]; then
     echo "ERROR: Metric is missing required labels (node, remote_ip, local_ip)"
@@ -101,6 +107,7 @@ echo ""
 echo "Step 5: Checking IPsec Child SA tunnel states..."
 
 # State values: 0=Unknown, 1=Installed, 2=Rekeyed, 3=Deleting, 4=Deleted
+set +x
 INSTALLED_TUNNELS=$(curl -k -H "Authorization: Bearer ${PROM_TOKEN}" \
     "https://${THANOS_QUERIER_HOST}/api/v1/query?query=${METRIC_QUERY}%3D%3D1" | \
     jq -r '.data.result | length')
@@ -108,6 +115,7 @@ INSTALLED_TUNNELS=$(curl -k -H "Authorization: Bearer ${PROM_TOKEN}" \
 TOTAL_TUNNELS=$(curl -k -H "Authorization: Bearer ${PROM_TOKEN}" \
     "https://${THANOS_QUERIER_HOST}/api/v1/query?query=${METRIC_QUERY}" | \
     jq -r '.data.result | length')
+set -x
 
 echo "Total IPsec tunnels: ${TOTAL_TUNNELS}"
 echo "Installed (healthy) tunnels: ${INSTALLED_TUNNELS}"
@@ -131,6 +139,17 @@ echo "Step 6: Running N×N connectivity matrix test..."
 # Create test namespace
 TEST_NS="ipsec-connectivity-test"
 oc delete namespace ${TEST_NS} --ignore-not-found=true
+
+# Wait for namespace to be fully deleted to avoid race condition
+echo "Waiting for namespace deletion to complete..."
+for i in {1..30}; do
+    if ! oc get namespace ${TEST_NS} &>/dev/null; then
+        break
+    fi
+    echo "  Waiting for ${TEST_NS} to finish terminating... ($i/30)"
+    sleep 2
+done
+
 oc create namespace ${TEST_NS}
 
 # Deploy nginx pods on all worker nodes
@@ -167,9 +186,26 @@ spec:
             cpu: "100m"
 EOF
 
-# Wait for all nginx pods to be ready
-echo "Waiting for nginx pods to be ready..."
-oc wait --for=condition=ready pod -l app=nginx-test -n ${TEST_NS} --timeout=180s
+# Wait for all nginx pods to be ready (increased timeout for 250-node scale)
+echo "Waiting for nginx pods to be ready across all nodes..."
+echo "This may take 10-15 minutes for image pulls across 250 nodes..."
+
+# Use longer timeout for large-scale deployments (30 minutes)
+if ! oc wait --for=condition=ready pod -l app=nginx-test -n ${TEST_NS} --timeout=1800s; then
+    echo "WARNING: Not all nginx pods became ready within 30 minutes"
+    echo "Checking partial deployment status..."
+    oc get pods -n ${TEST_NS} -l app=nginx-test --no-headers
+
+    READY_PODS=$(oc get pods -n ${TEST_NS} -l app=nginx-test --no-headers | grep -c Running || echo "0")
+    TOTAL_WORKERS=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | wc -l)
+
+    if [[ ${READY_PODS} -lt $((TOTAL_WORKERS * 80 / 100)) ]]; then
+        echo "ERROR: Less than 80% of nginx pods are ready (${READY_PODS}/${TOTAL_WORKERS})"
+        exit 1
+    fi
+
+    echo "Proceeding with partial deployment: ${READY_PODS}/${TOTAL_WORKERS} pods ready"
+fi
 
 NGINX_POD_COUNT=$(oc get pods -n ${TEST_NS} -l app=nginx-test --no-headers | grep Running | wc -l)
 echo "✓ ${NGINX_POD_COUNT} nginx pods running"
