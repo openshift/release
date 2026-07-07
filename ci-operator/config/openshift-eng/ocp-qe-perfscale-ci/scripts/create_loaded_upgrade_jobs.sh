@@ -67,8 +67,7 @@ echo ""
 # Validate YAML syntax
 echo "Validating YAML syntax..."
 if command -v python3 &> /dev/null; then
-    python3 -c "import yaml; yaml.safe_load(open('$TARGET_FILE'))" 2>&1
-    if [ $? -ne 0 ]; then
+    if ! python3 -c "import sys, yaml; yaml.safe_load(open(sys.argv[1]))" "$TARGET_FILE" 2>&1; then
         echo "Error: Generated YAML file has syntax errors"
         exit 1
     fi

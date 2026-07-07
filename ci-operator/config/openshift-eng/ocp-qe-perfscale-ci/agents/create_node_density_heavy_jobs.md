@@ -45,7 +45,8 @@ Parse the user's request to identify the target OpenShift version (e.g., "4.23",
 Use the automated script to create the configuration file:
 
 ```bash
-cd ci-operator/config/openshift-eng/ocp-qe-perfscale-ci/scripts/create_node_density_heavy_jobs.sh <TARGET_VERSION>
+cd ci-operator/config/openshift-eng/ocp-qe-perfscale-ci
+./scripts/create_node_density_heavy_jobs.sh <TARGET_VERSION>
 ```
 
 
