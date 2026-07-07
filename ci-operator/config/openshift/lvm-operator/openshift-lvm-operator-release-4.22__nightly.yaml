@@ -7,6 +7,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -98,9 +102,12 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      SCAN_NAMESPACE: openshift-lvm-storage
     test:
+    - ref: tls-scanner-run
     - as: lvms-mno-integration-test
       cli: latest
       commands: |
@@ -167,9 +174,9 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      LVM_CATALOG_SOURCE: lvm-catalogsource
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
     test:
     - as: lvms-mno-integration-test
       cli: latest
