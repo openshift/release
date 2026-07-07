@@ -1,0 +1,258 @@
+#!/bin/bash
+set -o errexit
+set -o nounset
+set -o pipefail
+set -x
+
+cat /etc/os-release
+oc config view
+oc projects
+
+echo "====================================="
+echo "IPsec Metrics Validation Test Suite"
+echo "====================================="
+
+# Check if registry URL is provided via ConfigMap (for testing custom builds)
+echo ""
+echo "Checking for custom registry URL in ConfigMap..."
+if oc get configmap ipsec-registry-config -n ci &>/dev/null; then
+    REGISTRY_URL=$(oc get configmap ipsec-registry-config -n ci -o jsonpath='{.data.REGISTRY_URL}' 2>/dev/null || echo "")
+    if [[ -n "${REGISTRY_URL}" ]]; then
+        echo "✓ Found custom registry URL in ConfigMap: ${REGISTRY_URL}"
+        export CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${REGISTRY_URL}"
+        echo "  This cluster was built with custom images from Cluster Bot"
+    else
+        echo "⚠ ConfigMap exists but REGISTRY_URL is empty, using default nightly build"
+    fi
+else
+    echo "ℹ No ConfigMap found, using default nightly build"
+fi
+
+# Get cluster info
+CLUSTER_NAME=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')
+NODE_COUNT=$(oc get nodes --no-headers | wc -l)
+echo "Cluster: ${CLUSTER_NAME}"
+echo "Total nodes: ${NODE_COUNT}"
+
+# Step 1: Verify IPsec is enabled
+echo ""
+echo "Step 1: Verifying IPsec is enabled..."
+IPSEC_ENABLED=$(oc get network.config.openshift.io/cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.ipsecConfig.mode}')
+if [[ "${IPSEC_ENABLED}" != "Full" ]]; then
+    echo "ERROR: IPsec is not enabled! Expected mode=Full, got: ${IPSEC_ENABLED}"
+    exit 1
+fi
+echo "✓ IPsec mode: ${IPSEC_ENABLED}"
+
+# Step 2: Check ovnkube-controller pods are running
+echo ""
+echo "Step 2: Checking ovnkube-controller pods..."
+OVNKUBE_PODS=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-control-plane --no-headers | grep Running | wc -l)
+if [[ ${OVNKUBE_PODS} -lt 1 ]]; then
+    echo "ERROR: No running ovnkube-controller pods found!"
+    exit 1
+fi
+echo "✓ Found ${OVNKUBE_PODS} running ovnkube-controller pods"
+
+# Step 3: Verify new IPsec Child SA state metric exists
+echo ""
+echo "Step 3: Validating new IPsec metric: ovnkube_controller_ipsec_tunnel_ike_child_sa_state..."
+
+# Get Prometheus token
+PROM_TOKEN=$(oc sa get-token prometheus-k8s -n openshift-monitoring)
+THANOS_QUERIER_HOST=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
+
+# Query the new metric
+METRIC_QUERY='ovnkube_controller_ipsec_tunnel_ike_child_sa_state'
+METRIC_RESULT=$(curl -k -H "Authorization: Bearer ${PROM_TOKEN}" \
+    "https://${THANOS_QUERIER_HOST}/api/v1/query?query=${METRIC_QUERY}" | \
+    jq -r '.data.result | length')
+
+if [[ ${METRIC_RESULT} -eq 0 ]]; then
+    echo "ERROR: Metric ovnkube_controller_ipsec_tunnel_ike_child_sa_state not found!"
+    echo "This metric should be exposed by ovn-kubernetes PR #3259"
+    exit 1
+fi
+
+echo "✓ Metric exists with ${METRIC_RESULT} time series"
+
+# Show sample metric values
+echo ""
+echo "Sample metric values:"
+curl -k -H "Authorization: Bearer ${PROM_TOKEN}" \
+    "https://${THANOS_QUERIER_HOST}/api/v1/query?query=${METRIC_QUERY}" | \
+    jq -r '.data.result[0:5][] | "  Node: \(.metric.node) | Remote IP: \(.metric.remote_ip) | State: \(.value[1])"'
+
+# Step 4: Check metric labels
+echo ""
+echo "Step 4: Validating metric labels (node, remote_ip, local_ip)..."
+LABEL_CHECK=$(curl -k -H "Authorization: Bearer ${PROM_TOKEN}" \
+    "https://${THANOS_QUERIER_HOST}/api/v1/query?query=${METRIC_QUERY}" | \
+    jq -r '.data.result[0].metric | has("node") and has("remote_ip") and has("local_ip")')
+
+if [[ "${LABEL_CHECK}" != "true" ]]; then
+    echo "ERROR: Metric is missing required labels (node, remote_ip, local_ip)"
+    exit 1
+fi
+echo "✓ All required labels present"
+
+# Step 5: Verify Child SA states
+echo ""
+echo "Step 5: Checking IPsec Child SA tunnel states..."
+
+# State values: 0=Unknown, 1=Installed, 2=Rekeyed, 3=Deleting, 4=Deleted
+INSTALLED_TUNNELS=$(curl -k -H "Authorization: Bearer ${PROM_TOKEN}" \
+    "https://${THANOS_QUERIER_HOST}/api/v1/query?query=${METRIC_QUERY}%3D%3D1" | \
+    jq -r '.data.result | length')
+
+TOTAL_TUNNELS=$(curl -k -H "Authorization: Bearer ${PROM_TOKEN}" \
+    "https://${THANOS_QUERIER_HOST}/api/v1/query?query=${METRIC_QUERY}" | \
+    jq -r '.data.result | length')
+
+echo "Total IPsec tunnels: ${TOTAL_TUNNELS}"
+echo "Installed (healthy) tunnels: ${INSTALLED_TUNNELS}"
+
+# Calculate expected tunnels (N*(N-1) for full mesh)
+WORKER_NODES=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | wc -l)
+EXPECTED_TUNNELS=$((WORKER_NODES * (WORKER_NODES - 1)))
+
+echo "Worker nodes: ${WORKER_NODES}"
+echo "Expected tunnels (N*(N-1)): ${EXPECTED_TUNNELS}"
+
+if [[ ${INSTALLED_TUNNELS} -lt $((EXPECTED_TUNNELS * 90 / 100)) ]]; then
+    echo "WARNING: Less than 90% of tunnels are in INSTALLED state!"
+    echo "This may indicate IPsec tunnel issues"
+fi
+
+# Step 6: Run connectivity tests
+echo ""
+echo "Step 6: Running N×N connectivity matrix test..."
+
+# Create test namespace
+TEST_NS="ipsec-connectivity-test"
+oc delete namespace ${TEST_NS} --ignore-not-found=true
+oc create namespace ${TEST_NS}
+
+# Deploy nginx pods on all worker nodes
+echo "Deploying nginx pods across all worker nodes..."
+cat <<EOF | oc apply -f -
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nginx-test
+  namespace: ${TEST_NS}
+spec:
+  selector:
+    matchLabels:
+      app: nginx-test
+  template:
+    metadata:
+      labels:
+        app: nginx-test
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      containers:
+      - name: nginx
+        image: quay.io/redhat-performance/test-nginx:latest
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+EOF
+
+# Wait for all nginx pods to be ready
+echo "Waiting for nginx pods to be ready..."
+oc wait --for=condition=ready pod -l app=nginx-test -n ${TEST_NS} --timeout=180s
+
+NGINX_POD_COUNT=$(oc get pods -n ${TEST_NS} -l app=nginx-test --no-headers | grep Running | wc -l)
+echo "✓ ${NGINX_POD_COUNT} nginx pods running"
+
+# Run connectivity test
+echo ""
+echo "Testing pod-to-pod connectivity across all nodes..."
+
+# Get all nginx pod IPs and nodes
+oc get pods -n ${TEST_NS} -l app=nginx-test -o json | \
+  jq -r '.items[] | "\(.status.podIP) \(.spec.nodeName) \(.metadata.name)"' > /tmp/nginx_pods.txt
+
+TOTAL_TESTS=0
+PASSED_TESTS=0
+FAILED_TESTS=0
+
+while IFS= read -r source_line; do
+    SOURCE_IP=$(echo ${source_line} | awk '{print $1}')
+    SOURCE_NODE=$(echo ${source_line} | awk '{print $2}')
+    SOURCE_POD=$(echo ${source_line} | awk '{print $3}')
+
+    while IFS= read -r target_line; do
+        TARGET_IP=$(echo ${target_line} | awk '{print $1}')
+        TARGET_NODE=$(echo ${target_line} | awk '{print $2}')
+
+        # Skip self-connectivity
+        if [[ "${SOURCE_IP}" == "${TARGET_IP}" ]]; then
+            continue
+        fi
+
+        TOTAL_TESTS=$((TOTAL_TESTS + 1))
+
+        # Test connectivity with timeout
+        if oc exec -n ${TEST_NS} ${SOURCE_POD} -- timeout 5 curl -s -o /dev/null -w "%{http_code}" http://${TARGET_IP}:8080 > /tmp/curl_result.txt 2>&1; then
+            HTTP_CODE=$(cat /tmp/curl_result.txt)
+            if [[ "${HTTP_CODE}" == "200" ]]; then
+                PASSED_TESTS=$((PASSED_TESTS + 1))
+            else
+                echo "  FAIL: ${SOURCE_NODE} → ${TARGET_NODE} (HTTP ${HTTP_CODE})"
+                FAILED_TESTS=$((FAILED_TESTS + 1))
+            fi
+        else
+            echo "  FAIL: ${SOURCE_NODE} → ${TARGET_NODE} (timeout/error)"
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+        fi
+    done < /tmp/nginx_pods.txt
+done < /tmp/nginx_pods.txt
+
+echo ""
+echo "Connectivity Test Results:"
+echo "  Total tests: ${TOTAL_TESTS}"
+echo "  Passed: ${PASSED_TESTS}"
+echo "  Failed: ${FAILED_TESTS}"
+echo "  Success rate: $(awk "BEGIN {printf \"%.2f\", (${PASSED_TESTS}/${TOTAL_TESTS})*100}")%"
+
+# Cleanup
+oc delete namespace ${TEST_NS} --ignore-not-found=true
+
+# Step 7: Final validation
+echo ""
+echo "====================================="
+echo "Test Summary"
+echo "====================================="
+
+if [[ ${FAILED_TESTS} -gt 0 ]]; then
+    echo "❌ FAILED: Connectivity test failed (${FAILED_TESTS} failures)"
+    exit 1
+fi
+
+if [[ ${INSTALLED_TUNNELS} -lt $((EXPECTED_TUNNELS * 90 / 100)) ]]; then
+    echo "⚠️  WARNING: Less than 90% of IPsec tunnels are healthy"
+    echo "   This is not a hard failure but should be investigated"
+fi
+
+echo ""
+echo "✓ IPsec is enabled (mode: ${IPSEC_ENABLED})"
+echo "✓ New metric ovnkube_controller_ipsec_tunnel_ike_child_sa_state is present"
+echo "✓ Metric has correct labels (node, remote_ip, local_ip)"
+echo "✓ IPsec tunnels: ${INSTALLED_TUNNELS}/${TOTAL_TUNNELS} in INSTALLED state"
+echo "✓ Connectivity: ${PASSED_TESTS}/${TOTAL_TESTS} tests passed"
+echo ""
+echo "====================================="
+echo "✅ ALL TESTS PASSED"
+echo "====================================="
+
+exit 0
