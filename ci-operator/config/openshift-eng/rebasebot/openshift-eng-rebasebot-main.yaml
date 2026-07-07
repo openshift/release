@@ -1,3 +1,8 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 build_root:
   project_image:
     dockerfile_literal: |-
@@ -22,6 +27,24 @@ build_root:
       USER 1001:1001
 images:
   items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      USER root
+      RUN dnf install -y git go make tar gzip gpgme gpgme-devel pkgconfig jq python3.12 python3.12-devel python3.12-pip && dnf clean all
+      RUN ln -s /usr/bin/podman /usr/local/bin/docker
+      COPY src/ /src/
+      WORKDIR /src/rebasebot
+      RUN python3.12 -m pip install --no-cache-dir uv && python3.12 -m pip install .
+      WORKDIR /working
+      RUN rm -rf /src && chmod -R a+rwX,o-w /working
+      USER 1001:1001
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-eng/rebasebot
+    to: rebasebot-podman
   - dockerfile_path: Containerfile
     to: rebasebot
 promotion:
