@@ -24,6 +24,8 @@ export KUBECONFIG=$KUBECONFIG_BAK
 # Starting in 4.21, we will aggressively retry test failures only in
 # presubmits to determine if a failure is a flake or legitimate. This is
 # to reduce the number of retests on PR's.
+TEST_ARGS="${TEST_ARGS:-} ${SHARD_ARGS:-}"
+
 if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) ]]; then
     if openshift-tests run --help | grep -q 'retry-strategy'; then
         TEST_ARGS+=" --retry-strategy=aggressive"
