@@ -629,659 +629,6 @@ presubmits:
     - ^release-v1\.17$
     - ^release-v1\.17-
     cluster: build09
-    context: ci/prow/421-images
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - openshift/ci-operator/knative-images/event_display/Dockerfile
-      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
-      - openshift/ci-operator/knative-images/migrate/Dockerfile
-      - openshift/ci-operator/knative-images/post-install/Dockerfile
-      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
-      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
-      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
-      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
-      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
-      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
-      - openshift/ci-operator/knative-test-images/print/Dockerfile
-      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
-      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
-      - openshift/ci-operator/source-image/Dockerfile
-      - openshift/ci-operator/static-images/dispatcher/Dockerfile
-      - openshift/ci-operator/static-images/receiver/Dockerfile
-    labels:
-      ci-operator.openshift.io/variant: "421"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-421-images
-    rerun_command: /test 421-images
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --target=src
-        - --variant=421
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )421-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.17$
-    - ^release-v1\.17-
-    cluster: build09
-    context: ci/prow/421-test-conformance
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - openshift/ci-operator/knative-images/event_display/Dockerfile
-      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
-      - openshift/ci-operator/knative-images/migrate/Dockerfile
-      - openshift/ci-operator/knative-images/post-install/Dockerfile
-      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
-      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
-      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
-      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
-      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
-      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
-      - openshift/ci-operator/knative-test-images/print/Dockerfile
-      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
-      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
-      - openshift/ci-operator/source-image/Dockerfile
-      - openshift/ci-operator/static-images/dispatcher/Dockerfile
-      - openshift/ci-operator/static-images/receiver/Dockerfile
-    labels:
-      ci-operator.openshift.io/variant: "421"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-421-test-conformance
-    rerun_command: /test 421-test-conformance
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-conformance
-        - --variant=421
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )421-test-conformance,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.17$
-    - ^release-v1\.17-
-    cluster: build09
-    context: ci/prow/421-test-e2e
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - openshift/ci-operator/knative-images/event_display/Dockerfile
-      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
-      - openshift/ci-operator/knative-images/migrate/Dockerfile
-      - openshift/ci-operator/knative-images/post-install/Dockerfile
-      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
-      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
-      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
-      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
-      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
-      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
-      - openshift/ci-operator/knative-test-images/print/Dockerfile
-      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
-      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
-      - openshift/ci-operator/source-image/Dockerfile
-      - openshift/ci-operator/static-images/dispatcher/Dockerfile
-      - openshift/ci-operator/static-images/receiver/Dockerfile
-    labels:
-      ci-operator.openshift.io/variant: "421"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-421-test-e2e
-    rerun_command: /test 421-test-e2e
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-e2e
-        - --variant=421
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )421-test-e2e,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.17$
-    - ^release-v1\.17-
-    cluster: build09
-    context: ci/prow/421-test-reconciler
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - openshift/ci-operator/knative-images/event_display/Dockerfile
-      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
-      - openshift/ci-operator/knative-images/migrate/Dockerfile
-      - openshift/ci-operator/knative-images/post-install/Dockerfile
-      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
-      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
-      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
-      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
-      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
-      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
-      - openshift/ci-operator/knative-test-images/print/Dockerfile
-      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
-      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
-      - openshift/ci-operator/source-image/Dockerfile
-      - openshift/ci-operator/static-images/dispatcher/Dockerfile
-      - openshift/ci-operator/static-images/receiver/Dockerfile
-    labels:
-      ci-operator.openshift.io/variant: "421"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-421-test-reconciler
-    rerun_command: /test 421-test-reconciler
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-reconciler
-        - --variant=421
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )421-test-reconciler,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.17$
-    - ^release-v1\.17-
-    cluster: build09
-    context: ci/prow/421-test-reconciler-encryption-auth
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - openshift/ci-operator/knative-images/event_display/Dockerfile
-      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
-      - openshift/ci-operator/knative-images/migrate/Dockerfile
-      - openshift/ci-operator/knative-images/post-install/Dockerfile
-      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
-      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
-      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
-      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
-      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
-      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
-      - openshift/ci-operator/knative-test-images/print/Dockerfile
-      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
-      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
-      - openshift/ci-operator/source-image/Dockerfile
-      - openshift/ci-operator/static-images/dispatcher/Dockerfile
-      - openshift/ci-operator/static-images/receiver/Dockerfile
-    labels:
-      ci-operator.openshift.io/variant: "421"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-421-test-reconciler-encryption-auth
-    rerun_command: /test 421-test-reconciler-encryption-auth
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-reconciler-encryption-auth
-        - --variant=421
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )421-test-reconciler-encryption-auth,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.17$
-    - ^release-v1\.17-
-    cluster: build09
-    context: ci/prow/421-test-reconciler-keda
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - openshift/ci-operator/knative-images/event_display/Dockerfile
-      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
-      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
-      - openshift/ci-operator/knative-images/migrate/Dockerfile
-      - openshift/ci-operator/knative-images/post-install/Dockerfile
-      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
-      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
-      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
-      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
-      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
-      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
-      - openshift/ci-operator/knative-test-images/print/Dockerfile
-      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
-      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
-      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
-      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
-      - openshift/ci-operator/source-image/Dockerfile
-      - openshift/ci-operator/static-images/dispatcher/Dockerfile
-      - openshift/ci-operator/static-images/receiver/Dockerfile
-    labels:
-      ci-operator.openshift.io/variant: "421"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-421-test-reconciler-keda
-    rerun_command: /test 421-test-reconciler-keda
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-reconciler-keda
-        - --variant=421
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )421-test-reconciler-keda,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-v1\.17$
-    - ^release-v1\.17-
-    cluster: build09
     context: ci/prow/422-images
     decorate: true
     decoration_config:
@@ -1313,11 +660,10 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: "422"
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-422-images
     rerun_command: /test 422-images
-    run_if_changed: ^non-existing$
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -1325,6 +671,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=src
         - --variant=422
         command:
         - ci-operator
@@ -1394,18 +741,17 @@ presubmits:
       - openshift/ci-operator/static-images/dispatcher/Dockerfile
       - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "422"
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-422-test-conformance
     rerun_command: /test 422-test-conformance
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1438,6 +784,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1458,6 +807,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1467,7 +819,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(422-test-conformance|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )422-test-conformance,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1503,18 +855,17 @@ presubmits:
       - openshift/ci-operator/static-images/dispatcher/Dockerfile
       - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "422"
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-422-test-e2e
     rerun_command: /test 422-test-e2e
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1547,6 +898,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1567,6 +921,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1576,7 +933,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(422-test-e2e|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )422-test-e2e,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1612,18 +969,17 @@ presubmits:
       - openshift/ci-operator/static-images/dispatcher/Dockerfile
       - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "422"
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-422-test-reconciler
     rerun_command: /test 422-test-reconciler
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1656,6 +1012,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1676,6 +1035,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1685,7 +1047,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(422-test-reconciler|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )422-test-reconciler,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1721,18 +1083,17 @@ presubmits:
       - openshift/ci-operator/static-images/dispatcher/Dockerfile
       - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "422"
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-422-test-reconciler-encryption-auth
     rerun_command: /test 422-test-reconciler-encryption-auth
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1765,6 +1126,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1785,6 +1149,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1794,7 +1161,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(422-test-reconciler-encryption-auth|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )422-test-reconciler-encryption-auth,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1830,14 +1197,211 @@ presubmits:
       - openshift/ci-operator/static-images/dispatcher/Dockerfile
       - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "422"
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-422-test-reconciler-keda
     rerun_command: /test 422-test-reconciler-keda
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=test-reconciler-keda
+        - --variant=422
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )422-test-reconciler-keda,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-v1\.17$
+    - ^release-v1\.17-
+    cluster: build09
+    context: ci/prow/50-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
+    labels:
+      ci-operator.openshift.io/variant: "50"
+      ci.openshift.io/generator: prowgen
+      job-release: "5.0"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-50-images
+    rerun_command: /test 50-images
+    run_if_changed: ^non-existing$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=50
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )50-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-v1\.17$
+    - ^release-v1\.17-
+    cluster: build09
+    context: ci/prow/50-test-conformance
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
+      ci-operator.openshift.io/variant: "50"
+      ci.openshift.io/generator: prowgen
+      job-release: "5.0"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-50-test-conformance
+    rerun_command: /test 50-test-conformance
     spec:
       containers:
       - args:
@@ -1846,8 +1410,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-reconciler-keda
-        - --variant=422
+        - --target=test-conformance
+        - --variant=50
         command:
         - ci-operator
         env:
@@ -1903,4 +1467,440 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(422-test-reconciler-keda|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(50-test-conformance|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-v1\.17$
+    - ^release-v1\.17-
+    cluster: build09
+    context: ci/prow/50-test-e2e
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
+      ci-operator.openshift.io/variant: "50"
+      ci.openshift.io/generator: prowgen
+      job-release: "5.0"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-50-test-e2e
+    rerun_command: /test 50-test-e2e
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=test-e2e
+        - --variant=50
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(50-test-e2e|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-v1\.17$
+    - ^release-v1\.17-
+    cluster: build09
+    context: ci/prow/50-test-reconciler
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
+      ci-operator.openshift.io/variant: "50"
+      ci.openshift.io/generator: prowgen
+      job-release: "5.0"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-50-test-reconciler
+    rerun_command: /test 50-test-reconciler
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=test-reconciler
+        - --variant=50
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(50-test-reconciler|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-v1\.17$
+    - ^release-v1\.17-
+    cluster: build09
+    context: ci/prow/50-test-reconciler-encryption-auth
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
+      ci-operator.openshift.io/variant: "50"
+      ci.openshift.io/generator: prowgen
+      job-release: "5.0"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-50-test-reconciler-encryption-auth
+    rerun_command: /test 50-test-reconciler-encryption-auth
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=test-reconciler-encryption-auth
+        - --variant=50
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(50-test-reconciler-encryption-auth|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-v1\.17$
+    - ^release-v1\.17-
+    cluster: build09
+    context: ci/prow/50-test-reconciler-keda
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
+      ci-operator.openshift.io/variant: "50"
+      ci.openshift.io/generator: prowgen
+      job-release: "5.0"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.17-50-test-reconciler-keda
+    rerun_command: /test 50-test-reconciler-keda
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=test-reconciler-keda
+        - --variant=50
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(50-test-reconciler-keda|remaining-required),?($|\s.*)
