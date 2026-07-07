@@ -67,28 +67,38 @@ if [[ -n "${OLD_CSV}" && "${OLD_CSV}" != "${PATCHED_CSV}" ]]; then
   oc delete csv "${OLD_CSV}" -n "${NAMESPACE}" --ignore-not-found
 fi
 
-echo "Waiting for operator deployment to be ready..."
-sleep 10
-for i in $(seq 1 30); do
-  READY=$(oc get deployment openshift-kueue-operator -n "${NAMESPACE}" \
-    -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
-  if [[ "${READY}" -ge 1 ]]; then
-    echo "Operator deployment ready after upgrade."
-    break
-  fi
-  if [[ "$i" -eq 30 ]]; then
-    echo "ERROR: Operator deployment not ready after 5 minutes"
-    oc get deployment -n "${NAMESPACE}" -o yaml 2>/dev/null || true
-    oc get pods -n "${NAMESPACE}" 2>/dev/null || true
-    exit 1
-  fi
-  echo "Waiting for operator deployment... ($i/30)"
-  sleep 10
-done
+echo "Waiting for operator deployment rollout to complete..."
+oc rollout status deployment/openshift-kueue-operator -n "${NAMESPACE}" --timeout=10m || {
+  echo "ERROR: Operator deployment rollout failed"
+  oc get deployment -n "${NAMESPACE}" -o wide 2>/dev/null || true
+  oc get pods -n "${NAMESPACE}" 2>/dev/null || true
+  exit 1
+}
 
 echo "Waiting for kueue controller-manager..."
 oc wait --for=condition=Available deployment/kueue-controller-manager \
   -n "${NAMESPACE}" --timeout=5m
+
+if [[ -n "${OPERAND_IMAGE:-}" ]]; then
+  echo "Waiting for kueue-controller-manager to use operand image: ${OPERAND_IMAGE}"
+  for i in $(seq 1 60); do
+    CURRENT_IMAGE=$(oc get deployment kueue-controller-manager -n "${NAMESPACE}" \
+      -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
+    if [[ "${CURRENT_IMAGE}" == "${OPERAND_IMAGE}" ]]; then
+      echo "kueue-controller-manager updated to correct operand image."
+      break
+    fi
+    if [[ "$i" -eq 60 ]]; then
+      echo "ERROR: kueue-controller-manager still using ${CURRENT_IMAGE}, expected ${OPERAND_IMAGE}"
+      oc get deployment -n "${NAMESPACE}" -o wide 2>/dev/null || true
+      oc get pods -n "${NAMESPACE}" 2>/dev/null || true
+      exit 1
+    fi
+    echo "Waiting for operand image update... ($i/60, current: ${CURRENT_IMAGE})"
+    sleep 10
+  done
+  oc rollout status deployment/kueue-controller-manager -n "${NAMESPACE}" --timeout=10m
+fi
 
 echo "Verifying CRDs are still available..."
 for crd in clusterqueues.kueue.x-k8s.io localqueues.kueue.x-k8s.io \
