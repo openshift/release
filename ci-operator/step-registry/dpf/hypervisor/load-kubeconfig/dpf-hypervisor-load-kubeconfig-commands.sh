@@ -1,0 +1,77 @@
+#!/bin/bash
+
+set -euo pipefail
+shopt -s inherit_errexit
+
+# Configuration
+REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
+REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
+
+echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
+
+# Prepare SSH key from Vault (add trailing newline if missing)
+echo "Configuring SSH private key..."
+cat /var/run/dpf-ci/private-key | base64 -d > /tmp/id_rsa
+echo "" >> /tmp/id_rsa
+chmod 600 /tmp/id_rsa
+
+# Define SSH command with explicit options (don't rely on ~/.ssh/config)
+SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
+
+# Test SSH connection
+echo "Testing SSH connection to ${REMOTE_HOST}..."
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} echo 'SSH connection successful'; then
+    echo "SSH setup complete and tested successfully"
+else
+    echo "ERROR: Failed to connect to hypervisor ${REMOTE_HOST}"
+    exit 1
+fi
+
+# Find the last DPF openshift-dpf install dir on the hypervisor
+echo "=== Locating last openshift-dpf install dir on hypervisor ==="
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION} /tmp
+
+if [ -f /tmp/last-openshift-dpf-dir.sh ]; then
+    cat /tmp/last-openshift-dpf-dir.sh
+    set -a
+    source /tmp/last-openshift-dpf-dir.sh
+    set +a
+    echo "Last openshift-dpf dir is: '${LAST_OPENSHIFT_DPF}'"
+else
+    echo "ERROR: Failed to find scp-ed file '/tmp/last-openshift-dpf-dir.sh'"
+    exit 1
+fi
+
+# Copy the cluster kubeconfig from the last install dir on the hypervisor
+echo "=== Copying kubeconfig from ${LAST_OPENSHIFT_DPF} on hypervisor ==="
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.doca8 /tmp/kubeconfig.doca8
+
+# The kubeconfig's API server is addressed by an internal hostname that is
+# not resolvable from the CI cluster's network. Resolve it from the
+# hypervisor (which can reach internal DNS) and substitute the IP so the
+# kubeconfig is usable from the CI pod.
+CLUSTER_NAME="$(oc --kubeconfig=/tmp/kubeconfig.doca8 config view -o jsonpath='{.clusters[0].name}')"
+CLUSTER_API_SERVER_HOSTNAME="$(oc --kubeconfig=/tmp/kubeconfig.doca8 config view -o jsonpath='{.clusters[0].cluster.server}' | sed -E 's#https://([^:]+):.*#\1#')"
+echo "Resolving cluster API server hostname '${CLUSTER_API_SERVER_HOSTNAME}' from the hypervisor..."
+CLUSTER_API_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${CLUSTER_API_SERVER_HOSTNAME} | awk '{print \$1}'")"
+
+if [[ -z "${CLUSTER_API_IP}" ]]; then
+    echo "ERROR: Failed to resolve '${CLUSTER_API_SERVER_HOSTNAME}' from the hypervisor"
+    exit 1
+fi
+
+echo "Resolved '${CLUSTER_API_SERVER_HOSTNAME}' to '${CLUSTER_API_IP}'"
+
+# The API server's serving certificate is issued for the hypervisor hostname
+# (and internal cluster IPs), not the IP substituted above, so TLS hostname
+# verification against it would fail. Mark the cluster as insecure and drop
+# the CA data (the two are mutually exclusive in a kubeconfig) so consumers
+# of this kubeconfig don't need to pass --insecure-skip-tls-verify
+# themselves.
+oc --kubeconfig=/tmp/kubeconfig.doca8 config set-cluster "${CLUSTER_NAME}" \
+    --server="https://${CLUSTER_API_IP}:6443" \
+    --insecure-skip-tls-verify=true
+oc --kubeconfig=/tmp/kubeconfig.doca8 config unset "clusters.${CLUSTER_NAME}.certificate-authority-data"
+
+cp /tmp/kubeconfig.doca8 "${SHARED_DIR}/kubeconfig"
+echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig successfully"
