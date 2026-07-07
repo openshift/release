@@ -4,10 +4,6 @@ import argparse
 import json
 import yaml
 
-parser = argparse.ArgumentParser(description="Boskos config generator")
-parser.add_argument("--print-cluster-profile-sets", dest="print_cps", default=False, help="Write cluster profile set details on stdout", action="store_true")
-args = parser.parse_args()
-
 CONFIG = {
     'aws-us-east-1-quota-slice': {
         'us-east-1': 15,
@@ -864,48 +860,6 @@ CLUSTER_PROFILE_SETS_CONFIG = {
     },
 }
 
-CLUSTER_PROFILE_SETS_IGNORE = {
-    # Do not dump the following cps. Useful when a new profile is about to be introduced
-    # and it is not fully defined yet.
-    'profiles': [],
-
-    # Do not enforce any Cluster Profile Set usage policy on these tests. The schema of
-    # this stanza is defined as follow:
-    #
-    #  'tests_allowlist': {
-    #    '${ORGANIZATION_REGEXP}/${REPOSITORY_REGEXP}' : {
-    #      '${BRANCH_REGEXP}': {
-    #        '${VARIANT_REGEXP}': [
-    #           '${TEST_REGEXP}'
-    #         ]
-    #      }
-    #    }
-    #  }
-    'tests_allowlist': {
-        'openshift(-priv)?/openshift-tests-private': {
-            '.+': {
-                '.*': [
-                    '.+-public-ipv4-pool.*'
-                ]
-            }
-        },
-        'openshift(-priv)?/installer': {
-            '.+': {
-                '.*': [
-                    '.+-public-ipv4-pool.*'
-                ]
-            }
-        },
-        'openshift/release': {
-            '.+': {
-                '.*': [
-                    '.+-public-ipv4-pool.*'
-                ]
-            }
-        }
-    },
-}
-
 def cluster_profile_set_resources(clusterProfileSets):
     def profile_set_resource(profileSet, profileSetData):
         cps_resource = {
@@ -977,22 +931,4 @@ def generate_config():
         f.write('# generated with generate-boskos.py; do not edit directly\n')
         yaml.dump(config, f, default_flow_style=False)
 
-def print_cluster_profile_set_details():
-    ignored_cps = CLUSTER_PROFILE_SETS_IGNORE['profiles']
-    cps = {
-        'cluster_profile_sets': {},
-        'tests_allowlist': {},
-    }
-
-    for cps_name, cps_data in CLUSTER_PROFILE_SETS_CONFIG.items():
-        if not cps_name in ignored_cps:
-            cps['cluster_profile_sets'][cps_name] = list(cps_data.keys())
-
-    cps['tests_allowlist'] = CLUSTER_PROFILE_SETS_IGNORE['tests_allowlist']
-
-    print(json.dumps(cps, indent=2))
-
-if args.print_cps:
-    print_cluster_profile_set_details()
-else:
-    generate_config()
+generate_config()
