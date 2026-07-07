@@ -265,13 +265,13 @@ if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     ocpVersion=$(oc get clusterversion -o json | jq -r '.items[0].status.desired.version')
 fi
 
-#if OVERRIDE_OC_MIRROR then download oc-mirror from mirror.openshift.com
+#if OVERRIDE_OC_MIRROR then download oc-mirror from CGW (Content Gateway)
 if [[ "${OVERRIDE_OC_MIRROR:-}" == "true" ]]; then
     echo "OCP Version: ${ocpVersion:-}"
     if [[ -n "${ocpVersion:-}" ]]; then
         tmpDir=$(mktemp -d)
         cd "${tmpDir}"
-        echo "Downloading oc-mirror from mirror.openshift.com for OCP version ${ocpVersion}, OCP_ARCH: ${OCP_ARCH:-}"
+        echo "Downloading oc-mirror from CGW for OCP version ${ocpVersion}, OCP_ARCH: ${OCP_ARCH:-}"
         set -x
 
         # Detect architecture for oc-mirror download
@@ -327,19 +327,16 @@ if [[ "${OVERRIDE_OC_MIRROR:-}" == "true" ]]; then
             echo "Warning: Unexpected version format '${ocpVersion}', using latest oc-mirror"
         fi
 
-        # Download oc-mirror from mirror.openshift.com
-        echo "Downloading oc-mirror from https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/"
-        # Download version-specific oc-mirror from mirror.openshift.com to match the payload version
+        # Download oc-mirror from CGW (Content Gateway)
+        CGWURL="https://mirror.openshift.com/pub/cgw"
+        echo "Downloading oc-mirror from https://mirror.openshift.com/pub/cgw/oc-mirror/"
         curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
-            "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/oc-mirror.tar.gz"
-        # When oc-mirror is removed from the OCP payload, replace the above curl command with this one to always use the latest version:
-        # curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
-        #     "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/latest/oc-mirror.tar.gz"
+            "${CGWURL}/oc-mirror/oc-mirror.tar.gz"
 
         # Verify the integrity of the downloaded tarball
         echo "Verifying oc-mirror.tar.gz integrity..."
         curl -fL --retry 5 --connect-timeout 30 -o sha256sum.txt \
-            "https://mirror.openshift.com/pub/openshift-v4/${ARCH}/clients/ocp/${oc_mirror_version}/sha256sum.txt"
+            "${CGWURL}/oc-mirror/sha256sum.txt"
         grep "oc-mirror.tar.gz" sha256sum.txt | sha256sum -c - || {
             echo "ERROR: oc-mirror.tar.gz checksum verification failed"
             exit 1

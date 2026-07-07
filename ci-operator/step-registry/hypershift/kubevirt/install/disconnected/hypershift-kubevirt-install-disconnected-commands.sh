@@ -73,11 +73,10 @@ CNV_CHANNEL="nightly-${CNV_PRERELEASE_VERSION}"
 echo "3: skopeo copy docker://${CNV_PRERELEASE_CATALOG_IMAGE} oci:///home/cnv-local-catalog --remove-signatures"
 skopeo copy "docker://${CNV_PRERELEASE_CATALOG_IMAGE}" "oci:///home/cnv-local-catalog" --remove-signatures
 
-echo "4: get oc-mirror from stable clients"
+echo "4: get oc-mirror from CGW (Content Gateway)"
+CGWURL="https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw"
 if [[ ! -f /home/oc-mirror ]]; then
-    MIRROR2URL="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4"
-    CLIENTURL="${MIRROR2URL}"/x86_64/clients/ocp/stable
-    curl -s -k -L "${CLIENTURL}/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
+    curl -s -k -L "${CGWURL}/oc-mirror/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
     if ls /home/oc-mirror > /dev/null ; then
         chmod +x /home/oc-mirror
     else
