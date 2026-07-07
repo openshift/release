@@ -79,12 +79,12 @@ if [ -z "$JOB_ID" ] || [ "$JOB_ID" = "null" ]; then
   exit 1
 fi
 
-# Wait briefly for prow to create the job so we can get the URL
-sleep 5
+# Poll gangway for the Prow job URL (up to ~60s)
+sleep 10
 
 set +x
 JOB_URL=""
-for ((i=1; i<=5; i++)); do
+for ((i=1; i<=10; i++)); do
   STATUS_RESPONSE=$(curl -s -X GET \
     -H "Authorization: Bearer $(cat "${TOKEN_FILE}")" \
     "${GANGWAY_API}/v1/executions/${JOB_ID}" \
@@ -101,6 +101,7 @@ for ((i=1; i<=5; i++)); do
       break
     fi
   fi
+  echo "[$i/10] Waiting for Prow job URL..."
   sleep 5
 done
 set -x
@@ -112,12 +113,11 @@ if [ -f "$APP_ID_FILE" ] && [ -f "$INSTALLATION_ID_UPSTREAM_FILE" ] && [ -f "$PR
   GITHUB_TOKEN=$(generate_github_token "$INSTALLATION_ID_UPSTREAM")
 
   if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
-    PROW_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${PERIODIC_JOB_NAME}/${JOB_ID}"
     if [ -n "$JOB_URL" ]; then
-      PROW_LINK="$JOB_URL"
+      COMMENT_BODY="Review agent triggered. [View job](${JOB_URL})"
+    else
+      COMMENT_BODY="Review agent triggered (Gangway execution ID: \`${JOB_ID}\`). The Prow job has not started yet — check the [job history](https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/${PERIODIC_JOB_NAME}) for the run once it begins."
     fi
-
-    COMMENT_BODY="Review agent triggered. [View job](${PROW_LINK})"
 
     set +x
     curl -s -X POST \

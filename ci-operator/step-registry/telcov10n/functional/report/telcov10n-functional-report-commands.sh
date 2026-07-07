@@ -43,15 +43,15 @@ mkdir -pv /tmp/reports
 echo "Create junit directory"
 mkdir -pv /tmp/junit
 
-if ! compgen -G "${SHARED_DIR}/polarion_*.xml" > /dev/null 2>&1; then
+if ! compgen -G "${SHARED_DIR}/*polarion*.xml" > /dev/null 2>&1; then
   echo "No Reports found in ${SHARED_DIR}, Using Bastion"
-  BASTION_REPORT_DIR="/tmp/ptp_reports"
+  BASTION_REPORT_DIR="/tmp/test_reports"
   POLARION_REPORT_DIR="${BASTION_REPORT_DIR}/polarion"
   JUNIT_REPORT_DIR="${BASTION_REPORT_DIR}/junit"
   UPLOAD_SHARED_DIR=""
 else
   echo "Reports found in SHARED_DIR"
-  for f in "${SHARED_DIR}"/polarion_*.xml; do
+  for f in "${SHARED_DIR}"/*polarion*.xml; do
     if [[ -f "$f" ]]; then
       filename=$(basename "$f" | sed 's/^polarion_//')
       cp "$f" "/tmp/reports/${filename}"

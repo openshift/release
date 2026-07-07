@@ -1,6 +1,88 @@
-# OpenShift Service Mesh CI Documentation
+# OpenShift Service Mesh CI
 
 Maintenance documentation for OpenShift Service Mesh CI jobs. Contains essential information not available in the configuration files themselves. Please add here any information that may help future maintainers.
+
+## CI Jobs Overview
+
+Quick reference for CI jobs across all OSSM repositories.
+
+| Repo | Branches |
+|------|----------|
+| [federation](../federation/) | master |
+| [istio](../istio/) | master, release-1.x |
+| [proxy](../proxy/) | release-1.x |
+| [sail-operator](./) | main, release-3.x |
+| [ztunnel](../ztunnel/) | release-1.x |
+
+### federation
+
+| Job | Type | OCP cluster |
+|-----|------|-------------|
+| `e2e-integration` | presubmit | yes |
+| `push-image` | postsubmit | no |
+
+### istio
+
+| Job | Type | OCP cluster |
+|-----|------|-------------|
+| `lint` | presubmit | no |
+| `unit-and-gencheck` | presubmit | no |
+| `istio-integration-{pilot,telemetry,security,ambient,helm}` | presubmit | yes |
+| `istio-integration-sail-{pilot,telemetry,security,ambient}` | presubmit | yes |
+| `sync-upstream-istio-master` | periodic | no |
+
+### proxy
+
+| Job | Type | OCP cluster |
+|-----|------|-------------|
+| `unit` / `unit-arm` | presubmit | no |
+| `envoy` | presubmit (`always_run: false`) | yes |
+| `copy-artifacts-gcs` / `copy-artifacts-gcs-arm` | postsubmit | no |
+| `update-istio` | postsubmit | no |
+
+### sail-operator
+
+| Job | Type | OCP cluster | Notes |
+|-----|------|-------------|-------|
+| `unit` / `integration` / `gencheck` / `lint` | presubmit | no | |
+| `e2e-ocp` | presubmit (`always_run: false`) | yes (amd64) | |
+| `scorecard` | presubmit (`always_run: false`) | yes | only when `bundle/` changes |
+| `istio-pr-perfscale` | presubmit (`always_run: false`) | yes | ~4h runtime |
+| `e2e-ocp-arm` | postsubmit | yes (arm64) | use `e2e-ocp-arm-retest` to rerun |
+| `e2e-next-ocp` | postsubmit | yes (amd64) | main/ocp-4.23 only; use `e2e-next-ocp-retest` to rerun |
+| `sync-upstream` | periodic | no | per release branch |
+| `istio-periodic-perfscale` | periodic | yes | 1st and 15th of month |
+| `cr-servicemesh-aws` / `servicemesh-aws-fips` | periodic | yes | lp-interop |
+
+### ztunnel
+
+| Job | Type | OCP cluster |
+|-----|------|-------------|
+| `cargo-build` | presubmit | no |
+| `cargo-build-and-push` | postsubmit | no |
+| `update-istio` | postsubmit | no |
+
+### Triggering jobs manually
+
+Presubmit jobs with `always_run: false` can be triggered from a PR comment:
+
+```
+/test <variant>-<job>
+```
+
+Postsubmit jobs cannot be triggered via `/test`. Use the dedicated retest presubmits in sail-operator:
+
+| Postsubmit | Trigger via |
+|-----------|-------------|
+| `e2e-ocp-arm` | `/test ocp-4.22-e2e-ocp-arm-retest` |
+| `e2e-next-ocp` | `/test ocp-4.23-e2e-next-ocp-retest` |
+
+### Slack notifications
+
+| Channel | Jobs |
+|---------|------|
+| `#team-ossm-quality` | `e2e-ocp-arm`, `e2e-next-ocp`, `istio-pr-perfscale`, `istio-periodic-perfscale`, `cr-servicemesh-aws`, `servicemesh-aws-fips` |
+| `#team-ossm-release-maintenance` | `sync-upstream` (all release branches) |
 
 ## Performance Job Usage
 
@@ -54,87 +136,35 @@ The Sail Operator performance job can only be triggered manually from a PR in th
 
 **To trigger the job:**
 1. Create or use an existing PR in [openshift-service-mesh/sail-operator](https://github.com/openshift-service-mesh/sail-operator)
-2. Add a comment with the text: `/test ocp-4.20-istio-pr-perfscale`
-
-Example PR: [openshift-service-mesh/sail-operator #633](https://github.com/openshift-service-mesh/sail-operator/pull/633)
+2. Add a comment with the text: `/test ocp-4.22-istio-pr-perfscale`
 
 **Important notes:**
 - Job duration: ~4 hours (timeout: 5 hours)
 - The job requires significant compute resources (5 m6i.2xlarge nodes)
-- Performance configuration may need manual updates depending on testing requirements
 
 ### Accessing Test Results
 
-Performance test results are available in multiple formats and locations:
-
-#### 1. Prow Job Artifacts
-After job completion, navigate to the Prow run URL and access artifacts:
-```
-https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/<job-id>/artifacts/istio-pr-perfscale/
-```
+#### Prow Job Artifacts
+After job completion, navigate to the Prow run URL and access the `artifacts/istio-pr-perfscale/` directory.
 
 Key directories:
 - `ingress/` - Contains ingress performance test results
 - `network/` - Contains network performance test results
 
-#### 2. Build Logs
-Raw performance data is available in build logs. Look for lines containing performance metrics:
-```
-time="2025-12-05 18:10:01" level=info msg="http: Rps=5001 avgLatency=2ms P95Latency=2ms" file="exec.go:149"
-```
-
-#### 3. Internal Performance Dashboard
+#### Internal Performance Dashboard
 **Note: Requires VPN access and Red Hat internal credentials**
 
 - **Grafana Dashboard**: `http://ocp-intlab-grafana.rdu2.scalelab.redhat.com:3000/`
   - Credentials: `viewer/viewer` (read-only access)
   - Search for service mesh performance metrics by UUID
 
-#### 4. Performance Analysis Bot (Future)
-An internal Slack bot for automated performance regression detection is planned:
-```
-@PerfScale Jedi analyze pr: https://github.com/openshift-service-mesh/sail-operator/pull/XXX, compare with 4.21
-```
-
-**Current status**: In development, expected implementation timeline depends on team capacity.
-
 ### Performance Metrics
 
-The performance tests measure:
-
 **Ingress Performance**:
-- `http_avg_rps` / `edge_avg_rps` - Average requests per second for HTTP and edge termination
-- `http_avg_lat` / `edge_avg_lat` - Average latency in microseconds (at 5000 request rate)
-- `http_avg_cpu_usage_ingress_gateway_pods` / `edge_avg_cpu_usage_ingress_gateway_pods` - CPU usage of ingress gateway pods
+- `http_avg_rps` / `edge_avg_rps` - Average requests per second
+- `http_avg_lat` / `edge_avg_lat` - Average latency in microseconds
+- `http_avg_cpu_usage_ingress_gateway_pods` / `edge_avg_cpu_usage_ingress_gateway_pods` - CPU usage
 
-**Network Performance**:
-- **Throughput metrics** (`TCP_STREAM` profile):
-  - `throughput_64_1p/2p/4p` - TCP throughput with 64-byte messages (1, 2, 4 parallel connections)
-  - `throughput_1024_1p/2p/4p` - TCP throughput with 1KB messages (1, 2, 4 parallel connections)
-  - `throughput_8192_1p/2p/4p` - TCP throughput with 8KB messages (1, 2, 4 parallel connections)
-- **Latency metrics** (`TCP_RR` profile):
-  - `latency_64_1p` - Request-response latency with 64-byte messages
-  - `latency_1024_1p` - Request-response latency with 1KB messages
-  - `latency_8192_1p` - Request-response latency with 8KB messages
-
-**Test Configuration**:
-Each test run generates a UUID that can be used to correlate results across different systems and dashboards.
-
-### Use Cases
-
-This job is primarily used for:
-1. **Version Bump Testing**: Detect regressions when updating service mesh versions
-2. **Performance Baseline**: Establish performance baselines for new releases
-3. **Comparative Analysis**: Compare OpenShift service mesh performance with upstream benchmarks
-4. **Resource Planning**: Understand resource requirements for different deployment modes
-
-### Troubleshooting
-
-**Common Issues**:
-- Job timeout: Consider increasing timeout if tests consistently run close to 5 hours
-- Resource allocation: Verify AWS cluster has sufficient capacity for requested instance types
-- Results access: Ensure VPN connection and proper credentials for internal dashboards
-
-**Getting Help**:
-- Performance-related questions: Contact the PerfScale team via internal Slack channels
-- Job configuration issues: Contact the OpenShift Service Mesh team
+**Network Performance** (`TCP_STREAM` / `TCP_RR` profiles):
+- `throughput_{64,1024,8192}_{1,2,4}p` - TCP throughput by message size and parallelism
+- `latency_{64,1024,8192}_1p` - Request-response latency by message size
