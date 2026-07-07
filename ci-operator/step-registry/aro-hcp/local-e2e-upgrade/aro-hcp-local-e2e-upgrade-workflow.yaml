@@ -7,11 +7,9 @@ workflow:
         resource_type: aro-hcp-msi-mock-cs-sp-dev
     pre:
       - ref: aro-hcp-lease-acquire
-      - ref: aro-hcp-git-checkout
       - ref: aro-hcp-write-config
       - ref: aro-hcp-provision-environment
     test:
-      - ref: aro-hcp-git-checkout-head
       - ref: aro-hcp-test-local-upgrade
     post:
       - ref: aro-hcp-deprovision-tracked-resource-groups
@@ -24,7 +22,8 @@ workflow:
       - ref: aro-hcp-deprovision-environment
       - ref: aro-hcp-lease-release
   documentation: |-
-    Acquire runtime leases, checkout main (or GIT_REF override), provision regional
-    infrastructure, checkout the PR head, build a hypershift override from PR
-    config/config.yaml, then run upgrade/in-place: create hosted cluster, run
-    pipeline/RP.HypershiftOperator in the test, validate node pool hash change, cleanup.
+    Acquire runtime leases, render and provision regional infrastructure from main
+    (via PROVISION_GIT_REF), then run upgrade/in-place against the PR head clone:
+    build a hypershift override from PR config/config.yaml, create hosted cluster,
+    run pipeline/RP.HypershiftOperator in the test, validate node pool hash change,
+    cleanup.
