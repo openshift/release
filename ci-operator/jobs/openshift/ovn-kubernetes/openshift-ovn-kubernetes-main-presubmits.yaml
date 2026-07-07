@@ -339,7 +339,6 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      timeout: 2h0m0s
     labels:
       ci-operator.openshift.io/variant: create-udn-with-sos-report-corenet-7217
       ci.openshift.io/generator: prowgen
@@ -350,6 +349,7 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -382,6 +382,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -402,6 +405,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -423,7 +429,6 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      timeout: 10h0m0s
     labels:
       ci-operator.openshift.io/variant: create-udn-with-sos-report-corenet-7217
       ci.openshift.io/generator: prowgen
@@ -434,6 +439,7 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -466,6 +472,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -486,6 +495,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -507,7 +519,6 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      timeout: 8h0m0s
     labels:
       ci-operator.openshift.io/variant: create-udn-with-sos-report-corenet-7217
       ci.openshift.io/generator: prowgen
@@ -518,6 +529,7 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -550,6 +562,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -570,6 +585,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -591,7 +609,6 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      timeout: 4h0m0s
     labels:
       ci-operator.openshift.io/variant: create-udn-with-sos-report-corenet-7217
       ci.openshift.io/generator: prowgen
@@ -602,6 +619,7 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -634,6 +652,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -654,6 +675,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4873,21 +4897,31 @@ presubmits:
     optional: true
     reporter_config:
       slack:
-        channel: "#coreovn"
+        channel: '#coreovn'
         job_states_to_report:
         - success
         - failure
         - error
         - triggered
-        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls }}\n  {{- $pull := index .Spec.Refs.Pulls\
-          \ 0 }}\n  {{- $link = $pull.Link }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n{{- else\
-          \ }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef }}\n{{- end }}\n\n{{- if eq .Status.State\
-          \ \"success\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref\
-          \ }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:\n{{- else\
-          \ if eq .Status.State \"triggered\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
-          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else -}}\n  :ovn: <{{ printf \"%s\" $link\
-          \ }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
-          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
+        report_template: |-
+          {{- $link := "" }}
+          {{- $ref := "" }}
+          {{- if .Spec.Refs.Pulls }}
+            {{- $pull := index .Spec.Refs.Pulls 0 }}
+            {{- $link = $pull.Link }}
+            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+          {{- else }}
+            {{- $link = .Spec.Refs.BaseLink }}
+            {{- $ref = .Spec.Refs.BaseRef }}
+          {{- end }}
+
+          {{- if eq .Status.State "success" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{- else if eq .Status.State "triggered" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+          {{- else -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+          {{- end -}}
     rerun_command: /test ovncore-perfscale-aws-ovn-large-cluster-density-v2
     spec:
       containers:
@@ -4977,21 +5011,31 @@ presubmits:
     optional: true
     reporter_config:
       slack:
-        channel: "#coreovn"
+        channel: '#coreovn'
         job_states_to_report:
         - success
         - failure
         - error
         - triggered
-        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls }}\n  {{- $pull := index .Spec.Refs.Pulls\
-          \ 0 }}\n  {{- $link = $pull.Link }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n{{- else\
-          \ }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef }}\n{{- end }}\n\n{{- if eq .Status.State\
-          \ \"success\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref\
-          \ }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:\n{{- else\
-          \ if eq .Status.State \"triggered\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
-          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else -}}\n  :ovn: <{{ printf \"%s\" $link\
-          \ }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
-          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
+        report_template: |-
+          {{- $link := "" }}
+          {{- $ref := "" }}
+          {{- if .Spec.Refs.Pulls }}
+            {{- $pull := index .Spec.Refs.Pulls 0 }}
+            {{- $link = $pull.Link }}
+            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+          {{- else }}
+            {{- $link = .Spec.Refs.BaseLink }}
+            {{- $ref = .Spec.Refs.BaseRef }}
+          {{- end }}
+
+          {{- if eq .Status.State "success" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{- else if eq .Status.State "triggered" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+          {{- else -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+          {{- end -}}
     rerun_command: /test ovncore-perfscale-aws-ovn-large-node-density-cni
     spec:
       containers:
@@ -5081,21 +5125,31 @@ presubmits:
     optional: true
     reporter_config:
       slack:
-        channel: "#coreovn"
+        channel: '#coreovn'
         job_states_to_report:
         - success
         - failure
         - error
         - triggered
-        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls }}\n  {{- $pull := index .Spec.Refs.Pulls\
-          \ 0 }}\n  {{- $link = $pull.Link }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n{{- else\
-          \ }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef }}\n{{- end }}\n\n{{- if eq .Status.State\
-          \ \"success\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref\
-          \ }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:\n{{- else\
-          \ if eq .Status.State \"triggered\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
-          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else -}}\n  :ovn: <{{ printf \"%s\" $link\
-          \ }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
-          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
+        report_template: |-
+          {{- $link := "" }}
+          {{- $ref := "" }}
+          {{- if .Spec.Refs.Pulls }}
+            {{- $pull := index .Spec.Refs.Pulls 0 }}
+            {{- $link = $pull.Link }}
+            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+          {{- else }}
+            {{- $link = .Spec.Refs.BaseLink }}
+            {{- $ref = .Spec.Refs.BaseRef }}
+          {{- end }}
+
+          {{- if eq .Status.State "success" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{- else if eq .Status.State "triggered" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+          {{- else -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+          {{- end -}}
     rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
     spec:
       containers:
@@ -5185,21 +5239,31 @@ presubmits:
     optional: true
     reporter_config:
       slack:
-        channel: "#coreovn"
+        channel: '#coreovn'
         job_states_to_report:
         - success
         - failure
         - error
         - triggered
-        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls }}\n  {{- $pull := index .Spec.Refs.Pulls\
-          \ 0 }}\n  {{- $link = $pull.Link }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n{{- else\
-          \ }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef }}\n{{- end }}\n\n{{- if eq .Status.State\
-          \ \"success\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref\
-          \ }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:\n{{- else\
-          \ if eq .Status.State \"triggered\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
-          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else -}}\n  :ovn: <{{ printf \"%s\" $link\
-          \ }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
-          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
+        report_template: |-
+          {{- $link := "" }}
+          {{- $ref := "" }}
+          {{- if .Spec.Refs.Pulls }}
+            {{- $pull := index .Spec.Refs.Pulls 0 }}
+            {{- $link = $pull.Link }}
+            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+          {{- else }}
+            {{- $link = .Spec.Refs.BaseLink }}
+            {{- $ref = .Spec.Refs.BaseRef }}
+          {{- end }}
+
+          {{- if eq .Status.State "success" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{- else if eq .Status.State "triggered" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+          {{- else -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+          {{- end -}}
     rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-node-density-cni
     spec:
       containers:
@@ -5290,21 +5354,31 @@ presubmits:
     optional: true
     reporter_config:
       slack:
-        channel: "#coreovn"
+        channel: '#coreovn'
         job_states_to_report:
         - success
         - failure
         - error
         - triggered
-        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls }}\n  {{- $pull := index .Spec.Refs.Pulls\
-          \ 0 }}\n  {{- $link = $pull.Link }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n{{- else\
-          \ }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef }}\n{{- end }}\n\n{{- if eq .Status.State\
-          \ \"success\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref\
-          \ }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:\n{{- else\
-          \ if eq .Status.State \"triggered\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
-          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else -}}\n  :ovn: <{{ printf \"%s\" $link\
-          \ }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
-          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
+        report_template: |-
+          {{- $link := "" }}
+          {{- $ref := "" }}
+          {{- if .Spec.Refs.Pulls }}
+            {{- $pull := index .Spec.Refs.Pulls 0 }}
+            {{- $link = $pull.Link }}
+            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+          {{- else }}
+            {{- $link = .Spec.Refs.BaseLink }}
+            {{- $ref = .Spec.Refs.BaseRef }}
+          {{- end }}
+
+          {{- if eq .Status.State "success" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{- else if eq .Status.State "triggered" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+          {{- else -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+          {{- end -}}
     rerun_command: /test ovncore-perfscale-aws-ovn-xxlarge-cluster-density-v2
     spec:
       containers:
@@ -5395,21 +5469,31 @@ presubmits:
     optional: true
     reporter_config:
       slack:
-        channel: "#coreovn"
+        channel: '#coreovn'
         job_states_to_report:
         - success
         - failure
         - error
         - triggered
-        report_template: "{{- $link := \"\" }}\n{{- $ref := \"\" }}\n{{- if .Spec.Refs.Pulls }}\n  {{- $pull := index .Spec.Refs.Pulls\
-          \ 0 }}\n  {{- $link = $pull.Link }}\n  {{- $ref = printf \"PR %d by %s\" $pull.Number $pull.Author }}\n{{- else\
-          \ }}\n  {{- $link = .Spec.Refs.BaseLink }}\n  {{- $ref = .Spec.Refs.BaseRef }}\n{{- end }}\n\n{{- if eq .Status.State\
-          \ \"success\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref\
-          \ }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:\n{{- else\
-          \ if eq .Status.State \"triggered\" -}}\n  :ovn: <{{ printf \"%s\" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}}\
-          \ [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* was triggered.\n{{- else -}}\n  :ovn: <{{ printf \"%s\" $link\
-          \ }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf \"%s\" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.\
-          \ <{{.Status.URL}}|View logs> :warning:\n{{- end -}}"
+        report_template: |-
+          {{- $link := "" }}
+          {{- $ref := "" }}
+          {{- if .Spec.Refs.Pulls }}
+            {{- $pull := index .Spec.Refs.Pulls 0 }}
+            {{- $link = $pull.Link }}
+            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+          {{- else }}
+            {{- $link = .Spec.Refs.BaseLink }}
+            {{- $ref = .Spec.Refs.BaseRef }}
+          {{- end }}
+
+          {{- if eq .Status.State "success" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{- else if eq .Status.State "triggered" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+          {{- else -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+          {{- end -}}
     rerun_command: /test ovncore-perfscale-aws-ovn-xxlarge-node-density-cni
     spec:
       containers:
