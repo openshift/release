@@ -7,6 +7,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -178,6 +182,50 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+- as: e2e-aws-disc-sno-qe-integration-tests
+  cron: 0 8 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+    test:
+    - as: lvms-sno-integration-test
+      cli: latest
+      commands: |
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: openshift-e2e-aws-disconnected-lvms-sno
+- as: e2e-aws-disc-mno-qe-integration-tests
+  cron: 0 8 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+    test:
+    - as: lvms-mno-integration-test
+      cli: latest
+      commands: |
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: openshift-e2e-aws-disconnected-lvms-mno
 - as: e2e-baremetalds-sno-dualstack-qe-integration-tests
   capabilities:
   - intranet

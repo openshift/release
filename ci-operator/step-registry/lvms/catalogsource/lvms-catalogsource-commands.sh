@@ -12,6 +12,11 @@ declare -r IDMS_NAME=${IDMS_NAME:-"lvm-operator-idms"}
 declare -r CATALOG_SOURCE=${LVM_CATALOG_SOURCE:-"lvm-catalogsource"}
 declare LVM_INDEX_IMAGE
 
+# Source proxy config early so oc commands work in disconnected environments
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
 
 echo "Detected OpenShift version: ${CLUSTER_VERSION}"
@@ -208,6 +213,55 @@ EOF
 	fi
 
 	echo "ImageDigestMirrorSet $IDMS_NAME created successfully for disconnected environment"
+
+	cat <<EOF | oc apply -f -
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: ${IDMS_NAME}-tag
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}/rhel8/support-tools
+    source: registry.redhat.io/rhel8/support-tools
+EOF
+
+	if [ $? -ne 0 ]; then
+		echo "!!! failed to create the ITMS for disconnected environment"
+		return 1
+	fi
+
+	echo "ITMS ${IDMS_NAME}-tag created successfully for disconnected environment"
+	return 0
+}
+
+function mirror_test_images {
+	echo "Pre-mirroring test dependency images to mirror registry (port 5000)"
+
+	local new_pull_secret="/tmp/mirror-pull-secret.json"
+	local registry_cred
+	registry_cred=$(head -n 1 "$MIRROR_REGISTRY_CREDS" | base64 -w 0)
+
+	jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" \
+		'.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+
+	local image="registry.redhat.io/rhel8/support-tools:latest=${MIRROR_REGISTRY_HOST}/rhel8/support-tools:latest"
+	local retries=0
+	echo "Mirroring $image"
+	until oc image mirror "$image" --insecure=true -a "${new_pull_secret}" \
+		--skip-verification=true --keep-manifest-list=true --filter-by-os='.*'; do
+		if [[ $retries -eq 5 ]]; then
+			echo "Failed to mirror support-tools image after 5 attempts"
+			rm -f "${new_pull_secret}"
+			return 1
+		fi
+		echo "Failed to mirror image, retrying in 10s..."
+		sleep 10
+		((retries+=1))
+	done
+
+	echo "Successfully mirrored support-tools image to ${MIRROR_REGISTRY_HOST}"
+	rm -f "${new_pull_secret}"
 	return 0
 }
 
@@ -303,7 +357,7 @@ function set_cluster_auth_disconnected {
 	registry_cred=$(head -n 1 "$MIRROR_REGISTRY_CREDS" | base64 -w 0)
 
 	# Add mirror registry auth to cluster pull secret
-	jq --argjson a "{\"${MIRROR_PROXY_REGISTRY_QUAY}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+	jq --argjson a "{\"${MIRROR_PROXY_REGISTRY_QUAY}\": {\"auth\": \"$registry_cred\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
 
 	run "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson"
 	ret=$?
@@ -392,11 +446,22 @@ function main {
 			return 1
 		}
 
-		# Create IDMS for disconnected environment
+		# Create IDMS/ITMS for disconnected environment
 		create_idms_disconnected || {
 			echo "failed to create ImageDigestMirrorSet for disconnected. resolve the above errors"
 			return 1
 		}
+
+		# Pre-mirror test dependency images to port 5000 while MCP rollout is in progress
+		mirror_test_images || {
+			echo "failed to mirror test images. resolve the above errors"
+			return 1
+		}
+
+		echo "Waiting for MachineConfigPool to finish rollout after IDMS changes..."
+		oc wait mcp --all --for=condition=Updating --timeout=5m || true
+		oc wait mcp --all --for=condition=Updated --timeout=20m || true
+		echo "MCP rollout completed"
 
 		# Update LVM_INDEX_IMAGE to point to mirrored location
 		LVM_INDEX_IMAGE="${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
