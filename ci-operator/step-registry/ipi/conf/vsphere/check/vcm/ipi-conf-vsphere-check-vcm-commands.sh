@@ -37,6 +37,7 @@ fi
 
 log "POOLS: ${POOLS}"
 log "POOL_COUNT: ${POOL_COUNT}"
+log "MAX_VCENTERS: ${MAX_VCENTERS}"
 
 # Make sure POOLS and POOL_COUNT are not both configured
 if [[ "${POOL_COUNT}" != "1" && "${POOLS}" != "" ]]; then
@@ -311,7 +312,8 @@ spec:
   network-type: \"${NETWORK_TYPE}\"
   requiresPool: \"${VSPHERE_BASTION_LEASED_RESOURCE}\"
   ${poolSelector}
-  networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
+  networks: 1
+  vcenters: ${MAX_VCENTERS}" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
 fi
 
 POOLS=${POOLS:-}
@@ -405,7 +407,8 @@ spec:
   pools: ${POOL_COUNT}
   ${requiredPool}
   ${poolSelector}
-  networks: $networks_number" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
+  networks: $networks_number
+  vcenters: ${MAX_VCENTERS}" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
 done
 
 log "waiting for lease $(printf '%s ' "${LEASES[@]}") to be fulfilled..."
@@ -516,6 +519,9 @@ declare -A pool_passwords
 # shellcheck disable=SC2089
 platformSpec='{"vcenters": [],"failureDomains": []}'
 
+# Track the number of unique vCenters to enforce MAX_VCENTERS limit
+vcenter_count=0
+
 log "building local variables and failure domains"
 
 # Iterate through each lease and generate the failure domain and vcenters information
@@ -604,13 +610,25 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
       platformSpec=$(echo "${platformSpec}" | jq -r --arg VCENTER "$VCENTER" --arg DC "$datacenter" '(.vcenters[] | select(.server == $VCENTER)) |= (.datacenters[.datacenters | length] |= .+ $DC)')
     fi
   else
-    log "Adding vcenter ${VCENTER} to config"
+    # Check if we've reached the maximum number of vCenters - this validates VCM honored the limit
+    if [[ ${vcenter_count} -ge ${MAX_VCENTERS} ]]; then
+      log "ERROR: VCM returned more vCenters than requested maximum (${MAX_VCENTERS})"
+      log "Attempted to add vCenter: ${VCENTER}"
+      log "Current vCenters already in configuration:"
+      echo "${platformSpec}" | jq -r '.vcenters[].server'
+      log "This indicates VCM did not honor the spec.vcenters limit in the lease request"
+      exit 1
+    fi
+    log "Adding vcenter ${VCENTER} to config (${vcenter_count}/${MAX_VCENTERS})"
     platformSpec=$(echo "${platformSpec}" | jq -r '.vcenters += [{"server": "'"${VCENTER}"'", "user": "'"${pool_usernames[$VCENTER]}"'", "password": "'"${pool_passwords[$VCENTER]}"'", "datacenters": ["'"${datacenter}"'"]}]')
+    vcenter_count=$((vcenter_count + 1))
   fi
 
     cp /tmp/pool.json "${SHARED_DIR}"/POOL_"${RESOURCE_POOL}".json
   done  # end for RESOURCE_POOL
 done  # end for _leaseJSON
+
+log "Successfully configured ${vcenter_count} vCenter(s) (max allowed: ${MAX_VCENTERS})"
 
 # For legacy spec, the below will merge the following json to the existing json.
 if [ -n "${POPULATE_LEGACY_SPEC}" ]; then
