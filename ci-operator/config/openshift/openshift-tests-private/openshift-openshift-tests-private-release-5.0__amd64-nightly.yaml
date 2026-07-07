@@ -151,12 +151,45 @@ tests:
     cluster_profile: aws-c2s-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
+      BASTION_HOST_AMI: ami-0cb19faa9c6c86a91
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      PUBLISH: Internal
+      SIZE_VARIANT: large
+    pre:
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: aws-c2s-get-project-info
+    - ref: aws-provision-bastionhost
+    - ref: proxy-config-generate
+    - ref: aws-c2s-instance-metadata
+    - ref: aws-c2s-mirror-images
+    - ref: mirror-images-by-oc-adm
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-network-c2s
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-mirror
+    - ref: ipi-install-monitoringpvc
+    - ref: aws-c2s-init-token-service
+    - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+    - ref: ipi-install-install-aws
+    - ref: ipi-install-times-collection
+    - ref: cucushift-installer-check-aws-custom-vpc
+    - ref: cucushift-installer-check-aws-c2s
+    - ref: cucushift-installer-check-control-plane-machinesets
+    - ref: cucushift-installer-check-operators
+    - ref: cucushift-installer-check-info
+    - ref: cucushift-installer-check-capability
+    - ref: cucushift-installer-check-realtime
+    - ref: cucushift-installer-check-compact
+    - ref: cucushift-installer-reportportal-marker
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: wait
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
 - as: aws-c2s-ipi-disc-priv-fips-f28-destructive
   cron: 22 8 7 * *
@@ -2023,11 +2056,45 @@ tests:
     cluster_profile: aws-sc2s-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
+      BASTION_HOST_AMI: ami-0cb19faa9c6c86a91
+      EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      PUBLISH: Internal
+      SIZE_VARIANT: large
+    pre:
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: aws-c2s-get-project-info
+    - ref: aws-provision-bastionhost
+    - ref: proxy-config-generate
+    - ref: aws-c2s-instance-metadata
+    - ref: aws-c2s-mirror-images
+    - ref: mirror-images-by-oc-adm
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-network-c2s
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-mirror
+    - ref: ipi-install-monitoringpvc
+    - ref: aws-c2s-init-token-service
+    - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+    - ref: ipi-install-install-aws
+    - ref: ipi-install-times-collection
+    - ref: cucushift-installer-check-aws-custom-vpc
+    - ref: cucushift-installer-check-aws-c2s
+    - ref: cucushift-installer-check-control-plane-machinesets
+    - ref: cucushift-installer-check-operators
+    - ref: cucushift-installer-check-info
+    - ref: cucushift-installer-check-capability
+    - ref: cucushift-installer-check-realtime
+    - ref: cucushift-installer-check-compact
+    - ref: cucushift-installer-reportportal-marker
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: wait
     workflow: cucushift-installer-rehearse-aws-sc2s-ipi-disconnected-private
 - as: aws-sc2s-ipi-disc-priv-fips-f28-destructive
   cron: 36 16 6 * *
