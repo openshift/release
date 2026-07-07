@@ -84,7 +84,16 @@ function ibmcloud_login {
 
 # Gather load-balancer resources
 function gather_lb_resources {
-    mapfile -t LBS < <("${IBMCLOUD_CLI}" is lbs -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}')
+    # Skip load balancers in "delete_pending" state. These can be fully
+    # deleted between the initial listing and the sub-resource queries
+    # (lb-ls, lb-ps, etc.), causing "load_balancer_not_found" errors that
+    # fail the gather step under "set -o errexit". Other transitional states
+    # are safe to query. Deleted LBs have nothing useful left to gather.
+    mapfile -t LBS < <("${IBMCLOUD_CLI}" is lbs --output JSON \
+        | jq -r --arg f "${CLUSTER_FILTER}" '.[]
+            | select((.name | contains($f)) or (.resource_group.name | contains($f)))
+            | select(.provisioning_status != "delete_pending")
+            | .id')
     for lb in "${LBS[@]}"; do
         {
             echo -e "# ibmcloud is lb-ls ${lb}\n"
