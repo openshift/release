@@ -134,7 +134,7 @@ MAX_ISSUES=${JIRA_AGENT_MAX_ISSUES:-1}
 echo "Configuration: MAX_ISSUES=$MAX_ISSUES"
 
 # Shared prompt instruction for subagent behavior
-SUBAGENT_PROMPT="SUBAGENTS: Launch ALL subagents in parallel (single message with multiple Task tool calls) for maximum speed. Each subagent should be given subagent_type: \"general-purpose\". Do NOT set the model parameter — let subagents inherit the parent model, as these analysis tasks require a capable model."
+SUBAGENT_PROMPT="SUBAGENTS: Launch ALL subagents in parallel (single message with multiple Task tool calls) for maximum speed. Each subagent should be given subagent_type: \"general-purpose\". Always set the model parameter to \"${CLAUDE_CODE_SUBAGENT_MODEL}\" on every Agent call to ensure all subagents use the correct model."
 
 # Security prompt appended to all Claude invocations
 SECURITY_PROMPT="SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
