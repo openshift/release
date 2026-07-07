@@ -180,7 +180,7 @@ if [[ "${JOB_TYPE}" == "periodic" ]]; then
     else
         job_type="periodic"
     fi
-elif [[ "${JOB_TYPE}" == "presubmit" && "${REPO_OWNER:-}" == "openshift" && "${REPO_NAME:-}" == "ovn-kubernetes" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+elif [[ "${JOB_TYPE}" == "presubmit" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
     pull_number="${PULL_NUMBER}"
     job_type="pull"
     EXTRA_FLAGS+=" --pr-analysis"
