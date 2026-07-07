@@ -39,11 +39,23 @@ echo "Installing CI-built bundle via operator-sdk..."
     oc apply --server-side --force-conflicts -f bindata/assets/kueue-operator/crds/
     oc apply --server-side --force-conflicts -f deploy/crd/kueue-operator.crd.yaml
 
-    echo "Patching CSV with operator image..."
+    echo "Patching CSV with operator and operand images..."
     PATCHED_CSV=$(oc get csv -n "${NAMESPACE}" --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | awk '{print $NF}')
     if [[ -n "${PATCHED_CSV}" && -n "${OPERATOR_IMAGE:-}" ]]; then
       oc patch csv "${PATCHED_CSV}" -n "${NAMESPACE}" --type='json' \
         -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"${OPERATOR_IMAGE}\"}]"
+
+      if [[ -n "${OPERAND_IMAGE:-}" ]]; then
+        ENV_INDEX=$(oc get csv "${PATCHED_CSV}" -n "${NAMESPACE}" -o json | \
+          jq -r '(.spec.install.spec.deployments[0].spec.template.spec.containers[0].env // []) | to_entries[] | select(.value.name == "RELATED_IMAGE_OPERAND_IMAGE") | .key')
+        if [[ -z "${ENV_INDEX}" ]]; then
+          echo "ERROR: RELATED_IMAGE_OPERAND_IMAGE env var not found in CSV ${PATCHED_CSV}"
+          exit 1
+        fi
+        echo "Patching RELATED_IMAGE_OPERAND_IMAGE at env index ${ENV_INDEX} to ${OPERAND_IMAGE}"
+        oc patch csv "${PATCHED_CSV}" -n "${NAMESPACE}" --type='json' \
+          -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/${ENV_INDEX}/value\", \"value\": \"${OPERAND_IMAGE}\"}]"
+      fi
     else
       echo "ERROR: Could not patch CSV (PATCHED_CSV=${PATCHED_CSV:-empty}, OPERATOR_IMAGE=${OPERATOR_IMAGE:-empty})"
       exit 1
