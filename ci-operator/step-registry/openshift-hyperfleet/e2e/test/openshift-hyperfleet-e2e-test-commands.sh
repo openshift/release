@@ -52,9 +52,8 @@ export NAMESPACE
 GCP_PROJECT_ID=$(cat "${SHARED_DIR}/gcp_project_id")
 export GCP_PROJECT_ID
 
-# Extract run id from shared dir
-RUN_ID=$(cat "${SHARED_DIR}/run_id")
-export RUN_ID
+# Extract run id from shared dir (used for E2E_RUN_ID below)
+E2E_RUN_ID=$(cat "${SHARED_DIR}/run_id")
 
 # Extract kubeconfig from shared dir
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -72,4 +71,4 @@ export API_CHART_REF="${API_CHART_REF:-main}"
 export API_CHART_PATH="${API_CHART_PATH:-charts}"
 
 # Run e2e tests via --label-filter
-"${E2E_BIN}" test --label-filter="${LABEL_FILTER}" --flake-attempts="${FLAKE_ATTEMPTS:-2}" --junit-report "${ARTIFACT_DIR}/junit.xml"
+E2E_RUN_ID="${E2E_RUN_ID}" "${E2E_BIN}" test --label-filter="${LABEL_FILTER}" --flake-attempts="${FLAKE_ATTEMPTS:-2}" --junit-report "${ARTIFACT_DIR}/junit.xml"
