@@ -1,6 +1,17 @@
 #!/bin/bash
-set -o errexit
+set -exo pipefail shopt -s inherit_errexit
 
+if [ "${MAP_TESTS}" == "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep "${DR__RP__JUNIT_FILE_NAME}"
+    ' EXIT
+fi
 # Check for health check configuration
 if [[ -f "$SHARED_DIR/health-check-url" ]]; then
     HEALTH_CHECK_URL=$(cat "$SHARED_DIR/health-check-url")
@@ -11,9 +22,6 @@ else
     export HEALTH_CHECK_URL=https://$console_url
     echo "Using console health check URL: $HEALTH_CHECK_URL"
 fi
-set -o nounset
-set -o pipefail
-set -x
 
 
 typeset secretDir=/secret/es
