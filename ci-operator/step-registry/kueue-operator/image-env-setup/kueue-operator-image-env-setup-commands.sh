@@ -28,9 +28,6 @@ echo "Latest Git commits:"
 git log --oneline -5
 echo "Git status:"
 git status
-export OPERATOR_IMAGE="quay.io/redhat-user-workloads/kueue-operator-tenant/${OPERATOR_COMPONENT}:on-pr-${REVISION}"
-echo "export OPERATOR_IMAGE=${OPERATOR_IMAGE}" >> "${SHARED_DIR}/env"
-
 resolve_latest_image() {
   local repo=$1
   skopeo list-tags "docker://$repo" | jq -r '.Tags[]' | grep -E '^[a-f0-9]{40}$' | while read -r tag; do
@@ -39,10 +36,28 @@ resolve_latest_image() {
   done | sort | tail -n1 | awk -v repo="$repo" '{print repo ":" $2}'
 }
 
-OPERAND_REPO="quay.io/redhat-user-workloads/kueue-operator-tenant/${OPERAND_COMPONENT}"
-OPERAND_IMAGE=$(resolve_latest_image "$OPERAND_REPO")
+resolve_image() {
+  local repo=$1
+  local pr_tag="on-pr-${REVISION}"
+  if skopeo inspect "docker://${repo}:${pr_tag}" &>/dev/null; then
+    echo "${repo}:${pr_tag}"
+    return
+  fi
+  echo "on-pr tag not found for ${repo}, falling back to latest branch build..." >&2
+  resolve_latest_image "$repo"
+}
+
+OPERATOR_IMAGE=$(resolve_image "quay.io/redhat-user-workloads/kueue-operator-tenant/${OPERATOR_COMPONENT}")
+if [[ -z "$OPERATOR_IMAGE" ]]; then
+  echo "ERROR: Failed to resolve OPERATOR_IMAGE (component=${OPERATOR_COMPONENT}, revision=${REVISION})"
+  exit 1
+fi
+echo "Resolved OPERATOR_IMAGE: ${OPERATOR_IMAGE}"
+echo "export OPERATOR_IMAGE=${OPERATOR_IMAGE}" >> "${SHARED_DIR}/env"
+
+OPERAND_IMAGE=$(resolve_image "quay.io/redhat-user-workloads/kueue-operator-tenant/${OPERAND_COMPONENT}")
 if [[ -z "$OPERAND_IMAGE" ]]; then
-  echo "ERROR: Failed to resolve OPERAND_IMAGE from $OPERAND_REPO"
+  echo "ERROR: Failed to resolve OPERAND_IMAGE (component=${OPERAND_COMPONENT}, revision=${REVISION})"
   exit 1
 fi
 echo "Resolved OPERAND_IMAGE: ${OPERAND_IMAGE}"
