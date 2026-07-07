@@ -54,8 +54,9 @@ mirror:
     kubeVirtContainer: true
 EOF2
 
-wget https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/x86_64/clients/ocp/candidate/oc-mirror.rhel9.tar.gz
-tar xvzf oc-mirror.rhel9.tar.gz
+CGWURL="https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw"
+wget ${CGWURL}/oc-mirror/oc-mirror.tar.gz
+tar xvzf oc-mirror.tar.gz
 chmod +x oc-mirror
 jq -s '.[0] * .[1]' "${XDG_RUNTIME_DIR}/containers/auth.json" /home/pull-secret > /home/oc_mirror_auth
 ./oc-mirror version
