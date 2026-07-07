@@ -137,7 +137,8 @@ while true; do
         # --- Trajectory context so Claude knows what has already happened ---
         COMMIT_LOG=$(git log --oneline --no-merges -20 2>/dev/null || echo "(no commits)")
         BASE_BRANCH=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json baseRefName -q '.baseRefName' 2>/dev/null || echo "main")
-        PR_DIFF_STAT=$(git diff "${BASE_BRANCH}" --stat 2>/dev/null || echo "(no diff)")
+        git fetch origin "${BASE_BRANCH}" 2>/dev/null || true
+        PR_DIFF_STAT=$(git diff "origin/${BASE_BRANCH}" --stat 2>/dev/null || echo "(no diff)")
 
         # Full review thread from trusted users (read-only context for prior decisions)
         ALL_INLINE_BODY=$(echo "${raw_inline_comments}" | jq --argjson trusted "${trusted_jq_filter}" \
