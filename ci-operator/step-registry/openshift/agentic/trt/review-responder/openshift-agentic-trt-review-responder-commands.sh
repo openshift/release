@@ -134,7 +134,20 @@ while true; do
         echo "Addressing feedback (comments: ${comment_total}, new CI failures: ${has_new_failures})..."
         idle_streak=0
 
-        # Format comments for Claude
+        # --- Trajectory context so Claude knows what has already happened ---
+        COMMIT_LOG=$(git log --oneline --no-merges -20 2>/dev/null || echo "(no commits)")
+        BASE_BRANCH=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json baseRefName -q '.baseRefName' 2>/dev/null || echo "main")
+        PR_DIFF_STAT=$(git diff "${BASE_BRANCH}" --stat 2>/dev/null || echo "(no diff)")
+
+        # Full review thread from trusted users (read-only context for prior decisions)
+        ALL_INLINE_BODY=$(echo "${raw_inline_comments}" | jq --argjson trusted "${trusted_jq_filter}" \
+            '[.[] | select(.user.login as $u | $trusted | index($u))]' | \
+            jq -r '.[] | "**\(.user.login)** on `\(.path // "general")`:\n\(.body)\n---"' 2>/dev/null || echo "")
+        ALL_REVIEW_SUMMARY=$(echo "${raw_reviews}" | jq --argjson trusted "${trusted_jq_filter}" \
+            '[.[] | select(.user.login as $u | $trusted | index($u)) | select(.state != "APPROVED" and .state != "PENDING")]' | \
+            jq -r '.[] | "**\(.user.login)** (\(.state)):\n\(.body)\n---"' 2>/dev/null || echo "")
+
+        # Format NEW (unprocessed) comments for Claude to act on
         # shellcheck disable=SC2034
         INLINE_BODY=$(echo "${INLINE_JSON}" | jq -r '.[] | "**\(.user.login)** on `\(.path // "general")`:\n\(.body)\n---"' 2>/dev/null || echo "")
         # shellcheck disable=SC2034
@@ -153,6 +166,24 @@ while true; do
             --output-format stream-json \
             --append-system-prompt-file "/workspace/.apm/prompts/agentic-followup.prompt.md" \
             -p "Address the review comments and fix any failing CI checks for ${JIRA_ISSUE_KEY}. The PR is #${PR_NUM} on ${UPSTREAM_REPO}.
+
+## PR History (what has already been done on this branch)
+
+Recent commits:
+${COMMIT_LOG}
+
+Files changed in this PR:
+${PR_DIFF_STAT}
+
+## Prior Review Thread (already addressed in earlier iterations - read-only context)
+
+Prior inline comments:
+${ALL_INLINE_BODY}
+
+Prior reviews:
+${ALL_REVIEW_SUMMARY}
+
+## NEW Comments To Address (act on these)
 
 Inline review comments:
 ${INLINE_BODY}
