@@ -452,6 +452,37 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 14h0m0s
+- as: ipsec-metrics-250nodes
+  optional: true
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "247"
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.xlarge
+      SET_ENV_BY_PLATFORM: custom
+      USER_TAGS: |
+        TicketId CORENET-5852
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-data-path-tests
+    - ref: openshift-qe-ipsec-metrics-validation
+    workflow: openshift-qe-installer-aws-ovn-ipsec
+  timeout: 14h0m0s
 - as: data-path-ipsec-9nodes
   cron: 0 2 8,22 * *
   reporter_config:
@@ -680,6 +711,185 @@ tests:
     - ref: openshift-qe-workers-scale
     test:
     - chain: openshift-qe-cudn-density
+- always_run: false
+  as: control-plane-24nodes-ovnfdp3965test1
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-75gic8t/release:latest
+      ENABLE_LAYER_3: "false"
+      UDN_ITERATION_MULTIPLIER: "3"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: control-plane-24nodes-ovnfdp3965test2
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-ldz09qt/release:latest
+      ENABLE_LAYER_3: "false"
+      UDN_ITERATION_MULTIPLIER: "3"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: control-plane-24nodes-baseline50
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_LAYER_3: "false"
+      UDN_ITERATION_MULTIPLIER: "3"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: control-plane-6nodes-ovn2603vanilla
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "3"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s --service-latency
+      CDV2_ITERATION_MULTIPLIER: "15"
+      ENABLE_LAYER_3: "false"
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      IGNORE_JOB_ITERATIONS: "true"
+      KB_FLAGS: --local-indexing
+      ND_CNI_EXTRA_FLAGS: --churn-mode=objects --churn-delay=1m --churn-percent=50
+        --churn-cycles=2
+      ND_EXTRA_FLAGS: --churn-mode=objects --churn-delay=1m --churn-percent=50 --churn-cycles=2
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: deferred
+      UDN_ITERATION_MULTIPLIER: "12"
+      VERSION: "5.0"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: control-plane-24nodes-ovn2509-421base
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-t242gyt/release:latest
+      ENABLE_LAYER_3: "false"
+      UDN_ITERATION_MULTIPLIER: "3"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: control-plane-6nodes-ovn2509-421base
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "3"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s --service-latency
+      CDV2_ITERATION_MULTIPLIER: "15"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-t242gyt/release:latest
+      ENABLE_LAYER_3: "false"
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      IGNORE_JOB_ITERATIONS: "true"
+      KB_FLAGS: --local-indexing
+      ND_CNI_EXTRA_FLAGS: --churn-mode=objects --churn-delay=1m --churn-percent=50
+        --churn-cycles=2
+      ND_EXTRA_FLAGS: --churn-mode=objects --churn-delay=1m --churn-percent=50 --churn-cycles=2
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: deferred
+      UDN_ITERATION_MULTIPLIER: "12"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws
 zz_generated_metadata:
   branch: main
   org: openshift-eng
