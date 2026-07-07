@@ -265,8 +265,9 @@ function set_CA_for_nodes () {
 
 # Applicable for 'disconnected' env
 install_oc_mirror() {
+  CGWURL="https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw"
   echo "Installing the latest oc-mirror client..."
-  run "cd /tmp && curl --noproxy '*' -k -L -o oc-mirror.tar.gz https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && rm -f oc-mirror.tar.gz"
+  run "cd /tmp && curl --noproxy '*' -k -L -o oc-mirror.tar.gz ${CGWURL}/oc-mirror/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && rm -f oc-mirror.tar.gz"
   if ls /tmp/oc-mirror > /dev/null; then
     chmod +x /tmp/oc-mirror
     run "oc version -o yaml"
