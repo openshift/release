@@ -46,5 +46,21 @@ fi
 echo "=== Copying kubeconfig from ${LAST_OPENSHIFT_DPF} on hypervisor ==="
 scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.doca8 /tmp/kubeconfig.doca8
 
+# The kubeconfig's API server is addressed by an internal hostname that is
+# not resolvable from the CI cluster's network. Resolve it from the
+# hypervisor (which can reach internal DNS) and substitute the IP so the
+# kubeconfig is usable from the CI pod.
+CLUSTER_API_SERVER_HOSTNAME="$(grep -oP '(?<=server: https://)[^:]+' /tmp/kubeconfig.doca8)"
+echo "Resolving cluster API server hostname '${CLUSTER_API_SERVER_HOSTNAME}' from the hypervisor..."
+CLUSTER_API_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${CLUSTER_API_SERVER_HOSTNAME} | awk '{print \$1}'")"
+
+if [[ -z "${CLUSTER_API_IP}" ]]; then
+    echo "ERROR: Failed to resolve '${CLUSTER_API_SERVER_HOSTNAME}' from the hypervisor"
+    exit 1
+fi
+
+echo "Resolved '${CLUSTER_API_SERVER_HOSTNAME}' to '${CLUSTER_API_IP}'"
+sed -i "s|server: https://${CLUSTER_API_SERVER_HOSTNAME}:|server: https://${CLUSTER_API_IP}:|" /tmp/kubeconfig.doca8
+
 cp /tmp/kubeconfig.doca8 "${SHARED_DIR}/kubeconfig"
 echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig successfully"
