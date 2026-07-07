@@ -3289,6 +3289,32 @@ tests:
       HYPERSHIFT_NODE_COUNT: "1"
       HYPERSHIFT_NODE_MEMORY: "16"
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-kubevirt-hypershift
+- as: metal-ds-ipi-ovn-dualstack-kubevirt-hypershift-debug-wait
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      HYPERSHIFT_NODE_COUNT: "3"
+      HYPERSHIFT_NODE_MEMORY: "16"
+    test:
+    - as: debug-wait
+      cli: latest
+      commands: |
+        echo "Cluster is ready. Waiting 8 hours for debugging..."
+        echo "Management cluster KUBECONFIG: \$KUBECONFIG"
+        echo "Hosted cluster KUBECONFIG: \${SHARED_DIR}/nested_kubeconfig"
+        oc get nodes
+        sleep 28800
+        echo "Debug wait complete."
+      from: stable:cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 9h0m0s
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-kubevirt-hypershift
 - as: metal-ds-ipi-ovn-lvms-f28
   capabilities:
   - intranet
