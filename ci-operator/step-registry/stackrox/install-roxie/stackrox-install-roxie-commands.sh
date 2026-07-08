@@ -57,22 +57,71 @@ roxie:
 
 central:
   namespace: stackrox
-  resourceProfile: small
   earlyReadiness: false
   exposure: loadbalancer
   spec:
+    central:
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+        limits:
+          cpu: "1"
+          memory: 4Gi
+      db:
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: "1"
+            memory: 4Gi
     scanner:
       scannerComponent: Enabled
       analyzer:
         scaling:
           autoScaling: Disabled
           replicas: 1
+        resources:
+          requests:
+            cpu: 500m
+            memory: 500Mi
+          limits:
+            cpu: "2"
+            memory: 2500Mi
+      db:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: "2"
+            memory: 4Gi
     scannerV4:
+      db:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 2Gi
+          limits:
+            cpu: "1"
+            memory: 2500Mi
+      indexer:
+        resources:
+          requests:
+            cpu: 600m
+            memory: 1500Mi
+          limits:
+            cpu: "1"
+            memory: 2Gi
       matcher:
-        scaling:
-          autoScaling: Enabled
-          replicas: 1
-          maxReplicas: 2
+        resources:
+          requests:
+            cpu: 600m
+            memory: 5Gi
+          limits:
+            cpu: "1"
+            memory: 5500Mi
     customize:
       envVars:
       - name: SCANNER_V4_MATCHER_READINESS
@@ -80,7 +129,6 @@ central:
 
 securedCluster:
   namespace: stackrox
-  resourceProfile: small
   earlyReadiness: false
 EOF
 
