@@ -39,10 +39,13 @@ echo "Nodes to deploy MicroShift on: $NODES"
 echo "Copying SSH keys to provisioned nodes..."
 for node in $NODES; do
   echo "Copying SSH key to ${node}..."
+  # Disable tracing due to password handling
+  set +x
   ssh ${SSH_ARGS} root@${bastion} "
     ssh-keygen -R ${node} 2>/dev/null || true
     sshpass -p '${LOGIN}' ssh-copy-id -o StrictHostKeyChecking=no root@${node}
   "
+  set -x
 done
 
 # Create ansible inventory following the MicroShift ansible format

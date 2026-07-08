@@ -72,7 +72,7 @@ case "${WORKLOAD}" in
 esac
 EXTRA_FLAGS+=" ${EXTRA_FLAGS_APPEND}"
 
-export WORKLOAD QPS BURST="${QPS}" UUID EXTRA_FLAGS
+export WORKLOAD QPS BURST="${BURST:-${QPS}}" UUID EXTRA_FLAGS
 if [[ "${KUBE_BURNER_VERSION}" != "default" ]]; then
   export KUBE_BURNER_VERSION
 fi
