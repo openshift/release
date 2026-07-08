@@ -54,15 +54,27 @@ oc --context hosted-mgmt get clusterpool -A -o jsonpath='{range .items[*]}{.meta
 
 comm -13 /tmp/clusterpools.configured /tmp/clusterpools.extant > /tmp/clusterpools.stale
 
+delete_zombie_clusterpool() {
+  local ns=$1 name=$2
+  echo "Deleting zombie clusterpool ${ns}/${name}"
+  while read -r cd; do
+    [[ -z "$cd" ]] && continue
+    echo "  Patching ${cd} preserveOnDelete=false"
+    oc --context hosted-mgmt -n "$ns" patch "$cd" --type=merge -p '{"spec":{"preserveOnDelete":false}}'
+    echo "  Deleting ${cd}"
+    oc --context hosted-mgmt -n "$ns" delete "$cd" --wait=false
+  done < <(oc --context hosted-mgmt -n "$ns" get clusterdeployment -o name 2>/dev/null || true)
+  oc --context hosted-mgmt delete clusterpool -n "$ns" "$name" --wait=false
+}
+
 if [[ -s /tmp/clusterpools.stale ]]; then
   stale_count=$(wc -l < /tmp/clusterpools.stale)
   echo "Found $stale_count zombie clusterpool(s) to clean up:"
   while read ns name; do
     if [[ $JOB_NAME == rehearse-* ]]; then
-      echo "    [REHEARSAL] Would delete: oc --context hosted-mgmt delete clusterpool -n $ns $name"
+      echo "    [REHEARSAL] Would delete: oc --context hosted-mgmt delete clusterpool -n $ns $name --wait=false"
     else
-      echo "Deleting zombie clusterpools"
-      oc --context hosted-mgmt delete clusterpool -n $ns $name
+      delete_zombie_clusterpool "$ns" "$name"
     fi
   done < /tmp/clusterpools.stale
 else
@@ -79,10 +91,10 @@ if [[ -s /tmp/imgsets.stale ]]; then
   echo "Found $stale_count zombie ClusterImageSet(s) to clean up:"
   while read name; do
     if [[ $JOB_NAME == rehearse-* ]]; then
-      echo "    [REHEARSAL] Would delete: oc --context hosted-mgmt delete clusterimageset $name"
+      echo "    [REHEARSAL] Would delete: oc --context hosted-mgmt delete clusterimageset $name --wait=false"
     else
-      echo "Deleting zombie ClusterImageSets"
-      oc --context hosted-mgmt delete clusterimageset "$name"
+      echo "Deleting zombie ClusterImageSet ${name}"
+      oc --context hosted-mgmt delete clusterimageset "$name" --wait=false
     fi
   done < /tmp/imgsets.stale
 else
