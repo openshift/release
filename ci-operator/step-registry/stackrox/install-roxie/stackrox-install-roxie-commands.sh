@@ -57,7 +57,7 @@ roxie:
 
 central:
   namespace: stackrox
-  earlyReadiness: false
+  earlyReadiness: true
   exposure: loadbalancer
   spec:
     central:
@@ -129,7 +129,7 @@ central:
 
 securedCluster:
   namespace: stackrox
-  earlyReadiness: false
+  earlyReadiness: true
 EOF
 
 ROXIE_ENVRC="${SCRATCH}/roxie-envrc"
@@ -141,8 +141,6 @@ roxie deploy \
   --config "${SCRATCH}/roxie-config.yaml" \
   --tag "${ACS_VERSION_TAG}" \
   --envrc "${ROXIE_ENVRC}" \
-  --central-wait 60m \
-  --secured-cluster-wait 60m \
   `# TODO(ROX-35434): simplify once roxie has 1st class support for community-branded repo` \
   --operator-env "RELATED_IMAGE_MAIN=${PUBLIC_REGISTRY}/main:${ACS_VERSION_TAG}" \
   --operator-env "RELATED_IMAGE_CENTRAL_DB=${PUBLIC_REGISTRY}/central-db:${ACS_VERSION_TAG}" \
@@ -159,6 +157,12 @@ echo ">>> Verifying deployment"
 # shellcheck disable=SC1090
 source "${ROXIE_ENVRC}"
 echo "${ROX_ADMIN_PASSWORD}" > "${SHARED_DIR}/rox_admin_password"
+
+echo ">>> Waiting for scanner-v4-matcher readiness"
+kubectl wait pods --for=condition=Ready --selector 'app=scanner-v4-matcher' -n stackrox \
+  --timeout=3600s \
+  || { kubectl logs --selector 'app=scanner-v4-matcher' -n stackrox --timestamps --tail=20; exit 1; }
+
 kubectl get nodes -o wide
 kubectl get pods -o wide --namespace stackrox
 
