@@ -1,10 +1,10 @@
 #!/bin/bash
-set -o errexit
+set -exo pipefail shopt -s inherit_errexit
 
 # Map results by setting identifier prefix in testsuite names for CR reporting.
 # Merge original results into a single file and send to shared dir for
 # mpiit-data-router-reporter.
-if [ "${MAP_TESTS:-}" = "true" ]; then
+if [ "${MAP_TESTS}" == "true" ]; then
     eval "$(
         typeset -a _fURL=()
         type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
