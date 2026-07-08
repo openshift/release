@@ -31,7 +31,7 @@ echo "Run JUnit verification on bastion against ${JUNIT_REPORT_DIR}"
 # shellcheck disable=SC2087
 ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" bash <<EOF
   set -e
-  python3 -m venv /tmp/verify-junit-venv
+  python3 -m venv --clear /tmp/verify-junit-venv
   /tmp/verify-junit-venv/bin/pip install --quiet junitparser
   SHARED_DIR=${JUNIT_REPORT_DIR} KNOWN_FAILURES='${KNOWN_FAILURES:-[]}' \
     /tmp/verify-junit-venv/bin/python3 /tmp/fail_if_any_test_failed.py
