@@ -138,7 +138,31 @@ tests:
 - as: verify
   capabilities:
   - nested-podman
-  commands: make -C openshift verify
+  commands: |
+    echo "=== Debug nested-podman environment ==="
+    echo "--- User info ---"
+    id
+    whoami
+    echo "--- subuid/subgid ---"
+    cat /etc/subuid
+    cat /etc/subgid
+    echo "--- /dev/fuse ---"
+    ls -la /dev/fuse || echo "/dev/fuse not found"
+    echo "--- fuse-overlayfs ---"
+    which fuse-overlayfs || echo "fuse-overlayfs not found"
+    echo "--- podman storage.conf ---"
+    cat ~/.config/containers/storage.conf 2>/dev/null || echo "no storage.conf"
+    echo "--- podman registries.conf ---"
+    cat ~/.config/containers/registries.conf 2>/dev/null || echo "no registries.conf"
+    echo "--- podman info ---"
+    podman info 2>&1 || echo "podman info failed"
+    echo "--- Test: podman run ---"
+    podman run --rm docker.io/alpine echo "nested podman works" 2>&1 || echo "podman run failed"
+    echo "--- Test: docker symlink ---"
+    which docker
+    docker run --rm docker.io/alpine echo "docker symlink works" 2>&1 || echo "docker run failed"
+    echo "=== End debug ==="
+    make -C openshift verify
   container:
     from: src-podman
   nested_podman: true
