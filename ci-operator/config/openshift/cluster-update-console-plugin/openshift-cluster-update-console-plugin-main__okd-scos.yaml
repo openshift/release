@@ -1,8 +1,8 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.25-openshift-5.0:
+  ocp_builder_rhel-9-openshift-nodejs-base-5.0.art:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-5.0
+    tag: rhel-9-openshift-nodejs-base-5.0.art
   origin_scos-5.0_base-stream9:
     name: scos-5.0
     namespace: origin
@@ -17,14 +17,14 @@ images:
   - build_args:
     - name: TAGS
       value: scos
-    dockerfile_path: openshift-hack/images/Dockerfile.openshift
+    dockerfile_path: Dockerfile
     from: origin_scos-5.0_base-stream9
     inputs:
-      ocp_builder_rhel-9-golang-1.25-openshift-5.0:
+      ocp_builder_rhel-9-openshift-nodejs-base-5.0.art:
         as:
-        - builder
-        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-    to: kubevirt-cloud-controller-manager
+        - build
+        - registry.access.redhat.com/ubi9/nodejs-22:latest
+    to: cluster-update-console-plugin
 promotion:
   to:
   - name: scos-5.0
@@ -50,5 +50,5 @@ tests:
 zz_generated_metadata:
   branch: main
   org: openshift
-  repo: cloud-provider-kubevirt
+  repo: cluster-update-console-plugin
   variant: okd-scos
