@@ -10,6 +10,13 @@ build_root:
     tag: rhel-9-release-golang-1.23-openshift-4.18
 images:
   items:
+  - dockerfile_path: build/Containerfile.test
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-online/rosa-boundary
+    to: ci-runner
   - dockerfile_literal: |
       FROM ubi-python
       USER 0
@@ -34,6 +41,62 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: ci-lint-shell
+  commands: |
+    cd /go/src/github.com/openshift-online/rosa-boundary
+    make lint-shell
+  container:
+    from: ci-runner
+- as: ci-test-shell
+  commands: |
+    cd /go/src/github.com/openshift-online/rosa-boundary
+    make test-shell
+  container:
+    from: ci-runner
+- as: ci-lint
+  commands: |
+    cd /go/src/github.com/openshift-online/rosa-boundary
+    make lint
+  container:
+    from: ci-runner
+- as: ci-staticcheck
+  commands: |
+    cd /go/src/github.com/openshift-online/rosa-boundary
+    make staticcheck
+  container:
+    from: ci-runner
+- as: ci-test-cli
+  commands: |
+    cd /go/src/github.com/openshift-online/rosa-boundary
+    make test-cli
+  container:
+    from: ci-runner
+- as: ci-build-cli
+  commands: |
+    cd /go/src/github.com/openshift-online/rosa-boundary
+    make build-cli
+  container:
+    from: ci-runner
+- as: ci-fmt
+  commands: |
+    cd /go/src/github.com/openshift-online/rosa-boundary
+    GOFMT_OUT=$(gofmt -l .)
+    SHFMT_OUT=$(shfmt -d -i 4 entrypoint.sh skel/sre/.bashrc.d/*.bashrc skel/sre/.local/bin/sre-login)
+    FAIL=0
+    if [ -n "$GOFMT_OUT" ]; then
+      echo "gofmt: the following files need formatting:"
+      echo "$GOFMT_OUT"
+      FAIL=1
+    fi
+    if [ -n "$SHFMT_OUT" ]; then
+      echo "shfmt: the following files need formatting:"
+      echo "$SHFMT_OUT"
+      FAIL=1
+    fi
+    if [ $FAIL -eq 0 ]; then echo "All files correctly formatted"; fi
+    exit $FAIL
+  container:
+    from: ci-runner
 - as: lambda-unit-tests
   commands: |
     export UV_CACHE_DIR=/tmp/uv-cache
