@@ -81,6 +81,7 @@ export SERVICE_IMAGE="${ASSISTED_SERVICE_IMAGE}"
 
 export PUBLIC_CONTAINER_REGISTRIES="\$(for image in \${images}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd ',' -)"
 export ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE="${ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE}"
+export ASSISTED_OPENSHIFT_VERSION="${ASSISTED_OPENSHIFT_VERSION:-}"
 
 # Fix for disconnected Hive
 export GO_REQUIRED_MIN_VERSION="1.14.4"

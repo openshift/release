@@ -127,6 +127,16 @@ releases:
       product: ocp
       stream: nightly
       version: "5.0"
+  ocp-4-20:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  ocp-4-22:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -365,6 +375,32 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
+      CLUSTERTYPE: assisted_medium_el9
+    workflow: assisted-ofcir-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-4-22
+  capabilities:
+  - intranet
+  run_if_changed: ^(cmd/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:ocp-4-22
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:ocp-4-22
+    env:
+      ASSISTED_OPENSHIFT_VERSION: openshift-v4.22
+      CLUSTERTYPE: assisted_medium_el9
+    workflow: assisted-ofcir-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-4-20
+  capabilities:
+  - intranet
+  run_if_changed: ^(cmd/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:ocp-4-20
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:ocp-4-20
+    env:
+      ASSISTED_OPENSHIFT_VERSION: openshift-v4.20
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
