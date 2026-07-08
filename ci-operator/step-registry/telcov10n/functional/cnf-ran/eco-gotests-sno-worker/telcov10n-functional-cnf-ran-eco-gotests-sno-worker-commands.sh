@@ -213,6 +213,12 @@ for feature in ${ECO_GOTESTS_FEATURES}; do
     fi
   fi
   rm -f "${scp_stderr}"
+  ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${WORKDIR}/temp_ssh_key" \
+    "cd ${ECO_GOTEST_DIR}/report && find . -mindepth 1 ! -name '*.xml' -type f \
+     | zip /tmp/k8sreporter_${feature}.zip -@ 2>/dev/null || true"
+  scp "${SSH_OPTS[@]}" -i "${WORKDIR}/temp_ssh_key" \
+    "${BASTION_USER}@${BASTION_IP}:/tmp/k8sreporter_${feature}.zip" \
+    "${ARTIFACT_SUBDIR}/" 2>/dev/null || echo "No k8sreporter artifacts for ${feature} — skipping"
 done
 
 echo "Copy reports to SHARED_DIR with prefixes"

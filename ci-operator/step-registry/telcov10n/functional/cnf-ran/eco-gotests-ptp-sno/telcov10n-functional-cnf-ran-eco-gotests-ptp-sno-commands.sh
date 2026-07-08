@@ -75,15 +75,23 @@ ssh -o ServerAliveInterval=30 \
   -i "${PROJECT_DIR}/temp_ssh_key" \
   "cd /tmp/eco_gotests_ptp && ./eco-gotests-ptp-run.sh || true"
 
+SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
+
 echo "Gather artifacts from bastion to ARTIFACT_DIR (for GCS)"
 # SCP all XML files to ARTIFACT_DIR so Prow uploads them to GCS for debugging.
 # This is the only transfer from bastion to CI pod — processing happens on the bastion.
 for i in 0 1 2 3; do
-  mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}"
-  scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    -i "${PROJECT_DIR}/temp_ssh_key" \
+  local_dir="${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}"
+  mkdir -p "${local_dir}"
+  scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
     "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_ptp_${i}/report/*.xml" \
-    "${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}/" || true
+    "${local_dir}/" || echo "No XML artifacts in eco_gotests_ptp_${i} — skipping"
+  ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
+    "cd /tmp/eco_gotests_ptp_${i}/report && find . -mindepth 1 ! -name '*.xml' -type f \
+     | zip /tmp/k8sreporter_ptp_${i}.zip -@ 2>/dev/null || true"
+  scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+    "${BASTION_USER}@${BASTION_IP}:/tmp/k8sreporter_ptp_${i}.zip" \
+    "${local_dir}/" 2>/dev/null || echo "No k8sreporter artifacts in eco_gotests_ptp_${i} — skipping"
 done
 
 echo "Process report files on bastion"
