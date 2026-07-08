@@ -1,0 +1,94 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM cli
+      RUN set -exo pipefail && \
+          # Install openssh-clients and jq
+          declare pkgs='openssh-clients jq' && \
+          if command -v dnf 1> /dev/null; then \
+              dnf install --setopt tsflags=nodocs -y ${pkgs} && \
+              dnf clean all; \
+          else \
+              microdnf install -y ${pkgs} && \
+              microdnf clean all; \
+          fi && \
+          rm -rf /var/cache/dnf/* && \
+          # Install yq
+          wget -qO - 'https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64.tar.gz' | \
+              tar zvx -C /usr/local/bin/ --transform 's|^\./yq_linux_amd64$|yq|' ./yq_linux_amd64
+    from: cli
+    to: cli-plus-tools
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cr--ocp--krkn-hub-tests--aws
+  cron: 0 6,18 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CHAOS_TEAM_NAME: lp-chaos
+      COMPUTE_NODE_TYPE: m5.metal
+      CONTAINER_ETCD_RECOVERY_TIME: "120"
+      DR__RP__CR_COMP_NAME: lp-chaos--OCP
+      TELEMETRY_GROUP: ocp4.22-nightly--aws
+    post:
+    - ref: mpiit-data-router-reporter
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    pre:
+    - chain: ipi-aws-pre
+    - ref: cucushift-installer-reportportal-marker
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+  timeout: 6h0m0s
+- as: cr--ocp--krkn-hub-node-tests--aws
+  cron: 0 3,15 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CHAOS_TEAM_NAME: lp-chaos
+      COMPUTE_NODE_TYPE: m5.metal
+      DR__RP__CR_COMP_NAME: lp-chaos--OCP
+      NODE_OUTAGE_TIMEOUT: "1200"
+      POWER_OUTAGE_TIMEOUT: "1200"
+      TELEMETRY_GROUP: ocp4.22-nightly--aws
+    post:
+    - ref: mpiit-data-router-reporter
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    pre:
+    - chain: ipi-aws-pre
+    - ref: cucushift-installer-reportportal-marker
+    test:
+    - chain: redhat-chaos-krkn-hub-node-tests
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: ocp-4.22-ocp-chaos
