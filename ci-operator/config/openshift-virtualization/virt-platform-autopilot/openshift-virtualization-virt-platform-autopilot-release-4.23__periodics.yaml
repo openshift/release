@@ -1,0 +1,95 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.23
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.23"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 600Mi
+tests:
+- as: e2e-azure
+  cron: 0 4 * * 1-5
+  steps:
+    cluster_profile: azure-virtualization
+    dependency_overrides:
+      OCP_CLI_JQ_LATEST: quay.io/openshift/ci:ocp_cli-jq_latest
+    env:
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+      OPERATORS: |
+        [
+          {"name": "cluster-kube-descheduler-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-kube-descheduler-operator", "target_namespaces": "openshift-kube-descheduler-operator", "operator_group": "descheduler-og"},
+          {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator", "target_namespaces": "", "operator_group": "coo-og"}
+        ]
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - as: install-cnv
+      cli: latest
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/master -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make update_pull_secret set_imagedigestmirrorset deploy_cnv
+        oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=json -p='[{"op": "add", "path": "/spec/defaultCPUModel", "value": "Broadwell"}]'
+        oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=merge -p='{"metadata":{"annotations":{"platform.kubevirt.io/autopilot":"true"}}}'
+      credentials:
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
+        name: cnv-ci-brew-pull-secret
+        namespace: test-credentials
+      - mount_path: /var/run/cnv-ci-konflux-pull-secret
+        name: konflux-pull-secret
+        namespace: test-credentials
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: openshift-virtualization+konflux_ro_bot
+        name: KONFLUX_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-konflux-pull-secret/token
+        name: KONFLUX_REGISTRY_TOKEN_PATH
+      - default: "4.23"
+        name: OCP_VERSION
+      - default: "4.23"
+        name: CNV_VERSION
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      - default: "false"
+        name: PRODUCTION_RELEASE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 1h0m0s
+    - ref: install-operators
+    - as: e2e-test
+      cli: latest
+      commands: |
+        trap 'cp -r _output/* ${ARTIFACT_DIR}/ || true' EXIT
+        GOFLAGS='' make run-e2e-tests-only
+      from: src
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-virtualization
+  repo: virt-platform-autopilot
+  variant: periodics
