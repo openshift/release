@@ -511,7 +511,15 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
 - always_run: false
-  as: e2e-aws-ovn-fdp-qe
+  as: e2e-metal-ipi-ovn-secondary-encap
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^bindata\/network\/ovn-kubernetes\/common\/008-script-lib\.yaml$|^bindata\/network\/ovn-kubernetes\/(managed|self-hosted)\/ovnkube-node\.yaml$|^pkg\/network\/ovn_kubernetes_test\.go$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: cluster-network-operator-ovn-secondary-encap
+- as: e2e-aws-ovn-fdp-qe
   pipeline_skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
     cluster_profile: openshift-org-aws
