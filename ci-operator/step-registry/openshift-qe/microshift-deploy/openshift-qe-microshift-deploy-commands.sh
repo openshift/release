@@ -154,4 +154,12 @@ scp -q ${SSH_ARGS} root@${bastion}:/root/$LAB/$LAB_CLOUD/microshift/kubeconfig $
   exit 1
 }
 
+# Publish handoff files for workload steps
+first_node=$(echo "${NODES}" | head -n1)
+echo "${first_node}" > "${SHARED_DIR}/microshift_node"
+if [[ "${PROMETHEUS_LOGGING}" == "true" ]]; then
+  # install-logging runs on the [logging] host (localhost = the bastion)
+  echo "http://${bastion}:9091" > "${SHARED_DIR}/prometheus_url"
+fi
+
 echo "MicroShift deployment completed successfully"
