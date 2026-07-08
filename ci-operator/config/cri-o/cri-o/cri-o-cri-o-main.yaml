@@ -7,6 +7,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: rhel-coreos
+  rhel-coreos-base-10:
+    name: "5.0"
+    namespace: ocp
+    tag: rhel-coreos-10
 build_root:
   image_stream_tag:
     name: release
@@ -40,6 +44,20 @@ images:
         as:
         - registry.ci.openshift.org/rhcos-devel/rhel-coreos
     to: rhel-coreos
+  - dockerfile_literal: |
+      FROM quay.io/centos/centos:stream9 as build
+      RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download cri-o
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
+      COPY --from=build /*.rpm /
+      RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+    inputs:
+      base-machine-with-rpms:
+        as:
+        - quay.io/centos/centos:stream9
+      rhel-coreos-base-10:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
+    to: rhel-coreos-10
   skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|SECURITY_CONTACTS|PROJECT|LICENSE)$
 raw_steps:
 - rpm_image_injection_step:
