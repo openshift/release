@@ -16,6 +16,7 @@ wait_for_csv() {
     sleep 10
   done
   echo "ERROR: CSV for ${sub} did not reach Succeeded" >&2
+  oc get subscription "${sub}" -n "${ns}" -o yaml >&2 || true
   return 1
 }
 
