@@ -1,3 +1,16 @@
+base_images:
+  rhel-9-golang-1.21:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.16
+  rhel-9-golang-1.24:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.20
+  rhel-9-golang-1.26:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.23
 build_root:
   image_stream_tag:
     name: release
@@ -18,11 +31,19 @@ images:
     - name: SDK_VERSION
       value: v1.31.0
     dockerfile_path: images/build-root/Dockerfile.rhel-9.custom
+    inputs:
+      rhel-9-golang-1.21:
+        as:
+        - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.21
     to: ci-build-root-golang-1.21-sdk-1.31
   - build_args:
     - name: SDK_VERSION
       value: v1.31.0
     dockerfile_path: images/build-root/Dockerfile.rhel-9.custom
+    inputs:
+      rhel-9-golang-1.24:
+        as:
+        - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.21
     to: ci-build-root-golang-1.24-sdk-1.31
   - build_args:
     - name: SDK_VERSION
@@ -30,6 +51,10 @@ images:
     - name: KUSTOMIZE_VERSION
       value: v5.6.0
     dockerfile_path: images/build-root/Dockerfile.rhel-9.custom
+    inputs:
+      rhel-9-golang-1.24:
+        as:
+        - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.21
     to: ci-build-root-golang-1.24-sdk-1.41.1
   - build_args:
     - name: GOLANG_BASE
@@ -39,6 +64,10 @@ images:
     - name: KUSTOMIZE_VERSION
       value: v5.6.0
     dockerfile_path: images/build-root/Dockerfile.rhel-9.custom
+    inputs:
+      rhel-9-golang-1.26:
+        as:
+        - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.21
     to: ci-build-root-golang-1.26-sdk-1.42.3
   skip_if_only_changed: ^renovate.json|^README.md
 promotion:

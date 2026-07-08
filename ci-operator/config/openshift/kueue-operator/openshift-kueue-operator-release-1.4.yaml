@@ -61,17 +61,18 @@ operator:
 prowgen:
   disable_sparse_checkout: true
 releases:
-  arm64-4-21-latest:
+  arm64-4-22-latest:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "4.22"
   latest:
-    release:
+    candidate:
       architecture: multi
-      channel: stable
-      version: "4.21"
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -111,7 +112,7 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
-- as: test-e2e-ci-build-downstream-4-21
+- as: test-e2e-ci-build-downstream-4-22
   steps:
     cluster_profile: openshift-org-aws
     post:
@@ -142,7 +143,7 @@ tests:
           cpu: "4"
           memory: 4Gi
     workflow: ipi-aws
-- as: test-e2e-ci-build-upstream-4-21
+- as: test-e2e-ci-build-upstream-4-22
   steps:
     cluster_profile: openshift-org-aws
     post:
@@ -174,8 +175,9 @@ tests:
           memory: 4Gi
     workflow: ipi-aws
 - always_run: false
-  as: test-e2e-ci-build-upstream-dra-4-21
-  optional: true
+  as: test-e2e-ci-build-upstream-dra-4-22
+  cron: '@daily'
+  presubmit: true
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -240,7 +242,7 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
-- as: test-e2e-4-21-arm64
+- as: test-e2e-4-22-arm64
   capabilities:
   - arm64
   cron: '@daily'
@@ -254,7 +256,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-4-21-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-4-22-latest
     env:
       BUNDLE_COMPONENT: kueue-bundle-1-4
       CONTAINER_IMAGE: quay.io/curl/curl:latest
@@ -293,7 +295,7 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
-- as: test-e2e-4-21-fips
+- as: test-e2e-4-22-fips
   cron: '@daily'
   reporter_config:
     channel: '#forum-node-jira'
@@ -315,7 +317,7 @@ tests:
     - ref: fips-check
     - chain: kueue-operator-test-e2e
     workflow: ipi-aws
-- as: test-e2e-4-21-hypershift
+- as: test-e2e-4-22-hypershift
   cron: '@daily'
   reporter_config:
     channel: '#forum-node-jira'
@@ -649,7 +651,7 @@ tests:
           memory: 500Mi
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
 - always_run: false
-  as: test-e2e-dra-gpu-4-21
+  as: test-e2e-dra-gpu-4-22
   cron: '@daily'
   optional: true
   presubmit: true
