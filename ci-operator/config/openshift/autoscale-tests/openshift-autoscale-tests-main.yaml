@@ -22,6 +22,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: lint-autoscaler
+  commands: make cas-lint
+  container:
+    from: src
 - as: e2e-aws-autoscaler
   skip_if_only_changed: (?i)^cas/(readme\.md|makefile)$|^cas/vendor/
   steps:
@@ -78,6 +82,102 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-aws-autoscaler-periodic
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-azure-autoscaler-periodic
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-azure
+- always_run: false
+  as: e2e-gcp-autoscaler-periodic
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-vsphere-autoscaler-periodic
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-openstack-autoscaler
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
+      WORKER_REPLICAS: "0"
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: openshift-e2e-openstack-ipi
+- always_run: false
+  as: e2e-openstack-autoscaler-periodic
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
+      WORKER_REPLICAS: "0"
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
