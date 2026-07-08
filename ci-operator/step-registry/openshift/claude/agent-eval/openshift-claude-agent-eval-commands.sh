@@ -67,7 +67,7 @@ if [[ -n "${EVAL_DISCOVER}" ]]; then
     fi
 
     # Filter to only changed evals when EVAL_CHANGED_ONLY is set
-    if [[ "${EVAL_CHANGED_ONLY}" == "true" ]] && [[ -n "${PULL_BASE_SHA:-}" ]]; then
+    if [[ "${EVAL_CHANGED_ONLY:-}" == "true" ]] && [[ -n "${PULL_BASE_SHA:-}" ]]; then
         echo ""
         echo "=== Filtering to changed evals ==="
         CHANGED_FILES=$(git diff --name-only "${PULL_BASE_SHA}...HEAD" || true)
@@ -176,7 +176,8 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
         echo "WARNING: approaching step timeout (${ELAPSED}s elapsed), skipping remaining configs."
         break
     fi
-    config_name=$(basename "${config}" .yaml)
+    config_name=$(echo "${config}" | sed 's|\.yaml$||' | tr '/' '-')
+    config_basename=$(basename "${config}" .yaml)
     echo ""
     echo "========================================"
     echo "=== Running eval: ${config_name} ==="
@@ -186,10 +187,10 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
 
     # Per-config changed-case detection
     CASE_ARGS=""
-    if [[ "${EVAL_CHANGED_ONLY}" == "true" ]] && [[ -n "${PULL_BASE_SHA:-}" ]]; then
+    if [[ "${EVAL_CHANGED_ONLY:-}" == "true" ]] && [[ -n "${PULL_BASE_SHA:-}" ]]; then
         # In discovery mode, derive cases dir from config path convention
         if [[ -n "${EVAL_DISCOVER}" ]]; then
-            CASES_DIR="$(dirname "${config}")/${config_name}/cases"
+            CASES_DIR="$(dirname "${config}")/${config_basename}/cases"
         elif [[ -n "${EVAL_CASES_DIR}" ]]; then
             CASES_DIR="${EVAL_CASES_DIR}"
         else
@@ -205,6 +206,12 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
                 fi
             fi
         fi
+    fi
+
+    # Skip configs with no changed cases in changed-only mode
+    if [[ "${EVAL_CHANGED_ONLY:-}" == "true" ]] && [[ -z "${CASE_ARGS}" ]] && [[ -z "${EVAL_CASES}" ]]; then
+        echo "No changed cases for ${config_name}, skipping."
+        continue
     fi
 
     # Include explicit EVAL_CASES if set (single-config mode)
