@@ -1,9 +1,24 @@
+base_images:
+  cli:
+    name: 5.0-priv
+    namespace: ocp-private
+    tag: cli
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/openshift-apiserver
 images:
   items:
+  - dockerfile_literal: |
+      FROM replaced-by-from
+      COPY oc /usr/bin/oc
+    from: bin
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: bin-with-oc
   - dockerfile_path: images/Dockerfile.rhel
     to: openshift-apiserver
 promotion:
@@ -34,7 +49,7 @@ tests:
   commands: |
     make verify -k --warn-undefined-variables
   container:
-    from: bin
+    from: bin-with-oc
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify-deps
   commands: |
