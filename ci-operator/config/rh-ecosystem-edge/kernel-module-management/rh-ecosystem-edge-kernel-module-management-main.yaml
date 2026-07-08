@@ -208,6 +208,40 @@ tests:
           cpu: 1000m
           memory: 500Mi
     workflow: generic-claim
+- as: e2e-dra
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-kmm
+        operator-sdk run bundle -n openshift-kmm --timeout 5m0s "$OO_BUNDLE"
+        oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller
+      dependencies:
+      - env: OO_BUNDLE
+        name: operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: run-test
+      cli: latest
+      commands: |
+        ./ci/prow/e2e-dra
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
 - as: e2e-hub
   cluster_claim:
     architecture: amd64
