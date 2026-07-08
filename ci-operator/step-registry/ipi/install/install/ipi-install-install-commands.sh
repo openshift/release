@@ -613,6 +613,10 @@ function refresh_destroy_cluster_install_lease() {
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# TODO(CORS-4508): initialize variables used in the EXIT trap to avoid
+# "unbound variable" when the trap fires before the installer runs.
+ret=1
+dir=/tmp/installer
 trap 'prepare_next_steps' EXIT TERM INT
 
 export INSTALLER_BINARY="openshift-install"
@@ -681,6 +685,10 @@ azurestack)
     ;;
 gcp)
     export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json
+    UNIVERSE_DOMAIN=$(python3 -c "import json; print(json.load(open('${GOOGLE_CLOUD_KEYFILE_JSON}')).get('universe_domain',''))" 2>/dev/null)
+    if [[ -n "${UNIVERSE_DOMAIN}" ]]; then
+      export GOOGLE_CLOUD_UNIVERSE_DOMAIN="${UNIVERSE_DOMAIN}"
+    fi
     if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
