@@ -176,6 +176,7 @@ EOF
 
 # Export function for parallel execution
 export -f collect_sosreport_from_node
+export -f timeout_to_seconds
 export KUBECONFIG SOS_REPORT_DIR SOS_TIMEOUT SOS_PLUGIN_FILTER
 
 # Get list of nodes to collect from
