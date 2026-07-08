@@ -118,7 +118,10 @@ COMPONENT_INFIX = "__component__"
 prune_tag_match = re.compile(r"^(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)(?P<hour>\d\d)(?P<minute>\d\d)(?P<second>\d\d)_prune_(?P<ci_tag>.+)$")
 
 # Match release payload tags like "rc_payload__4.4.0-0.nightly-s390x-2021-03-16-171946"
-rc_payload_tag_match = re.compile(rf"^{re.escape(RC_PAYLOAD_PREFIX)}(?P<version>.+)$")
+# Exclude __component__ preservation tags via negative lookahead on version.
+rc_payload_tag_match = re.compile(
+    rf"^{re.escape(RC_PAYLOAD_PREFIX)}(?P<version>(?:(?!{re.escape(COMPONENT_INFIX)}).)+)$"
+)
 
 # Match preserved marker tags like "preserved__rc_payload__4.4.0-0.nightly-s390x-2021-03-16-171946"
 rc_payload_preserved_match = re.compile(rf"^{re.escape(PRESERVED_RC_PAYLOAD_PREFIX)}(?P<version>.+)$")
@@ -438,13 +441,6 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                 mod_by = min(mod_by * 2, 1000)
                 logging.info('%d tags have been checked', tag_count)
 
-            # Check for rc_payload__ tags
-            payload_match = rc_payload_tag_match.match(image_tag)
-            if payload_match:
-                version = payload_match.group('version')
-                rc_payload_tags[version] = image_tag
-                continue
-
             # Check for preserved marker tags
             preserved_match = rc_payload_preserved_match.match(image_tag)
             if preserved_match:
@@ -459,13 +455,20 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                 remove_requests.add(version)
                 continue
 
-            # Check for component preservation tags
+            # Component tags before payload tags (most specific rc_payload__ match first).
             component_match = rc_payload_component_match.match(image_tag)
             if component_match:
                 version = component_match.group('version')
                 if version not in component_tags:
                     component_tags[version] = []
                 component_tags[version].append(image_tag)
+                continue
+
+            # Check for rc_payload__ tags
+            payload_match = rc_payload_tag_match.match(image_tag)
+            if payload_match:
+                version = payload_match.group('version')
+                rc_payload_tags[version] = image_tag
                 continue
 
             # Check for prune tags
