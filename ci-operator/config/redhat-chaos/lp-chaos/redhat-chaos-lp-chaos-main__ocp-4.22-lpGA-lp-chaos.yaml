@@ -96,6 +96,7 @@ tests:
       COMPUTE_NODE_TYPE: m5.metal
       DR__RP__CR_COMP_NAME: lp-chaos--CNV
       LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      MAP_TESTS: "true"
       TARGET_NAMESPACE: cnv-chaos-test-ns
       TELEMETRY_GROUP: ocp4.22-nightly--cnv-4.22-stable--aws
     test:
@@ -105,6 +106,23 @@ tests:
     - ref: redhat-lp-chaos-lp-cnv-vm-clean
     workflow: redhat-lp-chaos-ocp-installer-aws-cnv
   timeout: 4h0m0s
+- as: cr--cnv--node-outage--aws
+  cron: 0 8,18 * * *
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CNV_VERSION: "4.22"
+      COMPUTE_NODE_TYPE: m5.metal
+      DR__RP__CR_COMP_NAME: lp-chaos--CNV
+      LPC_LP_CNV__VM__REPLICA_COUNT: "1"
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      MAP_TESTS: "true"
+      TELEMETRY_GROUP: ocp4.22-nightly--cnv-4.22-stable--aws
+    test:
+    - chain: redhat-lp-chaos-lp-cnv-node-outage
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
