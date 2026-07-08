@@ -2,8 +2,13 @@
 
 set -euo pipefail
 
-echo "=== Installing Gateway API CRDs (${GATEWAY_API_CHANNEL} ${GATEWAY_API_VERSION}) ==="
-oc apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/${GATEWAY_API_CHANNEL}-install.yaml"
+echo "=== Checking Gateway API CRDs ==="
+if oc get crd gateways.gateway.networking.k8s.io >/dev/null 2>&1; then
+  echo "Gateway API CRDs already present (managed by the OpenShift Ingress Operator); skipping manual install."
+else
+  echo "Installing Gateway API CRDs (${GATEWAY_API_CHANNEL} ${GATEWAY_API_VERSION}) ..."
+  oc apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/${GATEWAY_API_CHANNEL}-install.yaml"
+fi
 
 echo "=== Resolving OpenShift Service Mesh channel ==="
 if [[ "${OSSM_CHANNEL}" == "!default" ]]; then
