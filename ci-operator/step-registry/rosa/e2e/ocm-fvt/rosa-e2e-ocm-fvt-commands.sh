@@ -44,6 +44,15 @@ if [[ -n "${OCM_FVT_EXTRA_ENVS:-}" ]]; then
   done <<< "${OCM_FVT_EXTRA_ENVS}"
 fi
 
+osdfm_qe_creds_dir=/usr/local/osdfm-qe-credentials
+aao_kubeconfig_env=()
+if [[ -f "${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig" ]]; then
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
+  aao_kubeconfig_env=("-e" "AWS_ACCOUNT_OPERATOR_KUBECONFIG=$(<"${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig")")
+  $WAS_TRACING && set -x
+fi
+
 cred_sources='source /usr/local/cs-qe-credentials/ocm-tokens'
 if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
   cred_sources="${cred_sources}; source /usr/local/cs-qe-credentials/jira-cred"
@@ -89,15 +98,26 @@ echo "=========================="
 
 echo "Running ocmtest: ${ocmtest_args[*]}"
 exit_code=0
+# aao_kubeconfig_env may hold the raw AWS_ACCOUNT_OPERATOR_KUBECONFIG contents
+# as a literal "-e KEY=VALUE" arg; keep xtrace off while it is expanded so the
+# kubeconfig is never printed to the (public) build log.
+[[ $- == *x* ]] && WAS_TRACING_RUN=true || WAS_TRACING_RUN=false
+set +x
 podman run \
   "${podman_args[@]}" \
+  "${aao_kubeconfig_env[@]}" \
   quay.io/redhat-services-prod/ocmci/ocmci:latest \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
+$WAS_TRACING_RUN && set -x
 
 # Copy only the merged report.xml to avoid inflated test counts from
 # per-phase XMLs that include all Ginkgo specs (including skipped).
 find "${ocm_fvt_output}" -type f -name 'report.xml' -print0 | while IFS= read -r -d '' xml_file; do
   cp "${xml_file}" "${ARTIFACT_DIR}/junit-ocm-fvt-report.xml"
 done
+
+# Record the test result so post steps (e.g. stage promotion) can tell
+# whether it is safe to act on this run instead of always running.
+echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code" 2>/dev/null || true
 
 exit "${exit_code}"

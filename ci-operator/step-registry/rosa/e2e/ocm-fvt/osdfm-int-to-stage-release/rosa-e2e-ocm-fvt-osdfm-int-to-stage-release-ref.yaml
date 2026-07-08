@@ -1,0 +1,35 @@
+ref:
+  as: rosa-e2e-ocm-fvt-osdfm-int-to-stage-release
+  from: osdfm-release-tools
+  commands: rosa-e2e-ocm-fvt-osdfm-int-to-stage-release-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 30m0s
+  grace_period: 30s
+  credentials:
+  - namespace: ci
+    name: osdfm-qe-credentials
+    mount_path: /usr/local/osdfm-qe-credentials
+  env:
+  - name: OCM_BACKEND_TESTS_REF
+    default: master
+    documentation: |-
+      Git ref for ocm-backend-tests tarball used to run osdfm_release.sh.
+  - name: COMMIT_SHA
+    default: ""
+    documentation: |-
+      Optional osd-fleet-manager commit SHA to promote. When empty,
+      osdfm_release.sh uses the latest osd-fleet-manager master commit.
+  documentation: |-
+    Runs osdfm_release.sh after a successful OSDFM integration basic
+    periodic test to open an app-interface MR promoting osd-fleet-manager
+    from integration to stage. Requires osdfm-qe-credentials secret
+    (osdfm_gitlab_token, osdfm_webhook_url).
+
+    This is a post step, so ci-operator runs it even if the preceding test
+    step failed. Before doing anything, it checks the exit code recorded by
+    the test step (via rosa-e2e-ocm-fvt-commands.sh) at
+    ${SHARED_DIR}/ocm-fvt-exit-code and skips the promotion unless that
+    test explicitly succeeded.

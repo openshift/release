@@ -8,6 +8,12 @@ build_root:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.23
+images:
+  items:
+  - dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-4.23
+      RUN dnf install -y python3-pip && python3 -m pip install yamlpath
+    to: osdfm-release-tools
 releases:
   latest:
     candidate:
@@ -22,6 +28,24 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: ocm-fvt-periodic-osdfm-basic-periodic-integration
+  capabilities:
+  - intranet
+  - nested-podman
+  cron: 0 9 * * 1
+  nested_podman: true
+  restrict_network_access: false
+  steps:
+    env:
+      OCM_FVT_JOB_NAME: osdfm-basic-periodic-integration
+      OCM_FVT_OCM_ENV: integration
+      OCM_FVT_REPORT_JIRA: "false"
+      OCM_FVT_SERVICE: osdfm
+    post:
+    - ref: rosa-e2e-ocm-fvt-osdfm-int-to-stage-release
+    test:
+    - ref: rosa-e2e-ocm-fvt-longrunning
+  timeout: 10h0m0s
 - as: ocm-fvt-periodic-osdfm-mc-autoscaling-integration
   capabilities:
   - nested-podman
