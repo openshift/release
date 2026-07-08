@@ -20,8 +20,9 @@ do
   sleep 5;
 done
 sudo ls -la /var/lib/microshift/resources/kubeadmin/
-sudo systemctl restart greenboot-healthcheck
-
+# Trigger greenboot health checks. On greenboot-rs (RHEL 9.8+) manual
+# restart is refused, so suppress the error — the polling loop handles it.
+sudo systemctl restart greenboot-healthcheck 2>/dev/null || true
 EOF
 
 chmod +x "${HOME}"/start_microshift.sh
@@ -38,6 +39,9 @@ retries=10
 while [ ${retries} -gt 0 ] ; do
   ((retries-=1))
   if ssh "${INSTANCE_PREFIX}" "sudo systemctl status greenboot-healthcheck | grep -q 'active (exited)'"; then
+    exit 0
+  fi
+  if ssh "${INSTANCE_PREFIX}" "sudo microshift healthcheck --timeout 30s 2>/dev/null"; then
     exit 0
   fi
   echo "Not ready yet. Waiting 30 seconds... (${retries} retries remaining)"

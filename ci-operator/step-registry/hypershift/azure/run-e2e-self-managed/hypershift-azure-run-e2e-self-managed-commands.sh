@@ -36,13 +36,17 @@ check_e2e_flag() {
   return $?
 }
 
+if [[ -f "${SHARED_DIR}/nodepool_release_images" ]]; then
+    source "${SHARED_DIR}/nodepool_release_images"
+fi
+
 N1_NP_VERSION_TEST_ARGS=""
-if [[ ${OCP_IMAGE_N1} != "${OCP_IMAGE_LATEST}" ]]; then
+if [[ -n "${OCP_IMAGE_N1:-}" && "${OCP_IMAGE_N1}" != "${OCP_IMAGE_LATEST}" ]]; then
   N1_NP_VERSION_TEST_ARGS="--e2e.n1-minor-release-image=${OCP_IMAGE_N1}"
 fi
 
 N2_NP_VERSION_TEST_ARGS=""
-if [[ ${OCP_IMAGE_N2} != "${OCP_IMAGE_LATEST}" ]]; then
+if [[ -n "${OCP_IMAGE_N2:-}" && "${OCP_IMAGE_N2}" != "${OCP_IMAGE_LATEST}" ]]; then
   N2_NP_VERSION_TEST_ARGS="--e2e.n2-minor-release-image=${OCP_IMAGE_N2}"
 fi
 

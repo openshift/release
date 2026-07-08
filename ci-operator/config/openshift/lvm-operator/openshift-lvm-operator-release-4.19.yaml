@@ -44,13 +44,6 @@ images:
           rm -rf /tmp/.git && \
           rm -rf /.cache/golangci && mkdir /.cache/golangci && \
           chmod -R 777 /.cache
-
-      # Snyk
-      ENV SNYK_DIR=/tmp/snyk
-      RUN mkdir -p ${SNYK_DIR}
-      RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
-      RUN chmod +x ${SNYK_DIR}/snyk
-      ENV PATH=$PATH:${SNYK_DIR}
     from: ocp_4.19_base-rhel9
     inputs:
       root:
@@ -129,28 +122,6 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
-- as: snyk-code
-  commands: |
-    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-code
-  container:
-    clone: true
-    from: lvms-pre-commit
-  optional: true
-  secret:
-    mount_path: /tmp/secret
-    name: lvms-snyk-token
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
-- as: snyk-deps
-  commands: |
-    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-deps
-  container:
-    clone: true
-    from: lvms-pre-commit
-  optional: true
-  secret:
-    mount_path: /tmp/secret
-    name: lvms-snyk-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: e2e-aws-single-node
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$

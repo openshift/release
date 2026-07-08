@@ -1,0 +1,43 @@
+ref:
+  as: rosa-cluster-lease-controller
+  from: rosa-aws-cli
+  grace_period: 5m
+  commands: rosa-cluster-lease-controller-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 2h0m0s
+  credentials:
+  - namespace: test-credentials
+    name: rosa-cluster-lease-manager
+    mount_path: /etc/rosa-cluster-lease-manager
+  env:
+  - name: LEASE_NAMESPACE
+    default: "rosa-cluster-lease"
+    documentation: Namespace on the lease host cluster where lease ConfigMaps live.
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: OCM environment for cluster operations.
+  - name: STALE_LEASE_HOURS
+    default: "4"
+    documentation: Hours after which an in-use lease is considered stale and force-released.
+  - name: ERROR_REPLACE_HOURS
+    default: "1"
+    documentation: Hours a cluster stays in error status before being replaced.
+  - name: DRY_RUN
+    default: "false"
+    documentation: When true, log what would be done without making changes.
+  documentation: |-
+    Reconciles the ROSA cluster lease inventory. Reads desired state
+    from a rosa-cluster-lease-config ConfigMap, compares with actual
+    per-cluster ConfigMaps, and takes action:
+
+    - Provisions missing clusters via rosa CLI
+    - Health checks existing clusters (OCM status, node health)
+    - Recovers stale leases (in-use beyond STALE_LEASE_HOURS)
+    - Replaces unhealthy clusters (error beyond ERROR_REPLACE_HOURS)
+    - Upgrades available clusters when desired version is newer
+    - Decommissions clusters no longer in desired state
+
+    Run as a periodic Prow job (e.g. every 15 minutes).

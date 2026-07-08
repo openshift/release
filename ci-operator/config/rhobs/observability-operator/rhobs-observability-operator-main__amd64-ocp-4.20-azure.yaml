@@ -12,10 +12,7 @@ base_images:
     namespace: ocp
     tag: upi-installer
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-release-golang-1.24-openshift-4.20
+  from_repository: true
 releases:
   latest:
     candidate:
@@ -38,16 +35,20 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{end}}'
+    report_template: |-
+      *COO image source:* FBC from Konflux
+      *OCP Version:* 4.20
+      *Environment:* Azure
+
+      {{if eq .Status.State "success"}} :slack-green: {{else}} :failed: {{end}}Job *{{.Spec.Job}}* with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
   steps:
     cluster_profile: azure-observability
     env:
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8s_v3
       CYPRESS_COO_NAMESPACE: coo
-      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: registry-proxy.engineering.redhat.com/rh-osbs/iib@sha256:a4594dd51181e3bed5e26eb23d8ee2f645769350fb40da525b60da4db44093eb
+      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: registry-proxy.engineering.redhat.com/rh-osbs/iib@sha256:346d0ba5a51527eea79dc841e4203a9f6cf5ceb26e7e96286b889876d3f07f45
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"},
@@ -61,6 +62,7 @@ tests:
     - ref: rhobs-wait-for-coo-ready
     - ref: distributed-tracing-tests-tracing-ui-integration
     - ref: monitoring-plugin-tests-monitoring-incidents-ui-integration
+    - ref: troubleshooting-panel-tests-ui
     - ref: rhobs-obo-test-harness
     workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:

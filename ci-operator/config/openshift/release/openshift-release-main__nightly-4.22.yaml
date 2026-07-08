@@ -243,18 +243,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-ovn-bm
-  capabilities:
-  - intranet
-  interval: 168h
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      CLUSTERTYPE: baremetal
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-serial-ovn-ipv6-runc
   capabilities:
   - intranet
@@ -849,6 +837,25 @@ tests:
   shard_count: 3
   steps:
     cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-fencing-recovery
+- as: e2e-metal-ovn-two-node-fencing-recovery-rhcos10-techpreview
+  capabilities:
+  - intranet
+  interval: 168h
+  shard_count: 3
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BMC_DRIVER=redfish
+        FEATURE_SET=TechPreviewNoUpgrade
+        IP_STACK=v4
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=8
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+      OSSTREAM: rhel-10
     workflow: baremetalds-two-node-fencing-recovery
 - as: e2e-metal-ovn-two-node-fencing-recovery-repo-ra
   capabilities:
@@ -1637,26 +1644,11 @@ tests:
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
-  cron: 30 7 * * 0-5
+  cron: 0 6 * * 0,2,4
   restrict_network_access: false
   steps:
     env:
       SKIP_OCP_INSTALL: "false"
-      T5CI_JOB_TYPE: ptp
-      T5CI_VERSION: "4.22"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-ptp
-- as: e2e-telco5g-ptp-upstream
-  capabilities:
-  - intranet
-  cron: 30 12 * * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      SKIP_OCP_INSTALL: "true"
-      T5CI_DEPLOY_UPSTREAM: "true"
       T5CI_JOB_TYPE: ptp
       T5CI_VERSION: "4.22"
     observers:
@@ -2703,7 +2695,9 @@ tests:
 - as: e2e-rosa-hcp-ovn
   cron: '@daily'
   steps:
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: rosa-e2e-02
+    env:
+      ENABLE_BILLING_ACCOUNT: "yes"
     observers:
       enable:
       - observers-resource-watch

@@ -76,10 +76,9 @@ configure_claude() {
     "allow": [
       "Read(//tmp/**)",
       "Write(//tmp/**)",
-      "Bash(bash plugins/lvms-ci/scripts/*)",
-      "Bash(python3 plugins/lvms-ci/scripts/*)",
-      "Skill(lvms-ci:doctor)",
-      "Skill(lvms-ci:prow-job)"
+      "Bash(bash plugins/*/scripts/*)",
+      "Bash(python3 plugins/*/scripts/*)",
+      "Skill(lvms-ci:*)"
     ]
   }
 }
@@ -106,11 +105,11 @@ cd "${SRC_DIR}"
 # Run analysis on all releases.
 # Time-box analysis and limit turns to avoid uncontrolled billable minutes.
 echo "Running Claude to analyze LVMS CI jobs..."
-timeout 3000 claude \
+timeout 4800 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 100 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/lvms-ci:doctor ${RELEASE_VERSIONS}" \
-    --verbose 2>&1 | tee "${CLAUDE_DOCTOR_LOG}"
+    --verbose &> "${CLAUDE_DOCTOR_LOG}"
 echo "Analysis for LVMS CI jobs completed"

@@ -2,9 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
-
-source openshift-ci/capz-test-env.sh
+source "${SHARED_DIR}/capz-test-env.sh"
 
 # Phase 01: Check Dependencies
 # Validates tool availability, authentication, and naming constraints.

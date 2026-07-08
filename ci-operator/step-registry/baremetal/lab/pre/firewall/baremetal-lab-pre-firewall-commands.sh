@@ -107,13 +107,13 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
   
   for ip in "${IP_ARRAY[@]}"; do
     if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
-      add_rule_safely --direct --add-rule ipv4 filter FORWARD 0 -s "${ip}" -d "${BMC_NETWORK}" -j ACCEPT
+      add_rule_safely --zone=internal --add-rich-rule="rule family='ipv4' source address='${ip}' destination address='${BMC_NETWORK}' accept"
     fi
-    add_rule_safely --direct --add-rule ipv4 filter FORWARD 0 -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    add_rule_safely --zone=internal --add-rich-rule="rule family='ipv4' source address='${ip}' destination not address='${INTERNAL_NET_CIDR}' drop"
   done
   if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
-    add_rule_safely --direct --add-rule ipv4 filter FORWARD 0 -s "${IPI_BOOTSTRAP_IP}" -d "${BMC_NETWORK}" -j ACCEPT
-    add_rule_safely --direct --add-rule ipv4 filter FORWARD 0 -s "${IPI_BOOTSTRAP_IP}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    add_rule_safely --zone=internal --add-rich-rule="rule family='ipv4' source address='${IPI_BOOTSTRAP_IP}' destination address='${BMC_NETWORK}' accept"
+    add_rule_safely --zone=internal --add-rich-rule="rule family='ipv4' source address='${IPI_BOOTSTRAP_IP}' destination not address='${INTERNAL_NET_CIDR}' drop"
   fi
 EOF
 

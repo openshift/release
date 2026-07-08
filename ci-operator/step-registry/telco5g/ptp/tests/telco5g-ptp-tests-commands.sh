@@ -326,7 +326,7 @@ build_images
 
 # Get an updated version of oc
 mkdir ~/bin
-wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+wget https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
 tar -zxvf openshift-client-linux.tar.gz -C ~/bin
 export PATH=$HOME/bin:$PATH
 
@@ -395,7 +395,13 @@ else
   echo "Version is 4.19 or greater"
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
   # Only run tgm and dualfollower tests from 4.19 onwards
-  TEST_MODES=("tgm" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+  TEST_MODES=("tgm" "tbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+
+  # T-BC test mode is only supported from 4.20 onwards,
+  # so if the version is 4.19 then, remove it from the list
+  if [[ "$T5CI_VERSION" == 4.19 ]]; then
+    TEST_MODES=("${TEST_MODES[@]/tbc}")
+  fi
 fi
 
 # wait for the linuxptp-daemon to be deployed

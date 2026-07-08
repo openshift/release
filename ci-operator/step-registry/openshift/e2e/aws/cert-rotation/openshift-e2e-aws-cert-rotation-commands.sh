@@ -136,7 +136,7 @@ ${SCP} "${CLUSTER_PROFILE_DIR}/ssh-privatekey" "${BASTION_USER}@${BASTION_HOST}:
 ${SSH} "sudo mkdir /root/.ssh -p && sudo mv /tmp/id_rsa /root/.ssh/id_rsa && sudo chmod 0600 /root/.ssh/id_rsa"
 
 # Install oc
-${SSH} "curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && tar xzvf oc.tar.gz && sudo mv oc /usr/local/bin/"
+${SSH} "curl -L https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && tar xzvf oc.tar.gz && sudo mv oc /usr/local/bin/"
 
 # Copy timeskew script
 ${SCP} "/tmp/time-skew.sh" "${BASTION_USER}@${BASTION_HOST}:/tmp/timeskew.sh"

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.12-e2e-deploy
     decorate: true
     decoration_config:
@@ -90,7 +90,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.12-e2e-upgrade
     decorate: true
     decoration_config:
@@ -175,7 +175,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.12-images
     decorate: true
     decoration_config:
@@ -233,7 +233,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.13-e2e-deploy
     decorate: true
     decoration_config:
@@ -318,7 +318,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.13-e2e-upgrade
     decorate: true
     decoration_config:
@@ -403,7 +403,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.13-images
     decorate: true
     decoration_config:
@@ -461,7 +461,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.14-e2e-deploy
     decorate: true
     decoration_config:
@@ -546,7 +546,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.14-e2e-upgrade
     decorate: true
     decoration_config:
@@ -631,7 +631,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.14-images
     decorate: true
     decoration_config:
@@ -689,7 +689,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.16-e2e-deploy
     decorate: true
     decoration_config:
@@ -774,7 +774,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.16-e2e-upgrade
     decorate: true
     decoration_config:
@@ -859,7 +859,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.16-images
     decorate: true
     decoration_config:
@@ -917,7 +917,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.21-e2e-deploy
     decorate: true
     decoration_config:
@@ -1002,7 +1002,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.21-e2e-upgrade
     decorate: true
     decoration_config:
@@ -1087,7 +1087,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/4.21-images
     decorate: true
     decoration_config:
@@ -1145,7 +1145,361 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
+    context: ci/prow/cnv-dev-preview-konflux-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - hack/Dockerfile.test.src.ci
+    labels:
+      ci-operator.openshift.io/variant: cnv-dev-preview-konflux
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cnv-cnv-ci-master-cnv-dev-preview-konflux-images
+    rerun_command: /test cnv-dev-preview-konflux-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=cnv-dev-preview-konflux
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cnv-dev-preview-konflux-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build13
+    context: ci/prow/cnv-odf-ocp4.20-konflux-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - hack/Dockerfile.test.src.ci
+    labels:
+      ci-operator.openshift.io/variant: cnv-odf-ocp4.20-konflux
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cnv-cnv-ci-master-cnv-odf-ocp4.20-konflux-images
+    rerun_command: /test cnv-odf-ocp4.20-konflux-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=cnv-odf-ocp4.20-konflux
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cnv-odf-ocp4.20-konflux-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build13
+    context: ci/prow/cnv-odf-ocp4.21-konflux-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - hack/Dockerfile.test.src.ci
+    labels:
+      ci-operator.openshift.io/variant: cnv-odf-ocp4.21-konflux
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cnv-cnv-ci-master-cnv-odf-ocp4.21-konflux-images
+    rerun_command: /test cnv-odf-ocp4.21-konflux-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=cnv-odf-ocp4.21-konflux
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cnv-odf-ocp4.21-konflux-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build13
+    context: ci/prow/cnv-odf-ocp4.22-konflux-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - hack/Dockerfile.test.src.ci
+    labels:
+      ci-operator.openshift.io/variant: cnv-odf-ocp4.22-konflux
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cnv-cnv-ci-master-cnv-odf-ocp4.22-konflux-images
+    rerun_command: /test cnv-odf-ocp4.22-konflux-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=cnv-odf-ocp4.22-konflux
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cnv-odf-ocp4.22-konflux-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build13
+    context: ci/prow/cnv-odf-ocp4.23-konflux-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - hack/Dockerfile.test.src.ci
+    labels:
+      ci-operator.openshift.io/variant: cnv-odf-ocp4.23-konflux
+      ci.openshift.io/generator: prowgen
+      job-release: "4.23"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cnv-cnv-ci-master-cnv-odf-ocp4.23-konflux-images
+    rerun_command: /test cnv-odf-ocp4.23-konflux-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=cnv-odf-ocp4.23-konflux
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cnv-odf-ocp4.23-konflux-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build13
+    context: ci/prow/cnv-odf-ocp5.0-konflux-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - hack/Dockerfile.test.src.ci
+    labels:
+      ci-operator.openshift.io/variant: cnv-odf-ocp5.0-konflux
+      ci.openshift.io/generator: prowgen
+      job-release: "5.0"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cnv-cnv-ci-master-cnv-odf-ocp5.0-konflux-images
+    rerun_command: /test cnv-odf-ocp5.0-konflux-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=cnv-odf-ocp5.0-konflux
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cnv-odf-ocp5.0-konflux-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build13
     context: ci/prow/e2e-deploy
     decorate: true
     decoration_config:
@@ -1228,7 +1582,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/e2e-upgrade
     decorate: true
     decoration_config:
@@ -1311,7 +1665,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build13
     context: ci/prow/images
     decorate: true
     decoration_config:

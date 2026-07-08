@@ -84,6 +84,7 @@ set +x
 ls -rtlhZ
 pwd
 set -x
+export WORKSPACE=\${kpi_tests_repo}
 bash \${SCRIPTS_DIR}/test_oslat.sh oslat
 set +x
 EOF
@@ -144,7 +145,7 @@ function make_up_ansible_playbook {
       - name: Building Podman container image at bastion host
         vars:
           _base_img: quay.io/centos/centos:stream9
-          _oc_bin_url: https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-4.18/openshift-client-linux.tar.gz
+          _oc_bin_url: https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/x86_64/clients/ocp/stable-4.18/openshift-client-linux.tar.gz
         ansible.builtin.shell: |
           cat << EO-Containerfile > {{ _remote_container_file }}
           FROM quay.io/centos/centos:stream9
@@ -223,11 +224,17 @@ function run_ansible_playbook {
 
 function setup_test_result_for_component_readiness {
 
+  if ! ls "${test_results_artifacts_append}"*.xml &>/dev/null; then
+    echo "ERROR: No XML result files found matching ${test_results_artifacts_append}*.xml" >&2
+    echo "ERROR: The oslat test may have failed to produce results" >&2
+    return 1
+  fi
+
   set -x
   sed -E \
     -e 's/(<testsuite name=")[^"]+/\1telco-verification/' \
     -e "s/<testcase name=\"([^\"]+)\"/<testcase name='${TEST_COMPONENT} \1'/" \
-    ${test_results_artifacts_append}*.xml \
+    "${test_results_artifacts_append}"*.xml \
       >| "${ARTIFACT_DIR}/junit_${TELCO_KPI_TEST_NAME// /-}_telco_kpi_test_results.xml"
   set +x
 

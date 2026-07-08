@@ -58,8 +58,8 @@ done
 
 cd /eco-ci-cd
 
-echo "Running deploy-ocp-sno for target hub ${TARGET_CLUSTER_NAME} (version=${TARGET_HUB_VERSION})"
-EXTRA_VARS="release=${TARGET_HUB_VERSION} cluster_name=${TARGET_CLUSTER_NAME} disconnected=true"
+echo "Running deploy-ocp-sno for target hub ${TARGET_CLUSTER_NAME} (version=${VERSION})"
+EXTRA_VARS="release=${VERSION} cluster_name=${TARGET_CLUSTER_NAME} disconnected=true"
 if [ "${DISABLE_INSIGHTS}" = "true" ]; then
   EXTRA_VARS="${EXTRA_VARS} disable_insights=true"
 fi
@@ -75,7 +75,15 @@ echo "Copying target hub inventory to SHARED_DIR"
 find /eco-ci-cd/inventories/ocp-deployment/host_vars -maxdepth 1 -type f | while read -r f; do
   cp "$f" "${SHARED_DIR}/$(basename "$f")"
 done
-cp /eco-ci-cd/inventories/ocp-deployment/group_vars/all "${SHARED_DIR}/all"
+find /eco-ci-cd/inventories/ocp-deployment/group_vars -maxdepth 1 -type f | while read -r f; do
+  cp "$f" "${SHARED_DIR}/$(basename "$f")"
+done
+echo "${TARGET_CLUSTER_NAME}" > "${SHARED_DIR}/cluster_name"
+
+echo "Preserving target hub inventory with target- prefix (readable after ibu-restore-seed-inventory)"
+for key in bastion hypervisor master0 all bastions hypervisors nodes masters; do
+  [[ -f "${SHARED_DIR}/${key}" ]] && cp "${SHARED_DIR}/${key}" "${SHARED_DIR}/target-${key}"
+done
 
 echo "Getting target hub cluster version"
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig"

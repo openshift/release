@@ -34,6 +34,22 @@ sos report --batch --tmp-dir /tmp/artifacts --all-logs \
   -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,dnf \
   -k podman.all -k podman.logs
 
+# Strip libvirt auth token from sosreport archives. The libvirt plugin
+# collects /run/libvirt/ which includes the daemon authentication token
+# at /run/libvirt/common/system.token — sensitive data that must not
+# appear in CI artifacts.
+for sos_tar in /tmp/artifacts/sosreport-*.tar.xz; do
+  [ -f "$sos_tar" ] || continue
+  if tar tf "$sos_tar" | grep -F "run/libvirt/common/system.token" >/dev/null; then
+    tmpdir=$(mktemp -d)
+    tar xf "$sos_tar" -C "$tmpdir"
+    find "$tmpdir" -path "*/run/libvirt/common/system.token" -delete
+    tar cf - -C "$tmpdir" . | xz > "${sos_tar}.new" && mv "${sos_tar}.new" "$sos_tar"
+    rm -rf "$tmpdir"
+    echo "Stripped system.token from $sos_tar"
+  fi
+done
+
 cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
 ls -ltr /var/lib/swtpm-localca/ >> /tmp/artifacts/libvirt-qemu/ls-swtpm-localca.txt || true
 
@@ -65,7 +81,7 @@ must_gather_dir=/tmp/artifacts/post-tests-must-gather
 mkdir -p "${must_gather_dir}"
 
 # Download the MCO sanitizer binary from mirror
-curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+curl -sL "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
 chmod +x /tmp/mco-sanitize
 
 echo "Gathering must-gather data..."

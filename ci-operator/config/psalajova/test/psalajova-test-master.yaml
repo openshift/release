@@ -16,6 +16,50 @@ tests:
 - as: test-credentials
   steps:
     workflow: psalajova-test
+- as: test-gsm-secrets
+  commands: |
+    echo "=== auto-discovery (collection+group, all fields) ==="
+    ls -la /var/my-secrets
+    cat /var/my-secrets/*
+  container:
+    from: src
+  cron: 0 0 1 1 *
+  secrets:
+  - collection: psalajova-first-secret
+    group: group1
+    mount_path: /var/my-secrets
+- as: test-gsm-secrets-mixed
+  commands: |
+    echo "=== 1. auto-discovery (collection+group) ==="
+    ls -la /var/auto-discovery
+    echo "=== 2. explicit field (collection+group+field) ==="
+    ls -la /var/explicit-field-without-as
+    echo "=== 3. explicit field with as rename ==="
+    ls -la /var/explicit-as
+    echo "=== 4. bundle sync_to_cluster:false (CSI path, multi-collection) ==="
+    ls -la /var/bundle-csi
+    echo "=== 5. bundle sync_to_cluster:true (K8s Secret path) ==="
+    ls -la /var/bundle-k8s
+  container:
+    from: src
+  cron: 0 0 1 1 *
+  secrets:
+  - collection: psalajova-first-secret
+    group: group1
+    mount_path: /var/auto-discovery
+  - collection: psalajova-first-secret
+    field: first-secret
+    group: test
+    mount_path: /var/explicit-field-without-as
+  - as: renamed-login
+    collection: psalajova-first-secret
+    field: login
+    group: psalajov-test
+    mount_path: /var/explicit-as
+  - bundle: psalajova-test-bundle
+    mount_path: /var/bundle-csi
+  - bundle: gce-sa-credentials-gcs-publisher
+    mount_path: /var/bundle-k8s
 zz_generated_metadata:
   branch: master
   org: psalajova

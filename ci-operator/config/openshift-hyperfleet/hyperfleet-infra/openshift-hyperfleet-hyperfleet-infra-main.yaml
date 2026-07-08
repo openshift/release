@@ -2,11 +2,13 @@ build_root:
   project_image:
     dockerfile_literal: |-
       FROM registry.access.redhat.com/ubi9/ubi
-      ARG HELM_VERSION=v3.17.3
+      ARG HELM_VERSION=v3.21.0
       ARG TERRAFORM_VERSION=1.9.8
       ARG KUBECTL_VERSION=v1.32.3
       ARG HELM_GIT_VERSION=v1.5.2
+      ARG HELM_DIFF_VERSION=3.15.7
       ARG SHELLCHECK_VERSION=v0.10.0
+      ARG HELMFILE_VERSION=1.5.2
       RUN yum -y install --setopt=skip_missing_names_on_install=False \
               git \
               make \
@@ -23,6 +25,9 @@ build_root:
           && unzip -o /tmp/terraform.zip -d /usr/local/bin/ \
           && curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
           && chmod 755 /usr/local/bin/kubectl \
+          && curl -fsSL "https://github.com/helmfile/helmfile/releases/download/v${HELMFILE_VERSION}/helmfile_${HELMFILE_VERSION}_linux_amd64.tar.gz" | tar -xzf - -C /tmp \
+          && mv /tmp/helmfile /usr/local/bin/helmfile \
+          && chmod 755 /usr/local/bin/helmfile \
           && rm -rf /tmp/*
       RUN mkdir -p /tmp/helm-home && chmod 777 /tmp/helm-home
       ENV HOME=/tmp/helm-home \
@@ -31,6 +36,7 @@ build_root:
           HELM_DATA_HOME=/tmp/helm-home/.local/share/helm \
           HELM_PLUGINS=/usr/local/share/helm/plugins
       RUN helm plugin install https://github.com/aslafy-z/helm-git --version ${HELM_GIT_VERSION}
+      RUN helm plugin install https://github.com/databus23/helm-diff --version ${HELM_DIFF_VERSION}
       RUN curl -fsSL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz" | tar -xzf - -C /opt \
           && /opt/google-cloud-sdk/install.sh \
               --quiet \

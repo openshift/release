@@ -94,6 +94,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-aws-autonode
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AWS_MULTI_ARCH: "true"
+      CI_TESTS_RUN: ^TestKarpenter
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-multi
   cron: 0 2 * * *
   steps:
@@ -162,38 +175,17 @@ tests:
     env:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
-- as: e2e-aws-ovn-conformance-ccm
-  cron: '@monthly'
-  reporter_config:
-    channel: '#forum-ocp-splat-alerts-aws'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: |
-      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+- as: e2e-aws-ovn-conformance-fips
+  cron: 0 4 * * 0
   steps:
     cluster_profile: hypershift-aws
     env:
+      EXTRA_ARGS: --fips
       PUBLIC_ONLY: "true"
-      TEST_SKIPS: loadbalancer NLB should be reachable with target-node-labels\|loadbalancer
-        NLB internal should be reachable with hairpinning traffic
-    workflow: hypershift-aws-conformance
-- as: e2e-aws-ovn-conformance-ccm-techpreview
-  cron: '@monthly'
-  reporter_config:
-    channel: '#forum-ocp-splat-alerts-aws'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: |
-      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      GUEST_FEATURE_SET: TechPreviewNoUpgrade
-      PUBLIC_ONLY: "true"
-      TEST_SKIPS: loadbalancer NLB should be reachable with target-node-labels\|loadbalancer
-        NLB internal should be reachable with hairpinning traffic
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *
@@ -271,6 +263,23 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    workflow: hypershift-azure-aks-conformance
+- as: e2e-azure-aks-ovn-conformance-fips
+  cron: 0 5 * * 0
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      HYPERSHIFT_AZURE_FIPS: "true"
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+      TEST_SKIPS: 'etcd leader changes are not excessive\| In-tree Volumes \[Driver:
+        azure-disk\]\| In-tree Volumes \[Driver: azure-file\]\| FIPS TestFIPS'
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
     workflow: hypershift-azure-aks-conformance
 - as: e2e-azure-v2-self-managed
   cron: 30 3 * * *
@@ -377,6 +386,13 @@ tests:
       GKE_REGION: us-central1
       GKE_RELEASE_CHANNEL: stable
     workflow: hypershift-gcp-gke-e2e-v2
+- as: e2e-v2-aws-backuprestore
+  cron: 0 5 * * 0
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-aws-e2e-backuprestore
 zz_generated_metadata:
   branch: release-4.23
   org: openshift

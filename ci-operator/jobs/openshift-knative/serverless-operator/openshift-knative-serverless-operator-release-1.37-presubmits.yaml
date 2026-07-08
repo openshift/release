@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build07
     context: ci/prow/416-images
     decorate: true
     decoration_config:
@@ -72,7 +72,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/416-kitchensink-e2e
     decorate: true
     decoration_config:
@@ -165,7 +165,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/416-kitchensink-upgrade
     decorate: true
     decoration_config:
@@ -258,7 +258,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/416-mesh-e2e
     decorate: true
     decoration_config:
@@ -351,7 +351,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/416-mesh-upgrade
     decorate: true
     decoration_config:
@@ -444,7 +444,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/416-operator-e2e
     decorate: true
     decoration_config:
@@ -536,7 +536,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/416-test-soak
     decorate: true
     decoration_config:
@@ -630,7 +630,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/416-test-upgrade
     decorate: true
     decoration_config:
@@ -722,7 +722,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/416-ui-e2e
     decorate: true
     decoration_config:
@@ -816,7 +816,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/416-upstream-e2e
     decorate: true
     decoration_config:
@@ -909,7 +909,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/416-upstream-e2e-kafka
     decorate: true
     decoration_config:
@@ -1002,7 +1002,167 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build07
+    context: ci/prow/420-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - knative-operator/Dockerfile
+      - must-gather/Dockerfile
+      - olm-catalog/serverless-operator-index/Dockerfile
+      - olm-catalog/serverless-operator/Dockerfile
+      - openshift-knative-operator/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - serving/ingress/Dockerfile
+      - serving/metadata-webhook/Dockerfile
+    labels:
+      ci-operator.openshift.io/variant: "420"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-release-1.37-420-images
+    rerun_command: /test 420-images
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=420
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )420-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-1\.37$
+    - ^release-1\.37-
+    cluster: build06
+    context: ci/prow/420-kitchensink-upgrade
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - knative-operator/Dockerfile
+      - must-gather/Dockerfile
+      - olm-catalog/serverless-operator-index/Dockerfile
+      - olm-catalog/serverless-operator/Dockerfile
+      - openshift-knative-operator/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - serving/ingress/Dockerfile
+      - serving/metadata-webhook/Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
+      ci-operator.openshift.io/variant: "420"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-release-1.37-420-kitchensink-upgrade
+    optional: true
+    rerun_command: /test 420-kitchensink-upgrade
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=kitchensink-upgrade
+        - --variant=420
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )420-kitchensink-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-1\.37$
+    - ^release-1\.37-
+    cluster: build07
     context: ci/prow/421-images
     decorate: true
     decoration_config:
@@ -1069,7 +1229,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build07
     context: ci/prow/421-kitchensink-e2e
     decorate: true
     decoration_config:
@@ -1168,106 +1328,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
-    context: ci/prow/421-kitchensink-upgrade
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - knative-operator/Dockerfile
-      - must-gather/Dockerfile
-      - olm-catalog/serverless-operator-index/Dockerfile
-      - olm-catalog/serverless-operator/Dockerfile
-      - openshift-knative-operator/Dockerfile
-      - openshift/ci-operator/source-image/Dockerfile
-      - serving/ingress/Dockerfile
-      - serving/metadata-webhook/Dockerfile
-    labels:
-      ci-operator.openshift.io/variant: "421"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serverless-operator-release-1.37-421-kitchensink-upgrade
-    optional: true
-    rerun_command: /test 421-kitchensink-upgrade
-    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=kitchensink-upgrade
-        - --variant=421
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )421-kitchensink-upgrade,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-1\.37$
-    - ^release-1\.37-
-    cluster: build05
+    cluster: build07
     context: ci/prow/421-mesh-e2e
     decorate: true
     decoration_config:
@@ -1366,7 +1427,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build07
     context: ci/prow/421-mesh-upgrade
     decorate: true
     decoration_config:
@@ -1465,7 +1526,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build07
     context: ci/prow/421-operator-e2e
     decorate: true
     decoration_config:
@@ -1563,7 +1624,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build07
     context: ci/prow/421-test-soak
     decorate: true
     decoration_config:
@@ -1662,7 +1723,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build07
     context: ci/prow/421-test-upgrade
     decorate: true
     decoration_config:
@@ -1760,7 +1821,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build07
     context: ci/prow/421-ui-e2e
     decorate: true
     decoration_config:
@@ -1859,7 +1920,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build07
     context: ci/prow/421-upstream-e2e
     decorate: true
     decoration_config:
@@ -1958,7 +2019,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build07
     context: ci/prow/421-upstream-e2e-kafka
     decorate: true
     decoration_config:
@@ -2057,7 +2118,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build07
     context: ci/prow/422-images
     decorate: true
     decoration_config:
@@ -2124,7 +2185,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/422-kitchensink-e2e
     decorate: true
     decoration_config:
@@ -2218,7 +2279,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/422-kitchensink-upgrade
     decorate: true
     decoration_config:
@@ -2312,7 +2373,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/422-mesh-e2e
     decorate: true
     decoration_config:
@@ -2406,7 +2467,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/422-mesh-upgrade
     decorate: true
     decoration_config:
@@ -2500,7 +2561,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/422-operator-e2e
     decorate: true
     decoration_config:
@@ -2593,7 +2654,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/422-test-soak
     decorate: true
     decoration_config:
@@ -2688,7 +2749,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/422-test-upgrade
     decorate: true
     decoration_config:
@@ -2781,7 +2842,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/422-ui-e2e
     decorate: true
     decoration_config:
@@ -2876,7 +2937,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/422-upstream-e2e
     decorate: true
     decoration_config:
@@ -2970,7 +3031,7 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
+    cluster: build06
     context: ci/prow/422-upstream-e2e-kafka
     decorate: true
     decoration_config:
@@ -3064,8 +3125,8 @@ presubmits:
     branches:
     - ^release-1\.37$
     - ^release-1\.37-
-    cluster: build05
-    context: ci/prow/ocp-4.22-lp-interop-images
+    cluster: build07
+    context: ci/prow/ocp-4.22-lpGA-lp-ocp-compat-images
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -3078,12 +3139,12 @@ presubmits:
       - serving/ingress/Dockerfile
       - serving/metadata-webhook/Dockerfile
     labels:
-      ci-operator.openshift.io/variant: ocp-4.22-lp-interop
+      ci-operator.openshift.io/variant: ocp-4.22-lpGA-lp-ocp-compat
       ci.openshift.io/generator: prowgen
       job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serverless-operator-release-1.37-ocp-4.22-lp-interop-images
-    rerun_command: /test ocp-4.22-lp-interop-images
+    name: pull-ci-openshift-knative-serverless-operator-release-1.37-ocp-4.22-lpGA-lp-ocp-compat-images
+    rerun_command: /test ocp-4.22-lpGA-lp-ocp-compat-images
     run_if_changed: ^non-existing$
     spec:
       containers:
@@ -3092,7 +3153,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=ocp-4.22-lp-interop
+        - --variant=ocp-4.22-lpGA-lp-ocp-compat
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -3125,4 +3186,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.22-lp-interop-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.22-lpGA-lp-ocp-compat-images,?($|\s.*)

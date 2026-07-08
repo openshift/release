@@ -4,10 +4,6 @@ import argparse
 import json
 import yaml
 
-parser = argparse.ArgumentParser(description="Boskos config generator")
-parser.add_argument("--print-cluster-profile-sets", dest="print_cps", default=False, help="Write cluster profile set details on stdout", action="store_true")
-args = parser.parse_args()
-
 CONFIG = {
     'aws-us-east-1-quota-slice': {
         'us-east-1': 15,
@@ -120,6 +116,9 @@ CONFIG = {
     'metal-perfscale-osp-nfv-quota-slice': {
         'metal-perfscale-osp-nfv-bos2': 1,
     },
+    'metal-perfscale-osp-selfsched-quota-slice': {
+        'metal-perfscale-osp-selfsched': 3,
+    },
     'metal-perfscale-selfsched-quota-slice': {
         'metal-perfscale-selfsched': 3,
     },
@@ -149,6 +148,12 @@ CONFIG = {
     },
     'aws-konflux-qe-quota-slice': {
         'us-west-2': 10
+    },
+    'aws-konflux-stg-quota-slice': {
+        'us-east-1': 25,
+        'us-east-2': 25,
+        'us-west-1': 25,
+        'us-west-2': 25
     },
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
@@ -191,16 +196,26 @@ CONFIG = {
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
-        'centralus': 14,
-        'eastus': 14,
-        'eastus2': 14,
-        'westus': 14
+        'centralus': 8,
+        'eastus': 8,
+        'eastus2': 8,
+        'northcentralus': 12,
+        'southcentralus': 8,
+        'westcentralus': 12,
+        'westus': 8,
+        'westus2': 12,
+        'westus3': 12
     },
     'azure-2-quota-slice': {
-        'centralus': 33,
-        'eastus': 33,
-        'eastus2': 33,
-        'westus': 33
+        'centralus': 21,
+        'eastus': 12,
+        'eastus2': 21,
+        'northcentralus': 12,
+        'southcentralus': 8,
+        'westcentralus': 12,
+        'westus': 21,
+        'westus2': 12,
+        'westus3': 12
     },
     'azure-arm64-quota-slice': {
         'centralus': 33,
@@ -236,7 +251,7 @@ CONFIG = {
         'centralus': 15
     },
     'azure-observability-quota-slice': {
-        'westus': 3
+        'westus': 25
     },
     'azure-hcp-qe-quota-slice': {
         'westus': 5,
@@ -307,8 +322,13 @@ CONFIG = {
     'aro-hcp-test-msi-containers-stg': {},
     'aro-hcp-test-msi-containers-prod': {},
     # BEGIN ARO-HCP E2E SLOT TYPES
-    'aro-hcp-dev-shard1-slot': {},
     'aro-hcp-dev-shard0-slot': {},
+    'aro-hcp-dev-shard1-slot': {},
+    'aro-hcp-dev-shard2-slot': {},
+    'aro-hcp-dev-shard3-slot': {},
+    'aro-hcp-dev-hypershift-westus3-slot': {},
+    'aro-hcp-int-shard0-slot': {},
+    'aro-hcp-stg-shard0-slot': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
@@ -335,11 +355,14 @@ CONFIG = {
     'fleet-manager-qe-quota-slice': {
         'ap-northeast-1': 3,
     },
+    'gcd-quota-slice': {
+        'u-germany-northeast1': 2,
+    },
     'gcp-qe-quota-slice': {
         'us-central1': 45,
     },
     'gcp-observability-quota-slice': {
-        'us-central1': 30,
+        'us-central1': 25,
     },
     'gcp-qe-c3-metal-quota-slice': {
         'us-central1': 4,
@@ -380,6 +403,7 @@ CONFIG = {
         'libvirt-s390x-amd64-0-0': 1
     },
     'libvirt-s390x-vpn-quota-slice': {},
+    'libvirt-s390x-vpn-oz-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -499,7 +523,7 @@ CONFIG = {
         'us-east': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'lon04': 3,
+        'eu-gb': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
@@ -688,6 +712,11 @@ for i in range(3):
 del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-0']
 del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
 
+# Orange zone (OZ) M83 LPARs lnxocp11-14: four concurrent clusters per LPAR
+for i in range(4):
+    for j in range(4):
+        CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-{}-{}'.format(i, j)] = 1
+
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
@@ -764,10 +793,20 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
 # BEGIN ARO-HCP E2E SLOT RESOURCES
-for i in range(7):
-    CONFIG['aro-hcp-dev-shard1-slot']['aro-hcp-dev-shard1-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(15):
+for i in range(6):
     CONFIG['aro-hcp-dev-shard0-slot']['aro-hcp-dev-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(6):
+    CONFIG['aro-hcp-dev-shard1-slot']['aro-hcp-dev-shard1-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(6):
+    CONFIG['aro-hcp-dev-shard2-slot']['aro-hcp-dev-shard2-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(6):
+    CONFIG['aro-hcp-dev-shard3-slot']['aro-hcp-dev-shard3-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-dev-hypershift-westus3-slot']['aro-hcp-dev-hypershift-westus3-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-int-shard0-slot']['aro-hcp-int-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
 for i in range(20):
     CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1
@@ -818,48 +857,6 @@ CLUSTER_PROFILE_SETS_CONFIG = {
             'install': 50,
             'quota': CONFIG['gcp-3-quota-slice'],
         },
-    },
-}
-
-CLUSTER_PROFILE_SETS_IGNORE = {
-    # Do not dump the following cps. Useful when a new profile is about to be introduced
-    # and it is not fully defined yet.
-    'profiles': [],
-
-    # Do not enforce any Cluster Profile Set usage policy on these tests. The schema of
-    # this stanza is defined as follow:
-    #
-    #  'tests_allowlist': {
-    #    '${ORGANIZATION_REGEXP}/${REPOSITORY_REGEXP}' : {
-    #      '${BRANCH_REGEXP}': {
-    #        '${VARIANT_REGEXP}': [
-    #           '${TEST_REGEXP}'
-    #         ]
-    #      }
-    #    }
-    #  }
-    'tests_allowlist': {
-        'openshift(-priv)?/openshift-tests-private': {
-            '.+': {
-                '.*': [
-                    '.+-public-ipv4-pool.*'
-                ]
-            }
-        },
-        'openshift(-priv)?/installer': {
-            '.+': {
-                '.*': [
-                    '.+-public-ipv4-pool.*'
-                ]
-            }
-        },
-        'openshift/release': {
-            '.+': {
-                '.*': [
-                    '.+-public-ipv4-pool.*'
-                ]
-            }
-        }
     },
 }
 
@@ -934,22 +931,4 @@ def generate_config():
         f.write('# generated with generate-boskos.py; do not edit directly\n')
         yaml.dump(config, f, default_flow_style=False)
 
-def print_cluster_profile_set_details():
-    ignored_cps = CLUSTER_PROFILE_SETS_IGNORE['profiles']
-    cps = {
-        'cluster_profile_sets': {},
-        'tests_allowlist': {},
-    }
-
-    for cps_name, cps_data in CLUSTER_PROFILE_SETS_CONFIG.items():
-        if not cps_name in ignored_cps:
-            cps['cluster_profile_sets'][cps_name] = list(cps_data.keys())
-
-    cps['tests_allowlist'] = CLUSTER_PROFILE_SETS_IGNORE['tests_allowlist']
-
-    print(json.dumps(cps, indent=2))
-
-if args.print_cps:
-    print_cluster_profile_set_details()
-else:
-    generate_config()
+generate_config()

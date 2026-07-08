@@ -1,10 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# Load environment
-# commented
-## source ${SHARED_DIR}/dpf-env
-
 echo "Checking access to SHARED_DIR ..."
 echo "Testing SHARED_DIR" > ${SHARED_DIR}/testing.txt
 ls -ltra ${SHARED_DIR}
@@ -25,32 +21,32 @@ chmod 600 /tmp/id_rsa
 # Define SSH command with explicit options (don't rely on ~/.ssh/config)
 SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
-### DEBUG: add a long timeout to troubleshoot from pod
-## echo "Sleeping for 999999999 seconds ...."
-## sleep 999999999
-
 # Test SSH connection
 echo "Testing SSH connection to ${REMOTE_HOST}..."
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} echo 'SSH connection successful'; then
-    echo "SSH setup complete and tested successfully"
+  echo "SSH setup complete and tested successfully"
 else
-    echo "ERROR: Failed to connect to hypervisor ${REMOTE_HOST}"
-    echo "Debug information:"
-    echo "- Checking if SSH key exists:"
-    ls -la /tmp/id_rsa
-    echo "- Testing SSH connectivity with verbose output:"
-    ssh -v ${SSH_OPTS} root@${REMOTE_HOST} echo 'test' || true
-    exit 1
+  echo "ERROR: Failed to connect to hypervisor ${REMOTE_HOST}"
+  echo "Debug information:"
+  echo "- Checking if SSH key exists:"
+  ls -la /tmp/id_rsa
+  echo "- Testing SSH connectivity with verbose output:"
+  ssh -v ${SSH_OPTS} root@${REMOTE_HOST} echo 'test' || true
+  exit 1
 fi
 
 # Bypassing env vars set in prepare-environment for now
-## OPENSHIFT_DPF_BRANCH="dpf-25.10"
 # This needs to be main branch
 OPENSHIFT_DPF_BRANCH="main"
 OPENSHIFT_DPF_GITHUB_REPO_URL="https://github.com/rh-ecosystem-edge/openshift-dpf.git"
 CLUSTER_NAME="doca8"
 REMOTE_MAIN_WORK_DIR="/root/${CLUSTER_NAME}/ci"
-ENV_FILE="/root/${CLUSTER_NAME}/ci/.env_${CLUSTER_NAME}"
+
+# Check if target bastion is in maintenance mode
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f /root/${CLUSTER_NAME}/pause"; then
+  echo "The cluster is in maintenance mode. Remove the file /root/${CLUSTER_NAME}/pause in the bastion host when the maintenance is over"
+  exit 1
+fi
 
 # store last openshift-dpf install dir on hypervisor
 REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
@@ -58,12 +54,6 @@ REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh
 echo "Deploying OpenShift cluster with DPF on host ${REMOTE_HOST}"
 echo "Remote Main Working directory on hypervisor: ${REMOTE_MAIN_WORK_DIR}"
 echo "Cluster name: ${CLUSTER_NAME}"
-echo "Env file: ${ENV_FILE}"
-
-
-# Create logs directory for artifacts 
-## LOGS_DIR="${ARTIFACT_DIR}/deployment-logs"
-## mkdir -p ${LOGS_DIR}
 
 # Verify remote work directory exists
 echo "Verifying remote work directory exists..."
@@ -78,9 +68,6 @@ REMOTE_LOGS_DIR="${REMOTE_MAIN_WORK_DIR}/deployment-logs"
 echo "Remote logs directory on hypervisor: ${REMOTE_LOGS_DIR}"
 
 datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
-
-# Start deployment with logging
-## DEPLOYMENT_LOG="${REMOTE_WORK_DIR}/logs/make_all_$(date +%Y%m%d_%H%M%S).log"
 
 CLEAN_ALL_LOG="${REMOTE_LOGS_DIR}/make_clean-all_${datetime_string}.log"
 echo "Remote make clean-all logs directory on hypervisor: ${CLEAN_ALL_LOG}"
@@ -103,15 +90,29 @@ else
   exit 1
 fi
 
+# If running in a PR job for openshift-dpf, checkout the PR branch
+if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "openshift-dpf" ]]; then
+  echo "PR job detected: checking out PR #${PULL_NUMBER} on the remote host"
+  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; \
+    git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER}; \
+    git checkout pr-${PULL_NUMBER}; \
+    git rebase ${OPENSHIFT_DPF_BRANCH}"; then
+    echo "Successfully checked out PR #${PULL_NUMBER}"
+  else
+    echo "ERROR: Failed to checkout PR #${PULL_NUMBER}"
+    exit 1
+  fi
+fi
+
 REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
 echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
 
 echo "Checking if github repo branch was cloned successfully"
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
-   env; \
-   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
-   git status; \
-   git log -1"; then
+  env; \
+  cd ${REMOTE_WORK_DIR}/openshift-dpf; \
+  git status; \
+  git log -1"; then
   echo "Git repository verified successfully"
 else
   echo "ERROR: Failed to verify git repository at ${REMOTE_WORK_DIR}/openshift-dpf"
@@ -148,16 +149,16 @@ echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hyp
 
 echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
-   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
-   pwd; \
-   env; \
-   set -a; \
-   source env.user_${CLUSTER_NAME}; \
-   env; \
-   set +a; \
-   make generate-env; \
-   ls -ltra .env; \
-   cat .env"; then
+  cd ${REMOTE_WORK_DIR}/openshift-dpf; \
+  pwd; \
+  env; \
+  set -a; \
+  source env.user_${CLUSTER_NAME}; \
+  env; \
+  set +a; \
+  make generate-env; \
+  ls -ltra .env; \
+  cat .env"; then
   echo ".env file from sourced env.user_${CLUSTER_NAME} was generated successfully"
 else
   echo "ERROR: Failed to generate .env file from sourced env.user_${CLUSTER_NAME} file"
@@ -181,14 +182,6 @@ else
   exit 1
 fi
 
-### DEBUG: add a long timeout to troubleshoot from pod
-### echo "Sleeping for 999999999 seconds ...."
-## sleep 999999999
-## echo "Sleeping for 1800 seconds ...."
-## sleep 1800
-
-echo "Sleeping for 600 seconds ...."
-sleep 600
 
 # SSH session to hypervisor
 echo "Starting DPF deployment with 'make all'..."
@@ -202,34 +195,34 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
   mkdir -p ${REMOTE_LOGS_DIR} ; \
   make clean-all 2>&1 | tee ${CLEAN_ALL_LOG}"; then
-  
-    CLEAN_ALL_SUCCESS=true
-    echo "DPF pre-deployment clean-all completed successfully.  CLEAN_ALL_SUCCESS is set to: ${CLEAN_ALL_SUCCESS}"
 
-    echo "Sleeping for 300 seconds ...."
-    sleep 300
+  CLEAN_ALL_SUCCESS=true
+  echo "DPF pre-deployment clean-all completed successfully.  CLEAN_ALL_SUCCESS is set to: ${CLEAN_ALL_SUCCESS}"
 
-    # Execute make all on hypervisor with comprehensive logging
-    echo "Execute make all on hypervisor with comprehensive logging"
+  echo "Sleeping for 300 seconds ...."
+  sleep 300
 
-    if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
-       cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
-       mkdir -p ${REMOTE_LOGS_DIR} ; \
-       make all 2>&1 | tee ${DEPLOYMENT_LOG}"; then
+  # Execute make all on hypervisor with comprehensive logging
+  echo "Execute make all on hypervisor with comprehensive logging"
 
-       DEPLOYMENT_SUCCESS=true
+  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
+    cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
+    mkdir -p ${REMOTE_LOGS_DIR} ; \
+    make all 2>&1 | tee ${DEPLOYMENT_LOG}"; then
 
-       ## Note:  here we often get here but make all failed, so we need to ssh again 
-       ## and run oc commands to confirm the deployment is success and we got the DPU workers ready
-    
-       echo "DPF deployment completed successfully, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
+    DEPLOYMENT_SUCCESS=true
 
-    else
-        DEPLOYMENT_SUCCESS=false
-        echo "ERROR: DPF deployment failed, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
-        echo "Check deployment logs at: ${DEPLOYMENT_LOG}"
-        exit 1
-    fi
+    # Note:  here we often get here but make all failed, so we need to ssh again
+    # and run oc commands to confirm the deployment is success and we got the DPU workers ready
+
+    echo "DPF deployment completed successfully, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
+
+  else
+    DEPLOYMENT_SUCCESS=false
+    echo "ERROR: DPF deployment failed, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
+    echo "Check deployment logs at: ${DEPLOYMENT_LOG}"
+    exit 1
+  fi
 
 else
   CLEAN_ALL_SUCCESS=false
@@ -237,80 +230,5 @@ else
   exit 1
 fi
 
-# Need basic oc commands to verify make all step passed
+# To Do: add basic oc commands to verify make all step passed
 
-
-#### Global comment:
-: <<'GLOBALCOMMENT'
-
-# Copy deployment logs back for analysis
-echo "Copying deployment logs for artifact collection..."
-scp -r ${REMOTE_HOST}:${REMOTE_WORK_DIR}/logs/* ${LOGS_DIR}/ || echo "Some logs could not be copied"
-
-# Copy kubeconfig if deployment succeeded
-if [[ "${DEPLOYMENT_SUCCESS}" == "true" ]]; then
-    echo "Copying kubeconfig from hypervisor..."
-    
-    # Check for kubeconfig files
-    if ssh ${REMOTE_HOST} "cd ${REMOTE_WORK_DIR} && test -f kubeconfig"; then
-        scp ${REMOTE_HOST}:${REMOTE_WORK_DIR}/kubeconfig ${SHARED_DIR}/kubeconfig
-        echo "Kubeconfig copied successfully"
-    elif ssh ${REMOTE_HOST} "cd ${REMOTE_WORK_DIR} && test -f ${CLUSTER_NAME}.kubeconfig"; then
-        scp ${REMOTE_HOST}:${REMOTE_WORK_DIR}/${CLUSTER_NAME}.kubeconfig ${SHARED_DIR}/${CLUSTER_NAME}.kubeconfig
-        echo "Hosted cluster kubeconfig copied successfully"
-    else
-        echo "WARNING: Could not find kubeconfig file"
-        ssh ${REMOTE_HOST} "cd ${REMOTE_WORK_DIR} && ls -la *.kubeconfig kubeconfig" || echo "No kubeconfig files found"
-        DEPLOYMENT_SUCCESS=false
-    fi
-else
-    echo "Deployment failed, skipping kubeconfig copy"
-fi
-
-# Validate cluster accessibility if kubeconfig exists
-if [[ "${DEPLOYMENT_SUCCESS}" == "true" && -f ${SHARED_DIR}/kubeconfig ]]; then
-    echo "Validating cluster accessibility..."
-    export KUBECONFIG=${SHARED_DIR}/kubeconfig
-    
-    # Test cluster connectivity
-    if oc get nodes &>/dev/null; then
-        echo "Cluster is accessible via kubeconfig"
-        
-        # Get basic cluster info for artifacts
-        oc get nodes > ${LOGS_DIR}/cluster-nodes.txt
-        oc get co > ${LOGS_DIR}/cluster-operators.txt || echo "Could not get cluster operators"
-        oc version > ${LOGS_DIR}/cluster-version.txt || echo "Could not get cluster version"
-        
-        echo "Cluster validation completed successfully"
-    else
-        echo "ERROR: Cannot access cluster with provided kubeconfig"
-        DEPLOYMENT_SUCCESS=false
-    fi
-fi
-
-# Collect hypervisor status for debugging
-echo "Collecting hypervisor status for artifacts..."
-ssh ${REMOTE_HOST} "df -h" > ${LOGS_DIR}/hypervisor-disk-usage.txt || true
-ssh ${REMOTE_HOST} "free -h" > ${LOGS_DIR}/hypervisor-memory-usage.txt || true
-ssh ${REMOTE_HOST} "virsh list --all" > ${LOGS_DIR}/hypervisor-vms.txt || true
-
-# Export deployment status for test steps
-echo "DEPLOYMENT_SUCCESS=${DEPLOYMENT_SUCCESS}" >> ${SHARED_DIR}/dpf-env
-
-
-
-# Final status check
-if [[ "${DEPLOYMENT_SUCCESS}" == "true" ]]; then
-    echo "DPF deployment completed successfully!"
-    echo "Cluster: ${CLUSTER_NAME}"
-    echo "Kubeconfig available at: ${SHARED_DIR}/kubeconfig"
-    echo "Ready for testing..."
-else
-    echo "💥 DPF deployment failed!"
-    echo "Check logs in: ${LOGS_DIR}/"
-    echo "Remote logs: ${REMOTE_WORK_DIR}/logs/"
-    exit 1
-fi
-
-## end of global multi-line comment
-GLOBALCOMMENT

@@ -74,6 +74,7 @@ presubmits:
         - --ignore=openshift-logging/extended-logging-tests-interop
         - --ignore=Azure/ARO-HCP
         - --ignore=rhbk/sso-test
+        - --ignore=openshift-priv/kubernetes-sigs-resource-state-metrics
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -137,6 +138,7 @@ presubmits:
         - --ignore=jws-qe/interop-ocp-ci
         - --ignore=Azure/ARO-HCP
         - --ignore=rhbk/sso-test
+        - --ignore=openshift-priv/kubernetes-sigs-resource-state-metrics
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -250,6 +252,38 @@ presubmits:
             cpu: 10m
       serviceAccountName: secret-bootstrap
     trigger: (?m)^/test( | .* )ci-secret-bootstrap-config-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: core-ci
+    context: ci/prow/cluster-manifest-verifier
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-cluster-manifest-verifier
+    rerun_command: /test cluster-manifest-verifier
+    run_if_changed: ^clusters/
+    spec:
+      containers:
+      - args:
+        - --release-repo-dir=.
+        command:
+        - cluster-manifest-verifier
+        env:
+        - name: ARGOCD_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: clientSecret
+              name: cluster-manifest-verifier-argocd
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_cluster-manifest-verifier_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )cluster-manifest-verifier,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -495,7 +529,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260602-e7f2be80c
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260702-ef12e757d
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -883,7 +917,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-main-release-config
     rerun_command: /test release-config
-    run_if_changed: ^core-services/release-controller/_releases/.*
+    run_if_changed: ^(core-services/release-controller/_releases/.*|core-services/release-controller/release-qualifiers.yaml)$
     spec:
       containers:
       - args:

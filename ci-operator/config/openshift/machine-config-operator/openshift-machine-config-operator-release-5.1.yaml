@@ -112,7 +112,11 @@ tests:
     - ref: agent-e2e-compact-ipv4-iso-no-registry-validation
     - as: iri-e2e-step
       cli: latest
-      commands: make test-e2e-iri
+      commands: |
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        make test-e2e-iri
+        TAGS=iri_delete make test-e2e-iri
       from: src
       resources:
         requests:
@@ -522,7 +526,7 @@ tests:
 - always_run: false
   as: e2e-openstack
   optional: true
-  run_if_changed: .*/on-prem/.*|.*openstack.*
+  pipeline_run_if_changed: .*/on-prem/.*|.*openstack.*
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -714,7 +718,11 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-gcp-mco-disruptive
@@ -729,7 +737,11 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-azure-ovn-multidisk-techpreview

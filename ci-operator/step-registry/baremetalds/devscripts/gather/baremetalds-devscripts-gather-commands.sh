@@ -23,8 +23,8 @@ function getlogs() {
 # Gather logs regardless of what happens after this
 trap getlogs EXIT
 
-if [[ ! -d "${ARTIFACT_DIR}/root/dev-scripts/logs" ]]; then
-  echo "### Dev-scripts logs not found, collecting as fallback..."
+if [[ ! -f "${SHARED_DIR}/devscripts-logs-collected" ]]; then
+  echo "### Dev-scripts logs not collected by setup, collecting as fallback..."
   timeout -s 9 5m ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs 2>/dev/null | tar -C "${ARTIFACT_DIR}" -xzf - || true
   if [[ -d "${ARTIFACT_DIR}/root/dev-scripts/logs" ]]; then
     find "${ARTIFACT_DIR}/root/dev-scripts/logs" -type f -exec sed -i '
@@ -60,6 +60,22 @@ sos report --batch \
   -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,dnf \
   -k podman.all -k podman.logs \
   --tmp-dir /tmp/artifacts
+
+# Strip libvirt auth token from sosreport archives. The libvirt plugin
+# collects /run/libvirt/ which includes the daemon authentication token
+# at /run/libvirt/common/system.token — sensitive data that must not
+# appear in CI artifacts.
+for sos_tar in /tmp/artifacts/sosreport-*.tar.xz; do
+  [ -f "\$sos_tar" ] || continue
+  if tar tf "\$sos_tar" | grep -F "run/libvirt/common/system.token" >/dev/null; then
+    tmpdir=\$(mktemp -d)
+    tar xf "\$sos_tar" -C "\$tmpdir"
+    find "\$tmpdir" -path "*/run/libvirt/common/system.token" -delete
+    tar cf - -C "\$tmpdir" . | xz > "\${sos_tar}.new" && mv "\${sos_tar}.new" "\$sos_tar"
+    rm -rf "\$tmpdir"
+    echo "Stripped system.token from \$sos_tar"
+  fi
+done
 
 echo "Get libvirt logs..."
 tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs.tar.gz" --transform "s?^\.?libvirt-logs?" .

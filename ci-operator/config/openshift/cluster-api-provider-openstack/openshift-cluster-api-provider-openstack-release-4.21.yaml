@@ -1,12 +1,3 @@
-base_images:
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
-  hypershift-tests:
-    name: hypershift-tests
-    namespace: hypershift
-    tag: latest
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -56,18 +47,6 @@ tests:
     make -C openshift verify
   container:
     from: src
-- as: e2e-hypershift
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vexxhost-quota-slice
-    test:
-    - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-nested
 - as: e2e-openstack-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

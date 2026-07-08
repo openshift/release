@@ -1,0 +1,43 @@
+ref:
+  as: rosa-e2e-silence-alerts
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: cli
+  commands: rosa-e2e-silence-alerts-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 50Mi
+  timeout: 3m0s
+  grace_period: 30s
+  credentials:
+  - namespace: ci
+    name: rhobs-oidc-production
+    mount_path: /usr/local/rhobs-oidc
+  env:
+  - name: RHOBS_ENV
+    default: production
+    documentation: |-
+      RHOBS environment to create silences on.
+      Valid values: production, staging.
+  - name: SILENCE_MATCHER_NAME
+    default: _id
+    documentation: |-
+      Alert label name to match for silencing.
+  - name: SILENCE_MATCHER_VALUE
+    default: "cs-ci-.*"
+    documentation: |-
+      Regex pattern to match against the label. All alerts matching
+      this pattern will be silenced for the duration of the job.
+  - name: SILENCE_DURATION_HOURS
+    default: "6"
+    documentation: |-
+      Duration of the silence in hours. Should match or slightly exceed
+      the job timeout to ensure alerts stay silenced for the full run.
+  documentation: |-
+    Creates alertmanager silences on all RHOBS cells for the specified
+    environment, matching alerts by a regex pattern on a label (default:
+    _id =~ "cs-ci-.*"). Used to suppress alerts from FVT test clusters
+    during production CI runs. Silence IDs are saved to SHARED_DIR for
+    cleanup by the rosa-e2e-unsilence-alerts post-step.

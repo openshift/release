@@ -16,10 +16,11 @@ fi
 
 oc registry login --to /tmp/config.json 
 
-# QCI proxy authenticates any SA that belongs to the build farm
-if [ -f /var/run/secrets/kubernetes.io/serviceaccount/token ]; then
-  t="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
-  oc registry login --to=/tmp/config.json --auth-basic="default:${t}" --registry=quay-proxy.ci.openshift.org
+if [ -d /etc/qci-robot-credentials ]; then
+  cred="$(cat /etc/qci-robot-credentials/username):$(cat /etc/qci-robot-credentials/password)"
+  oc registry login --auth-basic="$cred" --to=/tmp/config.json --registry=quay.io/openshift/ci
+else
+  echo "WARN: /etc/qci-robot-credentials has not been provided"
 fi
 
 failures=0 

@@ -107,9 +107,7 @@ then
   fi
   echo "mirror registry is ${mirror_registry}"
 
-  mirrored_index=${mirror_registry}/olm-index/redhat-operator-index
-  OLM_CATALOGS_R_OVERRIDES=registry.redhat.io/redhat/certified-operator-index=${mirrored_index},registry.redhat.io/redhat/community-operator-index=${mirrored_index},registry.redhat.io/redhat/redhat-marketplace-index=${mirrored_index},registry.redhat.io/redhat/redhat-operator-index=${mirrored_index}
-
+  OLM_CATALOGS_R_OVERRIDES=registry.redhat.io/redhat=${mirror_registry}/olm-index
   PAYLOADIMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
   RELEASE_IMAGE="${PAYLOADIMAGE}"
 

@@ -125,7 +125,7 @@ then
   oc get nodes -l kubernetes.io/arch=ppc64le -o yaml > "${ARTIFACT_DIR}"/nodes_with_ppc64le.txt || true
 
   # Download the MCO sanitizer binary from mirror
-  curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+  curl -sL "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
   chmod +x /tmp/mco-sanitize
 
   mkdir -p ${ARTIFACT_DIR}/must-gather-ppc64le

@@ -1,0 +1,45 @@
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: rosa-cluster-lease-manager
+  namespace: rosa-cluster-lease
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rosa-cluster-lease-manager-token
+  namespace: rosa-cluster-lease
+type: Opaque
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: rosa-cluster-lease-configmap-manager
+  namespace: rosa-cluster-lease
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - create
+  - update
+  - patch
+  - delete
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: rosa-cluster-lease-configmap-manager
+  namespace: rosa-cluster-lease
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rosa-cluster-lease-configmap-manager
+subjects:
+- kind: ServiceAccount
+  name: rosa-cluster-lease-manager
+  namespace: rosa-cluster-lease

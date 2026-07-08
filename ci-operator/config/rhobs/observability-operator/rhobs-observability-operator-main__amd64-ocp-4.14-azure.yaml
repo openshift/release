@@ -8,10 +8,7 @@ base_images:
     namespace: ci
     tag: latest
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+  from_repository: true
 releases:
   latest:
     candidate:
@@ -34,15 +31,19 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{end}}'
+    report_template: |-
+      *COO image source:* FBC from Konflux
+      *OCP Version:* 4.14
+      *Environment:* Azure
+
+      {{if eq .Status.State "success"}} :slack-green: {{else}} :failed: {{end}}Job *{{.Spec.Job}}* with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
   steps:
     cluster_profile: azure-observability
     env:
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
-      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: registry-proxy.engineering.redhat.com/rh-osbs/iib@sha256:6f9055bc4350a2d6e4d3b33fe251926f0641bc05bdf2c2a36bb79a4e9fa3ad8c
+      COMPUTE_NODE_TYPE: Standard_D4s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8s_v3
+      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: registry-proxy.engineering.redhat.com/rh-osbs/iib@sha256:fa6498538a158c058cd31ac1747003e796163c8e36cd4be25d3653be4ef4413c
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"}

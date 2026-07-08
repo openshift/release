@@ -15,8 +15,8 @@ set_proxy() {
     echo "setting the proxy"
     echo "source ${SHARED_DIR}/proxy-conf.sh"
     source "${SHARED_DIR}/proxy-conf.sh"
-    export no_proxy=mirror.openshift.com,github.com,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
-    export NO_PROXY=mirror.openshift.com,github.com,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
+    export no_proxy=mirror.openshift.com,openshift-mirror-list.ci-systems.workers.dev,github.com,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
+    export NO_PROXY=mirror.openshift.com,openshift-mirror-list.ci-systems.workers.dev,github.com,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
   else
     echo "no proxy setting. skipping this step"
   fi
@@ -266,7 +266,7 @@ function set_CA_for_nodes () {
 # Applicable for 'disconnected' env
 install_oc_mirror() {
   echo "Installing the latest oc-mirror client..."
-  run "cd /tmp && curl --noproxy '*' -k -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && rm -f oc-mirror.tar.gz"
+  run "cd /tmp && curl --noproxy '*' -k -L -o oc-mirror.tar.gz https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && rm -f oc-mirror.tar.gz"
   if ls /tmp/oc-mirror > /dev/null; then
     chmod +x /tmp/oc-mirror
     run "oc version -o yaml"
