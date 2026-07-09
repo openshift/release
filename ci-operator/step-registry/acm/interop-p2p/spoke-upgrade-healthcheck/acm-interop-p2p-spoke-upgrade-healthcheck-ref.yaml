@@ -1,0 +1,34 @@
+ref:
+  as: acm-interop-p2p-spoke-upgrade-healthcheck
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  grace_period: 10m
+  commands: acm-interop-p2p-spoke-upgrade-healthcheck-commands.sh
+  timeout: 5h0m0s
+  cli: latest
+  resources:
+    limits:
+      cpu: "1"
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: ACM_SPOKE_MCP_MINUTES_PER_NODE
+    default: "35"
+    documentation: Minutes of MCP wait budget per node (cucushift default 20). Rehearsal #2065916519451201536 needed ~33m/node on a 6-node spoke.
+  - name: ACM_SPOKE_MCP_READY_TIMEOUT_MINUTES
+    default: "210"
+    documentation: Minimum MCP wait budget in minutes regardless of node count. Floor above rehearsal failure (~196m) before cucushift 20m/node cap (120m on 6 nodes).
+  - name: ACM_SPOKE_CO_READY_TIMEOUT_MINUTES
+    default: "45"
+    documentation: Cluster operator stability wait budget in minutes (cucushift default 30). Poll interval is 60s.
+  documentation: |-
+    Post-upgrade health check on the ACM managed spoke cluster. Uses the same logic as
+    cucushift-upgrade-healthcheck against ${SHARED_DIR}/managed-cluster-kubeconfig (MCP, cluster
+    operators, nodes, pods). Requires acm-interop-p2p-cluster-install.
+    Step timeout (5h) covers max(MCP floor, nodes×MCP-per-node) + CO wait + margin; grace_period
+    allows failure diagnostics via EXIT trap.
+    On failure, writes spoke-<name>-upgrade-healthcheck-failure.txt to ${ARTIFACT_DIR} (ClusterVersion,
+    unhealthy MCP/node/CO describe, MCO pods) via EXIT trap before the step exits.

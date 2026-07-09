@@ -1,10 +1,10 @@
 base_images:
   acmqe-grc-test:
-    name: "2.15"
+    name: "2.16"
     namespace: acm-qe
     tag: acmqe-grc-test
   application-ui-test:
-    name: "2.15"
+    name: "2.16"
     namespace: acm-qe
     tag: application-ui-test
   cli:
@@ -19,19 +19,27 @@ base_images:
     name: autotest
     namespace: acm-qe
     tag: fetch-managed-clusters
+  installer:
+    name: "4.21"
+    namespace: ocp
+    tag: installer
   multicluster-observability-operator-opp:
-    name: "2.15"
+    name: "2.16"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
   openshift-virtualization-tests:
     name: openshift-virtualization-tests
     namespace: ci
     tag: latest
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.20
+    tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
   - dockerfile_literal: |
@@ -53,13 +61,17 @@ releases:
   initial:
     release:
       channel: stable
-      version: "4.20"
+      version: "4.21"
   latest:
+    release:
+      channel: stable
+      version: "4.21"
+  target:
     prerelease:
       product: ocp
       version_bounds:
-        lower: 4.21.0-rc.0
-        upper: 4.21.0-rc.20
+        lower: 4.22.0-rc.0
+        upper: 4.22.0-rc.20
 resources:
   '*':
     requests:
@@ -72,11 +84,11 @@ tests:
     cluster_profile: aws-cspi-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
     env:
-      ACM_CLUSTER_UPGRADE_TARGET_CHANNEL: candidate-4.21
+      ACM_CLUSTER_UPGRADE_TARGET_CHANNEL: candidate-4.22
       ACM_SPOKE_CLUSTER_COUNT: "1"
-      ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.20"
+      ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.21"
       ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
       ACM_SPOKE_CP_TYPE: m6a.2xlarge
       ACM_SPOKE_WORKER_TYPE: c5n.metal
@@ -116,20 +128,20 @@ tests:
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.21-p2p","ipi-aws-p2p","mpiit-acm-virt","mpiit_product2product","mpiit_virt"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-p2p","ipi-aws-p2p","mpiit-acm-virt","mpiit_product2product","mpiit_virt"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: vshakya@redhat.com
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA","mpiit_p2p"]'
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8652
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      OCP_VERSION: "4.21"
+      OCP_VERSION: "4.22"
       ODF_DEFAULT_STORAGE_CLASS: ocs-storagecluster-ceph-rbd-virtualization
-      ODF_OPERATOR_CHANNEL: stable-4.20
+      ODF_OPERATOR_CHANNEL: stable-4.21
       OPERATORS: |
         [
-          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.15", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
-      SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL: candidate-4.21
+      SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL: candidate-4.22
       USER_TAGS: |
         scenario acm-cnv-p2p
     leases:
@@ -157,8 +169,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     - ref: install-operators
-    - ref: p2p-install-odf-hub
     - ref: acm-mch
+    - ref: p2p-install-odf-hub
     - ref: acm-interop-p2p-cluster-install
     - ref: acm-fetch-managed-clusters
     - ref: p2p-install-odf-spokes
@@ -179,4 +191,4 @@ zz_generated_metadata:
   branch: master
   org: RedHatQE
   repo: interop-testing
-  variant: acm-cnv-ocp-4.21-p2p
+  variant: acm-cnv-ocp-4.22-p2p

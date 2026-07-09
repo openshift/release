@@ -1,0 +1,45 @@
+ref:
+  as: interop-tests-openshift-virtualization-upgrade-prep
+  documentation: |-
+    Prepares the ACM spoke cluster for CNV upgrade tests. Runs before
+    interop-tests-openshift-virtualization-upgrade-tests.
+    Resolves CNV_TARGET_VERSION from the spoke packagemanifest and writes it to
+    ${SHARED_DIR}/cnv-target-version. Configures storage class, ODF snapshot class,
+    CDI StorageProfile RWX, restarts ODF/HPP CSI to flush stale locks, waits for boot
+    image DataImportCrons, prepares OLM install plans for the target CSV, and slows
+    down HCO workload update so VMIs remain outdated for observability metric tests.
+  from: cli
+  commands: interop-tests-openshift-virtualization-upgrade-prep-commands.sh
+  timeout: 2h30m0s
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CNV_TARGET_MAJOR_MINOR
+    default: "4.21"
+    documentation: |-
+      When set, resolves the latest available patch version (e.g. 4.21.0) from the spoke
+      packagemanifest on CNV_CHANNEL and sets CNV_TARGET_VERSION. Leave empty to use
+      CNV_TARGET_VERSION as-is.
+  - name: CNV_TARGET_VERSION
+    default: "4.21.0"
+    documentation: Target CNV version for the upgrade. Overridden when CNV_TARGET_MAJOR_MINOR is set.
+  - name: CNV_CHANNEL
+    default: "stable"
+    documentation: CNV subscription channel for upgrade (stable, candidate, nightly).
+  - name: CNV_TARGET_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: |-
+      StorageClass for CNV boot images. Must match deploy-odf ODF_DEFAULT_STORAGE_CLASS.
+      deploy-odf must complete before this step.
+  - name: CNV_DV_NAMESPACE_PVC_WAIT_TIMEOUT
+    default: "600"
+    documentation: Max seconds to wait for openshift-virtualization-os-images PVCs to reach Bound/idle.
+  - name: CNV_DV_NAMESPACE_PVC_RETRY_WAIT_TIMEOUT
+    default: "300"
+    documentation: Max seconds to retry PVC idle wait after force-deleting stuck PVCs in boot image prep.
+  - name: CNV_BOOT_IMPORT_CRON_UPTODATE_WAIT_TIMEOUT
+    default: "20m"
+    documentation: Max wait per DataImportCron UpToDate condition during boot image prep.

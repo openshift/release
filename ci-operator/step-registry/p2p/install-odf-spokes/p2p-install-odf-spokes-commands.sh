@@ -69,11 +69,12 @@ LoadSpokeKubeconfigs() {
     printf '%s\n' "${spokeKubeconfigsArr[@]}"
 }
 
-# DumpSpokeOdfDiagnostics — write non-secret cluster state to ARTIFACT_DIR on failure.
+# DumpSpokeOdfDiagnostics — write non-secret cluster state and ODF must-gather to ARTIFACT_DIR on failure.
 DumpSpokeOdfDiagnostics() {
     typeset clusterName="${1:?}"
     typeset kubeconfig="${2:?}"
     typeset artifactDir="${ARTIFACT_DIR}/odf-spoke-${clusterName}"
+    typeset odfVersion="${ODF_OPERATOR_CHANNEL#stable-}"
 
     mkdir -p "${artifactDir}"
     oc --kubeconfig="${kubeconfig}" get storagecluster,cephcluster,noobaa,csv,subscription \
@@ -85,6 +86,9 @@ DumpSpokeOdfDiagnostics() {
     oc --kubeconfig="${kubeconfig}" describe storagecluster "${ODF_STORAGE_CLUSTER_NAME}" \
         -n "${ODF_INSTALL_NAMESPACE}" \
         > "${artifactDir}/storagecluster-describe.txt" 2>&1 || true
+    oc --kubeconfig="${kubeconfig}" adm must-gather \
+        --image="quay.io/rhceph-dev/ocs-must-gather:latest-${odfVersion}" \
+        --dest-dir="${artifactDir}/ocs_must_gather" || true
 }
 
 # ResolveStartingCsv — look up channel head CSV from packagemanifest on the spoke.
@@ -179,9 +183,20 @@ WaitStorageClusterAndNoobaaReady() {
 }
 
 # ConfigureDefaultStorage — set virtualization SC and snapshot class as cluster defaults.
+# When ODF_DEFAULT_STORAGE_CLASS ends in -ceph-rbd-virtualization the SC only exists after
+# the KubeVirt virtualmachines.kubevirt.io CRD is registered (by CNV). If CNV is installed
+# after this step (the normal p2p upgrade sequence), the SC will not exist yet — skip the
+# annotation here; the subsequent p2p-acm-cnv-install-policy step's ConfigureOdfVirtStorageClassDefaults
+# waits for and annotates the virt SC once ODF creates it in response to the KubeVirt CRD.
 ConfigureDefaultStorage() {
     typeset kubeconfig="${1:?}"
     typeset scName=""
+
+    if [[ "${ODF_DEFAULT_STORAGE_CLASS}" == *-ceph-rbd-virtualization ]] && \
+       ! oc --kubeconfig="${kubeconfig}" get storageclass "${ODF_DEFAULT_STORAGE_CLASS}" 1>/dev/null; then
+        : "Virt StorageClass ${ODF_DEFAULT_STORAGE_CLASS} not present yet (CNV not installed); skipping default annotation — will be set by p2p-acm-cnv-install-policy"
+        return 0
+    fi
 
     while IFS= read -r scName; do
         [[ -n "${scName}" ]] || continue
@@ -210,64 +225,58 @@ InstallOdfOnSpoke() {
     typeset clusterName="${1:?}"
     typeset kubeconfig="${2:?}"
     typeset resultFile="${3:?}"
-    typeset startingCsv="" startingCsvYaml="" ogName=""
+    typeset startingCsv="" ogName=""
+    typeset targetOgName="${ODF_INSTALL_NAMESPACE}-operatorgroup"
 
     (
-        oc --kubeconfig="${kubeconfig}" apply -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: "${ODF_INSTALL_NAMESPACE}"
-  labels:
-    openshift.io/cluster-monitoring: "true"
-EOF
+        # Namespace: oc create namespace gives backward/forward API version compatibility.
+        oc --kubeconfig="${kubeconfig}" create namespace "${ODF_INSTALL_NAMESPACE}" \
+            --dry-run=client -o yaml --save-config | oc --kubeconfig="${kubeconfig}" apply -f -
 
+        # Delete any pre-existing OperatorGroup that is NOT our target. OLM rejects multiple
+        # OperatorGroups per namespace, so a conflicting leftover from a prior run must be removed
+        # before we apply ours. Skipping the target means re-runs do not destroy an existing OG.
         while IFS= read -r ogName; do
             [[ -n "${ogName}" ]] || continue
+            [[ "${ogName}" == "${targetOgName}" ]] && continue
             oc --kubeconfig="${kubeconfig}" delete operatorgroup "${ogName}" \
                 -n "${ODF_INSTALL_NAMESPACE}" --ignore-not-found 1>/dev/null
         done < <(oc --kubeconfig="${kubeconfig}" get operatorgroup -n "${ODF_INSTALL_NAMESPACE}" \
             -o json | jq -r '.items[].metadata.name' || true)
 
-        oc --kubeconfig="${kubeconfig}" apply -f - <<EOF
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: "${ODF_INSTALL_NAMESPACE}-operatorgroup"
-  namespace: "${ODF_INSTALL_NAMESPACE}"
-spec:
-  targetNamespaces:
-  - "${ODF_INSTALL_NAMESPACE}"
-EOF
+        # OperatorGroup: jq marshals all variable values into JSON; oc apply is idempotent.
+        jq -cn \
+            --arg name "${targetOgName}" \
+            --arg ns "${ODF_INSTALL_NAMESPACE}" \
+            '{
+                apiVersion: "operators.coreos.com/v1",
+                kind: "OperatorGroup",
+                metadata: {name: $name, namespace: $ns},
+                spec: {targetNamespaces: [$ns]}
+            }' | oc --kubeconfig="${kubeconfig}" apply -f -
 
         startingCsv="$(ResolveStartingCsv "${kubeconfig}" || true)"
-        if [[ -n "${startingCsv}" ]]; then
-            startingCsvYaml="  startingCSV: \"${startingCsv}\""
-        else
-            startingCsvYaml=""
-        fi
 
-        while IFS= read -r csvName; do
-            [[ -n "${csvName}" ]] || continue
-            oc --kubeconfig="${kubeconfig}" delete csv "${csvName}" \
-                -n "${ODF_INSTALL_NAMESPACE}" --ignore-not-found 1>/dev/null
-        done < <(oc --kubeconfig="${kubeconfig}" get csv -n "${ODF_INSTALL_NAMESPACE}" \
-            -o json | jq -r '.items[].metadata.name' || true)
-
-        oc --kubeconfig="${kubeconfig}" apply -f - <<EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: ${ODF_SUBSCRIPTION_NAME}
-  namespace: "${ODF_INSTALL_NAMESPACE}"
-spec:
-  channel: "${ODF_OPERATOR_CHANNEL}"
-  installPlanApproval: Automatic
-  name: ${ODF_SUBSCRIPTION_NAME}
-  source: redhat-operators
-  sourceNamespace: openshift-marketplace
-${startingCsvYaml}
-EOF
+        # Subscription: jq marshals all values and conditionally sets startingCSV.
+        # No CSV pre-deletion — oc apply is idempotent; deleting a live CSV would break ODF on re-run.
+        jq -cn \
+            --arg channel "${ODF_OPERATOR_CHANNEL}" \
+            --arg name "${ODF_SUBSCRIPTION_NAME}" \
+            --arg ns "${ODF_INSTALL_NAMESPACE}" \
+            --arg csv "${startingCsv}" \
+            '{
+                apiVersion: "operators.coreos.com/v1alpha1",
+                kind: "Subscription",
+                metadata: {name: $name, namespace: $ns},
+                spec: {
+                    channel: $channel,
+                    installPlanApproval: "Automatic",
+                    name: $name,
+                    source: "redhat-operators",
+                    sourceNamespace: "openshift-marketplace"
+                }
+            } | if $csv != "" then .spec.startingCSV = $csv else . end' |
+            oc --kubeconfig="${kubeconfig}" apply -f -
 
         WaitCsvSucceeded "${kubeconfig}"
 
@@ -284,39 +293,46 @@ EOF
         oc --kubeconfig="${kubeconfig}" wait --for=create crd/storageclusters.ocs.openshift.io \
             --timeout=5m
 
-        oc --kubeconfig="${kubeconfig}" apply -f - <<EOF
-apiVersion: ocs.openshift.io/v1
-kind: StorageCluster
-metadata:
-  name: "${ODF_STORAGE_CLUSTER_NAME}"
-  namespace: "${ODF_INSTALL_NAMESPACE}"
-  annotations:
-    uninstall.ocs.openshift.io/cleanup-policy: delete
-    uninstall.ocs.openshift.io/mode: graceful
-spec:
-  resourceProfile: balanced
-  managedResources:
-    cephBlockPools:
-      defaultStorageClass: true
-      defaultVirtualizationStorageClass: true
-  storageDeviceSets:
-  - name: ocs-deviceset-${ODF_BACKEND_STORAGE_CLASS}
-    count: 1
-    replica: 3
-    portable: true
-    deviceClass: ssd
-    resources: {}
-    placement: {}
-    dataPVCTemplate:
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: "${ODF_VOLUME_SIZE}"
-        storageClassName: "${ODF_BACKEND_STORAGE_CLASS}"
-        volumeMode: Block
-EOF
+        # StorageCluster: jq marshals all variable values into JSON; oc apply is idempotent.
+        jq -cn \
+            --arg scName "${ODF_STORAGE_CLUSTER_NAME}" \
+            --arg ns "${ODF_INSTALL_NAMESPACE}" \
+            --arg backendSc "${ODF_BACKEND_STORAGE_CLASS}" \
+            --arg size "${ODF_VOLUME_SIZE}" \
+            '{
+                apiVersion: "ocs.openshift.io/v1",
+                kind: "StorageCluster",
+                metadata: {
+                    name: $scName,
+                    namespace: $ns,
+                    annotations: {
+                        "uninstall.ocs.openshift.io/cleanup-policy": "delete",
+                        "uninstall.ocs.openshift.io/mode": "graceful"
+                    }
+                },
+                spec: {
+                    resourceProfile: "balanced",
+                    managedResources: {cephBlockPools: {
+                        defaultStorageClass: true,
+                        defaultVirtualizationStorageClass: true
+                    }},
+                    storageDeviceSets: [{
+                        name: ("ocs-deviceset-" + $backendSc),
+                        count: 1,
+                        replica: 3,
+                        portable: true,
+                        deviceClass: "ssd",
+                        resources: {},
+                        placement: {},
+                        dataPVCTemplate: {spec: {
+                            accessModes: ["ReadWriteOnce"],
+                            resources: {requests: {storage: $size}},
+                            storageClassName: $backendSc,
+                            volumeMode: "Block"
+                        }}
+                    }]
+                }
+            }' | oc --kubeconfig="${kubeconfig}" apply -f -
 
         WaitCephClusterReady "${kubeconfig}"
         WaitStorageClusterAndNoobaaReady "${kubeconfig}"
@@ -342,28 +358,38 @@ mapfile -t spokeKubeconfigsArr < <(LoadSpokeKubeconfigs "${clusterNamesArr[@]}")
 
 resultsDir="$(mktemp -d "${ARTIFACT_DIR}/odf-spoke-install.XXXXXX")"
 
-typeset -a pidsArr=()
 typeset -i failedCount=0 idx waitRc=0
 typeset resultFile="" storedRc=""
 
-for ((idx = 0; idx < ${#clusterNamesArr[@]}; idx++)); do
-    resultFile="${resultsDir}/cluster-$((idx + 1)).result"
-    InstallOdfOnSpoke "${clusterNamesArr[idx]}" "${spokeKubeconfigsArr[idx]}" "${resultFile}" &
-    pidsArr+=($!)
-done
+if (( ${#clusterNamesArr[@]} == 1 )); then
+    # Single spoke: call directly to avoid background subprocess overhead.
+    resultFile="${resultsDir}/cluster-1.result"
+    InstallOdfOnSpoke "${clusterNamesArr[0]}" "${spokeKubeconfigsArr[0]}" "${resultFile}" || true
+    storedRc="$(<"${resultFile}")"
+    [[ "${storedRc}" == "0" ]] || failedCount=1
+else
+    # Multiple spokes: install in parallel so total wall-clock time is ~1x per-spoke
+    # rather than N x per-spoke (each ODF install takes ~60-90 min).
+    typeset -a pidsArr=()
+    for ((idx = 0; idx < ${#clusterNamesArr[@]}; idx++)); do
+        resultFile="${resultsDir}/cluster-$((idx + 1)).result"
+        InstallOdfOnSpoke "${clusterNamesArr[idx]}" "${spokeKubeconfigsArr[idx]}" "${resultFile}" &
+        pidsArr+=($!)
+    done
 
-for ((idx = 0; idx < ${#pidsArr[@]}; idx++)); do
-    resultFile="${resultsDir}/cluster-$((idx + 1)).result"
-    waitRc=0
-    wait "${pidsArr[idx]}" || waitRc=$?
+    for ((idx = 0; idx < ${#pidsArr[@]}; idx++)); do
+        resultFile="${resultsDir}/cluster-$((idx + 1)).result"
+        waitRc=0
+        wait "${pidsArr[idx]}" || waitRc=$?
 
-    if [[ -f "${resultFile}" ]]; then
-        storedRc="$(<"${resultFile}")"
-        [[ "${storedRc}" == "0" ]] || ((++failedCount))
-    elif (( waitRc != 0 )); then
-        ((++failedCount))
-    fi
-done
+        if [[ -f "${resultFile}" ]]; then
+            storedRc="$(<"${resultFile}")"
+            [[ "${storedRc}" == "0" ]] || ((++failedCount))
+        elif (( waitRc != 0 )); then
+            ((++failedCount))
+        fi
+    done
+fi
 
 (( failedCount == 0 ))
 true

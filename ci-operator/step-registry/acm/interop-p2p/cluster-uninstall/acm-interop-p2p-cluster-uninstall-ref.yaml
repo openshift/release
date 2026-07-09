@@ -9,6 +9,13 @@ ref:
       cpu: '1'
       memory: 500Mi
   env:
+  - name: ACM_CLUSTER_MC_DETACH_TIMEOUT_MINUTES
+    default: "10"
+    documentation: |-
+      Minutes to wait for ManagedCluster to be fully detached from ACM after
+      deletion is requested. If the spoke is unreachable, ACM cannot clear its
+      finalizers; the script auto-strips them after this timeout so that Hive
+      infrastructure deprovisioning always proceeds.
   - name: ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES
     default: "60"
     documentation: |-
@@ -23,14 +30,19 @@ ref:
   - name: ACM_CLUSTER_UNINSTALL_FORCE_DELETE_MC
     default: "false"
     documentation: |-
-      When "true", strips all finalizers from ManagedCluster before deletion.
-      Use only as a last resort when normal ACM detach is blocked by a stuck
-      finalizer; stripping finalizers bypasses cleanup hooks.
+      When "true", strips ManagedCluster finalizers immediately before deletion,
+      skipping the normal ACM detach wait. The script also auto-strips finalizers
+      after ACM_CLUSTER_MC_DETACH_TIMEOUT_MINUTES if detach is still blocked.
   documentation: |-
     Uninstalls one or more ACM spoke clusters by deleting ManagedCluster,
     KlusterletAddonConfig, ClusterDeployment, ManagedClusterSetBinding, and
     ManagedClusterSet resources. Waits for Hive ClusterDeprovision to complete
     before returning so that cloud infrastructure is fully cleaned up.
+
+    ManagedCluster deletion uses a timeout-with-auto-strip approach: if ACM cannot
+    clear the cluster's finalizers within ACM_CLUSTER_MC_DETACH_TIMEOUT_MINUTES
+    (e.g. because the spoke is unreachable), finalizers are stripped automatically
+    so that Hive deprovisioning is never blocked.
 
     Cluster names are read from SHARED_DIR (written by acm-interop-p2p-cluster-install):
       - managed-cluster-names    (preferred; one name per line for multi-cluster)
@@ -38,7 +50,8 @@ ref:
       - managed-cluster-name     (fallback; single-cluster backward compatibility)
 
     Env vars consumed:
+      ACM_CLUSTER_MC_DETACH_TIMEOUT_MINUTES   - minutes to wait for ACM detach before auto force-strip (default: 10)
       ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES - per-cluster deprovision wait limit (default: 60)
       ACM_CLUSTER_DEPROVISION_POLL_SECONDS    - poll interval for ClusterDeprovision creation (default: 10)
-      ACM_CLUSTER_UNINSTALL_FORCE_DELETE_MC   - strip ManagedCluster finalizers on delete (default: false)
+      ACM_CLUSTER_UNINSTALL_FORCE_DELETE_MC   - strip ManagedCluster finalizers immediately (default: false)
       SHARED_DIR                              - shared artifact directory (provides cluster name files)
