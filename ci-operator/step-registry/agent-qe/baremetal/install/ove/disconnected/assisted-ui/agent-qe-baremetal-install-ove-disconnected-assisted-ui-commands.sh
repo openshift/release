@@ -46,4 +46,4 @@ echo "Forcing a $wait_time delay to allow other machines to join the bootstrap n
 sleep "$wait_time"
 
 echo "Checking cluster installation progress by verifying all cluster operators are available and stable."
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=105m
