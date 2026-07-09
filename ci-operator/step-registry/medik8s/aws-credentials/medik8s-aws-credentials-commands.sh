@@ -30,6 +30,11 @@ set_proxy() {
     return 0
 }
 
+# Disconnected/air-gapped clusters cannot use CCO CredentialsRequest (no AWS IAM API access).
+# This path creates the fencing Secret directly from cluster profile credentials. Unlike the
+# CCO path (ec2:Describe/Start/Stop/RebootInstances only), profile credentials may be
+# installer-scoped with broader permissions. Prefer .awscred when available for a dedicated
+# least-privilege fencing credential; credentials is the installer fallback.
 create_secret_from_profile() {
     local cred_file="${CLUSTER_PROFILE_DIR}/.awscred"
     [[ ! -f "$cred_file" ]] && cred_file="${CLUSTER_PROFILE_DIR}/credentials"
