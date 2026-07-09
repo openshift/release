@@ -42,11 +42,18 @@ resources:
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: verify
-  commands: |
-    make verify -k --warn-undefined-variables
-  container:
-    from: bin-with-oc
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: verify
+      commands: |
+        make verify -k --warn-undefined-variables
+      from: bin-with-oc
+      resources:
+        requests:
+          cpu: "3"
+          memory: 6Gi
 - as: verify-deps
   commands: |
     make verify-deps -k --warn-undefined-variables
