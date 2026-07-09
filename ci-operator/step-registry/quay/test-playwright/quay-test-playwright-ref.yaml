@@ -1,0 +1,35 @@
+ref:
+  as: quay-test-playwright
+  cli: latest
+  from: playwright-base
+  commands: quay-test-playwright-commands.sh
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+    limits:
+      memory: 8Gi
+  timeout: 3h0m0s
+  grace_period: 15m0s
+  credentials:
+  - namespace: test-credentials
+    name: quay-qe-quay-secret
+    mount_path: /var/run/quay-qe-quay-secret
+  documentation: |-
+    Clone quay/quay at QUAY_SRC_COMMIT, install Playwright, and run
+    e2e tests in three phases: Database auth, OIDC auth (via Keycloak),
+    and LDAP auth (via 389ds). Requires quay-deploy-test-services to
+    have run first.
+  env:
+  - name: QUAY_SRC_COMMIT
+    documentation: |-
+      The quay/quay ref to clone tests from. Accepts a commit SHA,
+      branch name (e.g. redhat-3.17), or tag. For Konflux triggers
+      this is the source commit the image was built from. Should
+      match the deployed Quay version to avoid test/server mismatch.
+    default: "redhat-3.17"
+  - name: PLAYWRIGHT_GREP
+    documentation: |-
+      Playwright --grep filter passed to each phase. Overrides the
+      default phase filtering when set.
+    default: ""

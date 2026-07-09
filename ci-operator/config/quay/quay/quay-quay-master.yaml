@@ -18,23 +18,16 @@ build_root:
     tag: rhel-9-release-golang-1.25-openshift-4.21
 images:
   items:
-  - dockerfile_path: Dockerfile
-    to: quay-server
   - dockerfile_literal: |
-      FROM src
-      RUN dnf module enable -y nodejs:20 && \
-          dnf install -y nodejs \
-          alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
-          libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
-          libxkbcommon libXfixes libXcursor libXext libXi libXtst \
-          libwayland-client && \
-          dnf clean all
-      WORKDIR /go/src/github.com/quay/quay/web
-      RUN npm ci
-      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
-      RUN npx playwright install chromium
-    from: src
-    to: quay-playwright-runner
+      FROM registry.access.redhat.com/ubi9/nodejs-22:latest
+      USER root
+      RUN dnf install -y --setopt=install_weak_deps=0 --nodocs \
+          nss nspr atk at-spi2-atk at-spi2-core alsa-lib cups-libs \
+          libdrm libxcb libxkbcommon libX11 libXcomposite libXdamage \
+          libXext libXfixes libXrandr mesa-libgbm pango cairo \
+          git podman skopeo \
+        && dnf clean all
+    to: playwright-base
 releases:
   latest:
     candidate:
@@ -51,18 +44,31 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: playwright-e2e
+  as: e2e
   steps:
     cluster_profile: aws-quay-qe
-    dependencies:
-      QUAY_CI_IMAGE: pipeline:quay-server
     env:
       COMPUTE_MACHINE_TYPE: m5.4xlarge
       OCM_LOGIN_ENV: production
       QUAY_EXTRA_CONFIG: |
         FEATURE_REPO_MIRROR: true
+        FEATURE_ORG_MIRROR: true
         FEATURE_USER_METADATA: true
         FEATURE_IMMUTABLE_TAGS: true
+        FEATURE_MAILING: true
+        FEATURE_USER_LOG_ACCESS: true
+        FEATURE_QUOTA_MANAGEMENT: true
+        FEATURE_AUTO_PRUNE: true
+        FEATURE_IMAGE_EXPIRY_TRIGGER: true
+        FEATURE_IMAGE_PULL_STATS: true
+        SESSION_TIMEOUT: 2h
+        MAIL_SERVER: mailpit.quay-enterprise.svc
+        MAIL_PORT: 1025
+        MAIL_USE_TLS: false
+        MAIL_USE_AUTH: false
+        MAIL_DEFAULT_SENDER: noreply@quay.io
+        AUTOPRUNE_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1
+        NOTIFICATION_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1
         SUPER_USERS:
           - admin
         GLOBAL_READONLY_SUPER_USERS:
@@ -72,11 +78,12 @@ tests:
       REGION: us-east-1
       REPLICAS: "3"
     test:
+    - ref: quay-deploy-test-services
+    - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-deploy-quay-aws-s3
-    - ref: quay-tests-deploy-quay-custom-image
-    - ref: quay-tests-test-quay-playwright
+    - ref: quay-test-playwright
     workflow: rosa-aws-sts-hcp
-  timeout: 4h0m0s
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: master
   org: quay
