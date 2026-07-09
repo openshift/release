@@ -34,6 +34,7 @@ source "/workspace/${SETUP_SCRIPT}"
 
 echo "Installing Claude Code..."
 curl -fsSL https://claude.ai/install.sh | sh
+export PATH="${HOME}/.local/bin:${PATH}"
 
 mkdir -p /workspace/artifacts
 
