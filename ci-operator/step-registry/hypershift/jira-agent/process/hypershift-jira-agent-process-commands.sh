@@ -50,6 +50,244 @@ git checkout main
 git rebase upstream/main
 echo "Fork synced with upstream successfully"
 
+# === Create Dynamic Workflow infrastructure ===
+# These files are created at runtime in the cloned repo — they are not committed anywhere.
+# Content follows the jira-prow-workflow-migration-plan.md specification.
+echo "Creating Dynamic Workflow configuration..."
+mkdir -p .claude/workflows .claude/agents .claude/hooks
+
+# --- Workflow Script (Plan Section 1) ---
+cat > .claude/workflows/jira-prow-pipeline.js << 'WORKFLOW_JS_EOF'
+export const meta = {
+  name: 'jira-prow-pipeline',
+  description: 'Solve a Jira ticket, review, address findings, open PR',
+  phases: [
+    { title: 'Solve', detail: 'Implement fix for Jira ticket' },
+    { title: 'Review', detail: 'Pre-commit code review' },
+    { title: 'Fix', detail: 'Address review findings' },
+    { title: 'PR', detail: 'Create pull request' },
+  ],
+}
+
+// args is populated by Claude when it invokes the Workflow tool from the prompt.
+// The bash script also writes /tmp/workflow-args.json as a fallback.
+const issueKey = args?.issueKey ?? 'UNKNOWN'
+const forkContext = args?.forkContext ?? ''
+
+const solvePrompt = forkContext
+  ? `${issueKey} origin --ci. ${forkContext}`
+  : `${issueKey} origin --ci. Read /tmp/workflow-args.json for additional context (forkContext field).`
+
+// Phase 1: Solve
+phase('Solve')
+const solution = await agent(
+  solvePrompt,
+  {
+    agentType: 'solve-agent',
+    label: `${issueKey}-solve`,
+    phase: 'Solve',
+    schema: {
+      type: 'object',
+      properties: {
+        branchName:   { type: 'string' },
+        summary:      { type: 'string' },
+        filesChanged: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['branchName', 'summary'],
+    },
+  }
+)
+
+if (!solution || solution.error) {
+  return { status: 'failed', phase: 'solve', issueKey, reason: solution?.error ?? 'unknown' }
+}
+
+// Phase 2: Review
+phase('Review')
+const review = await agent(
+  `Review the changes on branch ${solution.branchName} for issue ${issueKey}. ` +
+  `Changed files: ${solution.filesChanged?.join(', ')}`,
+  {
+    agentType: 'review-agent',
+    label: `${issueKey}-review`,
+    phase: 'Review',
+    schema: {
+      type: 'object',
+      properties: {
+        hasFindings: { type: 'boolean' },
+        findings:    { type: 'string' },
+      },
+      required: ['hasFindings'],
+    },
+  }
+)
+
+if (!review || review.error) {
+  return { status: 'failed', phase: 'review', issueKey, reason: review?.error ?? 'unknown' }
+}
+
+// Phase 3: Address findings (only if review found issues)
+if (review.hasFindings && review.findings) {
+  phase('Fix')
+  const fix = await agent(
+    `Address the following code review findings for ${issueKey}. ` +
+    `Run make test and make verify after fixing. Commit the changes.\n\n` +
+    `Findings:\n${review.findings}`,
+    {
+      agentType: 'address-findings-agent',
+      label: `${issueKey}-fix`,
+      phase: 'Fix',
+    }
+  )
+
+  if (!fix || fix.error) {
+    return { status: 'failed', phase: 'address-findings', issueKey, reason: fix?.error ?? 'unknown' }
+  }
+}
+
+// Phase 4: Create PR
+phase('PR')
+const pr = await agent(
+  `Create a pull request for ${issueKey} on branch ${solution.branchName}. ` +
+  `Use gh pr create --repo openshift/hypershift --head hypershift-community:${solution.branchName}. ` +
+  `Read .github/PULL_REQUEST_TEMPLATE.md and format the body accordingly. ` +
+  `Summary of changes: ${solution.summary}\n\n` +
+  `After creating the PR, write the result to /tmp/workflow-result.json as ` +
+  `{"prUrl": "<url>", "branchName": "${solution.branchName}"} (via bash).`,
+  {
+    agentType: 'pr-agent',
+    label: `${issueKey}-pr`,
+    phase: 'PR',
+    schema: {
+      type: 'object',
+      properties: { prUrl: { type: 'string' } },
+      required: ['prUrl'],
+    },
+  }
+)
+
+return {
+  status: 'done',
+  issueKey,
+  prUrl: pr.prUrl,
+  branchName: solution.branchName,
+}
+WORKFLOW_JS_EOF
+
+# --- Subagent Definitions (Plan Section 2) ---
+cat > .claude/agents/solve-agent.md << 'SOLVE_AGENT_EOF'
+---
+name: solve-agent
+description: Phase 1 — implements a fix for a Jira ticket
+tools: Bash, Read, Write, Edit, Grep, Glob, WebFetch, Agent, Skill, Task
+maxTurns: 300
+skills:
+  - jira:solve
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: bash .claude/hooks/validate-solve.sh
+---
+
+Solve the Jira issue given in your prompt by following the preloaded jira:solve skill.
+The prompt supplies the skill's arguments per its synopsis: <jira-issue-id> [remote] [--ci].
+SOLVE_AGENT_EOF
+
+cat > .claude/agents/review-agent.md << 'REVIEW_AGENT_EOF'
+---
+name: review-agent
+description: Phase 2 — read-only pre-commit code review
+tools: Bash, Read, Grep, Glob, Agent, Skill, Task
+maxTurns: 225
+skills:
+  - code-review:pre-commit-review
+---
+
+Perform the preloaded code-review:pre-commit-review skill as if it were invoked with
+`--language go --profile hypershift`.
+You are read-only. Do not write or edit any files.
+Return your findings as a structured list. If there are no findings, say so explicitly.
+REVIEW_AGENT_EOF
+
+cat > .claude/agents/address-findings-agent.md << 'FIX_AGENT_EOF'
+---
+name: address-findings-agent
+description: Phase 3 — addresses code review findings
+tools: Bash, Read, Write, Edit, Grep, Glob, Agent, Skill, Task
+maxTurns: 225
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: bash .claude/hooks/validate-solve.sh
+---
+
+You are fixing code review findings in a Go codebase.
+After making fixes, run `make test` and `make verify`.
+Commit your changes with a message referencing the review findings.
+Do not open PRs or push — only commit locally.
+FIX_AGENT_EOF
+
+cat > .claude/agents/pr-agent.md << 'PR_AGENT_EOF'
+---
+name: pr-agent
+description: Phase 4 — creates the GitHub pull request
+model: claude-sonnet-5
+tools: Bash, Read, Grep, Glob
+maxTurns: 90
+---
+
+You are creating a GitHub pull request.
+Use `gh pr create` with the exact repo and branch provided.
+Read .github/PULL_REQUEST_TEMPLATE.md and follow its format.
+Return the PR URL in your response.
+After creating the PR, write `{"prUrl": "<url>", "branchName": "<branch>"}` to
+/tmp/workflow-result.json (e.g. via bash heredoc) so the orchestrating script can read it.
+Do not make any code changes.
+PR_AGENT_EOF
+
+# --- Validation Hook (Plan Section 3) ---
+cat > .claude/hooks/validate-solve.sh << 'HOOK_EOF'
+#!/usr/bin/env bash
+cd /tmp/hypershift || exit 1
+
+if ! make test > /tmp/solve-test-output.txt 2>&1; then
+  echo "Tests failed. Fix the failures before finishing." >&2
+  cat /tmp/solve-test-output.txt >&2
+  exit 2
+fi
+
+if ! make verify > /tmp/solve-verify-output.txt 2>&1; then
+  echo "Verify failed. Fix the failures before finishing." >&2
+  cat /tmp/solve-verify-output.txt >&2
+  exit 2
+fi
+
+exit 0
+HOOK_EOF
+chmod +x .claude/hooks/validate-solve.sh
+
+# --- Settings (Plan Section 4) ---
+cat > .claude/settings.json << 'SETTINGS_EOF'
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Grep(*)",
+      "Glob(*)",
+      "WebFetch(*)",
+      "Workflow(*)"
+    ]
+  }
+}
+SETTINGS_EOF
+
+echo "Dynamic Workflow configuration created"
+
 # Generate GitHub App installation token
 echo "Generating GitHub App token..."
 
@@ -325,6 +563,91 @@ send_slack_notification() {
   fi
 }
 
+# Helper: split unified workflow stream-json into per-phase files for report compatibility.
+# Uses agent labels in the stream to partition messages. Falls back to creating empty files
+# if the stream format doesn't contain agent label information.
+split_workflow_stream() {
+  local STREAM_FILE=$1
+  local ISSUE_KEY=$2
+
+  if [ ! -f "$STREAM_FILE" ] || [ ! -s "$STREAM_FILE" ]; then
+    echo "Warning: No workflow stream file to split"
+    return 0
+  fi
+
+  # Map agent labels to output file suffixes used by the report step
+  # output=solve, review=review, fix=fix, pr=pr
+  local LABEL_MAP="${ISSUE_KEY}-solve:output ${ISSUE_KEY}-review:review ${ISSUE_KEY}-fix:fix ${ISSUE_KEY}-pr:pr"
+
+  # Try to split by agent label in stream-json messages.
+  # Stream-json subagent messages may include agent/label metadata.
+  python3 - "$STREAM_FILE" "$ISSUE_KEY" << 'SPLIT_PY'
+import json, sys, os
+
+stream_file = sys.argv[1]
+issue_key = sys.argv[2]
+
+label_to_suffix = {
+    f"{issue_key}-solve": "output",
+    f"{issue_key}-review": "review",
+    f"{issue_key}-fix": "fix",
+    f"{issue_key}-pr": "pr",
+}
+
+# Collect messages per agent label
+phase_messages = {suffix: [] for suffix in label_to_suffix.values()}
+current_suffix = None
+
+for line in open(stream_file):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        msg = json.loads(line)
+    except (json.JSONDecodeError, ValueError):
+        continue
+
+    # Check for agent label in various possible locations
+    label = (msg.get("agentLabel") or msg.get("agent_label") or
+             (msg.get("subagent", {}).get("label", "") if isinstance(msg.get("subagent"), dict) else ""))
+
+    if label and label in label_to_suffix:
+        current_suffix = label_to_suffix[label]
+
+    # Also detect phase transitions from workflow log messages
+    msg_type = msg.get("type", "")
+    if msg_type == "system":
+        text = msg.get("message", "") or msg.get("text", "")
+        for lbl, sfx in label_to_suffix.items():
+            if lbl in str(text):
+                current_suffix = sfx
+
+    if current_suffix:
+        phase_messages[current_suffix].append(line)
+
+# Write per-phase files
+wrote_any = False
+for suffix, lines in phase_messages.items():
+    outfile = f"/tmp/claude-{issue_key}-{suffix}.json"
+    if lines:
+        with open(outfile, "w") as f:
+            f.write("\n".join(lines) + "\n")
+        wrote_any = True
+        print(f"Split: {len(lines)} messages -> {outfile}")
+
+if not wrote_any:
+    # Fallback: copy entire stream to output (solve) file so at least Phase 1 has data
+    import shutil
+    shutil.copy(stream_file, f"/tmp/claude-{issue_key}-output.json")
+    print("Fallback: no agent labels found, copied full stream to output file")
+
+    # Create empty files for other phases
+    for suffix in ["review", "fix", "pr"]:
+        open(f"/tmp/claude-{issue_key}-{suffix}.json", "w").close()
+        print(f"Created empty: /tmp/claude-{issue_key}-{suffix}.json")
+SPLIT_PY
+}
+
 # OTEL / BigQuery telemetry support
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
@@ -540,246 +863,128 @@ while IFS= read -r line; do
 
   TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-  # === Phase 1: Solve (via /jira:solve skill) ===
-  echo "Phase 1: Running /jira:solve $ISSUE_KEY origin --ci"
-
-  PHASE1_START=$(date +%s)
-
+  # === Workflow: Solve → Review → Fix → PR (single Dynamic Workflow invocation) ===
   FORK_CONTEXT="IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After creating commits on your feature branch, push the branch to origin. Do NOT create a Pull Request - the PR will be created in a subsequent automated step after code review. ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
 
+  WORKFLOW_START=$(date +%s)
+
+  set -o pipefail
+  rm -f /tmp/workflow-result.json
+
+  # Write workflow args as a fallback file
+  jq -n --arg issueKey "$ISSUE_KEY" --arg forkContext "$FORK_CONTEXT" \
+    '{issueKey: $issueKey, forkContext: $forkContext}' > /tmp/workflow-args.json
+
   set +e
-  run_claude "solve" "$ISSUE_KEY" "/jira:solve $ISSUE_KEY origin --ci" \
-    --append-system-prompt "$FORK_CONTEXT" \
-    --allowedTools "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task" \
-    --max-turns 300 \
+  run_claude "workflow" "$ISSUE_KEY" \
+    "Run the jira-prow-pipeline workflow with args: {\"issueKey\": \"${ISSUE_KEY}\", \"forkContext\": \"${FORK_CONTEXT}\"}" \
+    --allowedTools "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task Workflow" \
     --effort max \
-    2> "/tmp/claude-${ISSUE_KEY}-output.log" \
-    | tee "/tmp/claude-${ISSUE_KEY}-output.json"
-  EXIT_CODE=$?
+    2> "/tmp/claude-${ISSUE_KEY}-workflow.log" \
+    | tee "/tmp/claude-${ISSUE_KEY}-workflow.json" > /dev/null
+  WORKFLOW_EXIT=$?
   set -e
+  set +o pipefail
 
-  extract_artifacts "/tmp/claude-${ISSUE_KEY}-output.json" "claude-${ISSUE_KEY}-output"
-  extract_session_metrics "$ISSUE_KEY" "solve"
-  extract_tokens "/tmp/claude-${ISSUE_KEY}-output.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json"
-  echo "Phase 1 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json")"
-  SOLVE_SESSION_ID=$(get_session_id "/tmp/claude-${ISSUE_KEY}-output.json")
-  generate_autodl "$ISSUE_KEY" "solve" "$([ $EXIT_CODE -eq 0 ] && echo success || echo failed)" "" "$SOLVE_SESSION_ID"
+  WORKFLOW_END=$(date +%s)
+  WORKFLOW_DURATION=$((WORKFLOW_END - WORKFLOW_START))
+  echo "Workflow duration: ${WORKFLOW_DURATION}s"
 
-  PHASE1_END=$(date +%s)
-  PHASE1_DURATION=$((PHASE1_END - PHASE1_START))
-  echo "Phase 1 duration: ${PHASE1_DURATION}s"
-  echo "$PHASE1_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-duration.txt"
+  # Split the unified workflow stream into per-phase files for report compatibility
+  split_workflow_stream "/tmp/claude-${ISSUE_KEY}-workflow.json" "$ISSUE_KEY"
 
-  if [ $EXIT_CODE -eq 0 ]; then
-    echo "✅ Phase 1 (jira:solve) completed for $ISSUE_KEY"
+  # Extract per-phase artifacts and metrics from the split files
+  for phase_pair in "output:solve" "review:review" "fix:fix" "pr:pr-creation"; do
+    prefix="${phase_pair%%:*}"
+    phase="${phase_pair#*:}"
+    phase_file="/tmp/claude-${ISSUE_KEY}-${prefix}.json"
 
-    # Check if code changes were made (branch changed from main)
-    BRANCH_NAME=$(git branch --show-current)
-    HAS_CODE_CHANGES=false
-    PR_URL=""
+    if [ -f "$phase_file" ] && [ -s "$phase_file" ]; then
+      extract_artifacts "$phase_file" "claude-${ISSUE_KEY}-${prefix}"
+      extract_session_metrics "$ISSUE_KEY" "$phase"
+      extract_tokens "$phase_file" "${SHARED_DIR}/claude-${ISSUE_KEY}-${phase}-tokens.json"
+      echo "Phase (${phase}) tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-${phase}-tokens.json")"
+      generate_autodl "$ISSUE_KEY" "$phase" "$([ $WORKFLOW_EXIT -eq 0 ] && echo success || echo failed)" "" "$(get_session_id "$phase_file")"
+    else
+      echo "No stream data for phase '${phase}', creating empty artifacts"
+      echo '{}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-${phase}-tokens.json"
+      echo "" > "${SHARED_DIR}/claude-${ISSUE_KEY}-${prefix}-text.txt"
+      echo "" > "${SHARED_DIR}/claude-${ISSUE_KEY}-${prefix}-tools.txt"
+      echo "" > "${SHARED_DIR}/claude-${ISSUE_KEY}-${prefix}-errors.txt"
+    fi
 
-    if [ "$BRANCH_NAME" != "main" ] && [ "$BRANCH_NAME" != "master" ] && [ -n "$BRANCH_NAME" ]; then
-      DIFF_FILES=$(git diff main...HEAD --name-only 2>/dev/null || echo "")
-      if [ -n "$DIFF_FILES" ]; then
-        HAS_CODE_CHANGES=true
-        echo "Code changes detected on branch '$BRANCH_NAME':"
-        echo "$DIFF_FILES" | sed 's/^/  /' | head -20
+    # Use overall workflow duration split proportionally (fallback: equal split)
+    phase_duration_file="${SHARED_DIR}/claude-${ISSUE_KEY}-${phase}-duration.txt"
+    if [ ! -f "$phase_duration_file" ]; then
+      echo "$((WORKFLOW_DURATION / 4))" > "$phase_duration_file"
+    fi
+  done
+
+  # Extract results from the workflow result file written by pr-agent
+  PR_URL=""
+  BRANCH_NAME=""
+  if [ -f /tmp/workflow-result.json ]; then
+    PR_URL=$(jq -r '.prUrl // ""' /tmp/workflow-result.json 2>/dev/null || echo "")
+    BRANCH_NAME=$(jq -r '.branchName // ""' /tmp/workflow-result.json 2>/dev/null || echo "")
+  fi
+
+  # Fallback: grep for PR URL in the full workflow stream
+  if [ -z "$PR_URL" ]; then
+    PR_URL=$(grep -o 'https://github.com/openshift/hypershift/pull/[0-9]*' \
+      "/tmp/claude-${ISSUE_KEY}-workflow.json" 2>/dev/null | head -1 || echo "")
+  fi
+
+  if [ $WORKFLOW_EXIT -eq 0 ] && [ -n "$PR_URL" ]; then
+    echo "✅ Workflow completed for $ISSUE_KEY"
+    echo "PR URL: $PR_URL"
+
+    PR_NUM=$(echo "$PR_URL" | grep -o '[0-9]*$' || true)
+
+    # Refresh tokens for post-workflow operations (PR edit, Jira, Slack)
+    echo "Refreshing GitHub App tokens for post-workflow operations..."
+    GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
+    if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
+      echo "ERROR: Failed to refresh GitHub App token for fork"
+    else
+      git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
+      echo "Fork token refreshed"
+    fi
+
+    GITHUB_TOKEN_UPSTREAM=$(generate_github_token "$INSTALLATION_ID_UPSTREAM")
+    if [ -z "$GITHUB_TOKEN_UPSTREAM" ] || [ "$GITHUB_TOKEN_UPSTREAM" = "null" ]; then
+      echo "ERROR: Failed to refresh GitHub App token for upstream"
+    else
+      export GITHUB_TOKEN="$GITHUB_TOKEN_UPSTREAM"
+      echo "Upstream token refreshed"
+    fi
+
+    # Append report link to PR description
+    if [ -n "$PR_NUM" ]; then
+      REPORT_URL=""
+      if [ -n "${BUILD_ID:-}" ] && [ -n "${JOB_NAME:-}" ]; then
+        if [ "${JOB_TYPE:-}" = "periodic" ]; then
+          REPORT_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}/artifacts/periodic-jira-agent/hypershift-jira-agent-report/artifacts/jira-agent-report.html"
+        else
+          REPORT_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/${PULL_NUMBER:-0}/${JOB_NAME}/${BUILD_ID}/artifacts/periodic-jira-agent/hypershift-jira-agent-report/artifacts/jira-agent-report.html"
+        fi
+      fi
+
+      if [ -n "$REPORT_URL" ]; then
+        echo "Appending report link to PR #${PR_NUM} description..."
+        CURRENT_BODY=$(gh pr view "$PR_NUM" --repo openshift/hypershift --json body -q .body 2>/dev/null || echo "")
+        REPORT_SECTION="---
+
+> **Note:** This PR was auto-generated by the [jira-agent](https://github.com/openshift/release/tree/main/ci-operator/step-registry/hypershift/jira-agent) periodic CI job in response to [${ISSUE_KEY}](https://redhat.atlassian.net/browse/${ISSUE_KEY}). See the [full report](${REPORT_URL}) for token usage, cost breakdown, and detailed phase output."
+        UPDATED_BODY="${CURRENT_BODY}
+
+${REPORT_SECTION}"
+        gh pr edit "$PR_NUM" --repo openshift/hypershift --body "$UPDATED_BODY" 2>/dev/null || echo "Warning: Failed to update PR #${PR_NUM} description"
       fi
     fi
 
-    if [ "$HAS_CODE_CHANGES" = true ]; then
-      # === Phase 2: Pre-commit quality review (via /code-review:pre-commit-review skill) ===
-      echo ""
-      echo "=========================================="
-      echo "Phase 2: Pre-commit quality review for $ISSUE_KEY"
-      echo "=========================================="
-
-      PHASE2_START=$(date +%s)
-
-      set +e
-      run_claude "review" "$ISSUE_KEY" "/code-review:pre-commit-review --language go --profile hypershift" \
-        --append-system-prompt "${SECURITY_PROMPT} ${SUBAGENT_PROMPT}" \
-        --allowedTools "Bash Read Grep Glob Task Agent Skill" \
-        --max-turns 225 \
-        --effort max \
-        2> "/tmp/claude-${ISSUE_KEY}-review.log" \
-        | tee "/tmp/claude-${ISSUE_KEY}-review.json"
-      REVIEW_EXIT_CODE=$?
-      set -e
-
-      extract_artifacts "/tmp/claude-${ISSUE_KEY}-review.json" "claude-${ISSUE_KEY}-review"
-      extract_session_metrics "$ISSUE_KEY" "review"
-      extract_tokens "/tmp/claude-${ISSUE_KEY}-review.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json"
-      echo "Phase 2 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json")"
-      generate_autodl "$ISSUE_KEY" "review" "$([ $REVIEW_EXIT_CODE -eq 0 ] && echo success || echo failed)" "" "$(get_session_id "/tmp/claude-${ISSUE_KEY}-review.json")"
-
-      PHASE2_END=$(date +%s)
-      PHASE2_DURATION=$((PHASE2_END - PHASE2_START))
-      echo "Phase 2 duration: ${PHASE2_DURATION}s"
-      echo "$PHASE2_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-duration.txt"
-
-      if [ $REVIEW_EXIT_CODE -eq 0 ]; then
-        echo "✅ Phase 2 (pre-commit review) completed for $ISSUE_KEY"
-      else
-        echo "⚠️ Phase 2 (pre-commit review) failed for $ISSUE_KEY (exit code: $REVIEW_EXIT_CODE)"
-        echo "Continuing with PR creation despite review failure..."
-      fi
-
-      # === Phase 3: Address review findings (via /openshift-developer:address-review-precommit skill) ===
-      echo ""
-      echo "=========================================="
-      echo "Phase 3: Addressing review findings for $ISSUE_KEY"
-      echo "=========================================="
-
-      # Read the review text to feed as context
-      REVIEW_FINDINGS=""
-      if [ -f "${SHARED_DIR}/claude-${ISSUE_KEY}-review-text.txt" ] && \
-         [ -s "${SHARED_DIR}/claude-${ISSUE_KEY}-review-text.txt" ]; then
-        REVIEW_FINDINGS=$(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-review-text.txt")
-      fi
-
-      # Refresh tokens before Phase 3 since it pushes code.
-      # Phases 1-2 can exceed the 1-hour GitHub App token lifetime.
-      echo "Refreshing GitHub App tokens before Phase 3..."
-      GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
-      if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
-        echo "ERROR: Failed to refresh GitHub App token for fork"
-      else
-        git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
-        echo "Fork token refreshed"
-      fi
-
-      PHASE3_START=$(date +%s)
-
-      if [ -n "$REVIEW_FINDINGS" ]; then
-        set +e
-        run_claude "fix" "$ISSUE_KEY" "/openshift-developer:address-review-precommit" \
-          --append-system-prompt "REVIEW FINDINGS:
-${REVIEW_FINDINGS}
-
-${SECURITY_PROMPT} ${SUBAGENT_PROMPT}" \
-          --allowedTools "Bash Read Write Edit Grep Glob Agent Skill Task" \
-          --max-turns 225 \
-          --effort max \
-          2> "/tmp/claude-${ISSUE_KEY}-fix.log" \
-          | tee "/tmp/claude-${ISSUE_KEY}-fix.json"
-        FIX_EXIT_CODE=$?
-        set -e
-
-        extract_artifacts "/tmp/claude-${ISSUE_KEY}-fix.json" "claude-${ISSUE_KEY}-fix"
-        extract_session_metrics "$ISSUE_KEY" "fix"
-        extract_tokens "/tmp/claude-${ISSUE_KEY}-fix.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json"
-        echo "Phase 3 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json")"
-        generate_autodl "$ISSUE_KEY" "fix" "$([ $FIX_EXIT_CODE -eq 0 ] && echo success || echo failed)" "" "$(get_session_id "/tmp/claude-${ISSUE_KEY}-fix.json")"
-
-        if [ $FIX_EXIT_CODE -eq 0 ]; then
-          echo "✅ Phase 3 (address review) completed for $ISSUE_KEY"
-        else
-          echo "⚠️ Phase 3 (address review) failed (exit code: $FIX_EXIT_CODE)"
-          echo "Continuing with PR creation..."
-        fi
-      else
-        echo "No review findings to address, skipping Phase 3"
-      fi
-
-      PHASE3_END=$(date +%s)
-      PHASE3_DURATION=$((PHASE3_END - PHASE3_START))
-      echo "Phase 3 duration: ${PHASE3_DURATION}s"
-      echo "$PHASE3_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-duration.txt"
-
-      # Regenerate GitHub App tokens before Phase 4.
-      echo "Refreshing GitHub App tokens before Phase 4..."
-      GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
-      if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
-        echo "ERROR: Failed to refresh GitHub App token for fork"
-      else
-        git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
-        echo "Fork token refreshed"
-      fi
-
-      GITHUB_TOKEN_UPSTREAM=$(generate_github_token "$INSTALLATION_ID_UPSTREAM")
-      if [ -z "$GITHUB_TOKEN_UPSTREAM" ] || [ "$GITHUB_TOKEN_UPSTREAM" = "null" ]; then
-        echo "ERROR: Failed to refresh GitHub App token for upstream"
-      else
-        export GITHUB_TOKEN="$GITHUB_TOKEN_UPSTREAM"
-        echo "Upstream token refreshed"
-      fi
-
-      # === Phase 4: Create Pull Request ===
-      echo ""
-      echo "=========================================="
-      echo "Phase 4: Creating Pull Request for $ISSUE_KEY"
-      echo "=========================================="
-
-      PHASE4_START=$(date +%s)
-
-      set +e
-      run_claude "pr-creation" "$ISSUE_KEY" "/openshift-developer:create-pr ${ISSUE_KEY} --upstream openshift/hypershift --head hypershift-community:${BRANCH_NAME}" \
-        --append-system-prompt "${SECURITY_PROMPT} ${SUBAGENT_PROMPT}" \
-        --allowedTools "Bash Read Grep Glob" \
-        --max-turns 90 \
-        --effort max \
-        2> "/tmp/claude-${ISSUE_KEY}-pr.log" \
-        | tee "/tmp/claude-${ISSUE_KEY}-pr.json"
-      PR_EXIT_CODE=$?
-      set -e
-
-      extract_artifacts "/tmp/claude-${ISSUE_KEY}-pr.json" "claude-${ISSUE_KEY}-pr"
-      extract_session_metrics "$ISSUE_KEY" "pr-creation"
-      extract_tokens "/tmp/claude-${ISSUE_KEY}-pr.json" "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json"
-      echo "Phase 4 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json")"
-
-      PHASE4_END=$(date +%s)
-      PHASE4_DURATION=$((PHASE4_END - PHASE4_START))
-      echo "Phase 4 duration: ${PHASE4_DURATION}s"
-      echo "$PHASE4_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-duration.txt"
-
-      if [ $PR_EXIT_CODE -eq 0 ]; then
-        PR_URL=$(grep -o 'https://github.com/openshift/hypershift/pull/[0-9]*' "/tmp/claude-${ISSUE_KEY}-pr.json" | head -1 || echo "")
-        if [ -n "$PR_URL" ]; then
-          echo "✅ PR created: $PR_URL"
-        else
-          echo "⚠️ Phase 4 completed but no PR URL found in output"
-        fi
-      else
-        echo "❌ Phase 4 (PR creation) failed for $ISSUE_KEY (exit code: $PR_EXIT_CODE)"
-        PR_URL=""
-      fi
-      generate_autodl "$ISSUE_KEY" "pr-creation" "$([ $PR_EXIT_CODE -eq 0 ] && echo success || echo failed)" "$PR_URL" "$(get_session_id "/tmp/claude-${ISSUE_KEY}-pr.json")"
-
-      # Append report link to PR description
-      if [ -n "$PR_URL" ]; then
-        PR_NUM=$(echo "$PR_URL" | grep -o '[0-9]*$' || true)
-        if [ -n "$PR_NUM" ]; then
-          REPORT_URL=""
-          if [ -n "${BUILD_ID:-}" ] && [ -n "${JOB_NAME:-}" ]; then
-            if [ "${JOB_TYPE:-}" = "periodic" ]; then
-              REPORT_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}/artifacts/periodic-jira-agent/hypershift-jira-agent-report/artifacts/jira-agent-report.html"
-            else
-              REPORT_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/${PULL_NUMBER:-0}/${JOB_NAME}/${BUILD_ID}/artifacts/periodic-jira-agent/hypershift-jira-agent-report/artifacts/jira-agent-report.html"
-            fi
-          fi
-
-          if [ -n "$REPORT_URL" ]; then
-            echo "Appending report link to PR #${PR_NUM} description..."
-            CURRENT_BODY=$(gh pr view "$PR_NUM" --repo openshift/hypershift --json body -q .body 2>/dev/null || echo "")
-            REPORT_SECTION="---
-
-> **Note:** This PR was auto-generated by the [jira-agent](https://github.com/openshift/release/tree/main/ci-operator/step-registry/hypershift/jira-agent) periodic CI job in response to [${ISSUE_KEY}](https://redhat.atlassian.net/browse/${ISSUE_KEY}). See the [full report](${REPORT_URL}) for token usage, cost breakdown, and detailed phase output."
-            UPDATED_BODY="${CURRENT_BODY}
-
-${REPORT_SECTION}"
-            gh pr edit "$PR_NUM" --repo openshift/hypershift --body "$UPDATED_BODY" 2>/dev/null || echo "Warning: Failed to update PR #${PR_NUM} description"
-          fi
-        fi
-      fi
-
-      # Send Slack notification to team channel
-      if [ -n "$PR_URL" ] && [ -n "$PR_NUM" ]; then
-        send_slack_notification "$PR_URL" "$PR_NUM"
-      fi
-    else
-      echo "No code changes detected for $ISSUE_KEY, skipping review and PR creation"
+    # Send Slack notification to team channel
+    if [ -n "$PR_URL" ] && [ -n "$PR_NUM" ]; then
+      send_slack_notification "$PR_URL" "$PR_NUM"
     fi
 
     # Add 'agent-processed' label to mark issue as handled
@@ -839,10 +1044,14 @@ ${REPORT_SECTION}"
     PROCESSED_COUNT=$((PROCESSED_COUNT + 1))
     echo "$ISSUE_KEY $TIMESTAMP $PR_URL SUCCESS" >> "$STATE_FILE"
   else
-    # Log failure but don't mark as processed (will be retried next run)
-    echo "❌ Failed to process $ISSUE_KEY"
+    # Workflow failed or no PR was produced
+    if [ $WORKFLOW_EXIT -ne 0 ]; then
+      echo "❌ Workflow failed for $ISSUE_KEY (exit code: $WORKFLOW_EXIT)"
+    elif [ -z "$PR_URL" ]; then
+      echo "❌ Workflow finished but produced no PR URL for $ISSUE_KEY"
+    fi
     echo "Error output (last 20 lines):"
-    tail -20 "/tmp/claude-${ISSUE_KEY}-output.log"
+    tail -20 "/tmp/claude-${ISSUE_KEY}-workflow.log" 2>/dev/null || true
     FAILED_COUNT=$((FAILED_COUNT + 1))
     echo "$ISSUE_KEY $TIMESTAMP - FAILED" >> "$STATE_FILE"
   fi
