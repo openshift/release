@@ -34,6 +34,22 @@ NODE_COUNT=$(oc get nodes --no-headers | wc -l)
 echo "Cluster: ${CLUSTER_NAME}"
 echo "Total nodes: ${NODE_COUNT}"
 
+# Enable coredump collection for pluto crashes
+echo ""
+echo "Enabling coredump collection for libreswan pluto..."
+oc debug node/$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | head -1 | awk '{print $1}') -- chroot /host /bin/bash -c "
+  # Enable coredumps
+  ulimit -c unlimited
+  echo 'kernel.core_pattern=/var/lib/systemd/coredump/core.%e.%p.%t' > /etc/sysctl.d/50-coredump.conf
+  sysctl -p /etc/sysctl.d/50-coredump.conf
+
+  # Ensure coredump directory exists
+  mkdir -p /var/lib/systemd/coredump
+  chmod 755 /var/lib/systemd/coredump
+
+  echo 'Coredump collection enabled'
+" || echo "Warning: Could not enable coredumps on all nodes"
+
 # Step 1: Verify IPsec is enabled
 echo ""
 echo "Step 1: Verifying IPsec is enabled..."
@@ -264,7 +280,53 @@ echo "  Success rate: $(awk "BEGIN {printf \"%.2f\", (${PASSED_TESTS}/${TOTAL_TE
 # Cleanup
 oc delete namespace ${TEST_NS} --ignore-not-found=true
 
-# Step 7: Final validation
+# Step 7: Check for pluto crashes and collect coredumps
+echo ""
+echo "Step 7: Checking for pluto crashes..."
+
+CRASH_COUNT=0
+COREDUMP_COLLECTED=0
+
+for node in $(oc get nodes --no-headers | awk '{print $1}'); do
+    echo "Checking node: ${node}"
+
+    # Check for pluto segfaults in kernel logs
+    SEGFAULTS=$(oc debug node/${node} -- chroot /host journalctl -k --no-pager | grep -c "pluto.*segfault" || echo "0")
+
+    if [[ ${SEGFAULTS} -gt 0 ]]; then
+        echo "  ⚠️  Found ${SEGFAULTS} pluto segfault(s) on ${node}"
+        CRASH_COUNT=$((CRASH_COUNT + 1))
+
+        # Try to collect coredumps
+        COREDUMPS=$(oc debug node/${node} -- chroot /host /bin/bash -c "ls -1 /var/lib/systemd/coredump/core.pluto.* 2>/dev/null || echo ''")
+
+        if [[ -n "${COREDUMPS}" ]]; then
+            echo "  ✓ Found coredumps on ${node}:"
+            echo "${COREDUMPS}" | while read core; do
+                if [[ -n "${core}" ]]; then
+                    echo "    - ${core}"
+                    COREDUMP_COLLECTED=$((COREDUMP_COLLECTED + 1))
+                fi
+            done
+        else
+            echo "  ⚠️  No coredumps found (may need systemd-coredump enabled)"
+        fi
+    fi
+done
+
+echo ""
+echo "Crash Summary:"
+echo "  Nodes with pluto crashes: ${CRASH_COUNT}/${NODE_COUNT}"
+echo "  Coredumps collected: ${COREDUMP_COLLECTED}"
+
+if [[ ${CRASH_COUNT} -gt 0 ]]; then
+    echo ""
+    echo "⚠️  WARNING: Pluto crashes detected!"
+    echo "   This indicates OCPBUGS-55453 / RHEL-151431 libreswan regression"
+    echo "   Coredumps location: /var/lib/systemd/coredump/ on affected nodes"
+fi
+
+# Step 9: Final validation
 echo ""
 echo "====================================="
 echo "Test Summary"
