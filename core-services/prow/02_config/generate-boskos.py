@@ -461,7 +461,6 @@ CONFIG = {
     },
     'vsphere-dis-2-quota-slice':{},
     'vsphere-connected-2-quota-slice':{},
-    'vsphere-multizone-2-quota-slice':{},
     'vsphere-elastic-quota-slice':{},
     'vsphere-elastic-poc-quota-slice':{},
     'osd-ephemeral-quota-slice': {
@@ -759,9 +758,6 @@ for i in [990,1169,1166,1164,1146]:
 
 for i in [871,991,1165,1154,1148,1140]:
     CONFIG['vsphere-connected-2-quota-slice']['bcr01a.dal12.{}'.format(i)] = 1
-
-for i in [1287,1289,1296,1298,1300,1302]:
-    CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
 for i in range(0,2):
     CONFIG['vsphere-elastic-poc-quota-slice']['vsphere-elastic-poc-{}'.format(i)] = 1
