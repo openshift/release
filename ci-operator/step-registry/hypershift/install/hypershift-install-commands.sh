@@ -102,6 +102,7 @@ if echo "${INSTALL_HELP}" | grep -q -- '--additional-operator-env-vars'; then
   EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=quay-proxy.ci.openshift.org/openshift/ci:ocp_${OCP_VERSION}_cluster-api-provider-kubevirt"
 fi
 
+
 case "${CLOUD_PROVIDER}" in
   AWS)
     if echo "${INSTALL_HELP}" | grep -q -- '--scale-from-zero-provider'; then
