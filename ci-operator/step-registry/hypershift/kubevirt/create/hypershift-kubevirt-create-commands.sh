@@ -136,7 +136,27 @@ fi
 oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc apply -f -
 oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
-  oc apply -f - <<EOF
+  if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
+    # Model 3: Localnet — VMs connect directly to physical network via OVN localnet
+    oc apply -f - <<EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: localnet-network
+  namespace: ${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "localnet-network",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network"
+  }'
+EOF
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network"
+  else
+    # Existing macvlan path
+    oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
@@ -155,10 +175,11 @@ spec:
       }
   }'
 EOF
-  if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
-  else
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
+      EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    else
+      EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    fi
   fi
 fi
 
