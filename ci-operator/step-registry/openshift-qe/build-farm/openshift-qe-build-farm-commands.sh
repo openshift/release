@@ -26,6 +26,40 @@ LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchma
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+echo "mcornea patching rhcos version with cri-o 1.35.2-5.rhaos4.22 and wait"
+oc apply -f- <<EOF
+apiVersion: v1
+items:
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: worker
+    name: os-layer-custom-worker
+  spec:
+    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:81e97c192d3fed112c182dba8c4bbbbb6b1c15dfb3cf9ee4f3585267ba53ef16
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: master
+    name: os-layer-custom-master
+  spec:
+    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:81e97c192d3fed112c182dba8c4bbbbb6b1c15dfb3cf9ee4f3585267ba53ef16
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: infra
+    name: os-layer-custom-infra
+  spec:
+    osImageURL: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:81e97c192d3fed112c182dba8c4bbbbb6b1c15dfb3cf9ee4f3585267ba53ef16
+kind: List
+metadata:
+  resourceVersion: ""
+EOF
+oc adm wait-for-stable-cluster --minimum-stable-period 5m
+
 export WORKLOAD=build-farm
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
