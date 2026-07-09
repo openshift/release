@@ -17,8 +17,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-autoscale-tests-main-e2e-aws-autoscaler
+    optional: true
     rerun_command: /test e2e-aws-autoscaler
-    skip_if_only_changed: (?i)^cas/(readme\.md|makefile)$|^cas/vendor/
+    run_if_changed: ^cas/
     spec:
       containers:
       - args:
@@ -185,8 +186,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-autoscale-tests-main-e2e-azure-autoscaler
+    optional: true
     rerun_command: /test e2e-azure-autoscaler
-    skip_if_only_changed: (?i)^cas/(readme\.md|makefile)$|^cas/vendor/
+    run_if_changed: ^cas/
     spec:
       containers:
       - args:
@@ -353,8 +355,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-autoscale-tests-main-e2e-gcp-autoscaler
+    optional: true
     rerun_command: /test e2e-gcp-autoscaler
-    skip_if_only_changed: (?i)^cas/(readme\.md|makefile)$|^cas/vendor/
+    run_if_changed: ^cas/
     spec:
       containers:
       - args:
@@ -689,8 +692,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-autoscale-tests-main-e2e-vsphere-autoscaler
+    optional: true
     rerun_command: /test e2e-vsphere-autoscaler
-    skip_if_only_changed: (?i)^cas/(readme\.md|makefile)$|^cas/vendor/
+    run_if_changed: ^cas/
     spec:
       containers:
       - args:
@@ -863,6 +867,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
         - --target=src
         command:
         - ci-operator
@@ -898,7 +903,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -912,13 +917,17 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-autoscale-tests-main-lint-autoscaler
+    optional: true
     rerun_command: /test lint-autoscaler
+    run_if_changed: ^cas/
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=lint-autoscaler
         command:
         - ci-operator
@@ -937,6 +946,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -951,6 +966,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
