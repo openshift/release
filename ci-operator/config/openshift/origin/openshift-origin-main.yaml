@@ -40,6 +40,11 @@ promotion:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
+      curl -LsSf https://astral.sh/uv/install.sh | env INSTALLER_NO_MODIFY_PATH=1 UV_INSTALL_DIR=/usr/local/bin sh
+    from: bin
+    to: bin-uv
+- pipeline_image_cache_step:
+    commands: |
       curl http://base-openstack-4-22.ocp.svc > /etc/yum.repos.art/ci/base-openstack-4-22.repo
     from: tools
     to: tools-openstack
@@ -88,7 +93,7 @@ tests:
   commands: |
     make verify -k --warn-undefined-variables
   container:
-    from: bin
+    from: bin-uv
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: verify-deps
   commands: |
