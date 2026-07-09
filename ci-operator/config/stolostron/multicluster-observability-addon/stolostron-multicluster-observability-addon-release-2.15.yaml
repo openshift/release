@@ -1,25 +1,11 @@
-base_images:
-  base:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "9"
-  stolostron_builder_go1.25-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.25-linux
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: stolostron
-    tag: go1.25-linux
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.21
 images:
   items:
-  - dockerfile_path: Dockerfile.prow
-    from: base
-    inputs:
-      stolostron_builder_go1.25-linux:
-        as:
-        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+  - dockerfile_path: Dockerfile.Konflux
     to: multicluster-observability-addon
 promotion:
   to:
@@ -41,31 +27,6 @@ tests:
     env:
       IMAGE_REPO: multicluster-observability-addon
       REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: publish-multicluster-observability-addon
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: multicluster-observability-addon
-    env:
-      IMAGE_REPO: multicluster-observability-addon
-      REGISTRY_ORG: stolostron
-    test:
-    - as: publish
-      commands: |-
-        export SELF="make"
-        export OSCI_PUBLISH_DELAY="0"
-        export OSCI_COMPONENT_NAME="multicluster-observability-addon"
-        make -f /opt/build-harness/Makefile.prow osci/publish
-      credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.15
