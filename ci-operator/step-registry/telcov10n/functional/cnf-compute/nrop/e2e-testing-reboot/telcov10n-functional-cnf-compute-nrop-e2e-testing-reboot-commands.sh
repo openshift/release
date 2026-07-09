@@ -95,7 +95,7 @@ scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_
 echo "Copy junit test reports to shared directory for reporter step"
 if ls ${ARTIFACT_DIR}/tests/junit/*.xml 1> /dev/null 2>&1; then
     echo "Copy junit test reports to shared directory for reporter step"
-    cp -v "${ARTIFACT_DIR}"/tests/junit/*.xml "${SHARED_DIR}/" 2>/dev/null
+	tar -cvzf "${SHARED_DIR}/${SCOPE}_junit.tar.gz" "${ARTIFACT_DIR}/tests/junit/*.xml"
     touch "${SHARED_DIR}/gotest-completed"
 else
     echo "No junit test reports found to copy to SHARED_DIR"
