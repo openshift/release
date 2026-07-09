@@ -36,17 +36,37 @@ export DETECT_DIRTY_GIT_WORKTREE=0
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 
-if ! yq -e ".clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift" config/config.yaml >/dev/null; then
-  echo "ERROR: hypershift defaults missing in config/config.yaml for DEPLOY_ENV=${DEPLOY_ENV}" >&2
+# Override only hypershift image coordinates from PR config; templatize keeps all
+# other hypershift defaults from the base config (what provision deployed).
+if ! yq -e '.defaults.hypershift.image.registry' config/config.yaml >/dev/null 2>&1 \
+  || ! yq -e '.defaults.hypershift.image.repository' config/config.yaml >/dev/null 2>&1 \
+  || ! yq -e '.defaults.hypershift.image.digest' config/config.yaml >/dev/null 2>&1; then
+  echo "ERROR: hypershift operator image missing in config/config.yaml (.defaults.hypershift.image)" >&2
   exit 1
 fi
+if ! yq -e '.defaults.hypershift.sharedIngressImage.registry' config/config.yaml >/dev/null 2>&1 \
+  || ! yq -e '.defaults.hypershift.sharedIngressImage.repository' config/config.yaml >/dev/null 2>&1 \
+  || ! yq -e '.defaults.hypershift.sharedIngressImage.digest' config/config.yaml >/dev/null 2>&1; then
+  echo "ERROR: hypershift sharedIngressImage missing in config/config.yaml (.defaults.hypershift.sharedIngressImage)" >&2
+  exit 1
+fi
+
+HO_IMAGE_REGISTRY=$(yq '.defaults.hypershift.image.registry' config/config.yaml)
+HO_IMAGE_REPOSITORY=$(yq '.defaults.hypershift.image.repository' config/config.yaml)
+HO_IMAGE_DIGEST=$(yq '.defaults.hypershift.image.digest' config/config.yaml)
+HO_SHARED_INGRESS_REGISTRY=$(yq '.defaults.hypershift.sharedIngressImage.registry' config/config.yaml)
+HO_SHARED_INGRESS_REPOSITORY=$(yq '.defaults.hypershift.sharedIngressImage.repository' config/config.yaml)
+HO_SHARED_INGRESS_DIGEST=$(yq '.defaults.hypershift.sharedIngressImage.digest' config/config.yaml)
 
 export OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override-upgrade.yaml"
 
 yq eval -n "
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift = (
-    load(\"config/config.yaml\") | .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift
-  )
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.registry = \"${HO_IMAGE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.repository = \"${HO_IMAGE_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.digest = \"${HO_IMAGE_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.sharedIngressImage.registry = \"${HO_SHARED_INGRESS_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.sharedIngressImage.repository = \"${HO_SHARED_INGRESS_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.sharedIngressImage.digest = \"${HO_SHARED_INGRESS_DIGEST}\"
 " > "${OVERRIDE_CONFIG_FILE}"
 
 cp "${OVERRIDE_CONFIG_FILE}" "${SHARED_DIR}/config-override.yaml"
@@ -74,7 +94,7 @@ az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
 make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
 
 # Single suite: create cluster, run pipeline/RP.HypershiftOperator, hash watch, cleanup.
-./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" \
+SKIP_CERT_VERIFICATION=true ./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" \
   --junit-path="${ARTIFACT_DIR}/junit.xml" \
   --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" \
   --max-concurrency 100
