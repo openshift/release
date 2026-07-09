@@ -707,24 +707,32 @@ function change_channel(){
 }
 
 function retrieve_updates_by_channel(){
-    local cmd retrieve_status
+    local cmd retrieve_status try=0 max_retries=10 interval=30
     cmd="oc get clusterversion version -ojson|jq -r '.status.conditions[] | select(.type==\"RetrievedUpdates\").status'"
     # Change the channel to invalid one to clear RetrievedUpdates by force
-    change_channel "dummy" 
+    change_channel "dummy"
     retrieve_status=$(eval "${cmd}")
     if [[ "${retrieve_status}" != "False" ]]; then
         echo "Failed to clear RetrievedUpdates by force"
         return 1
     fi
-    # Then change the channel to expected one to ensure the avaliable update synced from correct channel
+    # Then change the channel to expected one to ensure the available update synced from correct channel
     change_channel "$1"
-    retrieve_status=$(eval "${cmd}")
-    if [[ "${retrieve_status}" != "True" ]]; then
-        echo "Failed to retrieve updates from upstream server after changing channel"
-        return 1
-    fi
-    return 0
+    # Wait for CVO to contact the upstream update server and update RetrievedUpdates status
+    while (( try < max_retries )); do
+        retrieve_status=$(eval "${cmd}")
+        if [[ "${retrieve_status}" == "True" ]]; then
+            echo "Successfully retrieved updates from channel $1"
+            return 0
+        fi
+        echo "Waiting for RetrievedUpdates to become True (attempt $((try+1))/${max_retries}, current: ${retrieve_status})..."
+        sleep ${interval}
+        (( try += 1 ))
+    done
+    echo "Failed to retrieve updates from upstream server after changing channel to $1"
+    return 1
 }
+
 
 function check_channel_enabled(){
     local result
@@ -805,7 +813,12 @@ for target in "${TARGET_RELEASES[@]}"; do
         eus_channel="eus-${ver_in_channel}"
         # before GA, eus/stable channel will not be promoted, skip the checkpoints.
         # currently only even number versions supported for eus channel, if odd number versions, skip the checkpoints.
-        if check_channel_enabled "${stable_channel}" && check_channel_enabled "${eus_channel}"; then
+ 	# For 2-hop EUS upgrades (e.g. 4.20->4.22), the stable channel does not include the source
+        # version as an entry point (stable only allows 1-hop), so the stable/eus comparison is not
+        # applicable and must be skipped to avoid a VersionNotFound failure.
+        if (( TARGET_MINOR_VERSION - SOURCE_MINOR_VERSION > 1 )); then
+            echo "Skip stable/eus channel comparison for 2-hop EUS upgrade (4.${SOURCE_MINOR_VERSION}->4.${TARGET_MINOR_VERSION}): stable-${ver_in_channel} does not include 4.${SOURCE_MINOR_VERSION}.x entry points"
+        elif check_channel_enabled "${stable_channel}" && check_channel_enabled "${eus_channel}"; then
             echo "Check the updates from stable&eus channels should be the same."
             if ! retrieve_updates_by_channel ${stable_channel}; then
                 echo "Fail to get latest update through ${stable_channel}"
