@@ -1,38 +1,35 @@
 base_images:
   cli:
-    name: "5.0"
+    name: "4.21"
     namespace: ocp
     tag: cli
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "5.0"
+    tag: "4.21"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-5.0
+    tag: rhel-9-release-golang-1.24-openshift-4.21
 releases:
   latest:
     candidate:
       architecture: amd64
       product: ocp
       stream: ci
-      version: "5.0"
+      version: "4.21"
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "1"
+      memory: 1Gi
 tests:
-- as: lint
-  commands: ./lint.sh
-  container:
-    from: src
 - as: aws-ipi-ovn-winc
   postsubmit: true
+  run_if_changed: ^v10\.21/
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -44,21 +41,9 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
-- as: aws-upi-ovn-winc
-  postsubmit: true
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-aws-upi-ovn-winc
 - as: gcp-ipi-ovn-winc
   postsubmit: true
+  run_if_changed: ^v10\.21/
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -71,6 +56,7 @@ tests:
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
 - as: azure-ipi-ovn-winc
   postsubmit: true
+  run_if_changed: ^v10\.21/
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -84,6 +70,7 @@ tests:
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
 - as: vsphere-ipi-ovn-winc
   postsubmit: true
+  run_if_changed: ^v10\.21/
   steps:
     cluster_profile: vsphere-connected-2
     env:
@@ -94,20 +81,9 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
-- as: vsphere-ipi-proxy-ovn-winc
-  postsubmit: true
-  steps:
-    cluster_profile: vsphere-connected-2
-    env:
-      FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-ovn-winc
 - as: nutanix-ipi-ovn-winc
   postsubmit: true
+  run_if_changed: ^v10\.21/
   steps:
     cluster_profile: nutanix
     env:
@@ -123,3 +99,4 @@ zz_generated_metadata:
   branch: main
   org: openshift
   repo: windows-machine-config-operator-fbc
+  variant: v10-21
