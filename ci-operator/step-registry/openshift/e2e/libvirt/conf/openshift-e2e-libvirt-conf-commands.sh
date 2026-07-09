@@ -282,8 +282,9 @@ EOF
 
 # Excluding few loadbalancer tests with UDP from 4.13 and above Libvirt and PowerVS ppc64le jobs since power environment does not currently support loadbalancing UDP traffic
 # Skipping the DRA test case due to its current failure in libvirt CI. It will be re-enabled once the issue is resolved.
-elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($1 == 4) && ($2 >= 13))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
+elif (echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 13)) { exit 0 } else {exit 1} }' || [[ "${BRANCH}" == "main" ]] || [[ "${BRANCH}" == "master" ]]) && [ "${ARCH}" == "ppc64le" ] && [ "${CLUSTER_TYPE}" != "powervc" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs"
 "[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
@@ -313,17 +314,14 @@ EOF
 "[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Beta] Pod Generation pod observedGeneration field set in pod conditions"
 EOF
        fi
-       # Skip HAProxy router tests for versions below 4.22 until the fix is backported
-       # These tests fail due to missing VPC security group rule for port 80 in IBM Cloud PowerVS infrastructure
-       # The issue was fixed in 4.22 by https://github.com/openshift/installer/pull/10548
+       # Skip the HAProxy router idled service test for versions below 4.22 until the fix is backported
+       # The test fails due to missing port 80 configuration, which was fixed in 4.22 by https://github.com/openshift/installer/pull/10548
        # Backporting to all lower versions requires significant resources and is not feasible at this time
        # Bug reference: https://redhat.atlassian.net/browse/OCPBUGS-85232
        if echo "${BRANCH}" | awk -F. '{ if ((($1 == 4) && ($2 < 22))) { exit 0 } else { exit 1 } }'; then
           cat >> "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Suite:openshift/conformance/parallel/minimal]"
 "[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Skipped:Disconnected] [Suite:openshift/conformance/parallel/minimal]"
-"[sig-network][Feature:Router][apigroup:operator.openshift.io] The HAProxy router should serve routes that were created from an ingress [apigroup:route.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-network][Feature:Router][apigroup:operator.openshift.io] The HAProxy router should respond with 503 to unrecognized hosts [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
 EOF
        fi
     fi
