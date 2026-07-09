@@ -28,7 +28,7 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -43,6 +43,7 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
       OPERATOR_NAMESPACE: sbr-operator-system
+      OPERATOR_RELEASED_VERSION: 0.3.0
     test:
     - as: install-last-operator-version
       cli: latest
@@ -53,8 +54,19 @@ tests:
         oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
         oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
-        # OPERATOR_NAMESPACE variable is used by bundle-run
-        BUNDLE_IMG="$OO_BUNDLE" make bundle-run
+        # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
+        BUNDLE_IMG=quay.io/medik8s/storage-based-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
+      env:
+      - name: OPERATOR_NAMESPACE
+      - name: OPERATOR_RELEASED_VERSION
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: upgrade-operator-latest
+      cli: latest
+      commands: BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
       dependencies:
       - env: OO_BUNDLE
         name: my-bundle
@@ -76,7 +88,9 @@ tests:
         unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT
 
         make setup-odf-storage
-        ODF_SUBSCRIPTION_CHANNEL="stable-4.20" make run-setup-odf-storage-retry
+        # ODF stable-4.22 available ~Jul 9, 2026; stable-4.23 ~Nov 11, 2026.
+        # Using stable-4.21 (latest GA) until then.
+        ODF_SUBSCRIPTION_CHANNEL="stable-4.21" make run-setup-odf-storage-retry
       from: src
       resources:
         requests:
@@ -108,4 +122,4 @@ zz_generated_metadata:
   branch: main
   org: medik8s
   repo: storage-based-remediation
-  variant: "4.20"
+  variant: "4.22"
