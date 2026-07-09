@@ -809,15 +809,17 @@ for target in "${TARGET_RELEASES[@]}"; do
         fi
 
         ver_in_channel=$(echo "${channel}"|cut -d- -f2)
+        ver_in_channel_minor="$(echo "${ver_in_channel}" | cut -d. -f2)"
         stable_channel="stable-${ver_in_channel}"
         eus_channel="eus-${ver_in_channel}"
         # before GA, eus/stable channel will not be promoted, skip the checkpoints.
         # currently only even number versions supported for eus channel, if odd number versions, skip the checkpoints.
- 	# For 2-hop EUS upgrades (e.g. 4.20->4.22), the stable channel does not include the source
-        # version as an entry point (stable only allows 1-hop), so the stable/eus comparison is not
-        # applicable and must be skipped to avoid a VersionNotFound failure.
-        if (( TARGET_MINOR_VERSION - SOURCE_MINOR_VERSION > 1 )); then
-            echo "Skip stable/eus channel comparison for 2-hop EUS upgrade (4.${SOURCE_MINOR_VERSION}->4.${TARGET_MINOR_VERSION}): stable-${ver_in_channel} does not include 4.${SOURCE_MINOR_VERSION}.x entry points"
+        # For EUS upgrades (e.g. 4.20->4.22), the cluster channel is pre-set to 4.22 for the full path.
+        # On the first chain hop (4.20->4.21), TARGET_MINOR_VERSION=21 but ver_in_channel=4.22, so
+        # stable-4.22 has no entry point for 4.20.x (stable only allows 1-hop). Compare the channel
+        # minor version against source to correctly skip in both direct and chain EUS upgrade scenarios.
+        if (( ver_in_channel_minor - SOURCE_MINOR_VERSION > 1 )); then
+            echo "Skip stable/eus channel comparison: source 4.${SOURCE_MINOR_VERSION}.x is not an entry point in stable-${ver_in_channel} (channel is more than 1 minor version ahead of source)"
         elif check_channel_enabled "${stable_channel}" && check_channel_enabled "${eus_channel}"; then
             echo "Check the updates from stable&eus channels should be the same."
             if ! retrieve_updates_by_channel ${stable_channel}; then
