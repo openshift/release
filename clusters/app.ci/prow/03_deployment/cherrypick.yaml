@@ -43,6 +43,7 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
+        - --git-signing-key-path=/etc/signing-key/id_ed25519
         - --dry-run=false
         ports:
           - name: http
@@ -53,6 +54,9 @@ spec:
           readOnly: true
         - name: oauth
           mountPath: /etc/github
+          readOnly: true
+        - name: signing-key
+          mountPath: /etc/signing-key
           readOnly: true
         - name: tmp
           mountPath: /tmp
@@ -77,5 +81,9 @@ spec:
       - name: oauth
         secret:
           secretName: github-credentials-openshift-cherrypick-robot
+      - name: signing-key
+        secret:
+          secretName: cherrypick-signing-key
+          defaultMode: 0400
       - name: tmp
         emptyDir: {}
