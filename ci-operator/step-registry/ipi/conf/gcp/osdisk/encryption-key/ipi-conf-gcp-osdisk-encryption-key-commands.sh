@@ -4,6 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Fall back to SHARED_DIR files if env vars are empty (e.g., when provisioned by gcp-provision-kms-key)
+if [[ "${KMS_KEY_RING}" == "" ]] && [[ -f "${SHARED_DIR}/gcp_kms_key_ring" ]]; then
+  KMS_KEY_RING="$(< "${SHARED_DIR}/gcp_kms_key_ring")"
+fi
+if [[ "${KMS_KEY_RING_LOCATION}" == "" ]] && [[ -f "${SHARED_DIR}/gcp_kms_key_location" ]]; then
+  KMS_KEY_RING_LOCATION="$(< "${SHARED_DIR}/gcp_kms_key_location")"
+fi
+if [[ "${KMS_KEY_NAME}" == "" ]] && [[ -f "${SHARED_DIR}/gcp_kms_key_name" ]]; then
+  KMS_KEY_NAME="$(< "${SHARED_DIR}/gcp_kms_key_name")"
+fi
+
 if [[ "${KMS_KEY_RING}" == "" ]] || [[ "${KMS_KEY_RING_LOCATION}" == "" ]] || [[ "${KMS_KEY_NAME}" == "" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Invalid OS disk custom encryption settings, abort." && exit 1
 fi
