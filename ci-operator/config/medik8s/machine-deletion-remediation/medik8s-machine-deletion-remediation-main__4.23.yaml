@@ -49,6 +49,7 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       INSTALL_NAMESPACE: mdr-install
+      OPERATOR_RELEASED_VERSION: 0.7.0
     test:
     - as: e2e-install
       cli: latest
@@ -59,7 +60,20 @@ tests:
         oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
         oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/machine-deletion-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
+      env:
+      - name: INSTALL_NAMESPACE
+      - name: OPERATOR_RELEASED_VERSION
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
         oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
       dependencies:
       - env: OO_BUNDLE
