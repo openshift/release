@@ -5674,10 +5674,11 @@ periodics:
     repo: eco-ci-cd
   labels:
     capability/intranet: intranet
-    ci-operator.openshift.io/variant: cnf-ran-ptp-gm-4.22
+    ci-operator.openshift.io/variant: cnf-ran-ptp-sno-4.14
     ci.openshift.io/generator: prowgen
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-ran-ptp-gm-4.22-cnf-ran-ztp-tests
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-ran-ptp-sno-4.14-cnf-ran-ptp-tests
   spec:
     containers:
     - args:
@@ -5685,8 +5686,9 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --target=cnf-ran-ztp-tests
-      - --variant=cnf-ran-ptp-gm-4.22
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=cnf-ran-ptp-tests
+      - --variant=cnf-ran-ptp-sno-4.14
       command:
       - ci-operator
       env:
@@ -5706,6 +5708,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -5727,6 +5732,9 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
