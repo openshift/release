@@ -1,0 +1,44 @@
+ref:
+  as: sandboxed-containers-operator-mirror-operator
+  from_image:
+    namespace: ci
+    name: tests-private-base
+    tag: latest
+  cli: latest
+  grace_period: 10m
+  commands: sandboxed-containers-operator-mirror-operator-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CATALOG_SOURCE_IMAGE
+    default: ""
+    documentation: |-
+      Optional Pre-GA catalog source image (e.g., from Konflux workspace).
+      If set, uses this instead of the official Red Hat operator index.
+      Example: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
+  - name: OPERATORS_TO_MIRROR
+    default: "sandboxed-containers-operator"
+    documentation: |-
+      Comma-separated list of operators to mirror from the official
+      Red Hat operator index to the local mirror registry.
+  - name: TRUSTEE_CATALOG_SOURCE_IMAGE
+    default: ""
+    documentation: |-
+      When set, also mirror the Trustee operator FBC catalog and
+      operator images to the local registry for CoCo disconnected tests.
+  - name: EXTRA_IMAGES_TO_MIRROR
+    default: "quay.io/openshift/origin-hello-openshift:latest,registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
+    documentation: |-
+      Comma-separated list of extra container images to mirror
+      to the local registry for use in disconnected tests.
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  documentation: |-
+    Mirror operator images from the official Red Hat operator catalog
+    to the local mirror registry and configure IDMS for transparent
+    redirect. This allows the default redhat-operators CatalogSource
+    to work in disconnected clusters.

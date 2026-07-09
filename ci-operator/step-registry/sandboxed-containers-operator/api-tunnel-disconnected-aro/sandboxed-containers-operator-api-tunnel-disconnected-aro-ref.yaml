@@ -1,0 +1,33 @@
+ref:
+  as: sandboxed-containers-operator-api-tunnel-disconnected-aro
+  from: upi-installer
+  commands: sandboxed-containers-operator-api-tunnel-disconnected-aro-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: BLOCK_OUTBOUND_INTERNET
+    default: "false"
+    documentation: |-
+      Set to "true" to block outbound internet access for air-gapped testing.
+      Creates NSG rule to deny all outbound traffic to Internet addresses.
+      WARNING: Requires all content (images, packages) to be pre-mirrored.
+  documentation: |-
+    Sets up a persistent HTTPS tunnel on the bastion to access ARO private cluster.
+
+    For ARO disconnected clusters with private API servers, the API is only
+    accessible from within the VNet. This step:
+    1. Opens port 16443 in the bastion NSG
+    2. Resolves the API server hostname on the bastion (which has VNet DNS)
+    3. Generates a self-signed certificate for the tunnel
+    4. Starts socat with SSL on both ends: bastion:16443 (HTTPS) -> ARO API (HTTPS)
+    5. Updates kubeconfig to use https://bastion_public_ip:16443
+    6. Optionally blocks outbound internet (BLOCK_OUTBOUND_INTERNET=true for air-gap)
+
+    The tunnel runs on the bastion itself (not in the CI pod), so it persists
+    across all subsequent CI steps. All steps can access the cluster API using
+    the standard kubeconfig without modification.
+
+    Air-gapped mode: Set BLOCK_OUTBOUND_INTERNET=true to add NSG rules blocking
+    all outbound internet traffic. Requires all content to be pre-mirrored.

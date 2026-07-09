@@ -1,0 +1,22 @@
+ref:
+  as: sandboxed-containers-operator-ipi-conf-acr-mirror
+  from: upi-installer
+  grace_period: 10m
+  commands: sandboxed-containers-operator-ipi-conf-acr-mirror-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: ENABLE_IDMS
+    default: "yes"
+    documentation: Whether to use IDMS (imageDigestSources) or ICSP (imageContentSources).
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  documentation: |-
+    Patches install-config.yaml with mirror registry configuration.
+    When ACR credentials exist in SHARED_DIR (from provision-acr-endpoint),
+    uses those and skips additionalTrustBundle (ACR has valid certs).
+    Falls back to vault credentials for bastion mirror registries.

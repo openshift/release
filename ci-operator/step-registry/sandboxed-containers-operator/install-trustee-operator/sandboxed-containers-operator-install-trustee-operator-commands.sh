@@ -3,21 +3,13 @@
 # Install Trustee Operator for Confidential Containers (CoCo)
 #
 # This script installs and configures the Trustee operator and operands using
-# helm charts from https://github.com/confidential-devhub/charts
-#
-# NETWORK ACCESS:
-#   Preferred: Use TRUSTEE_CHARTS_IMAGE (pre-built image dependency)
-#              Works with restrict_network_access: true for rehearsals
-#   Fallback:  Fetches from GitHub (requires restrict_network_access: false)
+# helm charts cloned from TRUSTEE_CHARTS_REPO (defaults to internal GitLab).
 #
 # Environment Variables:
 #   TRUSTEE_INSTALL               - "true" to install, "false" to skip (default: false)
 #   TRUSTEE_NAMESPACE             - Namespace for operator (default: trustee-operator-system)
 #   TRUSTEE_CATALOG_SOURCE_IMAGE  - Custom catalog image (optional)
-#                                   NOTE: CatalogSource name is hardcoded to "trustee-operator-dev-catalog"
-#                                   in the helm chart and cannot be overridden
-#   IMAGE_TRUSTEE_CHARTS          - Pre-built charts image (set by ci-operator, recommended)
-#   TRUSTEE_CHARTS_REPO           - Charts repo URL (default: https://github.com/confidential-devhub/charts)
+#   TRUSTEE_CHARTS_REPO           - Charts repo URL (default: internal GitLab)
 #   TRUSTEE_CHARTS_REF            - Charts git ref (default: main)
 #   KBS_CLIENT_TAG                - kbs-client version override (optional)
 #
@@ -35,13 +27,26 @@ set -euo pipefail
 # Configuration
 #========================================
 
+if test -s "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 export SHARED_DIR=${SHARED_DIR:-/tmp}
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 
 TRUSTEE_INSTALL=${TRUSTEE_INSTALL:-false}
 TRUSTEE_NAMESPACE=${TRUSTEE_NAMESPACE:-trustee-operator-system}
-TRUSTEE_CATALOG_SOURCE_IMAGE=${TRUSTEE_CATALOG_SOURCE_IMAGE:-}
-TRUSTEE_CHARTS_REPO=${TRUSTEE_CHARTS_REPO:-https://github.com/confidential-devhub/charts}
+
+# Use mirrored catalog location from mirror-operator step if available (disconnected)
+# Otherwise fall back to environment variable (connected)
+if [[ -f "${SHARED_DIR}/TRUSTEE_CATALOG_SOURCE_IMAGE" ]]; then
+  TRUSTEE_CATALOG_SOURCE_IMAGE=$(cat "${SHARED_DIR}/TRUSTEE_CATALOG_SOURCE_IMAGE")
+  echo ">>> Using mirrored Trustee catalog from mirror-operator: ${TRUSTEE_CATALOG_SOURCE_IMAGE}"
+else
+  TRUSTEE_CATALOG_SOURCE_IMAGE=${TRUSTEE_CATALOG_SOURCE_IMAGE:-}
+fi
+
+TRUSTEE_CHARTS_REPO=${TRUSTEE_CHARTS_REPO:-https://gitlab.cee.redhat.com/osc/midstream/charts.git}
 TRUSTEE_CHARTS_REF=${TRUSTEE_CHARTS_REF:-main}
 
 # Early exit if installation disabled
@@ -50,11 +55,13 @@ if [[ "${TRUSTEE_INSTALL}" != "true" ]]; then
   exit 0
 fi
 
-# Check helm is available
+# Install helm if not available
 if ! command -v helm &> /dev/null; then
-  echo ">>> ERROR: helm is not available in the step image." >&2
-  echo ">>> Install helm in the image used by this step to keep restrict_network_access support." >&2
-  exit 1
+  echo ">>> Installing helm..."
+  mkdir -p /tmp/helm-bin
+  curl --noproxy '*' -sL https://get.helm.sh/helm-v3.17.3-linux-amd64.tar.gz | tar xz -C /tmp/helm-bin --strip-components=1 linux-amd64/helm
+  export PATH="/tmp/helm-bin:${PATH}"
+  helm version
 fi
 
 # Show configuration
@@ -135,54 +142,39 @@ function wait_until() {
   return 1
 }
 
-# Fetch trustee helm charts (from pre-built image or GitHub)
+# Fetch trustee helm charts
 function fetch_trustee_charts() {
   local charts_dir="${SCRATCH}/charts"
 
-  # Option 1: Extract from pre-built container image (preferred, works with restrict_network_access: true)
-  # ci-operator provides built images via IMAGE_FORMAT and IMAGE_TRUSTEE_CHARTS env vars
-  if [[ -n "${IMAGE_TRUSTEE_CHARTS:-}" ]]; then
-    local charts_image="${IMAGE_TRUSTEE_CHARTS}"
-    echo ">>> Extracting trustee charts from pre-built image" >&2
-    echo ">>> Image: ${charts_image}" >&2
+  echo ">>> Fetching trustee charts from: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})" >&2
 
-    # Extract charts from the image
-    mkdir -p "${charts_dir}"
-    local extract_output
-    if extract_output=$(oc image extract "${charts_image}" --path /charts/:${charts_dir}/ 2>&1); then
-      echo ">>> Charts extracted from image (no network access needed)" >&2
-      echo ">>> Extracted files:" >&2
-      ls -lR "${charts_dir}" | head -50 >&2
-      # The git repo structure is: charts/trustee-operator/, so image has /charts/charts/
-      # Return the nested charts directory
-      echo "${charts_dir}/charts"
-      return 0
-    else
-      echo ">>> ERROR: Failed to extract charts from image" >&2
-      echo "$extract_output" >&2
-      echo ">>> Falling back to git clone" >&2
-    fi
+  mkdir -p "${charts_dir}"
+  # Download chart archive instead of git clone (git may not be available)
+  local archive_url="${TRUSTEE_CHARTS_REPO%.git}/-/archive/${TRUSTEE_CHARTS_REF}/charts-${TRUSTEE_CHARTS_REF}.tar.gz"
+  echo ">>> Downloading chart archive: ${archive_url}" >&2
+  if curl --noproxy '*' -skL "${archive_url}" | tar xz -C "${charts_dir}" --strip-components=1; then
+    echo ">>> Charts downloaded via curl" >&2
+  elif command -v git &> /dev/null; then
+    echo ">>> Falling back to git clone" >&2
+    rm -rf "${charts_dir}"
+    GIT_SSL_NO_VERIFY=true git clone --depth 1 --branch "${TRUSTEE_CHARTS_REF}" "${TRUSTEE_CHARTS_REPO}" "${charts_dir}"
   else
-    echo ">>> IMAGE_TRUSTEE_CHARTS not set, using git clone fallback" >&2
-  fi
-
-  # Option 2: Fallback to git clone (requires restrict_network_access: false)
-  echo ">>> Fetching trustee charts from GitHub: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})" >&2
-
-  if ! command -v git &> /dev/null; then
-    echo ">>> ERROR: git command not found" >&2
+    echo ">>> ERROR: Neither curl archive download nor git clone worked" >&2
     return 1
   fi
-
-  git clone --depth 1 --branch "${TRUSTEE_CHARTS_REF}" "${TRUSTEE_CHARTS_REPO}" "${charts_dir}"
 
   if [[ ! -d "${charts_dir}" ]]; then
     echo ">>> ERROR: Failed to clone charts repository" >&2
     return 1
   fi
 
-  echo ">>> Charts cloned from GitHub" >&2
-  echo "${charts_dir}"
+  echo ">>> Charts fetched" >&2
+  # charts are under charts/ subdirectory
+  if [[ -d "${charts_dir}/charts" ]]; then
+    echo "${charts_dir}/charts"
+  else
+    echo "${charts_dir}"
+  fi
 }
 
 # Get cluster domain from ingress config, console route, or console URL
@@ -310,17 +302,30 @@ function install_trustee_operator() {
     return 1
   fi
 
-  echo ">>> Rendered operator YAML:"
-  cat "${operator_yaml}"
-  echo ">>> Total YAML lines: $(wc -l < "${operator_yaml}")"
+  # Filter out ImageDigestMirrorSet and ImageTagMirrorSet from chart output.
+  # In disconnected, the chart's mirror sets point to quay.io which is unreachable.
+  # Our mirror-operator already created IDMS/ITMS pointing to ACR.
+  grep -v "ImageDigestMirrorSet\|ImageTagMirrorSet" "${operator_yaml}" > /dev/null 2>&1 || true
+  local filtered_yaml="${SCRATCH}/operator-manifests-filtered.yaml"
+  python3 -c "
+import sys
+docs = open('${operator_yaml}').read().split('---')
+for doc in docs:
+    if 'ImageDigestMirrorSet' not in doc and 'ImageTagMirrorSet' not in doc:
+        print('---')
+        print(doc)
+" > "${filtered_yaml}" 2>/dev/null || cp "${operator_yaml}" "${filtered_yaml}"
+
+  echo ">>> Rendered operator YAML (filtered, no mirror sets):"
+  grep "kind:" "${filtered_yaml}" | sort -u
+  echo ">>> Total YAML lines: $(wc -l < "${filtered_yaml}")"
 
   # Apply operator chart
   local apply_output
-  if ! apply_output=$(oc apply -f "${operator_yaml}" 2>&1); then
+  if ! apply_output=$(oc apply -f "${filtered_yaml}" 2>&1); then
     echo ">>> ERROR: Failed to apply operator manifests"
     echo "$apply_output"
-    echo ">>> Full operator YAML:"
-    cat "${operator_yaml}"
+    cat "${filtered_yaml}"
     return 1
   fi
 
@@ -471,6 +476,12 @@ function install_trustee_operands() {
   local charts_dir="$1"
 
   echo ">>> Installing Trustee operands (cluster domain: ${CLUSTER_DOMAIN})"
+
+  # Ensure kbsres1 secret exists (required by KbsConfig reconciliation)
+  if ! oc get secret kbsres1 -n "${TRUSTEE_NAMESPACE}" &>/dev/null; then
+    echo ">>> Creating kbsres1 test secret..."
+    oc create secret generic kbsres1 -n "${TRUSTEE_NAMESPACE}" --from-literal=key1=value1
+  fi
 
   # Render operands chart
   local operands_yaml="${SCRATCH}/operands-manifests.yaml"
