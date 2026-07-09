@@ -2,6 +2,20 @@
 
 set -euo pipefail
 
+if [[ "${SKIP_FRONTEND_TESTS:-false}" == "true" ]]; then
+  echo "====> SKIP_FRONTEND_TESTS=true, skipping frontend tests"
+  exit 0
+fi
+
+# setup proxy
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+if [ -f "${SHARED_DIR}/runtime_env" ]; then
+    source "${SHARED_DIR}/runtime_env"
+fi
+
 # Validate KUBECONFIG is set
 if [ -z "${KUBECONFIG:-}" ]; then
     echo "ERROR: KUBECONFIG environment variable must be set"
@@ -42,4 +56,10 @@ export CYPRESS_KUBECONFIG_PATH="${KUBECONFIG}"
 echo "Login IDP: ${CYPRESS_LOGIN_IDP}"
 echo "Test filter: ${CYPRESS_GREP_TAGS}"
 
-/opt/app-root/scripts/run-e2e-tests.sh
+FRONTEND_EXIT=0
+/opt/app-root/scripts/run-e2e-tests.sh || FRONTEND_EXIT=$?
+
+if [[ "${FRONTEND_EXIT}" -ne 0 ]]; then
+  echo "frontend-tests failed with exit code ${FRONTEND_EXIT}" >> "${SHARED_DIR}/netobserv-step-failures"
+  echo "====> Frontend tests completed with failures (exit ${FRONTEND_EXIT}), continuing to next step"
+fi

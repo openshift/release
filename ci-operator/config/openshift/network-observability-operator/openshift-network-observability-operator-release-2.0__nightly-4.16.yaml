@@ -1,0 +1,79 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  e2e-integration-tests-pf5:
+    name: e2e-integration-tests-pf5
+    namespace: netobserv
+    tag: ci
+  e2etests:
+    name: e2etests
+    namespace: netobserv
+    tag: ci
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: netobserv-aws-ipi-amd-f28
+  cron: 31 5 10,24 * *
+  reporter_config:
+    channel: '#team-qe-netobserv'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+    test:
+    - chain: openshift-e2e-test-netobserv-pf5
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 10h0m0s
+- as: netobserv-aws-ipi-arm-f28
+  cron: 16 12 12 * *
+  reporter_config:
+    channel: '#team-qe-netobserv'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - success
+    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
+      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6gd.2xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-netobserv-pf5
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 10h0m0s
+zz_generated_metadata:
+  branch: release-2.0
+  org: openshift
+  repo: network-observability-operator
+  variant: nightly-4.16
