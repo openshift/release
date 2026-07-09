@@ -98,8 +98,9 @@ fi
 
 OCP_VERSION="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep -oP '(?<=^  Version:  ).*$' | grep -oE '^[0-9]+\.[0-9]+')"
 if echo "${INSTALL_HELP}" | grep -q -- '--additional-operator-env-vars'; then
-  EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=registry.ci.openshift.org/ocp/${OCP_VERSION}:cluster-api-provider-kubevirt"
+  EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=quay.io/openshift/ci:ocp_${OCP_VERSION}_cluster-api-provider-kubevirt"
 fi
+
 
 case "${CLOUD_PROVIDER}" in
   AWS)
