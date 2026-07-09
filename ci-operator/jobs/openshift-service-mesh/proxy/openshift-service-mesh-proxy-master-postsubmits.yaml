@@ -1,12 +1,10 @@
-presubmits:
+postsubmits:
   openshift-service-mesh/proxy:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-master$
-    - ^release-master-
+    - ^master$
     cluster: build06
-    context: ci/prow/envoy
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -14,10 +12,8 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-proxy-release-master-envoy
-    optional: true
-    rerun_command: /test envoy
+    max_concurrency: 1
+    name: branch-ci-openshift-service-mesh-proxy-master-copy-artifacts-gcs
     spec:
       containers:
       - args:
@@ -26,7 +22,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=envoy
+        - --target=copy-artifacts-gcs
         command:
         - ci-operator
         env:
@@ -82,14 +78,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )envoy,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-master$
-    - ^release-master-
+    - ^master$
     cluster: build06
-    context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -97,9 +90,8 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-proxy-release-master-unit
-    rerun_command: /test unit
+    max_concurrency: 1
+    name: branch-ci-openshift-service-mesh-proxy-master-copy-artifacts-gcs-arm
     spec:
       containers:
       - args:
@@ -108,7 +100,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=unit
+        - --target=copy-artifacts-gcs-arm
         command:
         - ci-operator
         env:
@@ -164,33 +156,34 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-master$
-    - ^release-master-
-    cluster: build06
-    context: ci/prow/unit-arm
+    - ^master$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-proxy-release-master-unit-arm
-    rerun_command: /test unit-arm
+    max_concurrency: 1
+    name: branch-ci-openshift-service-mesh-proxy-master-update-istio
+    reporter_config:
+      slack:
+        channel: '#team-ossm-release-maintenance'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=unit-arm
+        - --secret-dir=/secrets/ossm-github-simple-job
+        - --target=update-istio
         command:
         - ci-operator
         env:
@@ -208,17 +201,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /secrets/ossm-github-simple-job
+          name: ossm-github-simple-job
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -228,22 +218,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
+      - name: ossm-github-simple-job
+        secret:
+          secretName: ossm-github-simple-job
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-arm,?($|\s.*)
