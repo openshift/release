@@ -1,0 +1,28 @@
+workflow:
+  as: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra
+  documentation: |-
+    Phase 1 workflow that provisions two ephemeral OpenShift clusters on libvirt:
+    a management cluster and an external infrastructure (infra) cluster. This is the
+    foundation for HyperShift KubeVirt on external infrastructure testing.
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: hypershift-mce-ibmz-libvirt-cleanup-pre
+    - chain: hypershift-mce-ibmz-libvirt-conf-mgmt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: hypershift-mce-ibmz-libvirt-install-mgmt
+    - chain: hypershift-mce-ibmz-libvirt-conf-infra
+    - chain: hypershift-mce-ibmz-libvirt-install-infra
+    test:
+    - ref: hypershift-mce-ibmz-libvirt-verify-clusters
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: hypershift-mce-ibmz-libvirt-cleanup-post
+    dnsConfig:
+      nameservers:
+      - 172.30.38.188
+      searches:
+      - "bastion-z.svc.cluster.local"
+      - "bastion-ppc64le-libvirt.svc.cluster.local"
