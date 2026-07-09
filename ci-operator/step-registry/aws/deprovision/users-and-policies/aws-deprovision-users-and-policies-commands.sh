@@ -7,7 +7,6 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
 REGION="${LEASED_RESOURCE}"
 
 function run_command() {
@@ -76,34 +75,42 @@ function aws_delete_user()
     return $ret_code
 }
 
-## delete users
-user_name_file="${SHARED_DIR}/aws_user_names"
-if [ -e "${user_name_file}" ]; then
-    for user_name in `cat ${user_name_file}`; do
-        if [ X"$user_name" == X"" ]; then
-            continue
-        fi
-        echo "Deleting AWS IAM user: ${user_name}"
-        aws_delete_user $REGION $user_name || echo "ERROR: delete user ${user_name}"
-    done
-else
-    echo "${user_name_file} is missing."
-fi
+## delete users and policies created with static credentials (aws-provision-cco-manual-users-static),
+## then users and policies created with STS credentials (aws-provision-iam-user)
+for suffix in "_static" ""; do
+    user_name_file="${SHARED_DIR}/aws_user_names${suffix}"
+    policy_arn_file="${SHARED_DIR}/aws_policy_arns${suffix}"
 
+    if [[ "${suffix}" == "_static" ]]; then
+        unset AWS_CONFIG_FILE
+    else
+        export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
+    fi
 
-## delete policies
-policy_arn_file="${SHARED_DIR}/aws_policy_arns"
-if [ -e "${policy_arn_file}" ]; then
-    for policy_arn in `cat ${policy_arn_file}`; do
-        if [ X"$policy_arn" == X"" ]; then
-            continue
-        fi
-        echo "Deleting AWS IAM policy: ${policy_arn}"
-        aws_delete_policy $REGION $policy_arn || echo "ERROR: delete policy ${policy_arn}"
-    done
-else
-    echo "${policy_arn_file} is missing."
-fi
+    if [ -e "${user_name_file}" ]; then
+        for user_name in $(cat "${user_name_file}"); do
+            if [ X"$user_name" == X"" ]; then
+                continue
+            fi
+            echo "Deleting AWS IAM user: ${user_name}"
+            aws_delete_user $REGION $user_name || echo "ERROR: delete user ${user_name}"
+        done
+    else
+        echo "${user_name_file} is missing."
+    fi
+
+    if [ -e "${policy_arn_file}" ]; then
+        for policy_arn in $(cat "${policy_arn_file}"); do
+            if [ X"$policy_arn" == X"" ]; then
+                continue
+            fi
+            echo "Deleting AWS IAM policy: ${policy_arn}"
+            aws_delete_policy $REGION $policy_arn || echo "ERROR: delete policy ${policy_arn}"
+        done
+    else
+        echo "${policy_arn_file} is missing."
+    fi
+done
 
 exit 0
 
