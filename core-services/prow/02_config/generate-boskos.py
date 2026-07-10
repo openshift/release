@@ -508,6 +508,9 @@ CONFIG = {
     'powervs-7-quota-slice': {},
     'powervs-8-quota-slice': {},
     'powervs-9-quota-slice': {},
+    'powervs-sno-quota-slice': {
+        'dal14': 2,
+    },
     'powervs-multi-1-quota-slice': {
         'lon04': 2,
     },
