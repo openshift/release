@@ -22,7 +22,7 @@ set -o errtrace
 #   DEBUG - Enable debug logging (default: false)
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.4.4"
+readonly POWERVC_TOOL_VERSION="v2.4.5"
 readonly YQ_VERSION="v4.53.2"
 readonly IBMCLOUD_VERSION="2.45.0"
 
@@ -831,7 +831,6 @@ function dump_resources() {
 		--baseDomain "ipi-ppc64le.cis.ibm.net" \
 		--metadata "${DIR}/metadata.json" \
 		--kubeconfig "${DIR}/auth/kubeconfig" \
-		--bastionUsername "cloud-user" \
 		--bastionRsa "${SSH_PRIV_KEY_FILE}" \
 		--shouldDebug false; then
 		log_warn "PowerVC-Tool watch-create failed, but continuing"
