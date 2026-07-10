@@ -37,7 +37,8 @@ echo "Total nodes: ${NODE_COUNT}"
 # Enable coredump collection for pluto crashes
 echo ""
 echo "Enabling coredump collection for libreswan pluto..."
-oc debug node/$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | head -1 | awk '{print $1}') -- chroot /host /bin/bash -c "
+WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | head -1 | awk '{print $1}')
+oc debug "node/${WORKER_NODE}" -- chroot /host /bin/bash -c "
   # Enable coredumps
   ulimit -c unlimited
   echo 'kernel.core_pattern=/var/lib/systemd/coredump/core.%e.%p.%t' > /etc/sysctl.d/50-coredump.conf
