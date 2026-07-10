@@ -288,6 +288,10 @@ Resources:
         ToPort: 5000
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
+        FromPort: 8443
+        ToPort: 8443
+        CidrIp: !Ref VpcCidr
+      - IpProtocol: tcp
         FromPort: 6001
         ToPort: 6002
         CidrIp: 0.0.0.0/0

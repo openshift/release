@@ -24,20 +24,34 @@ fi
 echo -e "image registry:\n$(cat ${install_config_mirror_patch})"
 
 # mirror registry credential
-MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
-if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
-    echo "File ${SHARED_DIR}/mirror_registry_url does not exist."
+if [[ ! -s "${SHARED_DIR}/mirror_registry_url" ]]; then
+    echo "File ${SHARED_DIR}/mirror_registry_url does not exist or is empty."
     exit 1
 fi
-mirror_registry_pull_secret=`mktemp`
-registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
-echo '{"auths":{}}' | jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' > "${mirror_registry_pull_secret}"
+MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+
+runtime_registry_creds="${SHARED_DIR}/mirror_registry_creds"
+if [[ -s "${runtime_registry_creds}" ]]; then
+    registry_creds_file="${runtime_registry_creds}"
+    echo "Using runtime mirror registry credentials from SHARED_DIR."
+else
+    registry_creds_file="/var/run/vault/mirror-registry/registry_creds"
+    echo "Using the configured mirror registry credential fallback."
+fi
+mirror_registry_pull_secret=$(mktemp)
+registry_cred=$(head -n 1 "${registry_creds_file}" | base64 -w 0)
+echo '{"auths":{}}' | jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" \
+  '.auths |= . + $a' > "${mirror_registry_pull_secret}"
 
 # Additional CA & pull secret patch
 CONFIG_PATCH="${SHARED_DIR}/pull_secret_ca.yaml.patch"
 
 additional_trust_bundle="${SHARED_DIR}/additional_trust_bundle"
-if [[ "${SELF_MANAGED_ADDITIONAL_CA}" == "true" ]]; then
+runtime_registry_ca="${SHARED_DIR}/mirror_registry_ca.crt"
+if [[ -s "${runtime_registry_ca}" ]]; then
+    echo >> "${additional_trust_bundle}"
+    cat "${runtime_registry_ca}" >> "${additional_trust_bundle}"
+elif [[ "${SELF_MANAGED_ADDITIONAL_CA}" == "true" ]]; then
     echo >> "${additional_trust_bundle}"
     cat "${CLUSTER_PROFILE_DIR}/mirror_registry_ca.crt" >> "${additional_trust_bundle}"
 else
