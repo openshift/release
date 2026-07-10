@@ -26,6 +26,7 @@ get_idms_manifest() {
   ssh ${SSH_ARGS} root@${bastion} "
     set -e
     set -o pipefail
+    export OPERATOR_PREGA_VERSION=v4.22-20260709T152629
     curl -k -o /tmp/idms.yaml https://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
   "
   scp -q ${SSH_ARGS} root@${bastion}:/tmp/idms.yaml /tmp/idms.yaml
@@ -45,15 +46,13 @@ if [ ${OCP_BUILD} == "dev" ]; then
   jq -s '.[0] * .[1]' /tmp/existing_pull_secret.json /tmp/prega_pull_secret.json > /tmp/merged_pull_secret.json
   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged_pull_secret.json
   sleep 300
-  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/${MCP_NAME}= | wc -l)" --timeout=60m mcp ${MCP_NAME}
-  oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
+  oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=40m
 
   echo "Applying the ImageDigestMirrorSet manifest"
   get_idms_manifest
   oc apply -f /tmp/idms.yaml
   sleep 300
-  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/${MCP_NAME}= | wc -l)" --timeout=60m mcp ${MCP_NAME}
-  oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
+  oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=40m
 
   echo "Creating CatalogSource for PREGA Operator Index"
   cat << EOF| oc apply -f -
