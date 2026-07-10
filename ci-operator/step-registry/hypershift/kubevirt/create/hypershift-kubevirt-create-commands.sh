@@ -137,7 +137,11 @@ oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc 
 oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
   if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
-    # Model 3: Localnet — VMs connect directly to physical network via OVN localnet
+    # Model 3: Localnet — VMs connect directly to physical network via OVN localnet.
+    # The NAD config "name" must match an existing OVN bridge-mapping on the nodes.
+    # OVN-Kubernetes automatically creates "physnet:br-ex" on all nodes, so we use
+    # "physnet" as the network name to reuse that default mapping (no NNCP needed).
+    # The "subnets" field enables OVN-managed IPAM so VMs get IPs automatically.
     oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
@@ -147,10 +151,11 @@ metadata:
 spec:
   config: '{
       "cniVersion": "0.3.1",
-      "name": "localnet-network",
+      "name": "physnet",
       "type": "ovn-k8s-cni-overlay",
       "topology": "localnet",
-      "netAttachDefName": "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network"
+      "netAttachDefName": "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network",
+      "subnets": "192.168.223.0/24"
   }'
 EOF
     EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network"
