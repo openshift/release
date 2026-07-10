@@ -306,7 +306,7 @@ timeout 900 claude \
     --max-turns 50 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:fix-test-bugs ${RELEASE_VERSIONS} --open" \
+    -p "/microshift-ci:fix-test-bugs ${RELEASE_VERSIONS}" \
     --verbose &> "${CLAUDE_FIX_TEST_BUGS_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "fix-test-bugs" 15
 
