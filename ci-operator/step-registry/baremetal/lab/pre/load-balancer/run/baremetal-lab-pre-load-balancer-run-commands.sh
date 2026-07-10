@@ -73,6 +73,27 @@ api_ip_interface=eth1
 if [ x"${DISCONNECTED}" == x"true" ]; then
   api_ip_interface=eth2
 fi
+
+LOCK="/tmp/dhclient_lease.lock"
+LOCK_FD=201
+touch "$LOCK"
+exec 201>"$LOCK"
+
+cleanup() {
+  echo "Releasing network lock"
+  flock -u "$LOCK_FD" 2>/dev/null || true
+  exec 201>&- || true
+}
+
+trap cleanup EXIT INT TERM
+
+echo "Acquiring network lock $LOCK_FD ($LOCK) (waiting up to 5 minutes)"
+if ! flock -w 300 "$LOCK_FD"; then
+    echo "Error: Failed to acquire network lock within 5 minutes."
+    exit 1
+fi
+echo "Network lock acquired"
+
 echo "${devices[@]}"
 for dev in "${devices[@]}"; do
   interface=${dev%%.*}
@@ -92,6 +113,9 @@ for dev in "${devices[@]}"; do
       -lf "/etc/haproxy/dhclient.$interface.v6.lease" "$interface"
   fi
 done
+
+cleanup
+trap - EXIT INT TERM
 
 echo "Sending HUP to HAProxy to trigger the configuration reload..."
 podman kill --signal HUP "haproxy-$CLUSTER_NAME"
