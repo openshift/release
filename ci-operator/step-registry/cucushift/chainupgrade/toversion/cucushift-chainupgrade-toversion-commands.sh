@@ -686,6 +686,7 @@ function get_target_from_available_update(){
     fi
     export TARGET_VERSION
     TARGET=$(oc get clusterversion version -o json| jq -r --arg z "${TARGET_VERSION}" '.status.availableUpdates[]? | select(.version==$z).image')
+    
     if [[ -z "${TARGET}" ]]; then
         echo "The target version ${TARGET_VERSION} is a bad update without image!"
         return 1
@@ -706,24 +707,32 @@ function change_channel(){
 }
 
 function retrieve_updates_by_channel(){
-    local cmd retrieve_status
+    local cmd retrieve_status try=0 max_retries=10 interval=30
     cmd="oc get clusterversion version -ojson|jq -r '.status.conditions[] | select(.type==\"RetrievedUpdates\").status'"
     # Change the channel to invalid one to clear RetrievedUpdates by force
-    change_channel "dummy" 
+    change_channel "dummy"
     retrieve_status=$(eval "${cmd}")
     if [[ "${retrieve_status}" != "False" ]]; then
         echo "Failed to clear RetrievedUpdates by force"
         return 1
     fi
-    # Then change the channel to expected one to ensure the avaliable update synced from correct channel
+    # Then change the channel to expected one to ensure the available update synced from correct channel
     change_channel "$1"
-    retrieve_status=$(eval "${cmd}")
-    if [[ "${retrieve_status}" != "True" ]]; then
-        echo "Failed to retrieve updates from upstream server after changing channel"
-        return 1
-    fi
-    return 0
+    # Wait for CVO to contact the upstream update server and update RetrievedUpdates status
+    while (( try < max_retries )); do
+        retrieve_status=$(eval "${cmd}")
+        if [[ "${retrieve_status}" == "True" ]]; then
+            echo "Successfully retrieved updates from channel $1"
+            return 0
+        fi
+        echo "Waiting for RetrievedUpdates to become True (attempt $((try+1))/${max_retries}, current: ${retrieve_status})..."
+        sleep ${interval}
+        (( try += 1 ))
+    done
+    echo "Failed to retrieve updates from upstream server after changing channel to $1"
+    return 1
 }
+
 
 function check_channel_enabled(){
     local result
@@ -773,6 +782,7 @@ for target in "${TARGET_RELEASES[@]}"; do
     export SOURCE_VERSION
     export SOURCE_MINOR_VERSION
 
+
     if ! get_target_from_available_update "${TARGET_MAJOR_MINOR_VERSION}"; then
         echo "Fail to get target from available update for version: ${TARGET_MAJOR_MINOR_VERSION}"
         exit 1
@@ -799,11 +809,18 @@ for target in "${TARGET_RELEASES[@]}"; do
         fi
 
         ver_in_channel=$(echo "${channel}"|cut -d- -f2)
+        ver_in_channel_minor="$(echo "${ver_in_channel}" | cut -d. -f2)"
         stable_channel="stable-${ver_in_channel}"
         eus_channel="eus-${ver_in_channel}"
         # before GA, eus/stable channel will not be promoted, skip the checkpoints.
         # currently only even number versions supported for eus channel, if odd number versions, skip the checkpoints.
-        if check_channel_enabled "${stable_channel}" && check_channel_enabled "${eus_channel}"; then
+        # For EUS upgrades (e.g. 4.20->4.22), the cluster channel is pre-set to 4.22 for the full path.
+        # On the first chain hop (4.20->4.21), TARGET_MINOR_VERSION=21 but ver_in_channel=4.22, so
+        # stable-4.22 has no entry point for 4.20.x (stable only allows 1-hop). Compare the channel
+        # minor version against source to correctly skip in both direct and chain EUS upgrade scenarios.
+        if (( ver_in_channel_minor - SOURCE_MINOR_VERSION > 1 )); then
+            echo "Skip stable/eus channel comparison: source 4.${SOURCE_MINOR_VERSION}.x is not an entry point in stable-${ver_in_channel} (channel is more than 1 minor version ahead of source)"
+        elif check_channel_enabled "${stable_channel}" && check_channel_enabled "${eus_channel}"; then
             echo "Check the updates from stable&eus channels should be the same."
             if ! retrieve_updates_by_channel ${stable_channel}; then
                 echo "Fail to get latest update through ${stable_channel}"
