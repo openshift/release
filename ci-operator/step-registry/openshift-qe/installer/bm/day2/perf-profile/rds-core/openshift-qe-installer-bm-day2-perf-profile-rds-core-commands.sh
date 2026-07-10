@@ -27,7 +27,7 @@ metadata:
   name: cpt-pao
   annotations:
     kubeletconfig.experimental: |
-      {"allowedUnsafeSysctls":["net.ipv6.conf.all.accept_ra"]}
+      {"allowedUnsafeSysctls":["net.ipv6.conf.all.accept_ra"],"maxPods":${MAX_PODS}}
 spec:
   cpu:
     isolated: ${ISOLATED_CORES}
