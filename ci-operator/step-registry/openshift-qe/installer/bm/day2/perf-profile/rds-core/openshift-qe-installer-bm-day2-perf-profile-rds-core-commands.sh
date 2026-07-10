@@ -63,5 +63,4 @@ else
   sleep 300
 fi
 
-kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/${MCP_NAME}= | wc -l)" --timeout=60m mcp ${MCP_NAME}
-oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
+oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=40m
