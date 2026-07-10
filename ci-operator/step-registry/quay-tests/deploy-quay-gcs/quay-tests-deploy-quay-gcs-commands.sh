@@ -25,8 +25,7 @@ QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 
 #Create GCS Storage Bucket
-QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
-QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
+# QUAY_OPERATOR_CHANNEL and QUAY_OPERATOR_SOURCE are set via step env defaults
 GCS_BUCKET_NAME="quayprowci$RANDOM"
 
 GCS_ACCESS_KEY=$(cat /var/run/quay-qe-gcp-secret/access_key)
@@ -61,9 +60,9 @@ terraform init
 terraform apply -auto-approve || true
 
 #Share Terraform Var and Terraform Directory
-echo "${GCS_BUCKET_NAME}" > ${SHARED_DIR}/QUAY_GCP_STORAGE_ID
-tar -cvzf terraform.tgz --exclude=".terraform" *
-cp terraform.tgz ${SHARED_DIR}
+echo "${GCS_BUCKET_NAME}" > "${SHARED_DIR}"/QUAY_GCP_STORAGE_ID
+tar -cvzf terraform.tgz --exclude=".terraform" ./*
+cp terraform.tgz "${SHARED_DIR}"
 
 #Deploy Quay Operator to OCP namespace 'quay-enterprise'
 cat <<EOF | oc apply -f -
@@ -247,8 +246,8 @@ for _ in {1..60}; do
     oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
     quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
-    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
-         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    curl -k -X POST "$quay_route"/api/v1/user/initialize --header 'Content-Type: application/json' \
+         --data '{ "username": "'"$QUAY_USERNAME"'", "password": "'"$QUAY_PASSWORD"'", "email": "'"$QUAY_EMAIL"'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
     archive_pod_info
     exit 0
   fi
