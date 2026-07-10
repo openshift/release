@@ -27,58 +27,6 @@ az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 oc version
 kubelogin --version
 
-# Parse CI-built image coordinates (registry, repository, digest) before
-# checking out main. The env vars are injected by ci-operator from the PR
-# pipeline; we use the same images for the baseline so that only the
-# infrastructure definitions (Bicep/Helm/config) come from main.
-BACKEND_DIGEST=$(echo ${BACKEND_IMAGE} | cut -d'@' -f2)
-BACKEND_REPOSITORY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-BACKEND_SOURCE_REGISTRY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${BACKEND_SOURCE_REGISTRY} and repo ${BACKEND_REPOSITORY} for Backend Image"
-
-FRONTEND_DIGEST=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f2)
-FRONTEND_REPOSITORY=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-FRONTEND_SOURCE_REGISTRY=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${FRONTEND_SOURCE_REGISTRY} and repo ${FRONTEND_REPOSITORY} for Frontend Image"
-
-ADMIN_API_DIGEST=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f2)
-ADMIN_API_REPOSITORY=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-ADMIN_API_SOURCE_REGISTRY=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${ADMIN_API_SOURCE_REGISTRY} and repo ${ADMIN_API_REPOSITORY} for Admin API Image"
-
-SESSIONGATE_DIGEST=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f2)
-SESSIONGATE_REPOSITORY=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-SESSIONGATE_SOURCE_REGISTRY=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${SESSIONGATE_SOURCE_REGISTRY} and repo ${SESSIONGATE_REPOSITORY} for SessionGate Image"
-
-HCP_RECOVERY_DIGEST=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f2)
-HCP_RECOVERY_REPOSITORY=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-HCP_RECOVERY_SOURCE_REGISTRY=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${HCP_RECOVERY_SOURCE_REGISTRY} and repo ${HCP_RECOVERY_REPOSITORY} for HCP Recovery Image"
-
-FLEET_DIGEST=$(echo ${FLEET_IMAGE} | cut -d'@' -f2)
-FLEET_REPOSITORY=$(echo ${FLEET_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-FLEET_SOURCE_REGISTRY=$(echo ${FLEET_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${FLEET_SOURCE_REGISTRY} and repo ${FLEET_REPOSITORY} for Fleet Image"
-
-MGMT_AGENT_DIGEST=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f2)
-MGMT_AGENT_REPOSITORY=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-MGMT_AGENT_SOURCE_REGISTRY=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${MGMT_AGENT_SOURCE_REGISTRY} and repo ${MGMT_AGENT_REPOSITORY} for Mgmt Agent Image"
-
-KUBE_APPLIER_DIGEST=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f2)
-KUBE_APPLIER_REPOSITORY=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-KUBE_APPLIER_SOURCE_REGISTRY=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${KUBE_APPLIER_SOURCE_REGISTRY} and repo ${KUBE_APPLIER_REPOSITORY} for Kube Applier Image"
-
-if [[ -n "${USE_OC_LOGIN_REGISTRIES}" ]]; then
-    USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY}"
-else
-    USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY}"
-fi
-export USE_OC_LOGIN_REGISTRIES
-echo "USE_OC_LOGIN_REGISTRIES set to: ${USE_OC_LOGIN_REGISTRIES}"
-
 # Check out main branch to provision the baseline environment.
 # The container image has the PR source baked in; we swap to main so that
 # Bicep templates, Helm charts, config, and pipeline definitions all come
@@ -88,35 +36,117 @@ git fetch https://github.com/Azure/ARO-HCP.git main
 git checkout -f FETCH_HEAD
 echo "Checked out main at $(git rev-parse --short HEAD)"
 
+# The CSPR postsubmit pushes service images to ACR tagged with the 7-char
+# commit SHA (see aro-hcp-images-push step). Resolve the tag and look up
+# the digest for each service image so the baseline uses main's actual images.
+MAIN_SHA=$(git rev-parse --short=7 HEAD)
+
+CONFIG_FILE="config/rendered/dev/${DEPLOY_ENV}/westus3.yaml"
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+  CONFIG_FILE="config/rendered/dev/${DEPLOY_ENV}/centralus.yaml"
+fi
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+  echo "ERROR: No rendered config found for ${DEPLOY_ENV} (tried westus3.yaml, centralus.yaml)"
+  exit 1
+fi
+
+ACR_NAME=$(yq '.acr.svc.name' "${CONFIG_FILE}")
+ACR_URL="${ACR_NAME}.azurecr.io"
+
+BACKEND_REPO=$(yq '.backend.image.repository' "${CONFIG_FILE}")
+FRONTEND_REPO=$(yq '.frontend.image.repository' "${CONFIG_FILE}")
+ADMIN_API_REPO=$(yq '.adminApi.image.repository' "${CONFIG_FILE}")
+SESSIONGATE_REPO=$(yq '.sessiongate.image.repository' "${CONFIG_FILE}")
+FLEET_REPO=$(yq '.fleet.image.repository' "${CONFIG_FILE}")
+MGMT_AGENT_REPO=$(yq '.mgmtAgent.image.repository' "${CONFIG_FILE}")
+KUBE_APPLIER_REPO=$(yq '.kubeApplier.image.repository' "${CONFIG_FILE}")
+# hcpRecovery is not pushed to ACR by images-push; its config digest is
+# empty by default, so we leave it as-is rather than trying to resolve it.
+
+echo "ACR: ${ACR_URL}, main SHA: ${MAIN_SHA}"
+echo "Repos: backend=${BACKEND_REPO} frontend=${FRONTEND_REPO} admin-api=${ADMIN_API_REPO} sessiongate=${SESSIONGATE_REPO} fleet=${FLEET_REPO} mgmt-agent=${MGMT_AGENT_REPO} kube-applier=${KUBE_APPLIER_REPO}"
+
+# Wait for the postsubmit images-push job to have pushed images for this
+# commit. Check one representative repo (fleet); all are pushed together.
+MAX_ATTEMPTS=30
+POLL_INTERVAL=30
+echo "Polling ACR for ${FLEET_REPO}:${MAIN_SHA} (up to $((MAX_ATTEMPTS * POLL_INTERVAL))s) ..."
+for attempt in $(seq 1 ${MAX_ATTEMPTS}); do
+  if az acr manifest show -r "${ACR_NAME}" -n "${FLEET_REPO}:${MAIN_SHA}" &>/dev/null; then
+    echo "Images for ${MAIN_SHA} available after attempt ${attempt}"
+    break
+  fi
+  if [[ ${attempt} -eq ${MAX_ATTEMPTS} ]]; then
+    echo "ERROR: Images for ${MAIN_SHA} not found in ${ACR_NAME} after ${MAX_ATTEMPTS} attempts."
+    echo "Falling back to parent commit ..."
+    MAIN_SHA=$(git rev-parse --short=7 HEAD~1)
+    echo "Trying parent commit: ${MAIN_SHA}"
+    if ! az acr manifest show -r "${ACR_NAME}" -n "${FLEET_REPO}:${MAIN_SHA}" &>/dev/null; then
+      echo "ERROR: Images for fallback ${MAIN_SHA} also not found. Aborting."
+      exit 1
+    fi
+    echo "Fallback images found for ${MAIN_SHA}"
+    break
+  else
+    echo "Attempt ${attempt}/${MAX_ATTEMPTS}: not yet available, retrying in ${POLL_INTERVAL}s ..."
+    sleep ${POLL_INTERVAL}
+  fi
+done
+
+# Resolve each image tag to its digest from ACR.
+resolve_digest() {
+  local repo=$1 tag=$2
+  local digest
+  digest=$(az acr manifest show-metadata -r "${ACR_NAME}" -n "${repo}:${tag}" --query 'digest' -o tsv)
+  if [[ -z "${digest}" ]]; then
+    echo "ERROR: Failed to resolve digest for ${repo}:${tag}" >&2
+    return 1
+  fi
+  echo "${digest}"
+}
+
+echo "Resolving image digests for tag ${MAIN_SHA} ..."
+BACKEND_DIGEST=$(resolve_digest "${BACKEND_REPO}" "${MAIN_SHA}")
+FRONTEND_DIGEST=$(resolve_digest "${FRONTEND_REPO}" "${MAIN_SHA}")
+ADMIN_API_DIGEST=$(resolve_digest "${ADMIN_API_REPO}" "${MAIN_SHA}")
+SESSIONGATE_DIGEST=$(resolve_digest "${SESSIONGATE_REPO}" "${MAIN_SHA}")
+FLEET_DIGEST=$(resolve_digest "${FLEET_REPO}" "${MAIN_SHA}")
+MGMT_AGENT_DIGEST=$(resolve_digest "${MGMT_AGENT_REPO}" "${MAIN_SHA}")
+KUBE_APPLIER_DIGEST=$(resolve_digest "${KUBE_APPLIER_REPO}" "${MAIN_SHA}")
+
+echo "Resolved digests:"
+echo "  backend:      ${BACKEND_DIGEST}"
+echo "  frontend:     ${FRONTEND_DIGEST}"
+echo "  admin-api:    ${ADMIN_API_DIGEST}"
+echo "  sessiongate:  ${SESSIONGATE_DIGEST}"
+echo "  fleet:        ${FLEET_DIGEST}"
+echo "  mgmt-agent:   ${MGMT_AGENT_DIGEST}"
+echo "  kube-applier: ${KUBE_APPLIER_DIGEST}"
+
 OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override.yaml"
 
-# Image overrides — use CI-built images so the baseline has working,
-# pullable images rather than main's default config digests which may
-# reference registries inaccessible from CI pods.
+# Image overrides — point at ACR images built from main's commit.
 yq eval -n "
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${BACKEND_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${ACR_URL}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPO}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.digest = \"${BACKEND_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.registry = \"${FRONTEND_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.repository = \"${FRONTEND_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.registry = \"${ACR_URL}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.repository = \"${FRONTEND_REPO}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.digest = \"${FRONTEND_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.registry = \"${ADMIN_API_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.repository = \"${ADMIN_API_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.registry = \"${ACR_URL}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.repository = \"${ADMIN_API_REPO}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.digest = \"${ADMIN_API_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.registry = \"${SESSIONGATE_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.repository = \"${SESSIONGATE_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.registry = \"${ACR_URL}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.repository = \"${SESSIONGATE_REPO}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.digest = \"${SESSIONGATE_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.registry = \"${HCP_RECOVERY_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.repository = \"${HCP_RECOVERY_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.digest = \"${HCP_RECOVERY_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.registry = \"${FLEET_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.repository = \"${FLEET_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.registry = \"${ACR_URL}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.repository = \"${FLEET_REPO}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.digest = \"${FLEET_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.registry = \"${MGMT_AGENT_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.repository = \"${MGMT_AGENT_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.registry = \"${ACR_URL}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.repository = \"${MGMT_AGENT_REPO}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.digest = \"${MGMT_AGENT_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.registry = \"${KUBE_APPLIER_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.repository = \"${KUBE_APPLIER_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.registry = \"${ACR_URL}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.repository = \"${KUBE_APPLIER_REPO}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\"
 " > "${OVERRIDE_CONFIG_FILE}"
 
@@ -143,8 +173,9 @@ fi
 
 # Temporary MGMT cluster sizing overrides for single-wave E2E parallelism.
 # These will be removed once the matching config.yaml defaults land in ARO-HCP.
-# Only apply when identity containers are leased (E2E runs); healthcheck
-# workflows provision without leases and should use the default sizing.
+# When identity containers are leased (E2E runs), scale up the node pool.
+# Otherwise, explicitly set minCount=1 to match the current ci config default
+# and ensure non-leased runs (e.g. healthcheck) use minimal sizing.
 if [[ -n "${LEASED_MSI_CONTAINERS:-}" ]]; then
   yq -i "
     .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.userAgentPool.minCount = 7 |

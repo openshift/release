@@ -19,9 +19,6 @@ ref:
     - name: LOCATION
       default: "westus3"
       documentation: Azure region to provision resources in. For example, "westus3".
-    - name: USE_OC_LOGIN_REGISTRIES
-      default: ""
-      documentation: Space-separated list of registries that require oc registry login for authentication
     - name: ARO_HCP_DEPLOY_ENV
       default: "ci00"
       documentation: |-
@@ -36,26 +33,10 @@ ref:
     - name: COMPRESS_TIMING_METADATA
       default: "true"
       documentation: Whether to compress timing metadata files with gzip.
-  dependencies:
-  - name: "pipeline:aro-hcp-backend"
-    env: BACKEND_IMAGE
-  - name: "pipeline:aro-hcp-frontend"
-    env: FRONTEND_IMAGE
-  - name: "pipeline:aro-hcp-admin-api"
-    env: ADMIN_API_IMAGE
-  - name: "pipeline:aro-hcp-sessiongate"
-    env: SESSIONGATE_IMAGE
-  - name: "pipeline:aro-hcp-hcp-recovery"
-    env: HCP_RECOVERY_IMAGE
-  - name: "pipeline:aro-hcp-fleet"
-    env: FLEET_IMAGE
-  - name: "pipeline:aro-hcp-mgmt-agent"
-    env: MGMT_AGENT_IMAGE
-  - name: "pipeline:aro-hcp-kube-applier"
-    env: KUBE_APPLIER_IMAGE
   documentation: |-
     Provision an ARO HCP baseline environment from the main branch.
     Used as the first phase of upgrade-path validation: the environment
     is created from main, then upgraded to the PR branch in a subsequent step.
-    Uses CI-built images (from the PR pipeline) with main's infrastructure
-    definitions (Bicep, Helm charts, config) to produce a working baseline.
+    Resolves main's HEAD commit SHA and looks up the corresponding images
+    in ACR (pushed by the postsubmit images-push job), polling until
+    available. Falls back to the parent commit if the latest isn't pushed yet.
