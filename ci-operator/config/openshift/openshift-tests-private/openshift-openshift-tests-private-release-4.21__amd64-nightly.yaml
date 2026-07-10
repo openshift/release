@@ -1214,30 +1214,6 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-lab
-- as: aws-ipi-ovn-hypershift-capacity-reservation-gpu-guest-f999
-  cron: 8 8 29 2 *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_HYPERSHIFT_INSTANCE_TYPE: p4d.24xlarge
-      ADDITIONAL_HYPERSHIFT_NODE_ARCH: amd64
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      HYPERSHIFT_HC_ZONES: us-east-1d
-      HYPERSHIFT_NODE_COUNT: "1"
-      NODEPOOL_CAPACITY_RESERVATION: CapacityBlocks
-      PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-    workflow: cucushift-hypershift-extended-capacity-reservation
 - as: aws-ipi-ovn-hypershift-fips-guest-openldap-f14
   cron: 49 0 1,17 * *
   reporter_config:
@@ -1677,16 +1653,6 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-private-shared-vpc-phz-sts
-- as: aws-ipi-proxy-fips-f999-fips-check
-  cron: 8 8 29 2 *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    test:
-    - ref: fips-check-optional-operator-images-scan
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-shared-vpc-phz-freeipa-f14
   cron: 13 2 10,26 * *
   steps:
@@ -2206,31 +2172,6 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hcp-private-proxy
-- as: aws-rosa-hcp-upgrade-f999
-  cron: 8 8 29 2 *
-  reporter_config:
-    channel: '#managed-hypershift-ci-watcher'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: candidate
-      E2E_RUN_TAGS: '@rosa'
-      NAME_PREFIX: ocpe2e
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-      TEST_PROFILE: ocpe2e-rosa-hcp-upgrade-y-stream
-      UPGRADE_ENABLED: "true"
-    test:
-    - ref: rosa-cluster-upgrade-hcp
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-lifecycle-advanced
 - as: aws-rosa-hcp-shared-vpc-advanced-int-f14
   cron: 22 2 9,25 * *
   reporter_config:
@@ -3347,26 +3288,6 @@ tests:
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
-- as: metal-ds-ipi-ovn-lvms-f999-file-integrity
-  capabilities:
-  - intranet
-  cron: 8 8 29 2 *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      E2E_RUN_TAGS: '@fio'
-      FILTERS_ADDITIONAL: ""
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
-      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
-      TEST_PARALLEL: "3"
-      TEST_SCENARIOS: File_Integrity_Operator
-    test:
-    - ref: file-integrity-konflux-catalogsource
-    - ref: openshift-extended-test
-    - ref: openshift-extended-web-tests
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
 - as: metal-ds-ipi-ovn-lvms-f28-security-profiles
   capabilities:
   - intranet
@@ -4284,13 +4205,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-gcp-upi
-- as: ibmcloud-ipi-dedicatedhost-dynamic-f999
-  cron: 8 8 29 2 *
-  steps:
-    cluster_profile: ibmcloud-qe
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-dynamic
 - as: ibmcloud-ipi-dedicatedhost-static-f28-destructive
   cron: 18 11 25 * *
   steps:
@@ -4351,13 +4265,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
-- as: ibmcloud-ipi-ovn-mtu-migrate-f999
-  cron: 8 8 29 2 *
-  steps:
-    cluster_profile: ibmcloud-qe
-    test:
-    - ref: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-mtu-migrate
 - as: ibmcloud-ipi-private-byo-kms-f28
   cron: 59 21 24 * *
   steps:
