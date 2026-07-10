@@ -10,12 +10,6 @@ QUAY_ACCESS_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/prega_quay_auth_token)
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
-if [[ $TYPE == "sno" ]]; then
-  MCP_NAME="master"
-else
-  MCP_NAME="worker"
-fi
-
 get_idms_manifest() {
   echo "Getting the ImageDigestMirrorSet manifest from the PREGA build server"
   QUAY_URL="https://quay.io/api/v1/repository/prega/prega-operator-index/tag/?limit=100&page=1"
