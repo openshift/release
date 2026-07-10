@@ -199,7 +199,7 @@ networking:
   networkType: OVNKubernetes
   machineNetwork:
   - cidr: 10.0.0.0/16
-  - cidr: fd00::/64
+  - cidr: fd00::/56
   clusterNetwork:
   - cidr: 10.128.0.0/14
     hostPrefix: 23
