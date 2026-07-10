@@ -58,7 +58,7 @@ format_cost() {
 sum_costs() {
   local a=${1:-0}
   local b=${2:-0}
-  awk "BEGIN {printf \"%.6f\", $a + $b}" 2>/dev/null || echo "0"
+  awk -v a="$a" -v b="$b" 'BEGIN {printf "%.6f", (a + b)}' 2>/dev/null || echo "0"
 }
 
 # HTML-escape a string
@@ -95,6 +95,8 @@ format_duration() {
   fi
 }
 
+JIRA_BASE_URL="${JIRA_BASE_URL:-https://redhat.atlassian.net}"
+
 # Build issue rows for summary table and detail sections
 SUMMARY_ROWS=""
 DETAIL_SECTIONS=""
@@ -113,7 +115,7 @@ while IFS= read -r line; do
   # Debug: verify token files exist and jq is available
   echo "Processing issue $ISSUE_KEY (status=$STATUS)"
   echo "  Token files check:"
-  for phase in solve review fix pr; do
+  for phase in solve review fix pr-creation; do
     tf="${SHARED_DIR}/claude-${ISSUE_KEY}-${phase}-tokens.json"
     if [ -f "$tf" ]; then
       echo "    ${phase}: $(cat "$tf" | tr -d '\n' | cut -c1-120)"
@@ -164,7 +166,7 @@ while IFS= read -r line; do
 
   ISSUE_TOTAL_DURATION=0
 
-  for phase_info in "solve:Phase 1: Solve" "review:Phase 2: Review" "fix:Phase 3: Fix" "pr:Phase 4: PR"; do
+  for phase_info in "solve:Phase 1: Solve" "review:Phase 2: Review" "fix:Phase 3: Fix" "pr-creation:Phase 4: PR"; do
     PHASE_KEY="${phase_info%%:*}"
     PHASE_LABEL="${phase_info#*:}"
     TOKEN_FILE="${SHARED_DIR}/claude-${ISSUE_KEY}-${PHASE_KEY}-tokens.json"
@@ -199,14 +201,14 @@ while IFS= read -r line; do
 
   # Build per-model breakdown rows from aggregated model_usage across phases
   MODEL_BREAKDOWN_ROWS=""
-  MODEL_FILES=""
-  for phase_key in solve review fix pr; do
+  MODEL_FILES_ARR=()
+  for phase_key in solve review fix pr-creation; do
     tf="${SHARED_DIR}/claude-${ISSUE_KEY}-${phase_key}-tokens.json"
     if [ -f "$tf" ]; then
-      MODEL_FILES="$MODEL_FILES $tf"
+      MODEL_FILES_ARR+=("$tf")
     fi
   done
-  if [ -n "$MODEL_FILES" ]; then
+  if [ ${#MODEL_FILES_ARR[@]} -gt 0 ]; then
     MODEL_BREAKDOWN=$(jq -s '
       [.[].model_usage // {} | to_entries[]]
       | group_by(.key)
@@ -220,12 +222,12 @@ while IFS= read -r line; do
       | sort_by(.model)
       | .[]
       | "\(.model)|\(.input)|\(.output)|\(.cache_read)|\(.cache_create)"
-    ' $MODEL_FILES 2>/dev/null || echo "")
+    ' "${MODEL_FILES_ARR[@]}" 2>/dev/null || echo "")
     if [ -n "$MODEL_BREAKDOWN" ]; then
       MODEL_BREAKDOWN_ROWS="<tr><td colspan=\"7\" style=\"background:#f0f0f0; font-size:0.85em; color:#666; padding:0.3em 1em;\"><em>Per-model breakdown</em></td></tr>"
       while IFS='|' read -r M_NAME M_INPUT M_OUTPUT M_CACHE_READ M_CACHE_CREATE; do
         if [ -n "$M_NAME" ]; then
-          M_SHORT=$(echo "$M_NAME" | sed 's/-[0-9]*$//')
+          M_SHORT="${M_NAME%-[0-9]*}"
           MODEL_BREAKDOWN_ROWS="${MODEL_BREAKDOWN_ROWS}<tr style=\"font-size:0.85em; color:#666;\"><td>&nbsp;&nbsp;${M_SHORT}</td><td>-</td><td>$(format_number "$M_INPUT")</td><td>$(format_number "$M_OUTPUT")</td><td>$(format_number "$M_CACHE_READ")</td><td>$(format_number "$M_CACHE_CREATE")</td><td>-</td></tr>"
         fi
       done <<< "$MODEL_BREAKDOWN"
@@ -256,11 +258,11 @@ while IFS= read -r line; do
   fi
 
   # Summary table row
-  SUMMARY_ROWS="${SUMMARY_ROWS}<tr><td><a href=\"https://redhat.atlassian.net/browse/${ISSUE_KEY}\">${ISSUE_KEY}</a></td><td>${ISSUE_TIMESTAMP}</td><td><span class=\"status ${STATUS_CLASS}\">${STATUS_LABEL}</span></td><td>${PR_LINK}</td><td>${ISSUE_COST}</td></tr>"
+  SUMMARY_ROWS="${SUMMARY_ROWS}<tr><td><a href=\"${JIRA_BASE_URL}/browse/${ISSUE_KEY}\">${ISSUE_KEY}</a></td><td>${ISSUE_TIMESTAMP}</td><td><span class=\"status ${STATUS_CLASS}\">${STATUS_LABEL}</span></td><td>${PR_LINK}</td><td>${ISSUE_COST}</td></tr>"
 
   DETAIL_SECTIONS="${DETAIL_SECTIONS}
 <div class=\"issue-card\">
-  <h2><a href=\"https://redhat.atlassian.net/browse/${ISSUE_KEY}\">${ISSUE_KEY}</a> <span class=\"status ${STATUS_CLASS}\">${STATUS_LABEL}</span></h2>
+  <h2><a href=\"${JIRA_BASE_URL}/browse/${ISSUE_KEY}\">${ISSUE_KEY}</a> <span class=\"status ${STATUS_CLASS}\">${STATUS_LABEL}</span></h2>
   ${TOKEN_TABLE}
 
   <h3>Phase 1: Solve</h3>
@@ -348,7 +350,7 @@ ${SUMMARY_ROWS}
 </tbody>
 </table>
 
-<p><a href="../../hypershift-jira-agent-process/artifacts/jira-agent-transcript.html">View full conversation transcript</a></p>
+<p><a href="../../${JIRA_AGENT_PROCESS_STEP:-jira-agent-process}/artifacts/jira-agent-transcript.html">View full conversation transcript</a></p>
 
 <h2>Details</h2>
 ${DETAIL_SECTIONS}
