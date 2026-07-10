@@ -3,7 +3,7 @@
 set -x
 set +eu
 
-MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"5m"}
+MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
 
 mkdir -p ${ARTIFACT_DIR}/must-gather/
 
