@@ -32,11 +32,16 @@ GCS_ACCESS_KEY=$(cat /var/run/quay-qe-gcp-secret/access_key)
 GCS_SECRET_KEY=$(cat /var/run/quay-qe-gcp-secret/secret_key)
 
 export GOOGLE_APPLICATION_CREDENTIALS="/var/run/quay-qe-gcp-secret/auth.json"
+GCP_PROJECT=$(jq -r '.project_id' "${GOOGLE_APPLICATION_CREDENTIALS}")
 
 mkdir -p QUAY_GCS && cd QUAY_GCS
 cat >>variables.tf <<EOF
 variable "gcs_bucket" {
   default = "quaygcs"
+}
+
+variable "gcp_project" {
+  description = "GCP project ID for the storage bucket"
 }
 EOF
 
@@ -47,6 +52,7 @@ provider "google" {
 
 resource "google_storage_bucket" "quaygcs" {
   name          = var.gcs_bucket
+  project       = var.gcp_project
   location      = "US"
   force_destroy = true
 
@@ -56,8 +62,9 @@ EOF
 
 echo "quay gcs bucket name is ${GCS_BUCKET_NAME}"
 export TF_VAR_gcs_bucket="${GCS_BUCKET_NAME}"
+export TF_VAR_gcp_project="${GCP_PROJECT}"
 terraform init
-terraform apply -auto-approve || true
+terraform apply -auto-approve
 
 #Share Terraform Var and Terraform Directory
 echo "${GCS_BUCKET_NAME}" > "${SHARED_DIR}"/QUAY_GCP_STORAGE_ID
@@ -253,6 +260,6 @@ for _ in {1..60}; do
   fi
   sleep 15
 done
-echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
+echo "Timed out waiting for Quay to become ready after 15 mins" >&2
 archive_pod_info
 exit 1
