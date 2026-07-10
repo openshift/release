@@ -142,6 +142,9 @@ if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
     # OVN-Kubernetes automatically creates "physnet:br-ex" on all nodes, so we use
     # "physnet" as the network name to reuse that default mapping (no NNCP needed).
     # The "subnets" field enables OVN-managed IPAM so VMs get IPs automatically.
+    # attach-default-network=true keeps the pod network for control plane traffic
+    # (ignition, API server, konnectivity) while the localnet interface provides
+    # direct L2 connectivity for data plane features like EgressIP.
     oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
@@ -158,7 +161,7 @@ spec:
       "subnets": "192.168.223.0/24"
   }'
 EOF
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network"
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network"
   else
     # Existing macvlan path
     oc apply -f - <<EOF
