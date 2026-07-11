@@ -16,15 +16,11 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
   exit 1
 fi
 
-function leaseLookup () {
-  local lookup
-  lookup=$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".${1}" "${CLUSTER_PROFILE_DIR}/leases")
-  if [[ -z "${lookup}" ]]; then
-    echo "Couldn't find ${1} in lease config"
-    exit 1
-  fi
-  echo "$lookup"
-}
+LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
+# shellcheck source=../../libvirt/cluster-context/upi-libvirt-cluster-context-commands.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../libvirt/cluster-context" && pwd)/upi-libvirt-cluster-context-commands.sh"
+upi_libvirt_cluster_context_init
+leaseLookup() { upi_libvirt_cluster_lease_lookup "$1"; }
 
 # ensure pull secret file is present
 if [[ ! -f "${CLUSTER_PROFILE_DIR}/pull-secret" ]]; then
@@ -38,17 +34,9 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]]; then
   exit 1
 fi
 
-if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
-  BASE_DOMAIN="phc-cicd.cis.ibm.net"
-  CLUSTER_NAME="${LEASED_RESOURCE}"
-else
-  BASE_DOMAIN="${LEASED_RESOURCE}.ci"
-  CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
-fi
-
 # Default UPI installation
-echo "Create the install-config.yaml file..."
-cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+echo "Create the install-config.yaml file for ${CLUSTER_NAME}..."
+cat >> "${CLUSTER_WORK_DIR}/install-config.yaml" << EOF
 apiVersion: v1
 baseDomain: "${BASE_DOMAIN}"
 metadata:
@@ -82,28 +70,28 @@ EOF
 
 if [ ${FIPS_ENABLED} = "true" ]; then
 	echo "Adding 'fips: true' to the install config..."
-	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+	cat >> "${CLUSTER_WORK_DIR}/install-config.yaml" << EOF
 fips: true
 EOF
 fi
 
 if [ ! -z "${OS_IMAGE_STREAM}" ]; then
 	echo "Adding 'OSImageStream: ${OS_IMAGE_STREAM}' to the install config..."
-	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+	cat >> "${CLUSTER_WORK_DIR}/install-config.yaml" << EOF
 osImageStream: "${OS_IMAGE_STREAM}"
 EOF
 fi
 
 if [ -n "${FEATURE_SET}" ]; then
         echo "Adding 'featureSet: ...' to install-config.yaml"
-        cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+        cat >> "${CLUSTER_WORK_DIR}/install-config.yaml" << EOF
 featureSet: ${FEATURE_SET}
 EOF
 fi
 
 if [ ${NODE_TUNING} = "true" ]; then
   echo "Saving node tuning yaml config..."
-  cat >> ${SHARED_DIR}/99-sysctl-worker.yaml << EOF
+  cat >> "${CLUSTER_WORK_DIR}/99-sysctl-worker.yaml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -130,7 +118,7 @@ fi
 # setting it to clock.corp.redhat.com
 if [ ${ARCH} = "ppc64le" ]; then
   echo "Saving chrony worker yaml config..."
-  cat >> ${SHARED_DIR}/99-chrony-worker.yaml << EOF
+  cat >> "${CLUSTER_WORK_DIR}/99-chrony-worker.yaml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -152,7 +140,7 @@ spec:
 EOF
 
   echo "Saving chrony master yaml config..."
-  cat >> ${SHARED_DIR}/99-chrony-master.yaml << EOF
+  cat >> "${CLUSTER_WORK_DIR}/99-chrony-master.yaml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -168,7 +156,7 @@ spec:
       - contents:
           source: data:text/plain;charset=utf-8;base64,c2VydmVyIGNsb2NrLmNvcnAucmVkaGF0LmNvbSBpYnVyc3QKZHJpZnRmaWxlIC92YXIvbGliL2Nocm9ueS9kcmlmdAptYWtlc3RlcCAxLjAgMwpydGNzeW5jCmxvZ2RpciAvdmFyL2xvZy9jaHJvbnkK
         filesystem: root
-        mode: 420
+        mode: 0644
         overwrite: true
         path: /etc/chrony.conf
 EOF

@@ -24,28 +24,13 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
 fi
 
 LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
-function leaseLookup () {
-  local lookup
-  lookup=$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".${1}" "${LEASE_CONF}")
-  if [[ -z "${lookup}" ]]; then
-    echo "Couldn't find ${1} in lease config"
-    exit 1
-  fi
-  echo "$lookup"
-}
-
-# Must match upi-conf-libvirt install-config naming when USE_EXTERNAL_DNS is true (VPN / phc-cicd).
-if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
-  BASE_DOMAIN="phc-cicd.cis.ibm.net"
-  CLUSTER_NAME="${LEASED_RESOURCE}"
-else
-  BASE_DOMAIN="${LEASED_RESOURCE}.ci"
-  CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
-fi
-BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
+# shellcheck source=../../libvirt/cluster-context/upi-libvirt-cluster-context-commands.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../libvirt/cluster-context" && pwd)/upi-libvirt-cluster-context-commands.sh"
+upi_libvirt_cluster_context_init
+leaseLookup() { upi_libvirt_cluster_lease_lookup "$1"; }
 
 echo "Creating the agent-config.yaml file..."
-cat >> "${SHARED_DIR}/agent-config.yaml" << EOF
+cat >> "${CLUSTER_WORK_DIR}/agent-config.yaml" << EOF
 apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
@@ -79,4 +64,4 @@ hosts:
         macAddress: $(leaseLookup 'compute[1].mac')
 EOF
 
-cat "${SHARED_DIR}/agent-config.yaml"
+cat "${CLUSTER_WORK_DIR}/agent-config.yaml"

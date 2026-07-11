@@ -4,21 +4,26 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-INSTALL_DIR=/tmp
+if [[ -z "${LEASED_RESOURCE}" ]]; then
+  echo "Failed to acquire lease"
+  exit 1
+fi
+
+if [[ -n "${CLUSTER_ROLE:-}" ]]; then
+  INSTALL_DIR="/tmp/${CLUSTER_ROLE}"
+else
+  INSTALL_DIR=/tmp
+fi
+mkdir -p "${INSTALL_DIR}"
 
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
-function leaseLookup () {
-  local lookup
-  lookup=$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".${1}" "${LEASE_CONF}")
-  if [[ -z "${lookup}" ]]; then
-    echo "Couldn't find ${1} in lease config"
-    exit 1
-  fi
-  echo "$lookup"
-}
+# shellcheck source=../../libvirt/cluster-context/upi-libvirt-cluster-context-commands.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../libvirt/cluster-context" && pwd)/upi-libvirt-cluster-context-commands.sh"
+upi_libvirt_cluster_context_init
+leaseLookup() { upi_libvirt_cluster_lease_lookup "$1"; }
 
 # ensure hostname can be found
 HOSTNAME="$(leaseLookup 'hostname')"
@@ -31,15 +36,25 @@ function save_credentials () {
   # Save credentials for diagnostic steps going forward
   echo "Saving authentication files for next steps..."
   if [ -f ${INSTALL_DIR}/metadata.json ]; then
-    cp ${INSTALL_DIR}/metadata.json ${SHARED_DIR}
+    cp ${INSTALL_DIR}/metadata.json "${CLUSTER_WORK_DIR}/"
+    if [[ -z "${CLUSTER_ROLE}" ]]; then
+      cp ${INSTALL_DIR}/metadata.json ${SHARED_DIR}
+    fi
   fi
-  cp ${INSTALL_DIR}/auth/kubeconfig ${SHARED_DIR}
-  cp ${INSTALL_DIR}/auth/kubeadmin-password ${SHARED_DIR}
+  cp ${INSTALL_DIR}/auth/kubeconfig "${CLUSTER_WORK_DIR}/kubeconfig"
+  cp ${INSTALL_DIR}/auth/kubeadmin-password "${CLUSTER_WORK_DIR}/kubeadmin-password"
+  if [[ -n "${CLUSTER_ROLE}" ]]; then
+    echo "${CLUSTER_NAME}" > "${SHARED_DIR}/${CLUSTER_ROLE}_cluster_name"
+  fi
+  if [[ -z "${CLUSTER_ROLE}" || "${CLUSTER_ROLE}" == "mgmt" ]]; then
+    cp ${INSTALL_DIR}/auth/kubeconfig ${SHARED_DIR}/kubeconfig
+    cp ${INSTALL_DIR}/auth/kubeadmin-password ${SHARED_DIR}/kubeadmin-password
+  fi
 }
 
 function prepare_next_steps () {
   EXIT_CODE=$?
-  echo ${EXIT_CODE} > "${SHARED_DIR}/install-status.txt"
+  echo ${EXIT_CODE} > "${CLUSTER_WORK_DIR}/install-status.txt"
   if [[ ${EXIT_CODE} != 0 ]]; then
     exit ${EXIT_CODE}
   fi
@@ -47,7 +62,11 @@ function prepare_next_steps () {
   echo "Setup phase finished, prepare env for next steps"
   # Password for the cluster gets leaked in the installer logs and hence removing them.
   sed -i 's/password: .*/password: REDACTED"/g' "${INSTALL_DIR}/.openshift_install.log"
-  cp "${INSTALL_DIR}/.openshift_install.log" "${ARTIFACT_DIR}"/.openshift_install.log
+  if [[ -n "${CLUSTER_ROLE}" ]]; then
+    cp "${INSTALL_DIR}/.openshift_install.log" "${ARTIFACT_DIR}/${CLUSTER_ROLE}-openshift_install.log"
+  else
+    cp "${INSTALL_DIR}/.openshift_install.log" "${ARTIFACT_DIR}/.openshift_install.log"
+  fi
   save_credentials
   set -e
 }
@@ -62,11 +81,6 @@ echo "Extracting openshift-install from the payload..."
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
   --command=openshift-install --to="${INSTALL_DIR}"
 
-if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
-  CLUSTER_NAME="${LEASED_RESOURCE}"
-else
-  CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
-fi
 OCPINSTALL="${INSTALL_DIR}/openshift-install"
 # All virsh commands need to be run on the hypervisor
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
@@ -93,10 +107,10 @@ fi
 
 # Move the install config to the install directory
 echo "Move the install config to the install directory..."
-cp ${SHARED_DIR}/install-config.yaml ${INSTALL_DIR}
+cp "${CLUSTER_WORK_DIR}/install-config.yaml" ${INSTALL_DIR}
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  cp ${SHARED_DIR}/agent-config.yaml ${INSTALL_DIR}
+  cp "${CLUSTER_WORK_DIR}/agent-config.yaml" ${INSTALL_DIR}
   ${OCPINSTALL} --dir ${INSTALL_DIR} agent create pxe-files
   save_credentials
 
@@ -107,9 +121,9 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
   ROOTFS=agent.${ARCH}-rootfs.img
 
   # These vars are exported since we will used them in the domain.xml creation
-  export KERNEL_NAME="${LEASED_RESOURCE}-kernel"
-  export INITRD_NAME="${LEASED_RESOURCE}-initrd"
-  export ROOTFS_NAME="${LEASED_RESOURCE}-rootfs"
+  export KERNEL_NAME="${RESOURCE_PREFIX}-kernel"
+  export INITRD_NAME="${RESOURCE_PREFIX}-initrd"
+  export ROOTFS_NAME="${RESOURCE_PREFIX}-rootfs"
   export BOOT_ARTIFACTS_PATH="${LIBVIRT_IMAGE_PATH}"
 
   # The name of the kernel artifact depends on the arch
@@ -271,21 +285,21 @@ else
 fi
 
 # Check for the node tuning yaml config, and save it in the installation directory
-NODE_TUNING_YAML="${SHARED_DIR}/99-sysctl-worker.yaml"
+NODE_TUNING_YAML="${CLUSTER_WORK_DIR}/99-sysctl-worker.yaml"
 if [ -f "${NODE_TUNING_YAML}" ]; then
   echo "Saving ${NODE_TUNING_YAML} to the install directory..."
   cp ${NODE_TUNING_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Sets up the chrony machineconfig for the worker nodes
-CHRONY_WORKER_YAML="${SHARED_DIR}/99-chrony-worker.yaml"
+CHRONY_WORKER_YAML="${CLUSTER_WORK_DIR}/99-chrony-worker.yaml"
 if [ -f "${CHRONY_WORKER_YAML}" ]; then
   echo "Saving ${CHRONY_WORKER_YAML} to the install directory..."
   cp ${CHRONY_WORKER_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Sets up the chrony machineconfig for the master nodes
-CHRONY_MASTER_YAML="${SHARED_DIR}/99-chrony-master.yaml"
+CHRONY_MASTER_YAML="${CLUSTER_WORK_DIR}/99-chrony-master.yaml"
 if [ -f "${CHRONY_MASTER_YAML}" ]; then
   echo "Saving ${CHRONY_MASTER_YAML} to the install directory..."
   cp ${CHRONY_MASTER_YAML} "${INSTALL_DIR}/manifests"
@@ -306,23 +320,23 @@ if [[ -f "${MCP_WORKER_YAML}" ]]; then
 fi
 # Check for the etcd on ramdisk yaml config, and save it in the installation directory
 ETCD_RAMDISK_YAML="${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
-if [ -f "${ETCD_RAMDISK_YAML}" ]; then
+if [ -f "${ETCD_RAMDISK_YAML}" ] && [[ -z "${CLUSTER_ROLE}" || "${CLUSTER_ROLE}" == "mgmt" ]]; then
   echo "Saving ${ETCD_RAMDISK_YAML} to the install directory..."
   cp ${ETCD_RAMDISK_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Check for static pod controller degraded yaml config, and save it in the installation directory
 STATIC_POD_DEGRADED_YAML="${SHARED_DIR}/manifest_static-pod-check-workaround-master-mc.yml"
-if [ -f "${STATIC_POD_DEGRADED_YAML}" ]; then
+if [ -f "${STATIC_POD_DEGRADED_YAML}" ] && [[ -z "${CLUSTER_ROLE}" || "${CLUSTER_ROLE}" == "mgmt" ]]; then
   echo "Saving ${STATIC_POD_DEGRADED_YAML} to the install directory..."
   cp ${STATIC_POD_DEGRADED_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Check for kdump worker yaml config, and save it in the installation directory
 KDUMP_WORKER_YAML="${SHARED_DIR}/manifest_99_worker_kdump.yml"
-if [ -f "${KDUMP_WORKER_YAML}" ]; then
+if [ -f "${KDUMP_WORKER_YAML}" ] && [[ -z "${CLUSTER_ROLE}" || "${CLUSTER_ROLE}" == "mgmt" ]]; then
   echo "Saving ${KDUMP_WORKER_YAML} to the install directory..."
-  cp ${KDUMP_WORKER_YAML} /tmp/manifests
+  cp ${KDUMP_WORKER_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 if [ "${INSTALLER_TYPE}" == "default" ]; then
@@ -332,7 +346,7 @@ if [ "${INSTALLER_TYPE}" == "default" ]; then
 
   # Create ignition volumes and upload the ignition configs
   for IGNITION_TYPE in bootstrap master worker; do
-    NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
+    NAME=${RESOURCE_PREFIX}-${IGNITION_TYPE}-ignition-volume
 
     echo "Creating ${IGNITION_TYPE} ignition volume..."
     ${VIRSH} vol-create-as \
@@ -358,7 +372,7 @@ restart_nodes () {
   TOTAL_GUESTS=$((${CONTROL_COUNT:-0} + ${COMPUTE_COUNT:-0}))
   while [ $GUESTS_RESTARTED -lt $TOTAL_GUESTS ]
   do
-     INSTALLED=$(${VIRSH} list --all | grep "${LEASED_RESOURCE}" | grep "shut off" | awk -F' ' '{print $2}' || true)
+     INSTALLED=$(${VIRSH} list --all | grep "${RESOURCE_PREFIX}" | grep "shut off" | awk -F' ' '{print $2}' || true)
      for i in $INSTALLED; do
        GUESTS_RESTARTED=$(($GUESTS_RESTARTED + 1))
        ${VIRSH} start $i
@@ -394,7 +408,7 @@ create_node () {
 
   NAME=${1}
   MAC_ADDRESS=${2}
-  IGNITION_VOLUME=${LEASED_RESOURCE}-${3}-ignition-volume
+  IGNITION_VOLUME=${RESOURCE_PREFIX}-${3}-ignition-volume
 
   if [ "$INSTALLER_TYPE" == "agent" ]; then
     # Calculate the last dynamic vars
@@ -468,7 +482,7 @@ create_node () {
 
 if [ "$INSTALLER_TYPE" == "default" ]; then
   # Create the bootstrap node.
-  NODE="${LEASED_RESOURCE}-bootstrap"
+  NODE="${RESOURCE_PREFIX}-bootstrap"
   echo "Creating ${NODE} node..."
   MAC_ADDRESS=$(leaseLookup "bootstrap[0].mac")
   create_node ${NODE} ${MAC_ADDRESS} bootstrap
@@ -476,7 +490,7 @@ fi
 
 # Create the control plane nodes.
 for (( i=0; i<=${CONTROL_COUNT}-1; i++ )); do
-  NODE="${LEASED_RESOURCE}-control-${i}"
+  NODE="${RESOURCE_PREFIX}-control-${i}"
   echo "Creating ${NODE} node..."
   MAC_ADDRESS=$(leaseLookup "control-plane[$i].mac")
   create_node ${NODE} ${MAC_ADDRESS} master
@@ -484,13 +498,13 @@ done
 
 # Create the compute nodes.
 for (( i=0; i<=${COMPUTE_COUNT}-1; i++ )); do
-  NODE="${LEASED_RESOURCE}-compute-${i}"
+  NODE="${RESOURCE_PREFIX}-compute-${i}"
   echo "Creating ${NODE} node..."
   MAC_ADDRESS=$(leaseLookup "compute[$i].mac")
   create_node ${NODE} ${MAC_ADDRESS} worker
 done
 
-date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
+date "+%F %X" > "${CLUSTER_WORK_DIR}/CLUSTER_INSTALL_START_TIME"
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
   # openshift-install agent wait-for bootstrap-complete completes when the bootstrap Kube API is
@@ -516,10 +530,10 @@ wait "$!"
 
 if [ "$INSTALLER_TYPE" == "default" ]; then
   # Sleep between destroy and undefine to allow for a slight destroy lag
-  echo "Deleting ${LEASED_RESOURCE}-bootstrap node..."
-  ${VIRSH} destroy "${LEASED_RESOURCE}-bootstrap"
+  echo "Deleting ${RESOURCE_PREFIX}-bootstrap node..."
+  ${VIRSH} destroy "${RESOURCE_PREFIX}-bootstrap"
   sleep 1s
-  ${VIRSH} undefine "${LEASED_RESOURCE}-bootstrap"
+  ${VIRSH} undefine "${RESOURCE_PREFIX}-bootstrap"
 
   echo "Approving pending CSRs..."
   approve_csrs () {
@@ -593,6 +607,6 @@ if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
   fi
 fi
 
-date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
+date "+%F %X" > "${CLUSTER_WORK_DIR}/CLUSTER_INSTALL_END_TIME"
 
 touch ${INSTALL_DIR}/install-complete
