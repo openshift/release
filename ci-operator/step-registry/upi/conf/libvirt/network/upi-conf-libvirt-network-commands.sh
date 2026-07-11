@@ -24,8 +24,8 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
 fi
 
 LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
-# shellcheck source=../../libvirt/cluster-context/upi-libvirt-cluster-context-commands.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../libvirt/cluster-context" && pwd)/upi-libvirt-cluster-context-commands.sh"
+# shellcheck source=../../../libvirt/cluster-context/upi-libvirt-cluster-context-commands.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../libvirt/cluster-context" && pwd)/upi-libvirt-cluster-context-commands.sh"
 upi_libvirt_cluster_context_init
 leaseLookup() { upi_libvirt_cluster_lease_lookup "$1"; }
 
