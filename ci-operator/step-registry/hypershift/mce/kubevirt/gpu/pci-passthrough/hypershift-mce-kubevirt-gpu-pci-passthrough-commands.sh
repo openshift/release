@@ -56,7 +56,14 @@ oc wait --all --for=condition=Updated=True machineconfigpool --timeout=60m
 oc wait --all --for=condition=Available=True clusteroperators.config.openshift.io --timeout=20m
 
 GPU_NAME=$(oc debug node/"${GPU_NODE}" -n default -- chroot /host/ bash -c 'lspci -nnv' | grep -i nvidia | head -n 1 | awk -F': ' '{print $2}' | awk '{print $3 "_" $4 "_" $5}' | sed 's/\[\|\]//g')
-oc patch HyperConverged -n openshift-cnv kubevirt-hyperconverged --type merge --patch '{"spec":{"permittedHostDevices":{"pciHostDevices":[{"pciDeviceSelector": "'"${IDS}"'", "resourceName": "'"nvidia.com/${GPU_NAME}"'"}]}}}'
+# CNV 4.22+ (HCO v1) moved permittedHostDevices under spec.virtualization
+if oc explain hyperconverged.spec.virtualization.permittedHostDevices --api-version=hco.kubevirt.io/v1 &>/dev/null; then
+  oc patch HyperConverged -n openshift-cnv kubevirt-hyperconverged --type merge \
+    --patch '{"spec":{"virtualization":{"permittedHostDevices":{"pciHostDevices":[{"pciDeviceSelector": "'"${IDS}"'", "resourceName": "'"nvidia.com/${GPU_NAME}"'"}]}}}}'
+else
+  oc patch HyperConverged -n openshift-cnv kubevirt-hyperconverged --type merge \
+    --patch '{"spec":{"permittedHostDevices":{"pciHostDevices":[{"pciDeviceSelector": "'"${IDS}"'", "resourceName": "'"nvidia.com/${GPU_NAME}"'"}]}}}'
+fi
 echo "nvidia.com/$GPU_NAME" > "${SHARED_DIR}/GPU_DEVICE_NAME"
 cp -f /tmp/100-worker-iommu.yaml "${ARTIFACT_DIR}/100-worker-iommu.yaml"
 cp -f /tmp/100-worker-vfiopci.yaml "${ARTIFACT_DIR}/100-worker-vfiopci.yaml"
