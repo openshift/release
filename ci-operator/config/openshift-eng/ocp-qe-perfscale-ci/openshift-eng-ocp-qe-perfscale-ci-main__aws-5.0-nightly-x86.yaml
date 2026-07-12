@@ -542,6 +542,37 @@ tests:
     - ref: openshift-qe-workers-scale
     test:
     - chain: openshift-qe-cudn-density
+- as: cudn-density-single-ns-1000-50nodes
+  cron: 0 6 * * 2,4
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "47"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: c6a.8xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: c6a.8xlarge
+      NAMESPACES_PER_CUDN: "1"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
+      OVERRIDE_ITERATIONS: "1000"
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    test:
+    - chain: openshift-qe-cudn-density
 - as: cudn-density-single-ns-250-24nodes
   cron: 0 4 * * 1,3,5
   reporter_config:
@@ -637,7 +668,7 @@ tests:
     - ref: openshift-qe-workers-scale
     test:
     - chain: openshift-qe-cudn-density
-- as: cudn-incremental-700-24nodes
+- as: cudn-incremental-1200-24nodes
   cron: 0 10 * * 2,4
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
@@ -652,15 +683,15 @@ tests:
   steps:
     cluster_profile: aws-perfscale-qe
     env:
-      ADDITIONAL_WORKER_NODES: "21"
+      ADDITIONAL_WORKER_NODES: "47"
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6a.4xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
-      EXTRA_FLAGS: --incremental-step-size=50 --incremental-step-delay=5m --incremental-pattern=linear
-        --timeout=8h
+      COMPUTE_NODE_TYPE: c6a.8xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: c6a.8xlarge
+      EXTRA_FLAGS: --incremental-step-size=200 --incremental-step-delay=5m --incremental-pattern=linear
+        --timeout=10h --log-level=info
       NAMESPACES_PER_CUDN: "1"
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      OVERRIDE_ITERATIONS: "700"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
+      OVERRIDE_ITERATIONS: "1200"
       SET_ENV_BY_PLATFORM: custom
     post:
     - chain: ipi-aws-post

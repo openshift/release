@@ -62,7 +62,7 @@ fi
 
 
 export WORKLOAD=cudn-density
-EXTRA_FLAGS+="${KB_FLAGS} --local-indexing --layer3=${ENABLE_LAYER_3} --namespaces-per-cudn=${NAMESPACES_PER_CUDN} --gc-metrics=false --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF} --job-pause=10m"
+EXTRA_FLAGS+="${KB_FLAGS} --local-indexing --layer3=${ENABLE_LAYER_3} --namespaces-per-cudn=${NAMESPACES_PER_CUDN} --gc-metrics=false --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF} --job-pause=15m"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
