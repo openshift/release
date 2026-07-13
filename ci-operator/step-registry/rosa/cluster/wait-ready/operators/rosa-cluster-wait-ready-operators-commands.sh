@@ -89,7 +89,7 @@ if [[ -n "${check_failed}" ]]; then
     echo "Meet operator issue. Sleep 3h to call debugging."
     CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
     slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")
-    slack_message='{"text": "'"${check_failed}"' for cluster '"${CLUSTER_ID}"'. Sleep 3 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
+    slack_message='{"text": "'"${check_failed}"' for cluster '"${CLUSTER_ID}"'. Sleep 3 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <!subteam^S0BEMESJS83>"}'
     curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
     sleep 10800
   fi
