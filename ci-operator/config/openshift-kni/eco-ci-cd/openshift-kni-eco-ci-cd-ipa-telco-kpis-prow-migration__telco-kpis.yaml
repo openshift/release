@@ -1,0 +1,113 @@
+build_root:
+  image_stream_tag:
+    name: eco-ci-cd
+    namespace: telcov10n-ci
+    tag: eco-ci-cd
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 300Mi
+tests:
+- as: telco-kpis-ztp-tests
+  capabilities:
+  - intranet
+  cron: 0 6 * * 2
+  reporter_config:
+    channel: '#telco-kpis-ci-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      ABSOLUTE_MAX_LATENCY: "50"
+      ACTION: setup
+      APPLY_FIXES: "false"
+      ARCHITECTURE: x86_64
+      BASELINE: "false"
+      CNF_GOTESTS_REPO: https://gitlab.cee.redhat.com/cnf/cnf-gotests.git
+      DEBUG: "false"
+      DISABLE_INSIGHTS: "true"
+      DURATION: 1h
+      ECO_CI_CD_IMAGE: quay.io/ccardenosa/eco-ci-cd:latest
+      FRAME_SIZE: "512"
+      GENERATE_HUB_LOCKDOWN: "false"
+      GENERATE_SPOKE_LOCKDOWN: "false"
+      GITLAB_REPO_BRANCH: telco-kpis
+      GITLAB_REPO_URL: https://gitlab.cee.redhat.com/ccardeno/ztp-site-configs-ci.git
+      HUB_CLUSTER: kni-qe-71
+      HUB_LOCKDOWN_URI: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json
+      LAT_RATE: "0.8"
+      MAX_LATENCY_THRESHOLD: "30"
+      METADATA_RELPATH: telco-ran/configuration/kube-compare-reference/metadata.yaml
+      OCP_RELEASE_IMAGE: ""
+      PR_ONLY: "true"
+      RAN_IMAGES: |
+        {
+          "images": [
+            "quay.io/telcov10n-ci/oslat:latest",
+            "quay.io/telcov10n-ci/cyclictest:latest",
+            "quay.io/telcov10n-ci/cnf-tests:4.8",
+            "quay.io/telcov10n-ci/stress-ng:latest",
+            "quay.io/telcov10n-ci/cnf-gotests-client:latest",
+            "quay.io/telcov10n-ci/dpdk-testpmd:latest",
+            "quay.io/telcov10n-ci/process-exporter:ppid-2",
+            "quay.io/telcov10n-ci/fedora-stress-ng:latest",
+            "quay.io/telcov10n-ci/curl:latest",
+            "quay.io/telcov10n-ci/sampleapp:latest",
+            "quay.io/telcov10n-ci/kubectl:latest",
+            "quay.io/telcov10n-ci/rtla:latest",
+            "quay.io/telcov10n-ci/oran-subscriber:latest"
+          ]
+        }
+      RAN_INTEGRATION_BRANCH: master
+      RAN_INTEGRATION_REPO: https://gitlab.cee.redhat.com/ran/ran-integration.git
+      REBOOT_AFTER_APPLY: "false"
+      REBOOT_COUNT: "6"
+      REFERENCE_BRANCH: ""
+      REFERENCE_REPO_URL: https://github.com/openshift-kni/telco-reference.git
+      SKIP_REBUILD_IMAGE: "false"
+      SPIRENT_CONFIG_FILE: spirent_testcfg.xml
+      SPOKE: spree-02
+      SPOKE_CLUSTER: spree-02
+      SPOKE_LOCKDOWN_URI: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json
+      THRESHOLD_DURATION: 2h0m
+      THROUGHPUT_THRESHOLD: "99.9"
+      TIMEOUT: +10 hour
+      TOLERANCE_NINES: "6"
+      VERSION: "4.21"
+      ZTP_CLUSTERS_PATH: siteconfig
+      ZTP_GIT_BRANCH: ""
+      ZTP_GIT_REPO: https://gitlab.cee.redhat.com/ocp-edge-qe/ztp-site-configs.git
+      ZTP_POLICIES_PATH: policygentemplates
+    post:
+    - ref: telcov10n-system-telco-kpis-wait-to-debug
+    - chain: telcov10n-system-telco-kpis-reporting
+    pre:
+    - chain: telcov10n-system-telco-kpis-hub-deployment-deploy-hub
+    - chain: telcov10n-system-telco-kpis-spoke-deployment-deploy-spoke
+    - ref: telcov10n-system-telco-kpis-mirror-ran-test-images
+    test:
+    - ref: telcov10n-system-telco-kpis-collect-node-info
+    - ref: telcov10n-system-telco-kpis-tests-run-ztp-ai-deployment-time-test
+    - ref: telcov10n-system-telco-kpis-tests-run-bios-validation-test
+    - ref: telcov10n-system-telco-kpis-tests-run-oslat-test
+    - ref: telcov10n-system-telco-kpis-tests-run-cyclictest-test
+    - ref: telcov10n-system-telco-kpis-tests-run-ptp-test
+    - ref: telcov10n-system-telco-kpis-tests-run-cpu-util-test
+    - ref: telcov10n-system-telco-kpis-tests-run-reboot-test
+    - ref: telcov10n-system-telco-kpis-tests-run-rfc2544-test
+    - ref: telcov10n-system-telco-kpis-tests-run-rds-compare-test
+zz_generated_metadata:
+  branch: ipa-telco-kpis-prow-migration
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: telco-kpis
