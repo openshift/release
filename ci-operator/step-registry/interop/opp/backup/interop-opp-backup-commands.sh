@@ -116,7 +116,6 @@ CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.ve
 NODE_COUNT=""
 NODE_COUNT=$(oc get nodes --no-headers 2>/dev/null | wc -l) || true
 
-OPERATOR_STATUS="[]"
 IFS=',' read -ra OP_LIST <<< "${OPP_OPERATORS}"
 OP_JSON="["
 for op in "${OP_LIST[@]}"; do
