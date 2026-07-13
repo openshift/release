@@ -1,0 +1,34 @@
+workflow:
+  as: telcov10n-system-telco-kpis-spoke-deployment
+  steps:
+    pre:
+    - chain: telcov10n-system-telco-kpis-spoke-deployment-deploy-spoke
+    post:
+    - ref: wait
+  documentation: |-
+    Deploy spoke clusters for Telco KPIs testing infrastructure using Zero Touch Provisioning (ZTP).
+
+    This workflow deploys managed spoke clusters via Red Hat Advanced Cluster Management (RHACM)
+    and GitOps. The spoke clusters are configured with telco-optimized settings and
+    operators required for CNF workload testing.
+
+    Workflow steps:
+    1. Mirror spoke operators to disconnected registry (OLM catalogs, operator images)
+    2. Deploy spoke cluster via ZTP (SiteConfig, PolicyGenTemplates, TALM orchestration)
+
+    Prerequisites:
+    - Hub cluster must be deployed and configured (use telco-kpis-hub-deployment workflow)
+    - ZTP GitOps repository must be configured with site configs
+    - Disconnected registry must be accessible from spoke cluster
+
+    Environment variables:
+    - SPOKE_CLUSTER: Spoke cluster name (spree-01, spree-02, spree-03, spree-04, cnfdg46)
+    - HUB_CLUSTER: Hub cluster managing the spoke
+    - ZTP_GIT_REPO: GitOps repository URL for ZTP configurations
+    - ZTP_CLUSTERS_PATH: Path to SiteConfig manifests in GitOps repo
+    - ZTP_POLICIES_PATH: Path to PolicyGenTemplate manifests in GitOps repo
+
+    Use cases:
+    - Fresh spoke cluster deployment via ZTP
+    - Spoke cluster rebuild after teardown
+    - Testing ZTP workflows and configurations
