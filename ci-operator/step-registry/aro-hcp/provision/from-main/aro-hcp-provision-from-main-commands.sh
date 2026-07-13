@@ -36,17 +36,19 @@ git fetch https://github.com/Azure/ARO-HCP.git main
 git checkout -f FETCH_HEAD
 echo "Checked out main at $(git rev-parse --short HEAD)"
 
-# The CSPR postsubmit pushes service images to ACR tagged with the 7-char
-# commit SHA (see aro-hcp-images-push step). Resolve the tag and look up
-# the digest for each service image so the baseline uses main's actual images.
+# The images-push-postsubmit job runs the aro-hcp-images-push step on every
+# merge to main (DEPLOY_ENV=dev), mirroring CI-built service images into the
+# shared SVC ACR tagged with the 7-char commit SHA. We resolve ACR/repo
+# coordinates from the dev config to match, since that's what images-push uses.
 MAIN_SHA=$(git rev-parse --short=7 HEAD)
 
-CONFIG_FILE="config/rendered/dev/${DEPLOY_ENV}/westus3.yaml"
+IMAGES_DEPLOY_ENV="dev"
+CONFIG_FILE="config/rendered/dev/${IMAGES_DEPLOY_ENV}/westus3.yaml"
 if [[ ! -f "${CONFIG_FILE}" ]]; then
-  CONFIG_FILE="config/rendered/dev/${DEPLOY_ENV}/centralus.yaml"
+  CONFIG_FILE="config/rendered/dev/${IMAGES_DEPLOY_ENV}/centralus.yaml"
 fi
 if [[ ! -f "${CONFIG_FILE}" ]]; then
-  echo "ERROR: No rendered config found for ${DEPLOY_ENV} (tried westus3.yaml, centralus.yaml)"
+  echo "ERROR: No rendered config found for ${IMAGES_DEPLOY_ENV} (tried westus3.yaml, centralus.yaml)"
   exit 1
 fi
 
@@ -66,32 +68,42 @@ KUBE_APPLIER_REPO=$(yq '.kubeApplier.image.repository' "${CONFIG_FILE}")
 echo "ACR: ${ACR_URL}, main SHA: ${MAIN_SHA}"
 echo "Repos: backend=${BACKEND_REPO} frontend=${FRONTEND_REPO} admin-api=${ADMIN_API_REPO} sessiongate=${SESSIONGATE_REPO} fleet=${FLEET_REPO} mgmt-agent=${MGMT_AGENT_REPO} kube-applier=${KUBE_APPLIER_REPO}"
 
-# Wait for the postsubmit images-push job to have pushed images for this
-# commit. Check one representative repo (fleet); all are pushed together.
-MAX_ATTEMPTS=30
+# Prefer the latest main commit's images. Poll ACR in case the postsubmit
+# images-push job is still running. If HEAD's images never appear, walk
+# back through history to find the newest commit with images available.
+MAX_POLL=30
 POLL_INTERVAL=30
-echo "Polling ACR for ${FLEET_REPO}:${MAIN_SHA} (up to $((MAX_ATTEMPTS * POLL_INTERVAL))s) ..."
-for attempt in $(seq 1 ${MAX_ATTEMPTS}); do
+echo "Polling ACR for ${FLEET_REPO}:${MAIN_SHA} (up to $((MAX_POLL * POLL_INTERVAL))s) ..."
+FOUND_HEAD=false
+for attempt in $(seq 1 ${MAX_POLL}); do
   if az acr manifest show -r "${ACR_NAME}" -n "${FLEET_REPO}:${MAIN_SHA}" &>/dev/null; then
-    echo "Images for ${MAIN_SHA} available after attempt ${attempt}"
+    echo "Images for HEAD (${MAIN_SHA}) available after attempt ${attempt}"
+    FOUND_HEAD=true
     break
   fi
-  if [[ ${attempt} -eq ${MAX_ATTEMPTS} ]]; then
-    echo "ERROR: Images for ${MAIN_SHA} not found in ${ACR_NAME} after ${MAX_ATTEMPTS} attempts."
-    echo "Falling back to parent commit ..."
-    MAIN_SHA=$(git rev-parse --short=7 HEAD~1)
-    echo "Trying parent commit: ${MAIN_SHA}"
-    if ! az acr manifest show -r "${ACR_NAME}" -n "${FLEET_REPO}:${MAIN_SHA}" &>/dev/null; then
-      echo "ERROR: Images for fallback ${MAIN_SHA} also not found. Aborting."
-      exit 1
-    fi
-    echo "Fallback images found for ${MAIN_SHA}"
-    break
-  else
-    echo "Attempt ${attempt}/${MAX_ATTEMPTS}: not yet available, retrying in ${POLL_INTERVAL}s ..."
-    sleep ${POLL_INTERVAL}
-  fi
+  echo "Attempt ${attempt}/${MAX_POLL}: not yet available, retrying in ${POLL_INTERVAL}s ..."
+  sleep ${POLL_INTERVAL}
 done
+
+if [[ "${FOUND_HEAD}" != "true" ]]; then
+  echo "Images for HEAD (${MAIN_SHA}) not found after polling. Walking back through history ..."
+  MAX_WALK=20
+  IMAGE_SHA=""
+  for sha in $(git log --format='%h' --abbrev=7 --skip=1 -n ${MAX_WALK}); do
+    if az acr manifest show -r "${ACR_NAME}" -n "${FLEET_REPO}:${sha}" &>/dev/null; then
+      IMAGE_SHA="${sha}"
+      echo "Found images in ACR for commit ${sha}"
+      break
+    fi
+    echo "  ${sha}: not in ACR, trying older ..."
+  done
+
+  if [[ -z "${IMAGE_SHA}" ]]; then
+    echo "ERROR: No images found in ${ACR_NAME} for any of the last ${MAX_WALK} main commits. Aborting."
+    exit 1
+  fi
+  MAIN_SHA="${IMAGE_SHA}"
+fi
 
 # Resolve each image tag to its digest from ACR.
 resolve_digest() {
@@ -125,7 +137,7 @@ echo "  kube-applier: ${KUBE_APPLIER_DIGEST}"
 
 OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override.yaml"
 
-# Image overrides — point at ACR images built from main's commit.
+# Image overrides: use ACR images built from main's commit.
 yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${ACR_URL}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPO}\" |
@@ -150,7 +162,7 @@ yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\"
 " > "${OVERRIDE_CONFIG_FILE}"
 
-# MSI mock SP overrides (if provided) — needed for both baseline and upgrade
+# MSI mock SP overrides (if provided). Needed for both baseline and upgrade.
 if [[ -n "${LEASED_MSI_MOCK_SP:-}" ]]; then
   MSI_MOCK_CLIENT_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".clientId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
   MSI_MOCK_PRINCIPAL_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".principalId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
