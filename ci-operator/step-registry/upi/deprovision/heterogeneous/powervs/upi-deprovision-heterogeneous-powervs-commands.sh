@@ -51,7 +51,7 @@ function cleanup_ibmcloud_powervs() {
             if [ -n "${VPC_CONN_ID}" ]
             then
                 echo "deleting VPC connection"
-                ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
+                ibmcloud tg connection-delete "${GW}" "${VPC_CONN_ID}" --force || true
                 sleep 120
                 echo "Done Cleaning up GW VPC Connection"
             else
