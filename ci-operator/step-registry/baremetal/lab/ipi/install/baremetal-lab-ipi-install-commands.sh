@@ -267,6 +267,8 @@ if [[ -n "${WORKER_COREOS_STREAM:-}" ]]; then
     fi
     esc_stream="$(printf '%s' "${WORKER_COREOS_STREAM}" | sed 's/[\/&]/\\&/g')"
     for bmh_file in "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_hosts-*.yaml; do
+        ls "${bmh_file}"
+        echo "-------------------------"
         if ! grep -q 'installer.openshift.io/role: control-plane' "${bmh_file}"; then
             sed -i "s/coreos.openshift.io\/stream: .*/coreos.openshift.io\/stream: ${esc_stream}/" "${bmh_file}"
             echo -e "${bmh_file} updated -------"
@@ -275,7 +277,10 @@ if [[ -n "${WORKER_COREOS_STREAM:-}" ]]; then
     done
     # Patch worker MachineSet hostSelector to match the new stream
     for ms_file in "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
-        sed -i "s/coreos.openshift.io\/stream: .*/coreos.openshift.io\/stream: ${WORKER_COREOS_STREAM}/" "${ms_file}"
+        ls "${ms_file}"
+        echo "-------------------------"
+        sed -i "s/coreos.openshift.io\/stream: .*/coreos.openshift.io\/stream: ${esc_stream}/" "${ms_file}"
+        grep coreos.openshift.io "${ms_file}"
     done
     # Set the worker MachineConfigPool to use the specified stream for
     # the on-disk OS. Requires the OSStreams feature gate (TechPreviewNoUpgrade).
@@ -295,7 +300,7 @@ spec:
     matchLabels:
       node-role.kubernetes.io/worker: ""
   osImageStream:
-    name: ${WORKER_COREOS_STREAM}
+    name: ${esc_stream}
 EOF
 fi
 
@@ -388,6 +393,9 @@ if ! wait "$install_pid"; then
 elif [ "${NO_END_TIME:-false}" = "true" ]; then
   date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 fi
+
+echo "sleeping for an hour"
+sleep 3600
 
 # Additional check to wait for all the nodes to be ready. Especially important
 # for multi-arch compute nodes clusters with mixed arch nodes.
