@@ -82,6 +82,24 @@ tests:
     - ref: quay-tests-test-quay-newui
     - ref: quay-tests-test-quay-e2e
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay318-ocp422-azure
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-22@sha256:dc85edf1095b3be72cf2a3f4e727857944c0538d56face1f3b96700dc0846053
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_STORAGE_PROVIDER: azure
+      QUAY_VERSION: "3.18"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-azure
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay
