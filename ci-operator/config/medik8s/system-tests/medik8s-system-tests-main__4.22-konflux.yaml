@@ -226,10 +226,17 @@ tests:
     cluster_profile: medik8s-aws
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_ENABLE_REPORT: "true"
+      ECO_TC_PREFIX: OCP-
       ECO_TEST_FEATURES: far-operator
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation
+      POLARION_TESTRUN_ID: RHWA-FAR-4.22-weekly
+      REPORT_CASE_TAG: polarion-testcase-id
+    post:
+    - ref: medik8s-polarion-reporter
+    - chain: ipi-aws-post
     test:
     - chain: medik8s-setup
     - ref: medik8s-aws-credentials
@@ -237,7 +244,10 @@ tests:
       cli: latest
       commands: make run-tests
       env:
+      - name: ECO_ENABLE_REPORT
+      - name: ECO_TC_PREFIX
       - name: ECO_TEST_FEATURES
+      - name: REPORT_CASE_TAG
       from: src
       resources:
         requests:
