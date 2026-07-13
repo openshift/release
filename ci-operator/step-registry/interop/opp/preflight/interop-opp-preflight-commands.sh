@@ -11,6 +11,15 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
+# Ensure jq is available (not shipped in the cli base image)
+if ! command -v jq &>/dev/null; then
+    echo "jq not found; installing..."
+    dnf install -y -q jq 2>/dev/null || yum install -y -q jq 2>/dev/null || {
+        echo >&2 "ERROR: failed to install jq"
+        exit 1
+    }
+fi
+
 REPORT_DIR="${ARTIFACT_DIR}/preflight"
 REPORT_FILE="${REPORT_DIR}/preflight-report.json"
 mkdir -p "${REPORT_DIR}"
@@ -327,8 +336,8 @@ check_mcp_readiness() {
     while IFS= read -r line; do
         local mcp_name ready desired
         mcp_name="$(echo "${line}" | awk '{print $1}')"
-        ready="$(echo "${line}" | awk '{print $6}')"
-        desired="$(echo "${line}" | awk '{print $7}')"
+        desired="$(echo "${line}" | awk '{print $6}')"
+        ready="$(echo "${line}" | awk '{print $7}')"
         if [[ -n "${ready}" && -n "${desired}" && "${ready}" != "${desired}" ]]; then
             mismatch="${mismatch}${mcp_name} (ready=${ready}, desired=${desired}); "
         fi
@@ -368,7 +377,7 @@ main() {
     fi
     echo "Target release image: ${target}"
 
-    KUBECONFIG="" oc --loglevel=8 registry login
+    KUBECONFIG="" oc registry login
 
     local target_version target_minor
     target_version="$(oc adm release info "${target}" --output=json | jq -r '.metadata.version')"
