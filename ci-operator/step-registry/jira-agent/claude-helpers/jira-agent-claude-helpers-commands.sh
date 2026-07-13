@@ -395,7 +395,6 @@ ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
     "Bash Read Grep Glob" 90 \
     --append-system-prompt "${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
 
-  local issue_success=true
   if [ $PHASE_EXIT_CODE -eq 0 ]; then
     pr_url=$(extract_pr_url "$issue_key")
     if [ -n "$pr_url" ]; then
@@ -403,11 +402,11 @@ ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
       generate_autodl "$issue_key" "pr-creation" "success" "$pr_url" "$PHASE_SESSION_ID"
     else
       echo "Phase 4 completed but no PR URL found in output"
-      issue_success=false
     fi
-  else
-    issue_success=false
   fi
+
+  # Always label after processing to prevent duplicate runs on next periodic
+  postprocess_jira_issue "$issue_key" "true"
 
   # Post-PR: append report link, notify Slack
   if [ -n "$pr_url" ]; then
@@ -419,10 +418,8 @@ ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
     fi
   fi
 
-  postprocess_jira_issue "$issue_key" "$issue_success"
-
-  if [ "$issue_success" = true ]; then
-    record_issue_result "$issue_key" "$timestamp" "$pr_url" "SUCCESS"
+  if [ $PHASE_EXIT_CODE -eq 0 ]; then
+    record_issue_result "$issue_key" "$timestamp" "${pr_url:-}" "SUCCESS"
     return 0
   else
     record_issue_result "$issue_key" "$timestamp" "" "FAILED"

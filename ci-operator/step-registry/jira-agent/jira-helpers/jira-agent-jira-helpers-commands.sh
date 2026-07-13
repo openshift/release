@@ -84,11 +84,18 @@ load_github_slack_map() {
 transition_issue() {
   local issue_key=$1 target_status=$2
 
-  local transitions transition_id http_code
-  transitions=$(curl -s \
+  local transitions transition_id http_code raw_response
+  raw_response=$(curl -s -w "\n%{http_code}" \
     "${JIRA_BASE_URL}/rest/api/3/issue/${issue_key}/transitions" \
     -H "Authorization: Basic $JIRA_AUTH" \
     -H "Content-Type: application/json")
+  http_code=$(echo "$raw_response" | tail -1)
+  transitions=$(echo "$raw_response" | sed '$d')
+
+  if [ "$http_code" != "200" ]; then
+    echo "   Warning: Jira transitions API returned HTTP $http_code"
+    return 1
+  fi
 
   transition_id=$(echo "$transitions" | jq -r --arg status "$target_status" \
     '.transitions[] | select(.name == $status) | .id' | head -1)
@@ -207,12 +214,19 @@ postprocess_jira_issue() {
 
   if [ -n "${JIRA_AGENT_ASSIGNEE:-}" ]; then
     echo "Looking up accountId for '${JIRA_AGENT_ASSIGNEE}'..."
-    local assignee_account_id assignee_response
-    assignee_account_id=$(curl -s -G \
+    local assignee_account_id assignee_response raw_response
+    raw_response=$(curl -s -w "\n%{http_code}" -G \
       "${JIRA_BASE_URL}/rest/api/3/user/search" \
       -H "Authorization: Basic $JIRA_AUTH" \
-      --data-urlencode "query=${JIRA_AGENT_ASSIGNEE}" \
-      | jq -r '[.[] | select(.displayName | test("'"${JIRA_AGENT_ASSIGNEE}"'"; "i"))] | .[0].accountId // empty')
+      --data-urlencode "query=${JIRA_AGENT_ASSIGNEE}")
+    http_code=$(echo "$raw_response" | tail -1)
+    if [ "$http_code" != "200" ]; then
+      echo "   Warning: Jira user search API returned HTTP $http_code, skipping assignee"
+      assignee_account_id=""
+    else
+      assignee_account_id=$(echo "$raw_response" | sed '$d' \
+        | jq -r '[.[] | select(.displayName | test("'"${JIRA_AGENT_ASSIGNEE}"'"; "i"))] | .[0].accountId // empty')
+    fi
     if [ -n "$assignee_account_id" ]; then
       echo "Setting assignee to account ID '${assignee_account_id}'..."
       assignee_response=$(set_assignee "$issue_key" "$assignee_account_id")

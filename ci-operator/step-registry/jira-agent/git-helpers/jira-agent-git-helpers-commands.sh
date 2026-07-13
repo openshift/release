@@ -42,7 +42,6 @@ load_github_app_credentials() {
     echo "  - private-key"
     echo ""
     echo "Exiting gracefully. Re-run once secrets are synced."
-    echo "no_credentials" > "${SHARED_DIR}/processed-issues.txt"
     exit 0
   fi
 
