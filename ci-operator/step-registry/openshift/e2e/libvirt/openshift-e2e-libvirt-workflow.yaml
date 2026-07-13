@@ -1,6 +1,10 @@
 workflow:
   as: openshift-e2e-libvirt
   steps:
+    env:
+      # No-op unless ARCH=s390x (see ipi-install-libvirt-install). Newer VPN/RHEL9 QEMU defaults
+      # reject ACPI in domain XML from terraform-provider-libvirt.
+      IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH: "true"
     allow_best_effort_post_steps: true
     pre:
     - chain: ipi-libvirt-pre
@@ -18,3 +22,6 @@ workflow:
     The IPI workflow provides pre- and post- steps that provision and
     deprovision an OpenShift cluster with a default configuration on libvirt,
     allowing job authors to inject their own end-to-end test logic.
+
+    Sets IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH for s390x-only libvirt install workarounds (ignored on
+    other architectures).
