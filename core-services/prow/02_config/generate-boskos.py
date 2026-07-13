@@ -477,7 +477,7 @@ CONFIG = {
         'eu-west-2': 8
     },
     'hypershift-aws-quota-slice': {
-        'default': 12,
+        'default': 30,
     },
     'hypershift-aks-quota-slice': {
         'default': 20,
