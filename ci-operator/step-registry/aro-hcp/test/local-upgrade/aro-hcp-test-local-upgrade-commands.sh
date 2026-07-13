@@ -4,6 +4,14 @@ set -o nounset
 set -o pipefail
 
 : "${ARO_HCP_SUITE_NAME:?ARO_HCP_SUITE_NAME must be set}"
+: "${BACKEND_IMAGE:?BACKEND_IMAGE must be set}"
+: "${FRONTEND_IMAGE:?FRONTEND_IMAGE must be set}"
+: "${ADMIN_API_IMAGE:?ADMIN_API_IMAGE must be set}"
+: "${SESSIONGATE_IMAGE:?SESSIONGATE_IMAGE must be set}"
+: "${HCP_RECOVERY_IMAGE:?HCP_RECOVERY_IMAGE must be set}"
+: "${FLEET_IMAGE:?FLEET_IMAGE must be set}"
+: "${MGMT_AGENT_IMAGE:?MGMT_AGENT_IMAGE must be set}"
+: "${KUBE_APPLIER_IMAGE:?KUBE_APPLIER_IMAGE must be set}"
 
 if [[ ! -f "${SHARED_DIR}/config.yaml" ]]; then
   echo "ERROR: ${SHARED_DIR}/config.yaml missing; run aro-hcp-provision-environment first"
@@ -36,8 +44,7 @@ export DETECT_DIRTY_GIT_WORKTREE=0
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 
-# Override only hypershift image coordinates from PR config; templatize keeps all
-# other hypershift defaults from the base config (what provision deployed).
+# Hypershift images from PR config; regional service images from PR pipeline builds.
 if ! yq -e '.defaults.hypershift.image.registry' config/config.yaml >/dev/null 2>&1 \
   || ! yq -e '.defaults.hypershift.image.repository' config/config.yaml >/dev/null 2>&1 \
   || ! yq -e '.defaults.hypershift.image.digest' config/config.yaml >/dev/null 2>&1; then
@@ -58,9 +65,72 @@ HO_SHARED_INGRESS_REGISTRY=$(yq '.defaults.hypershift.sharedIngressImage.registr
 HO_SHARED_INGRESS_REPOSITORY=$(yq '.defaults.hypershift.sharedIngressImage.repository' config/config.yaml)
 HO_SHARED_INGRESS_DIGEST=$(yq '.defaults.hypershift.sharedIngressImage.digest' config/config.yaml)
 
+BACKEND_DIGEST=$(echo "${BACKEND_IMAGE}" | cut -d'@' -f2)
+BACKEND_REPOSITORY=$(echo "${BACKEND_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
+BACKEND_SOURCE_REGISTRY=$(echo "${BACKEND_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
+
+FRONTEND_DIGEST=$(echo "${FRONTEND_IMAGE}" | cut -d'@' -f2)
+FRONTEND_REPOSITORY=$(echo "${FRONTEND_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
+FRONTEND_SOURCE_REGISTRY=$(echo "${FRONTEND_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
+
+ADMIN_API_DIGEST=$(echo "${ADMIN_API_IMAGE}" | cut -d'@' -f2)
+ADMIN_API_REPOSITORY=$(echo "${ADMIN_API_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
+ADMIN_API_SOURCE_REGISTRY=$(echo "${ADMIN_API_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
+
+SESSIONGATE_DIGEST=$(echo "${SESSIONGATE_IMAGE}" | cut -d'@' -f2)
+SESSIONGATE_REPOSITORY=$(echo "${SESSIONGATE_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
+SESSIONGATE_SOURCE_REGISTRY=$(echo "${SESSIONGATE_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
+
+HCP_RECOVERY_DIGEST=$(echo "${HCP_RECOVERY_IMAGE}" | cut -d'@' -f2)
+HCP_RECOVERY_REPOSITORY=$(echo "${HCP_RECOVERY_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
+HCP_RECOVERY_SOURCE_REGISTRY=$(echo "${HCP_RECOVERY_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
+
+FLEET_DIGEST=$(echo "${FLEET_IMAGE}" | cut -d'@' -f2)
+FLEET_REPOSITORY=$(echo "${FLEET_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
+FLEET_SOURCE_REGISTRY=$(echo "${FLEET_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
+
+MGMT_AGENT_DIGEST=$(echo "${MGMT_AGENT_IMAGE}" | cut -d'@' -f2)
+MGMT_AGENT_REPOSITORY=$(echo "${MGMT_AGENT_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
+MGMT_AGENT_SOURCE_REGISTRY=$(echo "${MGMT_AGENT_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
+
+KUBE_APPLIER_DIGEST=$(echo "${KUBE_APPLIER_IMAGE}" | cut -d'@' -f2)
+KUBE_APPLIER_REPOSITORY=$(echo "${KUBE_APPLIER_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
+KUBE_APPLIER_SOURCE_REGISTRY=$(echo "${KUBE_APPLIER_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
+
+if [[ -n "${USE_OC_LOGIN_REGISTRIES:-}" ]]; then
+  USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY}"
+else
+  USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY}"
+fi
+export USE_OC_LOGIN_REGISTRIES
+
 export OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override-upgrade.yaml"
 
 yq eval -n "
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${BACKEND_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.digest = \"${BACKEND_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.registry = \"${FRONTEND_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.repository = \"${FRONTEND_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.digest = \"${FRONTEND_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.registry = \"${ADMIN_API_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.repository = \"${ADMIN_API_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.digest = \"${ADMIN_API_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.registry = \"${SESSIONGATE_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.repository = \"${SESSIONGATE_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.digest = \"${SESSIONGATE_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.registry = \"${HCP_RECOVERY_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.repository = \"${HCP_RECOVERY_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.digest = \"${HCP_RECOVERY_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.registry = \"${FLEET_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.repository = \"${FLEET_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.digest = \"${FLEET_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.registry = \"${MGMT_AGENT_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.repository = \"${MGMT_AGENT_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.digest = \"${MGMT_AGENT_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.registry = \"${KUBE_APPLIER_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.repository = \"${KUBE_APPLIER_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.registry = \"${HO_IMAGE_REGISTRY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.repository = \"${HO_IMAGE_REPOSITORY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.digest = \"${HO_IMAGE_DIGEST}\" |
@@ -71,10 +141,8 @@ yq eval -n "
 
 cp "${OVERRIDE_CONFIG_FILE}" "${SHARED_DIR}/config-override.yaml"
 
-echo "Hypershift operator image (in override, sourced from PR-head config/config.yaml):"
-yq ".clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image" "${OVERRIDE_CONFIG_FILE}"
-echo "Hypershift shared ingress image (in override, sourced from PR-head config/config.yaml):"
-yq ".clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.sharedIngressImage" "${OVERRIDE_CONFIG_FILE}"
+echo "Created upgrade override config at: ${OVERRIDE_CONFIG_FILE}"
+cat "${OVERRIDE_CONFIG_FILE}"
 
 unset GOFLAGS
 
@@ -85,15 +153,13 @@ export KUBECONFIG=kubeconfig
 FRONTEND_ADDRESS="https://$(kubectl get virtualservice -n aro-hcp aro-hcp-vs-frontend -o jsonpath='{.spec.hosts[0]}')"
 make frontend-grant-ingress DEPLOY_ENV="${DEPLOY_ENV}"
 
-# HypershiftOperator runs on the management cluster; upgrade/in-place invokes
-# make pipeline/RP.HypershiftOperator and requires mgmt kubeconfig in KUBECONFIG.
 make -C dev-infrastructure/ mgmt.aks.kubeconfig MGMT_KUBECONFIG_FILE=../mgmt-kubeconfig DEPLOY_ENV="${DEPLOY_ENV}"
 export KUBECONFIG=mgmt-kubeconfig
 
 az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
 make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
 
-# Single suite: create cluster, run pipeline/RP.HypershiftOperator, hash watch, cleanup.
+# Suite upgrades svc and mgmt regional components via pipeline/RP.* using OVERRIDE_CONFIG_FILE.
 SKIP_CERT_VERIFICATION=true ./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" \
   --junit-path="${ARTIFACT_DIR}/junit.xml" \
   --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" \

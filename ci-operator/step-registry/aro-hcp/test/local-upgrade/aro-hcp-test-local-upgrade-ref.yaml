@@ -30,16 +30,35 @@ ref:
     - name: ARO_HCP_DEPLOY_ENV
       default: "ci01"
       documentation: Config environment name.
+    - name: USE_OC_LOGIN_REGISTRIES
+      default: ""
+      documentation: Space-separated list of registries that require oc registry login for authentication
     - name: ARO_HCP_SUITE_NAME
       default: "upgrade/in-place"
       documentation: |-
-        One-shot suite: create hosted cluster, run pipeline/RP.HypershiftOperator with
-        OVERRIDE_CONFIG_FILE, validate node pool hash change, cleanup.
+        Upgrade suite: expects OVERRIDE_CONFIG_FILE and USE_OC_LOGIN_REGISTRIES in the
+        environment. Suite make targets fetch svc/mgmt kubeconfigs as needed.
     - name: COMPRESS_TIMING_METADATA
       default: "true"
       documentation: Whether to compress timing metadata files with gzip.
+  dependencies:
+  - name: "pipeline:aro-hcp-backend"
+    env: BACKEND_IMAGE
+  - name: "pipeline:aro-hcp-frontend"
+    env: FRONTEND_IMAGE
+  - name: "pipeline:aro-hcp-admin-api"
+    env: ADMIN_API_IMAGE
+  - name: "pipeline:aro-hcp-sessiongate"
+    env: SESSIONGATE_IMAGE
+  - name: "pipeline:aro-hcp-hcp-recovery"
+    env: HCP_RECOVERY_IMAGE
+  - name: "pipeline:aro-hcp-fleet"
+    env: FLEET_IMAGE
+  - name: "pipeline:aro-hcp-mgmt-agent"
+    env: MGMT_AGENT_IMAGE
+  - name: "pipeline:aro-hcp-kube-applier"
+    env: KUBE_APPLIER_IMAGE
   documentation: |-
-    Uses PR head config/config.yaml to build hypershift operator and shared ingress
-    image overrides, fetches svc kubeconfig for frontend discovery and mgmt
-    kubeconfig for pipeline/RP.HypershiftOperator, then runs the upgrade/in-place
-    suite.
+    Builds PR pipeline and hypershift image overrides into OVERRIDE_CONFIG_FILE,
+    then runs the upgrade suite. Kubeconfig fetch and pipeline/RP.* upgrades are
+    handled inside the suite via make.

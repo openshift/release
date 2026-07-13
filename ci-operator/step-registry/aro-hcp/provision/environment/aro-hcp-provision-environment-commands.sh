@@ -54,91 +54,96 @@ az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 oc version
 kubelogin --version
 
-BACKEND_DIGEST=$(echo ${BACKEND_IMAGE} | cut -d'@' -f2)
-BACKEND_REPOSITORY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-BACKEND_SOURCE_REGISTRY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${BACKEND_SOURCE_REGISTRY} and repo ${BACKEND_REPOSITORY} for Backend Image"
-
-FRONTEND_DIGEST=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f2)
-FRONTEND_REPOSITORY=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-FRONTEND_SOURCE_REGISTRY=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${FRONTEND_SOURCE_REGISTRY} and repo ${FRONTEND_REPOSITORY} for Frontend Image"
-
-ADMIN_API_DIGEST=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f2)
-ADMIN_API_REPOSITORY=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-ADMIN_API_SOURCE_REGISTRY=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${ADMIN_API_SOURCE_REGISTRY} and repo ${ADMIN_API_REPOSITORY} for Admin API Image"
-
-SESSIONGATE_DIGEST=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f2)
-SESSIONGATE_REPOSITORY=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-SESSIONGATE_SOURCE_REGISTRY=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${SESSIONGATE_SOURCE_REGISTRY} and repo ${SESSIONGATE_REPOSITORY} for SessionGate Image"
-
-HCP_RECOVERY_DIGEST=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f2)
-HCP_RECOVERY_REPOSITORY=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-HCP_RECOVERY_SOURCE_REGISTRY=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${HCP_RECOVERY_SOURCE_REGISTRY} and repo ${HCP_RECOVERY_REPOSITORY} for HCP Recovery Image"
-
-FLEET_DIGEST=$(echo ${FLEET_IMAGE} | cut -d'@' -f2)
-FLEET_REPOSITORY=$(echo ${FLEET_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-FLEET_SOURCE_REGISTRY=$(echo ${FLEET_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${FLEET_SOURCE_REGISTRY} and repo ${FLEET_REPOSITORY} for Fleet Image"
-
-MGMT_AGENT_DIGEST=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f2)
-MGMT_AGENT_REPOSITORY=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-MGMT_AGENT_SOURCE_REGISTRY=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${MGMT_AGENT_SOURCE_REGISTRY} and repo ${MGMT_AGENT_REPOSITORY} for Mgmt Agent Image"
-
-KUBE_APPLIER_DIGEST=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f2)
-KUBE_APPLIER_REPOSITORY=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-KUBE_APPLIER_SOURCE_REGISTRY=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${KUBE_APPLIER_SOURCE_REGISTRY} and repo ${KUBE_APPLIER_REPOSITORY} for Kube Applier Image"
-
-EXPORTER_DIGEST=$(echo ${EXPORTER_IMAGE} | cut -d'@' -f2)
-EXPORTER_REPOSITORY=$(echo ${EXPORTER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
-EXPORTER_SOURCE_REGISTRY=$(echo ${EXPORTER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
-echo "source registry set to ${EXPORTER_SOURCE_REGISTRY} and repo ${EXPORTER_REPOSITORY} for Exporter Image"
-
-# Set up registries that require oc login - append backend and frontend registries
-if [[ -n "${USE_OC_LOGIN_REGISTRIES}" ]]; then
-    USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY} ${EXPORTER_SOURCE_REGISTRY}"
+if [[ -n "${PROVISION_GIT_REF:-}" ]]; then
+  echo "PROVISION_GIT_REF=${PROVISION_GIT_REF}; using config images from checked-out ref, skipping PR pipeline overrides"
+  yq eval -n "." > "${OVERRIDE_CONFIG_FILE}"
 else
-    USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY} ${EXPORTER_SOURCE_REGISTRY}"
+  BACKEND_DIGEST=$(echo ${BACKEND_IMAGE} | cut -d'@' -f2)
+  BACKEND_REPOSITORY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+  BACKEND_SOURCE_REGISTRY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+  echo "source registry set to ${BACKEND_SOURCE_REGISTRY} and repo ${BACKEND_REPOSITORY} for Backend Image"
+
+  FRONTEND_DIGEST=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f2)
+  FRONTEND_REPOSITORY=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+  FRONTEND_SOURCE_REGISTRY=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+  echo "source registry set to ${FRONTEND_SOURCE_REGISTRY} and repo ${FRONTEND_REPOSITORY} for Frontend Image"
+
+  ADMIN_API_DIGEST=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f2)
+  ADMIN_API_REPOSITORY=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+  ADMIN_API_SOURCE_REGISTRY=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+  echo "source registry set to ${ADMIN_API_SOURCE_REGISTRY} and repo ${ADMIN_API_REPOSITORY} for Admin API Image"
+
+  SESSIONGATE_DIGEST=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f2)
+  SESSIONGATE_REPOSITORY=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+  SESSIONGATE_SOURCE_REGISTRY=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+  echo "source registry set to ${SESSIONGATE_SOURCE_REGISTRY} and repo ${SESSIONGATE_REPOSITORY} for SessionGate Image"
+
+  HCP_RECOVERY_DIGEST=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f2)
+  HCP_RECOVERY_REPOSITORY=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+  HCP_RECOVERY_SOURCE_REGISTRY=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+  echo "source registry set to ${HCP_RECOVERY_SOURCE_REGISTRY} and repo ${HCP_RECOVERY_REPOSITORY} for HCP Recovery Image"
+
+  FLEET_DIGEST=$(echo ${FLEET_IMAGE} | cut -d'@' -f2)
+  FLEET_REPOSITORY=$(echo ${FLEET_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+  FLEET_SOURCE_REGISTRY=$(echo ${FLEET_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+  echo "source registry set to ${FLEET_SOURCE_REGISTRY} and repo ${FLEET_REPOSITORY} for Fleet Image"
+
+  MGMT_AGENT_DIGEST=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f2)
+  MGMT_AGENT_REPOSITORY=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+  MGMT_AGENT_SOURCE_REGISTRY=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+  echo "source registry set to ${MGMT_AGENT_SOURCE_REGISTRY} and repo ${MGMT_AGENT_REPOSITORY} for Mgmt Agent Image"
+
+  KUBE_APPLIER_DIGEST=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f2)
+  KUBE_APPLIER_REPOSITORY=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+  KUBE_APPLIER_SOURCE_REGISTRY=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+  echo "source registry set to ${KUBE_APPLIER_SOURCE_REGISTRY} and repo ${KUBE_APPLIER_REPOSITORY} for Kube Applier Image"
+
+  EXPORTER_DIGEST=$(echo ${EXPORTER_IMAGE} | cut -d'@' -f2)
+  EXPORTER_REPOSITORY=$(echo ${EXPORTER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+  EXPORTER_SOURCE_REGISTRY=$(echo ${EXPORTER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+  echo "source registry set to ${EXPORTER_SOURCE_REGISTRY} and repo ${EXPORTER_REPOSITORY} for Exporter Image"
+
+  # Set up registries that require oc login - append backend and frontend registries
+  if [[ -n "${USE_OC_LOGIN_REGISTRIES}" ]]; then
+      USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY} ${EXPORTER_SOURCE_REGISTRY}"
+  else
+      USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY} ${EXPORTER_SOURCE_REGISTRY}"
+  fi
+  echo "USE_OC_LOGIN_REGISTRIES set to: ${USE_OC_LOGIN_REGISTRIES}"
+
+  OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override.yaml"
+
+  # Image overrides
+  yq eval -n "
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${BACKEND_SOURCE_REGISTRY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPOSITORY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.digest = \"${BACKEND_DIGEST}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.registry = \"${FRONTEND_SOURCE_REGISTRY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.repository = \"${FRONTEND_REPOSITORY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.digest = \"${FRONTEND_DIGEST}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.registry = \"${ADMIN_API_SOURCE_REGISTRY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.repository = \"${ADMIN_API_REPOSITORY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.digest = \"${ADMIN_API_DIGEST}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.registry = \"${SESSIONGATE_SOURCE_REGISTRY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.repository = \"${SESSIONGATE_REPOSITORY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.digest = \"${SESSIONGATE_DIGEST}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.registry = \"${HCP_RECOVERY_SOURCE_REGISTRY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.repository = \"${HCP_RECOVERY_REPOSITORY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.digest = \"${HCP_RECOVERY_DIGEST}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.registry = \"${FLEET_SOURCE_REGISTRY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.repository = \"${FLEET_REPOSITORY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.digest = \"${FLEET_DIGEST}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.registry = \"${MGMT_AGENT_SOURCE_REGISTRY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.repository = \"${MGMT_AGENT_REPOSITORY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.digest = \"${MGMT_AGENT_DIGEST}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.registry = \"${KUBE_APPLIER_SOURCE_REGISTRY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.repository = \"${KUBE_APPLIER_REPOSITORY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.registry = \"${EXPORTER_SOURCE_REGISTRY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.repository = \"${EXPORTER_REPOSITORY}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.digest = \"${EXPORTER_DIGEST}\"
+  " > "${OVERRIDE_CONFIG_FILE}"
 fi
-echo "USE_OC_LOGIN_REGISTRIES set to: ${USE_OC_LOGIN_REGISTRIES}"
-
-OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override.yaml"
-
-# Image overrides
-yq eval -n "
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${BACKEND_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.digest = \"${BACKEND_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.registry = \"${FRONTEND_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.repository = \"${FRONTEND_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.digest = \"${FRONTEND_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.registry = \"${ADMIN_API_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.repository = \"${ADMIN_API_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.digest = \"${ADMIN_API_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.registry = \"${SESSIONGATE_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.repository = \"${SESSIONGATE_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.digest = \"${SESSIONGATE_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.registry = \"${HCP_RECOVERY_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.repository = \"${HCP_RECOVERY_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.digest = \"${HCP_RECOVERY_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.registry = \"${FLEET_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.repository = \"${FLEET_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.digest = \"${FLEET_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.registry = \"${MGMT_AGENT_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.repository = \"${MGMT_AGENT_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.digest = \"${MGMT_AGENT_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.registry = \"${KUBE_APPLIER_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.repository = \"${KUBE_APPLIER_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.registry = \"${EXPORTER_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.repository = \"${EXPORTER_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.digest = \"${EXPORTER_DIGEST}\"
-" > "${OVERRIDE_CONFIG_FILE}"
 
 # MSI mock SP overrides (if provided)
 if [[ -n "${LEASED_MSI_MOCK_SP:-}" ]]; then
