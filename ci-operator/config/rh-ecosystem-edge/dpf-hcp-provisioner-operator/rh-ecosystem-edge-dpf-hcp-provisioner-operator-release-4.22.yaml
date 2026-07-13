@@ -11,9 +11,8 @@ images:
     to: dpf-hcp-provisioner-operator-ci
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.22"
 resources:
   '*':
@@ -23,6 +22,24 @@ resources:
       cpu: 2000m
       memory: 2Gi
 tests:
+- as: lint
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache
+    unset GOFLAGS
+    make lint
+    make verify-generate
+  container:
+    from: src
+- as: unit-tests
+  commands: |
+    unset GOFLAGS
+    make test
+  container:
+    from: src
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
 - always_run: true
   as: dpf-hcp-provisioner-operator-e2e-aws-single-replica
   steps:
@@ -32,7 +49,6 @@ tests:
       MACHINE_OS_URL: quay.io/eelgaev/rhcos-bfb:4.22.0-ec.2
     workflow: rh-ecosystem-edge-dpf-hcp-provisioner-operator
 zz_generated_metadata:
-  branch: main
+  branch: release-4.22
   org: rh-ecosystem-edge
   repo: dpf-hcp-provisioner-operator
-  variant: "4.22"
