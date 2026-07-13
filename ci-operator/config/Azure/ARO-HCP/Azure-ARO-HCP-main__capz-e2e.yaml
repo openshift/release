@@ -203,6 +203,15 @@ tests:
   timeout: 4h0m0s
 - as: production
   cron: 0 20 * * 1-5
+  reporter_config:
+    channel: '#hcm-aro-team-capz'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:slack-green: Job *{{.Spec.Job}}*
+      succeeded.{{else}}:failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.{{end}}
+      <{{.Status.URL}}|View logs>'
   steps:
     allow_best_effort_post_steps: true
     env:
