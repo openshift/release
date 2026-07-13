@@ -1,0 +1,24 @@
+ref:
+  as: interop-opp-preflight
+  from: cli
+  grace_period: 2m
+  commands: interop-opp-preflight-commands.sh
+  timeout: 30m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  dependencies:
+  - name: "release:latest"
+    env: "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
+  env:
+    - name: OPP_OPERATORS
+      default: "advanced-cluster-management,rhacs-operator,odf-operator,quay-operator"
+      documentation: Comma-separated CSV name prefixes for OPP operators to validate in pre-flight checks
+  documentation: |-
+    Runs pre-flight validation checks before an OCP upgrade to detect
+    blocking conditions early.  Checks include API deprecation scanning
+    for the target OCP version, OPP operator compatibility matrix
+    validation, cluster health baseline capture, and MachineConfigPool
+    readiness verification.  Produces a structured JSON report in
+    $ARTIFACT_DIR/preflight/.  Exits with code 3 if any check fails.
