@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.21"
     namespace: ocp
     tag: cli
 build_root:
@@ -72,7 +72,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -81,7 +81,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-e2e-tests-quay313-ocp416-proxy
+- as: quay-e2e-tests-quay317-ocp421-proxy
   cron: 0 0 15 * *
   reporter_config:
     channel: '#quay-qe'
@@ -98,17 +98,80 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      CSO_CHANNEL: stable-3.13
-      QBO_CHANNEL: stable-3.13
-      QUAY_OPERATOR_CHANNEL: stable-3.13
+      CSO_CHANNEL: stable-3.17
+      QBO_CHANNEL: stable-3.17
+      QUAY_OPERATOR_CHANNEL: stable-3.17
       QUAY_PROXY: "true"
-      QUAY_VERSION: "3.13"
+      QUAY_VERSION: "3.17"
     test:
     - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-test-quay-e2e
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: quay-e2e-tests-quay316-fips
+  cron: 0 0 6 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      CSO_CHANNEL: stable-3.16
+      FIPS_ENABLED: "true"
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-21@sha256:c2e333a856d5e9b78b9982b833d871c22a1a047210814abe3a9e6636e3b5a710
+      QBO_CHANNEL: stable-3.16
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.16"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay317-fips
+  cron: 0 0 6 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      CSO_CHANNEL: stable-3.17
+      FIPS_ENABLED: "true"
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:2a048c3d57231d7cb7885439217af05cb36df14589c2b7dda2d9da657108319b
+      QBO_CHANNEL: stable-3.17
+      QUAY_OPERATOR_CHANNEL: stable-3.17
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.17"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay318-fips
+  cron: 0 0 6 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      CSO_CHANNEL: stable-3.18
+      FIPS_ENABLED: "true"
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-21@sha256:a94b3fd05155309ccaf1258f3fcbc4a1062eda025bf12c014ea4bfba6b5590fe
+      QBO_CHANNEL: stable-3.18
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.18"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay
