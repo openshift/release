@@ -24,18 +24,32 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
 fi
 
 LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
-# shellcheck source=../../../libvirt/cluster-context/upi-libvirt-cluster-context-commands.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../libvirt/cluster-context" && pwd)/upi-libvirt-cluster-context-commands.sh"
-upi_libvirt_cluster_context_init
-leaseLookup() { upi_libvirt_cluster_lease_lookup "$1"; }
+function leaseLookup () {
+  local lookup
+  lookup=$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".${1}" "${LEASE_CONF}")
+  if [[ -z "${lookup}" ]]; then
+    echo "Couldn't find ${1} in lease config"
+    exit 1
+  fi
+  echo "$lookup"
+}
 
-echo "Creating the libvirt network.xml file for ${CLUSTER_NAME}..."
+if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
+  BASE_DOMAIN="phc-cicd.cis.ibm.net"
+  CLUSTER_NAME="${LEASED_RESOURCE}"
+else
+  BASE_DOMAIN="${LEASED_RESOURCE}.ci"
+  CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+fi
+BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
+
+echo "Creating the libvirt network.xml file..."
 
 # This network xml forces the IP address of the rendezvous host to use the bootstrap IP.
 # We do this so that we can debug agent-based clusters by taking advantage of the open
 # SSH tunnel we created to pull debug logs for our libvirt IPI and UPI default workflows.
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  cat >> "${CLUSTER_WORK_DIR}/network.xml" << EOF
+  cat >> "${SHARED_DIR}/network.xml" << EOF
 <network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
   <name>${CLUSTER_NAME}</name>
   <forward mode='nat'>
@@ -76,7 +90,7 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
 EOF
 
 else
-  cat >> "${CLUSTER_WORK_DIR}/network.xml" << EOF
+  cat >> "${SHARED_DIR}/network.xml" << EOF
 <network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
   <name>${CLUSTER_NAME}</name>
   <forward mode='nat'>
@@ -122,4 +136,4 @@ else
 EOF
 fi
 
-cat "${CLUSTER_WORK_DIR}/network.xml"
+cat "${SHARED_DIR}/network.xml"
