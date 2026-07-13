@@ -44,7 +44,8 @@ timeout_monitor() {
 # Start timeout monitor in background
 timeout_monitor &
 TIMEOUT_PID=$!
-trap 'kill ${TIMEOUT_PID} 2>/dev/null || true' EXIT TERM
+trap 'kill ${TIMEOUT_PID} 2>/dev/null || true' EXIT
+trap 'kill ${TIMEOUT_PID} 2>/dev/null || true; exit 124' TERM
 
 echo "=== Pre-Upgrade Cluster Backup ==="
 echo "Start time: $(date '+%F %T')"
@@ -53,30 +54,48 @@ echo ""
 
 # --- Etcd snapshot ---
 echo "--- Etcd Snapshot ---"
-ETCD_POD=""
-ETCD_POD=$(oc get pods -n openshift-etcd -l app=etcd -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || true
-if [[ -n "${ETCD_POD}" ]]; then
-    echo "Found etcd pod: ${ETCD_POD}"
-    if oc exec -n openshift-etcd "${ETCD_POD}" -c etcdctl -- \
-        etcdctl snapshot save /var/lib/etcd/snapshot.db 2>&1; then
-        if oc cp "openshift-etcd/${ETCD_POD}:/var/lib/etcd/snapshot.db" \
-            "${BACKUP_DIR}/etcd-snapshot.db" -c etcdctl 2>&1; then
-            echo "  OK: etcd snapshot saved"
+CONTROL_PLANE_NODE=""
+CONTROL_PLANE_NODE=$(oc get nodes -l node-role.kubernetes.io/master="" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || true
+if [[ -n "${CONTROL_PLANE_NODE}" ]]; then
+    echo "Found control-plane node"
+    ETCD_BACKUP_REMOTE="/home/core/assets/backup"
+    if oc debug "node/${CONTROL_PLANE_NODE}" -- chroot /host /usr/local/bin/cluster-backup.sh "${ETCD_BACKUP_REMOTE}" 2>&1; then
+        # Copy snapshot and static-pod resources from the node
+        SNAPSHOT_FILE=$(oc debug "node/${CONTROL_PLANE_NODE}" -- chroot /host \
+            bash -c "ls -1 ${ETCD_BACKUP_REMOTE}/snapshot_*.db 2>/dev/null | head -1" 2>/dev/null) || true
+        RESOURCES_FILE=$(oc debug "node/${CONTROL_PLANE_NODE}" -- chroot /host \
+            bash -c "ls -1 ${ETCD_BACKUP_REMOTE}/static_kuberesources_*.tar.gz 2>/dev/null | head -1" 2>/dev/null) || true
+
+        COPY_OK=true
+        if [[ -n "${SNAPSHOT_FILE}" ]]; then
+            if ! oc debug "node/${CONTROL_PLANE_NODE}" -- cat "/host${SNAPSHOT_FILE}" > "${BACKUP_DIR}/etcd-snapshot.db" 2>&1; then
+                echo "  WARNING: Failed to copy etcd snapshot (continuing)"
+                COPY_OK=false
+            fi
+        fi
+        if [[ -n "${RESOURCES_FILE}" ]]; then
+            if ! oc debug "node/${CONTROL_PLANE_NODE}" -- cat "/host${RESOURCES_FILE}" > "${BACKUP_DIR}/static-kuberesources.tar.gz" 2>&1; then
+                echo "  WARNING: Failed to copy static kube resources (continuing)"
+                COPY_OK=false
+            fi
+        fi
+
+        if [[ "${COPY_OK}" == "true" ]]; then
+            echo "  OK: etcd snapshot and static kube resources saved"
             (( CAPTURED += 1 ))
         else
-            echo "  WARNING: Failed to copy etcd snapshot (continuing)"
             (( FAILURES += 1 ))
         fi
-        # Clean up snapshot inside pod
-        oc exec -n openshift-etcd "${ETCD_POD}" -c etcdctl -- \
-            rm -f /var/lib/etcd/snapshot.db 2>/dev/null || true
+        # Clean up backup files on the node
+        oc debug "node/${CONTROL_PLANE_NODE}" -- chroot /host \
+            rm -rf "${ETCD_BACKUP_REMOTE}" 2>/dev/null || true
     else
-        echo "  WARNING: Failed to create etcd snapshot (continuing)"
+        echo "  WARNING: Failed to create etcd backup via cluster-backup.sh (continuing)"
         echo "  This is expected in some CI environments due to permissions"
         (( FAILURES += 1 ))
     fi
 else
-    echo "  WARNING: No etcd pod found (continuing)"
+    echo "  WARNING: No control-plane node found (continuing)"
     (( FAILURES += 1 ))
 fi
 echo ""
