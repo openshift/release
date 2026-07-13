@@ -266,4 +266,53 @@ oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
+# OVN-Kubernetes assigns IPs to localnet ports via IPAM but does not create
+# DHCP_Options entries, so the VMs never receive the assigned IP via DHCP.
+# This block creates DHCP options in each per-node nbdb and attaches them to
+# the localnet logical switch ports so that OVN's built-in DHCP responder
+# hands out the IPs to the VMs.
+if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
+  LOCALNET_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  LOCALNET_SUBNET="192.168.223.0/24"
+
+  echo "Waiting for VMIs to be running..."
+  for i in $(seq 1 60); do
+    RUNNING_COUNT=$(oc get vmi -n "${LOCALNET_NAMESPACE}" --no-headers 2>/dev/null \
+      | grep -c Running || true)
+    if [[ "${RUNNING_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+      echo "All ${RUNNING_COUNT} VMIs are running"
+      break
+    fi
+    echo "Waiting for VMIs... (${RUNNING_COUNT}/${HYPERSHIFT_NODE_COUNT} running)"
+    sleep 10
+  done
+
+  echo "Configuring OVN DHCP for localnet interfaces..."
+  for VMI in $(oc get vmi -n "${LOCALNET_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}'); do
+    NODE=$(oc get vmi -n "${LOCALNET_NAMESPACE}" "${VMI}" -o jsonpath='{.status.nodeName}')
+    OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
+
+    LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl --columns=name --bare find Logical_Switch_Port \
+      "external_ids:k8s.ovn.org/topology=localnet" 2>/dev/null)
+
+    if [[ -z "${LSP_NAME}" ]]; then
+      echo "WARNING: No localnet LSP found on node ${NODE} for VMI ${VMI}"
+      continue
+    fi
+
+    DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl create DHCP_Options cidr="${LOCALNET_SUBNET}" \
+      options='"lease_time"="3500" "router"="192.168.223.1" "server_id"="192.168.223.1" "server_mac"="c0:ff:ee:00:00:01"' \
+      2>/dev/null)
+
+    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl lsp-set-dhcpv4-options "${LSP_NAME}" "${DHCP_UUID}" 2>/dev/null
+
+    echo "Configured DHCP for VMI ${VMI} on node ${NODE} (DHCP: ${DHCP_UUID})"
+  done
+  echo "OVN DHCP configuration complete for localnet interfaces"
+fi
+
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
