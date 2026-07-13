@@ -1,0 +1,116 @@
+ref:
+  as: openshift-qe-berserker-load
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  grace_period: 60s
+  commands: openshift-qe-berserker-load-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: BERSERKER_EXTRA_FLAGS
+    default: "--timeout=8h"
+    documentation: |-
+      Extra flags for berserker-load workload (includes 8h timeout to match other perfscale workloads)
+  - name: KB_FLAGS
+    default: "--qps=60 --burst=60"
+    documentation: |-
+      Additional flags for the kube-burner command. Reused across other kube-burner based workloads
+  - name: E2E_REPO
+    default: "https://github.com/stackrox/openshift-qe-e2e-benchmarking"
+    documentation: |-
+      e2e-benchmarking repository URL
+  - name: E2E_VERSION
+    default: "jv-add-berserker-workload"
+    documentation: |-
+      e2e-benchmarking branch/tag to use
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version (not used when using custom e2e repo with embedded binary URL)
+  - name: JOB_ITERATIONS
+    default: "5"
+    documentation: |-
+      Number of namespaces to create
+  - name: PROCESS_LOAD_REPLICAS
+    default: "6"
+    documentation: |-
+      Number of process-load DaemonSets
+  - name: ENDPOINT_LOAD_REPLICAS
+    default: "6"
+    documentation: |-
+      Number of endpoint-load DaemonSets
+  - name: CONNECTION_LOAD_REPLICAS
+    default: "6"
+    documentation: |-
+      Number of connection-load DaemonSets
+  - name: CHURN_DURATION
+    default: "20m"
+    documentation: |-
+      Churn duration (0 disables churn)
+  - name: JOB_PAUSE
+    default: "20m"
+    documentation: |-
+      Duration to pause after creating resources (before cleanup)
+  - name: CHURN_DELAY
+    default: "10m"
+    documentation: |-
+      Time to wait between each churn
+  - name: CHURN_PERCENT
+    default: "80"
+    documentation: |-
+      Percentage of job iterations to churn each round
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local-indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: BERSERKER_GC
+    default: "false"
+    documentation: |-
+      Garbage collection (disabled by default since CI clusters are ephemeral)
+  - name: ADDITIONAL_PARAMS
+    default: '{}'
+    documentation: |-
+      JSON value to upload additional metadata to the fingerprint
+  - name: PROCESS_LOAD_IMAGE
+    default: "quay.io/stackrox-io/berserker:1.0-86-g3464e60064"
+    documentation: |-
+      Process load container image
+  - name: ENDPOINT_LOAD_IMAGE
+    default: "quay.io/stackrox-io/berserker:1.0-86-g3464e60064"
+    documentation: |-
+      Endpoint load container image
+  - name: CONNECTION_LOAD_IMAGE
+    default: "quay.io/stackrox-io/berserker:network-1.0-85-g1b7ab034aa"
+    documentation: |-
+      Connection load container image
+  - name: POD_CAPTURE_ENABLED
+    default: "true"
+    documentation: |-
+      Enable periodic capture of pod states during test execution
+  - name: POD_CAPTURE_INTERVAL
+    default: "60"
+    documentation: |-
+      Interval in seconds between pod state snapshots (default: 60)
+  documentation: >-
+    This step runs the berserker-load workload for StackRox/RHACS performance testing in the deployed cluster
+  timeout: 6h
