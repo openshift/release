@@ -144,11 +144,13 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml
   container:
     from: src
-- as: e2e-aws-ovn-upgrade
+- always_run: false
+  as: e2e-aws-ovn-upgrade
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-aws-csi
+- always_run: false
+  as: e2e-aws-csi
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
@@ -159,7 +161,7 @@ tests:
 - always_run: false
   as: e2e-aws-csi-extended
   optional: true
-  run_if_changed: ^(Dockerfile\.aws-ebs|assets\/overlays\/aws-ebs\/.*|pkg\/driver\/aws-ebs\/.*|pkg\/operator\/.*)
+  pipeline_run_if_changed: ^(Dockerfile\.aws-ebs|assets\/overlays\/aws-ebs\/.*|pkg\/driver\/aws-ebs\/.*|pkg\/operator\/.*)
   steps:
     cluster_profile: aws-qe
     workflow: openshift-e2e-aws-csi-extended
@@ -184,22 +186,25 @@ tests:
       OO_CHANNEL: stable
       TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
     workflow: openshift-e2e-aws-csi-efs-fips-sts-extended
-- as: e2e-azure
+- always_run: false
+  as: e2e-azure
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
-- as: e2e-azure-csi
+- always_run: false
+  as: e2e-azure-csi
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi
-- as: e2e-azure-ovn-upgrade
+- always_run: false
+  as: e2e-azure-ovn-upgrade
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-azure-csi-extended
   optional: true
-  run_if_changed: ^(Dockerfile\.azure-disk|assets\/overlays\/azure-disk\/.*|pkg\/driver\/azure-disk\/.*|pkg\/operator\/.*)
+  pipeline_run_if_changed: ^(Dockerfile\.azure-disk|assets\/overlays\/azure-disk\/.*|pkg\/driver\/azure-disk\/.*|pkg\/operator\/.*)
   steps:
     cluster_profile: azure-qe
     env:
@@ -209,7 +214,7 @@ tests:
   as: e2e-azurestack-csi
   cluster: build01
   optional: true
-  run_if_changed: ^(Dockerfile\.azure-disk|assets\/overlays\/azure-disk\/.*|pkg\/driver\/azure-disk\/.*|pkg\/operator\/.*)
+  pipeline_run_if_changed: ^(Dockerfile\.azure-disk|assets\/overlays\/azure-disk\/.*|pkg\/driver\/azure-disk\/.*|pkg\/operator\/.*)
   steps:
     cluster_profile: azurestack-dev
     env:
@@ -221,18 +226,20 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
-- as: e2e-azure-file-csi
+- always_run: false
+  as: e2e-azure-file-csi
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi-file
-- as: e2e-azure-file-nfs-csi
+- always_run: false
+  as: e2e-azure-file-nfs-csi
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi-file-nfs
 - always_run: false
   as: e2e-azure-file-csi-extended
   optional: true
-  run_if_changed: ^(Dockerfile\.azure-file|assets\/overlays\/azure-file\/.*|pkg\/driver\/azure-file\/.*|pkg\/operator\/.*)
+  pipeline_run_if_changed: ^(Dockerfile\.azure-file|assets\/overlays\/azure-file\/.*|pkg\/driver\/azure-file\/.*|pkg\/operator\/.*)
   steps:
     cluster_profile: azure-qe
     env:
@@ -241,7 +248,7 @@ tests:
 - always_run: false
   as: e2e-openstack
   optional: true
-  run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*|Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
+  pipeline_run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*|Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -249,16 +256,18 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-cinder-csi
-  run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*)
+- always_run: false
+  as: e2e-openstack-cinder-csi
+  pipeline_run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*)
   steps:
     cluster_profile: openstack-vexxhost
     env:
       TEST_SKIPS: should concurrently access the volume and restored snapshot from
         pods on the same node
     workflow: openshift-e2e-openstack-csi-cinder
-- as: e2e-openstack-manila-csi
-  run_if_changed: ^(Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
+- always_run: false
+  as: e2e-openstack-manila-csi
+  pipeline_run_if_changed: ^(Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
   steps:
     cluster_profile: openstack-vexxhost
     env:
