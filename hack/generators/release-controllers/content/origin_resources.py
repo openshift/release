@@ -288,6 +288,7 @@ def _add_origin_resources(gendoc):
                                     "--jira-endpoint=https://redhat.atlassian.net",
                                     "--jira-username=openshift-release-controller-jira-bot@redhat.com",
                                     "--jira-password-file=/etc/jira/bot-password",
+                                    "--release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml",
                                     "-v=4"
                                 ],
                                 'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',

@@ -70,6 +70,10 @@ BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/al
 
 cd "${ECO_CI_CD_DIR}"
 
+echo "Read BMC credentials from ansible group_all secret"
+[[ -f /var/group_variables/common/all/bmc_user ]] && BMC_USER=$(tr -d '[:space:]' < /var/group_variables/common/all/bmc_user)
+[[ -f /var/group_variables/common/all/bmc_password ]] && BMC_PASSWORD=$(tr -d '[:space:]' < /var/group_variables/common/all/bmc_password)
+
 MIRROR_REGISTRY_VAR=""
 if [[ -n "${MIRROR_REGISTRY}" ]]; then
   MIRROR_REGISTRY_VAR="mirror_registry=${MIRROR_REGISTRY}"
@@ -98,25 +102,37 @@ ssh -o ServerAliveInterval=60 \
   -o UserKnownHostsFile=/dev/null "${BASTION_USER}@${BASTION_IP}" \
   -i "${PROJECT_DIR}/temp_ssh_key" "cd ${REMOTE_DIR}; ./eco-gotests-ptp-gm-run.sh || true"
 
+SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
+
 echo "Gather artifacts from bastion"
 
 for feature in containernshide powermanagement deploymenttypes; do
   local_dir="${ARTIFACT_DIR}/junit_eco_gotests_${feature}_0"
   mkdir -p "${local_dir}"
-  scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    -i "${PROJECT_DIR}/temp_ssh_key" \
+  scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
     "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_${feature}_0/report/*.xml" \
     "${local_dir}/" || echo "No XML artifacts in eco_gotests_${feature}_0 — skipping"
+  ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
+    "cd /tmp/eco_gotests_${feature}_0/report && find . -mindepth 1 ! -name '*.xml' -type f \
+     | zip /tmp/k8sreporter_${feature}_0.zip -@ 2>/dev/null || true"
+  scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+    "${BASTION_USER}@${BASTION_IP}:/tmp/k8sreporter_${feature}_0.zip" \
+    "${local_dir}/" 2>/dev/null || echo "No k8sreporter artifacts in eco_gotests_${feature}_0 — skipping"
 done
 
 PTP_CYCLE_COUNT=$(python3 -c "import json; print(len(json.loads('${PTP_CYCLE_CONFIGS:-[]}')))" 2>/dev/null || echo 0)
 for i in $(seq 0 "${PTP_CYCLE_COUNT}"); do
   local_dir="${ARTIFACT_DIR}/junit_eco_gotests_ptp_gm_${i}"
   mkdir -p "${local_dir}"
-  scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-    -i "${PROJECT_DIR}/temp_ssh_key" \
+  scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
     "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_ptp_gm_${i}/report/*.xml" \
     "${local_dir}/" || echo "No XML artifacts in eco_gotests_ptp_gm_${i} — skipping"
+  ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
+    "cd /tmp/eco_gotests_ptp_gm_${i}/report && find . -mindepth 1 ! -name '*.xml' -type f \
+     | zip /tmp/k8sreporter_ptp_gm_${i}.zip -@ 2>/dev/null || true"
+  scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+    "${BASTION_USER}@${BASTION_IP}:/tmp/k8sreporter_ptp_gm_${i}.zip" \
+    "${local_dir}/" 2>/dev/null || echo "No k8sreporter artifacts in eco_gotests_ptp_gm_${i} — skipping"
 done
 
 echo "Process report files on bastion"

@@ -122,9 +122,9 @@ EnsurePinnedCnvSubscriptionOnSpoke() {
     (
         SECONDS=0
         until oc --kubeconfig="${kubeconfig}" \
-                get namespace openshift-cnv &>/dev/null \
+                get namespace openshift-cnv 1>/dev/null \
             && oc --kubeconfig="${kubeconfig}" \
-                get operatorgroup openshift-cnv -n openshift-cnv &>/dev/null; do
+                get operatorgroup openshift-cnv -n openshift-cnv 1>/dev/null; do
             if (( SECONDS >= waitTimeoutSeconds )); then
                 : "Timeout waiting for openshift-cnv namespace/OperatorGroup on ${clusterName}"
                 exit 1
@@ -242,6 +242,121 @@ WaitForCNV() {
 
 typeset -a clusterNamesArr=()
 mapfile -t clusterNamesArr < <(LoadSpokeClusterNames)
+
+# Resolve latest kubevirt-hyperconverged version for major.minor from the spoke catalog.
+ResolveCnvLatestVersion() {
+    typeset majorMinor="$1"
+    typeset channel="$2"
+    typeset spokeKubeconfig="${3:-}"
+    typeset versionPrefix="${majorMinor}."
+
+    [[ -n "${spokeKubeconfig}" ]] || spokeKubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig"
+
+    oc --kubeconfig="${spokeKubeconfig}" get packagemanifest kubevirt-hyperconverged \
+        -n openshift-marketplace -o json \
+        | jq -r --arg ch "${channel}" --arg prefix "${versionPrefix}" '
+            .status.channels[]
+            | select(.name == $ch)
+            | .entries[]
+            | select(.version | startswith($prefix))
+            | .version' \
+        | sort -V | tail -n1
+}
+
+# Resolve packagemanifest CSV name for an exact x.y.z version on the spoke catalog channel.
+ResolveCnvCsvForVersion() {
+    typeset version="$1"
+    typeset channel="$2"
+    typeset spokeKubeconfig="${3:-}"
+
+    [[ -n "${spokeKubeconfig}" ]] || spokeKubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig"
+
+    oc --kubeconfig="${spokeKubeconfig}" get packagemanifest kubevirt-hyperconverged \
+        -n openshift-marketplace -o json \
+        | jq -r --arg ch "${channel}" --arg ver "${version}" '
+            .status.channels[]
+            | select(.name == $ch)
+            | .entries[]
+            | select(.version == $ver)
+            | .name' \
+        | head -n1
+}
+
+# Installed CNV CSV on the spoke: hco-operatorhub subscription, else package match, else Succeeded CSV.
+GetInstalledCnvCsv() {
+    typeset csv
+    if oc get subscription.operators.coreos.com hco-operatorhub -n openshift-cnv 1>/dev/null; then
+        csv="$(oc get subscription.operators.coreos.com hco-operatorhub -n openshift-cnv \
+            -o jsonpath='{.status.installedCSV}' || true)"
+        if [[ -n "${csv}" ]]; then
+            printf '%s' "${csv}"
+            return 0
+        fi
+    fi
+    csv="$(oc get subscription.operators.coreos.com -n openshift-cnv -o json \
+        | jq -r '.items[] | select(.spec.name=="kubevirt-hyperconverged") | .status.installedCSV' \
+        | grep -v '^$' | head -n1 || true)"
+    if [[ -n "${csv}" ]]; then
+        printf '%s' "${csv}"
+        return 0
+    fi
+    oc get csv -n openshift-cnv -o json \
+        | jq -r '
+            .items[]
+            | select(.metadata.labels["operators.coreos.com/kubevirt-hyperconverged.openshift-cnv"] != null)
+            | select(.status.phase == "Succeeded")
+            | .metadata.name' \
+        | head -n1
+}
+
+#=====================
+# ODF virt StorageClass — annotate after all spokes have HyperConverged Available.
+# ODF creates ocs-storagecluster-ceph-rbd-virtualization when it detects the
+# virtualmachines.kubevirt.io CRD. Called after WaitForCNV completes so the virt SC
+# is guaranteed to exist. Skipped when ODF_DEFAULT_STORAGE_CLASS is empty or not the virt SC
+# (e.g. CCLM job which installs ODF after this step).
+#=====================
+# Called per-spoke (with spoke KUBECONFIG) after all spokes have HyperConverged Available.
+ConfigureOdfVirtStorageClassDefaults() {
+    typeset kubeconfig="${1:?}"
+    typeset -r virtSc="${ODF_DEFAULT_STORAGE_CLASS}"
+    [[ -n "${virtSc}" && "${virtSc}" == *-ceph-rbd-virtualization ]] || return 0
+
+    oc --kubeconfig="${kubeconfig}" wait crd/virtualmachines.kubevirt.io --for=create \
+        --timeout="${ODF_VIRT_STORAGE_CLASS_WAIT_TIMEOUT}"
+
+    if ! oc --kubeconfig="${kubeconfig}" wait "storageclass/${virtSc}" --for=create \
+            --timeout="${ODF_VIRT_STORAGE_CLASS_WAIT_TIMEOUT}"; then
+        oc --kubeconfig="${kubeconfig}" get sc || true
+        oc --kubeconfig="${kubeconfig}" get crd/virtualmachines.kubevirt.io -o yaml \
+            > "${ARTIFACT_DIR}/kubevirt-crd.yaml" 2>&1 || true
+        oc --kubeconfig="${kubeconfig}" get storageconsumer -n openshift-storage -o yaml \
+            > "${ARTIFACT_DIR}/storageconsumer.yaml" 2>&1 || true
+        exit 1
+    fi
+
+    oc --kubeconfig="${kubeconfig}" get sc -o name | xargs -rI{} oc --kubeconfig="${kubeconfig}" annotate {} \
+        storageclass.kubernetes.io/is-default-class- \
+        storageclass.kubevirt.io/is-default-virt-class- --overwrite
+    oc --kubeconfig="${kubeconfig}" annotate storageclass "${virtSc}" \
+        storageclass.kubernetes.io/is-default-class=true \
+        storageclass.kubevirt.io/is-default-virt-class=true --overwrite
+
+    typeset -r snapClass='ocs-storagecluster-rbdplugin-snapclass'
+    if oc --kubeconfig="${kubeconfig}" get volumesnapshotclass "${snapClass}" 1>/dev/null; then
+        oc --kubeconfig="${kubeconfig}" get volumesnapshotclass -o name \
+            | xargs -rI{} oc --kubeconfig="${kubeconfig}" annotate {} snapshot.storage.kubernetes.io/is-default-class- --overwrite
+        oc --kubeconfig="${kubeconfig}" annotate volumesnapshotclass "${snapClass}" \
+            snapshot.storage.kubernetes.io/is-default-class=true --overwrite
+        typeset -r snapCtrlNs='openshift-cluster-storage-operator'
+        typeset -r snapDeploy='csi-snapshot-controller'
+        if oc --kubeconfig="${kubeconfig}" -n "${snapCtrlNs}" get deployment "${snapDeploy}" 1>/dev/null; then
+            oc --kubeconfig="${kubeconfig}" -n "${snapCtrlNs}" rollout restart "deployment/${snapDeploy}"
+            oc --kubeconfig="${kubeconfig}" -n "${snapCtrlNs}" rollout status "deployment/${snapDeploy}" --timeout=5m
+        fi
+    fi
+    true
+}
 
 typeset -a spokeKubeconfigsArr=()
 mapfile -t spokeKubeconfigsArr < <(LoadSpokeKubeconfigs "${clusterNamesArr[@]}")
@@ -541,6 +656,15 @@ for ((idx = 0; idx < ${#pidsArr[@]}; idx++)); do
 done
 
 (( failedCount == 0 ))
+
+# Per-spoke: configure virt StorageClass and snapshot defaults after all spokes have CNV Available.
+# ODF creates ocs-storagecluster-ceph-rbd-virtualization when it detects the
+# virtualmachines.kubevirt.io CRD registered by CNV. HyperConverged Available on all spokes
+# guarantees the CRD and virt SC both exist. Sequential so annotations settle before downstream
+# steps (openshift-virtualization-upgrade-prep) begin boot-image operations.
+for ((idx = 0; idx < ${#clusterNamesArr[@]}; idx++)); do
+    ConfigureOdfVirtStorageClassDefaults "${spokeKubeconfigsArr[idx]}"
+done
 
 # When pinned: remove startingCSV from all spoke subscriptions and from the ACM policy so
 # downstream CNV upgrade steps can create a new InstallPlan. installPlanApproval stays Manual

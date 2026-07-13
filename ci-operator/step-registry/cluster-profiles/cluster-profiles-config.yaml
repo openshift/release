@@ -1,3 +1,17 @@
+cluster_profile_sets_config:
+  tests_exceptions:
+    openshift(-priv)?/installer:
+      .+:
+        .*:
+        - .+-public-ipv4-pool.*
+    openshift(-priv)?/openshift-tests-private:
+      .+:
+        .*:
+        - .+-public-ipv4-pool.*
+    openshift/release:
+      .+:
+        .*:
+        - .+-public-ipv4-pool.*
 cluster_profiles:
 - cluster_type: alibabacloud
   lease_type: alibabacloud-quota-slice
@@ -917,6 +931,7 @@ cluster_profiles:
     - insights-operator
     - installer
     - local-storage-operator
+    - network-observability-operator
     - openshift-tests-private
     - release
     - rosa
@@ -1140,6 +1155,7 @@ cluster_profiles:
     - csi-operator
     - installer
     - multiarch-tuning-operator
+    - network-observability-operator
     - openshift-tests-private
     - release
     - sandboxed-containers-operator
@@ -1382,6 +1398,7 @@ cluster_profiles:
     - gcp-pd-csi-driver
     - gcp-pd-csi-driver-operator
     - installer
+    - network-observability-operator
     - openshift-tests-private
     - release
     - verification-tests
@@ -1623,15 +1640,25 @@ cluster_profiles:
 - cluster_type: aws
   lease_type: openshift-org-aws-quota-slice
   name: openshift-org-aws
-  secret: cluster-secrets-openshift-org-aws
+  set_members:
+  - aws
+  - aws-2
+  - aws-3
+  - aws-4
 - cluster_type: azure4
   lease_type: openshift-org-azure-quota-slice
   name: openshift-org-azure
-  secret: cluster-secrets-openshift-org-azure
+  set_members:
+  - azure-2
+  - azure4
 - cluster_type: gcp
   lease_type: openshift-org-gcp-quota-slice
   name: openshift-org-gcp
-  secret: cluster-secrets-openshift-org-gcp
+  set_members:
+  - gcp
+  - gcp-arm64
+  - gcp-openshift-gce-devel-ci-2
+  - gcp-3
 - cluster_type: openstack-hwoffload
   lease_type: openstack-hwoffload-quota-slice
   name: openstack-hwoffload
@@ -1823,10 +1850,6 @@ cluster_profiles:
   lease_type: vsphere-elastic-quota-slice
   name: vsphere-elastic
   secret: cluster-secrets-vsphere
-- cluster_type: vsphere
-  lease_type: vsphere-multizone-2-quota-slice
-  name: vsphere-multizone-2
-
 konflux:
   cluster_groups:
     rh-staging:

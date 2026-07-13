@@ -22,6 +22,9 @@ ref:
     Subscription. Combine with CNV_POLICY_UPGRADE_APPROVAL=Manual to prevent OLM from
     auto-upgrading past the pinned version.
 
+    When ODF_DEFAULT_STORAGE_CLASS is the virt SC, waits for KubeVirt CRD and virt StorageClass
+    after policy apply, sets cluster/kubevirt defaults and VolumeSnapshotClass before HCO boot-image import.
+
     Reads spoke names and kubeconfigs from ${SHARED_DIR} (managed-cluster-names or managed-cluster-name).
     Waits in parallel for HyperConverged Available on each spoke.
   env:
@@ -67,3 +70,12 @@ ref:
   - name: CNV_POLL_INTERVAL_SECONDS
     default: "30"
     documentation: Sleep interval between HyperConverged status polls on each spoke.
+  - name: ODF_DEFAULT_STORAGE_CLASS
+    default: ""
+    documentation: |-
+      When set to ${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd-virtualization, this step waits for the virt
+      StorageClass (created by ODF after CNV operator registers virtualmachines.kubevirt.io) and sets
+      default annotations before HCO boot-image import completes.
+  - name: ODF_VIRT_STORAGE_CLASS_WAIT_TIMEOUT
+    default: "30m"
+    documentation: Max time to wait for KubeVirt CRD and virt StorageClass after CNV policy apply.

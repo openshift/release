@@ -66,73 +66,34 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-- as: unit-and-gencheck
+- as: istio-integration-pilot
+  postsubmit: true
+  reporter_config:
+    channel: '#team-ossm-quality'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: pilot
+      TEST_SUITE_DESC: Istio Integration pilot
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
-    - as: gencheck
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export BUILD_WITH_CONTAINER=0 && \
-          export GOBIN='/gobin' && \
-          export GOCACHE='/tmp/cache' && \
-          export GOMODCACHE='/tmp/cache' && \
-          export XDG_CACHE_HOME='/tmp/cache' && \
-          export ARTIFACTS='${ARTIFACT_DIR}' && \
-          cd /work && \
-          entrypoint \
-          make gen-check"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 1h0m0s
-    - as: unit
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export BUILD_WITH_CONTAINER=0 && \
-          cd /work && \
-          entrypoint \
-          make -e T=-v build racetest binaries-test"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
-- as: istio-integration-pilot
+- always_run: false
+  as: istio-integration-pilot-retest
+  optional: true
   steps:
     cluster_profile: ossm-aws
     env:
@@ -150,6 +111,33 @@ tests:
     - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-telemetry
+  postsubmit: true
+  reporter_config:
+    channel: '#team-ossm-quality'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: telemetry
+      TEST_SUITE_DESC: Istio Integration telemetry
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
+    workflow: servicemesh-istio-e2e-hypershift
+- always_run: false
+  as: istio-integration-telemetry-retest
+  optional: true
   steps:
     cluster_profile: ossm-aws
     env:
@@ -167,6 +155,33 @@ tests:
     - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-security
+  postsubmit: true
+  reporter_config:
+    channel: '#team-ossm-quality'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: security
+      TEST_SUITE_DESC: Istio Integration security
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
+    workflow: servicemesh-istio-e2e-hypershift
+- always_run: false
+  as: istio-integration-security-retest
+  optional: true
   steps:
     cluster_profile: ossm-aws
     env:
@@ -184,6 +199,34 @@ tests:
     - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-ambient
+  postsubmit: true
+  reporter_config:
+    channel: '#team-ossm-quality'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      AMBIENT: "true"
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: ambient
+      TEST_SUITE_DESC: Istio Integration ambient
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
+    workflow: servicemesh-istio-e2e-hypershift
+- always_run: false
+  as: istio-integration-ambient-retest
+  optional: true
   steps:
     cluster_profile: ossm-aws
     env:
@@ -202,6 +245,14 @@ tests:
     - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-helm
+  postsubmit: true
+  reporter_config:
+    channel: '#team-ossm-quality'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: ossm-aws
     env:
@@ -218,7 +269,28 @@ tests:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
-- as: istio-integration-sail-pilot
+- always_run: false
+  as: istio-integration-helm-retest
+  optional: true
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: helm
+      TEST_SUITE_DESC: Istio Integration helm
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
+    workflow: servicemesh-istio-e2e-hypershift
+- always_run: false
+  as: istio-integration-sail-pilot
+  pipeline_skip_if_only_changed: (^(docs|\.github|\.claude|\.cursor)/)|(\.md$)|((^|/)OWNERS$)|(^\.gitignore$)|(^LICENSE$)
   steps:
     cluster_profile: ossm-aws
     env:
@@ -237,7 +309,9 @@ tests:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
-- as: istio-integration-sail-telemetry
+- always_run: false
+  as: istio-integration-sail-telemetry
+  pipeline_skip_if_only_changed: (^(docs|\.github|\.claude|\.cursor)/)|(\.md$)|((^|/)OWNERS$)|(^\.gitignore$)|(^LICENSE$)
   steps:
     cluster_profile: ossm-aws
     env:
@@ -256,7 +330,9 @@ tests:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
-- as: istio-integration-sail-security
+- always_run: false
+  as: istio-integration-sail-security
+  pipeline_skip_if_only_changed: (^(docs|\.github|\.claude|\.cursor)/)|(\.md$)|((^|/)OWNERS$)|(^\.gitignore$)|(^LICENSE$)
   steps:
     cluster_profile: ossm-aws
     env:
@@ -275,7 +351,9 @@ tests:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
-- as: istio-integration-sail-ambient
+- always_run: false
+  as: istio-integration-sail-ambient
+  pipeline_skip_if_only_changed: (^(docs|\.github|\.claude|\.cursor)/)|(\.md$)|((^|/)OWNERS$)|(^\.gitignore$)|(^LICENSE$)
   steps:
     cluster_profile: ossm-aws
     env:

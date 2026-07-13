@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/acm-cnv-ocp-4.21-p2p-images
     decorate: true
     decoration_config:
@@ -15,7 +15,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-RedHatQE-interop-testing-master-acm-cnv-ocp-4.21-p2p-images
-    optional: true
     rerun_command: /test acm-cnv-ocp-4.21-p2p-images
     spec:
       containers:
@@ -63,7 +62,64 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
+    context: ci/prow/acm-cnv-ocp-4.22-p2p-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: acm-cnv-ocp-4.22-p2p
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-RedHatQE-interop-testing-master-acm-cnv-ocp-4.22-p2p-images
+    rerun_command: /test acm-cnv-ocp-4.22-p2p-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=acm-cnv-ocp-4.22-p2p
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )acm-cnv-ocp-4.22-p2p-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build12
     context: ci/prow/acm-virt-ocp4.22-p2p-images
     decorate: true
     decoration_config:
@@ -121,7 +177,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/cnv-odf-ocp-4.20-lp-interop-cr-images
     decorate: true
     decoration_config:
@@ -180,7 +236,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/cnv-odf-ocp-4.20-lp-interop-images
     decorate: true
     decoration_config:
@@ -239,7 +295,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/cnv-odf-ocp-4.21-lp-interop-cr-images
     decorate: true
     decoration_config:
@@ -298,7 +354,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/cnv-odf-ocp-4.22-lpGA-lp-ocp-compat-images
     decorate: true
     decoration_config:
@@ -357,7 +413,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/cnv-odf-ocp-4.23-lp-interop-images
     decorate: true
     decoration_config:
@@ -416,7 +472,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/cnv-odf-ocp4.19-lp-interop-images
     decorate: true
     decoration_config:
@@ -475,7 +531,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/ibm-fusion-access-operator-ocp-4.21-lp-interop-cr-images
     decorate: true
     decoration_config:
@@ -533,7 +589,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/ibm-fusion-access-operator-ocp-4.23-lp-interop-images
     decorate: true
     decoration_config:
@@ -591,7 +647,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/ibm-fusion-access-operator-ocp4.20-lp-interop-cr-images
     decorate: true
     decoration_config:
@@ -649,7 +705,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/ibm-fusion-access-operator-ocp4.20-lp-interop-images
     decorate: true
     decoration_config:
@@ -707,7 +763,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build12
     context: ci/prow/ibm-fusion-access-operator-ocp4.21-lp-interop-images
     decorate: true
     decoration_config:

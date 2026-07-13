@@ -137,10 +137,6 @@ echo "ResourceSlices:"
 oc get resourceslice
 
 echo ""
-echo "ResourceSlice detail:"
-oc get "$(oc get resourceslice -o name | head -1)" -o yaml
-
-echo ""
 echo "========================================="
 echo "dra-example-driver Installation Complete"
 echo "========================================="

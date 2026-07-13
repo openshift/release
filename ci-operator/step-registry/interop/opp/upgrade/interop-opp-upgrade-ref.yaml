@@ -1,0 +1,32 @@
+ref:
+  as: interop-opp-upgrade
+  from: cli
+  grace_period: 10m
+  commands: interop-opp-upgrade-commands.sh
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  dependencies:
+  - name: "release:latest"
+    env: "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
+  env:
+    - name: UPGRADE_TIMEOUT
+      default: "130"
+      documentation: Maximum minutes to wait for CVO upgrade completion
+    - name: POLL_INTERVAL
+      default: "60"
+      documentation: Seconds between CVO status polls during upgrade monitoring
+    - name: STALL_WINDOW
+      default: "10"
+      documentation: Minutes of no CVO progress change before logging a stall warning
+    - name: OPP_OPERATORS
+      default: "advanced-cluster-management,rhacs-operator,odf-operator,quay-operator"
+      documentation: Comma-separated CSV name prefixes for OPP operators to validate post-upgrade
+  documentation: |-
+    Upgrades an OCP cluster from GA to a nightly release and validates
+    that OPP operators (ACM, ACS, ODF, Quay) survive the upgrade.
+    Expects a cluster already provisioned at the GA version with OPP
+    operators installed. The upgrade target image is resolved from
+    the ci-operator releases block via OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE.

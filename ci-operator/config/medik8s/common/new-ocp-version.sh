@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
-printf "%s\n" \
-"Don't forget to update the OPERATOR_RELEASED_VERSION in the previous config files for 'main' following the medik8s-REPO_NAME-BRANCH_NAME__NEW_VERSION.yaml format." \
-"For instance, after RHWA-25.9 release, medik8s-fence-agents-remediation-main__4.21 config file should have OPERATOR_RELEASED_VERSION with value of 0.6.0." \
-"and after RHWA-4.21-0 release (and FAR v0.7.0), medik8s-fence-agents-remediation-main__4.21 config file should have OPERATOR_RELEASED_VERSION with value of 0.7.0." \
-""
+get_latest_release() {
+  local repo=$1
+  curl -sf "https://api.github.com/repos/medik8s/${repo}/releases/latest" \
+    | grep -m1 '"tag_name"' \
+    | sed -E 's/.*"tag_name":[[:space:]]*"v?([^"]+)".*/\1/'
+}
 
 # check we are in the correct directory
 if [ "${PWD##*/}" != "common" ]; then
@@ -28,6 +29,7 @@ for repo in */ ; do
   repo="${repo%/}"
   echo "updating $repo"
   cd $repo
+  latest_rel=""
   # find latest release (and previous one if present)
   releases_sorted=$(ls | grep .yaml | grep release | sed -r 's#^medik8s-'"$repo"'-(.*)__.*$#\1#g' | sort -u -V)
   release=$(echo "$releases_sorted" | tail -1)
@@ -43,7 +45,10 @@ for repo in */ ; do
   for branch in $branches; do
     echo "branch: $branch"
     # find newest OCP version
-    version=$(ls | grep .yaml | grep "__" | grep medik8s-$repo-$branch | sed -r 's#^.*__(.*)\.yaml$#\1#g' | sort | tail -1)
+    version=$(printf '%s\n' medik8s-"${repo}"-"${branch}"__*.yaml \
+      | sed -nE 's#^.*__([0-9]+\.[0-9]+)\.yaml$#\1#p' \
+      | sort -V \
+      | tail -1)
     if [ -z $version ]; then
       echo "no OCP version variant found, skipping"
       continue
@@ -54,6 +59,18 @@ for repo in */ ; do
     cp ${file} ${new_file}
     # update OCP version
     sed -i "s/$version/$new_version/g" ${new_file}
+    if grep -q 'OPERATOR_RELEASED_VERSION' "${new_file}"; then
+      if [ -z "${latest_rel}" ]; then
+        latest_rel=$(get_latest_release "${repo}")
+      fi
+      if [ -n "${latest_rel}" ]; then
+        sed -i "s/OPERATOR_RELEASED_VERSION: .*/OPERATOR_RELEASED_VERSION: ${latest_rel}/" "${new_file}"
+        echo "  updated OPERATOR_RELEASED_VERSION to ${latest_rel}"
+      else
+        echo "  WARNING: could not fetch latest release for ${repo}"
+        echo "  update OPERATOR_RELEASED_VERSION manually"
+      fi
+    fi
   done
   cd ..
   echo

@@ -84,7 +84,9 @@ tests:
 - as: verify-client-go
   commands: |
     dir=$GOPATH/src/github.com/openshift/client-go
-    git clone https://github.com/openshift/client-go --branch ${PULL_BASE_REF:-master} --single-branch $dir
+    if [ ! -d $dir ]; then
+      git clone https://github.com/openshift/client-go --branch ${PULL_BASE_REF:-master} --single-branch $dir
+    fi
     rm -rf $dir/vendor/github.com/openshift/api/*
     cp -Rf ./ $dir/api/
     rm -rf $dir/api/vendor
@@ -100,8 +102,12 @@ tests:
 - as: verify-hypershift-integration
   commands: |
     dir=$GOPATH/src/github.com/openshift/hypershift
-    git clone https://github.com/openshift/hypershift --branch main --single-branch $dir
-     git clone https://github.com/openshift/client-go --branch master --single-branch $dir/openshift-client-go
+    if [ ! -d $dir ]; then
+      git clone https://github.com/openshift/hypershift --branch main --single-branch $dir
+    fi
+    if [ ! -d $dir/openshift-client-go ]; then
+      git clone https://github.com/openshift/client-go --branch master --single-branch $dir/openshift-client-go
+    fi
     rm -rf $dir/vendor/github.com/openshift/api/*
     rm -rf $dir/vendor/github.com/openshift/client-go/*
     cp -Rf ./ $dir/openshift-api/
