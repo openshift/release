@@ -208,7 +208,7 @@ function install_central_with_helm() {
       # `{{ define "srox._envVars" }}` -> `{{- include "srox.envVars" (list . "deployment" "scanner-v4-matcher" "matcher") | nindent 8 }}`
       installflags+=('--set' "customize.scanner-v4-matcher.envVars.SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}")
       if [[ -n "${SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST}" ]]; then
-        installflags+=('--set' "customize.scanner-v4-matcher.envVars.SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST=${SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST}")
+        installflags+=('--set' "customize.scanner-v4-matcher.envVars.SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST=${SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST//,/\\,}")
       fi
     fi
   fi
