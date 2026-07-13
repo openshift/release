@@ -51,7 +51,6 @@ tests:
         RoxProject PerfScale
       ZONES_COUNT: "3"
     post:
-    - ref: stackrox-stackrox-perf-scale-post
     - chain: gather-core-dump
     - chain: ipi-aws-post
     - ref: stackrox-stackrox-end
@@ -64,6 +63,42 @@ tests:
     - ref: stackrox-install-helm
     test:
     - chain: stackrox-perfscale
+  timeout: 14h0m0s
+- always_run: false
+  as: berserker-scale-test
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-stackrox
+    env:
+      ACS_IMAGE_TAG: 4.11.x-886-gc2425f0032
+      BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_REPLICAS: "5"
+      CONNECTION_LOAD_REPLICAS: "2"
+      ENDPOINT_LOAD_REPLICAS: "2"
+      JOB_ITERATIONS: "2"
+      MAIN_IMAGE_TAG: 4.11.x-886-gc2425f0032
+      PROCESS_LOAD_REPLICAS: "2"
+      ROX_SCANNER_V4_ENABLED: "true"
+      TEST_SUITE: ocp-perf-scale-tests
+      USER_TAGS: |
+        TicketId 382
+        RoxProject PerfScale
+      ZONES_COUNT: "1"
+    post:
+    - ref: stackrox-stackrox-perf-scale-post
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    - ref: stackrox-stackrox-end
+    pre:
+    - ref: stackrox-stackrox-begin
+    - ref: stackrox-stackrox-e2e-test
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: stackrox-install-helm
+    test:
+    - chain: stackrox-perfscale-berserker-test
   timeout: 14h0m0s
 zz_generated_metadata:
   branch: master
