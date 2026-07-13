@@ -1,0 +1,138 @@
+ref:
+  as: telcov10n-system-telco-kpis-hub-deployment-install-hub-operators
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-system-telco-kpis-hub-deployment-install-hub-operators-commands.sh
+  timeout: 1h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: HUB_CLUSTER
+      default: "dev-kpi-01"
+      documentation: Hub cluster name where operators will be installed
+    - name: HUB_LOCKDOWN_URI
+      default: ""
+      documentation: URL to hub lockdown JSON file
+    - name: GENERATE_HUB_LOCKDOWN
+      default: "false"
+      documentation: Generate hub lockdown JSON after operator installation
+    - name: ARCHITECTURE
+      default: "x86_64"
+      documentation: Target architecture (x86_64 or arm64)
+    - name: DEBUG
+      default: "false"
+      documentation: Enable Ansible debug output
+    - name: SKIP_REBUILD_IMAGE
+      default: "false"
+      documentation: Skip test-runner image rebuild
+    - name: ECO_CI_CD_IMAGE
+      default: "quay.io/telcov10n-ci/eco-ci-cd:latest"
+      documentation: Container image for Ansible execution
+  credentials:
+    # Common hypervisor (shared across all spokes)
+    - namespace: test-credentials
+      name: telcov10n-ansible-hypervisors-hv6
+      mount_path: /var/host_variables/common/hypervisor
+
+    # Common group variables
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-all
+      mount_path: /var/group_variables/common/all
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-bastions
+      mount_path: /var/group_variables/common/bastions
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-hypervisors
+      mount_path: /var/group_variables/common/hypervisors
+
+    # Spoke spree-01 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-01-master0
+      mount_path: /var/host_variables/spree-01/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-01-masters
+      mount_path: /var/group_variables/spree-01/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-01-nodes
+      mount_path: /var/group_variables/spree-01/nodes
+
+    # Spoke spree-02 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-02-master0
+      mount_path: /var/host_variables/spree-02/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-02-masters
+      mount_path: /var/group_variables/spree-02/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-02-nodes
+      mount_path: /var/group_variables/spree-02/nodes
+
+    # Spoke spree-03 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-03-master0
+      mount_path: /var/host_variables/spree-03/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-03-masters
+      mount_path: /var/group_variables/spree-03/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-03-nodes
+      mount_path: /var/group_variables/spree-03/nodes
+
+    # Spoke spree-04 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-04-master0
+      mount_path: /var/host_variables/spree-04/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-04-masters
+      mount_path: /var/group_variables/spree-04/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-04-nodes
+      mount_path: /var/group_variables/spree-04/nodes
+
+    # Spoke cnfdg46 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-cnfdg46-master0
+      mount_path: /var/host_variables/cnfdg46/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-cnfdg46-masters
+      mount_path: /var/group_variables/cnfdg46/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-cnfdg46-nodes
+      mount_path: /var/group_variables/cnfdg46/nodes
+
+    # Hub kni-qe-70 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-70-bastion
+      mount_path: /var/host_variables/kni-qe-70/bastion
+
+    # Hub kni-qe-71 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-71-bastion
+      mount_path: /var/host_variables/kni-qe-71/bastion
+
+    # Hub dev-kpi-01 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-01-bastion
+      mount_path: /var/host_variables/dev-kpi-01/bastion
+
+    # Hub dev-kpi-02 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-02-bastion
+      mount_path: /var/host_variables/dev-kpi-02/bastion
+
+    # Hub dev-kpi-03 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-03-bastion
+      mount_path: /var/host_variables/dev-kpi-03/bastion
+
+    # Hub dev-kpi-04 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-04-bastion
+      mount_path: /var/host_variables/dev-kpi-04/bastion
+  documentation: |-
+    Install required operators on hub cluster for ZTP and spoke management.
+    Includes ACM, assisted-service, and other hub-cluster operators.
