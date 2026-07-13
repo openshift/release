@@ -36,6 +36,11 @@ function config_nodepool() {
     echo "$EXTRA_FLARGS"  
 }
 
+if [[ -z "${ADDITIONAL_HYPERSHIFT_NODE_COUNT}" || "${ADDITIONAL_HYPERSHIFT_NODE_COUNT}" == "0" ]]; then
+  echo "Skip: no additional hypershift nodes requested"
+  exit 0
+fi
+
 eval "/usr/bin/hypershift create nodepool aws \
   --cluster-name  ${CLUSTER_NAME} \
   --name additional-${CLUSTER_NAME} \
