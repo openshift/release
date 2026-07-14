@@ -192,6 +192,27 @@ tests:
 
         export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
 
+        # Patch OLS config to follow the tool_calling pattern: enable introspection
+        # so the operator deploys the built-in MCP sidecar, and strip mcpServers +
+        # featureGates (the sidecar handles cluster access without explicit config).
+        sed -i -e 's/introspectionEnabled: false/introspectionEnabled: true/' \
+               -e '/^  mcpServers:/,$ d' \
+               tests/config/operator_install/olsconfig.crd.openai_cluster_updates.yaml
+
+        # Grant cluster-reader and monitoring-edit RBAC so the MCP sidecar can
+        # fetch ClusterVersion, ClusterOperators, Nodes, alerts, etc.
+        # The namespace must exist before the ServiceAccount can be created;
+        # the operator install later reuses it.
+        oc create namespace openshift-lightspeed --dry-run=client -o yaml | oc apply -f -
+        oc apply -f eval/rbac-cluster-updates.yaml
+
+        # The operator auto-generates reference_content in the ConfigMap pointing
+        # to a vector_db RAG index that doesn't exist in the CI image, causing
+        # OLS to fail its readiness check. Strip it — cluster_updates tests
+        # evaluate MCP tool calling, not RAG document retrieval.
+        sed -i '/lib_log_level.*INFO/a\    olsconfig["ols_config"].pop("reference_content", None)' \
+            tests/e2e/utils/ols_installer.py
+
         tests/scripts/test-cluster-updates.sh
       credentials:
       - mount_path: /var/run/bam
