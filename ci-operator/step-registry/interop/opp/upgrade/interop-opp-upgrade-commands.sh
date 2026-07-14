@@ -86,6 +86,7 @@ CheckSigned() {
     while (( try < maxRetries && response != 200 )); do
         : "Signature check attempt #${try}"
         response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null \
+            --connect-timeout 10 --max-time 30 \
             --write-out "%{http_code}" \
             "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hashValue}/signature-1")
         (( try += 1 ))
@@ -140,7 +141,9 @@ AdminAck() {
     while (( elapsed < 5 )); do
         sleep 1m
         (( elapsed += 1 ))
-        if ! oc adm upgrade 2>&1 | grep -q "AdminAckRequired"; then
+        typeset upgradeOutput=""
+        upgradeOutput="$(oc adm upgrade 2>&1)" || true
+        if [[ "${upgradeOutput}" != *"AdminAckRequired"* ]]; then
             : "Admin acks applied successfully"
             return 0
         fi
@@ -181,7 +184,9 @@ UpdateCcoAnnotation() {
     while (( elapsed < 5 )); do
         sleep 1m
         (( elapsed += 1 ))
-        if ! oc adm upgrade 2>&1 | grep -q "MissingUpgradeableAnnotation"; then
+        typeset upgradeOutput=""
+        upgradeOutput="$(oc adm upgrade 2>&1)" || true
+        if [[ "${upgradeOutput}" != *"MissingUpgradeableAnnotation"* ]]; then
             : "CCO annotation applied successfully"
             return 0
         fi
@@ -367,10 +372,16 @@ ValidateOppOperators() {
         if [[ -n "${notReady}" ]]; then
             : "WARNING: Non-running pods in ${ns}:"
             echo "${notReady}"
+            (( failCount += 1 ))
         else
             : "All pods healthy in ${ns}"
         fi
     done
+
+    if (( failCount > 0 )); then
+        : "${failCount} OPP operator issue(s) found after upgrade"
+        return 1
+    fi
 
     : "All OPP operators validated successfully"
     true

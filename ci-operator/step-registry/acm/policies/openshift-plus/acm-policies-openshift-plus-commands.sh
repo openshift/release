@@ -25,6 +25,13 @@ typeset candidates=""
 typeset try=""
 for try in $(seq "${retries}"); do
   results=$(oc get policies -n policies)
+  typeset -i policyCount=0
+  policyCount=$(echo "${results}" | grep -c -v '^NAME' || true)
+  if (( policyCount == 0 )); then
+    : "Try ${try}/${retries}: No policies found yet. Checking again in 30 seconds"
+    sleep 30
+    continue
+  fi
   notready=$(echo "${results}" | grep -E 'NonCompliant|Pending' || true)
   if [ "${notready}" == "" ]; then
     : "OPP policyset is applied and compliant"

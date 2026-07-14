@@ -73,23 +73,27 @@ GenerateJunitXml() {
     # Count test results
     typeset -i totalTests=${#allTestCasesArr[@]}
     typeset -i failedTests=0
+    typeset -i skippedTests=0
 
     for test in "${allTestCasesArr[@]}"; do
         if [ "${testStatus[${test}]}" = "failed" ]; then
             failedTests=$((failedTests + 1))
+        elif [ "${testStatus[${test}]}" = "skipped" ]; then
+            skippedTests=$((skippedTests + 1))
         fi
     done
 
     : "Generating JUnit XML Report"
     : "Total Tests: ${totalTests}"
     : "Failed Tests: ${failedTests}"
-    : "Passed Tests: $((totalTests - failedTests))"
+    : "Skipped Tests: ${skippedTests}"
+    : "Passed Tests: $((totalTests - failedTests - skippedTests))"
     : "Duration: ${totalDuration}s"
 
     cat > "${junitFile}" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="acm-opp-app" tests="${totalTests}" failures="${failedTests}" errors="0" skipped="0" time="${totalDuration}">
+  <testsuite name="acm-opp-app" tests="${totalTests}" failures="${failedTests}" errors="0" skipped="${skippedTests}" time="${totalDuration}">
 EOF
 
     # Generate XML for each test case
@@ -99,12 +103,14 @@ EOF
         typeset failureMsg="${testFailureMsg[${test}]}"
 
         if [ "${status}" = "failed" ]; then
-            # Escape XML special characters in failure message
             typeset escapedMsg=""
             escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
             echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"><failure message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+        elif [ "${status}" = "skipped" ]; then
+            typeset escapedMsg=""
+            escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         else
-            # passed
             echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"/>" >> "${junitFile}"
         fi
     done
@@ -190,7 +196,7 @@ RunTestCase1() {
         : "=== Quay Integration Status ==="
         oc get quayintegration quay -o yaml || true
         oc get cm -n openshift-config opp-ingres-ca -o yaml || true
-        oc get secret -n policies quay-integration -o yaml || true
+        oc get secret -n policies quay-integration --no-headers || true
 
         : "=== Quay Bridge Operator Logs ==="
         typeset operatorPod=""
@@ -223,7 +229,6 @@ RunTestCase2() {
     acsPassword=$(oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d)
     acsHost=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d)
     set -x
-    : "ACS Host: ${acsHost}"
 
     # Query ACS for httpd-example image
     typeset jqFilter='.images[] | select(.name | contains("httpd-example"))'
@@ -315,6 +320,7 @@ else
     : "Test Case 1 (Deploy OPP Application) Result: FAILED"
     : "Test Case 1 failed, skipping remaining test cases..."
     RecordTestResult "deploy-opp-application" "failed" "OPP application deployment failed" "${case1Duration}"
+    RecordTestResult "test-acs-integration" "skipped" "Skipped: prerequisite Test Case 1 (deploy) failed" "0"
 fi
 
 : "====== Test Summary ======"

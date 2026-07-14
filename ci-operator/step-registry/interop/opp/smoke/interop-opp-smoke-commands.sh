@@ -48,15 +48,18 @@ XmlEscape() {
 WriteJunit() {
     typeset -i total=${#tcNamesArr[@]}
     typeset -i failCount=0
+    typeset -i skipCount=0
     for r in "${tcResultsArr[@]}"; do
         if [[ "${r}" == "fail" ]]; then
             (( failCount++ )) || true
+        elif [[ "${r}" == "skip" ]]; then
+            (( skipCount++ )) || true
         fi
     done
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"opp-smoke\" tests=\"${total}\" failures=\"${failCount}\">"
+        echo "<testsuite name=\"opp-smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
@@ -65,6 +68,10 @@ WriteJunit() {
                 typeset msg=""
                 msg="$(XmlEscape "${tcMessagesArr[$i]}")"
                 echo "    <failure message=\"${msg}\"></failure>"
+            elif [[ "${tcResultsArr[$i]}" == "skip" ]]; then
+                typeset msg=""
+                msg="$(XmlEscape "${tcMessagesArr[$i]}")"
+                echo "    <skipped message=\"${msg}\"/>"
             fi
             echo "  </testcase>"
         done
@@ -255,7 +262,7 @@ TestAcmConnectivity() {
 
     if [[ "${mcCount}" -eq 0 ]]; then
         : "SKIP: No ManagedCluster resources found"
-        AddResult "acm-connectivity" "pass" ""
+        AddResult "acm-connectivity" "skip" "No ManagedCluster resources found"
         return
     fi
 
@@ -332,13 +339,13 @@ TestAcsSensors() {
 
         if [[ -z "${acsCsv}" ]]; then
             : "SKIP: ACS operator not installed"
-            AddResult "acs-sensors" "pass" ""
+            AddResult "acs-sensors" "skip" "ACS operator not installed"
             return
         fi
 
         # ACS operator installed but no SecuredCluster CR
         : "SKIP: ACS operator installed but no SecuredCluster CR found"
-        AddResult "acs-sensors" "pass" ""
+        AddResult "acs-sensors" "skip" "ACS operator installed but no SecuredCluster CR found"
         return
     fi
 
@@ -382,7 +389,7 @@ TestQuayPull() {
 
         if [[ -z "${quayCsv}" ]]; then
             : "SKIP: Quay operator not installed"
-            AddResult "quay-pull" "pass" ""
+            AddResult "quay-pull" "skip" "Quay operator not installed"
             return
         fi
 

@@ -67,6 +67,10 @@ if [[ -n "${controlPlaneNode}" ]]; then
             bash -c "ls -1 ${etcdBackupRemote}/static_kuberesources_*.tar.gz 2>/dev/null | head -1") || true
 
         typeset isCopyOk=true
+        if [[ -z "${snapshotFile}" || -z "${resourcesFile}" ]]; then
+            : "WARNING: Backup files not found (snapshot=${snapshotFile:-empty}, resources=${resourcesFile:-empty})"
+            isCopyOk=false
+        fi
         if [[ -n "${snapshotFile}" ]]; then
             if ! oc debug "node/${controlPlaneNode}" -- cat "/host${snapshotFile}" > "${backupDir}/etcd-snapshot.db" 2>&1; then
                 : "WARNING: Failed to copy etcd snapshot (continuing)"
