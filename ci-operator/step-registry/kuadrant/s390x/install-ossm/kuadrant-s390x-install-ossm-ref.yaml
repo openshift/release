@@ -35,21 +35,28 @@ ref:
     documentation: |-
       Subscription channel for the OpenShift Service Mesh 3.x operator. Set to "!default" to use the package default channel.
   - name: OSSM_STARTING_CSV
-    default: "servicemeshoperator3.v3.3.4"
+    default: "servicemeshoperator3.v3.4.0"
     documentation: |-
       Exact ClusterServiceVersion to pin the OpenShift Service Mesh operator to
-      (e.g. "servicemeshoperator3.v3.3.4"). When set, the subscription uses Manual
+      (e.g. "servicemeshoperator3.v3.4.0"). When set, the subscription uses Manual
       install-plan approval and only the install plan for this CSV is approved, so
       the operator lands on this version and is not auto-upgraded. Set to empty to
       track the channel head with Automatic approval.
   - name: ISTIO_VERSION
-    default: ""
+    default: "v1.28-latest"
     documentation: |-
-      Optional spec.version for the Sail Istio CR (e.g. "v1.24.1"). When empty the
-      operator's default supported version is used.
+      spec.version for the Sail Istio and IstioCNI CRs (e.g. "v1.28-latest").
+      Matches the known-good RHCL s390x reference cluster. Set empty to use the
+      operator default.
+  - name: ISTIO_CONTROL_NAMESPACE
+    default: "openshift-operators"
+    documentation: |-
+      Namespace for both Istio and IstioCNI control-plane workloads. The known-good
+      RHCL s390x stack co-locates them with the Sail operator in openshift-operators.
   documentation: |-
     Installs OpenShift Service Mesh 3.x (the Sail operator) via OLM on a provisioned
-    s390x OCP cluster, then creates the IstioCNI and Istio custom resources and
-    waits for them to become ready. Gateway API CRDs are installed only when not
-    already present; on OpenShift they are managed by the Ingress Operator and
-    installation is skipped automatically.
+    s390x OCP cluster, then creates the IstioCNI and Istio custom resources (both
+    in ISTIO_CONTROL_NAMESPACE, default openshift-operators) and waits for them to
+    become ready. Gateway API CRDs are installed only when not already present; on
+    OpenShift they are managed by the Ingress Operator and installation is skipped
+    automatically.

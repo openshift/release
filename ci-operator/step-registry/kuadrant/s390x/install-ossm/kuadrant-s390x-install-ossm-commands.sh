@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+# Align with the known-good m42lp36 RHCL s390x stack: OSSM 3.x Sail with
+# Istio + IstioCNI both in openshift-operators (not separate istio-system /
+# istio-cni namespaces).
+
+ISTIO_CONTROL_NAMESPACE="${ISTIO_CONTROL_NAMESPACE}"
+
 echo "=== Checking Gateway API CRDs ==="
 if oc get crd gateways.gateway.networking.k8s.io >/dev/null 2>&1; then
   echo "Gateway API CRDs already present (managed by the OpenShift Ingress Operator); skipping manual install."
@@ -72,27 +78,28 @@ done
 [[ -n "${TARGET_CSV}" ]] && CSV="${TARGET_CSV}"
 oc wait --for=jsonpath='{.status.phase}'=Succeeded "csv/${CSV}" -n openshift-operators --timeout=300s
 
-echo "=== Creating IstioCNI (required on OpenShift) ==="
-oc new-project istio-cni 2>/dev/null || oc project istio-cni
+echo "=== Creating IstioCNI in ${ISTIO_CONTROL_NAMESPACE} ==="
+# Working RHCL s390x clusters co-locate IstioCNI with the Sail operator namespace.
 cat <<EOF | oc apply -f -
 apiVersion: sailoperator.io/v1
 kind: IstioCNI
 metadata:
   name: default
 spec:
-  namespace: istio-cni
+  namespace: ${ISTIO_CONTROL_NAMESPACE}
 $( [[ -n "${ISTIO_VERSION}" ]] && echo "  version: ${ISTIO_VERSION}" )
 EOF
 
-echo "=== Creating Istio control plane ==="
-oc new-project istio-system 2>/dev/null || oc project istio-system
+echo "=== Creating Istio control plane in ${ISTIO_CONTROL_NAMESPACE} ==="
 cat <<EOF | oc apply -f -
 apiVersion: sailoperator.io/v1
 kind: Istio
 metadata:
   name: default
 spec:
-  namespace: istio-system
+  namespace: ${ISTIO_CONTROL_NAMESPACE}
+  updateStrategy:
+    type: InPlace
 $( [[ -n "${ISTIO_VERSION}" ]] && echo "  version: ${ISTIO_VERSION}" )
 EOF
 
@@ -102,3 +109,6 @@ oc wait --for=condition=Ready istio/default --timeout=600s
 
 echo "=== OpenShift Service Mesh 3.x install complete ==="
 oc get istio,istiocni -A
+oc get gatewayclass -o wide || true
+oc get deploy,pods -n "${ISTIO_CONTROL_NAMESPACE}" -o wide | grep -Ei 'istio|sail' || \
+  oc get deploy,pods -n "${ISTIO_CONTROL_NAMESPACE}" -o wide || true
