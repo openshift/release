@@ -495,7 +495,7 @@ HAPROXY_CFG
 # Append hypershift nodes
 for i in $(seq 1 ${HYPERSHIFT_NODE_COUNT}); do
   index=$((i - 1))
-  echo "   server ${HC_NAME}-compute-${i} ${ZVSI_COMPUTE_RIP[$index]}" >> haproxy.cfg
+  echo "   server ${HC_NAME}-compute-${i} ${ZVSI_COMPUTE_RIP[$index]}:80" >> haproxy.cfg
 done
 
 
@@ -560,10 +560,9 @@ export kernel_url
 rootfs_url=$(oc get infraenv/${HC_NAME} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.rootfs')
 export rootfs_url
 
-echo "Downloading the rootfs image locally and transferring to HTTPD server"
-curl -k -L --output $HOME/rootfs.img "$rootfs_url"
-scp "${ssh_options[@]}" $HOME/rootfs.img root@$BASTION_FIP:/var/www/html/rootfs.img 
-ssh "${ssh_options[@]}" root@$BASTION_FIP "chmod 644 /var/www/html/rootfs.img"
+echo "Downloading the rootfs image directly on the bastion httpd server"
+ssh "${ssh_options[@]}" root@$BASTION_FIP \
+  "curl -k -L -o /var/www/html/rootfs.img '${rootfs_url}' && chmod 644 /var/www/html/rootfs.img"
 
 # Downloading the script to trigger pxeboot of agents
 echo "Downloading the setup script for pxeboot of agents"
