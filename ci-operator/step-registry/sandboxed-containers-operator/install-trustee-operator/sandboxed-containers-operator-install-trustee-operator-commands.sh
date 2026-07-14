@@ -139,10 +139,14 @@ function fetch_trustee_charts() {
 
   mkdir -p "${charts_dir}" "${bin_dir}"
   local extract_output
+  local lib_dir="${SCRATCH}/lib"
+  mkdir -p "${lib_dir}"
   if extract_output=$(oc image extract "${HELM_CHART_IMAGE}" \
     --path /charts/:${charts_dir}/ \
     --path /usr/local/bin/helm:${bin_dir}/ \
-    --path /usr/bin/jq:${bin_dir}/ 2>&1); then
+    --path /usr/bin/jq:${bin_dir}/ \
+    --path /lib64/libjq.so.1:${lib_dir}/ \
+    --path /lib64/libonig.so.5:${lib_dir}/ 2>&1); then
     echo ">>> Extracted from image" >&2
     echo ">>> Chart files:" >&2
     ls -lR "${charts_dir}" | head -50 >&2
@@ -151,6 +155,7 @@ function fetch_trustee_charts() {
       chmod +x "${bin_dir}/helm"
       [[ -f "${bin_dir}/jq" ]] && chmod +x "${bin_dir}/jq"
       export PATH="${bin_dir}:${PATH}"
+      export LD_LIBRARY_PATH="${lib_dir}:${LD_LIBRARY_PATH:-}"
       echo ">>> helm version: $(helm version --short 2>/dev/null)" >&2
       echo ">>> jq version: $(jq --version 2>/dev/null || echo 'not found')" >&2
     else
@@ -1028,6 +1033,7 @@ echo ">>> Starting Trustee operator installation"
 CHARTS_DIR=$(fetch_trustee_charts)
 export CHARTS_DIR
 export PATH="${SCRATCH}/bin:${PATH}"
+export LD_LIBRARY_PATH="${SCRATCH}/lib:${LD_LIBRARY_PATH:-}"
 
 # Get cluster domain
 CLUSTER_DOMAIN=$(get_cluster_domain)
