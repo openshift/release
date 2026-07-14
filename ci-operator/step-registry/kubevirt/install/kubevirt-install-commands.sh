@@ -31,11 +31,14 @@ elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNE
 then
   CNV_RELEASE_CHANNEL=${CNV_SUBSCRIPTION_CHANNEL}
 else
-  if [ "${CNV_PRERELEASE_LATEST_CHANNEL}" == "true" ]; then
-    cnv_version=4.99
-  else
-    cnv_version=$(ocp_version)
-  fi
+  # CNV stopped refreshing the version-agnostic "4.99" (aka latest) nightly
+  # catalog after the OpenShift 5.0 major version transition: the 4.99 catalog
+  # references bundle images that have been pruned from quay, so subscriptions
+  # against it never resolve. Nightly catalogs are now published per OCP
+  # version (e.g. 4.23, 5.0) plus a "latest" alias equal to the newest one.
+  # Follow hypershift-kubevirt-install and always subscribe to the nightly
+  # matching the cluster version; CNV_PRERELEASE_LATEST_CHANNEL is a no-op.
+  cnv_version=$(ocp_version)
   CNV_RELEASE_CHANNEL=nightly-${cnv_version}
   CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:${cnv_version}
 fi
