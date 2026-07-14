@@ -11,6 +11,7 @@ if [[ -n ${MCE} ]] ; then
 else
     CLUSTER_NAMESPACE_PREFIX=clusters
 fi
+CONTROL_PLANE_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     # shellcheck source=/dev/null
@@ -134,14 +135,14 @@ then
 fi
 
 oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc apply -f -
-oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+oc create ns "${CONTROL_PLANE_NAMESPACE}"
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
   oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: macvlan-bridge-whereabouts
-  namespace: ${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}
+  namespace: ${CONTROL_PLANE_NAMESPACE}
 spec:
   config: '{
       "cniVersion": "0.3.1",
@@ -238,3 +239,41 @@ echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+# Workaround for OCPBUGS-54574: Apply CiliumNetworkPolicies for virt-launcher
+# pods on Cilium-managed management clusters.
+if [[ "${CNI_PROVIDER}" == "cilium" ]]; then
+
+  if ! oc get crd ciliumnetworkpolicies.cilium.io &>/dev/null; then
+    echo "CiliumNetworkPolicy CRD not found, aborting"
+    exit 1
+  fi
+
+  oc apply -f - <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: virt-launcher-allow-all-egress
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector:
+    matchLabels:
+      kubevirt.io: virt-launcher
+  egress:
+    - toEntities:
+        - all
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-host
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - all
+EOF
+
+  echo "CiliumNetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
+fi
