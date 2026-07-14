@@ -35,9 +35,6 @@ else
   exit 1
 fi
 
-# Bypassing env vars set in prepare-environment for now
-# This needs to be main branch
-OPENSHIFT_DPF_BRANCH="main"
 OPENSHIFT_DPF_GITHUB_REPO_URL="https://github.com/rh-ecosystem-edge/openshift-dpf.git"
 CLUSTER_NAME="doca8"
 REMOTE_MAIN_WORK_DIR="/root/${CLUSTER_NAME}/ci"
