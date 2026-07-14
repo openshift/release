@@ -10,7 +10,7 @@ CLAUDE_HOME="/home/claude/.claude"
 mkdir -p "${CLAUDE_HOME}"
 
 CLAUDE_DOCTOR_LOG="${WORKDIR}/claude-doctor.log"
-CLAUDE_CREATE_BUGS_LOG="${WORKDIR}/claude-create-bugs.log"
+#CLAUDE_CREATE_BUGS_LOG="${WORKDIR}/claude-create-bugs.log"
 CLAUDE_CLOSE_STALE_BUGS_LOG="${WORKDIR}/claude-close-stale-bugs.log"
 CLAUDE_FIX_TEST_BUGS_LOG="${WORKDIR}/claude-fix-test-bugs.log"
 CLAUDE_DOCTOR_REFRESH_LOG="${WORKDIR}/claude-doctor-refresh.log"
@@ -48,8 +48,9 @@ atexit_handler() {
         return 1
     fi
 
-    # Check if the Claude sessions were completed successfully
-    for log_file in "${CLAUDE_DOCTOR_LOG}" "${CLAUDE_CREATE_BUGS_LOG}" "${CLAUDE_CLOSE_STALE_BUGS_LOG}" "${CLAUDE_FIX_TEST_BUGS_LOG}" "${CLAUDE_DOCTOR_REFRESH_LOG}"; do
+    # Check if the Claude sessions were completed successfully.
+    # CLAUDE_CREATE_BUGS_LOG is excluded while the create-bugs session is disabled.
+    for log_file in "${CLAUDE_DOCTOR_LOG}" "${CLAUDE_CLOSE_STALE_BUGS_LOG}" "${CLAUDE_FIX_TEST_BUGS_LOG}" "${CLAUDE_DOCTOR_REFRESH_LOG}"; do
         # If a session was terminated due to a timeout, report lack of
         # subsequent session log files as a warning and continue not
         # to mask the actual error
@@ -273,17 +274,25 @@ timeout 2700 claude \
     --verbose &> "${CLAUDE_DOCTOR_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "doctor" 45
 
-# Run bug creation for failed jobs (15m and 50 turns).
-echo "Running Claude to create bugs for failed jobs..."
-CLAUDE_RC=0
-timeout 900 claude \
-    --model "${CLAUDE_MODEL}" \
-    --max-turns 50 \
-    --output-format stream-json \
-    --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS} --create" \
-    --verbose &> "${CLAUDE_CREATE_BUGS_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "create-bugs" 15
+# DISABLED: Automatic bug creation is turned off - bugs are filed manually
+# via the "Create Bug in JIRA" buttons in the HTML report. 
+# To re-enable:
+# - Uncomment the CLAUDE_CREATE_BUGS_LOG assignment above
+# - Uncomment the block below,
+# - Re-add CLAUDE_CREATE_BUGS_LOG to the loop in atexit_handler
+# - Re-add Slack notification link to created bugs
+
+# # Run bug creation for failed jobs (15m and 50 turns).
+# echo "Running Claude to create bugs for failed jobs..."
+# CLAUDE_RC=0
+# timeout 900 claude \
+#     --model "${CLAUDE_MODEL}" \
+#     --max-turns 50 \
+#     --output-format stream-json \
+#     --plugin-dir "${PLUGIN_DIR}" \
+#     -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS} --create" \
+#     --verbose &> "${CLAUDE_CREATE_BUGS_LOG}" || CLAUDE_RC=$?
+# check_claude_rc "${CLAUDE_RC}" "create-bugs" 15
 
 # Close stale bugs that are no longer linked to current failures (10m and 20 turns).
 echo "Running Claude to close stale bugs..."
@@ -310,7 +319,7 @@ timeout 900 claude \
     --verbose &> "${CLAUDE_FIX_TEST_BUGS_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "fix-test-bugs" 15
 
-# Run HTML report refresh to include the new bugs (10m and 20 turns).
+# Run HTML report refresh to include the latest bug data (10m and 20 turns).
 echo "Running Claude to refresh the HTML report..."
 CLAUDE_RC=0
 timeout 600 claude \
