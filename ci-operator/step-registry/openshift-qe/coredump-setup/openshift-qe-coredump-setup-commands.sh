@@ -1,5 +1,5 @@
 #!/bin/bash
-set -o errexit
+set +e
 set -o nounset
 set -o pipefail
 set -x
@@ -40,7 +40,7 @@ kernel.core_uses_pid=1
 SYSCTL
 
         echo 'Coredump enabled'
-    " 2>&1 | grep -v "Starting pod" || true; then
+    " 2>&1 | grep -v "Starting pod"; then
         echo "  ✓ ${node} configured"
         SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
     else
@@ -59,14 +59,17 @@ echo "Failed: $((NODE_COUNT - SUCCESS_COUNT))"
 
 if [[ ${SUCCESS_COUNT} -lt $((NODE_COUNT * 80 / 100)) ]]; then
     echo ""
-    echo "ERROR: Less than 80% of nodes configured successfully"
+    echo "WARNING: Less than 80% of nodes configured successfully (best-effort, non-blocking)"
     echo "Failed nodes:${FAILED_NODES}"
-    exit 1
+else
+    echo ""
+    echo "Coredump collection enabled on all nodes"
 fi
 
-echo ""
-echo "✓ Coredump collection enabled on all nodes"
 echo "  Pattern: /var/lib/systemd/coredump/core.%e.%p.%t"
 echo "  (executable.pid.timestamp)"
 echo ""
 echo "Pluto crashes will now be captured for RHEL-151431 investigation"
+
+# This step is best-effort — never block the pipeline
+exit 0

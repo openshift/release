@@ -37,7 +37,7 @@ echo "Total nodes: ${NODE_COUNT}"
 # Enable coredump collection for pluto crashes
 echo ""
 echo "Enabling coredump collection for libreswan pluto..."
-WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | head -1 | awk '{print $1}')
+WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | awk 'NR==1{print $1}')
 oc debug "node/${WORKER_NODE}" -- chroot /host /bin/bash -c "
   # Enable coredumps
   ulimit -c unlimited
@@ -64,7 +64,7 @@ echo "✓ IPsec mode: ${IPSEC_ENABLED}"
 # Step 2: Check ovnkube-controller pods are running
 echo ""
 echo "Step 2: Checking ovnkube-controller pods..."
-OVNKUBE_PODS=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-control-plane --no-headers | grep Running | wc -l)
+OVNKUBE_PODS=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-control-plane --no-headers | grep -c Running || true)
 if [[ ${OVNKUBE_PODS} -lt 1 ]]; then
     echo "ERROR: No running ovnkube-controller pods found!"
     exit 1
@@ -77,7 +77,7 @@ echo "Step 3: Validating new IPsec metric: ovnkube_controller_ipsec_tunnel_ike_c
 
 # Get Prometheus token (disable tracing to avoid leaking token in logs)
 set +x
-PROM_TOKEN=$(oc sa get-token prometheus-k8s -n openshift-monitoring)
+PROM_TOKEN=$(oc create token prometheus-k8s -n openshift-monitoring --duration=10m)
 THANOS_QUERIER_HOST=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
 
 # Query the new metric
@@ -213,7 +213,7 @@ if ! oc wait --for=condition=ready pod -l app=nginx-test -n ${TEST_NS} --timeout
     echo "Checking partial deployment status..."
     oc get pods -n ${TEST_NS} -l app=nginx-test --no-headers
 
-    READY_PODS=$(oc get pods -n ${TEST_NS} -l app=nginx-test --no-headers | grep -c Running || echo "0")
+    READY_PODS=$(oc get pods -n ${TEST_NS} -l app=nginx-test --no-headers | grep -c Running || true)
     TOTAL_WORKERS=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | wc -l)
 
     if [[ ${READY_PODS} -lt $((TOTAL_WORKERS * 80 / 100)) ]]; then
@@ -224,7 +224,7 @@ if ! oc wait --for=condition=ready pod -l app=nginx-test -n ${TEST_NS} --timeout
     echo "Proceeding with partial deployment: ${READY_PODS}/${TOTAL_WORKERS} pods ready"
 fi
 
-NGINX_POD_COUNT=$(oc get pods -n ${TEST_NS} -l app=nginx-test --no-headers | grep Running | wc -l)
+NGINX_POD_COUNT=$(oc get pods -n ${TEST_NS} -l app=nginx-test --no-headers | grep -c Running || true)
 echo "✓ ${NGINX_POD_COUNT} nginx pods running"
 
 # Run connectivity test
@@ -276,7 +276,11 @@ echo "Connectivity Test Results:"
 echo "  Total tests: ${TOTAL_TESTS}"
 echo "  Passed: ${PASSED_TESTS}"
 echo "  Failed: ${FAILED_TESTS}"
-echo "  Success rate: $(awk "BEGIN {printf \"%.2f\", (${PASSED_TESTS}/${TOTAL_TESTS})*100}")%"
+if [[ ${TOTAL_TESTS} -gt 0 ]]; then
+    echo "  Success rate: $(awk "BEGIN {printf \"%.2f\", (${PASSED_TESTS}/${TOTAL_TESTS})*100}")%"
+else
+    echo "  Success rate: N/A (no tests ran)"
+fi
 
 # Cleanup
 oc delete namespace ${TEST_NS} --ignore-not-found=true
@@ -292,23 +296,23 @@ for node in $(oc get nodes --no-headers | awk '{print $1}'); do
     echo "Checking node: ${node}"
 
     # Check for pluto segfaults in kernel logs
-    SEGFAULTS=$(oc debug node/${node} -- chroot /host journalctl -k --no-pager | grep -c "pluto.*segfault" || echo "0")
+    SEGFAULTS=$(oc debug "node/${node}" -- chroot /host journalctl -k --no-pager | grep -c "pluto.*segfault" || true)
 
     if [[ ${SEGFAULTS} -gt 0 ]]; then
         echo "  ⚠️  Found ${SEGFAULTS} pluto segfault(s) on ${node}"
         CRASH_COUNT=$((CRASH_COUNT + 1))
 
         # Try to collect coredumps
-        COREDUMPS=$(oc debug node/${node} -- chroot /host /bin/bash -c "ls -1 /var/lib/systemd/coredump/core.pluto.* 2>/dev/null || echo ''")
+        COREDUMPS=$(oc debug "node/${node}" -- chroot /host /bin/bash -c "ls -1 /var/lib/systemd/coredump/core.pluto.* 2>/dev/null || echo ''")
 
         if [[ -n "${COREDUMPS}" ]]; then
             echo "  ✓ Found coredumps on ${node}:"
-            echo "${COREDUMPS}" | while read core; do
+            while read -r core; do
                 if [[ -n "${core}" ]]; then
                     echo "    - ${core}"
                     COREDUMP_COLLECTED=$((COREDUMP_COLLECTED + 1))
                 fi
-            done
+            done <<< "${COREDUMPS}"
         else
             echo "  ⚠️  No coredumps found (may need systemd-coredump enabled)"
         fi
