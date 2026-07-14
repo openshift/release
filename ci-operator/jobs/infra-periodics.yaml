@@ -3002,3 +3002,63 @@ periodics:
         requests:
           cpu: 100m
     serviceAccountName: etcd-defragger
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 8 * * 1-5
+  decorate: true
+  extra_refs:
+  - base_ref: release-5.0
+    org: openshift
+    repo: openshift-mcp-server
+    workdir: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-openshift-mcp-server-upstream-pr-sync
+  reporter_config:
+    slack:
+      channel: '#pixaa-rebasebot-alerts'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed. https://prow.ci.openshift.org/?job={{.Spec.Job}}
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -euo pipefail
+
+        # Install gh CLI
+        GH_VERSION="2.62.0"
+        GH_TARBALL="gh_${GH_VERSION}_linux_amd64.tar.gz"
+        curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/${GH_TARBALL}" -o "/tmp/${GH_TARBALL}"
+        tar -xzf "/tmp/${GH_TARBALL}" -C /tmp
+        export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
+        gh --version
+
+        # Authenticate gh CLI and git push via token
+        GH_TOKEN="$(cat /etc/github/oauth)"
+        export GH_TOKEN
+        export OWNER_REPO="openshift/openshift-mcp-server"
+        git config user.name "OpenShift CI Robot"
+        git config user.email "noreply@openshift.io"
+        git remote add origin "https://openshift-ci-robot:${GH_TOKEN}@github.com/openshift/openshift-mcp-server.git" 2>/dev/null \
+            || git remote set-url origin "https://openshift-ci-robot:${GH_TOKEN}@github.com/openshift/openshift-mcp-server.git"
+
+        make sync-upstream-pr
+      command:
+      - /bin/bash
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.26-openshift-5.0
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-ci-robot
