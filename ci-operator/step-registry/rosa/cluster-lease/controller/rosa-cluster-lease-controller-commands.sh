@@ -261,15 +261,21 @@ while IFS= read -r cluster_json; do
 
     log "Resolved version: ${FULL_VERSION}"
 
-    # Read shared OIDC config ID from the config ConfigMap
-    OIDC_CONFIG_ID=$(echo "${DESIRED_CM}" | jq -r '.data["oidc-config-id"] // empty')
+    # Read OIDC config ID (per-cluster, then fall back to global)
+    OIDC_CONFIG_ID=$(echo "${cluster_json}" | jq -r '.["oidc-config-id"] // empty')
     if [[ -z "${OIDC_CONFIG_ID}" ]]; then
-        log "WARNING: No oidc-config-id in lease config. Skipping ${NAME}."
+        OIDC_CONFIG_ID=$(echo "${DESIRED_CM}" | jq -r '.data["oidc-config-id"] // empty')
+    fi
+    if [[ -z "${OIDC_CONFIG_ID}" ]]; then
+        log "WARNING: No oidc-config-id for ${NAME}. Skipping."
         continue
     fi
 
-    # Read account role prefix
-    ROLE_PREFIX=$(echo "${DESIRED_CM}" | jq -r '.data["account-role-prefix"] // "rosa-lease"')
+    # Read account role prefix (per-cluster, then fall back to global)
+    ROLE_PREFIX=$(echo "${cluster_json}" | jq -r '.["account-role-prefix"] // empty')
+    if [[ -z "${ROLE_PREFIX}" ]]; then
+        ROLE_PREFIX=$(echo "${DESIRED_CM}" | jq -r '.data["account-role-prefix"] // "rosa-lease"')
+    fi
 
     # Get AWS account ID for role ARNs
     AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)
