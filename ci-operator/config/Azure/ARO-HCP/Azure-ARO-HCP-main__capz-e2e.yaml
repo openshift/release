@@ -201,6 +201,52 @@ tests:
     - ref: capz-arohcp-delete-workload-cluster
     - ref: capz-arohcp-validate-cleanup
   timeout: 4h0m0s
+- as: stage
+  cron: 0 20 * * 1-5
+  reporter_config:
+    channel: '#hcm-aro-team-capz'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      ARO_REPO_BRANCH: aro-hcp-2025-23-12-preview
+      ARO_REPO_DIR: /tmp/cluster-api-installer-pro
+      ARO_REPO_URL: https://github.com/stolostron/cluster-api-installer.git
+      DEPLOY_CHARTS: "true"
+      LOCATION: uksouth
+      USE_KIND: "true"
+      VAULT_SECRET_PROFILE: stg
+      WORKLOAD_CLUSTER_NAMESPACE: capz-test-prow
+    leases:
+    - count: 1
+      env: ENV_QUOTA_LEASED_RESOURCE
+      resource_type: aro-hcp-stg-quota-slice
+    - count: 1
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-stg
+    post:
+    - ref: capz-arohcp-summary
+    - ref: capz-arohcp-teardown
+    - ref: capz-arohcp-cleanup-msi-roleassignments
+    - ref: capz-arohcp-aks-deprovision
+    pre:
+    - ref: capz-arohcp-write-env
+    - ref: capz-arohcp-aks-provision
+    - ref: capz-arohcp-check-dependencies
+    - ref: capz-arohcp-setup
+    test:
+    - ref: capz-arohcp-management-cluster
+    - ref: capz-arohcp-generate-yamls
+    - ref: capz-arohcp-cleanup-pre
+    - ref: capz-arohcp-deploy-crs
+    - ref: capz-arohcp-verify-workload-cluster
+    - ref: capz-arohcp-delete-workload-cluster
+    - ref: capz-arohcp-validate-cleanup
+  timeout: 4h0m0s
 - as: production
   cron: 0 20 * * 1-5
   steps:
