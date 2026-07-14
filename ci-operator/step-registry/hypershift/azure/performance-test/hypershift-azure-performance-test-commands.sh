@@ -8,7 +8,14 @@ echo "==========================================="
 
 # Use the nested management cluster kubeconfig
 export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
-export HYPERSHIFT_BINARY="${HYPERSHIFT_BINARY:-/hypershift/bin/hypershift}"
+if [[ -f /usr/bin/hcp ]]; then
+  HCP_CLI="/usr/bin/hcp"
+elif [[ -f /hypershift/bin/hypershift ]]; then
+  HCP_CLI="/hypershift/bin/hypershift"
+else
+  HCP_CLI="hypershift"
+fi
+echo "Using ${HCP_CLI} for CLI"
 
 # Generate unique cluster name
 PERF_CLUSTER_NAME="perf-$(echo -n "${PROW_JOB_ID}" | sha256sum | cut -c-12)"
@@ -23,9 +30,13 @@ cleanup() {
   echo "======================================"
   echo "Performance Test Results Summary"
   echo "======================================"
-  cat "${PERF_RESULTS_DIR}/metrics.txt"
-  echo ""
-  echo "Detailed metrics saved to: ${PERF_RESULTS_DIR}/metrics.json"
+  if [[ -f "${PERF_RESULTS_DIR}/metrics.txt" ]]; then
+    cat "${PERF_RESULTS_DIR}/metrics.txt"
+    echo ""
+    echo "Detailed metrics saved to: ${PERF_RESULTS_DIR}/metrics.json"
+  else
+    echo "No metrics collected (script failed before metrics initialization)"
+  fi
 }
 trap cleanup EXIT
 
@@ -33,6 +44,9 @@ trap cleanup EXIT
 AZURE_LOCATION="${HYPERSHIFT_AZURE_LOCATION:-centralus}"
 BASE_DOMAIN="${HYPERSHIFT_BASE_DOMAIN:-hcp-sm-azure.azure.devcluster.openshift.com}"
 AZURE_CREDS_FILE="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
+AZURE_WORKLOAD_IDENTITIES_FILE="/etc/hypershift-ci-jobs-self-managed-azure-e2e/workload-identities.json"
+AZURE_OIDC_ISSUER_URL="https://smazure.blob.core.windows.net/smazure"
+AZURE_SA_TOKEN_KEY_PATH="/etc/hypershift-ci-jobs-self-managed-azure/serviceaccount-signer.private"
 PULL_SECRET_FILE="/etc/ci-pull-credentials/.dockerconfigjson"
 
 # Performance test configuration
@@ -62,14 +76,19 @@ time_operation() {
 create_hosted_cluster() {
   echo "Creating HostedCluster: ${PERF_CLUSTER_NAME}"
 
-  ${HYPERSHIFT_BINARY} create cluster azure \
+  ${HCP_CLI} create cluster azure \
     --name "${PERF_CLUSTER_NAME}" \
     --node-pool-replicas "${INITIAL_NODEPOOL_SIZE}" \
     --base-domain "${BASE_DOMAIN}" \
     --pull-secret "${PULL_SECRET_FILE}" \
     --azure-creds "${AZURE_CREDS_FILE}" \
+    --workload-identities-file "${AZURE_WORKLOAD_IDENTITIES_FILE}" \
+    --oidc-issuer-url "${AZURE_OIDC_ISSUER_URL}" \
+    --sa-token-issuer-private-key-path "${AZURE_SA_TOKEN_KEY_PATH}" \
     --location "${AZURE_LOCATION}" \
     --release-image "${RELEASE_IMAGE}" \
+    --assign-service-principal-roles \
+    --dns-zone-rg-name "os4-common" \
     --generate-ssh
 
   echo "Waiting for HostedCluster to be available..."
@@ -81,17 +100,10 @@ create_hosted_cluster() {
 
 # Function to wait for nodepool ready
 wait_nodepool_ready() {
-  local expected_replicas=$1
-  echo "Waiting for NodePool to have ${expected_replicas} ready replicas..."
-
-  timeout 20m bash -c "
-    until [[ \$(oc get nodepool ${PERF_CLUSTER_NAME} -n ${PERF_NAMESPACE} -o jsonpath='{.status.readyReplicas}') == '${expected_replicas}' ]]; do
-      echo 'Current ready replicas: '\$(oc get nodepool ${PERF_CLUSTER_NAME} -n ${PERF_NAMESPACE} -o jsonpath='{.status.readyReplicas}')
-      sleep 10
-    done
-  "
-
-  echo "NodePool has ${expected_replicas} ready replicas"
+  echo "Waiting for NodePool to be ready..."
+  oc wait --timeout=30m nodepool/"${PERF_CLUSTER_NAME}" -n "${PERF_NAMESPACE}" \
+    --for=condition=Ready=True
+  echo "NodePool is ready"
 }
 
 # Function to scale nodepool
@@ -100,14 +112,14 @@ scale_nodepool() {
   echo "Scaling NodePool to ${target_size} replicas..."
 
   oc scale nodepool "${PERF_CLUSTER_NAME}" -n "${PERF_NAMESPACE}" --replicas="${target_size}"
-  wait_nodepool_ready "${target_size}"
+  wait_nodepool_ready
 }
 
 # Function to delete hosted cluster
 delete_hosted_cluster() {
   echo "Deleting HostedCluster: ${PERF_CLUSTER_NAME}"
 
-  ${HYPERSHIFT_BINARY} destroy cluster azure \
+  ${HCP_CLI} destroy cluster azure \
     --azure-creds "${AZURE_CREDS_FILE}" \
     --name "${PERF_CLUSTER_NAME}" \
     --namespace "${PERF_NAMESPACE}" \
@@ -130,7 +142,7 @@ check_api_availability() {
   echo "Checking API server availability..."
 
   # Get kubeconfig for the hosted cluster
-  ${HYPERSHIFT_BINARY} create kubeconfig \
+  ${HCP_CLI} create kubeconfig \
     --name="${PERF_CLUSTER_NAME}" \
     --namespace="${PERF_NAMESPACE}" > "${SHARED_DIR}/guest-kubeconfig"
 
@@ -160,8 +172,12 @@ echo "# Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> "${PERF_RESULTS_DIR}/metri
 echo "" >> "${PERF_RESULTS_DIR}/metrics.txt"
 
 # Performance Test Scenarios
-echo "=== Scenario 1: HostedCluster Creation ==="
+echo "=== Scenario 1: HostedCluster Creation (control plane) ==="
 time_operation "hosted_cluster_creation" create_hosted_cluster
+
+echo ""
+echo "=== Scenario 1b: Initial NodePool Ready (data plane) ==="
+time_operation "nodepool_initial_ready" wait_nodepool_ready
 
 echo ""
 echo "=== Scenario 2: API Server Availability Check ==="
