@@ -15,19 +15,24 @@ workflow:
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=250G
-      REDHAT_OPERATORS_INDEX_TAG: v4.21
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
-      CCS_OPERATOR_PACKAGES: odf-operator,ocs-operator,mcg-operator,odf-csi-addons-operator
-      CCS_OPERATOR_CHANNELS: stable-4.21,stable-4.21,stable-4.21,stable-4.21
-      DISCONNECTED: "false"
+      REDHAT_OPERATORS_INDEX_TAG: v4.22
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      ODF_VERSION_MAJOR_MINOR: "4.23"
+      ODF_OPERATOR_CHANNEL: stable-4.23
+      ODF_BACKEND_STORAGE_CLASS: localblock
+      ODF_VOLUME_SIZE: "250"
     pre:
     - chain: baremetalds-ofcir-pre
     - ref: oadp-baremetalds-update-pull-secret
-    - chain: hypershift-kubevirt-baremetalds-odf
+    - ref: hypershift-kubevirt-baremetalds-redhat-operators
+    - ref: operatorhub-subscribe-local-storage-operator
+    - ref: oadp-baremetalds-lso-localvolume
+    - ref: interop-tests-deploy-odf
     test:
     - ref: oadp-debug-wait
       timeout: 10h0m0s
     post:
     - chain: baremetalds-ofcir-post
   documentation: |-
-    Workflow that provisions a single-stack IPv6 bare metal cluster on Equinix Metal using dev-scripts.
+    Workflow that provisions a single-stack IPv6 bare metal cluster on Equinix Metal using dev-scripts,
+    installs ODF 4.23 pre-GA using LSO localblock storage, and waits for debugging.
