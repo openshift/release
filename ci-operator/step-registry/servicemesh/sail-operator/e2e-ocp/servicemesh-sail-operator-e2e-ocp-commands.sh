@@ -136,6 +136,7 @@ run_tests() {
     export HUB=\"${HUB:-quay.io/sail-dev}\"
     export USE_INTERNAL_REGISTRY=\"false\"
     export PR_NUMBER=\"${PULL_NUMBER:-}\"
+    export GINKGO_FLAGS=\"${GINKGO_FLAGS:-}\"
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
