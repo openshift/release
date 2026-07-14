@@ -68,15 +68,11 @@ export WORKLOAD=berserker-load
 EXTRA_FLAGS="${BERSERKER_EXTRA_FLAGS} ${KB_FLAGS} --gc=${BERSERKER_GC} --profile-type=${PROFILE_TYPE}"
 EXTRA_FLAGS+=" --job-iterations=${JOB_ITERATIONS}"
 EXTRA_FLAGS+=" --job-pause=${JOB_PAUSE}"
-EXTRA_FLAGS+=" --process-load-replicas=${PROCESS_LOAD_REPLICAS}"
-EXTRA_FLAGS+=" --endpoint-load-replicas=${ENDPOINT_LOAD_REPLICAS}"
-EXTRA_FLAGS+=" --connection-load-replicas=${CONNECTION_LOAD_REPLICAS}"
+EXTRA_FLAGS+=" --daemonset-replicas=${DAEMONSET_REPLICAS}"
+EXTRA_FLAGS+=" --service-replicas=${SERVICE_REPLICAS}"
 EXTRA_FLAGS+=" --churn-duration=${CHURN_DURATION}"
 EXTRA_FLAGS+=" --churn-delay=${CHURN_DELAY}"
 EXTRA_FLAGS+=" --churn-percent=${CHURN_PERCENT}"
-EXTRA_FLAGS+=" --process-load-image=${PROCESS_LOAD_IMAGE}"
-EXTRA_FLAGS+=" --endpoint-load-image=${ENDPOINT_LOAD_IMAGE}"
-EXTRA_FLAGS+=" --connection-load-image=${CONNECTION_LOAD_IMAGE}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
