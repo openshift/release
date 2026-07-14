@@ -90,7 +90,8 @@ tests:
     cp -Rf ./ $dir/api/
     rm -rf $dir/api/vendor
     cd $dir
-    echo "replace github.com/openshift/api => ./api" >> go.mod
+    go mod edit -dropreplace github.com/openshift/api
+    go mod edit -replace github.com/openshift/api=./api
     echo "# github.com/openshift/api => ./api" >> vendor/modules.txt
     sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/api/" vendor/modules.txt
     go mod vendor
@@ -113,8 +114,10 @@ tests:
     rm -rf $dir/openshift-api/vendor
     rm -rf $dir/openshift-client-go/vendor
     cd $dir
-    echo "replace github.com/openshift/api => ./openshift-api" >> go.mod
-    echo "replace github.com/openshift/client-go => ./openshift-client-go" >> go.mod
+    go mod edit -dropreplace github.com/openshift/api
+    go mod edit -dropreplace github.com/openshift/client-go
+    go mod edit -replace github.com/openshift/api=./openshift-api
+    go mod edit -replace github.com/openshift/client-go=./openshift-client-go
     echo "# github.com/openshift/api => ./openshift-api" >> vendor/modules.txt
     echo "# github.com/openshift/client-go => ./openshift-client-go" >> vendor/modules.txt
     sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/openshift-api/" vendor/modules.txt
