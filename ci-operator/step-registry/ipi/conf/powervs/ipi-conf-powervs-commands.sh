@@ -569,7 +569,7 @@ fi
 #   - Service Instance
 #   - Transit Gateway
 #   - Virtual Private Cloud
-if echo ${BRANCH} | awk -F. '{ if ($1 == 4 && $2 >= 18) { exit 0 } else { exit 1 } }'; then
+if printf '%s\n' "${BRANCH}" | awk -F. '{ if (($1 == 4 && $2 >= 18) || $1 >= 5) { exit 0 } else { exit 1 } }'; then
     echo "Removing existing service instance!"
     sed -i -e '/'${SERVICE_INSTANCE}'/d' "${CONFIG}"
     echo "Removing existing transit gateway!"
