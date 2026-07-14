@@ -1,0 +1,187 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: console-operator
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: ocp
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+# Default variant (no feature set) — tests run with IngressComponentRouteLabels
+# in the Default feature set once promoted
+- as: e2e-aws-ingress-component-route-labels
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws
+- as: e2e-aws-sno-ingress-component-route-labels
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws-single-node
+- as: e2e-azure-ingress-component-route-labels
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-azure
+- as: e2e-gcp-ingress-component-route-labels
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-gcp
+- as: e2e-vsphere-ingress-component-route-labels
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-vsphere
+- as: e2e-metal-ovn-ipv4-ingress-component-route-labels
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      TEST_SUITE: openshift/conformance/serial
+    workflow: baremetalds-e2e
+- as: e2e-metal-ovn-ipv6-ingress-component-route-labels
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+      TEST_SUITE: openshift/conformance/serial
+    workflow: baremetalds-e2e
+- as: e2e-metal-ovn-dualstack-ingress-component-route-labels
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+      TEST_SUITE: openshift/conformance/serial
+    workflow: baremetalds-e2e
+# TechPreviewNoUpgrade variant — tests run with the feature gate enabled
+- as: e2e-aws-techpreview-ingress-component-route-labels
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws
+- as: e2e-aws-sno-techpreview-ingress-component-route-labels
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws-single-node
+- as: e2e-azure-techpreview-ingress-component-route-labels
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-azure
+- as: e2e-gcp-techpreview-ingress-component-route-labels
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-gcp
+- as: e2e-vsphere-techpreview-ingress-component-route-labels
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-vsphere
+- as: e2e-metal-ovn-ipv4-techpreview-ingress-component-route-labels
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: baremetalds-e2e
+- as: e2e-metal-ovn-ipv6-techpreview-ingress-component-route-labels
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: baremetalds-e2e
+- as: e2e-metal-ovn-dualstack-techpreview-ingress-component-route-labels
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: baremetalds-e2e
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift
+  repo: console-operator
+  variant: periodics
