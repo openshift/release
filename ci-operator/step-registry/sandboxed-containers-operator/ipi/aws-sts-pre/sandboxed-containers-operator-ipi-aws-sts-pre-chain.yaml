@@ -1,0 +1,36 @@
+chain:
+  as: sandboxed-containers-operator-ipi-aws-sts-pre
+  steps:
+    - chain: ipi-conf-aws
+    - ref: sandboxed-containers-operator-aws-region-override
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-aws-oidc-creds-provision
+    - chain: ipi-install
+  env:
+    - name: AWS_CCOCTL_USE_MINIMAL_PERMISSIONS
+      default: "yes"
+      documentation: |-
+        Use a ccoctl-managed IAM user for STS resource creation rather
+        than relying on the cluster profile credentials having ccoctl permissions.
+    - name: AWS_REGION_OVERRIDE
+      default: "us-east-2"
+      documentation: |-
+        Region for sandboxed containers cluster installation.
+        us-east-2 is used to have the required instance types available.
+    - name: COMPUTE_NODE_REPLICAS
+      default: "2"
+      documentation: |-
+        Specify the number of openshift worker nodes; lowering to 2 which
+        should be enough for our testing
+    - name: LOKI_ENABLED
+      default: "false"
+    - name: SPOT_INSTANCES
+      default: "false"
+      documentation: |-
+        Allow the use of cheaper spot-instances; disabled here to avoid
+        disappearing nodes
+  documentation: |-
+    The sandboxed-containers-operator-ipi-aws-sts-pre chain installs a cluster
+    on AWS with STS (workload identity / IRSA) enabled. It uses ccoctl to create
+    the OIDC provider and per-operator IAM roles for core operators, and overrides
+    the AWS region to ensure required instance types are available.
