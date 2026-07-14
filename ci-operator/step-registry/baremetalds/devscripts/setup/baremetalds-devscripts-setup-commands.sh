@@ -457,8 +457,12 @@ exit \$rv
 
 EOF
 
-# Copy dev-scripts variables to be shared with the test step
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+# The remaining steps only apply when a cluster has been fully deployed.
+# When agent_create_cluster is handled by a separate CI step (e.g. for
+# ISO_NO_REGISTRY jobs), skip these post-install actions here.
+if ssh "${SSHOPTS[@]}" "root@${IP}" test -f /root/dev-scripts/ocp/*/auth/kubeconfig 2>/dev/null; then
+  # Copy dev-scripts variables to be shared with the test step
+  ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 cd /root/dev-scripts
 source common.sh
 source ocp_install_env.sh
@@ -470,13 +474,13 @@ echo "export DS_WORKING_DIR=\$WORKING_DIR" >> /tmp/ds-vars.conf
 echo "export DS_IP_STACK=\$IP_STACK" >> /tmp/ds-vars.conf
 EOF
 
-scp "${SSHOPTS[@]}" "root@${IP}:/tmp/ds-vars.conf" "${SHARED_DIR}/"
+  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/ds-vars.conf" "${SHARED_DIR}/"
 
-
-# Add required configurations ci-chat-bot need
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+  # Add required configurations ci-chat-bot need
+  ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 echo "https://\$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > /tmp/console.url
 EOF
 
-# Save console URL in `console.url` file so that ci-chat-bot could report success
-scp "${SSHOPTS[@]}" "root@${IP}:/tmp/console.url" "${SHARED_DIR}/"
+  # Save console URL in `console.url` file so that ci-chat-bot could report success
+  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/console.url" "${SHARED_DIR}/"
+fi
