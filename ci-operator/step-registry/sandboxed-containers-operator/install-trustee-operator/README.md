@@ -25,6 +25,7 @@ for Konflux jobs and pj-rehearse.
 The image must provide:
 
 - **helm** at `/usr/local/bin/helm`
+- **jq** at `/usr/bin/jq`
 - **charts** at `/charts/` with the following layout:
 
 ```
@@ -47,7 +48,7 @@ Build arguments let you pin the helm version and chart ref at build time.
 ```dockerfile
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
-RUN microdnf install -y git tar gzip && microdnf clean all
+RUN microdnf install -y git tar gzip jq && microdnf clean all
 
 ARG HELM_VERSION=v3.17.3
 RUN curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" | \

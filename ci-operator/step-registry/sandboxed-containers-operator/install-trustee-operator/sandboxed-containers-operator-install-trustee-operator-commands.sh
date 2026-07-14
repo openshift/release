@@ -141,15 +141,18 @@ function fetch_trustee_charts() {
   local extract_output
   if extract_output=$(oc image extract "${HELM_CHART_IMAGE}" \
     --path /charts/:${charts_dir}/ \
-    --path /usr/local/bin/helm:${bin_dir}/ 2>&1); then
+    --path /usr/local/bin/helm:${bin_dir}/ \
+    --path /usr/bin/jq:${bin_dir}/ 2>&1); then
     echo ">>> Extracted from image" >&2
     echo ">>> Chart files:" >&2
     ls -lR "${charts_dir}" | head -50 >&2
 
     if [[ -f "${bin_dir}/helm" ]]; then
       chmod +x "${bin_dir}/helm"
+      [[ -f "${bin_dir}/jq" ]] && chmod +x "${bin_dir}/jq"
       export PATH="${bin_dir}:${PATH}"
       echo ">>> helm version: $(helm version --short 2>/dev/null)" >&2
+      echo ">>> jq version: $(jq --version 2>/dev/null || echo 'not found')" >&2
     else
       echo ">>> ERROR: helm binary not found in image at /usr/local/bin/helm" >&2
       return 1
@@ -474,6 +477,45 @@ function install_trustee_operands() {
 
   echo ">>> Apply output:"
   echo "$apply_output"
+}
+
+# Create the kbsres1 secret required by the KbsConfig controller.
+# The trustee-operands chart references kbsres1 in kbsSecretResources;
+# without it the controller refuses to create the trustee-deployment.
+function register_kbs_secret() {
+  local secret_name="kbsres1"
+
+  cat > "${SCRATCH}/cosign.pub" <<'PUBKEY'
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWT07eR1HNK3D2iqHotE0c389aSTh
+Lj0B39PXTBcJzJpkXPO82lLGQdc47V5HPWaPZ2Fc3DWyRoz1oWbnLlvQ5Q==
+-----END PUBLIC KEY-----
+PUBKEY
+
+  echo ">>> Creating secret ${secret_name} in ${TRUSTEE_NAMESPACE}"
+  oc create secret generic "${secret_name}" \
+    -n "${TRUSTEE_NAMESPACE}" \
+    --from-file=key1="${SCRATCH}/cosign.pub"
+
+  local cr_name
+  cr_name=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [[ -z "${cr_name}" ]]; then
+    echo ">>> WARN: No KbsConfig found — secret created but not patched into CR"
+    return 0
+  fi
+
+  # Check whether kbsres1 is already listed in kbsSecretResources
+  local existing
+  existing=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" "${cr_name}" \
+    -o jsonpath='{.spec.kbsSecretResources}' 2>/dev/null || echo "")
+
+  if echo "${existing}" | grep -q "${secret_name}"; then
+    echo ">>> ${secret_name} already in kbsSecretResources — skipping patch"
+  else
+    echo ">>> Patching KbsConfig ${cr_name} to register ${secret_name}"
+    oc patch kbsconfig -n "${TRUSTEE_NAMESPACE}" "${cr_name}" --type=json \
+      -p="[{\"op\":\"add\",\"path\":\"/spec/kbsSecretResources/-\",\"value\":\"${secret_name}\"}]"
+  fi
 }
 
 # Wait for operand deployments to become available
@@ -995,6 +1037,7 @@ export CLUSTER_DOMAIN
 install_trustee_operator "${CHARTS_DIR}"
 wait_for_operator
 install_trustee_operands "${CHARTS_DIR}"
+register_kbs_secret
 wait_for_operands
 
 # Configure and verify
