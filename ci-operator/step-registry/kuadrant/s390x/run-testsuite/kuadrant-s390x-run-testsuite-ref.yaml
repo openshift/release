@@ -1,6 +1,7 @@
 ref:
   as: kuadrant-s390x-run-testsuite
-  from: cli
+  from: kuadrant-testsuite
+  cli: latest
   commands: kuadrant-s390x-run-testsuite-commands.sh
   resources:
     requests:
@@ -75,8 +76,10 @@ ref:
     documentation: |-
       Keycloak admin password written into the testsuite config.
   documentation: |-
-    Clones the Kuadrant testsuite, installs Python dependencies with Poetry (no dev deps,
-    no Playwright), generates config/settings.local.yaml dynamically from the cluster
-    (tool Routes created by kuadrant-s390x-deploy-tools and s390x tool images), runs
-    smoke tests and then `make kuadrant` (single-cluster tests, excluding ui/playwright),
-    polishes JUnit XML and copies reports to ${ARTIFACT_DIR}.
+    Runs the Kuadrant end-to-end testsuite from the kuadrant-testsuite pipeline
+    image (based on quay.io/kuadrant/testsuite), which already provides Python,
+    Poetry, make, git and CFSSL. The step runs on the amd64 build-farm and drives
+    the provisioned s390x cluster via kubeconfig. Generates settings.local.yaml
+    dynamically (tool Routes + s390x workload images), runs smoke tests and then
+    `make kuadrant` (excluding ui/playwright), polishes JUnit XML and copies
+    reports to ${ARTIFACT_DIR}. The OpenShift CLI is injected via cli: latest.

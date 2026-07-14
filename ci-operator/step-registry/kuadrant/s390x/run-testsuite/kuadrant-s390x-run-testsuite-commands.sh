@@ -2,41 +2,39 @@
 
 set -euo pipefail
 
+# This step runs on the amd64 build-farm (not on the s390x cluster). The cluster
+# under test is s390x; workloads that land on that cluster still use s390x images
+# (httpbin/mockserver/etc.). The runner itself uses quay.io/kuadrant/testsuite
+# which already provides Python 3.11, Poetry, make, git and CFSSL.
+
 TESTSUITE_DIR="${TESTSUITE_DIR}"
 RESULTS_DIR="${ARTIFACT_DIR}/test-run-results"
 mkdir -p "${RESULTS_DIR}"
+
+# OpenShift CI injects the cluster kubeconfig; prefer that over the image default.
+if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+fi
 
 KEYCLOAK_URL="$(cat "${SHARED_DIR}/keycloak-url")"
 MOCKSERVER_URL="$(cat "${SHARED_DIR}/mockserver-url")"
 JAEGER_QUERY_URL="$(cat "${SHARED_DIR}/jaeger-query-url")"
 JAEGER_COLLECTOR_URL="rpc://jaeger-collector.${TOOLS_NAMESPACE}.svc.cluster.local:4317"
 
-echo "=== Installing testsuite prerequisites (Python, Poetry, CFSSL) ==="
-if ! command -v python3.11 >/dev/null 2>&1; then
-  if command -v dnf >/dev/null 2>&1; then
-    dnf install -y python3.11 python3.11-pip git make curl
-    dnf clean all
-  elif command -v yum >/dev/null 2>&1; then
-    yum install -y python3 python3-pip git make curl
-    dnf clean all || true
-  fi
+CFSSL_BIN="$(command -v cfssl || true)"
+if [[ -z "${CFSSL_BIN}" ]]; then
+  echo "ERROR: cfssl not found in the kuadrant-testsuite image" >&2
+  exit 1
 fi
 
-PYTHON="$(command -v python3.11 || command -v python3)"
 if ! command -v poetry >/dev/null 2>&1; then
-  "${PYTHON}" -m pip install --no-cache-dir poetry
+  echo "ERROR: poetry not found in the kuadrant-testsuite image" >&2
+  exit 1
 fi
 
-CFSSL_BIN="/usr/local/bin/cfssl"
-if ! command -v cfssl >/dev/null 2>&1; then
-  ARCH="$(uname -m)"
-  case "${ARCH}" in
-    s390x) CFSSL_ARCH="s390x" ;;
-    aarch64|arm64) CFSSL_ARCH="arm64" ;;
-    *) CFSSL_ARCH="amd64" ;;
-  esac
-  curl -fsSL "https://github.com/cloudflare/cfssl/releases/download/v1.6.4/cfssl_1.6.4_linux_${CFSSL_ARCH}" -o "${CFSSL_BIN}"
-  chmod +x "${CFSSL_BIN}"
+if ! command -v make >/dev/null 2>&1; then
+  echo "ERROR: make not found in the kuadrant-testsuite image" >&2
+  exit 1
 fi
 
 echo "=== Cloning Kuadrant testsuite (${TESTSUITE_GITREF}) ==="
@@ -44,7 +42,7 @@ rm -rf "${TESTSUITE_DIR}"
 git clone --depth 1 --branch "${TESTSUITE_GITREF}" "${TESTSUITE_REPO}" "${TESTSUITE_DIR}"
 cd "${TESTSUITE_DIR}"
 
-echo "=== Installing Poetry dependencies (no dev, no Playwright) ==="
+echo "=== Syncing Poetry dependencies (no dev, no Playwright) ==="
 export POETRY_VIRTUALENVS_IN_PROJECT=true
 make poetry-no-dev
 
