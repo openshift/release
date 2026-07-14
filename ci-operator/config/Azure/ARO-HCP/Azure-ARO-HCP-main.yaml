@@ -11,7 +11,9 @@ build_root:
     tag: aro-hcp-e2e-base-ci
 images:
   items:
-  - dockerfile_literal: |
+  - capabilities:
+    - gcp
+    dockerfile_literal: |
       FROM nested-podman
       COPY /src /opt/app-root/src/github.com/Azure
       WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
@@ -37,6 +39,8 @@ images:
       value: linux/amd64
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
+    capabilities:
+    - gcp
     dockerfile_path: backend/Dockerfile
     to: aro-hcp-backend
   - build_args:
@@ -44,6 +48,8 @@ images:
       value: linux/amd64
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
+    capabilities:
+    - gcp
     dockerfile_path: frontend/Dockerfile
     to: aro-hcp-frontend
   - build_args:
@@ -51,6 +57,8 @@ images:
       value: linux/amd64
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
+    capabilities:
+    - gcp
     dockerfile_path: admin/Dockerfile
     to: aro-hcp-admin-api
   - build_args:
@@ -58,6 +66,8 @@ images:
       value: linux/amd64
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
+    capabilities:
+    - gcp
     dockerfile_path: sessiongate/Dockerfile
     to: aro-hcp-sessiongate
   - build_args:
@@ -65,6 +75,8 @@ images:
       value: linux/amd64
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
+    capabilities:
+    - gcp
     dockerfile_path: fleet/Dockerfile
     to: aro-hcp-fleet
   - build_args:
@@ -72,6 +84,8 @@ images:
       value: linux/amd64
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
+    capabilities:
+    - gcp
     dockerfile_path: mgmt-agent/Dockerfile
     to: aro-hcp-mgmt-agent
   - build_args:
@@ -81,6 +95,8 @@ images:
       value: ci-sha
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
+    capabilities:
+    - gcp
     dockerfile_path: kube-applier/Dockerfile
     to: aro-hcp-kube-applier
   - build_args:
@@ -90,19 +106,27 @@ images:
       value: ci-sha
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
+    capabilities:
+    - gcp
     dockerfile_path: hcp-recovery/Dockerfile
     from: src
     to: aro-hcp-hcp-recovery
-  - context_dir: image-sync/oc-mirror
+  - capabilities:
+    - gcp
+    context_dir: image-sync/oc-mirror
     dockerfile_path: Dockerfile
     to: aro-hcp-oc-mirror
   - build_args:
     - name: PLATFORM
       value: linux/amd64
+    capabilities:
+    - gcp
     context_dir: tooling
     dockerfile_path: aro-hcp-exporter/Dockerfile
     to: aro-hcp-exporter
-  - dockerfile_literal: |
+  - capabilities:
+    - gcp
+    dockerfile_literal: |
       FROM src
       USER root
       COPY /src /opt/app-root/src/github.com/Azure
@@ -119,10 +143,14 @@ images:
         - destination_dir: src
           source_path: /go/src/github.com/Azure/ARO-HCP
     to: aro-hcp-e2e-tools
-  - dockerfile_path: test/Containerfile.e2e
+  - capabilities:
+    - gcp
+    dockerfile_path: test/Containerfile.e2e
     from: src
     to: aro-hcp-e2e-tests
-  - dockerfile_literal: |
+  - capabilities:
+    - gcp
+    dockerfile_literal: |
       FROM aro-hcp-e2e-tools
       USER root
       # Install official Node.js binary from nodejs.org (pinned version)
@@ -469,6 +497,8 @@ tests:
     test:
     - ref: aro-hcp-provision-global-pipeline
 - as: images-push-postsubmit
+  capabilities:
+  - gcp
   max_concurrency: 4
   postsubmit: true
   reporter_config:
