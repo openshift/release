@@ -8,12 +8,25 @@ OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
 
 extract_hcp_cli() {
   local image=$1
-  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-  mkdir -p /tmp/hs-cli
-  oc image extract "${image}" --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
-  chmod +x /tmp/hs-cli/hypershift
-  HCP_CLI="/tmp/hs-cli/hypershift"
+  local cli_dir
+  cli_dir="$(mktemp -d "${TMPDIR:-/tmp}/hs-cli.XXXXXX")"
+  oc extract secret/pull-secret -n openshift-config --to="${cli_dir}" --confirm
+  oc image extract "${image}" --path "/usr/bin/hypershift:${cli_dir}" --registry-config="${cli_dir}/.dockerconfigjson" --filter-by-os="linux/amd64"
+  chmod +x "${cli_dir}/hypershift"
+  HCP_CLI="${cli_dir}/hypershift"
 }
+
+OVERRIDE_COUNT=0
+[[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]] && ((OVERRIDE_COUNT++))
+[[ "${HO_MULTI}" == "true" ]] && ((OVERRIDE_COUNT++))
+[[ "${INSTALL_FROM_LATEST}" == "true" ]] && ((OVERRIDE_COUNT++))
+
+if [[ ${OVERRIDE_COUNT} -gt 1 ]]; then
+  echo "WARNING: Multiple image override flags are set. Precedence (highest to lowest):"
+  echo "  1. OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE"
+  echo "  2. HO_MULTI"
+  echo "  3. INSTALL_FROM_LATEST"
+fi
 
 if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
   echo "WARNING: Overriding OPERATOR_IMAGE"
