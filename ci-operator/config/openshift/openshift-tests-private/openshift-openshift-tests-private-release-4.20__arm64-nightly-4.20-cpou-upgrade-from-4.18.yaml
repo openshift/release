@@ -96,6 +96,33 @@ tests:
           memory: 200Mi
     - chain: openshift-upgrade-qe-test-cpou
     workflow: cucushift-installer-rehearse-azure-ipi-without-identity
+- as: metal-ds-ipi-ovn-ipv4-f999
+  capabilities:
+  - intranet
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ARCHITECTURE: arm64
+      NVME_DEVICE: /dev/nvme1n1
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE},${RELEASE_IMAGE_ARM64_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE
+        name: release:arm64-intermediate
+      - env: RELEASE_IMAGE_ARM64_TARGET
+        name: release:arm64-target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: gcp-ipi-proxy-private-mini-perm-f28
   cron: 21 9 28 * *
   steps:
