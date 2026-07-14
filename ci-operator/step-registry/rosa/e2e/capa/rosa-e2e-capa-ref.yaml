@@ -1,0 +1,37 @@
+ref:
+  as: rosa-e2e-capa
+  from: ansible
+  grace_period: 10m
+  cli: latest
+  commands: rosa-e2e-capa-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  credentials:
+  - namespace: test-credentials
+    name: rosa-hcp-e2e-secrets
+    mount_path: /var/run/rosa-hcp-e2e-secrets
+  - namespace: test-credentials
+    name: rosa-e2e-aws-creds
+    mount_path: /var/run/rosa-e2e-aws-creds
+  env:
+  - name: ROSA_HCP_E2E_REPO
+    default: "https://github.com/stolostron/rosa-hcp-e2e-test"
+    documentation: Repository URL for the stolostron rosa-hcp-e2e-test project.
+  - name: ROSA_HCP_E2E_BRANCH
+    default: "main"
+    documentation: Branch of the rosa-hcp-e2e-test repository to use.
+  - name: REGION
+    default: "us-east-1"
+    documentation: The AWS region for the ROSA HCP cluster.
+  - name: DEPLOYMENT_MODE
+    default: "standalone"
+    documentation: Deployment mode for CAPI installation (standalone or mce).
+  - name: TEST_SUITE
+    default: "--list"
+    documentation: Test suite argument passed to run-test-suite.py (e.g. 10-install-capi-standalone, --tag standalone, --all).
+  documentation: |-
+    Clones the stolostron/rosa-hcp-e2e-test repository and runs the
+    ROSA HCP e2e test suite against the management cluster with
+    CAPI/CAPA controllers already installed.
