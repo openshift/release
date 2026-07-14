@@ -2,16 +2,21 @@
 
 set -euo pipefail
 
-# This step runs on the amd64 build-farm (not on the s390x cluster). The cluster
-# under test is s390x; workloads that land on that cluster still use s390x images
-# (httpbin/mockserver/etc.). The runner itself uses quay.io/kuadrant/testsuite
-# which already provides Python 3.11, Poetry, make, git and CFSSL.
+# This step runs on the amd64 build-farm (not on the s390x cluster). The runner
+# image is based on quay.io/kuadrant/testsuite, which already COPYs the testsuite
+# sources and runs `make poetry-no-dev` at build time
+# (https://github.com/Kuadrant/testsuite/blob/main/Dockerfile). We reuse that
+# baked-in tree instead of cloning. OpenShift CI runs as an arbitrary UID, so
+# the image WORKDIR may not be writable; copy into HOME before generating
+# settings. Workload images on the s390x cluster remain s390x-specific.
 
-TESTSUITE_DIR="${TESTSUITE_DIR}"
+BAKED_TESTSUITE_DIR="${TESTSUITE_DIR}"
+RUNTIME_DIR="${HOME}/kuadrant-testsuite"
 RESULTS_DIR="${ARTIFACT_DIR}/test-run-results"
 mkdir -p "${RESULTS_DIR}"
 
-# OpenShift CI injects the cluster kubeconfig; prefer that over the image default.
+# OpenShift CI injects the cluster kubeconfig; prefer that over the image default
+# (/run/kubeconfig from the Dockerfile).
 if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
   export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 fi
@@ -27,24 +32,16 @@ if [[ -z "${CFSSL_BIN}" ]]; then
   exit 1
 fi
 
-if ! command -v poetry >/dev/null 2>&1; then
-  echo "ERROR: poetry not found in the kuadrant-testsuite image" >&2
+if [[ ! -d "${BAKED_TESTSUITE_DIR}" ]]; then
+  echo "ERROR: baked-in testsuite directory not found at ${BAKED_TESTSUITE_DIR}" >&2
   exit 1
 fi
 
-if ! command -v make >/dev/null 2>&1; then
-  echo "ERROR: make not found in the kuadrant-testsuite image" >&2
-  exit 1
-fi
-
-echo "=== Cloning Kuadrant testsuite (${TESTSUITE_GITREF}) ==="
-rm -rf "${TESTSUITE_DIR}"
-git clone --depth 1 --branch "${TESTSUITE_GITREF}" "${TESTSUITE_REPO}" "${TESTSUITE_DIR}"
-cd "${TESTSUITE_DIR}"
-
-echo "=== Syncing Poetry dependencies (no dev, no Playwright) ==="
-export POETRY_VIRTUALENVS_IN_PROJECT=true
-make poetry-no-dev
+echo "=== Copying baked-in Kuadrant testsuite from ${BAKED_TESTSUITE_DIR} to ${RUNTIME_DIR} ==="
+rm -rf "${RUNTIME_DIR}"
+mkdir -p "${RUNTIME_DIR}"
+cp -a "${BAKED_TESTSUITE_DIR}/." "${RUNTIME_DIR}/"
+cd "${RUNTIME_DIR}"
 
 echo "=== Generating config/settings.local.yaml ==="
 mkdir -p config
@@ -94,6 +91,7 @@ $WAS_TRACING && set -x
 
 echo "Generated config/settings.local.yaml (credentials redacted in logs)."
 
+# ci-operator overrides the image ENTRYPOINT; invoke make targets explicitly.
 export junit=yes
 export resultsdir="${RESULTS_DIR}"
 export USER="${USER:-ci}"

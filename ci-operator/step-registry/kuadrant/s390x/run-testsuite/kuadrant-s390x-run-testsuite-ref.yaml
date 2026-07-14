@@ -11,18 +11,13 @@ ref:
       memory: 8Gi
   timeout: 3h0m0s
   env:
-  - name: TESTSUITE_REPO
-    default: "https://github.com/Kuadrant/testsuite.git"
-    documentation: |-
-      Git URL of the Kuadrant testsuite repository to clone.
-  - name: TESTSUITE_GITREF
-    default: "main"
-    documentation: |-
-      Git branch, tag or commit of the testsuite to check out.
   - name: TESTSUITE_DIR
-    default: "/tmp/kuadrant-testsuite"
+    default: "/opt/workdir/kuadrant-testsuite"
     documentation: |-
-      Directory where the testsuite is cloned and executed.
+      Path to the Kuadrant testsuite already present in the kuadrant-testsuite
+      image (FROM quay.io/kuadrant/testsuite). Sources and Poetry deps are baked
+      in at image build time. The step copies this tree to a writable runtime
+      directory; it does not clone the repository again.
   - name: PYTEST_FLAGS
     default: "-n1"
     documentation: |-
@@ -77,9 +72,12 @@ ref:
       Keycloak admin password written into the testsuite config.
   documentation: |-
     Runs the Kuadrant end-to-end testsuite from the kuadrant-testsuite pipeline
-    image (based on quay.io/kuadrant/testsuite), which already provides Python,
-    Poetry, make, git and CFSSL. The step runs on the amd64 build-farm and drives
-    the provisioned s390x cluster via kubeconfig. Generates settings.local.yaml
+    image (FROM quay.io/kuadrant/testsuite). That image already contains the
+    testsuite sources and Poetry dependencies (see the upstream Dockerfile), so
+    this step does not clone the repo again. It copies the baked-in tree to a
+    writable path (OpenShift CI arbitrary UID), generates settings.local.yaml
     dynamically (tool Routes + s390x workload images), runs smoke tests and then
     `make kuadrant` (excluding ui/playwright), polishes JUnit XML and copies
     reports to ${ARTIFACT_DIR}. The OpenShift CLI is injected via cli: latest.
+    The image ENTRYPOINT is overridden by ci-operator; make targets are invoked
+    explicitly.
