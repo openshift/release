@@ -73,6 +73,7 @@ EXTRA_FLAGS+=" --service-replicas=${SERVICE_REPLICAS}"
 EXTRA_FLAGS+=" --churn-duration=${CHURN_DURATION}"
 EXTRA_FLAGS+=" --churn-delay=${CHURN_DELAY}"
 EXTRA_FLAGS+=" --churn-percent=${CHURN_PERCENT}"
+EXTRA_FLAGS+=" --max-wait-timeout=${MAX_WAIT_TIMEOUT}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
