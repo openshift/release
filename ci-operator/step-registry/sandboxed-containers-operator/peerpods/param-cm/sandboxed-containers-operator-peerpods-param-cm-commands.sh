@@ -12,6 +12,86 @@ cd /tmp || exit 1
 # can reference it.
 PP_CONFIGM_PATH="${SHARED_DIR:-$(pwd)}/peerpods-param-cm.yaml"
 
+# Create an IRSA role for the OSC operator service account in AWS STS mode.
+# The role ARN and policy ARN are saved to SHARED_DIR for cleanup in the post step.
+create_osc_irsa_role() {
+    local CLUSTER_ID OIDC_PROVIDER AWS_ACCOUNT_ID ROLE_NAME ROLE_ARN POLICY_ARN
+
+    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
+    AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+    CLUSTER_ID=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')
+    OIDC_PROVIDER=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}' \
+        | sed -e "s|^https://||")
+    ROLE_NAME="${CLUSTER_ID}-osc-irsa-role"
+
+    echo "Creating IRSA role ${ROLE_NAME} for OSC operator (OIDC provider: ${OIDC_PROVIDER})"
+
+    cat > "${SHARED_DIR}/osc-irsa-trust.json" <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {
+      "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_PROVIDER}"
+    },
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": {
+        "${OIDC_PROVIDER}:sub": "system:serviceaccount:openshift-sandboxed-containers-operator:default"
+      }
+    }
+  }]
+}
+EOF
+
+    cat > "${SHARED_DIR}/osc-irsa-policy.json" <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": [
+      "ec2:RunInstances",
+      "ec2:TerminateInstances",
+      "ec2:DescribeInstances",
+      "ec2:DescribeInstanceTypes",
+      "ec2:DescribeImages",
+      "ec2:DescribeSubnets",
+      "ec2:DescribeVpcs",
+      "ec2:DescribeSecurityGroups",
+      "ec2:CreateNetworkInterface",
+      "ec2:DeleteNetworkInterface",
+      "ec2:DescribeNetworkInterfaces",
+      "ec2:CreateTags"
+    ],
+    "Resource": "*"
+  }]
+}
+EOF
+
+    ROLE_ARN=$(aws iam create-role \
+        --role-name "${ROLE_NAME}" \
+        --assume-role-policy-document "file://${SHARED_DIR}/osc-irsa-trust.json" \
+        --tags "Key=kubernetes.io/cluster/${CLUSTER_ID},Value=owned" \
+        --query "Role.Arn" --output text)
+    echo "Created IRSA role: ${ROLE_ARN}"
+
+    POLICY_ARN=$(aws iam create-policy \
+        --policy-name "${CLUSTER_ID}-osc-irsa-policy" \
+        --policy-document "file://${SHARED_DIR}/osc-irsa-policy.json" \
+        --tags "Key=kubernetes.io/cluster/${CLUSTER_ID},Value=owned" \
+        --query "Policy.Arn" --output text)
+    echo "Created IRSA policy: ${POLICY_ARN}"
+
+    aws iam attach-role-policy --role-name "${ROLE_NAME}" --policy-arn "${POLICY_ARN}"
+
+    # Save for cleanup in the post step
+    echo "${ROLE_ARN}" > "${SHARED_DIR}/osc-irsa-role-arn"
+    echo "${POLICY_ARN}" > "${SHARED_DIR}/osc-irsa-policy-arn"
+
+    echo "STS identity setup complete for OSC operator"
+}
+
 handle_aws() {
     local AWS_REGION
     local AWS_SG_IDS
@@ -19,14 +99,22 @@ handle_aws() {
     local AWS_VPC_ID
     local INSTANCE_ID
 
-    oc -n kube-system get secret aws-creds -o json > aws-creds.json
+    case "${IDENTITY_MODE:-cco}" in
+        sts)
+            echo "STS mode - creating IRSA role for OSC operator"
+            export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+            create_osc_irsa_role
+            ;;
+        *)
+            echo "CCO/manual mode - creating peerpods-param-secret from static credentials"
+            oc -n kube-system get secret aws-creds -o json > aws-creds.json
 
-    AWS_ACCESS_KEY_ID="$(jq -r .data.aws_access_key_id aws-creds.json | base64 -d)"
-    export AWS_ACCESS_KEY_ID
-    AWS_SECRET_ACCESS_KEY="$(jq -r .data.aws_secret_access_key aws-creds.json | base64 -d)"
-    export AWS_SECRET_ACCESS_KEY
+            AWS_ACCESS_KEY_ID="$(jq -r .data.aws_access_key_id aws-creds.json | base64 -d)"
+            export AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY="$(jq -r .data.aws_secret_access_key aws-creds.json | base64 -d)"
+            export AWS_SECRET_ACCESS_KEY
 
-    cat<<-EOF > ./auth.json
+            cat<<-EOF > ./auth.json
     {
       "aws": {
         "aws_access_key_id": "${AWS_ACCESS_KEY_ID}",
@@ -35,7 +123,9 @@ handle_aws() {
     }
 EOF
 
-    oc create secret generic peerpods-param-secret --from-file=./auth.json -n default
+            oc create secret generic peerpods-param-secret --from-file=./auth.json -n default
+            ;;
+    esac
 
     INSTANCE_ID=$(oc get nodes -l 'node-role.kubernetes.io/worker' -o jsonpath='{.items[0].spec.providerID}' | sed 's#[^ ]*/##g')
     AWS_REGION=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.aws.region}')
