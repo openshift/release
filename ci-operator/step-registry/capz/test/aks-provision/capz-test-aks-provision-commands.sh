@@ -18,7 +18,18 @@ RESOURCEGROUP="${RESOURCE_NAME_PREFIX}-capz-rg"
 CLUSTER="${RESOURCE_NAME_PREFIX}-capz-aks"
 
 echo "Creating resource group ${RESOURCEGROUP}"
-az group create --name "${RESOURCEGROUP}" --location "${AZURE_LOCATION}" --output none
+DELETE_AFTER=$(date -u -d "+6 hours" +"%Y-%m-%dT%H:%M:%SZ")
+CREATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+az group create --name "${RESOURCEGROUP}" --location "${AZURE_LOCATION}" \
+  --tags \
+    "e2e.aro-hcp-ci.redhat.com=true" \
+    "deleteAfter.aro-hcp-ci.redhat.com=${DELETE_AFTER}" \
+    "createdAt=${CREATED_AT}" \
+    "capi-test-user=${CAPI_USER:-prow}" \
+    "capi-test-env=${DEPLOYMENT_ENV:-ci}" \
+    "capi-test-run-id=${NAME_PREFIX:-unknown}" \
+    "capi-test-created-at=${CREATED_AT}" \
+  --output none
 echo "${RESOURCEGROUP}" > "${SHARED_DIR}/resourcegroup_aks"
 
 K8S_VERSION_ARGS=()
