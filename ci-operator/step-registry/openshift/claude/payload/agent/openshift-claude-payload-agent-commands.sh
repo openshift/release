@@ -99,12 +99,14 @@ export PATH="/tmp/google-cloud-sdk/bin:${PATH}"
 echo "gcloud CLI installed."
 
 # Parse version and stream from payload tag
-# Format: 4.22.0-0.nightly-2026-02-25-152806
+# OCP format:  4.22.0-0.nightly-2026-02-25-152806
+# OKD format:  4.22.0-0.okd-scos-nightly-2026-06-10-015300
+# OKD CI fmt:  4.22.0-0.okd-scos-2026-06-10-003203
 VERSION=$(echo "${PAYLOAD_TAG}" | grep -oP '^\d+\.\d+')
-STREAM=$(echo "${PAYLOAD_TAG}" | grep -oP '\d+\.\d+\.\d+-\d+\.\K[a-z]+')
+STREAM_NAME=$(echo "${PAYLOAD_TAG}" | sed 's/-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[0-9]\{6\}$//')
+STREAM=$(echo "${STREAM_NAME}" | sed 's/^[0-9]*\.[0-9]*\.[0-9]*-[0-9]*\.//')
 
-RELEASE_CONTROLLER_URL="https://amd64.ocp.releases.ci.openshift.org"
-STREAM_NAME="${VERSION}.0-0.${STREAM}"
+RELEASE_CONTROLLER_URL="${RELEASE_CONTROLLER_URL:-https://amd64.ocp.releases.ci.openshift.org}"
 API_URL="${RELEASE_CONTROLLER_URL}/api/v1/releasestream/${STREAM_NAME}/release/${PAYLOAD_TAG}"
 PAYLOAD_URL="${RELEASE_CONTROLLER_URL}/releasestream/${STREAM_NAME}/release/${PAYLOAD_TAG}"
 
