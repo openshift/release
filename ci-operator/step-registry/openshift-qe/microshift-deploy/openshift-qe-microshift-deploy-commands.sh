@@ -114,6 +114,14 @@ set +x
 scp -q ${SSH_ARGS} ${CLUSTER_PROFILE_DIR}/pull_secret root@${bastion}:${microshift_repo}/ansible/roles/install-microshift/files/pull-secret.txt
 set -x
 
+# Clean up legacy RPM-based Prometheus left behind by older runs. The
+# logging role now deploys Prometheus as a podman quadlet and skips
+# deployment when it detects an existing unmanaged instance, which would
+# leave a stale Prometheus (scraping a previous allocation) on port 9091.
+if [[ "${PROMETHEUS_LOGGING}" == "true" ]]; then
+  ssh ${SSH_ARGS} root@${bastion} "systemctl disable --now prometheus 2>/dev/null || true"
+fi
+
 # Run ansible playbook
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
