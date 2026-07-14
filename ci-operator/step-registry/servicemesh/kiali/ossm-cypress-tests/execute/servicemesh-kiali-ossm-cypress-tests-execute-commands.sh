@@ -48,6 +48,9 @@ fi
 
 # download hack from kiali repo
 hack/download-hack-scripts.sh --kiali-branch ${KIALI_VERSION}
+# put hack folder to ../ where tests expect it
+cp -r _output/ ../_output
+
 # download prometheus script
 wget -N https://raw.githubusercontent.com/kiali/kiali/${KIALI_VERSION}/hack/use-openshift-prometheus.sh -O _output/kiali/hack/use-openshift-prometheus.sh
 chmod +x _output/kiali/hack/use-openshift-prometheus.sh
@@ -55,6 +58,8 @@ chmod +x _output/kiali/hack/use-openshift-prometheus.sh
 # remove v from ISTIO version if there is any
 [[ $ISTIO_SAMPLE_APP_VERSION == v* ]] && ISTIO_SAMPLE_APP_VERSION="${ISTIO_SAMPLE_APP_VERSION#v}" || ISTIO_SAMPLE_APP_VERSION="$ISTIO_SAMPLE_APP_VERSION"
 _output/kiali/hack/istio/download-istio.sh -iv ${ISTIO_SAMPLE_APP_VERSION}
+# delete testing apps if there from previous run
+_output/kiali/hack/istio/install-testing-demos.sh -d true || true
 # install testing apps
 _output/kiali/hack/istio/install-testing-demos.sh -c oc -in ${ISTIO_NAMESPACE}
 # wait till all apps are ready
@@ -88,7 +93,7 @@ export CYPRESS_AUTH_PROVIDER="kube:admin"
 
 # for flaky tests
 export CYPRESS_RETRIES=2
-export TEST_GROUP="@smoke and @ossmc and not @skip-lpinterop"
+export TEST_GROUP="(@core-1 or @core-2) and @smoke and not @skip-ossmc and not @skip-lpinterop"
 yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 # save screenshots from the 1st run
 cp -r cypress/screenshots ${ARTIFACT_DIR}/ || true
