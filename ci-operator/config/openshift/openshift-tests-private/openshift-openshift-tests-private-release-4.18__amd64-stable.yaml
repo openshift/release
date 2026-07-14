@@ -414,6 +414,29 @@ tests:
     - ref: rosa-cluster-upgrade-hcp
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-lifecycle-advanced
+- as: aws-rosa-hcp-upgrade-with-running-cluster-f999
+  cron: 8 8 29 2 *
+  reporter_config:
+    channel: '#managed-hypershift-ci-watcher'
+    job_states_to_report:
+    - error
+    - failure
+    - success
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-sd-qe
+    env:
+      E2E_RUN_TAGS: '@rosa'
+      NAME_PREFIX: ci-long-run
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+    test:
+    - ref: rosa-cluster-upgrade-hcp
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-lifecycle-running-cluster
 - as: aws-usgov-ipi-private-sts-f14
   cron: 0 8 15,29 * *
   steps:
