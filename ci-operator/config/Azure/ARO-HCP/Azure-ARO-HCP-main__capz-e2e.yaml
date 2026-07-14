@@ -149,13 +149,18 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: dev
-  run_if_changed: ^$
+- always_run: false
+  as: dev
+  optional: true
   steps:
     allow_best_effort_post_steps: true
     env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters (EA Subscription),ARO HCP
+        E2E Hosted Clusters 2 (EA Subscription),ARO HCP E2E Hosted Clusters - Dev
+        - 02,ARO HCP E2E Hosted Clusters - Dev - 03
       ARO_HCP_CLOUD: dev
       ARO_HCP_DEPLOY_ENV: ci01
+      ARO_HCP_SWEEPER_TAGS: "true"
       ARO_REPO_BRANCH: aro-hcp-2025-23-12-preview
       ARO_REPO_DIR: /tmp/cluster-api-installer-pro
       ARO_REPO_URL: https://github.com/stolostron/cluster-api-installer.git
@@ -165,12 +170,6 @@ tests:
       VAULT_SECRET_PROFILE: dev
       WORKLOAD_CLUSTER_NAMESPACE: capz-test-prow
     leases:
-    - count: 1
-      env: ENV_QUOTA_LEASED_RESOURCE
-      resource_type: aro-hcp-dev-quota-slice
-    - count: 1
-      env: LEASED_MSI_CONTAINERS
-      resource_type: aro-hcp-test-msi-containers-dev
     - count: 1
       env: LEASED_MSI_MOCK_SP
       resource_type: aro-hcp-msi-mock-cs-sp-dev
@@ -184,7 +183,9 @@ tests:
     - ref: aro-hcp-gather-custom-link-tools
     - ref: aro-hcp-gather-observability
     - ref: aro-hcp-deprovision-environment
+    - ref: aro-hcp-lease-release
     pre:
+    - ref: aro-hcp-lease-acquire
     - ref: aro-hcp-write-config
     - ref: aro-hcp-provision-environment
     - ref: capz-arohcp-write-env-dev

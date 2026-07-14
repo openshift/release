@@ -19,9 +19,11 @@ az login --service-principal \
   --output none
 az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
 
+MSI_SCOPE="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${MSI_RESOURCEGROUPNAME}"
 RA_IDS=$(az role assignment list \
-  --resource-group "${MSI_RESOURCEGROUPNAME}" \
-  --query "[].id" \
+  --scope "${MSI_SCOPE}" \
+  --include-inherited \
+  --query "[?starts_with(scope, '${MSI_SCOPE}')].[id]" \
   --output tsv 2>/dev/null) || true
 
 if [[ -z "${RA_IDS}" ]]; then
