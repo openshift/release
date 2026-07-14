@@ -20,7 +20,7 @@ typeset targetVersion=""
 typeset -i targetMinorVersion=0
 typeset sourceVersion=""
 typeset -i sourceMinorVersion=0
-typeset forceUpdate="false"
+typeset isForceUpdate="false"
 
 DebugOnExit() {
     if (( exitCode != 0 )); then
@@ -72,7 +72,7 @@ ResolveTargetImage() {
 }
 
 CheckSigned() {
-    typeset payload="${1}"
+    typeset payload="${1:-}"; (($#)) && shift
     typeset digest="" algorithm="" hashValue=""
     typeset -i response=0 try=0 maxRetries=3
     if [[ "${payload}" =~ "@sha256:" ]]; then
@@ -103,7 +103,8 @@ CheckSigned() {
 }
 
 AdminAck() {
-    typeset -i srcMinor="${1}" tgtMinor="${2}"
+    typeset -i srcMinor="${1:-0}"; (($#)) && shift
+    typeset -i tgtMinor="${1:-0}"; (($#)) && shift
     if (( srcMinor == tgtMinor )) || (( srcMinor < 8 )); then
         : "Admin ack not required (z-stream or pre-4.8)"
         return 0
@@ -150,7 +151,8 @@ AdminAck() {
 }
 
 UpdateCcoAnnotation() {
-    typeset srcVersion="${1}" tgtVersion="${2}"
+    typeset srcVersion="${1:-}"; (($#)) && shift
+    typeset tgtVersion="${1:-}"; (($#)) && shift
     typeset -i srcMinor=0 tgtMinor=0
     srcMinor="$(echo "${srcVersion}" | cut -f2 -d.)"
     tgtMinor="$(echo "${tgtVersion}" | cut -f2 -d.)"
@@ -190,10 +192,10 @@ UpdateCcoAnnotation() {
 }
 
 InitiateUpgrade() {
-    typeset forceFlag="${1}"
+    typeset isForce="${1:-}"; (($#)) && shift
     : "Initiating upgrade to ${upgradeTarget}"
-    : "Force flag: ${forceFlag}"
-    oc adm upgrade --to-image="${upgradeTarget}" --allow-explicit-upgrade --force="${forceFlag}"
+    : "Force flag: ${isForce}"
+    oc adm upgrade --to-image="${upgradeTarget}" --allow-explicit-upgrade --force="${isForce}"
     : "Upgrade command accepted at $(date '+%F %T')"
 
     sleep 10
@@ -319,8 +321,8 @@ ValidatePlatformHealth() {
 
 ValidateOppOperators() {
     : "Validating OPP operator health"
-    typeset -a operators=()
-    IFS=',' read -ra operators <<< "${OPP_OPERATORS}"
+    typeset -a operatorsArr=()
+    IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
 
     : "Waiting 5 minutes for operator settling"
     sleep 300
@@ -333,7 +335,7 @@ ValidateOppOperators() {
     }
 
     typeset csvLine="" phase=""
-    for op in "${operators[@]}"; do
+    for op in "${operatorsArr[@]}"; do
         csvLine="$(echo "${allCsvs}" | grep "${op}" | head -1)" || true
         if [[ -z "${csvLine}" ]]; then
             : "CSV not found for operator: ${op}"
@@ -391,18 +393,18 @@ Main() {
     export sourceVersion sourceMinorVersion
     : "Source release: ${sourceVersion} (minor: ${sourceMinorVersion})"
 
-    forceUpdate="false"
+    isForceUpdate="false"
     if ! CheckSigned "${upgradeTarget}"; then
         : "Target is unsigned; will use --force"
-        forceUpdate="true"
+        isForceUpdate="true"
     fi
 
-    if [[ "${forceUpdate}" == "false" ]]; then
+    if [[ "${isForceUpdate}" == "false" ]]; then
         AdminAck "${sourceMinorVersion}" "${targetMinorVersion}"
         UpdateCcoAnnotation "${sourceVersion}" "${targetVersion}"
     fi
 
-    InitiateUpgrade "${forceUpdate}"
+    InitiateUpgrade "${isForceUpdate}"
     MonitorUpgrade
     StabilizeCluster
     ValidatePlatformHealth

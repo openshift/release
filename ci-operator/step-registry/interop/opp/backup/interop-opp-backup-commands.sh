@@ -17,8 +17,8 @@ typeset -i failures=0
 typeset -i captured=0
 
 Capture() {
-    typeset description="${1}" outputFile="${2}"
-    shift 2
+    typeset description="${1:-}"; (($#)) && shift
+    typeset outputFile="${1:-}"; (($#)) && shift
     : "Capturing ${description}..."
     if "$@" > "${outputFile}" 2>&1; then
         : "OK: ${description} -> $(basename "${outputFile}")"
@@ -66,21 +66,21 @@ if [[ -n "${controlPlaneNode}" ]]; then
         resourcesFile=$(oc debug "node/${controlPlaneNode}" -- chroot /host \
             bash -c "ls -1 ${etcdBackupRemote}/static_kuberesources_*.tar.gz 2>/dev/null | head -1") || true
 
-        typeset copyOk=true
+        typeset isCopyOk=true
         if [[ -n "${snapshotFile}" ]]; then
             if ! oc debug "node/${controlPlaneNode}" -- cat "/host${snapshotFile}" > "${backupDir}/etcd-snapshot.db" 2>&1; then
                 : "WARNING: Failed to copy etcd snapshot (continuing)"
-                copyOk=false
+                isCopyOk=false
             fi
         fi
         if [[ -n "${resourcesFile}" ]]; then
             if ! oc debug "node/${controlPlaneNode}" -- cat "/host${resourcesFile}" > "${backupDir}/static-kuberesources.tar.gz" 2>&1; then
                 : "WARNING: Failed to copy static kube resources (continuing)"
-                copyOk=false
+                isCopyOk=false
             fi
         fi
 
-        if [[ "${copyOk}" == "true" ]]; then
+        if [[ "${isCopyOk}" == "true" ]]; then
             : "OK: etcd snapshot and static kube resources saved"
             (( captured += 1 ))
         else
@@ -132,11 +132,11 @@ clusterVersion=$(oc get clusterversion version -o jsonpath='{.status.desired.ver
 typeset -i nodeCount=0
 nodeCount=$(oc get nodes -o json | jq '.items | length') || true
 
-typeset -a opList=()
-IFS=',' read -ra opList <<< "${OPP_OPERATORS}"
+typeset -a opListArr=()
+IFS=',' read -ra opListArr <<< "${OPP_OPERATORS}"
 typeset opJson="["
 typeset csvPhase=""
-for op in "${opList[@]}"; do
+for op in "${opListArr[@]}"; do
     csvPhase=""
     csvPhase=$(oc get csv -A --no-headers | grep "${op}" | head -1 | awk '{print $NF}') || true
     opJson="${opJson}{\"name\":\"${op}\",\"phase\":\"${csvPhase:-unknown}\"},"

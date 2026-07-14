@@ -17,23 +17,26 @@ SMOKE_SETTLE_SECONDS="${SMOKE_SETTLE_SECONDS:-120}"
 typeset junitFile="${ARTIFACT_DIR}/junit_opp_smoke.xml"
 
 # Accumulators for JUnit generation
-typeset -a tcNames=()
-typeset -a tcResults=()    # "pass" or "fail"
-typeset -a tcMessages=()   # failure message (empty when pass)
+typeset -a tcNamesArr=()
+typeset -a tcResultsArr=()    # "pass" or "fail"
+typeset -a tcMessagesArr=()   # failure message (empty when pass)
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 AddResult() {
-    typeset name="${1}" result="${2}" message="${3:-}"
-    tcNames+=("${name}")
-    tcResults+=("${result}")
-    tcMessages+=("${message}")
+    typeset name="${1:-}"; (($#)) && shift
+    typeset result="${1:-}"; (($#)) && shift
+    typeset message="${1:-}"; (($#)) && shift
+    tcNamesArr+=("${name}")
+    tcResultsArr+=("${result}")
+    tcMessagesArr+=("${message}")
+    true
 }
 
 XmlEscape() {
-    typeset text="${1}"
+    typeset text="${1:-}"; (($#)) && shift
     text="${text//&/&amp;}"
     text="${text//</&lt;}"
     text="${text//>/&gt;}"
@@ -43,9 +46,9 @@ XmlEscape() {
 }
 
 WriteJunit() {
-    typeset -i total=${#tcNames[@]}
+    typeset -i total=${#tcNamesArr[@]}
     typeset -i failCount=0
-    for r in "${tcResults[@]}"; do
+    for r in "${tcResultsArr[@]}"; do
         if [[ "${r}" == "fail" ]]; then
             (( failCount++ )) || true
         fi
@@ -54,13 +57,13 @@ WriteJunit() {
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
         echo "<testsuite name=\"opp-smoke\" tests=\"${total}\" failures=\"${failCount}\">"
-        for i in "${!tcNames[@]}"; do
+        for i in "${!tcNamesArr[@]}"; do
             typeset name=""
-            name="$(XmlEscape "${tcNames[$i]}")"
+            name="$(XmlEscape "${tcNamesArr[$i]}")"
             echo "  <testcase classname=\"opp-smoke\" name=\"${name}\">"
-            if [[ "${tcResults[$i]}" == "fail" ]]; then
+            if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
                 typeset msg=""
-                msg="$(XmlEscape "${tcMessages[$i]}")"
+                msg="$(XmlEscape "${tcMessagesArr[$i]}")"
                 echo "    <failure message=\"${msg}\"></failure>"
             fi
             echo "  </testcase>"
@@ -162,9 +165,9 @@ TestOppOperators() {
     : "=== Test: opp-operators ==="
     typeset failMsg=""
 
-    typeset -a operators=()
-    IFS=',' read -ra operators <<< "${OPP_OPERATORS}"
-    for op in "${operators[@]}"; do
+    typeset -a operatorsArr=()
+    IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
+    for op in "${operatorsArr[@]}"; do
         op="$(echo "${op}" | xargs)"  # trim whitespace
         : "Checking operator: ${op}"
 
@@ -433,15 +436,15 @@ Main() {
     WriteJunit
 
     # Determine overall result
-    typeset -i anyFail=0
-    for r in "${tcResults[@]}"; do
+    typeset -i hasAnyFail=0
+    for r in "${tcResultsArr[@]}"; do
         if [[ "${r}" == "fail" ]]; then
-            anyFail=1
+            hasAnyFail=1
             break
         fi
     done
 
-    if (( anyFail )); then
+    if (( hasAnyFail )); then
         : "OPP Smoke Tests: SOME TESTS FAILED"
         exit 1
     fi

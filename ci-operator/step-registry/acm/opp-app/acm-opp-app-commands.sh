@@ -37,14 +37,14 @@ typeset -A testDuration
 typeset -A testFailureMsg
 
 # All test cases that should appear in JUnit XML
-typeset -a allTestCases=(
+typeset -a allTestCasesArr=(
     "deploy-opp-application"
     "test-acs-integration"
 )
 
 # Initialize all tests as failed (will be updated to passed if they succeed)
 typeset test=""
-for test in "${allTestCases[@]}"; do
+for test in "${allTestCasesArr[@]}"; do
     testStatus["${test}"]="failed"
     testDuration["${test}"]=0
     testFailureMsg["${test}"]="Test did not run"
@@ -55,10 +55,10 @@ startTime=$(date +%s)
 
 # Function to record test result
 RecordTestResult() {
-    typeset testName="${1}"
-    typeset status="${2}"  # "passed", "failed", or "skipped"
-    typeset failureMessage="${3:-}"
-    typeset duration="${4:-0}"
+    typeset testName="${1:-}"; (($#)) && shift
+    typeset status="${1:-}"; (($#)) && shift
+    typeset failureMessage="${1:-}"; (($#)) && shift
+    typeset duration="${1:-0}"; (($#)) && shift
 
     testStatus["${testName}"]="${status}"
     testDuration["${testName}"]="${duration}"
@@ -71,10 +71,10 @@ GenerateJunitXml() {
     typeset -i totalDuration=$(( $(date +%s) - startTime ))
 
     # Count test results
-    typeset -i totalTests=${#allTestCases[@]}
+    typeset -i totalTests=${#allTestCasesArr[@]}
     typeset -i failedTests=0
 
-    for test in "${allTestCases[@]}"; do
+    for test in "${allTestCasesArr[@]}"; do
         if [ "${testStatus[${test}]}" = "failed" ]; then
             failedTests=$((failedTests + 1))
         fi
@@ -93,7 +93,7 @@ GenerateJunitXml() {
 EOF
 
     # Generate XML for each test case
-    for test in "${allTestCases[@]}"; do
+    for test in "${allTestCasesArr[@]}"; do
         typeset status="${testStatus[${test}]}"
         typeset duration="${testDuration[${test}]}"
         typeset failureMsg="${testFailureMsg[${test}]}"
@@ -230,7 +230,7 @@ RunTestCase2() {
 
     typeset -i retries=10
     typeset -i retryInterval=30
-    typeset imageFound=false
+    typeset isImageFound=false
     typeset httpdImageJson="" imageId="" cves="" image=""
 
     : "Waiting for httpd-example image to appear in ACS (max $((retries * retryInterval))s)..."
@@ -246,14 +246,14 @@ RunTestCase2() {
             cves=$(echo "${httpdImageJson}" | /tmp/jq .cves)
             image=$(echo "${httpdImageJson}" | /tmp/jq .name)
             : "Success: Found ${cves} CVEs for image ${image}"
-            imageFound=true
+            isImageFound=true
             break
         fi
 
         [ "${attempt}" -lt "${retries}" ] && sleep "${retryInterval}"
     done
 
-    [ "${imageFound}" = true ] || return 1
+    [ "${isImageFound}" = true ] || return 1
 
     return 0
 }
@@ -275,7 +275,7 @@ if ! oc get quayintegration quay >/dev/null; then
     : "Cannot proceed with testing - marking all test cases as failed."
 
     # Mark all tests as failed with specific message
-    for test in "${allTestCases[@]}"; do
+    for test in "${allTestCasesArr[@]}"; do
         testStatus["${test}"]="failed"
         testFailureMsg["${test}"]="QuayIntegration not found - OPP bundle not configured"
     done
