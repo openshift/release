@@ -1,7 +1,6 @@
 #!/bin/bash
-set -x
-set -o nounset
-set -o pipefail
+set -euxo pipefail
+shopt -s inherit_errexit
 
 ################################################################################
 # Test Overview
@@ -33,95 +32,97 @@ set -o pipefail
 cd /tmp/ || exit 0
 
 # Define all test cases with initial "skipped" status
-declare -A TEST_STATUS
-declare -A TEST_DURATION
-declare -A TEST_FAILURE_MSG
+typeset -A testStatus
+typeset -A testDuration
+typeset -A testFailureMsg
 
 # All test cases that should appear in JUnit XML
-ALL_TEST_CASES=(
+typeset -a allTestCases=(
     "deploy-opp-application"
     "test-acs-integration"
 )
 
 # Initialize all tests as failed (will be updated to passed if they succeed)
-for test in "${ALL_TEST_CASES[@]}"; do
-    TEST_STATUS["$test"]="failed"
-    TEST_DURATION["$test"]=0
-    TEST_FAILURE_MSG["$test"]="Test did not run"
+typeset test=""
+for test in "${allTestCases[@]}"; do
+    testStatus["${test}"]="failed"
+    testDuration["${test}"]=0
+    testFailureMsg["${test}"]="Test did not run"
 done
 
-START_TIME=$(date +%s)
+typeset -i startTime=0
+startTime=$(date +%s)
 
 # Function to record test result
-record_test_result() {
-    local test_name="$1"
-    local status="$2"  # "passed", "failed", or "skipped"
-    local failure_message="${3:-}"
-    local duration="${4:-0}"
+RecordTestResult() {
+    typeset testName="${1}"
+    typeset status="${2}"  # "passed", "failed", or "skipped"
+    typeset failureMessage="${3:-}"
+    typeset duration="${4:-0}"
 
-    TEST_STATUS["$test_name"]="$status"
-    TEST_DURATION["$test_name"]="$duration"
-    TEST_FAILURE_MSG["$test_name"]="$failure_message"
+    testStatus["${testName}"]="${status}"
+    testDuration["${testName}"]="${duration}"
+    testFailureMsg["${testName}"]="${failureMessage}"
 }
 
 # Function to generate JUnit XML
-generate_junit_xml() {
-    local junit_file="${ARTIFACT_DIR}/junit_acm-opp-app.xml"
-    local total_duration=$(($(date +%s) - START_TIME))
+GenerateJunitXml() {
+    typeset junitFile="${ARTIFACT_DIR}/junit_acm-opp-app.xml"
+    typeset -i totalDuration=$(( $(date +%s) - startTime ))
 
     # Count test results
-    local total_tests=${#ALL_TEST_CASES[@]}
-    local failed_tests=0
+    typeset -i totalTests=${#allTestCases[@]}
+    typeset -i failedTests=0
 
-    for test in "${ALL_TEST_CASES[@]}"; do
-        if [ "${TEST_STATUS[$test]}" = "failed" ]; then
-            failed_tests=$((failed_tests + 1))
+    for test in "${allTestCases[@]}"; do
+        if [ "${testStatus[${test}]}" = "failed" ]; then
+            failedTests=$((failedTests + 1))
         fi
     done
 
-    echo "====== Generating JUnit XML Report ======"
-    echo "Total Tests: $total_tests"
-    echo "Failed Tests: $failed_tests"
-    echo "Passed Tests: $((total_tests - failed_tests))"
-    echo "Duration: ${total_duration}s"
+    : "Generating JUnit XML Report"
+    : "Total Tests: ${totalTests}"
+    : "Failed Tests: ${failedTests}"
+    : "Passed Tests: $((totalTests - failedTests))"
+    : "Duration: ${totalDuration}s"
 
-    cat > "$junit_file" << EOF
+    cat > "${junitFile}" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="acm-opp-app" tests="$total_tests" failures="$failed_tests" errors="0" skipped="0" time="$total_duration">
+  <testsuite name="acm-opp-app" tests="${totalTests}" failures="${failedTests}" errors="0" skipped="0" time="${totalDuration}">
 EOF
 
     # Generate XML for each test case
-    for test in "${ALL_TEST_CASES[@]}"; do
-        local status="${TEST_STATUS[$test]}"
-        local duration="${TEST_DURATION[$test]}"
-        local failure_msg="${TEST_FAILURE_MSG[$test]}"
+    for test in "${allTestCases[@]}"; do
+        typeset status="${testStatus[${test}]}"
+        typeset duration="${testDuration[${test}]}"
+        typeset failureMsg="${testFailureMsg[${test}]}"
 
-        if [ "$status" = "failed" ]; then
+        if [ "${status}" = "failed" ]; then
             # Escape XML special characters in failure message
-            local escaped_msg
-            escaped_msg=$(echo "$failure_msg" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
-            echo "    <testcase name=\"$test\" classname=\"acm-opp-app\" time=\"$duration\"><failure message=\"$escaped_msg\"/></testcase>" >> "$junit_file"
+            typeset escapedMsg=""
+            escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"><failure message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         else
             # passed
-            echo "    <testcase name=\"$test\" classname=\"acm-opp-app\" time=\"$duration\"/>" >> "$junit_file"
+            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"/>" >> "${junitFile}"
         fi
     done
 
-    cat >> "$junit_file" << EOF
+    cat >> "${junitFile}" << EOF
   </testsuite>
 </testsuites>
 EOF
 
-    echo "JUnit XML generated at: $junit_file"
-    cat "$junit_file"
+    : "JUnit XML generated at: ${junitFile}"
+    cat "${junitFile}"
 }
 
 ################################################################################
 # Test Case 1: Deploy OPP Application and Wait for Build/Deployment
 ################################################################################
-run_test_case_1() {
-    echo "====== Test Case 1: Deploy OPP Application ======"
+RunTestCase1() {
+    : "====== Test Case 1: Deploy OPP Application ======"
 
     # Download jq
     curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq || return 1
@@ -135,7 +136,7 @@ run_test_case_1() {
     sleep 60
 
     # Verify e2e-opp namespace was created
-    oc get namespace e2e-opp >/dev/null 2>&1 || return 1
+    oc get namespace e2e-opp >/dev/null || return 1
 
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite
 
@@ -146,56 +147,60 @@ run_test_case_1() {
     oc get deployment -n e2e-opp || true
 
     # Trigger build if needed
-    LATEST_BUILD_NAME=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
-    [ -z "$LATEST_BUILD_NAME" ] && { LATEST_BUILD_NAME=$(oc start-build httpd-example -n e2e-opp -o name | cut -d'/' -f2) || return 1; }
-    echo "Monitoring build: ${LATEST_BUILD_NAME}"
+    typeset latestBuildName=""
+    latestBuildName=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' || echo "")
+    [ -z "${latestBuildName}" ] && { latestBuildName=$(oc start-build httpd-example -n e2e-opp -o name | cut -d'/' -f2) || return 1; }
+    : "Monitoring build: ${latestBuildName}"
 
     # Wait for deployment (which implicitly waits for build to complete)
-    echo "Waiting for deployment to be available (timeout: 10m)..."
+    : "Waiting for deployment to be available (timeout: 10m)..."
     if ! oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=10m; then
-        echo "❌ ERROR: Deployment did not become available"
+        : "ERROR: Deployment did not become available"
 
         # Collect diagnostics to understand why deployment failed
-        echo "=== Build Status ==="
-        LATEST_BUILD=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
-        if [ -n "$LATEST_BUILD" ]; then
-            BUILD_STATUS=$(oc get build "$LATEST_BUILD" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-            echo "Latest build: $LATEST_BUILD"
-            echo "Build status: $BUILD_STATUS"
+        : "=== Build Status ==="
+        typeset latestBuild=""
+        latestBuild=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' || echo "")
+        if [ -n "${latestBuild}" ]; then
+            typeset buildStatus=""
+            buildStatus=$(oc get build "${latestBuild}" -n e2e-opp -o jsonpath='{.status.phase}' || echo "Unknown")
+            : "Latest build: ${latestBuild}"
+            : "Build status: ${buildStatus}"
 
-            if [ "$BUILD_STATUS" != "Complete" ]; then
-                echo "=== Build Details ==="
-                oc describe build "$LATEST_BUILD" -n e2e-opp || true
+            if [ "${buildStatus}" != "Complete" ]; then
+                : "=== Build Details ==="
+                oc describe build "${latestBuild}" -n e2e-opp || true
                 oc describe buildconfig httpd-example -n e2e-opp || true
             fi
         fi
 
-        echo "=== Events ==="
+        : "=== Events ==="
         oc get event -n e2e-opp || true
 
-        echo "=== Deployment Status ==="
+        : "=== Deployment Status ==="
         oc get deployment -n e2e-opp || true
         oc describe deployment httpd-example -n e2e-opp || true
 
-        echo "=== Pod Status ==="
+        : "=== Pod Status ==="
         oc get po -n e2e-opp || true
 
-        echo "=== ImageStream Status ==="
+        : "=== ImageStream Status ==="
         oc get is -n e2e-opp httpd-example -o yaml | grep -A 10 "status:" || true
 
-        echo "=== Quay Integration Status ==="
+        : "=== Quay Integration Status ==="
         oc get quayintegration quay -o yaml || true
         oc get cm -n openshift-config opp-ingres-ca -o yaml || true
         oc get secret -n policies quay-integration -o yaml || true
 
-        echo "=== Quay Bridge Operator Logs ==="
-        OPERATOR_POD=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-        [ -n "$OPERATOR_POD" ] && oc logs -n openshift-operators "$OPERATOR_POD" -c manager --tail=100 || true
+        : "=== Quay Bridge Operator Logs ==="
+        typeset operatorPod=""
+        operatorPod=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}' || echo "")
+        [ -n "${operatorPod}" ] && oc logs -n openshift-operators "${operatorPod}" -c manager --tail=100 || true
 
         return 1
     fi
 
-    echo "✅ Deployment is available"
+    : "Deployment is available"
 
     # Collect final status
     oc get build,po,deployment -n e2e-opp || true
@@ -207,42 +212,48 @@ run_test_case_1() {
 ################################################################################
 # Test Case 2: Test ACS Integration
 ################################################################################
-run_test_case_2() {
-    echo "====== Test Case 2: Test ACS Integration ======"
-    echo "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
+RunTestCase2() {
+    : "====== Test Case 2: Test ACS Integration ======"
+    : "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
 
-    # Fetch ACS credentials
-    echo "Fetching ACS credentials..."
-    ACS_PASSWORD=$(oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d)
-
-    ACS_HOST=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d)
-    echo "ACS Host: ${ACS_HOST}"
+    # Fetch ACS credentials - disable xtrace for secret handling
+    typeset acsPassword=""
+    typeset acsHost=""
+    set +x
+    acsPassword=$(oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d)
+    acsHost=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d)
+    set -x
+    : "ACS Host: ${acsHost}"
 
     # Query ACS for httpd-example image
-    JQ_FILTER='.images[] | select(.name | contains("httpd-example"))'
-    ACS_COMMAND="curl -s -k -u admin:${ACS_PASSWORD} https://$ACS_HOST/v1/images"
+    typeset jqFilter='.images[] | select(.name | contains("httpd-example"))'
 
-    RETRIES=10
-    RETRY_INTERVAL=30
-    IMAGE_FOUND=false
+    typeset -i retries=10
+    typeset -i retryInterval=30
+    typeset imageFound=false
+    typeset httpdImageJson="" imageId="" cves="" image=""
 
-    echo "Waiting for httpd-example image to appear in ACS (max $((RETRIES * RETRY_INTERVAL))s)..."
-    for attempt in $(seq 1 $RETRIES); do
-        echo "Attempt $attempt/$RETRIES: Querying ACS for httpd-example image..."
-        HTTPD_IMAGE_JSON=$($ACS_COMMAND | /tmp/jq "$JQ_FILTER")
-        ID=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq .id)
-        if [ "$ID" != "" ]; then
-            CVES=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq .cves)
-            image=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq .name)
-            echo "✅ Success: Found $CVES CVEs for image $image"
-            IMAGE_FOUND=true
+    : "Waiting for httpd-example image to appear in ACS (max $((retries * retryInterval))s)..."
+    typeset attempt=""
+    for attempt in $(seq 1 "${retries}"); do
+        : "Attempt ${attempt}/${retries}: Querying ACS for httpd-example image..."
+        # Disable xtrace to protect ACS password in curl arguments
+        set +x
+        httpdImageJson=$(curl -s -k -u "admin:${acsPassword}" "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}")
+        set -x
+        imageId=$(echo "${httpdImageJson}" | /tmp/jq .id)
+        if [ "${imageId}" != "" ]; then
+            cves=$(echo "${httpdImageJson}" | /tmp/jq .cves)
+            image=$(echo "${httpdImageJson}" | /tmp/jq .name)
+            : "Success: Found ${cves} CVEs for image ${image}"
+            imageFound=true
             break
         fi
 
-        [ $attempt -lt $RETRIES ] && sleep $RETRY_INTERVAL
+        [ "${attempt}" -lt "${retries}" ] && sleep "${retryInterval}"
     done
 
-    [ "$IMAGE_FOUND" = true ] || return 1
+    [ "${imageFound}" = true ] || return 1
 
     return 0
 }
@@ -251,61 +262,63 @@ run_test_case_2() {
 # Test Execution Setup
 ################################################################################
 # Set trap to generate JUnit XML on exit (regardless of success or failure)
-trap generate_junit_xml EXIT
+trap GenerateJunitXml EXIT
 
 ################################################################################
 # Pre-flight Checks
 ################################################################################
-echo "====== Pre-flight Check: QuayIntegration ======"
+: "====== Pre-flight Check: QuayIntegration ======"
 
-if ! oc get quayintegration quay >/dev/null 2>&1; then
-    echo "❌ ERROR: QuayIntegration 'quay' not found!"
-    echo "OPP bundle components are not properly configured."
-    echo "Cannot proceed with testing - marking all test cases as failed."
+if ! oc get quayintegration quay >/dev/null; then
+    : "ERROR: QuayIntegration 'quay' not found!"
+    : "OPP bundle components are not properly configured."
+    : "Cannot proceed with testing - marking all test cases as failed."
 
     # Mark all tests as failed with specific message
-    for test in "${ALL_TEST_CASES[@]}"; do
-        TEST_STATUS["$test"]="failed"
-        TEST_FAILURE_MSG["$test"]="QuayIntegration not found - OPP bundle not configured"
+    for test in "${allTestCases[@]}"; do
+        testStatus["${test}"]="failed"
+        testFailureMsg["${test}"]="QuayIntegration not found - OPP bundle not configured"
     done
 
     # Exit immediately (EXIT trap will generate JUnit XML)
     exit 0
 fi
 
-echo "✅ QuayIntegration quay found"
+: "QuayIntegration quay found"
 oc get quayintegration quay -o yaml || true
 
 ################################################################################
 # Execute Test Cases
 ################################################################################
 # Run Test Case 1
-CASE1_START=$(date +%s)
-if run_test_case_1; then
-    CASE1_DURATION=$(($(date +%s) - CASE1_START))
-    record_test_result "deploy-opp-application" "passed" "" "$CASE1_DURATION"
-    echo "✅ Test Case 1 (Deploy OPP Application) Result: PASSED"
+typeset -i case1Start=0
+case1Start=$(date +%s)
+if RunTestCase1; then
+    typeset -i case1Duration=$(( $(date +%s) - case1Start ))
+    RecordTestResult "deploy-opp-application" "passed" "" "${case1Duration}"
+    : "Test Case 1 (Deploy OPP Application) Result: PASSED"
 
     # Run Test Case 2 (ACS Integration)
-    CASE2_START=$(date +%s)
-    if run_test_case_2; then
-        CASE2_DURATION=$(($(date +%s) - CASE2_START))
-        record_test_result "test-acs-integration" "passed" "" "$CASE2_DURATION"
-        echo "✅ Test Case 2 (Test ACS Integration) Result: PASSED"
+    typeset -i case2Start=0
+    case2Start=$(date +%s)
+    if RunTestCase2; then
+        typeset -i case2Duration=$(( $(date +%s) - case2Start ))
+        RecordTestResult "test-acs-integration" "passed" "" "${case2Duration}"
+        : "Test Case 2 (Test ACS Integration) Result: PASSED"
     else
-        CASE2_DURATION=$(($(date +%s) - CASE2_START))
-        record_test_result "test-acs-integration" "failed" "ACS integration test failed" "$CASE2_DURATION"
-        echo "❌ Test Case 2 (Test ACS Integration) Result: FAILED"
+        typeset -i case2Duration=$(( $(date +%s) - case2Start ))
+        RecordTestResult "test-acs-integration" "failed" "ACS integration test failed" "${case2Duration}"
+        : "Test Case 2 (Test ACS Integration) Result: FAILED"
     fi
 else
-    CASE1_DURATION=$(($(date +%s) - CASE1_START))
-    echo "❌ Test Case 1 (Deploy OPP Application) Result: FAILED"
-    echo "Test Case 1 failed, skipping remaining test cases..."
-    record_test_result "deploy-opp-application" "failed" "OPP application deployment failed" "$CASE1_DURATION"
+    typeset -i case1Duration=$(( $(date +%s) - case1Start ))
+    : "Test Case 1 (Deploy OPP Application) Result: FAILED"
+    : "Test Case 1 failed, skipping remaining test cases..."
+    RecordTestResult "deploy-opp-application" "failed" "OPP application deployment failed" "${case1Duration}"
 fi
 
-echo "====== Test Summary ======"
-echo "All test results will be available in JUnit XML report"
+: "====== Test Summary ======"
+: "All test results will be available in JUnit XML report"
 
 # Always exit 0 to allow subsequent test steps to run
 # Test results are reported via JUnit XML
