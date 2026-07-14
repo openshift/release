@@ -14,10 +14,16 @@ shopt -s inherit_errexit
 mkdir -p "${OCP__ABI__CLUSTER_DIR}"
 
 eval "$(
-    curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/BuildCustomScriptsFromYAML.sh"
 )"
 eval "$(
-    curl -fsSL "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/main/libs/bash/common/EnsureReqs.sh"
 )"; EnsureReqs yq
 
 typeset ocpABIcfg="${CLUSTER_PROFILE_DIR}/${OCP__ABI__CFG_FN}"; [ -r "${ocpABIcfg}" ]
@@ -54,7 +60,8 @@ function UpdateCfg () {
         [[ "${cfgFile}" == */* ]] &&
             mkdir -p "${OCP__ABI__CLUSTER_DIR}/${cfgFile%/*}"
         true 1>> "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"
-        exec 3< <(cat "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"); wait $!
+        # shellcheck disable=SC2188
+        exec 3< <(0< "${OCP__ABI__CLUSTER_DIR}/${cfgFile}"); wait $!
         case ${cfgType} in
           (*+)  updateOp='select(fileIndex==0) *+ ' ;;
           (*-)  updateOp='select(fileIndex==0) * '  ;;
@@ -99,12 +106,17 @@ function UpdateCfg () {
     jq -c \
         --arg clsName "${OCP__ABI__BM__CLS_NAME}" \
         --arg baseDom "${OCP__ABI__BM__BASE_DOM}" \
-        --rawfile pullCrd <(set +x; cat "${CLUSTER_PROFILE_DIR}/pull-secret") \
+        --rawfile pullCrd <(
+            jq -csj \
+                '.[0].auths += .[1].auths | .[0]' \
+                "/var/run/secrets/registry-pull--build-farms/.dockerconfigjson" \
+                "${CLUSTER_PROFILE_DIR}/pull-secret"
+        ) \
         --rawfile sshKey <(set +x; cat "${CLUSTER_PROFILE_DIR}/ssh-publickey") \
         '
             .baseDomain=$baseDom |
             .metadata.name=$clsName |
-            .pullSecret=($pullCrd | rtrimstr("\n")) |
+            .pullSecret=$pullCrd |
             .sshKey=$sshKey
         ' |
     yq -p json -o yaml eval .
@@ -148,8 +160,8 @@ eval "$(BuildCustomScriptsFromYAML OCP__ABI__DAY0_SCRIPTS_YAML)"
 {
     yq -p yaml -o json eval . |
     jq \
-        --rawfile usr <(set +x; cat "${CLUSTER_PROFILE_DIR}/cred--bmc--usr") \
-        --rawfile pwd <(set +x; cat "${CLUSTER_PROFILE_DIR}/cred--bmc--pwd") \
+        --rawfile usr <(set +x; printf '%s' "$(0< "${CLUSTER_PROFILE_DIR}/cred--bmc--usr")") \
+        --rawfile pwd <(set +x; printf '%s' "$(0< "${CLUSTER_PROFILE_DIR}/cred--bmc--pwd")") \
         --argjson rIP "$(yq -o json '(select(
             (.rendezvousIP | length) > 0) | .rendezvousIP
         ) // ([
@@ -181,8 +193,8 @@ eval "$(BuildCustomScriptsFromYAML OCP__ABI__DAY0_SCRIPTS_YAML)"
             ); . == $rIP)))
         ) | {
             url: ("https://" + (.bmc.address | split("://")[-1])),
-            usr: (.bmc.username // ($usr | rtrimstr("\n"))),
-            pwd: (.bmc.password // ($pwd | rtrimstr("\n"))),
+            usr: (.bmc.username // $usr),
+            pwd: (.bmc.password // $pwd),
             hostIPv4: ([
                 .networkConfig.interfaces[] |
                 select(.ipv4.enabled == true) |
@@ -192,10 +204,11 @@ eval "$(BuildCustomScriptsFromYAML OCP__ABI__DAY0_SCRIPTS_YAML)"
 } 0< "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml" 1> "${SHARED_DIR}/ocp--bmc--info.json"
 
 # Strip BMC Credentials from `agent-config.yaml`.
-exec 3< <(cat "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"); wait $!
+# shellcheck disable=SC2188
+exec 3< <(0< "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"); wait $!
 {
     yq -p yaml -o json eval . |
-    jq '.hosts[].bmc |= del(.username, .password)' |
+    jq '.hosts[].bmc|=del(.username, .password)' |
     yq -p json -o yaml eval .
 } 0<&3 1> "${OCP__ABI__CLUSTER_DIR}/agent-config.yaml"
 exec 3<&-
