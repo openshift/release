@@ -5,11 +5,11 @@ set -o errexit
 set -o pipefail
 
 ODF_INSTALL_NAMESPACE=openshift-storage
-ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-'stable-4.12'}"
-ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-'odf-operator'}"
-ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp3-csi'}"
+ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-stable-4.12}"
+ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-odf-operator}"
+ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-gp3-csi}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-100}Gi"
-ODF_SUBSCRIPTION_SOURCE="${ODF_SUBSCRIPTION_SOURCE:-'redhat-operators'}"
+ODF_SUBSCRIPTION_SOURCE="${ODF_SUBSCRIPTION_SOURCE:-redhat-operators}"
 
 # Make the masters schedulable so we have more capacity to run VMs
 CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')

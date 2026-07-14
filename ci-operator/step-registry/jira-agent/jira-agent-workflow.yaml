@@ -1,0 +1,36 @@
+workflow:
+  as: jira-agent
+  steps:
+    pre:
+      - ref: jira-agent-setup
+      - ref: jira-agent-github-app-auth
+      - ref: jira-agent-slack-pr-notify
+      - ref: jira-agent-claude-helpers
+      - ref: jira-agent-jira-helpers
+      - ref: jira-agent-git-helpers
+    test:
+      - ref: jira-agent-process
+    post:
+      - ref: jira-agent-report
+  documentation: |-
+    Generic Jira Agent workflow for automated issue processing.
+
+    Pre steps write shell libraries to SHARED_DIR:
+    - setup: Verifies Claude Code CLI and Vertex AI credentials
+    - github-app-auth: GitHub App token generation helpers
+    - slack-pr-notify: Slack notification helpers
+    - claude-helpers: Phase runner, output extraction, prompt builders
+    - jira-helpers: Jira API, credential loading, issue postprocessing
+    - git-helpers: Token management, fork sync, branch operations
+
+    Test step (process): Sources the libraries and runs a four-phase pipeline
+    (solve, review, fix, PR) for each Jira issue matching the JQL query.
+
+    Post step (report): Generates HTML report with token usage and cost breakdown.
+
+    Required env vars (set in your team's wrapper workflow):
+    - JIRA_AGENT_FORK_REPO: Fork repo (org/repo) for pushing branches
+    - JIRA_AGENT_UPSTREAM_REPO: Upstream repo (org/repo) for creating PRs
+    - JIRA_AGENT_JQL: JQL query for finding issues to process
+
+    See ONBOARDING.md in this directory for full setup instructions.

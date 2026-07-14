@@ -104,6 +104,9 @@ CONFIG = {
         'us-west-2': 5,
         'us-east-2': 5
     },
+    'metal-dpf-doca8-quota-slice': {
+        'metal-dpf-doca8-rdu2': 1,
+    },
     'metal-perfscale-cpt-quota-slice': {
         'metal-perfscale-cpt-rdu3': 1,
     },
@@ -477,7 +480,7 @@ CONFIG = {
         'eu-west-2': 8
     },
     'hypershift-aws-quota-slice': {
-        'default': 12,
+        'default': 30,
     },
     'hypershift-aks-quota-slice': {
         'default': 20,

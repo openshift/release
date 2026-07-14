@@ -1106,16 +1106,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn
-- as: aws-ipi-proxy-fips-f999-fips-check
-  cron: 8 8 29 2 *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-    test:
-    - ref: fips-check-optional-operator-images-scan
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-sdn-live-migration-ovn-f28
   cron: 47 11 2 * *
   steps:
@@ -1694,26 +1684,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace
-- as: azure-ipi-ovn-hypershift-guest-f999
-  cron: 8 8 29 2 *
-  reporter_config:
-    channel: '#forum-prow-hypershift-qe-ci'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: azure-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-ovn-hypershift-guest
 - as: azure-ipi-ovn-winc-f14
   cron: 20 17 16,30 * *
   steps:
@@ -1913,26 +1883,6 @@ tests:
     - ref: file-integrity-konflux-catalogsource
     - ref: etcd-encryption
     - ref: openshift-extended-test-disruptive
-    - ref: openshift-extended-web-tests
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
-- as: azure-stack-ipi-proxy-fips-f999-file-integrity
-  cluster: build01
-  cron: 8 8 29 2 *
-  steps:
-    cluster_profile: azurestack-qe
-    env:
-      E2E_RUN_TAGS: '@fio'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      FILTERS_ADDITIONAL: ""
-      FIPS_ENABLED: "true"
-      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
-      TEST_PARALLEL: "3"
-      TEST_SCENARIOS: File_Integrity_Operator
-      TEST_TIMEOUT: "30"
-    test:
-    - ref: file-integrity-konflux-catalogsource
-    - ref: openshift-extended-test
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
@@ -2944,13 +2894,6 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
-- as: ibmcloud-ipi-ovn-mtu-migrate-f999
-  cron: 8 16 29 2 *
-  steps:
-    cluster_profile: ibmcloud-qe
-    test:
-    - ref: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-mtu-migrate
 - as: ibmcloud-ipi-private-fips-f28
   cron: 33 1 2 * *
   steps:
