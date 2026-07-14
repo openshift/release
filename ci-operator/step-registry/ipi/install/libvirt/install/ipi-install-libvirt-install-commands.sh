@@ -362,6 +362,59 @@ function collect_bootstrap() {
 	set -e
 }
 
+function collect_control_plane_logs() {
+	local DIR=$1
+	local ID=$2
+	local cluster_name cluster_domain hostname FROM TO
+
+	[[ -f "${DIR}/terraform.tfvars.json" ]] || return 0
+	cluster_domain=$(sed -n -r -e 's,^ *"cluster_domain": "([^"]*).*$,\1,p' "${DIR}/terraform.tfvars.json")
+	if [[ -z "${cluster_domain}" ]]; then
+		echo "collect_control_plane: could not determine cluster_domain"
+		return 0
+	fi
+	if [[ -f "${DIR}/metadata.json" ]]; then
+		cluster_name=$(sed -n -r -e 's/.*"clusterName"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${DIR}/metadata.json" | head -n1)
+	fi
+	if [[ -z "${cluster_name:-}" && -f "${SHARED_DIR}/install-config.yaml" ]]; then
+		if command -v yq-v4 >/dev/null 2>&1; then
+			cluster_name=$(yq-v4 -oy '.metadata.name' "${SHARED_DIR}/install-config.yaml")
+		else
+			cluster_name=$(yq eval -o=y '.metadata.name' "${SHARED_DIR}/install-config.yaml")
+		fi
+	fi
+	if [[ -z "${cluster_name:-}" ]]; then
+		echo "collect_control_plane: could not determine cluster name"
+		return 0
+	fi
+
+	set +e
+	for ((i=0; i<${MASTER_REPLICAS}; i++)); do
+		hostname="${cluster_name}-master-${i}.${cluster_domain}"
+		echo "collect_control_plane: ssh ${hostname}:${BASTION_SSH_PORTS[${RESOURCE_ID}]}"
+		mock-nss.sh ssh \
+			-o 'ConnectTimeout=5' \
+			-o 'StrictHostKeyChecking=no' \
+			-i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
+			-l core \
+			-p "${BASTION_SSH_PORTS[${RESOURCE_ID}]}" \
+			"${hostname}" \
+			/usr/local/bin/installer-gather.sh --id "${ID}"
+		if [ $? -eq 0 ]; then
+			FROM="/var/home/core/log-bundle-${ID}.tar.gz"
+			TO="/logs/artifacts/control-plane-${i}-log-bundle-${ID}.tar.gz"
+			echo "collect_control_plane: scp ${hostname}:${BASTION_SSH_PORTS[${RESOURCE_ID}]}"
+			mock-nss.sh scp \
+				-o 'ConnectTimeout=5' \
+				-o 'StrictHostKeyChecking=no' \
+				-i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
+				-P "${BASTION_SSH_PORTS[${RESOURCE_ID}]}" \
+				"core@${hostname}:${FROM}" "${TO}"
+		fi
+	done
+	set -e
+}
+
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -581,6 +634,7 @@ ret=${RC0}
 if [ ${ret} -gt 0 ] || [ -n "${OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP}" ]
 then
 	collect_bootstrap 1
+	collect_control_plane_logs "${dir}" 1
 fi
 
 if [ ${ret} -gt 0 ]
@@ -605,6 +659,7 @@ then
 	if [ ${ret} -gt 0 ] || [ -n "${OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP}" ]
 	then
 		collect_bootstrap 2
+		collect_control_plane_logs "${dir}" 2
 	fi
 fi
 
