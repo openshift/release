@@ -981,9 +981,11 @@ function verify_trustee_connectivity() {
 
 echo ">>> Starting Trustee operator installation"
 
-# Fetch helm charts from GitHub
+# Fetch helm and charts from image (function runs in subshell via $(), so
+# the PATH export inside it doesn't propagate — set it here)
 CHARTS_DIR=$(fetch_trustee_charts)
 export CHARTS_DIR
+export PATH="${SCRATCH}/bin:${PATH}"
 
 # Get cluster domain
 CLUSTER_DOMAIN=$(get_cluster_domain)
