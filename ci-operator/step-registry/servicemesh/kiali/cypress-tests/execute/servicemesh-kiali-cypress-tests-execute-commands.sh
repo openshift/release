@@ -49,6 +49,8 @@ fi
 # remove v from ISTIO version if there is any
 [[ $ISTIO_SAMPLE_APP_VERSION == v* ]] && ISTIO_SAMPLE_APP_VERSION="${ISTIO_SAMPLE_APP_VERSION#v}" || ISTIO_SAMPLE_APP_VERSION="$ISTIO_SAMPLE_APP_VERSION"
 hack/istio/download-istio.sh -iv ${ISTIO_SAMPLE_APP_VERSION}
+# delete testing apps if there from previous run
+hack/istio/install-testing-demos.sh -d true || true
 # install testing apps
 hack/istio/install-testing-demos.sh -c oc -in ${ISTIO_NAMESPACE}
 # wait till all apps are ready
