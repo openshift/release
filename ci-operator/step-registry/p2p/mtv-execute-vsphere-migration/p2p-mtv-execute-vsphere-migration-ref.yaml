@@ -1,0 +1,74 @@
+ref:
+  as: p2p-mtv-execute-vsphere-migration
+  from: cli
+  commands: p2p-mtv-execute-vsphere-migration-commands.sh
+  timeout: 3h0m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  credentials:
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-config
+    mount_path: /var/run/vault/vsphere-ibmcloud-config
+  documentation: |-
+    Execute MTV cold migration from VMware vSphere to OpenShift Virtualization (OCP spoke).
+
+    Different from p2p-mtv-execute-live-migration (OCP-to-OCP CCLM):
+      - No source spoke kubeconfig. vSphere VMs are referenced by MoRef ID (no OCP cluster).
+      - Uses govc to resolve VM names → MoRef IDs from ${SHARED_DIR}/vsphere-vm-names.
+      - Builds a Forklift Plan with vms[].id (MoRef) rather than vms[].namespace.
+      - Plan type is always "cold" (VMware warm migration is a separate step).
+
+    Inputs from SHARED_DIR (written by previous steps):
+      vsphere-vm-names                    — newline-separated VM names to migrate
+      vsphere-vcenter-host                — vCenter host for govc connectivity
+      managed-cluster-kubeconfig-{N}      — destination spoke admin kubeconfig
+
+    Outputs:
+      ${ARTIFACT_DIR}/mtv-vsphere-migration-status.txt  — Plan/Migration summary
+      ${ARTIFACT_DIR}/junit_vsphere_migration.xml       — JUnit XML for Prow/Firewatch
+      ${ARTIFACT_DIR}/mtv-vsphere-migration-diagnostics/ — on failure
+
+    Run after: p2p-mtv-register-vsphere-provider, p2p-mtv-register-providers (OCP spoke),
+               p2p-mtv-vsphere-migration-maps, p2p-install-odf-spokes (ODF on spoke).
+  env:
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV operator and Plan/Migration CRs live.
+  - name: P2P_MTV_VSPHERE_SOURCE_PROVIDER
+    default: "vsphere-source"
+    documentation: |-
+      MTV Provider CR name for the vSphere source. Must match P2P_MTV_VSPHERE_PROVIDER_NAME
+      from p2p-mtv-register-vsphere-provider.
+  - name: P2P_MTV_VSPHERE_DEST_PROVIDER
+    default: "spoke-1"
+    documentation: MTV Provider CR name for the OCP destination spoke.
+  - name: P2P_MTV_VSPHERE_NETWORK_MAP_NAME
+    default: "vsphere-network-map"
+    documentation: NetworkMap name to reference in the Plan.
+  - name: P2P_MTV_VSPHERE_STORAGE_MAP_NAME
+    default: "vsphere-storage-map"
+    documentation: StorageMap name to reference in the Plan.
+  - name: P2P_MTV_VSPHERE_PLAN_NAME
+    default: "vsphere-cold-plan"
+    documentation: Forklift Plan metadata.name.
+  - name: P2P_MTV_VSPHERE_MIGRATION_NAME
+    default: "vsphere-cold-run-1"
+    documentation: Forklift Migration metadata.name.
+  - name: P2P_MTV_VSPHERE_TARGET_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Namespace on the destination spoke where migrated VMs will be created.
+  - name: P2P_MTV_VSPHERE_DEST_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based index for ${SHARED_DIR}/managed-cluster-kubeconfig-{N} (destination spoke).
+  - name: P2P_MTV_VSPHERE_PLAN_READY_TIMEOUT
+    default: "15m"
+    documentation: oc wait timeout for Plan Ready condition.
+  - name: P2P_MTV_VSPHERE_MIGRATION_TIMEOUT_SECONDS
+    default: "7200"
+    documentation: Total seconds to poll Migration Succeeded before failing (default 2h).
+  - name: P2P_MTV_VSPHERE_MIGRATION_POLL_SECONDS
+    default: "30"
+    documentation: Seconds between Migration status polls.

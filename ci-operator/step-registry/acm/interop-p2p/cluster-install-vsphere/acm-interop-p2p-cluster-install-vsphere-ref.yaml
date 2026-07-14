@@ -1,0 +1,101 @@
+ref:
+  as: acm-interop-p2p-cluster-install-vsphere
+  from: cli
+  commands: acm-interop-p2p-cluster-install-vsphere-commands.sh
+  timeout: 3h0m0s
+  grace_period: 30m0s
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  credentials:
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-config
+    mount_path: /var/run/vault/vsphere-ibmcloud-config
+  env:
+  - name: ACM_VSPHERE_ARCH_TYPE
+    default: "amd64"
+    documentation: |-
+      CPU architecture for spoke cluster nodes (amd64, arm64).
+  - name: BASE_DOMAIN
+    default: "cspilp.interop.ccitredhat.com"
+    documentation: |-
+      Base DNS domain for the vSphere spoke cluster (must be resolvable from the vSphere VLAN).
+  - name: ACM_VSPHERE_WORKER_REPLICAS
+    default: "3"
+    documentation: |-
+      Number of worker nodes in the vSphere spoke cluster.
+  - name: ACM_VSPHERE_CP_REPLICAS
+    default: "3"
+    documentation: |-
+      Number of control plane nodes in the vSphere spoke cluster (minimum 3 for vSphere IPI).
+  - name: ACM_VSPHERE_CLUSTER_NAME_PREFIX
+    default: "acm-vs"
+    documentation: |-
+      Prefix for the generated vSphere spoke cluster name.
+      Final name: {prefix}-vs-{hub-hash} (e.g. acm-vs-vs-a1b2c).
+  - name: ACM_VSPHERE_NETWORK_TYPE
+    default: "OVNKubernetes"
+    documentation: |-
+      OCP network plugin for the vSphere spoke: OVNKubernetes or OpenShiftSDN.
+  - name: ACM_VSPHERE_INSTALL_TIMEOUT_MINUTES
+    default: "150"
+    documentation: |-
+      Minutes to wait for the vSphere ClusterDeployment to reach Provisioned=True.
+      vSphere IPI typically takes 45-60 minutes.
+  - name: ACM_VSPHERE_CLUSTER_INITIAL_VERSION
+    default: ""
+    documentation: |-
+      Target OCP minor version for the vSphere spoke ClusterImageSet (e.g. "4.22").
+      Selects the latest available ClusterImageSet whose name starts with "img{version}.".
+      Must be non-empty.
+  - name: ACM_VSPHERE_SPOKE_INDEX
+    default: "2"
+    documentation: |-
+      1-based index used for kubeconfig and name output files in SHARED_DIR.
+      Must not conflict with the AWS spoke(s) provisioned by acm-interop-p2p-cluster-install.
+      Default is 2 so that the AWS step (count=1) occupies index 1 and the vSphere spoke is 2.
+      Output files:
+        SHARED_DIR/managed-cluster-name-{N}          — cluster name
+        SHARED_DIR/managed-cluster-kubeconfig-{N}    — admin kubeconfig
+        SHARED_DIR/managed-cluster-metadata-{N}.json — Hive metadata
+  documentation: |-
+    Provisions a single OCP spoke cluster on vSphere via ACM/Hive ClusterDeployment.
+    Intended for use alongside acm-interop-p2p-cluster-install (AWS spoke) in Migration
+    Toolkit for Virtualization (MTV) cross-cluster live migration (CCLM) jobs.
+
+    The step reads vCenter credentials and VLAN topology from vault secrets mounted at
+    /var/run/vault/vsphere-ibmcloud-config/ and the VSPHERE_LEASED_RESOURCE env var
+    (format: "router.datacenter.vlanid", e.g. "bcr01a.dal10.1153" from the
+    vsphere-connected-2-quota-slice Boskos resource type).
+
+    Resources created on the hub:
+      - Namespace, ManagedClusterSet, ManagedClusterSetBinding
+      - vsphere-creds secret (vCenter username/password)
+      - vsphere-certs secret (vCenter CA cert fetched dynamically via openssl)
+      - pull-secret, ssh-public-key, ssh-private-key
+      - install-config secret (platform.vsphere, OCP 4.13+ vcenters/failureDomains format)
+      - ClusterDeployment (platform.vsphere with credentialsSecretRef/certificatesSecretRef)
+      - ManagedCluster, KlusterletAddonConfig
+
+    Output files (N = ACM_VSPHERE_SPOKE_INDEX):
+      SHARED_DIR/managed-cluster-name-{N}          — cluster name
+      SHARED_DIR/managed-cluster-kubeconfig-{N}    — admin kubeconfig
+      SHARED_DIR/managed-cluster-metadata-{N}.json — Hive cluster metadata
+    Also appends to SHARED_DIR batch files:
+      managed-cluster-names, managed-cluster-cluster-network-cidrs,
+      managed-cluster-machine-network-cidrs, managed-cluster-service-network-cidrs
+
+    Env vars consumed:
+      VSPHERE_LEASED_RESOURCE          — vSphere VLAN lease from Boskos
+      ACM_VSPHERE_CLUSTER_INITIAL_VERSION — OCP minor version for ClusterImageSet
+      ACM_VSPHERE_SPOKE_INDEX          — output file index (default: 2)
+      ACM_VSPHERE_ARCH_TYPE            — node architecture (default: amd64)
+      ACM_VSPHERE_CP_REPLICAS          — control plane count (default: 3)
+      ACM_VSPHERE_WORKER_REPLICAS      — worker count (default: 3)
+      ACM_VSPHERE_CLUSTER_NAME_PREFIX  — name prefix (default: acm-vs)
+      ACM_VSPHERE_NETWORK_TYPE         — network plugin (default: OVNKubernetes)
+      ACM_VSPHERE_INSTALL_TIMEOUT_MINUTES — timeout in minutes (default: 150)
+      BASE_DOMAIN                      — base DNS domain
+      SHARED_DIR                       — cross-step shared directory
+      CLUSTER_PROFILE_DIR              — hub AWS cluster profile (pull-secret, SSH keys)

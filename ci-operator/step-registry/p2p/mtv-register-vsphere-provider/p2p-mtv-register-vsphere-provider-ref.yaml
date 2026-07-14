@@ -1,0 +1,44 @@
+ref:
+  as: p2p-mtv-register-vsphere-provider
+  from: cli
+  commands: p2p-mtv-register-vsphere-provider-commands.sh
+  timeout: 20m0s
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  credentials:
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-config
+    mount_path: /var/run/vault/vsphere-ibmcloud-config
+  documentation: |-
+    Register a VMware vSphere vCenter as an MTV Provider (type: vsphere) on the hub cluster.
+
+    Reads the vCenter host from ${SHARED_DIR}/vsphere-vcenter-host (written by
+    p2p-create-vsphere-test-vms) and vault credentials from vsphere-ibmcloud-config,
+    then creates:
+      1. A Kubernetes Secret with vCenter credentials (user, password, thumbprint or
+         insecureSkipVerify). Credentials are handled via process substitution to
+         prevent xtrace leakage.
+      2. A Forklift Provider CR (type: vsphere) pointing to https://<vcenter>/sdk.
+
+    Waits for the Provider to reach Ready condition (inventory connection established)
+    before returning. Writes the Provider CR to ${ARTIFACT_DIR}/mtv-vsphere-provider.yaml.
+
+    Run after: p2p-create-vsphere-test-vms, p2p-mtv-additional-config (ForkliftController).
+    Run before: p2p-mtv-vsphere-migration-maps.
+
+    Hub kubeconfig is KUBECONFIG from ci-operator.
+  env:
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV operator and Provider CRs live.
+  - name: P2P_MTV_VSPHERE_PROVIDER_NAME
+    default: "vsphere-source"
+    documentation: |-
+      Name of the MTV Provider CR for the vSphere vCenter (source of migration).
+      Referenced as MTV_SOURCE_PROVIDER in downstream map and plan steps.
+  - name: P2P_MTV_VSPHERE_PROVIDER_READY_TIMEOUT
+    default: "15m"
+    documentation: oc wait timeout for Provider Ready condition (inventory scan).

@@ -1,0 +1,60 @@
+ref:
+  as: p2p-mtv-vsphere-migration-maps
+  from: cli
+  commands: p2p-mtv-vsphere-migration-maps-commands.sh
+  timeout: 30m0s
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  documentation: |-
+    Create MTV NetworkMap and StorageMap for VMware vSphere → OpenShift Virtualization migration.
+
+    Distinct from p2p-mtv-create-migration-maps (OCP-to-OCP CCLM):
+      NetworkMap: maps vSphere portgroup (by MoRef ID) → OCP pod network on destination spoke.
+      StorageMap: maps vSphere datastore (by MoRef ID) → ODF StorageClass on destination spoke.
+
+    MoRef IDs are read from SHARED_DIR files written by p2p-create-vsphere-test-vms:
+      ${SHARED_DIR}/vsphere-datastore-id  — datastore MoRef (e.g. "datastore-10")
+      ${SHARED_DIR}/vsphere-portgroup-id  — portgroup MoRef (e.g. "dvportgroup-120")
+
+    Both providers are waited for Ready and annotated for inventory refresh before maps are
+    created. Maps are then waited for Ready before returning.
+
+    Run after: p2p-mtv-register-vsphere-provider, p2p-mtv-register-providers (OCP spoke),
+               p2p-install-odf-spokes (ODF must be Ready on spoke before StorageMap validates).
+    Run before: p2p-mtv-execute-live-migration (MTV_PLAN_TYPE=cold).
+
+    Hub kubeconfig is KUBECONFIG from ci-operator.
+  env:
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV operator and map CRs live.
+  - name: P2P_MTV_VSPHERE_SOURCE_PROVIDER
+    default: "vsphere-source"
+    documentation: |-
+      MTV Provider CR name for the vSphere source. Must match P2P_MTV_VSPHERE_PROVIDER_NAME
+      used in p2p-mtv-register-vsphere-provider.
+  - name: P2P_MTV_VSPHERE_DEST_PROVIDER
+    default: "spoke-1"
+    documentation: |-
+      MTV Provider CR name for the OCP destination spoke. Must match the provider name
+      registered by p2p-mtv-register-providers for the AWS spoke.
+  - name: P2P_MTV_VSPHERE_NETWORK_MAP_NAME
+    default: "vsphere-network-map"
+    documentation: NetworkMap metadata.name. Referenced in the MTV Plan.
+  - name: P2P_MTV_VSPHERE_STORAGE_MAP_NAME
+    default: "vsphere-storage-map"
+    documentation: StorageMap metadata.name. Referenced in the MTV Plan.
+  - name: P2P_MTV_VSPHERE_DEST_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: |-
+      Destination StorageClass on the OCP spoke. Must be an ODF RWX class for live migration;
+      any RWO class is sufficient for cold migration.
+  - name: P2P_MTV_VSPHERE_MAP_PROVIDER_TIMEOUT
+    default: "15m"
+    documentation: oc wait timeout for Provider Ready condition before creating maps.
+  - name: P2P_MTV_VSPHERE_MAP_READY_TIMEOUT
+    default: "15m"
+    documentation: oc wait timeout for NetworkMap and StorageMap Ready conditions.

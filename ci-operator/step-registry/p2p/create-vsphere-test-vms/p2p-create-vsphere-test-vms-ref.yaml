@@ -1,0 +1,56 @@
+ref:
+  as: p2p-create-vsphere-test-vms
+  from: cli
+  commands: p2p-create-vsphere-test-vms-commands.sh
+  timeout: 30m0s
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  credentials:
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-config
+    mount_path: /var/run/vault/vsphere-ibmcloud-config
+  documentation: |-
+    Create test VMware VMs in a leased IBM Cloud vSphere environment for MTV migration testing.
+
+    Reads the VSPHERE_LEASED_RESOURCE Boskos slice (format: router.datacenter.vlanid) and
+    vault credentials at /var/run/vault/vsphere-ibmcloud-config/ to connect to vCenter via
+    govc, then creates one or more minimal VMs with a configurable disk in the leased portgroup.
+
+    VMs are powered off by default (suitable for cold migration). Set P2P_MTV_VSPHERE_VM_POWER_ON
+    to "true" for warm migration testing.
+
+    Outputs to SHARED_DIR:
+      vsphere-vm-names       — newline-separated VM name list (used by MTV Plan)
+      vsphere-datastore-id   — vSphere datastore MoRef ID (used by p2p-mtv-vsphere-migration-maps)
+      vsphere-portgroup-id   — vSphere portgroup MoRef ID (used by p2p-mtv-vsphere-migration-maps)
+      vsphere-vcenter-host   — vCenter hostname (used by p2p-mtv-register-vsphere-provider)
+      vsphere-datacenter     — vSphere datacenter name
+
+    Requires: VSPHERE_LEASED_RESOURCE env set by Boskos vsphere-connected-2-quota-slice lease.
+    Requires: vsphere-ibmcloud-config vault secret mounted (subnets.json, load-vsphere-env-config.sh).
+  env:
+  - name: P2P_MTV_VSPHERE_VM_NAME_PREFIX
+    default: "mtv-test-vm"
+    documentation: Prefix for created VM names. VMs are named <prefix>-1, <prefix>-2, etc.
+  - name: P2P_MTV_VSPHERE_VM_COUNT
+    default: "1"
+    documentation: Number of test VMs to create.
+  - name: P2P_MTV_VSPHERE_VM_MEMORY_MB
+    default: "512"
+    documentation: VM memory in megabytes.
+  - name: P2P_MTV_VSPHERE_VM_CPUS
+    default: "1"
+    documentation: Number of vCPUs for each test VM.
+  - name: P2P_MTV_VSPHERE_VM_DISK_SIZE
+    default: "1GB"
+    documentation: |-
+      Root disk size. 1GB is sufficient for cold migration testing (MTV copies the VMDK).
+      Increase if testing OS-level VM migration.
+  - name: P2P_MTV_VSPHERE_VM_POWER_ON
+    default: "false"
+    documentation: |-
+      Set to "true" to power on VMs after creation. Required for warm migration; cold
+      migration works with powered-off VMs.
