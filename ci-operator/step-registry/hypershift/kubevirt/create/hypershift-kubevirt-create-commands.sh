@@ -310,9 +310,99 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
     oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
       ovn-nbctl lsp-set-dhcpv4-options "${LSP_NAME}" "${DHCP_UUID}" 2>/dev/null
 
-    echo "Configured DHCP for VMI ${VMI} on node ${NODE} (DHCP: ${DHCP_UUID})"
+    # Clear port security on the VM's localnet port so EgressIP-SNATed packets
+    # can exit the management cluster's OVN. Without this, OVN drops packets
+    # whose source IP is the EgressIP (not the VM's assigned localnet IP).
+    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl clear Logical_Switch_Port "${LSP_NAME}" port_security 2>/dev/null
+
+    echo "Configured DHCP and cleared port security for VMI ${VMI} on node ${NODE}"
   done
-  echo "OVN DHCP configuration complete for localnet interfaces"
+  echo "OVN DHCP and port security configuration complete for localnet interfaces"
+
+  # Enable IP forwarding on enp2s0 (the secondary/localnet NIC) inside each
+  # hosted cluster VM. OVN multi-NIC EgressIP uses iptables SNAT to change the
+  # source IP on enp2s0, but the de-SNATed return traffic needs to be forwarded
+  # from enp2s0 back to ovn-k8s-mp0. Without forwarding enabled on enp2s0,
+  # these return packets are silently dropped by the kernel.
+  # OVN-Kubernetes only enables forwarding on interfaces it manages (br-ex,
+  # ovn-k8s-mp0) but not on the secondary NIC.
+  NESTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+  if [[ -f "${NESTED_KUBECONFIG}" ]]; then
+    echo "Enabling IP forwarding on enp2s0 for all hosted cluster nodes..."
+    for OVN_NODE_POD in $(KUBECONFIG="${NESTED_KUBECONFIG}" oc get pods -n openshift-ovn-kubernetes \
+      -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+      KUBECONFIG="${NESTED_KUBECONFIG}" oc exec -n openshift-ovn-kubernetes "${OVN_NODE_POD}" \
+        -c ovnkube-controller -- sysctl -w net.ipv4.conf.enp2s0.forwarding=1 2>/dev/null || true
+      echo "Enabled enp2s0 forwarding on ${OVN_NODE_POD}"
+    done
+    echo "IP forwarding configuration complete for hosted cluster nodes"
+  else
+    echo "WARNING: Nested kubeconfig not found at ${NESTED_KUBECONFIG}, skipping enp2s0 forwarding setup"
+  fi
+
+  # Deploy ip-echo on the management cluster with localnet NAD for EgressIP
+  # source-IP verification. The ip-echo pod gets a localnet IP that is NOT in the
+  # hosted cluster's OVN node address set, so EgressIP reroute + SNAT applies
+  # to traffic going to it. Without this, traffic to hosted cluster node IPs
+  # (including localnet IPs) is exempted from EgressIP by OVN priority 102 policy.
+  #
+  # The ip-echo pod is deployed in a dedicated namespace (not the HyperShift
+  # control plane namespace) to prevent HyperShift's control plane operator from
+  # garbage-collecting it during namespace reconciliation.
+  IPECHO_NAMESPACE="egressip-ipecho-${CLUSTER_NAME}"
+  echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE}..."
+  oc create namespace "${IPECHO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+  oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+
+  # Create a localnet NAD in the ip-echo namespace (same config as the hosted cluster namespace)
+  oc apply -f - <<IPECHO_NAD_EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: localnet-network
+  namespace: ${IPECHO_NAMESPACE}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "physnet",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "${IPECHO_NAMESPACE}/localnet-network",
+      "subnets": "192.168.223.0/24"
+  }'
+IPECHO_NAD_EOF
+
+  oc apply -f - <<IPECHO_EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: egressip-ipecho
+  namespace: ${IPECHO_NAMESPACE}
+  annotations:
+    k8s.v1.cni.cncf.io/networks: localnet-network
+spec:
+  containers:
+  - name: ip-echo
+    image: quay.io/openshifttest/ip-echo:1.2.0
+    ports:
+    - containerPort: 80
+      protocol: TCP
+    securityContext:
+      runAsUser: 0
+  restartPolicy: Always
+  tolerations:
+  - operator: Exists
+IPECHO_EOF
+
+  echo "Waiting for ip-echo pod to be ready..."
+  oc wait --for=condition=Ready pod/egressip-ipecho -n "${IPECHO_NAMESPACE}" --timeout=120s
+
+  IPECHO_LOCALNET_IP=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" \
+    -o jsonpath='{.metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}' | \
+    python3 -c "import sys,json; nets=json.loads(sys.stdin.read()); [print(n['ips'][0]) for n in nets if 'localnet' in n.get('name','')]")
+  echo "ip-echo localnet IP: ${IPECHO_LOCALNET_IP}:80"
+  echo "${IPECHO_LOCALNET_IP}:80" > "${SHARED_DIR}/kubevirt_ipecho_url"
 fi
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
