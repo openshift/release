@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if test -s "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 if [ "$ENABLEPEERPODS" != "true" ]; then
     echo "skip as ENABLEPEERPODS is not true"
     exit 0
@@ -69,7 +73,7 @@ EOF
       AWS_SG_IDS: "${AWS_SG_IDS}"
       VXLAN_PORT: "9000"
       PODVM_INSTANCE_TYPE: "t3.medium"
-      PODVM_INSTANCE_TYPES: "${PODVM_INSTANCE_TYPES}"
+      PODVM_INSTANCE_TYPES: "t3.small,t3.medium,t3.large,t3.xlarge,g4dn.2xlarge,g5.2xlarge,p3.2xlarge"
       PROXY_TIMEOUT: "30m"
 EOF
 }
@@ -159,6 +163,9 @@ handle_azure() {
         AZURE_CLIENT_SECRET="$(jq -r .data.azure_client_secret azure_credentials.json|base64 -d)"
         AZURE_TENANT_ID="$(jq -r .data.azure_tenant_id azure_credentials.json|base64 -d)"
         rm -f azure_credentials.json
+    elif [[ -f "${SHARED_DIR}/resourcegroup" ]]; then
+        # Disconnected IPI: VNet is in the network RG, not the cluster RG
+        MANAGEMENT_RESOURCE_GROUP="$(cat "${SHARED_DIR}/resourcegroup")"
     else
         MANAGEMENT_RESOURCE_GROUP="$AZURE_RESOURCE_GROUP"
     fi
@@ -188,22 +195,28 @@ handle_azure() {
     PP_SUBNET_ID="${AZURE_SUBNET_ID}"
     PP_NSG_ID="${AZURE_NSG_ID}"
 
-    # Peer-pod requires gateway
-    az network public-ip create \
-        --resource-group "${MANAGEMENT_RESOURCE_GROUP}" \
-        --name MyPublicIP \
-        --sku Standard \
-        --allocation-method Static
-    az network nat gateway create \
-        --resource-group "${MANAGEMENT_RESOURCE_GROUP}" \
-        --name MyNatGateway \
-        --public-ip-addresses MyPublicIP \
-        --idle-timeout 10
-    az network vnet subnet update \
-        --resource-group "${MANAGEMENT_RESOURCE_GROUP}" \
-        --vnet-name "${PP_VNET_NAME}" \
-        --name "${PP_SUBNET_NAME}" \
-        --nat-gateway MyNatGateway
+    # In disconnected environments peer-pod VMs pull images from the
+    # mirror registry in the same VNet, so they don't need internet
+    # access via NAT gateway.
+    if [[ "${RESTRICTED_NETWORK:-}" == "yes" ]]; then
+        echo "Disconnected: skipping NAT gateway (peer-pods use mirror registry)"
+    else
+        az network public-ip create \
+            --resource-group "${MANAGEMENT_RESOURCE_GROUP}" \
+            --name MyPublicIP \
+            --sku Standard \
+            --allocation-method Static
+        az network nat gateway create \
+            --resource-group "${MANAGEMENT_RESOURCE_GROUP}" \
+            --name MyNatGateway \
+            --public-ip-addresses MyPublicIP \
+            --idle-timeout 10
+        az network vnet subnet update \
+            --resource-group "${MANAGEMENT_RESOURCE_GROUP}" \
+            --vnet-name "${PP_VNET_NAME}" \
+            --name "${PP_SUBNET_NAME}" \
+            --nat-gateway MyNatGateway
+    fi
 
     create_ssh_key
 
@@ -224,7 +237,7 @@ handle_azure() {
       AZURE_NSG_ID: "${PP_NSG_ID}"
       AZURE_RESOURCE_GROUP: "${PP_RESOURCE_GROUP}"
       AZURE_REGION: "${PP_REGION}"
-      PROXY_TIMEOUT: "30m"
+      PROXY_TIMEOUT: "2h"
 EOF
 
     if [[ -z "${AZURE_AUTH_LOCATION}" ]]; then
@@ -234,6 +247,26 @@ EOF
     fi
     # Creating peerpods-param-secret with the keys needed for test case execution
     oc create secret generic peerpods-param-secret --from-file="${AZURE_AUTH_LOCATION}" -n default
+
+    # The operator namespace may not exist yet (operator is installed later),
+    # so ensure it exists before creating resources in it.
+    oc create namespace openshift-sandboxed-containers-operator 2>/dev/null || true
+
+    # Enable SSH debug on peerpod VMs: create ssh-key-secret so the CAA
+    # injects the public key into the VM instead of generating a throwaway
+    oc create secret generic ssh-key-secret \
+        --from-file=id=/tmp/id_ed25519 \
+        --from-file=id.pub=/tmp/id_ed25519.pub \
+        -n openshift-sandboxed-containers-operator
+    cp /tmp/id_ed25519 "${SHARED_DIR}/podvm-ssh-key"
+
+    # Allow SSH inbound to peerpod VMs (blocked by default NSG)
+    az network nsg rule create -g "${AZURE_RESOURCE_GROUP}" \
+        --nsg-name "${AZURE_NSG_ID##*/}" -n AllowSSHPodVM \
+        --priority 100 --access Allow --protocol Tcp \
+        --destination-port-ranges 22 --direction Inbound \
+        --output none || true
+
 }
 
 provider="$(oc get infrastructure -n cluster -o json | jq '.items[].status.platformStatus.type'  | awk '{print tolower($0)}' | tr -d '"')"

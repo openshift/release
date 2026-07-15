@@ -44,10 +44,10 @@ tests:
       CUSTOM_AZURE_REGION: eastus
       ENABLE_MUST_GATHER: "true"
       INITDATA: ""
-      INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      INSTALL_KATA_RPM: "false"
+      KATA_RPM_VERSION: ""
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
-      MUST_GATHER_ON_FAILURE_ONLY: "false"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
       SLEEP_DURATION: 0h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
       TEST_RELEASE_TYPE: Pre-GA
@@ -80,10 +80,10 @@ tests:
       ENABLE_MUST_GATHER: "true"
       ENABLEPEERPODS: "true"
       INITDATA: ""
-      INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      INSTALL_KATA_RPM: "false"
+      KATA_RPM_VERSION: ""
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
-      MUST_GATHER_ON_FAILURE_ONLY: "false"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
@@ -118,10 +118,10 @@ tests:
       ENABLE_MUST_GATHER: "true"
       ENABLEPEERPODS: "true"
       INITDATA: ""
-      INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      INSTALL_KATA_RPM: "false"
+      KATA_RPM_VERSION: ""
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
-      MUST_GATHER_ON_FAILURE_ONLY: "false"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
@@ -131,6 +131,108 @@ tests:
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: coco
     workflow: sandboxed-containers-operator-e2e-azure
+  timeout: 24h0m0s
+- as: azure-ipi-kata-disconnected
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 1
+  reporter_config:
+    channel: '#kata-ocp-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
+      {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_MUST_GATHER: "true"
+      INSTALL_KATA_RPM: "false"
+      KATA_RPM_VERSION: ""
+      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
+      OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP: "true"
+      SLEEP_DURATION: 0h
+      TEST_FILTERS: ~Disruptive&
+      TEST_RELEASE_TYPE: GA
+      TEST_SCENARIOS: sig-kata.*C00091|sig-kata.*C00100|sig-kata.*C00102|sig-kata.*C00113|sig-kata.*C00122|sig-kata.*C00123|sig-kata.*C00132|sig-kata.*C00147|sig-kata.*C00156|sig-kata.*C00159|sig-kata.*C00162|sig-kata.*C00170|sig-kata.*C00192|sig-kata.*C00317|sig-kata.*C00350|sig-kata.*C00355|sig-kata.*C00367
+      TEST_TIMEOUT: "120"
+    workflow: sandboxed-containers-operator-e2e-azure-disconnected
+  timeout: 24h0m0s
+- as: azure-ipi-peerpods-disconnected
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 1
+  reporter_config:
+    channel: '#kata-ocp-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
+      {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.13.0-1782823107
+      COMPUTE_NODE_REPLICAS: "3"
+      ENABLE_MUST_GATHER: "true"
+      ENABLEPEERPODS: "true"
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
+      OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP: "true"
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: 6h
+      TEST_FILTERS: ~Disruptive&;~C00347&;~C00348&;~C00349&;~C00099&;~C00131&;~C00320&;~C00210&;~C00366&;~C00317&
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: sig-kata
+      TEST_TIMEOUT: "120"
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-azure-disconnected
+  timeout: 24h0m0s
+- as: azure-ipi-coco-disconnected
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 1
+  reporter_config:
+    channel: '#kata-ocp-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
+      {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.13.0-1782823107
+      COMPUTE_NODE_REPLICAS: "3"
+      ENABLE_MUST_GATHER: "true"
+      ENABLEPEERPODS: "true"
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
+      OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP: "true"
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: 6h
+      TEST_FILTERS: ~Disruptive&;~C00347&;~C00348&;~C00349&;~C00099&;~C00131&;~C00320&;~C00210&;~C00366&;~C00317&
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: sig-kata
+      TEST_TIMEOUT: "120"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.2.0-1783171802
+      TRUSTEE_INSTALL: "true"
+      WORKLOAD_TO_TEST: coco
+    workflow: sandboxed-containers-operator-e2e-azure-disconnected
   timeout: 24h0m0s
 - as: aro-ipi-peerpods
   capabilities:
@@ -156,11 +258,11 @@ tests:
       ENABLEPEERPODS: "true"
       HYPERSHIFT_AZURE_LOCATION: eastus
       INITDATA: ""
-      INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      INSTALL_KATA_RPM: "false"
+      KATA_RPM_VERSION: ""
       LOCATION: eastus
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
-      MUST_GATHER_ON_FAILURE_ONLY: "false"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
@@ -195,11 +297,11 @@ tests:
       ENABLEPEERPODS: "true"
       HYPERSHIFT_AZURE_LOCATION: eastus
       INITDATA: ""
-      INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      INSTALL_KATA_RPM: "false"
+      KATA_RPM_VERSION: ""
       LOCATION: eastus
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
-      MUST_GATHER_ON_FAILURE_ONLY: "false"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
@@ -233,10 +335,10 @@ tests:
       ENABLE_MUST_GATHER: "true"
       ENABLEPEERPODS: "true"
       INITDATA: ""
-      INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      INSTALL_KATA_RPM: "false"
+      KATA_RPM_VERSION: ""
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
-      MUST_GATHER_ON_FAILURE_ONLY: "false"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
@@ -270,10 +372,10 @@ tests:
       ENABLE_MUST_GATHER: "true"
       ENABLEPEERPODS: "true"
       INITDATA: ""
-      INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+      INSTALL_KATA_RPM: "false"
+      KATA_RPM_VERSION: ""
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
-      MUST_GATHER_ON_FAILURE_ONLY: "false"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
