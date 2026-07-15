@@ -75,11 +75,19 @@ ref:
       Value for RELATED_IMAGE_WASMSHIM. Applied via Subscription.spec.config.env so
       OLM persists it on kuadrant-operator-controller-manager (a direct Deployment
       env patch is reconciled away). Set empty to keep the CSV/bundle default.
+  - name: KUADRANT_OPERATOR_IMAGE
+    default: "quay.io/vray_rh/kuadrant:init-observability-skipped"
+    documentation: |-
+      Override for the kuadrant-operator-controller-manager container image. Newer
+      Kuadrant builds serve /wasm/plugin.wasm from the operator image itself, so
+      RELATED_IMAGE_WASMSHIM alone is not enough. Patched on the installed CSV
+      (and Deployment). Set empty to keep the catalog CSV image.
   documentation: |-
     Installs cert-manager and the Kuadrant operator (which deploys the Authorino,
     Limitador and DNS operators) via OLM on a provisioned s390x OCP cluster,
-    sets RELATED_IMAGE_WASMSHIM via Subscription config.env when set, restarts the
-    kuadrant-operator Deployment after DNS is Available (so dependency discovery
-    sees DNS), creates the bootstrap Kuadrant CR (required by testsuite conftest),
-    a self-signed ClusterIssuer, the test namespaces (kuadrant, kuadrant2, tools)
-    and the DNS provider Secret. Writes operator/wasm diagnostics to ARTIFACT_DIR.
+    sets RELATED_IMAGE_WASMSHIM via Subscription config.env when set, optionally
+    overrides the kuadrant-operator manager image (embeds wasm), ensures DNS is
+    Available before that restart, creates the bootstrap Kuadrant CR (required by
+    testsuite conftest), a self-signed ClusterIssuer, the test namespaces
+    (kuadrant, kuadrant2, tools) and the DNS provider Secret. Writes
+    operator/wasm diagnostics to ARTIFACT_DIR.

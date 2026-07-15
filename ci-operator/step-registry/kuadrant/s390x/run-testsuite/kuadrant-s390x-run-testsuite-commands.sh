@@ -103,6 +103,8 @@ export USER="${USER:-ci}"
 
 PROXY_LOG_DIR="${ARTIFACT_DIR}/gateway-istio-proxy-logs"
 PROXY_COLLECTOR_PID=""
+DNS_LOG_DIR="${ARTIFACT_DIR}/dns-diagnostics-logs"
+DNS_COLLECTOR_PIDS=()
 
 # Gateway/istio-proxy pods are created and deleted by the testsuite during smoke.
 # A post-smoke dump is too late; follow istio-proxy logs concurrently into
@@ -176,6 +178,103 @@ stop_istio_proxy_log_collector() {
   } | tee "${ARTIFACT_DIR}/gateway-istio-proxy-wasm-summary.txt" || true
 }
 
+# DNSPolicy smoke failures need live operator + CR status while tests run
+# (DNSPolicy/DNSRecord objects are often gone after suite teardown).
+start_dns_log_collector() {
+  mkdir -p "${DNS_LOG_DIR}"
+  echo "=== Starting concurrent DNS diagnostics collector → ${DNS_LOG_DIR} ==="
+  {
+    echo "===== $(date -u +%Y-%m-%dT%H:%M:%SZ) DNS collector start ====="
+    echo "DNS_PROVIDER_SECRET_NAME=${DNS_PROVIDER_SECRET_NAME}"
+    echo "KUADRANT_NAMESPACE=${KUADRANT_NAMESPACE}"
+  } >"${DNS_LOG_DIR}/dns-collector-meta.txt"
+
+  # Stream dns-operator + kuadrant-operator logs for the whole smoke window.
+  (
+    while oc get deploy/dns-operator-controller-manager -n "${KUADRANT_NAMESPACE}" >/dev/null 2>&1; do
+      oc logs -n "${KUADRANT_NAMESPACE}" deploy/dns-operator-controller-manager \
+        -f --timestamps=true --all-containers=true >>"${DNS_LOG_DIR}/dns-operator-controller-manager.log" 2>&1 && break
+      sleep 2
+    done
+  ) &
+  DNS_COLLECTOR_PIDS+=("$!")
+
+  (
+    while oc get deploy/kuadrant-operator-controller-manager -n "${KUADRANT_NAMESPACE}" >/dev/null 2>&1; do
+      oc logs -n "${KUADRANT_NAMESPACE}" deploy/kuadrant-operator-controller-manager \
+        -f --timestamps=true --all-containers=true >>"${DNS_LOG_DIR}/kuadrant-operator-controller-manager.log" 2>&1 && break
+      sleep 2
+    done
+  ) &
+  DNS_COLLECTOR_PIDS+=("$!")
+
+  # Periodic CR/secret/event snapshots (no secret data values).
+  (
+    while true; do
+      {
+        echo "========== $(date -u +%Y-%m-%dT%H:%M:%SZ) =========="
+        echo "--- DNSPolicy / DNSRecord / TLSPolicy (wide) ---"
+        oc get dnspolicy,dnsrecord,tlspolicy -A -o wide 2>&1 || true
+        echo "--- DNSPolicy yaml ---"
+        oc get dnspolicy -A -o yaml 2>&1 || true
+        echo "--- DNSRecord yaml ---"
+        oc get dnsrecord -A -o yaml 2>&1 || true
+        echo "--- DNS provider Secret metadata (keys only, no values) ---"
+        for ns in kuadrant kuadrant2; do
+          echo ">> namespace/${ns} secret/${DNS_PROVIDER_SECRET_NAME}"
+          oc get secret "${DNS_PROVIDER_SECRET_NAME}" -n "${ns}" \
+            -o go-template='name={{.metadata.name}} type={{.type}} keys={{range $k,$v := .data}}{{$k}} {{end}}{{"\n"}}' 2>&1 \
+            || echo "(missing)"
+        done
+        echo "--- Events mentioning DNS / DNSPolicy / DNSRecord ---"
+        oc get events -A --sort-by='.lastTimestamp' 2>/dev/null \
+          | grep -iE 'dns|dnspolicy|dnsrecord|coredns|provider' | tail -80 || true
+        echo "--- csv/pods dns-related ---"
+        oc get csv,pods -n "${KUADRANT_NAMESPACE}" 2>&1 | grep -iE 'dns|NAME' || true
+      } >>"${DNS_LOG_DIR}/dns-resources-snapshots.log" 2>&1
+      sleep 10
+    done
+  ) &
+  DNS_COLLECTOR_PIDS+=("$!")
+  echo "${DNS_COLLECTOR_PIDS[*]}" >"${DNS_LOG_DIR}/.collector.pids"
+}
+
+stop_dns_log_collector() {
+  echo "=== Stopping concurrent DNS diagnostics collector ==="
+  local pid
+  for pid in "${DNS_COLLECTOR_PIDS[@]}"; do
+    [[ -n "${pid}" ]] || continue
+    pkill -P "${pid}" 2>/dev/null || true
+    kill "${pid}" 2>/dev/null || true
+  done
+  if [[ -f "${DNS_LOG_DIR}/.collector.pids" ]]; then
+    for pid in $(cat "${DNS_LOG_DIR}/.collector.pids" 2>/dev/null || true); do
+      pkill -P "${pid}" 2>/dev/null || true
+      kill "${pid}" 2>/dev/null || true
+    done
+  fi
+  sleep 1
+  wait 2>/dev/null || true
+
+  echo "--- captured DNS diagnostic files ---"
+  ls -la "${DNS_LOG_DIR}" 2>/dev/null || echo "(none)"
+  {
+    echo "===== $(date -u +%Y-%m-%dT%H:%M:%SZ) DNS error/condition summary ====="
+    echo "--- from dns-operator log ---"
+    grep -iE 'error|fail|warn|missing|not ready|provider|credential|dnspolicy|dnsrecord' \
+      "${DNS_LOG_DIR}/dns-operator-controller-manager.log" 2>/dev/null | tail -120 \
+      || echo "(no dns-operator matches)"
+    echo "--- from kuadrant-operator log (dns) ---"
+    grep -iE 'dns|DNSPolicy|DNSRecord|MissingDependency|provider' \
+      "${DNS_LOG_DIR}/kuadrant-operator-controller-manager.log" 2>/dev/null | tail -120 \
+      || echo "(no kuadrant-operator dns matches)"
+    echo "--- last DNSPolicy/DNSRecord conditions from snapshots ---"
+    grep -E 'type:|reason:|message:|status:|kind: DNS|name:' \
+      "${DNS_LOG_DIR}/dns-resources-snapshots.log" 2>/dev/null | tail -160 \
+      || echo "(no snapshot matches)"
+  } | tee "${ARTIFACT_DIR}/dns-diagnostics-summary.txt" || true
+}
+
 dump_s390x_smoke_diagnostics() {
   local out="${ARTIFACT_DIR}/kuadrant-smoke-diagnostics.txt"
   echo "=== Dumping post-smoke diagnostics to ${out} ==="
@@ -185,9 +284,11 @@ dump_s390x_smoke_diagnostics() {
     oc get kuadrant -A -o wide 2>&1 || true
     oc get kuadrant -A -o yaml 2>&1 || true
 
-    echo "--- operator RELATED_IMAGE_WASMSHIM ---"
+    echo "--- operator RELATED_IMAGE_WASMSHIM / manager image ---"
     oc set env deployment/kuadrant-operator-controller-manager \
       -n "${KUADRANT_NAMESPACE}" --list 2>&1 | grep RELATED_IMAGE || true
+    oc get deployment/kuadrant-operator-controller-manager -n "${KUADRANT_NAMESPACE}" \
+      -o jsonpath='{range .spec.template.spec.containers[*]}{.name}={.image}{"\n"}{end}' 2>&1 || true
 
     echo "--- kuadrant-operator-wasm Service / Endpoints ---"
     oc get svc,endpoints kuadrant-operator-wasm -n "${KUADRANT_NAMESPACE}" -o wide 2>&1 || true
@@ -233,18 +334,22 @@ dump_s390x_smoke_diagnostics() {
       done
     done
 
-    echo "--- DNSPolicy / TLSPolicy (expect DNS issues without real credentials) ---"
-    oc get dnspolicy -A -o wide 2>&1 || true
-    oc get tlspolicy -A -o wide 2>&1 || true
+    echo "--- DNSPolicy / TLSPolicy / DNSRecord (post-smoke; may be empty after teardown) ---"
+    oc get dnspolicy,dnsrecord,tlspolicy -A -o wide 2>&1 || true
+    oc get dnspolicy -A -o yaml 2>&1 || true
+    oc get dnsrecord -A -o yaml 2>&1 || true
 
     echo "--- concurrent istio-proxy captures (see also ${PROXY_LOG_DIR}) ---"
     ls -la "${PROXY_LOG_DIR}"/*_istio-proxy.log 2>/dev/null || echo "(none)"
+    echo "--- concurrent DNS captures (see also ${DNS_LOG_DIR}) ---"
+    ls -la "${DNS_LOG_DIR}" 2>/dev/null || echo "(none)"
   } >"${out}" 2>&1 || true
   # Also echo a short summary to the step log
   echo "--- diagnostic summary ---"
-  grep -E '^(--- |NAME |Error|error|wasm|RELATED|phase=|message:|Unable)' "${out}" 2>/dev/null | head -80 || true
+  grep -E '^(--- |NAME |Error|error|wasm|RELATED|phase=|message:|Unable|manager=)' "${out}" 2>/dev/null | head -80 || true
   echo "(full dump: ${out})"
   echo "(proxy streams: ${PROXY_LOG_DIR}/ ; wasm summary: ${ARTIFACT_DIR}/gateway-istio-proxy-wasm-summary.txt)"
+  echo "(dns streams: ${DNS_LOG_DIR}/ ; dns summary: ${ARTIFACT_DIR}/dns-diagnostics-summary.txt)"
 }
 
 FAILED=0
@@ -252,11 +357,13 @@ FAILED=0
 if [[ "${RUN_SMOKE}" == "true" ]]; then
   echo "=== Running smoke tests (no Playwright) ==="
   start_istio_proxy_log_collector
+  start_dns_log_collector
   if ! flags="${PYTEST_FLAGS}" make smoke; then
     echo "WARNING: smoke tests reported failures" >&2
     FAILED=1
   fi
   stop_istio_proxy_log_collector
+  stop_dns_log_collector
   dump_s390x_smoke_diagnostics
 fi
 

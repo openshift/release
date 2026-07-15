@@ -160,16 +160,73 @@ if [[ -n "${RELATED_IMAGE_WASMSHIM}" ]]; then
   fi
 fi
 
-# Kuadrant caches dependency discovery at startup. If DNS (or others) became
-# Ready after the operator pod started, DNSPolicy stays MissingDependency until
-# the controller is restarted.
-echo "=== Ensuring DNS operator is Available before restarting Kuadrant operator ==="
+# Newer kuadrant-operator serves /wasm/plugin.wasm from the manager image itself.
+# RELATED_IMAGE_WASMSHIM alone is not enough; patch the operator container image
+# on the installed CSV so OLM keeps the override (Deployment patches are reconciled away).
+patch_kuadrant_operator_image() {
+  local image="$1" csv
+  [[ -z "${image}" ]] && return 0
+  csv="$(oc get subscription "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_NAMESPACE}" -o jsonpath='{.status.installedCSV}')"
+  if [[ -z "${csv}" ]]; then
+    echo "ERROR: no installedCSV for ${KUADRANT_SUBSCRIPTION_NAME}" >&2
+    return 1
+  fi
+  echo "=== Patching CSV ${csv} manager image → ${image} ==="
+  oc get csv "${csv}" -n "${KUADRANT_NAMESPACE}" -o json \
+    | jq --arg img "${image}" '
+        (.spec.install.spec.deployments[]?
+          | select(.name == "kuadrant-operator-controller-manager")
+          | .spec.template.spec.containers[]?
+          | select(.name == "manager")
+          | .image) = $img
+        |
+        (.spec.relatedImages[]? | select(.name == "kuadrant-operator" or .name == "manager") | .image) = $img
+      ' \
+    | oc apply -f -
+  # Also force Deployment immediately (CSV reconcile may lag briefly).
+  oc set image deployment/kuadrant-operator-controller-manager \
+    -n "${KUADRANT_NAMESPACE}" "manager=${image}"
+}
+
+echo "=== Ensuring DNS operator is Available before operator image restart ==="
 oc wait --for=condition=Available deployment/dns-operator-controller-manager \
   -n "${KUADRANT_NAMESPACE}" --timeout=300s || true
-echo "=== Restarting kuadrant-operator so it rediscovers installed dependencies ==="
-oc rollout restart deployment/kuadrant-operator-controller-manager -n "${KUADRANT_NAMESPACE}"
-oc rollout status deployment/kuadrant-operator-controller-manager \
-  -n "${KUADRANT_NAMESPACE}" --timeout=300s
+
+if [[ -n "${KUADRANT_OPERATOR_IMAGE}" ]]; then
+  patch_kuadrant_operator_image "${KUADRANT_OPERATOR_IMAGE}"
+  oc rollout status deployment/kuadrant-operator-controller-manager \
+    -n "${KUADRANT_NAMESPACE}" --timeout=300s
+  actual_img="$(oc get deployment/kuadrant-operator-controller-manager -n "${KUADRANT_NAMESPACE}" \
+    -o jsonpath='{range .spec.template.spec.containers[*]}{.name}={.image}{"\n"}{end}' \
+    | grep '^manager=' || true)"
+  echo "Deployment manager image: ${actual_img:-<unset>}"
+  if [[ "${actual_img}" != "manager=${KUADRANT_OPERATOR_IMAGE}" ]]; then
+    echo "ERROR: kuadrant-operator manager image did not stick (want ${KUADRANT_OPERATOR_IMAGE})" >&2
+    oc get deployment/kuadrant-operator-controller-manager -n "${KUADRANT_NAMESPACE}" -o yaml >&2 || true
+    exit 1
+  fi
+  # Re-verify WASMSHIM after image replacement (CSV may reset env briefly).
+  if [[ -n "${RELATED_IMAGE_WASMSHIM}" ]]; then
+    actual="$(oc set env deployment/kuadrant-operator-controller-manager \
+      -n "${KUADRANT_NAMESPACE}" --list | grep '^RELATED_IMAGE_WASMSHIM=' || true)"
+    echo "Deployment env after image patch: ${actual:-<unset>}"
+    if [[ "${actual}" != "RELATED_IMAGE_WASMSHIM=${RELATED_IMAGE_WASMSHIM}" ]]; then
+      oc patch subscription "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_NAMESPACE}" --type merge \
+        -p "{\"spec\":{\"config\":{\"env\":[{\"name\":\"RELATED_IMAGE_WASMSHIM\",\"value\":\"${RELATED_IMAGE_WASMSHIM}\"}]}}}"
+      oc set env deployment/kuadrant-operator-controller-manager \
+        -n "${KUADRANT_NAMESPACE}" "RELATED_IMAGE_WASMSHIM=${RELATED_IMAGE_WASMSHIM}" || true
+      oc rollout status deployment/kuadrant-operator-controller-manager \
+        -n "${KUADRANT_NAMESPACE}" --timeout=300s || true
+    fi
+  fi
+else
+  # Kuadrant caches dependency discovery at startup. Restart so DNS is rediscovered.
+  echo "=== Restarting kuadrant-operator so it rediscovers installed dependencies ==="
+  oc rollout restart deployment/kuadrant-operator-controller-manager -n "${KUADRANT_NAMESPACE}"
+  oc rollout status deployment/kuadrant-operator-controller-manager \
+    -n "${KUADRANT_NAMESPACE}" --timeout=300s
+fi
+
 oc wait --for=condition=Available \
   deployment/kuadrant-operator-controller-manager \
   deployment/dns-operator-controller-manager \
@@ -237,8 +294,10 @@ echo "=== Kuadrant operator install diagnostic dump ==="
 {
   echo "--- subscription ${KUADRANT_SUBSCRIPTION_NAME} ---"
   oc get subscription "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_NAMESPACE}" -o yaml || true
-  echo "--- deployment env (kuadrant-operator-controller-manager) ---"
+  echo "--- deployment env / image (kuadrant-operator-controller-manager) ---"
   oc set env deployment/kuadrant-operator-controller-manager -n "${KUADRANT_NAMESPACE}" --list || true
+  oc get deployment/kuadrant-operator-controller-manager -n "${KUADRANT_NAMESPACE}" \
+    -o jsonpath='{range .spec.template.spec.containers[*]}{.name}={.image}{"\n"}{end}' || true
   echo "--- CSV relatedImages (wasm) ---"
   csv="$(oc get subscription "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_NAMESPACE}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
   if [[ -n "${csv}" ]]; then
