@@ -11,7 +11,7 @@ QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 set +x
 echo
 echo "Login to get token ..."
-TOKEN=$(curl -fsSk -X POST -u "metal-perfscale-cpt@redhat.com:$quads_pwd" -H "Content-Type: application/json" $QUADS_INSTANCE/api/v3/login/ | jq -r .'auth_token')
+TOKEN=$(curl -fsSk -X POST -u "ocp-perfscale-cpt@redhat.com:$quads_pwd" -H "Content-Type: application/json" $QUADS_INSTANCE/api/v3/login/ | jq -r .'auth_token')
 
 # Get available hosts for self scheduling from a certain hardware model
 echo
