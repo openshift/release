@@ -45,6 +45,11 @@ if [[ "${TRUSTEE_INSTALL}" != "true" ]]; then
   exit 0
 fi
 
+if [[ -z "${HELM_CHART_IMAGE:-}" ]]; then
+  echo ">>> ERROR: HELM_CHART_IMAGE is required but not set" >&2
+  return 1
+fi
+
 # Show configuration
 echo ">>> Trustee charts image: ${HELM_CHART_IMAGE}"
 if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
@@ -130,10 +135,7 @@ function fetch_trustee_charts() {
   local charts_dir="${SCRATCH}/charts"
   local bin_dir="${SCRATCH}/bin"
 
-  if [[ -z "${HELM_CHART_IMAGE:-}" ]]; then
-    echo ">>> ERROR: HELM_CHART_IMAGE is required but not set" >&2
-    return 1
-  fi
+
 
   echo ">>> Extracting charts and helm from image: ${HELM_CHART_IMAGE}" >&2
 

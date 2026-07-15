@@ -1,10 +1,8 @@
 # install-trustee-operator
 
-Installs the [Trustee operator](https://github.com/confidential-containers/trustee) and
-its operands on an OpenShift cluster for Confidential Containers (CoCo) testing.
+If `TRUSTEE_INSTALL: "true"` and `HELM_CHART_IMAGE` is set to a prebuilt image in a container repo, this step installs the [Trustee operator](https://github.com/confidential-containers/trustee) and its operands on an OpenShift cluster for Confidential Containers (CoCo) testing.
 
-Helm charts from [confidential-devhub/charts](https://github.com/confidential-devhub/charts)
-are rendered with `helm template` and applied via `oc apply`.
+Helm charts from [confidential-devhub/charts](https://github.com/confidential-devhub/charts) are rendered with `helm template` and applied via `oc apply`.
 
 ## Chart Delivery
 
@@ -138,7 +136,7 @@ tests:
   restrict_network_access: true
   steps:
     env:
-      HELM_CHART_IMAGE: quay.io/$ORG/trustee-helm-charts:v1.2.0
+      HELM_CHART_IMAGE: quay.io/$ORG/trustee-helm-charts:v1.13
       TRUSTEE_INSTALL: "true"
       TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:latest
     workflow: sandboxed-containers-operator-e2e-azure
