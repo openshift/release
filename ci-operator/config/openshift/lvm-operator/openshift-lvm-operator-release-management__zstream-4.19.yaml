@@ -12,12 +12,12 @@ images:
   items:
   - dockerfile_literal: |-
       FROM golang:1.23 AS builder
-      WORKDIR /workspace
-      RUN git clone --depth 1 --branch release-4.19 https://github.com/openshift/lvm-operator.git /tmp/src && \
-          cp -r /tmp/src/test/integration/* .
-      RUN GO_COMPLIANCE_POLICY=exempt_all CGO_ENABLED=0 go build -o integration-test .
+      RUN git clone --depth 1 --branch release-4.19 https://github.com/openshift/lvm-operator.git /go/src/github.com/openshift/lvm-operator
+      WORKDIR /go/src/github.com/openshift/lvm-operator/test/integration
+      RUN go mod download
+      RUN GO_COMPLIANCE_POLICY=exempt_all CGO_ENABLED=0 go build -o /tmp/integration-test .
       FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
-      COPY --from=builder /workspace/integration-test /integration-test
+      COPY --from=builder /tmp/integration-test /integration-test
       ENTRYPOINT ["/integration-test"]
     inputs:
       ocp_4.19_base-rhel9:
