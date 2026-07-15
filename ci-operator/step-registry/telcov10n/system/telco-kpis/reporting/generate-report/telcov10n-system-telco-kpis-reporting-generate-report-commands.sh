@@ -8,7 +8,7 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 #   exit 0
 # fi
 
-export_env_vars_from_json 'generate_report' "${TEST_SETTINGS:-}" "${TEST_SETTINGS_DEFAULTS:-}"
+export_env_vars_from_json 'generate_report' "${REPORTING_SETTINGS:-}" "${REPORTING_SETTINGS_DEFAULTS:-}"
 setup_continue_on_fail
 
 main() {
