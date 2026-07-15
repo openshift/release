@@ -160,7 +160,21 @@ if [[ -n "${RELATED_IMAGE_WASMSHIM}" ]]; then
   fi
 fi
 
-# Do not create a Kuadrant CR here — the testsuite creates it during test setup.
+# The baked-in testsuite conftest fails fast unless a Kuadrant CR already
+# exists in KUADRANT_NAMESPACE ("Unable to locate Kuadrant installation").
+# Creating it here is bootstrap only — individual tests still own policies / routes.
+echo "=== Creating the Kuadrant CR (required by testsuite bootstrap) ==="
+cat <<EOF | oc apply -f -
+apiVersion: kuadrant.io/v1beta1
+kind: Kuadrant
+metadata:
+  name: kuadrant
+  namespace: ${KUADRANT_NAMESPACE}
+spec: {}
+EOF
+echo "Waiting for the Kuadrant CR to become Ready ..."
+oc wait --for=condition=Ready kuadrant/kuadrant -n "${KUADRANT_NAMESPACE}" --timeout=300s || \
+  oc get kuadrant/kuadrant -n "${KUADRANT_NAMESPACE}" -o yaml
 
 echo "=== Creating test namespaces ==="
 for ns in kuadrant kuadrant2 tools; do
@@ -216,9 +230,10 @@ echo "=== Kuadrant operator install diagnostic dump ==="
   fi
   echo "--- pods in ${KUADRANT_NAMESPACE} ---"
   oc get pods -n "${KUADRANT_NAMESPACE}" -o wide || true
-  echo "--- kuadrant CRs (expect none; testsuite creates them) ---"
-  oc get kuadrant -A || true
+  echo "--- kuadrant CRs ---"
+  oc get kuadrant -A -o yaml || true
 } | tee "${ARTIFACT_DIR}/kuadrant-install-diagnostics.txt"
 
 echo "=== Kuadrant operator install complete ==="
 oc get csv -n "${KUADRANT_NAMESPACE}"
+oc get kuadrant -n "${KUADRANT_NAMESPACE}"
