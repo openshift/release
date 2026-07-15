@@ -101,6 +101,62 @@ export junit=yes
 export resultsdir="${RESULTS_DIR}"
 export USER="${USER:-ci}"
 
+dump_s390x_smoke_diagnostics() {
+  local out="${ARTIFACT_DIR}/kuadrant-smoke-diagnostics.txt"
+  echo "=== Dumping post-smoke diagnostics to ${out} ==="
+  {
+    echo "===== $(date -u +%Y-%m-%dT%H:%M:%SZ) smoke diagnostics ====="
+    echo "--- Kuadrant CRs ---"
+    oc get kuadrant -A -o wide 2>&1 || true
+    oc get kuadrant -A -o yaml 2>&1 || true
+
+    echo "--- operator RELATED_IMAGE_WASMSHIM ---"
+    oc set env deployment/kuadrant-operator-controller-manager \
+      -n "${KUADRANT_NAMESPACE}" --list 2>&1 | grep RELATED_IMAGE || true
+
+    echo "--- WasmPlugin (all namespaces) ---"
+    oc get wasmplugin -A -o wide 2>&1 || true
+    oc get wasmplugin -A -o yaml 2>&1 || true
+
+    echo "--- RateLimitPolicy / AuthPolicy ---"
+    oc get ratelimitpolicy -A -o wide 2>&1 || true
+    oc get ratelimitpolicy -A -o yaml 2>&1 || true
+    oc get authpolicy -A -o wide 2>&1 || true
+
+    echo "--- Gateways / HTTPRoutes ---"
+    oc get gateway -A -o wide 2>&1 || true
+    oc get httproute -A -o wide 2>&1 || true
+
+    echo "--- Limitador / Authorino ---"
+    oc get limitador -A -o wide 2>&1 || true
+    oc get limitador -A -o yaml 2>&1 || true
+    oc get pods -A -l 'app.kubernetes.io/name=limitador' -o wide 2>&1 || true
+    oc get pods -A -l 'app.kubernetes.io/name=authorino' -o wide 2>&1 || true
+
+    echo "--- kuadrant-operator recent logs (wasm/shim/error) ---"
+    oc logs -n "${KUADRANT_NAMESPACE}" deploy/kuadrant-operator-controller-manager \
+      --tail=200 2>&1 | grep -iE 'wasm|shim|error|fail|ratelimit' || true
+
+    echo "--- istiod / gateway proxy log snippets (wasm) ---"
+    for ns in istio-system openshift-operators "${KUADRANT_NAMESPACE}" kuadrant kuadrant2; do
+      for pod in $(oc get pods -n "${ns}" -o name 2>/dev/null | grep -E 'istiod|gateway|istio-ingress' || true); do
+        echo ">>> ${ns}/${pod}"
+        oc logs -n "${ns}" "${pod}" -c discovery --tail=80 2>/dev/null | grep -iE 'wasm|error|fail' || true
+        oc logs -n "${ns}" "${pod}" -c istio-proxy --tail=80 2>/dev/null | grep -iE 'wasm|error|fail|503' || true
+        oc logs -n "${ns}" "${pod}" --all-containers --tail=40 2>/dev/null | grep -iE 'wasm|error|fail' || true
+      done
+    done
+
+    echo "--- DNSPolicy / TLSPolicy (expect DNS issues without real credentials) ---"
+    oc get dnspolicy -A -o wide 2>&1 || true
+    oc get tlspolicy -A -o wide 2>&1 || true
+  } >"${out}" 2>&1 || true
+  # Also echo a short summary to the step log
+  echo "--- diagnostic summary ---"
+  grep -E '^(--- |NAME |Error|error|wasm|RELATED|phase=|message:)' "${out}" 2>/dev/null | head -80 || true
+  echo "(full dump: ${out})"
+}
+
 FAILED=0
 
 if [[ "${RUN_SMOKE}" == "true" ]]; then
@@ -109,6 +165,7 @@ if [[ "${RUN_SMOKE}" == "true" ]]; then
     echo "WARNING: smoke tests reported failures" >&2
     FAILED=1
   fi
+  dump_s390x_smoke_diagnostics
 fi
 
 # Temporarily disable the full single-cluster suite while stabilizing smoke on s390x.

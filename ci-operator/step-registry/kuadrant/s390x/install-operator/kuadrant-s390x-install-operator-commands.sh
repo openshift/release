@@ -160,18 +160,7 @@ if [[ -n "${RELATED_IMAGE_WASMSHIM}" ]]; then
   fi
 fi
 
-echo "=== Creating the Kuadrant CR ==="
-cat <<EOF | oc apply -f -
-apiVersion: kuadrant.io/v1beta1
-kind: Kuadrant
-metadata:
-  name: kuadrant
-  namespace: ${KUADRANT_NAMESPACE}
-spec: {}
-EOF
-echo "Waiting for the Kuadrant CR to become Ready ..."
-oc wait --for=condition=Ready kuadrant/kuadrant -n "${KUADRANT_NAMESPACE}" --timeout=300s || \
-  oc get kuadrant/kuadrant -n "${KUADRANT_NAMESPACE}" -o yaml
+# Do not create a Kuadrant CR here — the testsuite creates it during test setup.
 
 echo "=== Creating test namespaces ==="
 for ns in kuadrant kuadrant2 tools; do
@@ -213,6 +202,23 @@ EOF
   fi
 done
 
+echo "=== Kuadrant operator install diagnostic dump ==="
+{
+  echo "--- subscription ${KUADRANT_SUBSCRIPTION_NAME} ---"
+  oc get subscription "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_NAMESPACE}" -o yaml || true
+  echo "--- deployment env (kuadrant-operator-controller-manager) ---"
+  oc set env deployment/kuadrant-operator-controller-manager -n "${KUADRANT_NAMESPACE}" --list || true
+  echo "--- CSV relatedImages (wasm) ---"
+  csv="$(oc get subscription "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_NAMESPACE}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+  if [[ -n "${csv}" ]]; then
+    oc get csv "${csv}" -n "${KUADRANT_NAMESPACE}" -o jsonpath='{range .spec.relatedImages[*]}{.name}{"="}{.image}{"\n"}{end}' 2>/dev/null | grep -i wasm || true
+    oc get csv "${csv}" -n "${KUADRANT_NAMESPACE}" -o jsonpath='{range .spec.install.spec.deployments[*].spec.template.spec.containers[*].env[*]}{.name}{"="}{.value}{"\n"}{end}' 2>/dev/null | grep RELATED_IMAGE || true
+  fi
+  echo "--- pods in ${KUADRANT_NAMESPACE} ---"
+  oc get pods -n "${KUADRANT_NAMESPACE}" -o wide || true
+  echo "--- kuadrant CRs (expect none; testsuite creates them) ---"
+  oc get kuadrant -A || true
+} | tee "${ARTIFACT_DIR}/kuadrant-install-diagnostics.txt"
+
 echo "=== Kuadrant operator install complete ==="
 oc get csv -n "${KUADRANT_NAMESPACE}"
-oc get kuadrant -n "${KUADRANT_NAMESPACE}"
