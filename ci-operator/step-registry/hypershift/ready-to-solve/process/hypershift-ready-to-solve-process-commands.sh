@@ -116,7 +116,7 @@ if [[ "$SEARCH_HTTP_CODE" != "200" ]]; then
     exit 1
 fi
 
-TOTAL_RESULTS=$(echo "$SEARCH_BODY" | jq -r '.total // 0')
+TOTAL_RESULTS=$(echo "$SEARCH_BODY" | jq -r '.issues | length')
 echo "Jira search returned $TOTAL_RESULTS result(s)"
 ISSUES=$(echo "$SEARCH_BODY" | jq -r '.issues[]? | "\(.key) \([.fields.components[]?.name] | join(",")) \(.fields.summary)"')
 

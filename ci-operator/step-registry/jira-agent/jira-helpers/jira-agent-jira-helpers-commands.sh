@@ -145,6 +145,8 @@ query_jira_issues() {
 
   search_payload=$(jq -n --arg jql "$jql" --argjson max "$MAX_ISSUES" \
     '{jql: $jql, fields: ["key", "summary"], maxResults: $max}')
+  echo "JQL: $jql"
+  echo "Endpoint: ${JIRA_BASE_URL}/rest/api/3/search/jql"
   search_response=$(curl -s -w "\n%{http_code}" "${JIRA_BASE_URL}/rest/api/3/search/jql" \
     -X POST \
     -H "Authorization: Basic $JIRA_AUTH" \
@@ -159,12 +161,16 @@ query_jira_issues() {
     exit 1
   fi
 
-  total_results=$(echo "$search_body" | jq -r '.total // 0')
+  total_results=$(echo "$search_body" | jq -r '.issues | length')
   echo "Jira search returned $total_results result(s)"
   ISSUES=$(echo "$search_body" | jq -r '.issues[]? | "\(.key) \(.fields.summary)"')
 
   if [ -z "$ISSUES" ]; then
     echo "No issues found matching criteria"
+    if [ -n "${JIRA_AGENT_ISSUE_KEY:-}" ]; then
+      echo "DEBUG: Issue key override was set but returned no results"
+      echo "DEBUG: Response body: $search_body"
+    fi
     exit 0
   fi
 
