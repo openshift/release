@@ -22,7 +22,7 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: npm ci && npm run build
+test_binary_build_commands: npm ci && npm run build && npx playwright install chromium
 tests:
 - as: lint
   commands: npm run lint
@@ -31,6 +31,11 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
 - as: unit
   commands: npm run test
+  container:
+    from: test-bin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: e2e
+  commands: CI=true npm run test:e2e
   container:
     from: test-bin
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
