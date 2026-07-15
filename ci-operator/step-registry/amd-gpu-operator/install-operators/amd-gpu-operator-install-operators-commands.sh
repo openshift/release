@@ -63,6 +63,10 @@ pci_devices: []
 wait_timeout: 3600
 version_channel: stable
 
+snapshot:
+  enabled: ${SNAPSHOT_ENABLED:-true}
+  max_cached: ${SNAPSHOT_MAX_CACHED:-3}
+
 operators:
   install: true
   gpu_operator_version: "${GPU_OPERATOR_VERSION:-1.4}"
