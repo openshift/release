@@ -35,31 +35,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  capabilities:
-  - nested-podman
+- as: lint
   commands: |
     unset GOFLAGS
     echo "Go Version: $(go version)"
-    make db/setup
     make lint
-    make test
   container:
     from: golang-plus
-  nested_podman: true
-- as: unit-postmerge
-  capabilities:
-  - nested-podman
-  commands: |
-    unset GOFLAGS
-    echo "Go Version: $(go version)"
-    make db/setup
-    make lint
-    make test
-  container:
-    from: golang-plus
-  nested_podman: true
-  postsubmit: true
 - as: integration
   capabilities:
   - nested-podman
@@ -91,6 +73,35 @@ tests:
   secrets:
   - mount_path: /opt/app-root/ats-secrets
     name: openshift-online-ats-secrets
+- as: coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    make db/setup
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - mount_path: /var/run/codecov-secret
+    name: access-transparency-service-codecov
+- as: publish-coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    make db/setup
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  postsubmit: true
+  secrets:
+  - mount_path: /var/run/codecov-secret
+    name: access-transparency-service-codecov
 zz_generated_metadata:
   branch: main
   org: openshift-online
