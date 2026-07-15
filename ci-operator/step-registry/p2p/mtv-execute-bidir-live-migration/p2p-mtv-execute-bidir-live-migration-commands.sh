@@ -10,9 +10,9 @@
 set -euxo pipefail; shopt -s inherit_errexit
 
 eval "$(
-    typeset -a _fURL=()
-    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    typeset -a fURLArr=()
+    type -t wget 1>/dev/null && fURLArr=(wget -nv -O-) || fURLArr=(curl -fsSL)
+    "${fURLArr[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq
 
 if [[ -n "${SHARED_DIR}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
@@ -246,6 +246,13 @@ RunPass() {
                 oc --kubeconfig=\"${KUBECONFIG}\" wait \"provider/${dstProv}\" \
                     -n \"${MTV_NAMESPACE}\" --for=condition=Ready --timeout=\"${MTV_PROVIDER_INVENTORY_REFRESH_WAIT}\"
             "
+
+        # MTV leaves the source VM in a stopped state after a live migration.
+        # Remove any leftover VM from the destination before creating the Plan so
+        # the incoming VM does not collide with the pre-existing object.
+        JStep "${label}: Pre-migration: Clear destination VM if present" \
+            DstOc delete vm "${MTV_TEST_VM_NAME}" -n "${targetNs}" \
+                --ignore-not-found=true --wait=true --timeout="${MTV_VM_DELETE_TIMEOUT}"
 
         JStep "${label}: Migration: Apply Plan" \
             ApplyManifest_ <<EOF

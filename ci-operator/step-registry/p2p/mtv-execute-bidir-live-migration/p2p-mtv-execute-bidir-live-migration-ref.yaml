@@ -20,6 +20,11 @@ ref:
       Separate Plan/Migration names (MTV_BIDIR_REVERSE_PLAN_NAME / MIGRATION_NAME).
       Same preflights ensure CCLM gates and sync controllers are still healthy.
 
+    Pre-migration cleanup: before each pass, any existing VM with the same name is deleted
+    from the destination spoke (MTV leaves the source VM in a stopped state after a live
+    migration). --ignore-not-found makes this a safe no-op on the first pass where the
+    destination is initially empty. Timeout controlled by MTV_VM_DELETE_TIMEOUT.
+
     Both passes write results to junit_cclm_bidir_migration.xml for Prow/Firewatch.
     Diagnostics written per-pass under ${ARTIFACT_DIR}/bidir-<planName>-diagnostics/.
 
@@ -99,6 +104,9 @@ ref:
   - name: MTV_DEST_SPOKE_KUBECONFIG
     default: ""
     documentation: Optional explicit kubeconfig for the destination spoke (overrides index discovery).
+  - name: MTV_VM_DELETE_TIMEOUT
+    default: "5m"
+    documentation: oc delete timeout for removing a leftover VM from the destination spoke before each migration pass.
   - name: P2P_CCLM_DEBUG_MODE
     default: "false"
     documentation: When true, log failures but exit 0 so downstream debug steps can run.
