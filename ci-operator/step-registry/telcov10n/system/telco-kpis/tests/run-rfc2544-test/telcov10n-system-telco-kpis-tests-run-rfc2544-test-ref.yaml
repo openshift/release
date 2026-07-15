@@ -14,42 +14,48 @@ ref:
     - name: HUB_CLUSTER
       default: "kni-qe-71"
       documentation: Hub cluster managing the spoke
-    - name: DURATION
-      default: "12h"
-      documentation: Test duration
-    - name: FRAME_SIZE
-      default: "512"
-      documentation: Ethernet frame size in bytes
-    - name: LAT_RATE
-      default: "0.8"
-      documentation: Latency test rate (0-1)
-    - name: RAN_INTEGRATION_REPO
-      default: "https://gitlab.cee.redhat.com/ran/ran-integration.git"
-      documentation: RAN integration repository URL
-    - name: RAN_INTEGRATION_BRANCH
-      default: "master"
-      documentation: RAN integration repository branch
-    - name: SPIRENT_CONFIG_FILE
-      default: "spirent_testcfg.xml"
-      documentation: Spirent configuration file
-    - name: THROUGHPUT_THRESHOLD
-      default: "99.9"
-      documentation: Minimum throughput percentage
-    - name: MAX_LATENCY_THRESHOLD
-      default: "30"
-      documentation: Maximum latency threshold in microseconds
-    - name: TOLERANCE_NINES
-      default: "6"
-      documentation: Number of nines for latency tolerance
-    - name: ABSOLUTE_MAX_LATENCY
-      default: "50"
-      documentation: Absolute maximum latency in microseconds
-    - name: DEBUG
-      default: "false"
-      documentation: Enable Ansible debug output
-    - name: SKIP_REBUILD_IMAGE
-      default: "false"
-      documentation: Skip test-runner image rebuild
+    - name: TEST_SETTINGS
+      default: '{}'
+      documentation: >-
+        JSON object for per-test configuration overrides from CI config.
+        Values here take precedence over TEST_SETTINGS_DEFAULTS.
+    - name: TEST_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "rfc2544": {
+            "skip": false,
+            "continue_on_fail": false,
+            "duration": "12h",
+            "frame_size": "512",
+            "lat_rate": "0.8",
+            "ran_integration_repo": "https://gitlab.cee.redhat.com/ran/ran-integration.git",
+            "ran_integration_branch": "master",
+            "spirent_config_file": "spirent_testcfg.xml",
+            "throughput_threshold": "99.9",
+            "max_latency_threshold": "30",
+            "tolerance_nines": "6",
+            "absolute_max_latency": "50",
+            "debug": false,
+            "skip_rebuild_image": false
+          }
+        }
+      documentation: >-
+        JSON object for per-test configuration. The "rfc2544" key supports:
+        skip (bool) - when true, skip this test entirely and exit 0;
+        continue_on_fail (bool) - when true, failures exit 0 so the pipeline continues;
+        duration (string) - test duration (e.g. "12h", "1h");
+        frame_size (string) - Ethernet frame size in bytes;
+        lat_rate (string) - latency test rate 0-1;
+        ran_integration_repo (string) - RAN integration repository URL;
+        ran_integration_branch (string) - RAN integration repository branch;
+        spirent_config_file (string) - Spirent configuration file name;
+        throughput_threshold (string) - minimum throughput percentage;
+        max_latency_threshold (string) - maximum latency threshold in microseconds;
+        tolerance_nines (string) - number of nines for latency tolerance;
+        absolute_max_latency (string) - absolute maximum latency in microseconds;
+        debug (bool) - when true, enables Ansible -vvv verbose output;
+        skip_rebuild_image (bool) - when true, skips rebuilding the test-runner container image.
+        Values are exported as uppercase env vars, overriding ref.yaml defaults.
 
   credentials:
     # Common hypervisor (shared across all spokes)

@@ -185,6 +185,126 @@ setup_ansible_inventory() {
 
     echo "Ansible inventory setup complete"
 }
+
+# ----------------------------------------------------------------------
+# export_env_vars_from_json
+#
+# Merges TEST_SETTINGS_DEFAULTS (ref-level) with TEST_SETTINGS (config-level)
+# and exports the result as uppercase environment variables.
+# TEST_SETTINGS values take precedence over TEST_SETTINGS_DEFAULTS.
+# Supports "skip": true to skip a test and "continue_on_fail": true
+# to prevent pipeline stops.
+#
+# Parameters:
+#   1 - step_testname: test key in the JSON (e.g., "oslat", "reboot")
+#   2 - test_settings: config-level overrides JSON (defaults to empty)
+#   3 - test_settings_defaults: ref-level defaults JSON (defaults to empty)
+# ----------------------------------------------------------------------
+
+export_env_vars_from_json() {
+    local step_testname="$1"
+    local test_settings="${2:-}"
+    local test_settings_defaults="${3:-}"
+
+    local result
+    result=$(python3 -c "
+import json, sys
+
+step_name = sys.argv[1]
+overrides_raw = sys.argv[2] if len(sys.argv) > 2 else ''
+defaults_raw = sys.argv[3] if len(sys.argv) > 3 else ''
+
+def parse_json(raw):
+    if not raw or raw.strip() == '{}':
+        return {}
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return {}
+
+defaults_all = parse_json(defaults_raw)
+overrides_all = parse_json(overrides_raw)
+
+defaults = defaults_all.get(step_name, {})
+overrides = overrides_all.get(step_name, {})
+
+merged = {**defaults, **overrides}
+
+if not merged:
+    sys.exit(0)
+
+has_overrides = bool(overrides)
+print(f'__DUMP_START__')
+print(f'Step: {step_name}')
+if has_overrides:
+    print(f'Defaults:  {json.dumps(defaults, indent=2)}')
+    print(f'Overrides: {json.dumps(overrides, indent=2)}')
+print(f'Merged:    {json.dumps(merged, indent=2)}')
+print(f'__DUMP_END__')
+
+skip_val = merged.get('skip', False)
+if isinstance(skip_val, bool):
+    is_skip = skip_val
+else:
+    is_skip = str(skip_val).lower() == 'true'
+
+if is_skip:
+    print('SKIP=true')
+    sys.exit(0)
+
+for key, value in merged.items():
+    if key == 'skip':
+        continue
+    env_name = key.upper()
+    if isinstance(value, bool):
+        value = str(value).lower()
+    print(f'{env_name}={value}')
+" "${step_testname}" "${test_settings}" "${test_settings_defaults}")
+
+    if [[ -z "${result}" ]]; then
+        echo "No settings found for '${step_testname}'"
+        return 0
+    fi
+
+    local dump
+    dump=$(echo "${result}" | sed -n '/__DUMP_START__/,/__DUMP_END__/p' | grep -v '__DUMP_')
+    local settings_lines
+    settings_lines=$(echo "${result}" | sed '/__DUMP_START__/,/__DUMP_END__/d')
+
+    if [[ -n "${dump}" ]]; then
+        echo "========================================"
+        echo "${dump}"
+        echo "========================================"
+    fi
+
+    if echo "${settings_lines}" | grep -q "^SKIP=true$"; then
+        echo "SKIPPED: ${step_testname} — skip=true in TEST_SETTINGS"
+        exit 0
+    fi
+
+    if [[ -z "${settings_lines}" ]]; then
+        return 0
+    fi
+
+    while IFS='=' read -r key value; do
+        export "${key}=${value}"
+    done <<< "${settings_lines}"
+}
+
+# ----------------------------------------------------------------------
+# setup_continue_on_fail
+#
+# When CONTINUE_ON_FAIL=true, sets an ERR trap so that test failures
+# exit 0 instead of non-zero. Prow sees success and continues to the
+# next step. Intended for development/debugging, not production runs.
+# ----------------------------------------------------------------------
+
+setup_continue_on_fail() {
+    if [[ "${CONTINUE_ON_FAIL:-false}" == "true" ]]; then
+        echo "CONTINUE_ON_FAIL enabled — test failures will not stop the pipeline"
+        trap 'echo "ERROR: Test failed (exit code $?) but CONTINUE_ON_FAIL=true — continuing"; exit 0' ERR
+    fi
+}
 EOF
 
 echo "Shared functions written to ${SHARED_DIR}/telco-kpis-common-functions.sh"

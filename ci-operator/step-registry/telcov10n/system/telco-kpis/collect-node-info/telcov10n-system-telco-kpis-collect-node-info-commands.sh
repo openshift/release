@@ -3,10 +3,13 @@ set -euo pipefail
 
 source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
-if [ -f "${SHARED_DIR}/skip.txt" ]; then
-  echo "Detected skip.txt — skipping"
-  exit 0
-fi
+# if [ -f "${SHARED_DIR}/skip.txt" ]; then
+#   echo "Detected skip.txt — skipping"
+#   exit 0
+# fi
+
+export_env_vars_from_json 'collect_node_info' "${TEST_SETTINGS:-}" "${TEST_SETTINGS_DEFAULTS:-}"
+setup_continue_on_fail
 
 main() {
     echo "Collecting node information for spoke: ${SPOKE_CLUSTER}"
