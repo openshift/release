@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+# Prow runs containers with arbitrary UIDs and HOME=/ (not writable).
+# Ansible resolves ~/.ansible/tmp via /etc/passwd, not $HOME, for delegate_to: localhost tasks.
+export ANSIBLE_REMOTE_TMP=/tmp/.ansible/tmp
+
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
   echo "Detected skip.txt — skipping"
   exit 0
@@ -8,6 +12,43 @@ fi
 
 MOUNTED_HOST_INVENTORY="/var/host_variables"
 MOUNTED_GROUP_INVENTORY="/var/group_variables"
+
+setup_ssh_jump() {
+    local mounted_host_inventory="$1"
+    local mounted_group_inventory="$2"
+    local bastion_host_vars="$3"
+
+    echo "Configuring SSH jump through hypervisor to reach bastion..."
+
+    local hypervisor_ip
+    hypervisor_ip=$(tr -d '[:space:]' < "${mounted_host_inventory}/common/hypervisor/ansible_host")
+
+    local ssh_user
+    ssh_user=$(tr -d '[:space:]' < "${mounted_group_inventory}/common/all/ansible_user")
+
+    local ssh_key_file="/tmp/ssh-jump-key"
+    [[ $- == *x* ]] && local was_tracing=true || local was_tracing=false
+    set +x
+    cat "${mounted_group_inventory}/common/all/ansible_ssh_private_key" > "${ssh_key_file}"
+    $was_tracing && set -x
+    chmod 600 "${ssh_key_file}"
+
+    python3 -c "
+import yaml, sys
+
+key = 'ansible_ssh_common_args'
+ssh_key, user, host = sys.argv[1], sys.argv[2], sys.argv[3]
+proxy = (
+    '-o StrictHostKeyChecking=no '
+    '-o UserKnownHostsFile=/dev/null '
+    '-o ProxyCommand=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+    f'-i {ssh_key} -W %h:%p {user}@{host}\"'
+)
+print(yaml.dump({key: proxy}, default_flow_style=False, allow_unicode=True).rstrip())
+" "${ssh_key_file}" "${ssh_user}" "${hypervisor_ip}" >> "${bastion_host_vars}"
+
+    echo "SSH jump configured: container -> ${ssh_user}@${hypervisor_ip} -> bastion"
+}
 
 process_inventory() {
     local directory="$1"
@@ -72,10 +113,12 @@ main() {
     echo "Create host_vars directory"
     mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
 
-    # Copy spoke credentials to temporary location (hypervisor may be shared across spokes)
+    # Copy spoke credentials to temporary location
     mkdir -p /tmp/"${SPOKE_CLUSTER}" && chmod 700 /tmp/"${SPOKE_CLUSTER}"
-    if [[ -d "${MOUNTED_HOST_INVENTORY}/${SPOKE_CLUSTER}/hypervisor" ]]; then
-        cp -r "${MOUNTED_HOST_INVENTORY}/${SPOKE_CLUSTER}/hypervisor" /tmp/"${SPOKE_CLUSTER}"/hypervisor
+
+    # Copy common hypervisor credentials (shared across all spokes)
+    if [[ -d "${MOUNTED_HOST_INVENTORY}/common/hypervisor" ]]; then
+        cp -r "${MOUNTED_HOST_INVENTORY}/common/hypervisor" /tmp/"${SPOKE_CLUSTER}"/hypervisor
     fi
     if [[ -d "${MOUNTED_HOST_INVENTORY}/${SPOKE_CLUSTER}" ]]; then
         cp -r "${MOUNTED_HOST_INVENTORY}/${SPOKE_CLUSTER}/"* /tmp/"${SPOKE_CLUSTER}"/
@@ -94,19 +137,17 @@ main() {
         process_inventory "${MOUNTED_HOST_INVENTORY}/${HUB_CLUSTER}/bastion" /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
     fi
 
-    # Determine kubeconfig paths
-    HUB_KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
-    SPOKE_KUBECONFIG="${SHARED_DIR}/spoke-kubeconfig-${SPOKE_CLUSTER}"
+    # Configure SSH jump: Prow container -> hypervisor (hv6) -> bastion
+    setup_ssh_jump "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
+        /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
 
-    if [[ ! -f "${HUB_KUBECONFIG}" ]]; then
-        echo "ERROR: Hub kubeconfig not found at ${HUB_KUBECONFIG}"
-        exit 1
-    fi
+    # Kubeconfig paths on the bastion (not in SHARED_DIR — Ansible SSHes to bastion)
+    HUB_KUBECONFIG="/home/telcov10n/project/generated/${HUB_CLUSTER}/auth/kubeconfig"
+    SPOKE_KUBECONFIG="/tmp/${SPOKE_CLUSTER}-kubeconfig"
 
-    if [[ ! -f "${SPOKE_KUBECONFIG}" ]]; then
-        echo "ERROR: Spoke kubeconfig not found at ${SPOKE_KUBECONFIG}"
-        exit 1
-    fi
+    echo "Using kubeconfig paths on bastion:"
+    echo "  Hub kubeconfig: ${HUB_KUBECONFIG}"
+    echo "  Spoke kubeconfig: ${SPOKE_KUBECONFIG}"
 
     cd /eco-ci-cd
 
