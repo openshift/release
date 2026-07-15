@@ -35,14 +35,18 @@ OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
 # Filters to JSON lines only (agentic-ci log lines are stripped).
 # Captures OTEL JSONL per invocation and appends to the consolidated log.
 #
-# Usage: run_claude <phase> <issue_key> <prompt> [extra agentic-ci/claude args...]
+# Usage: run_claude <phase> <issue_key> <prompt> <output_file> [extra agentic-ci/claude args...]
 run_claude() {
   local phase=$1; shift
   local issue_key=$1; shift
   local prompt="$1"; shift
+  local output_file="$1"; shift
 
   local phase_otel="/tmp/claude-${issue_key}-${phase}-otel.jsonl"
+  local raw_output="/tmp/claude-${issue_key}-${phase}-raw.jsonl"
+  local log_file="/tmp/claude-${issue_key}-${phase}.log"
 
+  local rc=0
   agentic-ci run \
     --backend local \
     --harness claude-code \
@@ -55,8 +59,10 @@ run_claude() {
     --verbose \
     --output-format stream-json \
     "$@" \
-    | grep '^{'
-  local rc=${PIPESTATUS[0]}
+    > "$raw_output" 2>"$log_file" \
+    || rc=$?
+
+  grep '^{' "$raw_output" > "$output_file" || true
 
   for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
     if [ -f "$f" ]; then
@@ -215,26 +221,22 @@ run_claude_phase() {
   local issue_key=$1 phase=$2 artifact_prefix=$3 prompt=$4 tools=$5 max_turns=$6
   shift 6
 
-  local phase_start json_file log_file
+  local phase_start json_file
   phase_start=$(date +%s)
   json_file="/tmp/claude-${issue_key}-${artifact_prefix}.json"
-  log_file="/tmp/claude-${issue_key}-${artifact_prefix}.log"
 
   echo ""
   echo "=========================================="
   echo "Phase: ${phase} for ${issue_key}"
   echo "=========================================="
 
-  set +e
-  run_claude "$phase" "$issue_key" "$prompt" \
+  PHASE_EXIT_CODE=0
+  run_claude "$phase" "$issue_key" "$prompt" "$json_file" \
     --allowedTools "$tools" \
     --max-turns "$max_turns" \
     --effort max \
     "$@" \
-    2> "$log_file" \
-    | tee "$json_file"
-  PHASE_EXIT_CODE=$?
-  set -e
+    || PHASE_EXIT_CODE=$?
 
   extract_claude_outputs "$json_file" "$issue_key" "$artifact_prefix"
   extract_claude_tokens "$json_file" "$issue_key" "$phase"
