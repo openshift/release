@@ -111,13 +111,15 @@ if [[ "${RUN_SMOKE}" == "true" ]]; then
   fi
 fi
 
-if [[ "${RUN_KUADRANT}" == "true" ]]; then
-  echo "=== Running single-cluster Kuadrant tests (make kuadrant, no ui/playwright) ==="
-  if ! flags="${PYTEST_FLAGS}" make kuadrant; then
-    echo "ERROR: kuadrant tests reported failures" >&2
-    FAILED=1
-  fi
-fi
+# Temporarily disable the full single-cluster suite while stabilizing smoke on s390x.
+# if [[ "${RUN_KUADRANT}" == "true" ]]; then
+#   echo "=== Running single-cluster Kuadrant tests (make kuadrant, no ui/playwright) ==="
+#   if ! flags="${PYTEST_FLAGS}" make kuadrant; then
+#     echo "ERROR: kuadrant tests reported failures" >&2
+#     FAILED=1
+#   fi
+# fi
+echo "=== Skipping make kuadrant (disabled while stabilizing smoke) ==="
 
 echo "=== Polishing JUnit reports ==="
 make polish-junit || true

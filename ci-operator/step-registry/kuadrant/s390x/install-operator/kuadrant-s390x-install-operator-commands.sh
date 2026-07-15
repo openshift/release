@@ -119,6 +119,18 @@ echo "=== Waiting for the operator deployments (kuadrant, authorino, limitador, 
 oc wait --for=condition=Available deployment --all -n "${KUADRANT_NAMESPACE}" --timeout=300s || true
 oc get deployment -n "${KUADRANT_NAMESPACE}"
 
+if [[ -n "${RELATED_IMAGE_WASMSHIM}" ]]; then
+  echo "=== Patching Kuadrant operator RELATED_IMAGE_WASMSHIM ==="
+  echo "Setting RELATED_IMAGE_WASMSHIM=${RELATED_IMAGE_WASMSHIM}"
+  oc set env deployment/kuadrant-operator-controller-manager \
+    -n "${KUADRANT_NAMESPACE}" \
+    "RELATED_IMAGE_WASMSHIM=${RELATED_IMAGE_WASMSHIM}"
+  oc rollout status deployment/kuadrant-operator-controller-manager \
+    -n "${KUADRANT_NAMESPACE}" --timeout=300s
+  oc set env deployment/kuadrant-operator-controller-manager \
+    -n "${KUADRANT_NAMESPACE}" --list | grep RELATED_IMAGE_WASMSHIM || true
+fi
+
 echo "=== Creating the Kuadrant CR ==="
 cat <<EOF | oc apply -f -
 apiVersion: kuadrant.io/v1beta1
