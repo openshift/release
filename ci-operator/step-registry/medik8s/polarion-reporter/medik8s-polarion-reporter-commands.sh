@@ -22,7 +22,7 @@ fi
 
 echo "Found ${#xml_files[@]} file(s): ${xml_files[*]}"
 
-metadata_file=$(mktemp "${TMPDIR:-/tmp}"/datarouter-meta.XXXXXX.json)
+metadata_file=$(mktemp "${TMPDIR:-/tmp}"/datarouter-meta.XXXXXX)
 cleanup() { rm -f "${metadata_file}"; }
 trap cleanup EXIT
 
