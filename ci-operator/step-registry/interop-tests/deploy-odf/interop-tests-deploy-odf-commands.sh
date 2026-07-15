@@ -198,6 +198,7 @@ metadata:
   name: ${ODF_STORAGE_CLUSTER_NAME}
   namespace: openshift-storage
 spec:
+  monDataDirHostPath: /var/lib/rook
   storageDeviceSets:
   - count: 1
     dataPVCTemplate:
