@@ -160,7 +160,11 @@ create_vsi() {
     fi
 
     if ! resource_exists "instance" $VSI_NAME; then
-        ibmcloud is instance-create "$VSI_NAME" "$VPC_NAME" "$ZONE" "$PROFILE" "$SUBNET_NAME" --image "$IMAGE_NAME" --keys "$SSH_KEY_NAME" --pnac-vni "$VSI_NAME-vni"
+        local extra_vol_args=""
+        if [[ "$VSI_NAME" == *"-compute-"* ]]; then
+            extra_vol_args="--volume-attach '[{\"name\":\"'"$VSI_NAME"'-data\",\"volume\":{\"name\":\"'"$VSI_NAME"'-datavol\",\"capacity\":'"${ZVSI_DISK_SIZE:-120}"',\"profile\":{\"name\":\"general-purpose\"}}}]'"
+        fi
+        ibmcloud is instance-create "$VSI_NAME" "$VPC_NAME" "$ZONE" "$PROFILE" "$SUBNET_NAME" --image "$IMAGE_NAME" --keys "$SSH_KEY_NAME" --pnac-vni "$VSI_NAME-vni" $extra_vol_args
         echo "Waiting for the $VSI_NAME VSI to be ready under 2 minutes ⏳..."
         for i in {1..13}; do
             state=$(ibmcloud is instance $VSI_NAME --output JSON | jq -r '.status')
