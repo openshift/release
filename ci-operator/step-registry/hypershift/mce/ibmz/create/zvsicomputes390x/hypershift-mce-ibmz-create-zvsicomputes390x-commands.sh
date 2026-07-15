@@ -620,7 +620,28 @@ for ((i=50; i>=1; i--)); do
   sleep 25
 done
 
-# Approve agents 
+# Scale nodepool first so the HyperShift controller creates the AgentClusterInstall
+# and the ClusterDeployment that agents need to bind to.
+echo "$(date) Scaling up nodepool to ${HYPERSHIFT_NODE_COUNT}"
+oc -n $HC_NS scale nodepool $HC_NAME --replicas $HYPERSHIFT_NODE_COUNT
+
+# Wait for the AgentClusterInstall to be created by the nodepool controller (max 10m)
+echo "$(date) Waiting for AgentClusterInstall to be created in namespace ${hcp_ns}"
+for ((i=60; i>=1; i--)); do
+  aci_count=$(oc get agentclusterinstall -n $hcp_ns --no-headers 2>/dev/null | wc -l)
+  if [ "$aci_count" -ge 1 ]; then
+    echo "$(date) AgentClusterInstall is ready"
+    break
+  elif [ "$i" -eq 1 ]; then
+    echo "[ERROR] AgentClusterInstall not created after 10 minutes"
+    oc get agentclusterinstall -n $hcp_ns || true
+    exit 1
+  fi
+  echo "Waiting for AgentClusterInstall... $i retries left"
+  sleep 10
+done
+
+# Approve agents
 echo "$(date) Patching the agents to the hosted control plane"
 agents=$(oc get agents -n $hcp_ns --no-headers | awk '{print $1}')
 agents=$(echo "$agents" | tr '\n' ' ')
@@ -628,9 +649,6 @@ IFS=' ' read -ra agents_list <<< "$agents"
 for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
   oc -n $hcp_ns patch agent ${agents_list[i]} -p "{\"spec\":{\"approved\":true,\"hostname\":\"compute-$i.${hcp_domain}\"}}" --type merge
 done
-
-# Scaling up nodepool
-oc -n $HC_NS scale nodepool $HC_NAME --replicas $HYPERSHIFT_NODE_COUNT
 
 # Waiting for compute nodes to get ready
 set -e
