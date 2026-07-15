@@ -1,0 +1,125 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  fetch-managed-clusters:
+    name: autotest
+    namespace: acm-qe
+    tag: fetch-managed-clusters
+  installer:
+    name: "4.22"
+    namespace: ocp
+    tag: installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.20
+releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.22"
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: cclm-live-bidir-spoke-to-spoke
+  cron: 0 1 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      ACM_SPOKE_CLUSTER_COUNT: "2"
+      ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.22"
+      ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
+      ACM_SPOKE_CP_TYPE: m6a.2xlarge
+      ACM_SPOKE_WORKER_TYPE: c5n.metal
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      CNV_ENABLE_CCLM: "true"
+      CNV_TEST_VM_NAME: test-vm-bidir
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "cucushift-*",                          "failure_type": "all", "classification": "Cluster Health Check",                                 "group": {"name": "cluster",           "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "acm-interop-p2p-cluster-install",      "failure_type": "all", "classification": "Spoke cluster installation",                           "group": {"name": "cluster",           "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "acm-interop-p2p-cluster-uninstall",    "failure_type": "all", "classification": "Spoke cluster un-installation",                        "group": {"name": "cluster",           "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "p2p-acm-cnv-install-policy",           "failure_type": "all", "classification": "CNV installation policy deploy",                       "group": {"name": "cluster",           "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "p2p-install-odf-spokes",               "failure_type": "all", "classification": "ODF spoke install failure",                            "group": {"name": "cluster",           "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "acm-interop-p2p-submariner-*",         "failure_type": "all", "classification": "Submariner failure",                                   "group": {"name": "cluster",           "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "p2p-mtv-additional-config",            "failure_type": "all", "classification": "MTV ForkliftController / CCLM configuration failure",  "group": {"name": "cluster",           "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "p2p-mtv-register-providers",           "failure_type": "all", "classification": "MTV provider registration failure",                    "group": {"name": "cluster",           "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "p2p-mtv-create-migration-maps",        "failure_type": "all", "classification": "MTV migration maps failure",                           "group": {"name": "cluster",           "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "p2p-create-migration-test-vm",         "failure_type": "all", "classification": "CCLM test VM creation failure",                       "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "p2p-mtv-execute-bidir-live-migration",  "failure_type": "all", "classification": "MTV CCLM bi-directional live migration failure",        "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "acm-mch",                              "failure_type": "all", "classification": "ACM MCH install",                                      "group": {"name": "cluster",           "priority": 2}, "jira_additional_labels": ["!default"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-p2p","ipi-aws-p2p","mpiit-acm-virt","cclm-poc","cclm-live-bidir"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: vshakya@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA","mpiit_p2p"]'
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8652
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      MTV_PROVIDER_NAMES: spoke-1,spoke-2
+      MTV_SPOKE_CLUSTER_COUNT: "2"
+      MTV_TEST_VM_NAME: test-vm-bidir
+      ODF_OPERATOR_CHANNEL: stable-4.21
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
+          {"name": "mtv-operator", "source": "redhat-operators", "channel": "release-v2.11", "install_namespace": "openshift-mtv", "target_namespaces": "openshift-mtv", "operator_group": "openshift-mtv-operatorgroup"}
+        ]
+      USER_TAGS: |
+        scenario cclm-poc-live-bidir
+    leases:
+    - count: 1
+      env: LEASED_RESOURCE
+      resource_type: aws-cspi-qe-quota-slice
+    - count: 2
+      env: MANAGED_CLUSTER_LEASED_RESOURCE
+      resource_type: aws-cspi-qe-quota-slice
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: acm-inspector
+    - ref: gather-aws-console
+    - ref: acm-interop-p2p-cluster-uninstall
+    - chain: ipi-deprovision
+    - ref: firewatch-report-issues
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-interop-p2p-cluster-install
+    - ref: acm-fetch-managed-clusters
+    - ref: p2p-acm-cnv-install-policy
+    - ref: p2p-install-odf-spokes
+    - chain: acm-interop-p2p-submariner-install
+    - chain: p2p-mtv-mig-config
+    - chain: p2p-cclm-bidir-migration-test
+  timeout: 12h0m0s
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: acm-virt-ocp4.22-p2p-cclm-extended
