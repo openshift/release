@@ -1,7 +1,5 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+set -euxo pipefail; shopt -s inherit_errexit
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
@@ -48,21 +46,26 @@ if ! oc image info "${MUST_GATHER_IMAGE}" --filter-by-os="linux/amd64" &>/dev/nu
 
   # Add quay.io:443 auth to cluster pull secret so the must-gather pod can pull the dev image
   if [[ -f /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username ]]; then
-    QUAY_USERNAME=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username)
-    QUAY_PASSWORD=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_pullsecret)
-    TMP_PULL_SECRET=$(mktemp)
-    oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > "${TMP_PULL_SECRET}"
-    QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
-    jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io:443": {"auth":$QUAY_AUTH,"email":""}}' "${TMP_PULL_SECRET}" > "${TMP_PULL_SECRET}.tmp"
-    mv "${TMP_PULL_SECRET}.tmp" "${TMP_PULL_SECRET}"
-    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${TMP_PULL_SECRET}"
-    rm -f "${TMP_PULL_SECRET}"
-    echo "Added quay.io:443 auth to cluster pull secret for must-gather"
-    # Allow CRI-O to pick up the updated pull secret by waiting for the MCO to roll it out
+    # Merge quay.io:443 auth into the cluster pull secret
+    typeset tmpPullSecret
+    tmpPullSecret=$(mktemp)
+    oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > "${tmpPullSecret}"
+    # Build auth token and merge into pull secret (xtrace disabled to protect credentials)
+    ( set +x
+      typeset quayUsername quayPassword quayAuth
+      quayUsername=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username)
+      quayPassword=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_pullsecret)
+      quayAuth=$(echo -n "${quayUsername}:${quayPassword}" | base64 -w 0)
+      jq --arg quayAuth "${quayAuth}" '.auths += {"quay.io:443": {"auth":$quayAuth,"email":""}}' "${tmpPullSecret}" > "${tmpPullSecret}.tmp"
+      mv "${tmpPullSecret}.tmp" "${tmpPullSecret}"
+    true )
+    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${tmpPullSecret}"
+    rm -f "${tmpPullSecret}"
+    # Wait for the MCO to propagate the updated pull secret to nodes
     sleep 60
     oc wait mcp master worker --for condition=updated --timeout=15m || true
   else
-    echo "WARNING: Credentials not available at /etc/acm-d-mce-quay-pull-credentials/, pre-release image pull may fail"
+    : "WARNING: Credentials not available at /etc/acm-d-mce-quay-pull-credentials/, pre-release image pull may fail"
   fi
 fi
 
