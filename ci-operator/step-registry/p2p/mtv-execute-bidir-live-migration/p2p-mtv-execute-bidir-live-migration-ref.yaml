@@ -1,0 +1,104 @@
+ref:
+  as: p2p-mtv-execute-bidir-live-migration
+  from: cli
+  commands: p2p-mtv-execute-bidir-live-migration-commands.sh
+  timeout: 5h0m0s
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Execute bi-directional CCLM live migration for a single VM in one step.
+
+    Pass 1 (forward):  MTV_SOURCE_PROVIDER  → MTV_DESTINATION_PROVIDER
+      Preflights, creates Plan + Migration on hub, waits for Succeeded, verifies VMI Running
+      on destination.
+
+    Pass 2 (reverse):  MTV_DESTINATION_PROVIDER → MTV_SOURCE_PROVIDER
+      Same VM (now on destination after Pass 1) is migrated back to the original source.
+      Separate Plan/Migration names (MTV_BIDIR_REVERSE_PLAN_NAME / MIGRATION_NAME).
+      Same preflights ensure CCLM gates and sync controllers are still healthy.
+
+    Both passes write results to junit_cclm_bidir_migration.xml for Prow/Firewatch.
+    Diagnostics written per-pass under ${ARTIFACT_DIR}/bidir-<planName>-diagnostics/.
+
+    Prerequisites: p2p-create-migration-test-vm (VM Running on source), p2p-mtv-mig-config
+    (ForkliftController, providers, network/storage maps), p2p-install-odf-spokes,
+    p2p-acm-cnv-install-policy (CNV_ENABLE_CCLM=true), acm-interop-p2p-submariner-install.
+  env:
+  - name: MTV_SOURCE_PROVIDER
+    default: "spoke-1"
+    documentation: MTV source Provider CR name (used as source in Pass 1, destination in Pass 2).
+  - name: MTV_DESTINATION_PROVIDER
+    default: "spoke-2"
+    documentation: MTV destination Provider CR name (used as destination in Pass 1, source in Pass 2).
+  - name: MTV_TEST_VM_NAME
+    default: "test-vm-bidir"
+    documentation: VirtualMachine name to migrate in both directions.
+  - name: MTV_TEST_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Namespace where the VM lives on both spokes.
+  - name: MTV_TEST_VM_TARGET_NAMESPACE
+    default: ""
+    documentation: Destination namespace after migration. Empty defaults to MTV_TEST_VM_NAMESPACE.
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV Plans and Migrations are created on the hub.
+  - name: MTV_NETWORK_MAP_NAME
+    default: "spoke-network-map"
+    documentation: NetworkMap referenced by both Plans.
+  - name: MTV_STORAGE_MAP_NAME
+    default: "spoke-storage-map"
+    documentation: StorageMap referenced by both Plans.
+  - name: MTV_BIDIR_FORWARD_PLAN_NAME
+    default: "cclm-bidir-plan-fwd"
+    documentation: Plan name for Pass 1 (forward direction).
+  - name: MTV_BIDIR_FORWARD_MIGRATION_NAME
+    default: "cclm-bidir-run-fwd"
+    documentation: Migration name for Pass 1 (forward direction).
+  - name: MTV_BIDIR_REVERSE_PLAN_NAME
+    default: "cclm-bidir-plan-rev"
+    documentation: Plan name for Pass 2 (reverse direction).
+  - name: MTV_BIDIR_REVERSE_MIGRATION_NAME
+    default: "cclm-bidir-run-rev"
+    documentation: Migration name for Pass 2 (reverse direction).
+  - name: MTV_PLAN_READY_TIMEOUT
+    default: "15m"
+    documentation: oc wait timeout for Provider/Map/Plan Ready conditions.
+  - name: MTV_MIGRATION_TIMEOUT
+    default: "2h"
+    documentation: Per-pass maximum wait duration for Migration Succeeded.
+  - name: MTV_MIGRATION_POLL_INTERVAL_SECONDS
+    default: "30"
+    documentation: Sleep interval between Migration status polls.
+  - name: MTV_PROVIDER_INVENTORY_REFRESH_WAIT
+    default: "10m"
+    documentation: Wait for Provider Ready after inventory refresh annotation.
+  - name: MTV_SYNC_CONTROLLER_WAIT
+    default: "10m"
+    documentation: oc wait timeout for virt-synchronization-controller Deployment Available.
+  - name: MTV_CNV_NAMESPACE
+    default: "openshift-cnv"
+    documentation: Namespace where CNV/KubeVirt components run on the spokes.
+  - name: MTV_HCO_NAME
+    default: "kubevirt-hyperconverged"
+    documentation: HyperConverged CR name used to enable CCLM feature gate.
+  - name: MTV_KUBEVIRT_NAME
+    default: "kubevirt-kubevirt-hyperconverged"
+    documentation: KubeVirt CR name used to verify DecentralizedLiveMigration feature gate.
+  - name: MTV_SOURCE_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based SHARED_DIR kubeconfig index for the initial source spoke.
+  - name: MTV_DEST_SPOKE_INDEX
+    default: "2"
+    documentation: 1-based SHARED_DIR kubeconfig index for the initial destination spoke.
+  - name: MTV_SOURCE_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional explicit kubeconfig for the source spoke (overrides index discovery).
+  - name: MTV_DEST_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional explicit kubeconfig for the destination spoke (overrides index discovery).
+  - name: P2P_CCLM_DEBUG_MODE
+    default: "false"
+    documentation: When true, log failures but exit 0 so downstream debug steps can run.
