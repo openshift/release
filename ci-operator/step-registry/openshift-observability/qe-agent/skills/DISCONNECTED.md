@@ -332,6 +332,8 @@ cp tests/e2e/disconnected-smoke/chainsaw-test.yaml "${dest}/"
 Write a `${ARTIFACT_DIR}/test-fixes/CHANGES.md` using this structure:
 
 ```markdown
+> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
+
 # Test Fix Summary
 
 ## Failing test
@@ -357,6 +359,8 @@ Rerun result after fix: [PASS / FAIL / not re-verified]
 Do not attempt to fix the operator code. Instead, write `${ARTIFACT_DIR}/bug-report.md`:
 
 ````markdown
+> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
+
 # Product Bug Report
 
 ## Summary
@@ -421,7 +425,7 @@ After editing, copy changed files to `${ARTIFACT_DIR}/test-fixes/` (same structu
 
 ## Step 5d — If CLUSTER_INSTABILITY: Write Incident Note
 
-Write `${ARTIFACT_DIR}/cluster-instability-report.md` with: a one-sentence summary; a table of affected tests (suite / test case / original duration / rerun duration); root cause (MCP updates, node evictions, operator pod restarts/leader election loss — include the MCP status snapshot from Step 0a); evidence (MCP output, relevant pod events); and a recommendation to rerun the CI job.
+Write `${ARTIFACT_DIR}/cluster-instability-report.md` with: a one-sentence summary; a table of affected tests (suite / test case / original duration / rerun duration); root cause (MCP updates, node evictions, operator pod restarts/leader election loss — include the MCP status snapshot from Step 0a); evidence (MCP output, relevant pod events); and a recommendation to rerun the CI job. Begin the report with the following banner: `> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.`
 
 ---
 
@@ -436,6 +440,9 @@ The document must include these sections:
 - **Rerun Summary** — table: Original CI run + Reruns 1–4, each row `PASS / FAIL`
 - **Outcome** — per-classification: test fix location, bug report location, or rerun recommendation
 - **Skill Improvement Recommendations** — deviations from skill steps (wrong commands, missing diagnostics, steps that needed adaptation). Examples: a command had a wrong flag; a diagnostic not in the skill was decisive; a step was unnecessary; the cleanup approach did not work; a namespace or resource name assumption was wrong. Write `None.` if all steps worked as written.
+- **Evidence Sources** (JUnit XML filename + failure line, operator logs namespace/deployment + excerpt, cluster state checks including mirror config, test source file path + finding)
+
+Begin the document with: `> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.`
 
 ---
 
