@@ -9,14 +9,18 @@ ref:
       cpu: 200m
       memory: 400Mi
   documentation: |-
-    Execute bi-directional CCLM live migration for a single VM in one step.
+    Execute bi-directional CCLM live migration for one or more VMs in one step.
+
+    VM list: set MTV_TEST_VM_NAMES (comma-separated, e.g. "vm-1,vm-2") to migrate multiple
+    VMs. When unset, falls back to MTV_TEST_VM_NAME (single-VM mode).
+    All VMs are grouped into a single MTV Plan per pass, so they migrate concurrently.
 
     Pass 1 (forward):  MTV_SOURCE_PROVIDER  → MTV_DESTINATION_PROVIDER
-      Preflights, creates Plan + Migration on hub, waits for Succeeded, verifies VMI Running
-      on destination.
+      Preflights, creates Plan + Migration on hub, waits for Succeeded, verifies all VMIs
+      Running on destination.
 
     Pass 2 (reverse):  MTV_DESTINATION_PROVIDER → MTV_SOURCE_PROVIDER
-      Same VM (now on destination after Pass 1) is migrated back to the original source.
+      Same VMs (now on destination after Pass 1) are migrated back to the original source.
       Separate Plan/Migration names (MTV_BIDIR_REVERSE_PLAN_NAME / MIGRATION_NAME).
       Same preflights ensure CCLM gates and sync controllers are still healthy.
 
@@ -25,10 +29,19 @@ ref:
     migration). --ignore-not-found makes this a safe no-op on the first pass where the
     destination is initially empty. Timeout controlled by MTV_VM_DELETE_TIMEOUT.
 
+    Post-migration verification (per pass, four checks):
+      1. Destination VMs Running   — all VMIs reach Running phase on the destination spoke.
+      2. Source VMIs Absent        — source VMIs are gone after live migration, ruling out
+                                     double-running guests.
+      3. Destination PVCs Bound    — root PVC (<vmName>-rootdisk) is Bound on the destination,
+                                     confirming storage was transferred successfully.
+      4. Destination VM IPs        — each destination VMI has an IP address (retries up to
+                                     MTV_VM_IP_WAIT), confirming the network stack survived.
+
     Both passes write results to junit_cclm_bidir_migration.xml for Prow/Firewatch.
     Diagnostics written per-pass under ${ARTIFACT_DIR}/bidir-<planName>-diagnostics/.
 
-    Prerequisites: p2p-create-migration-test-vm (VM Running on source), p2p-mtv-mig-config
+    Prerequisites: p2p-create-migration-test-vm (all VMs Running on source), p2p-mtv-mig-config
     (ForkliftController, providers, network/storage maps), p2p-install-odf-spokes,
     p2p-acm-cnv-install-policy (CNV_ENABLE_CCLM=true), acm-interop-p2p-submariner-install.
   env:
@@ -38,12 +51,17 @@ ref:
   - name: MTV_DESTINATION_PROVIDER
     default: "spoke-2"
     documentation: MTV destination Provider CR name (used as destination in Pass 1, source in Pass 2).
+  - name: MTV_TEST_VM_NAMES
+    default: ""
+    documentation: |-
+      Comma-separated list of VM names to include in each Plan (e.g. "vm-1,vm-2").
+      When set, overrides MTV_TEST_VM_NAME. All VMs migrate concurrently per pass.
   - name: MTV_TEST_VM_NAME
     default: "test-vm-bidir"
-    documentation: VirtualMachine name to migrate in both directions.
+    documentation: Single VM name when MTV_TEST_VM_NAMES is unset (single-VM fallback).
   - name: MTV_TEST_VM_NAMESPACE
     default: "vm-migration-test"
-    documentation: Namespace where the VM lives on both spokes.
+    documentation: Namespace where the VMs live on both spokes.
   - name: MTV_TEST_VM_TARGET_NAMESPACE
     default: ""
     documentation: Destination namespace after migration. Empty defaults to MTV_TEST_VM_NAMESPACE.
@@ -107,6 +125,11 @@ ref:
   - name: MTV_VM_DELETE_TIMEOUT
     default: "5m"
     documentation: oc delete timeout for removing a leftover VM from the destination spoke before each migration pass.
+  - name: MTV_VM_IP_WAIT
+    default: "2m"
+    documentation: |-
+      How long to retry waiting for each destination VMI to have an IP address after
+      reaching Running phase. IP assignment can lag slightly behind VMI startup.
   - name: P2P_CCLM_DEBUG_MODE
     default: "false"
     documentation: When true, log failures but exit 0 so downstream debug steps can run.

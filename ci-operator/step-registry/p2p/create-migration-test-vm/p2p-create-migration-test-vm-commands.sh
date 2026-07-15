@@ -23,7 +23,7 @@ typeset -i spokeIndex="${CNV_TEST_VM_SPOKE_INDEX}"
 typeset cclmDebugMode="${P2P_CCLM_DEBUG_MODE}"
 
 typeset spokeKubeconfig=""
-typeset dvName="${CNV_TEST_VM_NAME}-rootdisk"
+typeset dvName=""   # set per VM in the creation loop
 typeset diagDir=""
 
 # SpokeOc — run oc against the source spoke cluster.
@@ -359,6 +359,7 @@ typeset -i cclmStepRc=0
     SpokeOc get crd virtualmachines.kubevirt.io 1>/dev/null
     SpokeOc get "storageclass/${CNV_TEST_VM_STORAGE_CLASS}" 1>/dev/null
 
+    # Ensure namespace once before creating VMs
     yq e '.metadata.name = strenv(CNV_TEST_VM_NAMESPACE)' - <<'YAML' | SpokeOc apply -f -
 apiVersion: v1
 kind: Namespace
@@ -368,36 +369,52 @@ metadata:
     app.kubernetes.io/part-of: vm-migration-test
 YAML
 
-    if [[ "${CNV_TEST_VM_CLEAN}" == "true" ]] \
-        || SpokeOc get "datavolume/${dvName}" -n "${CNV_TEST_VM_NAMESPACE}" \
-            -o jsonpath='{.status.phase}' | grep -qE 'Failed|Lost'; then
-        CleanupPriorResources
+    # Build VM names list: CNV_TEST_VM_NAMES (comma-separated) takes precedence over CNV_TEST_VM_NAME
+    typeset -a vmNamesArr=()
+    if [[ -n "${CNV_TEST_VM_NAMES}" ]]; then
+        IFS=',' read -ra vmNamesArr <<< "${CNV_TEST_VM_NAMES}"
+    else
+        vmNamesArr=("${CNV_TEST_VM_NAME}")
     fi
 
-    case "${CNV_TEST_VM_IMAGE_TYPE}" in
-        cirros) ApplyCirrosDataVolume ;;
-        rhel)   ApplyRhelDataVolume ;;
-    esac
+    typeset vmNameIter
+    for vmNameIter in "${vmNamesArr[@]}"; do
+        vmNameIter="${vmNameIter// /}"   # trim whitespace
+        # Override for this iteration so all functions and yq strenv() see the current name
+        export CNV_TEST_VM_NAME="${vmNameIter}"
+        dvName="${vmNameIter}-rootdisk"
 
-    WaitDataVolumeReady
+        : "Creating VM ${CNV_TEST_VM_NAME} (dv=${dvName})"
 
-    case "${CNV_TEST_VM_IMAGE_TYPE}" in
-        cirros) ApplyCirrosVirtualMachine ;;
-        rhel)   ApplyRhelVirtualMachine ;;
-    esac
+        if [[ "${CNV_TEST_VM_CLEAN}" == "true" ]] \
+            || SpokeOc get "datavolume/${dvName}" -n "${CNV_TEST_VM_NAMESPACE}" \
+                -o jsonpath='{.status.phase}' 2>/dev/null | grep -qE 'Failed|Lost'; then
+            CleanupPriorResources
+        fi
 
-    WaitVmiRunning
+        case "${CNV_TEST_VM_IMAGE_TYPE}" in
+            cirros) ApplyCirrosDataVolume ;;
+            rhel)   ApplyRhelDataVolume ;;
+        esac
+
+        WaitDataVolumeReady
+
+        case "${CNV_TEST_VM_IMAGE_TYPE}" in
+            cirros) ApplyCirrosVirtualMachine ;;
+            rhel)   ApplyRhelVirtualMachine ;;
+        esac
+
+        WaitVmiRunning
+    done
 
     if [[ -n "${ARTIFACT_DIR}" ]]; then
         mkdir -p "${ARTIFACT_DIR}"
         {
-            printf '%s\n' "vm_name=${CNV_TEST_VM_NAME}"
+            printf '%s\n' "vm_names=${CNV_TEST_VM_NAMES:-${CNV_TEST_VM_NAME}}"
             printf '%s\n' "vm_namespace=${CNV_TEST_VM_NAMESPACE}"
             printf '%s\n' "image_type=${CNV_TEST_VM_IMAGE_TYPE}"
             printf '%s\n' "spoke_kubeconfig=${spokeKubeconfig}"
-            SpokeOc get "virtualmachine/${CNV_TEST_VM_NAME}" "virtualmachineinstance/${CNV_TEST_VM_NAME}" \
-                "datavolume/${dvName}" "persistentvolumeclaim/${dvName}" \
-                -n "${CNV_TEST_VM_NAMESPACE}" -o wide
+            SpokeOc get vm,vmi -n "${CNV_TEST_VM_NAMESPACE}" -o wide
         } > "${ARTIFACT_DIR}/migration-test-vm-status.txt"
     fi
     true

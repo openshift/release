@@ -160,6 +160,18 @@ RunPass() {
     # MTV_TEST_VM_TARGET_NAMESPACE defaults to "" in ref.yaml; fall back to source namespace
     typeset targetNs="${MTV_TEST_VM_TARGET_NAMESPACE:-${MTV_TEST_VM_NAMESPACE}}"
 
+    # MTV_TEST_VM_NAMES (comma-separated) takes precedence over MTV_TEST_VM_NAME
+    typeset -a vmNamesArr=()
+    if [[ -n "${MTV_TEST_VM_NAMES}" ]]; then
+        IFS=',' read -ra vmNamesArr <<< "${MTV_TEST_VM_NAMES}"
+    else
+        vmNamesArr=("${MTV_TEST_VM_NAME}")
+    fi
+    typeset -i _idx
+    for (( _idx=0; _idx<${#vmNamesArr[@]}; _idx++ )); do
+        vmNamesArr[_idx]="${vmNamesArr[_idx]// /}"
+    done
+
     SrcOc() { oc --kubeconfig="${srcKc}" "$@"; }
     DstOc() { oc --kubeconfig="${dstKc}" "$@"; }
 
@@ -202,6 +214,148 @@ RunPass() {
         HubOc create -f - --dry-run=client -o yaml --save-config | HubOc apply -f -
     }
 
+    # Build and apply Plan with all VMs in a single MTV Plan (concurrent migration)
+    ApplyPlan_() {
+        typeset vmYaml="" vmNameIter
+        for vmNameIter in "${vmNamesArr[@]}"; do
+            vmYaml+="  - name: ${vmNameIter}"$'\n'
+            vmYaml+="    namespace: ${MTV_TEST_VM_NAMESPACE}"$'\n'
+        done
+        printf '%s' "apiVersion: forklift.konveyor.io/v1beta1
+kind: Plan
+metadata:
+  name: ${planName}
+  namespace: ${MTV_NAMESPACE}
+spec:
+  provider:
+    source:
+      name: ${srcProv}
+      namespace: ${MTV_NAMESPACE}
+    destination:
+      name: ${dstProv}
+      namespace: ${MTV_NAMESPACE}
+  targetNamespace: ${targetNs}
+  map:
+    network:
+      name: ${MTV_NETWORK_MAP_NAME}
+      namespace: ${MTV_NAMESPACE}
+    storage:
+      name: ${MTV_STORAGE_MAP_NAME}
+      namespace: ${MTV_NAMESPACE}
+  vms:
+${vmYaml}  type: live
+" | ApplyManifest_
+    }
+
+    # Apply Migration CR (references only the Plan, not individual VMs)
+    ApplyMigration_() {
+        printf '%s' "apiVersion: forklift.konveyor.io/v1beta1
+kind: Migration
+metadata:
+  name: ${migName}
+  namespace: ${MTV_NAMESPACE}
+spec:
+  plan:
+    name: ${planName}
+    namespace: ${MTV_NAMESPACE}
+" | ApplyManifest_
+    }
+
+    # MTV leaves source VMs stopped after live migration; delete each from destination
+    # before Plan creation so incoming VMs do not collide with pre-existing objects.
+    # --ignore-not-found makes this a no-op on Pass 1 where the destination is empty.
+    ClearDestVms_() {
+        typeset vmNameIter
+        for vmNameIter in "${vmNamesArr[@]}"; do
+            DstOc delete vm "${vmNameIter}" -n "${targetNs}" \
+                --ignore-not-found=true --wait=true --timeout="${MTV_VM_DELETE_TIMEOUT}"
+        done
+    }
+
+    # Verify all source VMs have a Running VMI before migration
+    CheckSourceVmsRunning_() {
+        typeset vmNameIter phase
+        for vmNameIter in "${vmNamesArr[@]}"; do
+            phase="$(SrcOc get "virtualmachineinstance/${vmNameIter}" \
+                -n "${MTV_TEST_VM_NAMESPACE}" \
+                -o jsonpath='{.status.phase}' || true)"
+            [[ "${phase}" == "Running" ]] || {
+                : "VMI ${vmNameIter} not Running on source (phase=${phase})"
+                false
+            }
+        done
+    }
+
+    # Verify all destination VMs have a Running VMI after migration
+    VerifyDstVmsRunning_() {
+        typeset vmNameIter phase
+        for vmNameIter in "${vmNamesArr[@]}"; do
+            phase="$(DstOc get "virtualmachineinstance/${vmNameIter}" \
+                -n "${targetNs}" \
+                -o jsonpath='{.status.phase}' || true)"
+            [[ "${phase}" == "Running" ]] || {
+                : "VMI ${vmNameIter} not Running on destination (phase=${phase})"
+                false
+            }
+        done
+    }
+
+    # After a successful live migration MTV stops (and eventually deletes) the source VMI.
+    # Assert it is gone so we detect any case where the guest is double-running.
+    VerifySrcVmiGone_() {
+        typeset vmNameIter
+        for vmNameIter in "${vmNamesArr[@]}"; do
+            if SrcOc get "virtualmachineinstance/${vmNameIter}" \
+                    -n "${MTV_TEST_VM_NAMESPACE}" 2>/dev/null; then
+                : "VMI ${vmNameIter} still exists on source after migration — possible double-run"
+                false
+            fi
+            : "VMI ${vmNameIter} is absent from source — OK"
+        done
+    }
+
+    # Verify each VM's root PVC landed on the destination and is Bound.
+    # MTV preserves the PVC name from the source DataVolume (${vmName}-rootdisk).
+    VerifyDstPvcsBound_() {
+        typeset vmNameIter dvName phase
+        for vmNameIter in "${vmNamesArr[@]}"; do
+            dvName="${vmNameIter}-rootdisk"
+            phase="$(DstOc get "persistentvolumeclaim/${dvName}" \
+                -n "${targetNs}" \
+                -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+            [[ "${phase}" == "Bound" ]] || {
+                : "PVC ${dvName} not Bound on destination (phase=${phase:-<not found>})"
+                false
+            }
+            : "PVC ${dvName} is Bound on destination — OK"
+        done
+    }
+
+    # Verify each destination VMI has an IP address, indicating the guest network stack
+    # survived the migration. Retries for MTV_VM_IP_WAIT because IP assignment can lag
+    # slightly behind the VMI reaching Running phase.
+    VerifyDstVmIPs_() {
+        typeset vmNameIter ipAddr
+        typeset -i deadline ipWaitSecs
+        ipWaitSecs="$(ParseOcWaitDurationSeconds "${MTV_VM_IP_WAIT}")"
+        for vmNameIter in "${vmNamesArr[@]}"; do
+            deadline=$(( SECONDS + ipWaitSecs ))
+            ipAddr=""
+            while (( SECONDS < deadline )); do
+                ipAddr="$(DstOc get "virtualmachineinstance/${vmNameIter}" \
+                    -n "${targetNs}" \
+                    -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || true)"
+                [[ -n "${ipAddr}" ]] && break
+                sleep 10
+            done
+            [[ -n "${ipAddr}" ]] || {
+                : "VMI ${vmNameIter} has no IP on destination after ${MTV_VM_IP_WAIT}"
+                false
+            }
+            : "VMI ${vmNameIter} IP on destination: ${ipAddr} — OK"
+        done
+    }
+
     typeset -i passRc=0
     (
         trap 'DumpPassDiagnostics' ERR
@@ -225,14 +379,7 @@ RunPass() {
                     -n \"${MTV_CNV_NAMESPACE}\" --for=condition=Available --timeout=\"${MTV_SYNC_CONTROLLER_WAIT}\"
             "
 
-        JStep "${label}: Preflight: Source VM Running" \
-            bash -c "
-                phase=\$(oc --kubeconfig=\"${srcKc}\" get \
-                    \"virtualmachineinstance/${MTV_TEST_VM_NAME}\" \
-                    -n \"${MTV_TEST_VM_NAMESPACE}\" \
-                    -o jsonpath='{.status.phase}' || true)
-                [[ \"\${phase}\" == \"Running\" ]]
-            "
+        JStep "${label}: Preflight: Source VMs Running" CheckSourceVmsRunning_
 
         JStep "${label}: Migration: Refresh Provider Inventory" \
             bash -c "
@@ -247,69 +394,23 @@ RunPass() {
                     -n \"${MTV_NAMESPACE}\" --for=condition=Ready --timeout=\"${MTV_PROVIDER_INVENTORY_REFRESH_WAIT}\"
             "
 
-        # MTV leaves the source VM in a stopped state after a live migration.
-        # Remove any leftover VM from the destination before creating the Plan so
-        # the incoming VM does not collide with the pre-existing object.
-        JStep "${label}: Pre-migration: Clear destination VM if present" \
-            DstOc delete vm "${MTV_TEST_VM_NAME}" -n "${targetNs}" \
-                --ignore-not-found=true --wait=true --timeout="${MTV_VM_DELETE_TIMEOUT}"
+        JStep "${label}: Pre-migration: Clear destination VMs if present" ClearDestVms_
 
-        JStep "${label}: Migration: Apply Plan" \
-            ApplyManifest_ <<EOF
-apiVersion: forklift.konveyor.io/v1beta1
-kind: Plan
-metadata:
-  name: ${planName}
-  namespace: ${MTV_NAMESPACE}
-spec:
-  provider:
-    source:
-      name: ${srcProv}
-      namespace: ${MTV_NAMESPACE}
-    destination:
-      name: ${dstProv}
-      namespace: ${MTV_NAMESPACE}
-  targetNamespace: ${targetNs}
-  map:
-    network:
-      name: ${MTV_NETWORK_MAP_NAME}
-      namespace: ${MTV_NAMESPACE}
-    storage:
-      name: ${MTV_STORAGE_MAP_NAME}
-      namespace: ${MTV_NAMESPACE}
-  vms:
-  - name: ${MTV_TEST_VM_NAME}
-    namespace: ${MTV_TEST_VM_NAMESPACE}
-  type: live
-EOF
+        JStep "${label}: Migration: Apply Plan" ApplyPlan_
 
         JStep "${label}: Migration: Plan Ready" \
             HubOc wait "plan/${planName}" -n "${MTV_NAMESPACE}" \
                 --for=condition=Ready --timeout="${MTV_PLAN_READY_TIMEOUT}"
 
-        JStep "${label}: Migration: Apply Migration" \
-            ApplyManifest_ <<EOF
-apiVersion: forklift.konveyor.io/v1beta1
-kind: Migration
-metadata:
-  name: ${migName}
-  namespace: ${MTV_NAMESPACE}
-spec:
-  plan:
-    name: ${planName}
-    namespace: ${MTV_NAMESPACE}
-EOF
+        JStep "${label}: Migration: Apply Migration" ApplyMigration_
 
         JStep "${label}: Migration: Succeeded" WaitMigrationSucceeded
 
-        JStep "${label}: Verification: Destination VMI Running" \
-            bash -c "
-                phase=\$(oc --kubeconfig=\"${dstKc}\" get \
-                    \"virtualmachineinstance/${MTV_TEST_VM_NAME}\" \
-                    -n \"${targetNs}\" \
-                    -o jsonpath='{.status.phase}' || true)
-                [[ \"\${phase}\" == \"Running\" ]]
-            "
+        # Post-migration verification — all four checks must pass
+        JStep "${label}: Verification: Destination VMs Running"   VerifyDstVmsRunning_
+        JStep "${label}: Verification: Source VMIs Absent"        VerifySrcVmiGone_
+        JStep "${label}: Verification: Destination PVCs Bound"    VerifyDstPvcsBound_
+        JStep "${label}: Verification: Destination VM IPs Assigned" VerifyDstVmIPs_
 
         true
     ) || passRc=$?
