@@ -28,15 +28,13 @@ fi
 check_result=0
 node_lists=$(oc get nodes -ojson | jq -r '.items[].metadata.name' | xargs)
 for node in $node_lists; do
-    result=""
     echo "**********Check fips on node ${node}**********"
-    result=$(oc debug node/${node} -n openshift-infra -- chroot /host fips-mode-setup --check)
-    if [[ "${result}" == "FIPS mode is enabled." ]]; then
+    result=$(oc debug node/${node} -n openshift-infra -- cat /proc/sys/crypto/fips_enabled 2>/dev/null || echo "error")
+    if [[ "${result}" == "1" ]]; then
         echo "Check passed on node ${node}"
     else
-        echo "Check failed on node ${node}"
-        oc debug node/${node} -n openshift-infra -- chroot /host fips-mode-setup --check
-        oc debug node/${node} -n openshift-infra -- chroot /host grep -i fips /proc/cmdline
+        echo "Check failed on node ${node} (fips_enabled=${result})"
+        oc debug node/${node} -n openshift-infra -- grep -i fips /proc/cmdline || true
         check_result=1
     fi
 done
