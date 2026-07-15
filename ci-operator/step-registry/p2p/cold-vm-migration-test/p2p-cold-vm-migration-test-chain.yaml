@@ -1,0 +1,26 @@
+chain:
+  as: p2p-cold-vm-migration-test
+  steps:
+    - ref: p2p-create-migration-test-vm
+    - ref: p2p-stop-migration-test-vm
+    - ref: p2p-mtv-execute-live-migration
+  documentation: |-
+    End-to-end cold VM migration test: create a CNV VM on spoke-1, power it off, then
+    cold-migrate it to spoke-2 via MTV.
+
+    Requires p2p-mtv-mig-config (ForkliftController, providers, network/storage maps)
+    and p2p-install-odf-spokes before this chain. Does NOT require Submariner Globalnet
+    absence or CCLM-specific live migration gates.
+
+    Set MTV_PLAN_TYPE=cold in the CI config job env to drive cold migration (Plan
+    spec.type=cold). The MTV_PLAN_TYPE env var is consumed by p2p-mtv-execute-live-migration.
+
+    Step 1 (p2p-create-migration-test-vm): ODF-backed RWX VM created on source spoke
+      and started (runStrategy: Always).
+    Step 2 (p2p-stop-migration-test-vm): patches runStrategy to Halted and waits for
+      the VMI to be deleted so the VM is fully powered off before migration.
+    Step 3 (p2p-mtv-execute-live-migration): creates Plan (type=cold) and Migration on
+      the hub, polls until Succeeded, and verifies VM is Running on destination spoke.
+
+    NOTE: This chain is a POC intended to be combined with p2p-cclm-migration-test in
+    a single job once cold migration is validated independently.

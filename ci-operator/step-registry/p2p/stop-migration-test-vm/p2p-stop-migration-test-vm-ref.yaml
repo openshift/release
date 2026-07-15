@@ -1,0 +1,46 @@
+ref:
+  as: p2p-stop-migration-test-vm
+  from: cli
+  commands: p2p-stop-migration-test-vm-commands.sh
+  timeout: 30m0s
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Stop the CNV test VM on the source spoke to prepare it for cold (powered-off) migration.
+
+    Patches spec.runStrategy to Halted and waits for the VirtualMachineInstance to be
+    deleted, then confirms VM printableStatus is Stopped. This step must run after
+    p2p-create-migration-test-vm and before p2p-mtv-execute-live-migration (with
+    MTV_PLAN_TYPE=cold) in a cold migration chain.
+
+    Shares CNV_TEST_VM_NAME / CNV_TEST_VM_NAMESPACE / CNV_TEST_VM_SPOKE_INDEX env vars
+    with p2p-create-migration-test-vm so the same VM is targeted.
+
+    Writes ${ARTIFACT_DIR}/stop-migration-vm-status.txt; diagnostics on failure under
+    ${ARTIFACT_DIR}/stop-migration-vm-diagnostics/.
+  env:
+  - name: CNV_TEST_VM_NAME
+    default: "test-vm-1"
+    documentation: VirtualMachine metadata.name on the source spoke (must match p2p-create-migration-test-vm).
+  - name: CNV_TEST_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Namespace containing the test VM (must match p2p-create-migration-test-vm).
+  - name: CNV_TEST_VM_SPOKE_KUBECONFIG
+    default: ""
+    documentation: |-
+      Optional path to source spoke kubeconfig. When empty, uses
+      SHARED_DIR/managed-cluster-kubeconfig-${CNV_TEST_VM_SPOKE_INDEX}.
+  - name: CNV_TEST_VM_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based spoke index for SHARED_DIR kubeconfig discovery (source spoke).
+  - name: CNV_TEST_VM_STOP_TIMEOUT
+    default: "10m"
+    documentation: oc wait --for=delete timeout for the VMI after patching runStrategy to Halted.
+  - name: P2P_CCLM_DEBUG_MODE
+    default: "false"
+    documentation: |-
+      When true, log failures and exit 0 so downstream debug steps can run.
+      Set P2P_CCLM_DEBUG_MODE=true in the job env during investigation.
