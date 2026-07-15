@@ -14,26 +14,36 @@ ref:
     - name: HUB_CLUSTER
       default: "kni-qe-71"
       documentation: Hub cluster managing the spoke
-    - name: VERSION
-      default: "4.21"
-      documentation: OCP version used to auto-construct reference branch
-    - name: REFERENCE_REPO_URL
-      default: "https://github.com/openshift-kni/telco-reference.git"
-      documentation: Telco reference repository URL for RDS comparison
-    - name: REFERENCE_BRANCH
-      default: ""
+    - name: TEST_SETTINGS
+      default: '{}'
       documentation: >-
-        Telco reference repository branch.
-        Empty to auto-construct as release-${VERSION}.
-    - name: METADATA_RELPATH
-      default: "telco-ran/configuration/kube-compare-reference/metadata.yaml"
-      documentation: Relative path to metadata file in reference repository
-    - name: BASELINE
-      default: "false"
-      documentation: Generate baseline RDS comparison
-    - name: DEBUG
-      default: "false"
-      documentation: Enable Ansible debug output
+        JSON object for per-test configuration overrides from CI config.
+        Values here take precedence over TEST_SETTINGS_DEFAULTS.
+    - name: TEST_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "rds_compare": {
+            "skip": false,
+            "continue_on_fail": false,
+            "version": "4.21",
+            "reference_repo_url": "https://github.com/openshift-kni/telco-reference.git",
+            "reference_branch": "",
+            "metadata_relpath": "telco-ran/configuration/kube-compare-reference/metadata.yaml",
+            "baseline": false,
+            "debug": false
+          }
+        }
+      documentation: >-
+        JSON object for per-test configuration. The "rds_compare" key supports:
+        skip (bool) - when true, skip this test entirely and exit 0;
+        continue_on_fail (bool) - when true, failures exit 0 so the pipeline continues;
+        version (string) - OCP version used to auto-construct reference branch;
+        reference_repo_url (string) - telco reference repository URL;
+        reference_branch (string) - reference branch (empty to auto-construct as release-VERSION);
+        metadata_relpath (string) - relative path to metadata file in reference repository;
+        baseline (bool) - when true, generates baseline RDS comparison;
+        debug (bool) - when true, enables Ansible -vvv verbose output.
+        Values are exported as uppercase env vars, overriding ref.yaml defaults.
 
   credentials:
     # Common hypervisor (shared across all spokes)

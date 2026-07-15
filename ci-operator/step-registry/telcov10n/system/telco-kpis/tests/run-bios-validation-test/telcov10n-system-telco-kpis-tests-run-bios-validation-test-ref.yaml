@@ -14,21 +14,34 @@ ref:
     - name: HUB_CLUSTER
       default: "kni-qe-71"
       documentation: Hub cluster managing the spoke
-    - name: VERSION
-      default: "4.21"
-      documentation: OCP version used to construct BIOS profile URL
-    - name: BIOS_PROFILE_URL
-      default: ""
-      documentation: BIOS profile URL (auto-constructed from VERSION and SPOKE_CLUSTER if empty)
-    - name: APPLY_FIXES
-      default: "false"
-      documentation: Apply BIOS setting fixes automatically
-    - name: REBOOT_AFTER_APPLY
-      default: "false"
-      documentation: Reboot nodes after applying BIOS fixes
-    - name: DEBUG
-      default: "false"
-      documentation: Enable Ansible debug output
+    - name: TEST_SETTINGS
+      default: '{}'
+      documentation: >-
+        JSON object for per-test configuration overrides from CI config.
+        Values here take precedence over TEST_SETTINGS_DEFAULTS.
+    - name: TEST_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "bios_validation": {
+            "skip": false,
+            "continue_on_fail": false,
+            "version": "4.21",
+            "bios_profile_url": "",
+            "apply_fixes": false,
+            "reboot_after_apply": false,
+            "debug": false
+          }
+        }
+      documentation: >-
+        JSON object for per-test configuration. The "bios_validation" key supports:
+        skip (bool) - when true, skip this test entirely and exit 0;
+        continue_on_fail (bool) - when true, failures exit 0 so the pipeline continues;
+        version (string) - OCP version used to auto-construct BIOS profile URL;
+        bios_profile_url (string) - explicit BIOS profile URL (empty to auto-construct from version and spoke);
+        apply_fixes (bool) - when true, applies BIOS setting fixes automatically;
+        reboot_after_apply (bool) - when true, reboots nodes after applying BIOS fixes;
+        debug (bool) - when true, enables Ansible -vvv verbose output.
+        Values are exported as uppercase env vars, overriding ref.yaml defaults.
 
   credentials:
     # Common hypervisor (shared across all spokes)
