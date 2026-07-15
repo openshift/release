@@ -44,70 +44,70 @@ process_inventory() {
 
 OCP_DEPLOYMENT_INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 CNF_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
-MOUNTED_SPOKE_INVENTORY="/var/host_variables/${CLUSTER_NAME}/spoke-master0"
+MOUNTED_SPOKE_INVENTORY="/var/host_variables/${TARGET_CLUSTER_NAME}/spoke-master0"
 
-echo "=== IBU Seed eco-gotests Configuration ==="
-echo "SEED_SPOKE_CLUSTER=${SEED_SPOKE_CLUSTER}"
-echo "CLUSTER_NAME=${CLUSTER_NAME}"
+echo "=== IBU Upgrade eco-gotests Configuration ==="
+echo "TARGET_CLUSTER_NAME=${TARGET_CLUSTER_NAME}"
+echo "TARGET_SPOKE_CLUSTER=${TARGET_SPOKE_CLUSTER}"
 echo "ECO_GOTESTS_FEATURES=${ECO_GOTESTS_FEATURES}"
 echo "MIRROR_REGISTRY=${MIRROR_REGISTRY}"
 echo "VERSION=${VERSION}"
 echo ""
 
-# Copy inventory from SHARED_DIR (already processed by earlier hub-deploy step)
-echo "=== Copying inventory for seed hub ${CLUSTER_NAME} from SHARED_DIR ==="
+# Copy target hub inventory from SHARED_DIR (target-* prefixed files saved by ibu-target-hub-deploy)
+echo "=== Copying target hub inventory from SHARED_DIR ==="
 
-# Set up ocp-deployment inventory (used by prepare-ibu-seed-sno.yml and ibu-poweroff-seed-spoke.yml)
 mkdir -p "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars"
 mkdir -p "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars"
 
-cp "${SHARED_DIR}/all" "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars/all"
-cp "${SHARED_DIR}/bastions" "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars/bastions"
-cp "${SHARED_DIR}/hypervisors" "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars/hypervisors"
-cp "${SHARED_DIR}/nodes" "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars/nodes"
-cp "${SHARED_DIR}/masters" "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars/masters"
-cp "${SHARED_DIR}/bastion" "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/bastion"
-cp "${SHARED_DIR}/hypervisor" "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/hypervisor"
+cp "${SHARED_DIR}/target-all"        "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars/all"
+cp "${SHARED_DIR}/target-bastions"   "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars/bastions"
+cp "${SHARED_DIR}/target-hypervisors" "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars/hypervisors"
+cp "${SHARED_DIR}/target-nodes"      "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars/nodes"
+cp "${SHARED_DIR}/target-masters"    "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars/masters"
+cp "${SHARED_DIR}/target-bastion"    "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/bastion"
+cp "${SHARED_DIR}/target-hypervisor" "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/hypervisor"
+cp "${SHARED_DIR}/target-master0"    "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/master0"
 
-# Set up cnf inventory (used by deploy-run-eco-gotests.yaml)
 mkdir -p "${CNF_INVENTORY_PATH}/group_vars"
 mkdir -p "${CNF_INVENTORY_PATH}/host_vars"
 
-cp "${SHARED_DIR}/bastions" "${CNF_INVENTORY_PATH}/group_vars/bastions.yaml"
-cp "${SHARED_DIR}/all" "${CNF_INVENTORY_PATH}/group_vars/all.yaml"
-cp "${SHARED_DIR}/bastion" "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml"
+cp "${SHARED_DIR}/target-bastions"   "${CNF_INVENTORY_PATH}/group_vars/bastions.yaml"
+cp "${SHARED_DIR}/target-all"        "${CNF_INVENTORY_PATH}/group_vars/all.yaml"
+cp "${SHARED_DIR}/target-bastion"    "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml"
 
-echo "Processing spoke SNO inventory for master-0 with proper multi-line SSH key handling"
+echo "Processing target spoke SNO inventory with proper multi-line SSH key handling"
 process_inventory "${MOUNTED_SPOKE_INVENTORY}" "${CNF_INVENTORY_PATH}/host_vars/master-0.yaml"
 process_inventory "${MOUNTED_SPOKE_INVENTORY}" "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/master-0"
 
+echo "Target hub inventory copied from SHARED_DIR and spoke inventory processed"
 
-echo "Inventory copied from SHARED_DIR and spoke inventory processed"
+# Target hub kubeconfig at the standard telcov10n path on the target bastion
+TARGET_HUB_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
+TARGET_VM_NAME="master-0.${TARGET_CLUSTER_NAME}"
 
 echo ""
-echo "=== Step 1: Prepare IBU seed SNO and retrieve kubeconfig ==="
-SEED_VM_NAME="master-0.${CLUSTER_NAME}"
+echo "=== Step 1: Prepare IBU target SNO and retrieve kubeconfig ==="
 
 cd /eco-ci-cd
 ansible-playbook playbooks/ran/ibu-prepare-spoke-sno.yml \
   -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
-  --extra-vars "hub_cluster=${CLUSTER_NAME}" \
-  --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}" \
-  --extra-vars "seed_vm_name=${SEED_VM_NAME}" 
-  
+  --extra-vars "hub_cluster=${TARGET_CLUSTER_NAME}" \
+  --extra-vars "spoke_cluster=${TARGET_SPOKE_CLUSTER}" \
+  --extra-vars "seed_vm_name=${TARGET_VM_NAME}"
+
 echo ""
-echo "=== Step 2: Run eco-gotests IBU seedgeneration suite ==="
-SEED_SPOKE_KUBECONFIG="/tmp/${SEED_SPOKE_CLUSTER}-kubeconfig"
+echo "=== Step 2: Run eco-gotests IBU upgrade suite ==="
+TARGET_SPOKE_KUBECONFIG="/tmp/${TARGET_SPOKE_CLUSTER}-kubeconfig"
 
 # Build eco-gotests environment variables
 ECO_GOTESTS_ENV_VARS="-e ECO_CNF_RAN_SKIP_TLS_VERIFY=true"
 ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBGU_SEED_IMAGE=${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
-ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_SNO=/kubeconfig/kubeconfig"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_SNO=${TARGET_HUB_KUBECONFIG}"
 
-# Run eco-gotests
 ansible-playbook playbooks/deploy-run-eco-gotests.yaml \
   -i "${CNF_INVENTORY_PATH}/switch-config.yaml" \
-  --extra-vars "kubeconfig=${SEED_SPOKE_KUBECONFIG}" \
+  --extra-vars "kubeconfig=${TARGET_SPOKE_KUBECONFIG}" \
   --extra-vars "features=${ECO_GOTESTS_FEATURES}" \
   --extra-vars 'labels=!no-container' \
   --extra-vars 'eco_worker_label=""' \
@@ -131,24 +131,18 @@ ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 \
   "cd /tmp/eco_gotests && ./eco-gotests-run.sh || true"
 
 echo "Gather artifacts from bastion"
-mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests"
+mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests_upgrade"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i "${PROJECT_DIR}/temp_ssh_key" \
   "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests/report/*.xml" \
-  "${ARTIFACT_DIR}/junit_eco_gotests/"
+  "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/"
 rm -f "${PROJECT_DIR}/temp_ssh_key"
 
 # Save junit XMLs to SHARED_DIR with junit_ prefix for ibu-report step
-for f in "${ARTIFACT_DIR}/junit_eco_gotests/"*.xml; do
-  [[ -f "$f" ]] && cp "$f" "${SHARED_DIR}/junit_ibu_seed_$(basename "$f")"
+for f in "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/"*.xml; do
+  [[ -f "$f" ]] && cp "$f" "${SHARED_DIR}/junit_ibu_upgrade_$(basename "$f")"
 done
 
 echo ""
-echo "=== Step 3: Power off seed spoke VM ==="
-ansible-playbook playbooks/ran/ibu-poweroff-seed-spoke.yml \
-  -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py"
-
-echo ""
-echo "=== IBU Seed Eco-Gotests Complete ==="
+echo "=== IBU Upgrade Eco-Gotests Complete ==="
 echo "Seed image: ${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
-echo "Seed spoke VM has been powered off and is ready for IBU upgrade"
