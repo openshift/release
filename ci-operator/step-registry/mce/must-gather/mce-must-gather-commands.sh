@@ -50,15 +50,17 @@ if ! oc image info "${MUST_GATHER_IMAGE}" --filter-by-os="linux/amd64" &>/dev/nu
   if [[ -f /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username ]]; then
     QUAY_USERNAME=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username)
     QUAY_PASSWORD=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_pullsecret)
-    oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
+    TMP_PULL_SECRET=$(mktemp)
+    oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > "${TMP_PULL_SECRET}"
     QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
-    jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io:443": {"auth":$QUAY_AUTH,"email":""}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
-    mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
-    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
-    rm /tmp/global-pull-secret.json
+    jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io:443": {"auth":$QUAY_AUTH,"email":""}}' "${TMP_PULL_SECRET}" > "${TMP_PULL_SECRET}.tmp"
+    mv "${TMP_PULL_SECRET}.tmp" "${TMP_PULL_SECRET}"
+    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${TMP_PULL_SECRET}"
+    rm -f "${TMP_PULL_SECRET}"
     echo "Added quay.io:443 auth to cluster pull secret for must-gather"
-    # Allow CRI-O to pick up the updated pull secret
-    sleep 10
+    # Allow CRI-O to pick up the updated pull secret by waiting for the MCO to roll it out
+    sleep 60
+    oc wait mcp master worker --for condition=updated --timeout=15m || true
   else
     echo "WARNING: Credentials not available at /etc/acm-d-mce-quay-pull-credentials/, pre-release image pull may fail"
   fi
