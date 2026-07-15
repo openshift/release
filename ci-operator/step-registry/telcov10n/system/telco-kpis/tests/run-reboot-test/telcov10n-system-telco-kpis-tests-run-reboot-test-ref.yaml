@@ -14,21 +14,34 @@ ref:
     - name: HUB_CLUSTER
       default: "kni-qe-71"
       documentation: Hub cluster managing the spoke
-    - name: REBOOT_COUNT
-      default: "6"
-      documentation: Number of reboots to perform
-    - name: RAN_INTEGRATION_REPO
-      default: "https://gitlab.cee.redhat.com/ran/ran-integration.git"
-      documentation: RAN integration repository URL
-    - name: CNF_GOTESTS_REPO
-      default: "https://gitlab.cee.redhat.com/cnf/cnf-gotests.git"
-      documentation: CNF gotests repository URL
-    - name: DEBUG
-      default: "false"
-      documentation: Enable Ansible debug output
-    - name: SKIP_REBUILD_IMAGE
-      default: "false"
-      documentation: Skip test-runner image rebuild
+    - name: TEST_SETTINGS
+      default: '{}'
+      documentation: >-
+        JSON object for per-test configuration overrides from CI config.
+        Values here take precedence over TEST_SETTINGS_DEFAULTS.
+    - name: TEST_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "reboot": {
+            "skip": false,
+            "continue_on_fail": false,
+            "reboot_count": "6",
+            "ran_integration_repo": "https://gitlab.cee.redhat.com/ran/ran-integration.git",
+            "cnf_gotests_repo": "https://gitlab.cee.redhat.com/cnf/cnf-gotests.git",
+            "debug": false,
+            "skip_rebuild_image": false
+          }
+        }
+      documentation: >-
+        JSON object for per-test configuration. The "reboot" key supports:
+        skip (bool) - when true, skip this test entirely and exit 0;
+        continue_on_fail (bool) - when true, failures exit 0 so the pipeline continues;
+        reboot_count (string) - number of reboots to perform;
+        ran_integration_repo (string) - RAN integration repository URL;
+        cnf_gotests_repo (string) - CNF gotests repository URL;
+        debug (bool) - when true, enables Ansible -vvv verbose output;
+        skip_rebuild_image (bool) - when true, skips rebuilding the test-runner container image.
+        Values are exported as uppercase env vars, overriding ref.yaml defaults.
 
   credentials:
     # Common hypervisor (shared across all spokes)
