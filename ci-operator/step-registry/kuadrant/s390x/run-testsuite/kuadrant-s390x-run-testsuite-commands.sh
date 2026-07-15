@@ -121,8 +121,10 @@ fi
 # fi
 echo "=== Skipping make kuadrant (disabled while stabilizing smoke) ==="
 
-echo "=== Polishing JUnit reports ==="
-make polish-junit || true
+# Temporarily skip while stabilizing smoke on s390x.
+# echo "=== Polishing JUnit reports ==="
+# make polish-junit || true
+echo "=== Skipping make polish-junit (disabled while stabilizing smoke) ==="
 
 echo "=== Copying test artifacts to ${ARTIFACT_DIR} ==="
 cp -a "${RESULTS_DIR}/." "${ARTIFACT_DIR}/" || true
