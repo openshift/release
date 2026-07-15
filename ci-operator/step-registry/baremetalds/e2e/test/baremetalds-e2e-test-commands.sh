@@ -4,6 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Adding tmp to path..."
+export PATH=/tmp/:$PATH
+
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
+done
+
+
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
 
 # In order for openshift-tests to pull external binary images from the
