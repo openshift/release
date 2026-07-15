@@ -85,6 +85,20 @@ EOF
 fi
 
 echo "=== Installing the Kuadrant operator (pulls in Authorino, Limitador, DNS operators) ==="
+# Set RELATED_IMAGE_WASMSHIM via Subscription.spec.config.env so OLM owns the
+# Deployment env and does not reconcile away a direct oc set env patch.
+WASMSHIM_SUB_CONFIG=""
+if [[ -n "${RELATED_IMAGE_WASMSHIM}" ]]; then
+  echo "Subscription will set RELATED_IMAGE_WASMSHIM=${RELATED_IMAGE_WASMSHIM}"
+  WASMSHIM_SUB_CONFIG=$(cat <<EOF
+  config:
+    env:
+    - name: RELATED_IMAGE_WASMSHIM
+      value: "${RELATED_IMAGE_WASMSHIM}"
+EOF
+)
+fi
+
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
@@ -105,6 +119,7 @@ spec:
   name: ${KUADRANT_SUBSCRIPTION_NAME}
   source: ${KUADRANT_SOURCE}
   sourceNamespace: ${KUADRANT_SOURCE_NS}
+${WASMSHIM_SUB_CONFIG}
 EOF
 
 if [[ "${KUADRANT_CHANNEL}" == "!default" ]]; then
@@ -120,15 +135,29 @@ oc wait --for=condition=Available deployment --all -n "${KUADRANT_NAMESPACE}" --
 oc get deployment -n "${KUADRANT_NAMESPACE}"
 
 if [[ -n "${RELATED_IMAGE_WASMSHIM}" ]]; then
-  echo "=== Patching Kuadrant operator RELATED_IMAGE_WASMSHIM ==="
-  echo "Setting RELATED_IMAGE_WASMSHIM=${RELATED_IMAGE_WASMSHIM}"
-  oc set env deployment/kuadrant-operator-controller-manager \
-    -n "${KUADRANT_NAMESPACE}" \
-    "RELATED_IMAGE_WASMSHIM=${RELATED_IMAGE_WASMSHIM}"
+  echo "=== Verifying RELATED_IMAGE_WASMSHIM on kuadrant-operator-controller-manager ==="
   oc rollout status deployment/kuadrant-operator-controller-manager \
-    -n "${KUADRANT_NAMESPACE}" --timeout=300s
-  oc set env deployment/kuadrant-operator-controller-manager \
-    -n "${KUADRANT_NAMESPACE}" --list | grep RELATED_IMAGE_WASMSHIM || true
+    -n "${KUADRANT_NAMESPACE}" --timeout=300s || true
+  actual="$(oc set env deployment/kuadrant-operator-controller-manager \
+    -n "${KUADRANT_NAMESPACE}" --list | grep '^RELATED_IMAGE_WASMSHIM=' || true)"
+  echo "Deployment env: ${actual:-<unset>}"
+  if [[ "${actual}" != "RELATED_IMAGE_WASMSHIM=${RELATED_IMAGE_WASMSHIM}" ]]; then
+    echo "WARNING: Deployment env does not match Subscription config; re-applying Subscription.config.env" >&2
+    oc patch subscription "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_NAMESPACE}" --type merge \
+      -p "{\"spec\":{\"config\":{\"env\":[{\"name\":\"RELATED_IMAGE_WASMSHIM\",\"value\":\"${RELATED_IMAGE_WASMSHIM}\"}]}}}"
+    for _ in $(seq 1 30); do
+      actual="$(oc set env deployment/kuadrant-operator-controller-manager \
+        -n "${KUADRANT_NAMESPACE}" --list | grep '^RELATED_IMAGE_WASMSHIM=' || true)"
+      [[ "${actual}" == "RELATED_IMAGE_WASMSHIM=${RELATED_IMAGE_WASMSHIM}" ]] && break
+      sleep 5
+    done
+    echo "Deployment env after patch: ${actual:-<unset>}"
+  fi
+  if [[ "${actual}" != "RELATED_IMAGE_WASMSHIM=${RELATED_IMAGE_WASMSHIM}" ]]; then
+    echo "ERROR: RELATED_IMAGE_WASMSHIM did not stick on the operator Deployment" >&2
+    oc get subscription "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_NAMESPACE}" -o yaml >&2 || true
+    exit 1
+  fi
 fi
 
 echo "=== Creating the Kuadrant CR ==="
