@@ -88,6 +88,16 @@ ami_id=$(jq -r .images.aws.regions[\"${REGION}\"].image <omr-ami-images.json)
 
 mkdir -p terraform_omr && cd terraform_omr
 
+# Build-from-source path: extract mirror-registry.tar.gz directly from CI-built pipeline image
+# This avoids passing the large tarball (826MB) through SHARED_DIR (3MB K8s secret limit)
+if [ "${OMR_FROM_SOURCE}" = true ]; then
+  echo "Extracting mirror-registry.tar.gz from CI-built pipeline image..."
+  MIRROR_REGISTRY_PULLSPEC=$(oc get istag pipeline:mirror-registry -o jsonpath='{.image.dockerImageReference}')
+  echo "Resolved pipeline image: ${MIRROR_REGISTRY_PULLSPEC}"
+  oc image extract "${MIRROR_REGISTRY_PULLSPEC}" --path /mirror-registry.tar.gz:/tmp --confirm --insecure --registry-config="/var/run/ci-credentials/registry/.dockerconfigjson"
+  ls -lh /tmp/mirror-registry.tar.gz
+fi
+
 cat >>variables.tf <<EOF
 variable "quay_build_worker_key" {
 }
@@ -97,6 +107,7 @@ variable "quay_build_instance_name" {
 }
 EOF
 
+# Part 1: Provider, key pair, security group, and instance resource preamble
 cat >>create_aws_ec2.tf <<EOF
 provider "aws" {
   region = "${REGION}"
@@ -132,11 +143,32 @@ resource "aws_instance" "quaybuilder" {
   associate_public_ip_address = true
   vpc_security_group_ids = [aws_security_group.quaybuilder.id]
   subnet_id = "${PublicSubnet}"
-  
-  ebs_block_device {
-    device_name = "/dev/sda1"
+
+  root_block_device {
     volume_size = 200
   }
+EOF
+
+# Part 2: Provisioner blocks (conditional on build-from-source vs image-based)
+if [ "${OMR_FROM_SOURCE}" = true ]; then
+  # Build-from-source path: upload pre-built tar.gz via file provisioner
+  cat >>create_aws_ec2.tf <<'TFEOF'
+  provisioner "file" {
+    source      = "/tmp/mirror-registry.tar.gz"
+    destination = "/home/ec2-user/mirror-registry.tar.gz"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "sudo yum install podman openssl -y",
+      "tar -xzvf mirror-registry.tar.gz",
+      "./mirror-registry --version",
+      "./mirror-registry install --quayHostname ${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
+    ]
+  }
+TFEOF
+else
+  # Legacy path: pull image on EC2 and extract tar.gz via podman cp
+  cat >>create_aws_ec2.tf <<EOF
   provisioner "remote-exec" {
     inline = [
       "sudo yum install podman openssl -y",
@@ -150,6 +182,11 @@ resource "aws_instance" "quaybuilder" {
       "./mirror-registry install --quayHostname \${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
     ]
   }
+EOF
+fi
+
+# Part 3: Connection, tags, and output
+cat >>create_aws_ec2.tf <<'TFEOF'
   connection {
     type        = "ssh"
     host        = self.public_ip
@@ -163,7 +200,7 @@ resource "aws_instance" "quaybuilder" {
 output "instance_public_dns" {
   value = aws_instance.quaybuilder.public_dns
 }
-EOF
+TFEOF
 
 cp /var/run/quay-qe-omr-secret/quaybuilder . && cp /var/run/quay-qe-omr-secret/quaybuilder.pub .
 chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >>quaybuilder
@@ -173,6 +210,11 @@ export TF_VAR_quay_build_worker_key="${OMR_CI_NAME}"
 export TF_VAR_quay_build_worker_security_group="${OMR_CI_NAME}"
 terraform init
 terraform apply -auto-approve
+
+# Clean up the large tarball from /tmp to avoid exceeding the 3MB K8s secret sync limit
+if [ "${OMR_FROM_SOURCE}" = true ]; then
+  rm -f /tmp/mirror-registry.tar.gz
+fi
 
 #Share the OMR HOSTNAME, Terraform Var and Terraform Directory
 tar -cvzf terraform.tgz --exclude=".terraform" *

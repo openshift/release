@@ -5,12 +5,12 @@ set -o errexit
 set -o pipefail
 
 
-#Check podman and skopeo version
+# Read terraform state from SHARED_DIR (saved by provisioning-omr-disconnected step)
 mkdir -p terraform_omr && cd terraform_omr
-cp ${SHARED_DIR}/terraform.tgz .
+cp "${SHARED_DIR}/terraform.tgz" .
 tar -xzvf terraform.tgz && ls
-OMR_CI_NAME=$(cat ${SHARED_DIR}/OMR_CI_NAME)
-OMR_HOST_NAME=$(cat ${SHARED_DIR}/OMR_HOST_NAME)
+OMR_CI_NAME=$(cat "${SHARED_DIR}/OMR_CI_NAME")
+OMR_HOST_NAME=$(cat "${SHARED_DIR}/OMR_HOST_NAME")
 echo "Start to destroy OMR $OMR_HOST_NAME ..."
 
 #Destroy Quay OMR
