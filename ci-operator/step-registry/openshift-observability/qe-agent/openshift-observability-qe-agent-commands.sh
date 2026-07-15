@@ -125,25 +125,43 @@ if [[ -s "${ARTIFACT_DIR}/qe-agent-usage.json" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Command audit log — every Bash tool call Claude made, command strings only.
-# Cluster output (pod logs, events, API responses) is not captured here — only
-# the command text, which contains no sensitive data and enables post-incident
-# review of what Claude actually executed on the cluster.
+# Tool call audit log — every tool invocation Claude made (command strings,
+# file paths, search patterns). Cluster output (pod logs, events, API
+# responses) is NOT captured here. Note: Bash command strings may reference
+# sensitive paths (e.g. KUBECONFIG, mounted secrets) — treat this log with
+# the same access controls as other CI artifacts.
 # ---------------------------------------------------------------------------
 if command -v jq &>/dev/null; then
   jq -r '
     select(.type == "assistant")
     | .message.content[]?
-    | select(.type == "tool_use" and .name == "Bash")
-    | "---\n" + (.input.command // "")
+    | select(.type == "tool_use" and (.name == "Bash" or .name == "Read" or .name == "Write" or .name == "Grep" or .name == "Glob"))
+    | "[" + .name + "] " + (if .name == "Bash" then (.input.command // "") elif .name == "Read" then (.input.file_path // "") elif .name == "Write" then (.input.file_path // "") elif .name == "Grep" then (.input.pattern // "") elif .name == "Glob" then (.input.pattern // "") else "" end)
   ' "${_QE_STREAM}" 2>/dev/null \
   > "${ARTIFACT_DIR}/qe-agent-commands.log" || true
 
   if [[ -s "${ARTIFACT_DIR}/qe-agent-commands.log" ]]; then
-    _CMD_COUNT=$(grep -c '^---$' "${ARTIFACT_DIR}/qe-agent-commands.log" 2>/dev/null || echo 0)
-    echo "Audit log: ${_CMD_COUNT} Bash commands → ${ARTIFACT_DIR}/qe-agent-commands.log"
+    _CMD_COUNT=$(grep -c '^\[' "${ARTIFACT_DIR}/qe-agent-commands.log" 2>/dev/null || echo 0)
+    echo "Audit log: ${_CMD_COUNT} tool calls → ${ARTIFACT_DIR}/qe-agent-commands.log"
   fi
 fi
+
+# ---------------------------------------------------------------------------
+# TR-01 / HU-01: Tag all AI-generated markdown output with a persistent
+# banner. Uses find for recursive coverage of nested directories (e.g.
+# test-fixes/). Skips files that already start with the banner to avoid
+# duplication when the skill template also includes it. Guarded with
+# || true to preserve best-effort exit semantics under errexit.
+# ---------------------------------------------------------------------------
+readonly _AI_BANNER='> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.'
+while IFS= read -r md_file; do
+  if head -1 "${md_file}" 2>/dev/null | grep -qF 'AI-Generated Content'; then
+    continue
+  fi
+  _tmp=$(mktemp) || continue
+  { printf '%s\n\n' "${_AI_BANNER}" | cat - "${md_file}" > "${_tmp}" && mv "${_tmp}" "${md_file}"; } \
+    || { rm -f "${_tmp}" 2>/dev/null; true; }
+done < <(find "${ARTIFACT_DIR}" -name '*.md' -type f 2>/dev/null || true)
 
 echo "=== QE Agent Complete ==="
 
