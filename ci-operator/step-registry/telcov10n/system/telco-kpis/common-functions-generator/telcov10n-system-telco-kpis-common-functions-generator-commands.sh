@@ -297,11 +297,14 @@ for key, value in merged.items():
 # When CONTINUE_ON_FAIL=true, sets an ERR trap so that test failures
 # exit 0 instead of non-zero. Prow sees success and continues to the
 # next step. Intended for development/debugging, not production runs.
+#
+# Uses set -E (errtrace) so the trap is inherited by functions like main().
 # ----------------------------------------------------------------------
 
 setup_continue_on_fail() {
     if [[ "${CONTINUE_ON_FAIL:-false}" == "true" ]]; then
         echo "CONTINUE_ON_FAIL enabled — test failures will not stop the pipeline"
+        set -E
         trap 'echo "ERROR: Test failed (exit code $?) but CONTINUE_ON_FAIL=true — continuing"; exit 0' ERR
     fi
 }
