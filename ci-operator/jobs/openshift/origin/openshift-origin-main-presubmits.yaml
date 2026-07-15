@@ -5,6 +5,94 @@ presubmits:
     branches:
     - ^main$
     - ^main-
+    cluster: build10
+    context: ci/prow/e2e-agent-compact-ipv4-iso-no-registry
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-main-e2e-agent-compact-ipv4-iso-no-registry
+    optional: true
+    rerun_command: /test e2e-agent-compact-ipv4-iso-no-registry
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agent-compact-ipv4-iso-no-registry
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-compact-ipv4-iso-no-registry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
     cluster: build06
     context: ci/prow/e2e-agnostic-ovn-cmd
     decorate: true
@@ -3665,7 +3753,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-csi
     decorate: true
     decoration_config:
@@ -3751,7 +3839,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-disruptive
     decorate: true
     decoration_config:
@@ -3838,7 +3926,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-fips-serial-1of2
     decorate: true
     decoration_config:
@@ -3926,7 +4014,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-fips-serial-2of2
     decorate: true
     decoration_config:
@@ -4014,7 +4102,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     decoration_config:
@@ -4102,7 +4190,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-builds
     decorate: true
     decoration_config:
@@ -4188,7 +4276,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-etcd-scaling
     decorate: true
     decoration_config:
@@ -4277,7 +4365,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-image-ecosystem
     decorate: true
     decoration_config:
@@ -4363,7 +4451,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-kube-apiserver-rollout
     decorate: true
     decoration_config:
@@ -4450,7 +4538,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-rt-upgrade
     decorate: true
     decoration_config:
@@ -4537,7 +4625,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     decoration_config:
@@ -4624,7 +4712,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-techpreview-pkiconfig
     decorate: true
     decoration_config:
@@ -4711,7 +4799,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-techpreview-serial-1of2
     decorate: true
     decoration_config:
@@ -4799,7 +4887,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-techpreview-serial-2of2
     decorate: true
     decoration_config:
@@ -4887,7 +4975,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
     decoration_config:
@@ -4973,7 +5061,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-usernamespace
     decorate: true
     decoration_config:
