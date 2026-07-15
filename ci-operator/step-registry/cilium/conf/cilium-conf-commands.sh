@@ -45,32 +45,6 @@ metadata:
   name: cilium
 EOF
 
-# Workaround for OCPBUGS-86033: override the default 0.3.1 cniVersion
-cat > "${SHARED_DIR}/manifest_cilium-00-cni-override-configmap.yaml" <<EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cilium-cni-override
-  namespace: cilium
-data:
-  cilium-override.conf: |
-    {
-      "cniVersion": "0.4.0",
-      "name": "portmap",
-      "plugins": [
-        {
-            "type": "cilium-cni",
-            "enable-debug": true,
-            "log-file": "/var/run/cilium/cilium-cni.log"
-        },
-        {
-          "type": "portmap",
-          "capabilities": {"portMappings": true}
-        }
-      ]
-    }
-EOF
-
 # Workaround for OCPBUGS-85607: Apply Cilium NetworkPolicy to allow DNS pods to reach kube-apiserver
 # This needs to be applied on the management cluster for Hypershift Cilium jobs
 cat > "${SHARED_DIR}/manifest_cilium-00-network-policy-dns.yaml" <<EOF

@@ -46,32 +46,6 @@ oc adm policy add-scc-to-user privileged -z cilium -n cilium
 oc adm policy add-scc-to-user privileged -z cilium-operator -n cilium
 oc adm policy add-scc-to-user privileged -z cilium-envoy -n cilium
 
-# Overriding the default 0.3.1 cniVersion to workaround https://redhat.atlassian.net/browse/OCPBUGS-86033
-oc apply -f - <<'EOF'
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cilium-cni-override
-  namespace: cilium
-data:
-  cilium-override.conf: |
-    {
-      "cniVersion": "0.4.0",
-      "name": "portmap",
-      "plugins": [
-        {
-            "type": "cilium-cni",
-            "enable-debug": true,
-            "log-file": "/var/run/cilium/cilium-cni.log"
-        },
-        {
-          "type": "portmap",
-          "capabilities": {"portMappings": true}
-        }
-      ]
-    }
-EOF
-
 # Note: In order to test with a development version, use:
 # --repository oci://quay.io/cilium-charts-dev/cilium --version <version>
 # where <version> is a tag from https://quay.io/repository/cilium-charts-dev/cilium
