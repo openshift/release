@@ -49,6 +49,7 @@ Build arguments let you pin the helm version and chart ref at build time.
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 RUN microdnf install -y git tar gzip jq && microdnf clean all
+RUN cp -L /lib64/libjq.so.1 /lib64/libonig.so.5 /usr/local/lib/
 
 ARG HELM_VERSION=v3.17.3
 RUN curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" | \

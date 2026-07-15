@@ -145,11 +145,8 @@ function fetch_trustee_charts() {
     --path /charts/:${charts_dir}/ \
     --path /usr/local/bin/helm:${bin_dir}/ \
     --path /usr/bin/jq:${bin_dir}/ \
-    --path /lib64/libjq.so.1.0.4:${lib_dir}/ \
-    --path /lib64/libonig.so.5.1.0:${lib_dir}/ 2>&1); then
-    # oc image extract cannot follow symlinks, so create them from the versioned files
-    for f in "${lib_dir}"/libjq.so.*; do ln -sf "$(basename "$f")" "${lib_dir}/libjq.so.1" 2>/dev/null; break; done
-    for f in "${lib_dir}"/libonig.so.*; do ln -sf "$(basename "$f")" "${lib_dir}/libonig.so.5" 2>/dev/null; break; done
+    --path /usr/local/lib/libjq.so.1:${lib_dir}/ \
+    --path /usr/local/lib/libonig.so.5:${lib_dir}/ 2>&1); then
     echo ">>> Extracted from image" >&2
     echo ">>> Chart files:" >&2
     ls -lR "${charts_dir}" | head -50 >&2
