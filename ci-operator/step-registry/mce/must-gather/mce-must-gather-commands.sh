@@ -45,6 +45,23 @@ MUST_GATHER_IMAGE="registry.redhat.io/rhacm2/acm-must-gather-rhel9:v${ACM_VERSIO
 if ! oc image info "${MUST_GATHER_IMAGE}" --filter-by-os="linux/amd64" &>/dev/null; then
   echo "Image ${MUST_GATHER_IMAGE} not found, falling back to pre-release registry"
   MUST_GATHER_IMAGE="quay.io:443/acm-d/acm-must-gather-rhel9:${ACM_VERSION}-dev"
+
+  # Add quay.io:443 auth to cluster pull secret so the must-gather pod can pull the dev image
+  if [[ -f /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username ]]; then
+    QUAY_USERNAME=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username)
+    QUAY_PASSWORD=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_pullsecret)
+    oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
+    QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
+    jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io:443": {"auth":$QUAY_AUTH,"email":""}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
+    mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
+    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
+    rm /tmp/global-pull-secret.json
+    echo "Added quay.io:443 auth to cluster pull secret for must-gather"
+    # Allow CRI-O to pick up the updated pull secret
+    sleep 10
+  else
+    echo "WARNING: Credentials not available at /etc/acm-d-mce-quay-pull-credentials/, pre-release image pull may fail"
+  fi
 fi
 
 # shellcheck disable=SC2086
