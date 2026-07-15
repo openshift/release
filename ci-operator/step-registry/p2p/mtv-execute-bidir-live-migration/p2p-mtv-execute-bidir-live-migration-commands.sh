@@ -126,6 +126,7 @@ EnsureCclmGate() {
     done
     false
 }
+export -f HasCclmGate EnsureCclmGate
 
 # ---- Helper: ParseOcWaitDurationSeconds -------------------------------------
 
@@ -156,6 +157,7 @@ RunPass() {
     typeset dstKc="${5:?}"
     typeset planName="${6:?}"
     typeset migName="${7:?}"
+    # MTV_TEST_VM_TARGET_NAMESPACE defaults to "" in ref.yaml; fall back to source namespace
     typeset targetNs="${MTV_TEST_VM_TARGET_NAMESPACE:-${MTV_TEST_VM_NAMESPACE}}"
 
     SrcOc() { oc --kubeconfig="${srcKc}" "$@"; }
@@ -172,7 +174,7 @@ RunPass() {
         DstOc get vm,vmi -n "${targetNs}" -o wide > "${diagDir}/dst-vms.txt" 2>&1 || true
     }
 
-    WaitMigrationSucceeded_() {
+    WaitMigrationSucceeded() {
         typeset -i deadline
         typeset succeededStatus failedStatus
         deadline=$((SECONDS + $(ParseOcWaitDurationSeconds "${MTV_MIGRATION_TIMEOUT}")))
@@ -195,6 +197,11 @@ RunPass() {
         return 1
     }
 
+    # Idempotent apply: adds last-applied-configuration annotation for proper 3-way merge on re-runs
+    ApplyManifest_() {
+        HubOc create -f - --dry-run=client -o yaml --save-config | HubOc apply -f -
+    }
+
     typeset -i passRc=0
     (
         trap 'DumpPassDiagnostics' ERR
@@ -208,28 +215,7 @@ RunPass() {
             "
 
         JStep "${label}: Preflight: CCLM Gates" \
-            bash -c "
-                EnsureCclmGate() {
-                    typeset kc=\"\${1:?}\"
-                    oc --kubeconfig=\"\${kc}\" get kubevirt \"${MTV_KUBEVIRT_NAME}\" \
-                        -n \"${MTV_CNV_NAMESPACE}\" -o json \
-                        | jq -e '.spec.configuration.developerConfiguration.featureGates // [] | contains([\"DecentralizedLiveMigration\"])' \
-                        > /dev/null && return 0
-                    oc --kubeconfig=\"\${kc}\" patch hyperconverged \"${MTV_HCO_NAME}\" \
-                        -n \"${MTV_CNV_NAMESPACE}\" --type merge \
-                        -p '{\"spec\":{\"featureGates\":{\"decentralizedLiveMigration\":true}}}'
-                    typeset -i d=\$((SECONDS + 600))
-                    while (( SECONDS < d )); do
-                        oc --kubeconfig=\"\${kc}\" get kubevirt \"${MTV_KUBEVIRT_NAME}\" \
-                            -n \"${MTV_CNV_NAMESPACE}\" -o json \
-                            | jq -e '.spec.configuration.developerConfiguration.featureGates // [] | contains([\"DecentralizedLiveMigration\"])' \
-                            > /dev/null && return 0
-                        sleep 10
-                    done; false
-                }
-                EnsureCclmGate \"${srcKc}\"
-                EnsureCclmGate \"${dstKc}\"
-            "
+            bash -c "EnsureCclmGate \"${srcKc}\"; EnsureCclmGate \"${dstKc}\""
 
         JStep "${label}: Preflight: Sync Controllers Ready" \
             bash -c "
@@ -262,7 +248,7 @@ RunPass() {
             "
 
         JStep "${label}: Migration: Apply Plan" \
-            HubOc apply -f - <<EOF
+            ApplyManifest_ <<EOF
 apiVersion: forklift.konveyor.io/v1beta1
 kind: Plan
 metadata:
@@ -295,7 +281,7 @@ EOF
                 --for=condition=Ready --timeout="${MTV_PLAN_READY_TIMEOUT}"
 
         JStep "${label}: Migration: Apply Migration" \
-            HubOc apply -f - <<EOF
+            ApplyManifest_ <<EOF
 apiVersion: forklift.konveyor.io/v1beta1
 kind: Migration
 metadata:
@@ -307,7 +293,7 @@ spec:
     namespace: ${MTV_NAMESPACE}
 EOF
 
-        JStep "${label}: Migration: Succeeded" WaitMigrationSucceeded_
+        JStep "${label}: Migration: Succeeded" WaitMigrationSucceeded
 
         JStep "${label}: Verification: Destination VMI Running" \
             bash -c "
