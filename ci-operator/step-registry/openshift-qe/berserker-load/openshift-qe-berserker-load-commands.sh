@@ -88,6 +88,8 @@ if [[ "${POD_CAPTURE_ENABLED:-true}" == "true" ]]; then
     while true; do
       TIMESTAMP=$(date +%Y%m%d-%H%M%S)
       oc get pods --all-namespaces -o wide > "${POD_STATE_DIR}/pods-${TIMESTAMP}.txt" 2>&1 || true
+      oc get namespaces > "${POD_STATE_DIR}/namespaces-${TIMESTAMP}.txt" 2>&1 || true
+      oc get daemonsets --all-namespaces > "${POD_STATE_DIR}/daemonsets-${TIMESTAMP}.txt" 2>&1 || true
       sleep ${POD_CAPTURE_INTERVAL}
     done
   ) &
