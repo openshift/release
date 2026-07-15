@@ -160,6 +160,23 @@ if [[ -n "${RELATED_IMAGE_WASMSHIM}" ]]; then
   fi
 fi
 
+# Kuadrant caches dependency discovery at startup. If DNS (or others) became
+# Ready after the operator pod started, DNSPolicy stays MissingDependency until
+# the controller is restarted.
+echo "=== Ensuring DNS operator is Available before restarting Kuadrant operator ==="
+oc wait --for=condition=Available deployment/dns-operator-controller-manager \
+  -n "${KUADRANT_NAMESPACE}" --timeout=300s || true
+echo "=== Restarting kuadrant-operator so it rediscovers installed dependencies ==="
+oc rollout restart deployment/kuadrant-operator-controller-manager -n "${KUADRANT_NAMESPACE}"
+oc rollout status deployment/kuadrant-operator-controller-manager \
+  -n "${KUADRANT_NAMESPACE}" --timeout=300s
+oc wait --for=condition=Available \
+  deployment/kuadrant-operator-controller-manager \
+  deployment/dns-operator-controller-manager \
+  deployment/limitador-operator-controller-manager \
+  deployment/authorino-operator \
+  -n "${KUADRANT_NAMESPACE}" --timeout=300s || true
+
 # The baked-in testsuite conftest fails fast unless a Kuadrant CR already
 # exists in KUADRANT_NAMESPACE ("Unable to locate Kuadrant installation").
 # Creating it here is bootstrap only — individual tests still own policies / routes.
