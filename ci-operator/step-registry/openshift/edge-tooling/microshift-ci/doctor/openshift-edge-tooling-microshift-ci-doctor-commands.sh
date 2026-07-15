@@ -309,6 +309,7 @@ check_claude_rc "${CLAUDE_RC}" "close-stale-bugs" 10
 # Run bug fix for test bugs (15m and 50 turns).
 # Dry-run mode only.
 echo "Running Claude to fix test bugs (dry-run mode)..."
+export MICROSHIFT_CI_DRY_RUN=1
 CLAUDE_RC=0
 timeout 900 claude \
     --model "${CLAUDE_MODEL}" \
