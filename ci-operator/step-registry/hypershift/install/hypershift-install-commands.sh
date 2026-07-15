@@ -17,9 +17,15 @@ extract_hcp_cli() {
 }
 
 OVERRIDE_COUNT=0
-[[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]] && ((OVERRIDE_COUNT++))
-[[ "${HO_MULTI}" == "true" ]] && ((OVERRIDE_COUNT++))
-[[ "${INSTALL_FROM_LATEST}" == "true" ]] && ((OVERRIDE_COUNT++))
+if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+if [[ "${HO_MULTI}" == "true" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+if [[ "${INSTALL_FROM_LATEST}" == "true" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
 
 if [[ ${OVERRIDE_COUNT} -gt 1 ]]; then
   echo "WARNING: Multiple image override flags are set. Precedence (highest to lowest):"
