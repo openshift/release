@@ -3,7 +3,7 @@ chain:
   steps:
   - ref: odf-prepare-cluster
   - ref: install-operators
-  - ref: redhat-lp-chaos-lp-cnv-odf-apply-storage-cluster
+  - ref: odf-apply-storage-cluster
   - ref: redhat-lp-chaos-lp-cnv-windows-vm-create
   env:
   - name: OPERATORS
@@ -21,6 +21,12 @@ chain:
   - name: ODF_STORAGE_CLAIM
     default: "100Gi"
     documentation: Size of each ODF storage device PVC.
+  - name: ODF_STORAGE_CLUSTER_WAIT_TIMEOUT
+    default: "25m"
+    documentation: >-
+      How long to wait for the StorageCluster to reach Available condition.
+      Overrides the upstream odf-apply-storage-cluster default of 10m because
+      ODF stable-4.21 requires longer Ceph cluster initialization on AWS.
   documentation: |-
     Deploys ODF onto the cluster and then creates a Windows VM in the benchmark-runner
     namespace. Uses the standard odf-prepare-cluster + install-operators +
