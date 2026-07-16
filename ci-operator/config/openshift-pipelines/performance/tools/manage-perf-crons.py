@@ -20,7 +20,7 @@ except ImportError:
     sys.exit(1)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(SCRIPT_DIR, "openshift-pipelines-performance-main.yaml")
+CONFIG_FILE = os.path.join(SCRIPT_DIR, os.pardir, "openshift-pipelines-performance-main.yaml")
 
 # ---------------------------------------------------------------------------
 # Schedule constants -- must match the variant-based scheduling plan
@@ -170,6 +170,14 @@ def get_variant(job):
     return "standard"
 
 
+def _ver_key(v):
+    """Sort key for dotted version strings (e.g. '1.22') by numeric components."""
+    try:
+        return tuple(int(x) for x in v.split("."))
+    except (ValueError, AttributeError):
+        return (0,)
+
+
 def is_cron_job(job):
     return "cron" in job
 
@@ -243,7 +251,7 @@ def cmd_show(args):
     versions = sorted(set(
         get_version(j) for j in cron_jobs
         if get_version(j) and get_version(j) != "nightly"
-    ))
+    ), key=_ver_key)
     print(f"\nActive versions: nightly, {', '.join(versions)}")
     print(f"Cron jobs: {len(cron_jobs)}")
 
@@ -339,7 +347,7 @@ def cmd_add(args):
     versions = sorted(set(
         get_version(j) for j in cron_jobs
         if get_version(j) and get_version(j) != "nightly"
-    ))
+    ), key=_ver_key)
     if not versions:
         print("No existing versioned jobs to clone from.")
         return
@@ -490,6 +498,9 @@ def cmd_promote(args):
     tests = data["tests"]
     new_ver = args.version
     old_ver = args.replace
+    if new_ver == old_ver:
+        print(f"Cannot promote {new_ver} to replace itself.")
+        return
 
     cron_jobs = [t for t in tests if is_cron_job(t)]
 
@@ -514,7 +525,8 @@ def cmd_promote(args):
     need_clone = not has_new
     if need_clone:
         clone_ver = max(
-            e["ver"] for g in groups.values() for e in g if e["ver"] != "nightly"
+            (e["ver"] for g in groups.values() for e in g if e["ver"] != "nightly"),
+            key=_ver_key,
         )
         clone_vdash = clone_ver.replace(".", "-")
         new_vdash = new_ver.replace(".", "-")
@@ -547,7 +559,7 @@ def cmd_promote(args):
         positions = [e for e in entries if e["ver"] != new_ver]
         new_content = sorted(
             [e for e in entries if e["ver"] != old_ver],
-            key=lambda x: x["ver"],
+            key=lambda x: _ver_key(x["ver"]),
         )
         days = slot_days(fam, var)
 
@@ -698,6 +710,16 @@ examples:
     p_pro.add_argument("--confirm", action="store_true")
 
     args = parser.parse_args()
+
+    def _check_ver(v, label):
+        if not re.fullmatch(r"\d+\.\d+", v):
+            parser.error(f"invalid {label}: '{v}' (expected MAJOR.MINOR, e.g. 1.23)")
+
+    if hasattr(args, "version"):
+        _check_ver(args.version, "version")
+    if hasattr(args, "replace") and args.replace:
+        _check_ver(args.replace, "--replace version")
+
     cmds = {
         "show": cmd_show, "remove": cmd_remove,
         "add": cmd_add, "promote": cmd_promote,
