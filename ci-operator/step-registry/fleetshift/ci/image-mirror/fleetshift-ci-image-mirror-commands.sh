@@ -11,81 +11,71 @@ log() {
     echo "$ts" "$@" | tee -a "$log_file"
 }
 
-# Setup registry credentials
 REGISTRY_TOKEN_FILE="$SECRETS_PATH/$REGISTRY_SECRET/$REGISTRY_SECRET_FILE"
 
 if [[ ! -r "$REGISTRY_TOKEN_FILE" ]]; then
-    log "ERROR Registry secret file not found: $REGISTRY_TOKEN_FILE"
+    log "ERROR Registry secret file not found or not readable"
     exit 1
 fi
 
-config_file="$HOME/.docker/config.json"
-base64 -d <"$REGISTRY_TOKEN_FILE" >"$config_file" || {
-    log "ERROR Could not base64 decode registry secret file"
-    log "      From: $REGISTRY_TOKEN_FILE"
-    log "      To  : $config_file"
+base64 -d <"$REGISTRY_TOKEN_FILE" >"$HOME/.docker/config.json" || {
+    log "ERROR Could not decode registry secret"
     exit 1
 }
 
-# Get IMAGE_TAG if not provided
 if [[ -z "$IMAGE_TAG" ]]; then
     case "$JOB_TYPE" in
     presubmit)
-        log "INFO Building image tag for a $JOB_TYPE job"
         IMAGE_TAG="PR${PULL_NUMBER}-${PULL_PULL_SHA}"
         ;;
     postsubmit)
-        log "INFO Building image tag for a $JOB_TYPE job"
         IMAGE_TAG="${PULL_BASE_SHA}"
         ;;
     *)
-        log "ERROR Cannot derive an image tag from a $JOB_TYPE job; set IMAGE_TAG explicitly"
+        log "ERROR Cannot derive IMAGE_TAG for job type $JOB_TYPE"
         exit 1
         ;;
     esac
 fi
-log "INFO Image tag is $IMAGE_TAG"
 
 mirror_image() {
     local tag="$1"
     local destination_image_ref="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$tag"
-    local mirror_log="${ARTIFACT_DIR}/oc-mirror-output-${tag}.log"
+    local mirror_log
+    mirror_log="$(mktemp)"
 
-    log "INFO Mirroring Image"
-    log "     From: $SOURCE_IMAGE_REF"
-    log "     To  : $destination_image_ref"
+    log "INFO Mirroring $IMAGE_REPO:$tag"
 
     for i in {1..6}; do
-        if ! oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$destination_image_ref" 1>"${mirror_log}"; then
-            log "ERROR Unable to mirror image to $destination_image_ref"
-        fi
-
-        if [[ -n "$(cat "${mirror_log}")" ]]; then
-            log "INFO Mirroring complete for tag $tag"
+        : >"$mirror_log"
+        if oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$destination_image_ref" 1>"$mirror_log" 2>/dev/null \
+            && [[ -s "$mirror_log" ]]; then
+            rm -f "$mirror_log"
+            log "INFO Mirrored $IMAGE_REPO:$tag"
             return 0
         fi
 
-        log "WARN Nothing mirrored: oc image mirror log is empty."
-
         if [[ "${i}" == "6" ]]; then
-            log "ERROR failed to complete mirroring for tag $tag"
+            rm -f "$mirror_log"
+            log "ERROR Failed to mirror $IMAGE_REPO:$tag"
             return 1
         fi
 
-        log "INFO Retrying (${i} of 5) ..."
+        log "WARN Mirror attempt $i failed; retrying in 60s"
         sleep 60
     done
+
+    rm -f "$mirror_log"
 }
 
 if ! mirror_image "$IMAGE_TAG"; then
     exit 1
 fi
 
-# Optionally also publish :latest from the same built image (postsubmit / periodic heal).
 if [[ "${ALSO_TAG_LATEST:-}" == "true" && "$IMAGE_TAG" != "latest" ]]; then
     if ! mirror_image "latest"; then
         exit 1
     fi
 fi
 
-log "INFO All mirroring complete."
+log "INFO Done"
