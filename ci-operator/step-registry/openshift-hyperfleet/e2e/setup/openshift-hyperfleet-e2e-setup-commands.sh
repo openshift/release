@@ -61,6 +61,16 @@ export SENTINEL_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG:-lates
 # Enable JWT authentication for the API
 export JWT_AUTH_ENABLED="${JWT_AUTH_ENABLED:-true}"
 
+# When JWT is enabled, discover the actual OIDC issuer URL from the cluster.
+# GKE uses a GCP-specific issuer (container.googleapis.com/v1/projects/...),
+# not kubernetes.default.svc.cluster.local, so we must detect it at runtime.
+if [[ "${JWT_AUTH_ENABLED}" == "true" ]]; then
+  OIDC_ISSUER_URL=$(kubectl get --raw /.well-known/openid-configuration | jq -r '.issuer')
+  OIDC_JWKS_URL="${OIDC_ISSUER_URL}/jwks"
+  export OIDC_ISSUER_URL OIDC_JWKS_URL
+  log "OIDC issuer discovered: ${OIDC_ISSUER_URL}"
+fi
+
 # Install hyperfleet components via infra repo
 # Will inherit all exported values here
 git clone --depth 1 "https://github.com/openshift-hyperfleet/hyperfleet-infra.git" /tmp/hyperfleet-infra
