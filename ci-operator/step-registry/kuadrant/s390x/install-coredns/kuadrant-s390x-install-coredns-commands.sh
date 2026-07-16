@@ -241,7 +241,8 @@ fi
 
 echo "${COREDNS_LB_IP}" >"${SHARED_DIR}/kuadrant-coredns-ip"
 echo "${COREDNS_ZONE}" >"${SHARED_DIR}/kuadrant-coredns-zone"
-echo "Wrote ${SHARED_DIR}/kuadrant-coredns-ip=${COREDNS_LB_IP} zone=${COREDNS_ZONE}"
+echo "${COREDNS_NAMESPACE}" >"${SHARED_DIR}/kuadrant-coredns-namespace"
+echo "Wrote ${SHARED_DIR}/kuadrant-coredns-ip=${COREDNS_LB_IP} zone=${COREDNS_ZONE} ns=${COREDNS_NAMESPACE}"
 
 echo "=== kuadrant-coredns install complete ==="
 oc get deploy,svc,pods -n "${COREDNS_NAMESPACE}" -o wide

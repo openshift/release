@@ -33,41 +33,235 @@ JAEGER_QUERY_URL="$(cat "${SHARED_DIR}/jaeger-query-url")"
 JAEGER_COLLECTOR_URL="rpc://jaeger-collector.${TOOLS_NAMESPACE}.svc.cluster.local:4317"
 
 COREDNS_ZONE="${COREDNS_ZONE:-k.example.com}"
+COREDNS_NAMESPACE="${COREDNS_NAMESPACE:-kuadrant-coredns}"
 COREDNS_LB_IP=""
+COREDNS_PF_PID=""
+COREDNS_LOCAL_PORT="${COREDNS_LOCAL_PORT:-15353}"
+DNS_HOOK_DIR="${HOME}/kuadrant-dns-hook"
 if [[ -f "${SHARED_DIR}/kuadrant-coredns-ip" ]]; then
   COREDNS_LB_IP="$(tr -d '[:space:]' <"${SHARED_DIR}/kuadrant-coredns-ip")"
 fi
 if [[ -f "${SHARED_DIR}/kuadrant-coredns-zone" ]]; then
   COREDNS_ZONE="$(tr -d '[:space:]' <"${SHARED_DIR}/kuadrant-coredns-zone")"
 fi
-
-# Smoke DNSPolicy hostnames are under COREDNS_ZONE (e.g. *.k.example.com). The
-# test pod must query kuadrant-coredns (MetalLB) to resolve them — same pattern
-# as the m42lp36/mc1 lab where clients use the CoreDNS LB as nameserver.
-if [[ -n "${COREDNS_LB_IP}" ]]; then
-  echo "=== Configuring resolver for zone ${COREDNS_ZONE} via ${COREDNS_LB_IP} ==="
-  cp /etc/resolv.conf /tmp/kuadrant-resolv-orig.conf 2>/dev/null || true
-  {
-    echo "nameserver ${COREDNS_LB_IP}"
-    if [[ -f /tmp/kuadrant-resolv-orig.conf ]]; then
-      grep -v '^nameserver '"${COREDNS_LB_IP}"'$' /tmp/kuadrant-resolv-orig.conf || true
-    fi
-  } >/tmp/kuadrant-resolv.conf
-  if cat /tmp/kuadrant-resolv.conf >/etc/resolv.conf 2>/dev/null; then
-    echo "Updated /etc/resolv.conf"
-  elif mount --bind /tmp/kuadrant-resolv.conf /etc/resolv.conf 2>/dev/null; then
-    echo "Bound-mounted custom resolv.conf"
-  else
-    echo "WARNING: could not update /etc/resolv.conf; DNSPolicy HTTP checks may fail" >&2
-  fi
-  echo "--- resolv.conf ---"
-  cat /etc/resolv.conf || true
-  if command -v dig >/dev/null 2>&1; then
-    dig @"${COREDNS_LB_IP}" NS "${COREDNS_ZONE}" +time=3 +tries=1 || true
-  fi
-else
-  echo "WARNING: ${SHARED_DIR}/kuadrant-coredns-ip missing; DNS zone resolution may fail" >&2
+if [[ -f "${SHARED_DIR}/kuadrant-coredns-namespace" ]]; then
+  COREDNS_NAMESPACE="$(tr -d '[:space:]' <"${SHARED_DIR}/kuadrant-coredns-namespace")"
 fi
+
+# CI step pods cannot rewrite /etc/resolv.conf (Permission denied). Dynaconf
+# dns.* is only used by geo/dig helpers, not by httpx. Bridge resolution by:
+#   1) oc port-forward kuadrant-coredns :53 → 127.0.0.1:COREDNS_LOCAL_PORT (TCP)
+#   2) pytest plugin that patches socket.getaddrinfo for *.COREDNS_ZONE
+setup_coredns_client_resolver() {
+  if [[ -z "${COREDNS_LB_IP}" ]]; then
+    echo "WARNING: ${SHARED_DIR}/kuadrant-coredns-ip missing; DNS zone resolution may fail" >&2
+    return 0
+  fi
+
+  echo "=== Bridging DNS zone ${COREDNS_ZONE} via port-forward to kuadrant-coredns ==="
+  echo "CoreDNS LoadBalancer ${COREDNS_LB_IP}; local TCP DNS 127.0.0.1:${COREDNS_LOCAL_PORT}"
+
+  mkdir -p "${DNS_HOOK_DIR}"
+  cat >"${DNS_HOOK_DIR}/kuadrant_coredns_resolve.py" <<'PY'
+"""Pytest plugin: resolve Kuadrant DNSPolicy hostnames via local CoreDNS forward."""
+from __future__ import annotations
+
+import os
+import socket
+import struct
+import sys
+
+_ZONE = os.environ.get("KUADRANT_COREDNS_ZONE", "k.example.com").strip(".").lower()
+_DNS_HOST = os.environ.get("KUADRANT_COREDNS_DNS_HOST", "127.0.0.1")
+_DNS_PORT = int(os.environ.get("KUADRANT_COREDNS_DNS_PORT", "15353"))
+_ORIG_GETADDRINFO = socket.getaddrinfo
+_CACHE: dict[str, str] = {}
+
+
+def _belongs_to_zone(host: str) -> bool:
+    h = host.strip(".").lower()
+    return h == _ZONE or h.endswith("." + _ZONE)
+
+
+def _encode_name(name: str) -> bytes:
+    out = b""
+    for label in name.strip(".").split("."):
+        raw = label.encode("idna")
+        out += bytes([len(raw)]) + raw
+    return out + b"\x00"
+
+
+def _dns_query_a(name: str) -> str | None:
+    cached = _CACHE.get(name)
+    if cached:
+        return cached
+    question = _encode_name(name) + struct.pack("!HH", 1, 1)  # A IN
+    header = struct.pack("!HHHHHH", 0xC0DE, 0x0100, 1, 0, 0, 0)
+    payload = header + question
+    with socket.create_connection((_DNS_HOST, _DNS_PORT), timeout=3.0) as sock:
+        sock.sendall(struct.pack("!H", len(payload)) + payload)
+        sock.settimeout(3.0)
+        length_bytes = sock.recv(2)
+        if len(length_bytes) < 2:
+            return None
+        (msg_len,) = struct.unpack("!H", length_bytes)
+        data = b""
+        while len(data) < msg_len:
+            chunk = sock.recv(msg_len - len(data))
+            if not chunk:
+                break
+            data += chunk
+    if len(data) < 12:
+        return None
+    ancount = struct.unpack("!H", data[6:8])[0]
+    i = 12
+    # skip question
+    while i < len(data) and data[i] != 0:
+        i += 1 + data[i]
+    i += 5
+    for _ in range(ancount):
+        if i >= len(data):
+            break
+        if data[i] & 0xC0 == 0xC0:
+            i += 2
+        else:
+            while i < len(data) and data[i] != 0:
+                i += 1 + data[i]
+            i += 1
+        if i + 10 > len(data):
+            break
+        rtype, _, _, rdlen = struct.unpack("!HHIH", data[i : i + 10])
+        i += 10
+        rdata = data[i : i + rdlen]
+        i += rdlen
+        if rtype == 1 and rdlen == 4:
+            ip = socket.inet_ntoa(rdata)
+            _CACHE[name] = ip
+            return ip
+    return None
+
+
+def _patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    if isinstance(host, bytes):
+        try:
+            host_str = host.decode("utf-8")
+        except UnicodeDecodeError:
+            host_str = ""
+    else:
+        host_str = host if isinstance(host, str) else ""
+    if host_str and _belongs_to_zone(host_str):
+        ip = _dns_query_a(host_str)
+        if ip:
+            return _ORIG_GETADDRINFO(ip, port, family, type, proto, flags)
+    return _ORIG_GETADDRINFO(host, port, family, type, proto, flags)
+
+
+def install() -> None:
+    if socket.getaddrinfo is not _patched_getaddrinfo:
+        socket.getaddrinfo = _patched_getaddrinfo  # type: ignore[assignment]
+        print(
+            f"[kuadrant_coredns_resolve] patching getaddrinfo for *.{_ZONE} "
+            f"via {_DNS_HOST}:{_DNS_PORT}",
+            file=sys.stderr,
+        )
+
+
+def pytest_configure(config):  # noqa: ARG001
+    install()
+
+
+install()
+PY
+
+  # Also provide sitecustomize for any non-pytest python helpers.
+  cat >"${DNS_HOOK_DIR}/sitecustomize.py" <<'PY'
+try:
+    import kuadrant_coredns_resolve
+except Exception as exc:  # pragma: no cover
+    import sys
+    print(f"[sitecustomize] kuadrant_coredns_resolve failed: {exc}", file=sys.stderr)
+PY
+
+  export PYTHONPATH="${DNS_HOOK_DIR}${PYTHONPATH:+:${PYTHONPATH}}"
+  export KUADRANT_COREDNS_ZONE="${COREDNS_ZONE}"
+  export KUADRANT_COREDNS_DNS_HOST="127.0.0.1"
+  export KUADRANT_COREDNS_DNS_PORT="${COREDNS_LOCAL_PORT}"
+
+  # Tear down any stale forwarder on this port, then start a fresh one.
+  if command -v fuser >/dev/null 2>&1; then
+    fuser -k "${COREDNS_LOCAL_PORT}/tcp" 2>/dev/null || true
+  fi
+  oc port-forward -n "${COREDNS_NAMESPACE}" svc/kuadrant-coredns \
+    "${COREDNS_LOCAL_PORT}:53" >"${ARTIFACT_DIR}/kuadrant-coredns-port-forward.log" 2>&1 &
+  COREDNS_PF_PID=$!
+  echo "${COREDNS_PF_PID}" >"${SHARED_DIR}/kuadrant-coredns-port-forward.pid"
+
+  echo "Waiting for local DNS port-forward (pid ${COREDNS_PF_PID})..."
+  ready=0
+  for _ in $(seq 1 60); do
+    if ! kill -0 "${COREDNS_PF_PID}" 2>/dev/null; then
+      echo "ERROR: kuadrant-coredns port-forward exited early" >&2
+      cat "${ARTIFACT_DIR}/kuadrant-coredns-port-forward.log" >&2 || true
+      return 1
+    fi
+    if PYTHONPATH="${DNS_HOOK_DIR}" KUADRANT_COREDNS_ZONE="${COREDNS_ZONE}" \
+      KUADRANT_COREDNS_DNS_HOST="127.0.0.1" KUADRANT_COREDNS_DNS_PORT="${COREDNS_LOCAL_PORT}" \
+      "$(command -v python3 || command -v python)" - <<'PROBE'
+import socket, struct, os, sys
+zone = os.environ["KUADRANT_COREDNS_ZONE"]
+host = os.environ["KUADRANT_COREDNS_DNS_HOST"]
+port = int(os.environ["KUADRANT_COREDNS_DNS_PORT"])
+# SOA/NS probe: query type NS (2)
+def enc(n):
+    o=b""
+    for lab in n.strip(".").split("."):
+        r=lab.encode(); o+=bytes([len(r)])+r
+    return o+b"\x00"
+q = enc(zone)+struct.pack("!HH", 2, 1)
+payload = struct.pack("!HHHHHH", 0xBEEF, 0x0100, 1, 0, 0, 0)+q
+try:
+    with socket.create_connection((host, port), timeout=2.0) as s:
+        s.sendall(struct.pack("!H", len(payload))+payload)
+        s.settimeout(2.0)
+        lb=s.recv(2)
+        if len(lb)<2:
+            sys.exit(1)
+        (n,)=struct.unpack("!H", lb)
+        data=b""
+        while len(data)<n:
+            c=s.recv(n-len(data))
+            if not c: break
+            data+=c
+    rcode = data[3] & 0x0F if len(data)>=4 else 15
+    # rcode 0 (NOERROR) or 3 (NXDOMAIN) both prove CoreDNS answered
+    sys.exit(0 if rcode in (0, 3) else 1)
+except Exception:
+    sys.exit(1)
+PROBE
+    then
+      ready=1
+      break
+    fi
+    sleep 1
+  done
+  if [[ "${ready}" -ne 1 ]]; then
+    echo "ERROR: could not reach kuadrant-coredns via port-forward on 127.0.0.1:${COREDNS_LOCAL_PORT}" >&2
+    cat "${ARTIFACT_DIR}/kuadrant-coredns-port-forward.log" >&2 || true
+    return 1
+  fi
+  echo "CoreDNS port-forward ready; getaddrinfo patch will load via pytest -p kuadrant_coredns_resolve"
+}
+
+stop_coredns_client_resolver() {
+  if [[ -n "${COREDNS_PF_PID}" ]]; then
+    echo "=== Stopping kuadrant-coredns port-forward (pid ${COREDNS_PF_PID}) ==="
+    kill_pid_tree "${COREDNS_PF_PID}"
+    wait_for_pids "${COREDNS_PF_PID}"
+    COREDNS_PF_PID=""
+  elif [[ -f "${SHARED_DIR}/kuadrant-coredns-port-forward.pid" ]]; then
+    kill_pid_tree "$(cat "${SHARED_DIR}/kuadrant-coredns-port-forward.pid" 2>/dev/null || true)"
+  fi
+}
 
 CFSSL_BIN="$(command -v cfssl || true)"
 if [[ -z "${CFSSL_BIN}" ]]; then
@@ -424,14 +618,17 @@ FAILED=0
 
 if [[ "${RUN_SMOKE}" == "true" ]]; then
   echo "=== Running smoke tests (no Playwright) ==="
+  setup_coredns_client_resolver
   start_istio_proxy_log_collector
   start_dns_log_collector
-  if ! flags="${PYTEST_FLAGS}" make smoke; then
+  # -p kuadrant_coredns_resolve: patch getaddrinfo for *.COREDNS_ZONE via port-forward
+  if ! flags="${PYTEST_FLAGS} -p kuadrant_coredns_resolve" make smoke; then
     echo "WARNING: smoke tests reported failures" >&2
     FAILED=1
   fi
   stop_dns_log_collector
   stop_istio_proxy_log_collector
+  stop_coredns_client_resolver
   dump_s390x_smoke_diagnostics
 fi
 
