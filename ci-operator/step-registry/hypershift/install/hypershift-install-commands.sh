@@ -6,20 +6,58 @@ EXTRA_ARGS=""
 HCP_CLI="bin/hypershift"
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
 
-if [[ $HO_MULTI == "true" ]]; then
+extract_hcp_cli() {
+  local image=$1
+  local cli_dir
+  cli_dir="$(mktemp -d "${TMPDIR:-/tmp}/hs-cli.XXXXXX")"
+  oc extract secret/pull-secret -n openshift-config --to="${cli_dir}" --confirm
+  oc image extract "${image}" --path "/usr/bin/hypershift:${cli_dir}" --registry-config="${cli_dir}/.dockerconfigjson" --filter-by-os="linux/amd64" --confirm
+  chmod +x "${cli_dir}/hypershift"
+  HCP_CLI="${cli_dir}/hypershift"
+}
+
+# Gangway does not strip the MULTISTAGE_PARAM_OVERRIDE_ prefix, so the HO release
+# controller passes the image via the prefixed variable and we copy it here.
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE="${MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
+fi
+
+OVERRIDE_COUNT=0
+if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+if [[ "${HO_MULTI}" == "true" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+if [[ "${INSTALL_FROM_LATEST}" == "true" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+
+if [[ ${OVERRIDE_COUNT} -gt 1 ]]; then
+  echo "WARNING: Multiple image override flags are set. Precedence (highest to lowest):"
+  echo "  1. OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE"
+  echo "  2. HO_MULTI"
+  echo "  3. INSTALL_FROM_LATEST"
+fi
+
+if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  echo "WARNING: Overriding OPERATOR_IMAGE"
+  echo "  Default: ${HYPERSHIFT_RELEASE_LATEST}"
+  echo "  Override: ${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
+  OPERATOR_IMAGE="${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
+  extract_hcp_cli "${OPERATOR_IMAGE}"
+elif [[ "${HO_MULTI}" == "true" ]]; then
+  # extract_hcp_cli uses --filter-by-os=linux/amd64 because the step container is always amd64
+  echo "WARNING: Using ACM downstream multi-arch operator image (CI pipeline builds amd64 only)"
+  echo "  Default: ${HYPERSHIFT_RELEASE_LATEST}"
+  echo "  Override: quay.io/acm-d/rhtap-hypershift-operator:latest"
   OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
-  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-  mkdir /tmp/hs-cli
-  oc image extract quay.io/acm-d/rhtap-hypershift-operator:latest --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
-  chmod +x /tmp/hs-cli/hypershift
-  HCP_CLI="/tmp/hs-cli/hypershift"
-elif [[ $INSTALL_FROM_LATEST == "true" ]]; then
+  extract_hcp_cli "${OPERATOR_IMAGE}"
+elif [[ "${INSTALL_FROM_LATEST}" == "true" ]]; then
   # We should use the hypershift cli from the HYPERSHIFT_RELEASE_LATEST
-  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-  mkdir /tmp/hs-cli
-  oc image extract $HYPERSHIFT_RELEASE_LATEST --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
-  chmod +x /tmp/hs-cli/hypershift
-  HCP_CLI="/tmp/hs-cli/hypershift"
+  echo "WARNING: Extracting hcp CLI from dependency image instead of step container"
+  echo "  Image: ${OPERATOR_IMAGE}"
+  extract_hcp_cli "${OPERATOR_IMAGE}"
 fi
 
 if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
