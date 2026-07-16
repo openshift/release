@@ -12,6 +12,10 @@ pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
 
 cp /secrets/import-secret/.dockerconfigjson ${HOME}/.pull-secret.json
 
+set +x
+ci_clone_src true
+set -x
+
 cd /go/src/github.com/openshift/microshift/
 DEST_DIR=${HOME}/.local/bin ./scripts/fetch_tools.sh yq
 ./scripts/auto-rebase/rebase_job_entrypoint.sh
