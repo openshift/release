@@ -49,14 +49,22 @@ if ! oc image info "${MUST_GATHER_IMAGE}" --filter-by-os="linux/amd64" &>/dev/nu
     # Merge quay.io:443 auth into the cluster pull secret
     typeset tmpPullSecret
     tmpPullSecret=$(mktemp)
-    oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > "${tmpPullSecret}"
+    oc extract secret/pull-secret -n openshift-config --to=- --keys=.dockerconfigjson > "${tmpPullSecret}"
     # Build auth token and merge into pull secret (xtrace disabled to protect credentials)
     ( set +x
       typeset quayUsername quayPassword quayAuth
       quayUsername=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username)
       quayPassword=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_pullsecret)
       quayAuth=$(echo -n "${quayUsername}:${quayPassword}" | base64 -w 0)
-      jq --arg quayAuth "${quayAuth}" '.auths += {"quay.io:443": {"auth":$quayAuth,"email":""}}' "${tmpPullSecret}" > "${tmpPullSecret}.tmp"
+      # Use python3 (available in RHEL-based cli image) instead of jq (not available)
+      _QUAY_AUTH="${quayAuth}" python3 -c '
+import json, os, sys
+with open(sys.argv[1]) as f:
+    ps = json.load(f)
+ps.setdefault("auths", {})["quay.io:443"] = {"auth": os.environ["_QUAY_AUTH"], "email": ""}
+with open(sys.argv[1] + ".tmp", "w") as f:
+    json.dump(ps, f)
+' "${tmpPullSecret}"
       mv "${tmpPullSecret}.tmp" "${tmpPullSecret}"
     true )
     oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${tmpPullSecret}"
