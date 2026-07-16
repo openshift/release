@@ -65,6 +65,12 @@ proxy = (
 print(yaml.dump({key: proxy}, default_flow_style=False, allow_unicode=True).rstrip())
 " "${ssh_key_file}" "${ssh_user}" "${hypervisor_ip}" >> "${bastion_host_vars}"
 
+    # Override ANSIBLE_REMOTE_TMP for the bastion. The global env var sets
+    # /tmp/.ansible/tmp (needed for the Prow container where HOME=/ is not
+    # writable), but the bastion denies mkdir in /tmp via sshpass+ProxyCommand.
+    # The bastion's home directory is writable, so the default path works.
+    echo "ansible_remote_tmp: ~/.ansible/tmp" >> "${bastion_host_vars}"
+
     echo "SSH jump configured: container -> ${ssh_user}@${hypervisor_ip} -> bastion"
 }
 
