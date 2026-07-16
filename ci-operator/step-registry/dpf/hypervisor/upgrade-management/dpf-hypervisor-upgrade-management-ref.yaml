@@ -1,0 +1,29 @@
+ref:
+  as: dpf-hypervisor-upgrade-management
+  commands: dpf-hypervisor-upgrade-management-commands.sh
+  credentials:
+  - mount_path: /var/run/dpf-ci
+    name: dpf-ci
+    namespace: test-credentials
+  documentation: |-
+    Upgrade the management cluster OCP version on an existing deployment.
+
+    This step:
+    1. Sets up SSH access to hypervisor
+    2. Locates the last deployed cluster via last-openshift-dpf-dir.sh
+    3. Runs 'make upgrade-management' (upgrade + verify-deployment)
+
+    By default upgrades to z+1 of the current cluster version.
+    Set MANAGEMENT_UPGRADE_TARGET_VERSION in .env to target a specific version.
+
+    Required Vault secrets:
+    - private-key: SSH key for hypervisor
+  env:
+  - default: "10.6.135.45"
+    name: REMOTE_HOST
+  from: dpf-ci
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 2h0m0s
