@@ -1,7 +1,7 @@
 ref:
-  as: aro-hcp-provision-environment
+  as: aro-hcp-provision-from-main
   from: aro-hcp-e2e-tools
-  commands: aro-hcp-provision-environment-commands.sh
+  commands: aro-hcp-provision-from-main-commands.sh
   grace_period: 15s
   resources:
     requests:
@@ -18,10 +18,7 @@ ref:
         Selects which environment's cluster secrets to use (dev, int, stg, prod).
     - name: LOCATION
       default: "westus3"
-      documentation: Azure region to provision resources in.  For example, "westus3".
-    - name: USE_OC_LOGIN_REGISTRIES
-      default: ""
-      documentation: Space-separated list of registries that require oc registry login for authentication
+      documentation: Azure region to provision resources in. For example, "westus3".
     - name: ARO_HCP_DEPLOY_ENV
       default: "ci00"
       documentation: |-
@@ -36,22 +33,11 @@ ref:
     - name: COMPRESS_TIMING_METADATA
       default: "true"
       documentation: Whether to compress timing metadata files with gzip.
-  dependencies:
-  - name: "pipeline:aro-hcp-backend"
-    env: BACKEND_IMAGE
-  - name: "pipeline:aro-hcp-frontend"
-    env: FRONTEND_IMAGE
-  - name: "pipeline:aro-hcp-admin-api"
-    env: ADMIN_API_IMAGE
-  - name: "pipeline:aro-hcp-sessiongate"
-    env: SESSIONGATE_IMAGE
-  - name: "pipeline:aro-hcp-hcp-recovery"
-    env: HCP_RECOVERY_IMAGE
-  - name: "pipeline:aro-hcp-fleet"
-    env: FLEET_IMAGE
-  - name: "pipeline:aro-hcp-mgmt-agent"
-    env: MGMT_AGENT_IMAGE
-  - name: "pipeline:aro-hcp-kube-applier"
-    env: KUBE_APPLIER_IMAGE
   documentation: |-
-    Create ARO HCP development environment.
+    Provision an ARO HCP baseline environment from the main branch.
+    Used as the first phase of upgrade-path validation: the environment
+    is created from main, then upgraded to the PR branch in a subsequent step.
+    Resolves main's HEAD commit SHA and looks up the corresponding images
+    in ACR (pushed by the postsubmit images-push job), polling until
+    available. If HEAD's images never appear, walks back through recent
+    history to find the newest commit with images already pushed.
