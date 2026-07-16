@@ -14,6 +14,7 @@ function pr_debug_mode_waiting {
   TZ=UTC
   END_TIME=$(date -d "${TIMEOUT}" +%s)
   debug_done=/tmp/debug.done
+  keep_debugging=/tmp/keep.debugging
 
   while sleep 1m; do
 
@@ -23,15 +24,23 @@ function pr_debug_mode_waiting {
     echo "'${debug_done}' not found. Debugging can continue... "
     now=$(date +%s)
     if [ "${END_TIME}" -lt "${now}" ] ; then
-      echo "Time out reached. Exiting by timeout..."
-      break
+      if [ -f "${keep_debugging}" ]; then
+        echo "To quit debugging, run the following command from the POD Terminal:"
+        echo "$ rm -f ${keep_debugging}"
+        continue
+      else
+        echo "Time out reached. Exiting by timeout..."
+        break
+      fi
     else
       echo "Now:     $(date -d "@${now}")"
       echo "Timeout: $(date -d "@${END_TIME}")"
     fi
-    echo "Note: To exit from debug mode before the timeout is reached,"
-    echo "just run the following command from the POD Terminal:"
-    echo "$ touch ${debug_done}"
+    echo "[Note]:"
+    echo "- To exit from debug mode before the timeout is reached,"
+    echo "  run the following command from the POD Terminal: $ touch ${debug_done}"
+    echo "- To keep debugging after the timeout is reached,"
+    echo "  run the following command from the POD Terminal: $ touch ${keep_debugging}"
 
   done
 
