@@ -1,0 +1,25 @@
+workflow:
+  as: openshift-e2e-gcd-csi
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-gcd-pre
+    - ref: storage-conf-csi-gcp-pd
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-obj-check
+    - chain: gather-core-dump
+    - chain: ipi-gcp-post
+    - ref: gcp-deprovision-bastionhost
+    - ref: gcp-deprovision-vpc
+    env:
+      TEST_CSI_DRIVER_MANIFEST: manifest-gcp-pd.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-gcp-pd.yaml
+      TEST_SUITE: openshift/csi
+      COMPUTE_DISK_TYPE: hyperdisk-balanced
+  documentation: |-
+    The OpenShift E2E GCD CSI workflow executes the openshift/csi end-to-end
+    test suite on a private cluster on Google Cloud Dedicated using the
+    GCP PD CSI driver with hyperdisk-balanced storage.
