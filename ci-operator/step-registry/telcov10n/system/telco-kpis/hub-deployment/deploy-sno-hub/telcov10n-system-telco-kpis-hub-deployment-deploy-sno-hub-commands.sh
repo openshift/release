@@ -14,11 +14,20 @@ main() {
 
     cd /eco-ci-cd
 
+    DEBUG_FLAG="-vv"
+    if [ "${DEBUG}" = "true" ]; then
+        DEBUG_FLAG="-vvv"
+    fi
+
     # Determine release: lockdown > explicit image > version
     local release=""
     if [[ -n "${HUB_LOCKDOWN_URI:-}" ]]; then
         echo "Resolving OCP release from hub lockdown: ${HUB_LOCKDOWN_URI}"
-        download_lockdown_json "${HUB_LOCKDOWN_URI}" /tmp/hub-lockdown.json
+        ansible-playbook ./playbooks/telco-kpis/download-lockdown.yml \
+            -i ./inventories/ocp-deployment/build-inventory.py \
+            -e "lockdown_uri=${HUB_LOCKDOWN_URI}" \
+            -e "lockdown_local_path=/tmp/hub-lockdown.json" \
+            ${DEBUG_FLAG}
         release=$(python3 -c "
 import json, sys
 data = json.load(open('/tmp/hub-lockdown.json'))
@@ -32,11 +41,6 @@ print(ps['tag'] if isinstance(ps, dict) else ps)
     else
         release="${VERSION}"
         echo "OCP release from version: ${release}"
-    fi
-
-    DEBUG_FLAG="-vv"
-    if [ "${DEBUG}" = "true" ]; then
-        DEBUG_FLAG="-vvv"
     fi
 
     ansible-playbook ./playbooks/deploy-ocp-sno.yml \
