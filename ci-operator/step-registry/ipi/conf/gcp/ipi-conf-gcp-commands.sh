@@ -93,7 +93,7 @@ controlPlane:
     gcp:
       type: ${master_type}
       osDisk:
-        diskType: pd-ssd
+        diskType: ${CONTROL_PLANE_DISK_TYPE}
         diskSizeGB: 200
   replicas: ${masters}
 compute:
