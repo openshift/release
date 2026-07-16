@@ -43,7 +43,7 @@ if [[ -n "${CPU_PLATFORM}" ]]; then
 fi
 
 gcloud compute instances create "${INSTANCE_PREFIX}" \
-  --image-family rhel-9 \
+  --image-family "${INSTANCE_IMAGE}" \
   --image-project rhel-cloud \
   --enable-nested-virtualization \
   "${CPU_PLATFORM_ARGS[@]}" \
