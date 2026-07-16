@@ -16,6 +16,31 @@ export CYPRESS_QUAY_USER="$QUAY_USERNAME"
 export CYPRESS_QUAY_PASSWORD="$QUAY_PASSWORD"
 export CYPRESS_QUAY_VERSION="$QUAY_VERSION"
 
+ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
+mkdir -p $ARTIFACT_DIR
+
+function copyArtifacts {
+    JUNIT_PREFIX="junit_"
+    # Copy XML test results with junit_ prefix for Prow reporting
+    for file in cypress/results/*.xml; do
+        if [ -f "$file" ]; then
+            base=$(basename "$file")
+            cp "$file" "$ARTIFACT_DIR/${JUNIT_PREFIX}${base}"
+        fi
+    done
+    # Copy the console log with .log extension
+    if [ -f quay_api_testing_report ]; then
+        cp quay_api_testing_report "$ARTIFACT_DIR/quay_api_testing_report.log"
+    fi
+    # Copy cypress videos if they exist
+    if ls cypress/videos/* 1>/dev/null 2>&1; then
+        mkdir -p "$ARTIFACT_DIR/quay_api_testing_cypress_videos"
+        cp cypress/videos/* "$ARTIFACT_DIR/quay_api_testing_cypress_videos/" || true
+    fi
+}
+
+trap copyArtifacts EXIT
+
 npm install
 
 # Determine which Cypress spec to use based on Quay version
@@ -30,8 +55,3 @@ fi
 
 NO_COLOR=1 npx cypress run --spec "${CYPRESS_SPEC}" --browser chrome --headless --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json > \
     quay_api_testing_report || true
-
-mkdir -p $ARTIFACT_DIR/quay_api_testing_cypress_videos || true
-cp cypress/results/quay_api_testing_report.xml $ARTIFACT_DIR/quay_api_testing_report.xml || true
-cp quay_api_testing_report $ARTIFACT_DIR/quay_api_testing_report || true
-cp cypress/videos/* $ARTIFACT_DIR/quay_api_testing_cypress_videos/ || true
