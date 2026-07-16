@@ -616,9 +616,18 @@ dump_s390x_smoke_diagnostics() {
 
 FAILED=0
 
+# CoreDNS client bridge is needed for DNSPolicy/TLSPolicy tests in both smoke
+# and the full kuadrant suite (*.COREDNS_ZONE hostnames).
+NEED_COREDNS_BRIDGE=false
+if [[ "${RUN_SMOKE}" == "true" || "${RUN_KUADRANT}" == "true" ]]; then
+  NEED_COREDNS_BRIDGE=true
+fi
+if [[ "${NEED_COREDNS_BRIDGE}" == "true" ]]; then
+  setup_coredns_client_resolver
+fi
+
 if [[ "${RUN_SMOKE}" == "true" ]]; then
   echo "=== Running smoke tests (no Playwright) ==="
-  setup_coredns_client_resolver
   start_istio_proxy_log_collector
   start_dns_log_collector
   # -p kuadrant_coredns_resolve: patch getaddrinfo for *.COREDNS_ZONE via port-forward
@@ -628,24 +637,28 @@ if [[ "${RUN_SMOKE}" == "true" ]]; then
   fi
   stop_dns_log_collector
   stop_istio_proxy_log_collector
-  stop_coredns_client_resolver
   dump_s390x_smoke_diagnostics
 fi
 
-# Temporarily disable the full single-cluster suite while stabilizing smoke on s390x.
-# if [[ "${RUN_KUADRANT}" == "true" ]]; then
-#   echo "=== Running single-cluster Kuadrant tests (make kuadrant, no ui/playwright) ==="
-#   if ! flags="${PYTEST_FLAGS}" make kuadrant; then
-#     echo "ERROR: kuadrant tests reported failures" >&2
-#     FAILED=1
-#   fi
-# fi
-echo "=== Skipping make kuadrant (disabled while stabilizing smoke) ==="
+if [[ "${RUN_KUADRANT}" == "true" ]]; then
+  echo "=== Running single-cluster Kuadrant tests (make kuadrant, no ui/playwright) ==="
+  start_istio_proxy_log_collector
+  start_dns_log_collector
+  if ! flags="${PYTEST_FLAGS} -p kuadrant_coredns_resolve" make kuadrant; then
+    echo "WARNING: kuadrant tests reported failures" >&2
+    FAILED=1
+  fi
+  stop_dns_log_collector
+  stop_istio_proxy_log_collector
+  dump_s390x_smoke_diagnostics
+fi
 
-# Temporarily skip while stabilizing smoke on s390x.
-# echo "=== Polishing JUnit reports ==="
-# make polish-junit || true
-echo "=== Skipping make polish-junit (disabled while stabilizing smoke) ==="
+if [[ "${NEED_COREDNS_BRIDGE}" == "true" ]]; then
+  stop_coredns_client_resolver
+fi
+
+echo "=== Polishing JUnit reports ==="
+make polish-junit || true
 
 echo "=== Copying test artifacts to ${ARTIFACT_DIR} ==="
 cp -a "${RESULTS_DIR}/." "${ARTIFACT_DIR}/" || true
