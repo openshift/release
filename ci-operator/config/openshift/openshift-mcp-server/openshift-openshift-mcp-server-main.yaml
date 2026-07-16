@@ -41,85 +41,31 @@ tests:
 - as: mcpchecker-eval-google
   optional: true
   steps:
+    cluster_profile: openshift-org-aws
+    env:
+      ANTHROPIC_USE_VERTEX: ""
+      EVAL_CONFIG: evals/core-eval-testing/builtin-google/eval-core.yaml
+      EVAL_LABEL_SELECTOR: suite=core
+      GEMINI_USE_VERTEX: "1"
+      GOOGLE_CLOUD_LOCATION: us-east5
+      GOOGLE_CLOUD_PROJECT: ocp-mcp-server-team
     test:
-    - as: mcpchecker-eval-google
-      commands: |
-        set -euo pipefail
-
-        export GOOGLE_APPLICATION_CREDENTIALS="/var/run/ocp-mcp/service-account.json"
-        export GOOGLE_CLOUD_LOCATION="us-east1"
-        export GEMINI_USE_VERTEX="1"
-
-        # Extract project ID from service account JSON
-        GOOGLE_CLOUD_PROJECT="$(python3 -c "import json; print(json.load(open('${GOOGLE_APPLICATION_CREDENTIALS}'))['project_id'])")"
-        export GOOGLE_CLOUD_PROJECT
-
-        # Build MCP server binary
-        GOFLAGS='-mod=readonly' make build
-
-        # Install mcpchecker (clear -mod=vendor set by CI environment)
-        GOFLAGS='' make mcpchecker
-
-        # Start MCP server in background
-        make run-server TOOLSETS=core,config
-        trap 'make stop-server || true' EXIT
-
-        # Run mcpchecker evaluation with Google Gemini agent
-        _output/tools/bin/mcpchecker check \
-          evals/core-eval-testing/builtin-google/eval-core.yaml \
-          --label-selector suite=core \
-          --output json
-      credentials:
-      - mount_path: /var/run/ocp-mcp
-        name: ocp-mcp
-        namespace: test-credentials
-      from: src
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 500m
-          memory: 200Mi
+    - chain: openshift-mcp-server-mcpchecker-eval-vertex
+    workflow: ipi-aws
 - as: mcpchecker-eval-anthropic
   optional: true
   steps:
+    cluster_profile: openshift-org-aws
+    env:
+      ANTHROPIC_USE_VERTEX: "1"
+      EVAL_CONFIG: evals/core-eval-testing/builtin-anthropic/eval-core.yaml
+      EVAL_LABEL_SELECTOR: suite=core
+      GEMINI_USE_VERTEX: ""
+      GOOGLE_CLOUD_LOCATION: us-east5
+      GOOGLE_CLOUD_PROJECT: ocp-mcp-server-team
     test:
-    - as: mcpchecker-eval-anthropic
-      commands: |
-        set -euo pipefail
-
-        export GOOGLE_APPLICATION_CREDENTIALS="/var/run/ocp-mcp/service-account.json"
-        export GOOGLE_CLOUD_LOCATION="us-east1"
-        export ANTHROPIC_USE_VERTEX="1"
-
-        # Extract project ID from service account JSON
-        GOOGLE_CLOUD_PROJECT="$(python3 -c "import json; print(json.load(open('${GOOGLE_APPLICATION_CREDENTIALS}'))['project_id'])")"
-        export GOOGLE_CLOUD_PROJECT
-
-        # Build MCP server binary
-        GOFLAGS='-mod=readonly' make build
-
-        # Install mcpchecker (clear -mod=vendor set by CI environment)
-        GOFLAGS='' make mcpchecker
-
-        # Start MCP server in background
-        make run-server TOOLSETS=core,config
-        trap 'make stop-server || true' EXIT
-
-        # Run mcpchecker evaluation with Anthropic Claude agent
-        _output/tools/bin/mcpchecker check \
-          evals/core-eval-testing/builtin-anthropic/eval-core.yaml \
-          --label-selector suite=core \
-          --output json
-      credentials:
-      - mount_path: /var/run/ocp-mcp
-        name: ocp-mcp
-        namespace: test-credentials
-      from: src
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 500m
-          memory: 200Mi
+    - chain: openshift-mcp-server-mcpchecker-eval-vertex
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
