@@ -192,11 +192,23 @@ setup_ansible_inventory() {
 # ----------------------------------------------------------------------
 # export_env_vars_from_json
 #
-# Merges TEST_SETTINGS_DEFAULTS (ref-level) with TEST_SETTINGS (config-level)
+# Merges *_SETTINGS_DEFAULTS (ref-level) with *_SETTINGS (config-level)
 # and exports the result as uppercase environment variables.
-# TEST_SETTINGS values take precedence over TEST_SETTINGS_DEFAULTS.
-# Supports "skip": true to skip a test and "continue_on_fail": true
+# *_SETTINGS values take precedence over *_SETTINGS_DEFAULTS.
+# Supports "skip": true to skip a step and "continue_on_fail": true
 # to prevent pipeline stops.
+#
+# IMPORTANT — shallow merge: overrides REPLACE entire keys, they do NOT
+# deep-merge nested objects or append to arrays. For example, if defaults
+# define a list of 13 images and the CI config overrides that key with a
+# list of 1 image, the result is 1 image — not 14. To add an image,
+# copy the full default list into the CI config override and append.
+# This is why some defaults (e.g. ran_images) are left empty: putting a
+# default list there would force every CI config to duplicate it in full
+# just to add or remove a single entry.
+#
+# Dict/list values are serialized to JSON strings via json.dumps() when
+# exported, so downstream consumers receive valid JSON.
 #
 # Parameters:
 #   1 - step_testname: test key in the JSON (e.g., "oslat", "reboot")
@@ -261,6 +273,8 @@ for key, value in merged.items():
     env_name = key.upper()
     if isinstance(value, bool):
         value = str(value).lower()
+    elif isinstance(value, (dict, list)):
+        value = json.dumps(value)
     print(f'{env_name}={value}')
 " "${step_testname}" "${test_settings}" "${test_settings_defaults}")
 

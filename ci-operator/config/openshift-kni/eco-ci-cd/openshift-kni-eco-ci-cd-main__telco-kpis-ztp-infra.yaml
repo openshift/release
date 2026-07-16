@@ -17,7 +17,7 @@ resources:
       cpu: 200m
       memory: 300Mi
 tests:
-- as: telco-kpis-ztp-tests
+- as: telco-kpis-ztp-infra
   capabilities:
   - intranet
   cron: 0 6 31 2 *
@@ -68,51 +68,26 @@ tests:
           }
         }
       PR_ONLY: "true"
-      REPORTING_SETTINGS: |-
-        {
-          "generate_report": { "development_mode": true }
-        }
-      SPOKE: spree-02
       SPOKE_CLUSTER: spree-02
-      TEST_SETTINGS: |-
-        {
-          "collect_node_info": { "skip": true },
-          "bios_validation": { "continue_on_fail": true },
-          "oslat": { "duration": "10m" },
-          "cyclictest": { "duration": "10m" },
-          "ptp": { "duration": "10m" },
-          "cpu_util": { "duration": "10m" },
-          "rfc2544": { "duration": "10m" },
-          "reboot": { "reboot_count": "1" },
-          "rds_compare": { "continue_on_fail": true }
-        }
       TIMEOUT: +10 min
-      VERSION: "4.21"
-      ZTP_CLUSTERS_PATH: siteconfig
-      ZTP_GIT_BRANCH: ""
-      ZTP_GIT_REPO: https://gitlab.cee.redhat.com/ocp-edge-qe/ztp-site-configs.git
-      ZTP_POLICIES_PATH: policygentemplates
     post:
     - ref: telcov10n-system-telco-kpis-wait-to-debug
-    - chain: telcov10n-system-telco-kpis-reporting
     pre:
     - ref: telcov10n-system-telco-kpis-common-functions-generator
+    - ref: telcov10n-system-telco-kpis-deploy-vm-bastion
     - chain: telcov10n-system-telco-kpis-hub-deployment
-    - chain: telcov10n-system-telco-kpis-spoke-deployment
+    - ref: telcov10n-system-telco-kpis-spoke-deployment-mirror-spoke-operators
     - ref: telcov10n-system-telco-kpis-mirror-ran-test-images
     test:
-    - ref: telcov10n-system-telco-kpis-collect-node-info
-    - ref: telcov10n-system-telco-kpis-tests-run-ztp-ai-deployment-time-test
-    - ref: telcov10n-system-telco-kpis-tests-run-bios-validation-test
-    - ref: telcov10n-system-telco-kpis-tests-run-oslat-test
-    - ref: telcov10n-system-telco-kpis-tests-run-cyclictest-test
-    - ref: telcov10n-system-telco-kpis-tests-run-ptp-test
-    - ref: telcov10n-system-telco-kpis-tests-run-cpu-util-test
-    - ref: telcov10n-system-telco-kpis-tests-run-reboot-test
-    - ref: telcov10n-system-telco-kpis-tests-run-rfc2544-test
-    - ref: telcov10n-system-telco-kpis-tests-run-rds-compare-test
+    - as: infra-complete
+      commands: echo "ZTP infrastructure deployment completed successfully"
+      from: dev-eco-ci-cd
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
 zz_generated_metadata:
   branch: main
   org: openshift-kni
   repo: eco-ci-cd
-  variant: telco-kpis
+  variant: telco-kpis-ztp-infra

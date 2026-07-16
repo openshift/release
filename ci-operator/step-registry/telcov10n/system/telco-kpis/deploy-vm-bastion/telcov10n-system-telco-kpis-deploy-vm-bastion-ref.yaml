@@ -1,19 +1,16 @@
 ref:
-  as: telcov10n-system-telco-kpis-hub-deployment-setup-spoke-hub-connectivity
+  as: telcov10n-system-telco-kpis-deploy-vm-bastion
   from: dev-eco-ci-cd
-  commands: telcov10n-system-telco-kpis-hub-deployment-setup-spoke-hub-connectivity-commands.sh
-  timeout: 30m
+  commands: telcov10n-system-telco-kpis-deploy-vm-bastion-commands.sh
+  timeout: 1h
   resources:
     requests:
       cpu: 100m
       memory: 200Mi
   env:
-    - name: SPOKE_CLUSTER
-      default: "spree-01"
-      documentation: Spoke cluster to connect to hub
     - name: HUB_CLUSTER
       default: "kni-qe-70"
-      documentation: Hub cluster managing the spoke
+      documentation: Hub cluster name - derives bastion MACHINE as bastion.<HUB_CLUSTER>.telco-kpis.rdu3.redhat.com
     - name: INFRA_SETTINGS
       default: '{}'
       documentation: >-
@@ -22,20 +19,14 @@ ref:
     - name: INFRA_SETTINGS_DEFAULTS
       default: |-
         {
-          "setup_spoke_hub_connectivity": {
+          "deploy_vm_bastion": {
             "skip": false,
-            "action": "setup",
-            "update_dns": true,
-            "update_provisioning_cr": true,
             "debug": false
           }
         }
       documentation: >-
-        JSON object for per-step infrastructure configuration. The "setup_spoke_hub_connectivity" key supports:
+        JSON object for per-step infrastructure configuration. The "deploy_vm_bastion" key supports:
         skip (bool) - when true, skip this step entirely and exit 0;
-        action (str) - action to perform (setup, remove, check-only, list-interconnections);
-        update_dns (bool) - update DNS records for spoke-hub connectivity;
-        update_provisioning_cr (bool) - update provisioning CR with spoke network configuration;
         debug (bool) - when true, enables Ansible -vvv verbose output.
         Values are exported as uppercase env vars.
   credentials:
@@ -140,5 +131,17 @@ ref:
       name: telcov10n-ansible-dev-kpi-04-bastion
       mount_path: /var/host_variables/dev-kpi-04/bastion
   documentation: |-
-    Setup network connectivity and ACM import between spoke and hub clusters.
-    Creates ManagedCluster resource and validates spoke is imported to hub.
+    Deploy bastion VM on hypervisor using libvirt for a given hub cluster.
+    The MACHINE name is derived from HUB_CLUSTER as bastion.<HUB_CLUSTER>.telco-kpis.rdu3.redhat.com.
+    Runs the deploy-vm-bastion-libvirt.yml Ansible playbook which:
+    - Downloads and resizes RHEL qcow2 image on the hypervisor
+    - Configures network via cloud-init
+    - Creates and starts the VM via libvirt
+    - Performs initial system setup (SSH, packages, OS activation)
+    - Sets up bastion host (registry, oc-mirror, Go, certificates)
+
+    Jenkins equivalent: telco-kpis-deploy-vm-libvirt job
+
+    CREDENTIAL DESIGN: All hub/spoke credentials are mounted in every step to enable
+    runtime cluster selection via HUB_CLUSTER environment variable
+    without modifying step definitions.

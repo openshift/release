@@ -1,9 +1,6 @@
 ref:
   as: telcov10n-system-telco-kpis-mirror-ran-test-images
-  from_image:
-    namespace: telcov10n-ci
-    name: eco-ci-cd
-    tag: eco-ci-cd
+  from: dev-eco-ci-cd
   commands: telcov10n-system-telco-kpis-mirror-ran-test-images-commands.sh
   timeout: 1h
   resources:
@@ -12,23 +9,35 @@ ref:
       memory: 200Mi
   env:
     - name: SPOKE_CLUSTER
-      default: "spree-02"
+      default: "spree-01"
       documentation: Spoke cluster where test images will be mirrored
     - name: HUB_CLUSTER
-      default: "kni-qe-71"
+      default: "kni-qe-70"
       documentation: Hub cluster managing the spoke
-    - name: RAN_IMAGES
-      default: ""
-      documentation: JSON list of container images to mirror (empty to use default RAN test images)
-    - name: DEBUG
-      default: "false"
-      documentation: Enable Ansible debug output
-    - name: SKIP_REBUILD_IMAGE
-      default: "false"
-      documentation: Skip test-runner image rebuild
-    - name: ECO_CI_CD_IMAGE
-      default: "quay.io/telcov10n-ci/eco-ci-cd:latest"
-      documentation: Container image for Ansible execution
+    - name: INFRA_SETTINGS
+      default: '{}'
+      documentation: >-
+        JSON object for per-step infrastructure configuration overrides from CI config.
+        Values here take precedence over INFRA_SETTINGS_DEFAULTS.
+    - name: INFRA_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "mirror_ran_test_images": {
+            "skip": false,
+            "ran_images": "",
+            "debug": false
+          }
+        }
+      documentation: >-
+        JSON object for per-step infrastructure configuration. The "mirror_ran_test_images" key supports:
+        skip (bool) - when true, skip this step entirely and exit 0;
+        ran_images (str/obj) - container images to mirror as a JSON object with an "images" array
+        (empty string to use playbook defaults). Intentionally left empty here because INFRA_SETTINGS
+        uses shallow merge (overrides replace entire keys, not deep merge). If ran_images had a default
+        list here, CI configs could not add a single image without copying the full list — any override
+        would replace the entire default. Set the full list in each CI config's INFRA_SETTINGS instead;
+        debug (bool) - when true, enables Ansible -vvv verbose output.
+        Values are exported as uppercase env vars.
   credentials:
     # Common hypervisor (shared across all spokes)
     - namespace: test-credentials
