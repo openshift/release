@@ -23,6 +23,8 @@ ref:
             "skip": false,
             "version": "4.21",
             "ocp_release_image": "",
+            "hub_lockdown_uri": "",
+            "architecture": "x86_64",
             "disable_insights": true,
             "debug": false
           }
@@ -30,8 +32,17 @@ ref:
       documentation: >-
         JSON object for per-step infrastructure configuration. The "deploy_sno_hub" key supports:
         skip (bool) - when true, skip this step entirely and exit 0;
-        version (str) - OpenShift version to deploy;
-        ocp_release_image (str) - optional OCP release pull spec (if empty, uses version);
+        version (str) - OpenShift version to deploy (fallback when no lockdown or release image);
+        ocp_release_image (str) - optional OCP release pull spec (overrides version, overridden by lockdown);
+        hub_lockdown_uri (str) - optional URL to hub lockdown JSON. When provided, the OCP release
+        image tag is extracted from .hub.ocp.pull_spec.tag and used as the release. This takes
+        highest priority over ocp_release_image and version. Recommended defaults (symlinks to
+        latest verified lockdowns):
+        x86_64: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json
+        arm64: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-arm64.json
+        Version-specific URLs are also available (e.g. lockdown-hub-4.21-x86_64.json).
+        Empty string disables lockdown;
+        architecture (str) - target architecture (x86_64 or arm64);
         disable_insights (bool) - disable Red Hat Insights operator;
         debug (bool) - when true, enables Ansible -vvv verbose output.
         Values are exported as uppercase env vars.
@@ -111,31 +122,100 @@ ref:
     - namespace: test-credentials
       name: telcov10n-ansible-kni-qe-70-bastion
       mount_path: /var/host_variables/kni-qe-70/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-70-master0
+      mount_path: /var/host_variables/kni-qe-70/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-kni-qe-70-masters
+      mount_path: /var/group_variables/kni-qe-70/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-kni-qe-70-nodes
+      mount_path: /var/group_variables/kni-qe-70/nodes
 
     # Hub kni-qe-71 credentials
     - namespace: test-credentials
       name: telcov10n-ansible-kni-qe-71-bastion
       mount_path: /var/host_variables/kni-qe-71/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-71-master0
+      mount_path: /var/host_variables/kni-qe-71/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-kni-qe-71-masters
+      mount_path: /var/group_variables/kni-qe-71/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-kni-qe-71-nodes
+      mount_path: /var/group_variables/kni-qe-71/nodes
 
     # Hub dev-kpi-01 credentials
     - namespace: test-credentials
       name: telcov10n-ansible-dev-kpi-01-bastion
       mount_path: /var/host_variables/dev-kpi-01/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-01-master0
+      mount_path: /var/host_variables/dev-kpi-01/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-01-masters
+      mount_path: /var/group_variables/dev-kpi-01/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-01-nodes
+      mount_path: /var/group_variables/dev-kpi-01/nodes
 
     # Hub dev-kpi-02 credentials
     - namespace: test-credentials
       name: telcov10n-ansible-dev-kpi-02-bastion
       mount_path: /var/host_variables/dev-kpi-02/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-02-master0
+      mount_path: /var/host_variables/dev-kpi-02/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-02-masters
+      mount_path: /var/group_variables/dev-kpi-02/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-02-nodes
+      mount_path: /var/group_variables/dev-kpi-02/nodes
 
     # Hub dev-kpi-03 credentials
     - namespace: test-credentials
       name: telcov10n-ansible-dev-kpi-03-bastion
       mount_path: /var/host_variables/dev-kpi-03/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-03-master0
+      mount_path: /var/host_variables/dev-kpi-03/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-03-masters
+      mount_path: /var/group_variables/dev-kpi-03/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-03-nodes
+      mount_path: /var/group_variables/dev-kpi-03/nodes
 
     # Hub dev-kpi-04 credentials
     - namespace: test-credentials
       name: telcov10n-ansible-dev-kpi-04-bastion
       mount_path: /var/host_variables/dev-kpi-04/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-04-master0
+      mount_path: /var/host_variables/dev-kpi-04/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-04-masters
+      mount_path: /var/group_variables/dev-kpi-04/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-04-nodes
+      mount_path: /var/group_variables/dev-kpi-04/nodes
   documentation: |-
     Deploy Single Node OpenShift (SNO) hub cluster using assisted installer.
     Creates hub cluster that will manage spoke deployments via ZTP.
+
+    Uses setup_ansible_inventory(HUB_CLUSTER, HUB_CLUSTER) to populate
+    inventories/ocp-deployment/ with the hub's own master0, bastion, and
+    hypervisor host_vars plus common/hub-specific group_vars.
+
+    OCP release resolution priority:
+    1. hub_lockdown_uri — download lockdown JSON, extract .hub.ocp.pull_spec.tag
+    2. ocp_release_image — explicit pull spec
+    3. version — OCP minor version (e.g., "4.21")
+
+    Jenkins equivalent: telco-kpis-deploy-sno-hub job
+
+    CREDENTIAL DESIGN: Hub clusters mount bastion, master0, and masters/nodes
+    group credentials (needed for OCP deployment). Other infra steps that only
+    need SSH access to the bastion mount bastion credentials only.

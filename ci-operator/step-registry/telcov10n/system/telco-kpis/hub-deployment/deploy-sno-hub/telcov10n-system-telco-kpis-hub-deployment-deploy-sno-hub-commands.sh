@@ -6,27 +6,47 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'deploy_sno_hub' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
 
-# TODO: Implement SNO hub deployment using Ansible playbook
-# Expected playbook: repos/eco-ci-cd/playbooks/telco-kpis/deploy-sno-hub.yml
-#
-# Implementation steps:
-# 1. Source common functions and setup environment
-# 2. Build Ansible inventory with hub cluster host variables
-# 3. Execute playbook: ansible-playbook ./playbooks/telco-kpis/deploy-sno-hub.yml
-# 4. Playbook should:
-#    - Prepare hypervisor VM for hub cluster
-#    - Download and configure assisted installer ISO
-#    - Boot VM from ISO and complete installation
-#    - Wait for cluster to be fully operational
-#    - Extract kubeconfig to bastion for subsequent steps
-# 5. Store hub kubeconfig in SHARED_DIR for downstream steps
-#
-# Environment variables:
-#   HUB_CLUSTER: Hub cluster name (dev-kpi-01, dev-kpi-02, etc.)
-#   VERSION: OpenShift version to deploy
-#   DEBUG: Enable Ansible debug output
-#   ECO_CI_CD_IMAGE: Container image for Ansible execution
+main() {
+    echo "Deploying SNO hub cluster: ${HUB_CLUSTER}"
 
-echo "TODO: Deploy SNO hub cluster ${HUB_CLUSTER} with version ${VERSION}"
-echo "This step will execute Ansible playbook for SNO hub deployment"
-echo "Required playbook: repos/eco-ci-cd/playbooks/telco-kpis/deploy-sno-hub.yml"
+    # Hub IS the OCP cluster being deployed — pass as both spoke and hub args
+    setup_ansible_inventory "${HUB_CLUSTER}" "${HUB_CLUSTER}"
+
+    cd /eco-ci-cd
+
+    # Determine release: lockdown > explicit image > version
+    local release=""
+    if [[ -n "${HUB_LOCKDOWN_URI:-}" ]]; then
+        echo "Resolving OCP release from hub lockdown: ${HUB_LOCKDOWN_URI}"
+        download_lockdown_json "${HUB_LOCKDOWN_URI}" /tmp/hub-lockdown.json
+        release=$(python3 -c "
+import json, sys
+data = json.load(open('/tmp/hub-lockdown.json'))
+ps = data['hub']['ocp']['pull_spec']
+print(ps['tag'] if isinstance(ps, dict) else ps)
+")
+        echo "OCP release from lockdown: ${release}"
+    elif [[ -n "${OCP_RELEASE_IMAGE:-}" ]]; then
+        release="${OCP_RELEASE_IMAGE}"
+        echo "OCP release from explicit image: ${release}"
+    else
+        release="${VERSION}"
+        echo "OCP release from version: ${release}"
+    fi
+
+    DEBUG_FLAG="-vv"
+    if [ "${DEBUG}" = "true" ]; then
+        DEBUG_FLAG="-vvv"
+    fi
+
+    ansible-playbook ./playbooks/deploy-ocp-sno.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        -e release="${release}" \
+        -e cluster_name="${HUB_CLUSTER}" \
+        -e disconnected=true \
+        ${DEBUG_FLAG}
+
+    echo "SNO hub deployment completed: ${HUB_CLUSTER}"
+}
+
+main
