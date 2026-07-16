@@ -190,6 +190,62 @@ setup_ansible_inventory() {
 }
 
 # ----------------------------------------------------------------------
+# setup_infra_inventory
+#
+# Sets up Ansible inventory for infrastructure playbooks that use the
+# inventories/infra/ layout (bastion + hypervisor hosts). This is
+# distinct from setup_ansible_inventory which uses inventories/ocp-deployment/.
+#
+# Populates group_vars (all, bastions, hypervisors) and host_vars
+# (hypervisor, bastion) from Kubernetes secret mounts, then configures
+# SSH jump through the hypervisor to reach the bastion.
+#
+# Parameters:
+#   1 - hub_cluster: hub cluster name (e.g., kni-qe-70) — used to
+#       locate the bastion host_vars at /var/host_variables/<hub_cluster>/bastion
+# ----------------------------------------------------------------------
+
+setup_infra_inventory() {
+    local hub_cluster="$1"
+
+    echo "Setting up infra inventory for hub: ${hub_cluster}"
+
+    local infra_inv="/eco-ci-cd/inventories/infra"
+
+    echo "Create group_vars directory"
+    mkdir -p "${infra_inv}/group_vars"
+
+    for group_dir in "${MOUNTED_GROUP_INVENTORY}/common/"*/; do
+        if [[ -d "${group_dir}" ]]; then
+            local group_name
+            group_name=$(basename "${group_dir}")
+            echo "Process infra group inventory: ${group_name}"
+            process_inventory "${group_dir}" "${infra_inv}/group_vars/${group_name}"
+        fi
+    done
+
+    echo "Create host_vars directory"
+    mkdir -p "${infra_inv}/host_vars"
+
+    if [[ -d "${MOUNTED_HOST_INVENTORY}/common/hypervisor" ]]; then
+        echo "Process hypervisor host inventory"
+        process_inventory "${MOUNTED_HOST_INVENTORY}/common/hypervisor" \
+            "${infra_inv}/host_vars/hypervisor"
+    fi
+
+    if [[ -d "${MOUNTED_HOST_INVENTORY}/${hub_cluster}/bastion" ]]; then
+        echo "Process bastion host inventory for hub: ${hub_cluster}"
+        process_inventory "${MOUNTED_HOST_INVENTORY}/${hub_cluster}/bastion" \
+            "${infra_inv}/host_vars/bastion"
+    fi
+
+    setup_ssh_jump "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
+        "${infra_inv}/host_vars/bastion"
+
+    echo "Infra inventory setup complete"
+}
+
+# ----------------------------------------------------------------------
 # export_env_vars_from_json
 #
 # Merges *_SETTINGS_DEFAULTS (ref-level) with *_SETTINGS (config-level)
