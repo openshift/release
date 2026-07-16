@@ -329,6 +329,18 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
   # ovn-k8s-mp0) but not on the secondary NIC.
   NESTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
   if [[ -f "${NESTED_KUBECONFIG}" ]]; then
+    echo "Waiting for OVN node pods to be ready in hosted cluster..."
+    for i in $(seq 1 60); do
+      OVN_READY_COUNT=$(KUBECONFIG="${NESTED_KUBECONFIG}" oc get pods -n openshift-ovn-kubernetes \
+        -l app=ovnkube-node --no-headers 2>/dev/null | grep -c Running || true)
+      if [[ "${OVN_READY_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+        echo "All ${OVN_READY_COUNT} OVN node pods are running"
+        break
+      fi
+      echo "Waiting for OVN node pods... (${OVN_READY_COUNT}/${HYPERSHIFT_NODE_COUNT} running)"
+      sleep 10
+    done
+
     echo "Enabling IP forwarding on enp2s0 for all hosted cluster nodes..."
     for OVN_NODE_POD in $(KUBECONFIG="${NESTED_KUBECONFIG}" oc get pods -n openshift-ovn-kubernetes \
       -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
