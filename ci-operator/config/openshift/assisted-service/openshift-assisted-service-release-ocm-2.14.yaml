@@ -176,8 +176,9 @@ tests:
       REGISTRY_CATALOG_REPOSITORY_TAG: ocm-2.14
     test:
     - ref: assisted-baremetal-operator-catalog-publish
-- as: assisted-operator-catalog-publish-verify
-  run_if_changed: ^(deploy/olm-catalog/.*)$
+- always_run: false
+  as: assisted-operator-catalog-publish-verify
+  pipeline_run_if_changed: ^(deploy/olm-catalog/.*)$
   steps:
     env:
       REGISTRY_BUNDLE_REPOSITORY_NAME: assisted-service-operator-bundle-test
@@ -222,7 +223,8 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
-- as: subsystem-aws
+- always_run: false
+  as: subsystem-aws
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -230,7 +232,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  pipeline_run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -292,7 +294,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: subsystem-kubeapi-aws
+- always_run: false
+  as: subsystem-kubeapi-aws
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -300,7 +303,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  pipeline_run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -364,10 +367,11 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: e2e-ai-operator-ztp
+- always_run: false
+  as: e2e-ai-operator-ztp
   capabilities:
   - intranet
-  run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  pipeline_run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -392,6 +396,7 @@ tests:
   as: e2e-ai-operator-ztp-3masters
   capabilities:
   - intranet
+  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -417,10 +422,11 @@ tests:
       CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-disconnected
+- always_run: false
+  as: e2e-ai-operator-ztp-disconnected
   capabilities:
   - intranet
-  run_if_changed: ^(deploy/operator/.*)$
+  pipeline_run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -620,10 +626,11 @@ tests:
         DAY2_MASTERS=True
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-capi
+- always_run: false
+  as: e2e-ai-operator-ztp-capi
   capabilities:
   - intranet
-  run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+  pipeline_run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -651,10 +658,11 @@ tests:
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal-operator-capi
-- as: e2e-ai-operator-disconnected-capi
+- always_run: false
+  as: e2e-ai-operator-disconnected-capi
   capabilities:
   - intranet
-  run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+  pipeline_run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
