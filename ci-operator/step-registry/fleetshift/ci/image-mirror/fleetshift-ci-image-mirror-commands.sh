@@ -39,40 +39,53 @@ if [[ -z "$IMAGE_TAG" ]]; then
         IMAGE_TAG="${PULL_BASE_SHA}"
         ;;
     *)
-        log "ERROR Cannot publish an image from a $JOB_TYPE job"
+        log "ERROR Cannot derive an image tag from a $JOB_TYPE job; set IMAGE_TAG explicitly"
         exit 1
         ;;
     esac
 fi
 log "INFO Image tag is $IMAGE_TAG"
 
-# Build destination image reference
-DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$IMAGE_TAG"
+mirror_image() {
+    local tag="$1"
+    local destination_image_ref="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$tag"
+    local mirror_log="${ARTIFACT_DIR}/oc-mirror-output-${tag}.log"
 
-log "INFO Mirroring Image"
-log "     From: $SOURCE_IMAGE_REF"
-log "     To  : $DESTINATION_IMAGE_REF"
+    log "INFO Mirroring Image"
+    log "     From: $SOURCE_IMAGE_REF"
+    log "     To  : $destination_image_ref"
 
-mirror_log="${ARTIFACT_DIR}/oc-mirror-output.log"
+    for i in {1..6}; do
+        if ! oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$destination_image_ref" 1>"${mirror_log}"; then
+            log "ERROR Unable to mirror image to $destination_image_ref"
+        fi
 
-for i in {1..6}; do
-    if ! oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" 1>${mirror_log}; then
-        log "ERROR Unable to mirror image"
-    fi
+        if [[ -n "$(cat "${mirror_log}")" ]]; then
+            log "INFO Mirroring complete for tag $tag"
+            return 0
+        fi
 
-    if [[ -n "$(cat ${mirror_log})" ]]; then
-        break
-    fi
+        log "WARN Nothing mirrored: oc image mirror log is empty."
 
-    log "WARN Nothing mirrored: oc image mirror log is empty."
+        if [[ "${i}" == "6" ]]; then
+            log "ERROR failed to complete mirroring for tag $tag"
+            return 1
+        fi
 
-    if [[ "${i}" == "6" ]]; then
-        log "ERROR failed to complete mirroring"
+        log "INFO Retrying (${i} of 5) ..."
+        sleep 60
+    done
+}
+
+if ! mirror_image "$IMAGE_TAG"; then
+    exit 1
+fi
+
+# Optionally also publish :latest from the same built image (postsubmit / periodic heal).
+if [[ "${ALSO_TAG_LATEST:-}" == "true" && "$IMAGE_TAG" != "latest" ]]; then
+    if ! mirror_image "latest"; then
         exit 1
     fi
+fi
 
-    log "INFO Retrying (${i} of 5) ..."
-    sleep 60
-done
-
-log "INFO Mirroring complete."
+log "INFO All mirroring complete."
