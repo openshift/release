@@ -17,13 +17,45 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "4.22"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- always_run: false
+  as: build-farm-114nodes
+  cron: 0 8 1,15 * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BUILD_FARM_EXTRA_FLAGS: --alerting=false --job-iterations=80
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:731
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "true"
+      INDEX_ENABLED: "true"
+      KUBE_BURNER_VERSION: 1.11.18
+      MIN_REPLICAS: "18"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.22"
+      REPLICAS: "114"
+    test:
+    - chain: openshift-qe-build-farm
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
 - always_run: false
   as: cluster-density-v2-249nodes
   steps:
@@ -37,11 +69,9 @@ tests:
       ENABLE_AUTOSCALING: "false"
       GC_METRICS: "false"
       INDEX_ENABLED: "true"
-      KB_FLAGS: --set=metricsEndpoints.0.step=2m --set=metricsEndpoints.1.step=2m
-        --local-indexing
       MULTI_AZ: "true"
       MUST_GATHER_TIMEOUT: 90m
-      OPENSHIFT_VERSION: "4.21"
+      OPENSHIFT_VERSION: "4.22"
       REPLICAS: "249"
     test:
     - chain: openshift-qe-control-plane
@@ -62,17 +92,14 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
-      CD_V2_EXTRA_FLAGS: --churn-duration=20m --timeout=6h
       CHANNEL_GROUP: nightly
       CLUSTER_TAGS: TicketId:731
       COMPUTE_MACHINE_TYPE: m6i.xlarge
       ENABLE_AUTOSCALING: "false"
       GC_METRICS: "false"
       INDEX_ENABLED: "true"
-      KB_FLAGS: --set=metricsEndpoints.0.step=2m --set=metricsEndpoints.1.step=2m
-        --local-indexing
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.21"
+      OPENSHIFT_VERSION: "4.22"
       REPLICAS: "120"
     test:
     - chain: openshift-qe-control-plane
@@ -100,9 +127,8 @@ tests:
       ENABLE_AUTOSCALING: "false"
       GC_METRICS: "false"
       INDEX_ENABLED: "true"
-      KB_FLAGS: --local-indexing
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.21"
+      OPENSHIFT_VERSION: "4.22"
       READY_WAIT_TIMEOUT: 30m
     test:
     - ref: openshift-qe-workers-scale
@@ -130,7 +156,7 @@ tests:
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.21"
+      OPENSHIFT_VERSION: "4.22"
     test:
     - ref: openshift-qe-workers-scale
     - ref: openshift-qe-perfscale-aws-data-path-sg
@@ -158,7 +184,7 @@ tests:
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.21"
+      OPENSHIFT_VERSION: "4.22"
       READY_WAIT_TIMEOUT: 30m
     test:
     - ref: openshift-qe-workers-scale
@@ -176,7 +202,7 @@ tests:
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.21"
+      OPENSHIFT_VERSION: "4.22"
       READY_WAIT_TIMEOUT: 30m
     test:
     - ref: openshift-qe-workers-scale
@@ -197,7 +223,7 @@ tests:
       MP_REPLICAS: "3"
       MP_TAINTS: test=test:PreferNoSchedule
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.21"
+      OPENSHIFT_VERSION: "4.22"
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "3"
     test:
@@ -216,45 +242,14 @@ tests:
       GC_METRICS: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.21"
+      OPENSHIFT_VERSION: "4.22"
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "3"
     test:
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
-- always_run: false
-  as: build-farm-114nodes
-  reporter_config:
-    channel: '#ocp-qe-scale-ci-results'
-    job_states_to_report:
-    - success
-    - failure
-    - error
-    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :warning: {{end}}'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: aws-perfscale
-    env:
-      BUILD_FARM_EXTRA_FLAGS: --alerting=false --job-iterations=80
-      CHANNEL_GROUP: nightly
-      CLUSTER_TAGS: TicketId:731
-      COMPUTE_MACHINE_TYPE: m6i.xlarge
-      ENABLE_AUTOSCALING: "true"
-      INDEX_ENABLED: "true"
-      KUBE_BURNER_VERSION: 1.11.18
-      MIN_REPLICAS: "18"
-      MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.21"
-      REPLICAS: "114"
-    test:
-    - chain: openshift-qe-build-farm
-    workflow: rosa-aws-sts
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
-  repo: ocp-qe-perfscale-ci
-  variant: rosa-4.21-nightly-x86
+  repo: ocp-perfscale
+  variant: rosa-4.22-nightly-x86
