@@ -22,7 +22,9 @@ ssh "${INSTANCE_PREFIX}" \
 PMLOGS_DIR=/var/log/pcp/pmlogger
 if ssh "${INSTANCE_PREFIX}" "[ -d \"${PMLOGS_DIR}\" ]" ; then
     mkdir -p "${LOCAL_ARTIFACTS}/pmlogs"
-    scp -r "${INSTANCE_PREFIX}:${PMLOGS_DIR}/"* "${LOCAL_ARTIFACTS}/pmlogs/" || true
+    if ! scp -r "${INSTANCE_PREFIX}:${PMLOGS_DIR}/"* "${LOCAL_ARTIFACTS}/pmlogs/" ; then
+        echo "WARNING: failed to copy hypervisor pmlogger data, skipping"
+    fi
 fi
 
 # Generate the interactive PCP dashboard
