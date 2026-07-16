@@ -6,27 +6,32 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'setup_spoke_hub_connectivity' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
 
-# TODO: Implement spoke-hub connectivity setup using Ansible playbook
-# Expected playbook: repos/eco-ci-cd/playbooks/telco-kpis/setup-spoke-hub-connectivity.yml
-#
-# Implementation steps:
-# 1. Source common functions and setup environment
-# 2. Build Ansible inventory with both hub and spoke cluster variables
-# 3. Execute playbook: ansible-playbook ./playbooks/telco-kpis/setup-spoke-hub-connectivity.yml
-# 4. Playbook should:
-#    - Create ManagedCluster resource on hub for spoke cluster
-#    - Apply klusterlet manifests on spoke cluster
-#    - Wait for spoke to appear as Available in hub's ManagedCluster status
-#    - Validate ACM agent pods are running on spoke
-#    - Configure network policies if needed for hub-spoke communication
-# 5. Verify spoke cluster is successfully imported and ready for ZTP workflows
-#
-# Environment variables:
-#   SPOKE_CLUSTER: Spoke cluster name to connect
-#   HUB_CLUSTER: Hub cluster managing the spoke
-#   DEBUG: Enable Ansible debug output
-#   ECO_CI_CD_IMAGE: Container image for Ansible execution
+main() {
+    echo "Setting up spoke-hub connectivity: ${SPOKE_CLUSTER} -> ${HUB_CLUSTER}"
 
-echo "TODO: Setup connectivity between spoke ${SPOKE_CLUSTER} and hub ${HUB_CLUSTER}"
-echo "This step will execute Ansible playbook for spoke-hub connectivity"
-echo "Required playbook: repos/eco-ci-cd/playbooks/telco-kpis/setup-spoke-hub-connectivity.yml"
+    setup_ansible_inventory "${SPOKE_CLUSTER}" "${HUB_CLUSTER}"
+
+    cd /eco-ci-cd
+
+    local hub_kubeconfig="/home/telcov10n/project/generated/${HUB_CLUSTER}/auth/kubeconfig"
+
+    DEBUG_FLAG="-vv"
+    if [ "${DEBUG}" = "true" ]; then
+        DEBUG_FLAG="-vvv"
+    fi
+
+    ansible-playbook ./playbooks/telco-kpis/setup-spoke-hub-connectivity.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        -e "spoke_name=${SPOKE_CLUSTER}" \
+        -e "hub_name=${HUB_CLUSTER}" \
+        -e "hypervisor=hypervisor" \
+        -e "hub_kubeconfig=${hub_kubeconfig}" \
+        -e "action=${ACTION}" \
+        -e "update_dns=${UPDATE_DNS}" \
+        -e "update_provisioning_cr=${UPDATE_PROVISIONING_CR}" \
+        ${DEBUG_FLAG}
+
+    echo "Spoke-hub connectivity ${ACTION} completed: ${SPOKE_CLUSTER} -> ${HUB_CLUSTER}"
+}
+
+main

@@ -140,5 +140,29 @@ ref:
       name: telcov10n-ansible-dev-kpi-04-bastion
       mount_path: /var/host_variables/dev-kpi-04/bastion
   documentation: |-
-    Setup network connectivity and ACM import between spoke and hub clusters.
-    Creates ManagedCluster resource and validates spoke is imported to hub.
+    Configure iptables DNAT rules on the hypervisor for spoke-hub network
+    connectivity. Runs playbooks/telco-kpis/setup-spoke-hub-connectivity.yml
+    on hosts: bastion, which delegates iptables/firewalld/dnsmasq operations
+    to the hypervisor via spoke_hub_connectivity role.
+
+    Creates three sets of DNAT rules:
+    1. BMC → hub cluster (spoke BMC access to hub API/ingress)
+    2. Cluster → hub cluster (spoke nodes to hub API/ingress)
+    3. Cluster → hub bastion registry (spoke nodes to hub mirror registry)
+
+    The "hypervisor" extra var is set to "hypervisor" (the Prow inventory
+    host name created by setup_ansible_inventory), not an FQDN.
+
+    Supports actions: setup, remove, check-only, list-interconnections.
+
+    Default spoke-hub mappings:
+      spree-01 → kni-qe-70
+      spree-02 → kni-qe-71
+      spree-03 → dev-kpi-02
+      spree-04 → dev-kpi-01
+      cnfdg46  → dev-kpi-04
+    These are defaults only — all combinations are possible. A spoke can
+    be connected to any hub, and multiple hubs can be connected to the
+    same spoke (e.g., spree-01 → kni-qe-70 + spree-01 → dev-kpi-01).
+
+    Jenkins equivalent: telco-kpis-setup-spoke-hub-connectivity job
