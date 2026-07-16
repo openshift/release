@@ -19,21 +19,20 @@ MOUNTED_GROUP_INVENTORY="/var/group_variables"
 # setup_ssh_jump
 #
 # Configures SSH ProxyCommand through the hypervisor (hv6) to reach
-# the bastion. Appends ansible_ssh_common_args to the bastion host_vars
-# so Ansible tunnels SSH transparently.
+# a host on the isolated network. Appends ansible_ssh_common_args and
+# ansible_remote_tmp to the host_vars file so Ansible tunnels SSH
+# transparently and uses a writable temp directory.
 #
 # Parameters:
 #   1 - mounted_host_inventory: path to host variables mount
 #   2 - mounted_group_inventory: path to group variables mount
-#   3 - bastion_host_vars: path to bastion host_vars file to append to
+#   3 - host_vars_file: path to host_vars file to append to
 # ----------------------------------------------------------------------
 
 setup_ssh_jump() {
     local mounted_host_inventory="$1"
     local mounted_group_inventory="$2"
-    local bastion_host_vars="$3"
-
-    echo "Configuring SSH jump through hypervisor to reach bastion..."
+    local host_vars_file="$3"
 
     local hypervisor_ip
     hypervisor_ip=$(tr -d '[:space:]' < "${mounted_host_inventory}/common/hypervisor/ansible_host")
@@ -63,15 +62,15 @@ proxy = (
     f'-i {ssh_key} -W %h:%p {user}@{host}\"'
 )
 print(yaml.dump({key: proxy}, default_flow_style=False, allow_unicode=True).rstrip())
-" "${ssh_key_file}" "${ssh_user}" "${hypervisor_ip}" >> "${bastion_host_vars}"
+" "${ssh_key_file}" "${ssh_user}" "${hypervisor_ip}" >> "${host_vars_file}"
 
-    # Override ANSIBLE_REMOTE_TMP for the bastion. The global env var sets
+    # Override ANSIBLE_REMOTE_TMP for remote hosts. The global env var sets
     # /tmp/.ansible/tmp (needed for the Prow container where HOME=/ is not
-    # writable), but the bastion denies mkdir in /tmp via sshpass+ProxyCommand.
-    # The bastion's home directory is writable, so the default path works.
-    echo "ansible_remote_tmp: ~/.ansible/tmp" >> "${bastion_host_vars}"
+    # writable), but remote hosts deny mkdir in /tmp via sshpass+ProxyCommand.
+    # Remote hosts have writable home directories, so the default path works.
+    echo "ansible_remote_tmp: ~/.ansible/tmp" >> "${host_vars_file}"
 
-    echo "SSH jump configured: container -> ${ssh_user}@${hypervisor_ip} -> bastion"
+    echo "SSH jump configured: container -> ${ssh_user}@${hypervisor_ip} -> $(basename "${host_vars_file}")"
 }
 
 # ----------------------------------------------------------------------
@@ -182,15 +181,21 @@ setup_ansible_inventory() {
         process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
     done
 
-    # Process hub bastion credentials (for accessing hub cluster)
-    if [[ -d "${MOUNTED_HOST_INVENTORY}/${hub_cluster}/bastion" ]]; then
-        echo "Process hub bastion inventory file: ${MOUNTED_HOST_INVENTORY}/${hub_cluster}/bastion"
-        process_inventory "${MOUNTED_HOST_INVENTORY}/${hub_cluster}/bastion" /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
+    # Process hub host credentials and configure SSH jump.
+    # Hub hosts (bastion, master0, etc.) are on the isolated network behind
+    # the hypervisor. Spoke hosts are directly reachable and don't need a jump.
+    if [[ -d "${MOUNTED_HOST_INVENTORY}/${hub_cluster}" ]]; then
+        for hub_host_dir in "${MOUNTED_HOST_INVENTORY}/${hub_cluster}/"*/; do
+            [[ -d "${hub_host_dir}" ]] || continue
+            local hub_host_name
+            hub_host_name=$(basename "${hub_host_dir}")
+            echo "Process hub host inventory: ${hub_host_name}"
+            process_inventory "${hub_host_dir}" \
+                /eco-ci-cd/inventories/ocp-deployment/host_vars/"${hub_host_name}"
+            setup_ssh_jump "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
+                /eco-ci-cd/inventories/ocp-deployment/host_vars/"${hub_host_name}"
+        done
     fi
-
-    # Configure SSH jump: Prow container -> hypervisor (hv6) -> bastion
-    setup_ssh_jump "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
-        /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
 
     echo "Ansible inventory setup complete"
 }
@@ -245,8 +250,13 @@ setup_infra_inventory() {
             "${infra_inv}/host_vars/bastion"
     fi
 
-    setup_ssh_jump "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
-        "${infra_inv}/host_vars/bastion"
+    for host_vars_file in "${infra_inv}"/host_vars/*; do
+        [[ -f "${host_vars_file}" ]] || continue
+        [[ "$(basename "${host_vars_file}")" == "hypervisor" ]] && continue
+        echo "Configuring SSH jump for: $(basename "${host_vars_file}")"
+        setup_ssh_jump "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
+            "${host_vars_file}"
+    done
 
     echo "Infra inventory setup complete"
 }
