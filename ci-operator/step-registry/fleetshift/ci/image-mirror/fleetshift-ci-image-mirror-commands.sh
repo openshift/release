@@ -43,8 +43,6 @@ mirror_image() {
     local destination_image_ref="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$tag"
     local mirror_log
     mirror_log="$(mktemp)"
-    # shellcheck disable=SC2064
-    trap "rm -f '$mirror_log'" RETURN
 
     log "INFO Mirroring $IMAGE_REPO:$tag"
 
@@ -52,6 +50,7 @@ mirror_image() {
         : >"$mirror_log"
         if oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$destination_image_ref" >"$mirror_log" 2>&1 \
             && [[ -s "$mirror_log" ]]; then
+            rm -f "$mirror_log"
             log "INFO Mirrored $IMAGE_REPO:$tag"
             return 0
         fi
@@ -65,12 +64,15 @@ mirror_image() {
                     log "ERROR $line"
                 done
             fi
+            rm -f "$mirror_log"
             return 1
         fi
 
         log "WARN Mirror attempt $i failed; retrying in 60s"
         sleep 60
     done
+
+    rm -f "$mirror_log"
 }
 
 if ! mirror_image "$IMAGE_TAG"; then
