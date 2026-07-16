@@ -319,7 +319,7 @@ PHASE1_START=$(date +%s)
 set +e
 run_claude "address-review" "$PR_NUMBER" "/openshift-developer:address-review-pr $PR_NUMBER --ci" \
   --append-system-prompt "You are addressing review comments on PR #$PR_NUMBER in openshift/hypershift. The PR was created from the hypershift-community fork." \
-  --allowedTools "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task" \
+  --allowedTools "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task LSP mcp__plugin_golang_gopls__*" \
   --disallowedTools "${DISALLOWED_TOOLS[@]}" \
   --max-turns 200 \
   --effort max \
