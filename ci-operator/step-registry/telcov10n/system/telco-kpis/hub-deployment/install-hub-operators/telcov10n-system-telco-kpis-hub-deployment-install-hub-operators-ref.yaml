@@ -21,6 +21,7 @@ ref:
         {
           "install_hub_operators": {
             "skip": false,
+            "version": "4.21",
             "hub_lockdown_uri": "",
             "generate_hub_lockdown": false,
             "architecture": "x86_64",
@@ -30,9 +31,13 @@ ref:
       documentation: >-
         JSON object for per-step infrastructure configuration. The "install_hub_operators" key supports:
         skip (bool) - when true, skip this step entirely and exit 0;
-        hub_lockdown_uri (str) - optional URL to hub lockdown JSON. If provided, operators are
-        installed using exact CSVs from lockdown. Recommended defaults (symlinks to latest verified
-        lockdowns):
+        version (str) - OpenShift version for operator catalog resolution (e.g., "4.21").
+        Used as fallback when no lockdown URI is provided. When lockdown is provided,
+        the playbook extracts version from the lockdown JSON automatically;
+        hub_lockdown_uri (str) - optional URL to hub lockdown JSON. When provided, the wrapper
+        playbook downloads and parses the lockdown on bastion, extracting both operators list
+        and OCP version. Operators are installed using exact CSVs from the lockdown.
+        Recommended defaults (symlinks to latest verified lockdowns):
         x86_64: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json
         arm64: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-arm64.json
         Version-specific URLs are also available (e.g. lockdown-hub-4.21-x86_64.json).
@@ -143,5 +148,16 @@ ref:
       name: telcov10n-ansible-dev-kpi-04-bastion
       mount_path: /var/host_variables/dev-kpi-04/bastion
   documentation: |-
-    Install required operators on hub cluster for ZTP and spoke management.
-    Includes ACM, assisted-service, and other hub-cluster operators.
+    Mirror and install hub operators (ACM, MCE, GitOps, TALM, local-storage,
+    cluster-logging) for ZTP and spoke management.
+
+    Uses the wrapper playbook telco-kpis/deploy-ocp-operators.yml which:
+    1. Parses hub lockdown on bastion if hub_lockdown_uri provided (extracts
+       operators list and OCP version via the lockdowns Ansible role)
+    2. Calls upstream deploy-ocp-operators.yml for operator mirroring and install
+    3. Captures hub lockdown if generate_hub_lockdown requested
+
+    When no lockdown URI, operators are built from defaults in the playbook
+    and version is used for catalog resolution.
+
+    Jenkins equivalent: telco-kpis-install-hub-operators job
