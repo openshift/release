@@ -341,7 +341,7 @@ process_single_issue() {
   # Phase 1: Solve the issue
   run_claude_phase "$issue_key" "solve" "output" \
     "$(build_solve_prompt "$issue_key")" \
-    "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task" 300 \
+    "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task LSP mcp__plugin_golang_gopls__*" 300 \
     --append-system-prompt "$fork_context"
 
   if [ $PHASE_EXIT_CODE -ne 0 ]; then
@@ -364,7 +364,7 @@ process_single_issue() {
   # Phase 2: Code review
   run_claude_phase "$issue_key" "review" "review" \
     "$(build_review_prompt)" \
-    "Bash Read Grep Glob Task Agent Skill" 225 \
+    "Bash Read Grep Glob Task Agent Skill LSP mcp__plugin_golang_gopls__*" 225 \
     --append-system-prompt "${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
 
   # Phase 3: Fix review findings
@@ -379,7 +379,7 @@ process_single_issue() {
   if [ -n "$review_findings" ]; then
     run_claude_phase "$issue_key" "fix" "fix" \
       "$(build_fix_prompt)" \
-      "Bash Read Write Edit Grep Glob Agent Skill Task" 225 \
+      "Bash Read Write Edit Grep Glob Agent Skill Task LSP mcp__plugin_golang_gopls__*" 225 \
       --append-system-prompt "REVIEW FINDINGS:
 ${review_findings}
 
