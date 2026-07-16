@@ -56,7 +56,10 @@ ssh_key, user, host = sys.argv[1], sys.argv[2], sys.argv[3]
 proxy = (
     '-o StrictHostKeyChecking=no '
     '-o UserKnownHostsFile=/dev/null '
+    '-o ServerAliveInterval=60 '
+    '-o ServerAliveCountMax=720 '
     '-o ProxyCommand=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+    '-o ServerAliveInterval=60 -o ServerAliveCountMax=720 '
     f'-i {ssh_key} -W %h:%p {user}@{host}\"'
 )
 print(yaml.dump({key: proxy}, default_flow_style=False, allow_unicode=True).rstrip())
