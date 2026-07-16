@@ -16,6 +16,12 @@ extract_hcp_cli() {
   HCP_CLI="${cli_dir}/hypershift"
 }
 
+# Gangway does not strip the MULTISTAGE_PARAM_OVERRIDE_ prefix, so the HO release
+# controller passes the image via the prefixed variable and we copy it here.
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE="${MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
+fi
+
 OVERRIDE_COUNT=0
 if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
   OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
