@@ -32,6 +32,43 @@ MOCKSERVER_URL="$(cat "${SHARED_DIR}/mockserver-url")"
 JAEGER_QUERY_URL="$(cat "${SHARED_DIR}/jaeger-query-url")"
 JAEGER_COLLECTOR_URL="rpc://jaeger-collector.${TOOLS_NAMESPACE}.svc.cluster.local:4317"
 
+COREDNS_ZONE="${COREDNS_ZONE:-k.example.com}"
+COREDNS_LB_IP=""
+if [[ -f "${SHARED_DIR}/kuadrant-coredns-ip" ]]; then
+  COREDNS_LB_IP="$(tr -d '[:space:]' <"${SHARED_DIR}/kuadrant-coredns-ip")"
+fi
+if [[ -f "${SHARED_DIR}/kuadrant-coredns-zone" ]]; then
+  COREDNS_ZONE="$(tr -d '[:space:]' <"${SHARED_DIR}/kuadrant-coredns-zone")"
+fi
+
+# Smoke DNSPolicy hostnames are under COREDNS_ZONE (e.g. *.k.example.com). The
+# test pod must query kuadrant-coredns (MetalLB) to resolve them — same pattern
+# as the m42lp36/mc1 lab where clients use the CoreDNS LB as nameserver.
+if [[ -n "${COREDNS_LB_IP}" ]]; then
+  echo "=== Configuring resolver for zone ${COREDNS_ZONE} via ${COREDNS_LB_IP} ==="
+  cp /etc/resolv.conf /tmp/kuadrant-resolv-orig.conf 2>/dev/null || true
+  {
+    echo "nameserver ${COREDNS_LB_IP}"
+    if [[ -f /tmp/kuadrant-resolv-orig.conf ]]; then
+      grep -v '^nameserver '"${COREDNS_LB_IP}"'$' /tmp/kuadrant-resolv-orig.conf || true
+    fi
+  } >/tmp/kuadrant-resolv.conf
+  if cat /tmp/kuadrant-resolv.conf >/etc/resolv.conf 2>/dev/null; then
+    echo "Updated /etc/resolv.conf"
+  elif mount --bind /tmp/kuadrant-resolv.conf /etc/resolv.conf 2>/dev/null; then
+    echo "Bound-mounted custom resolv.conf"
+  else
+    echo "WARNING: could not update /etc/resolv.conf; DNSPolicy HTTP checks may fail" >&2
+  fi
+  echo "--- resolv.conf ---"
+  cat /etc/resolv.conf || true
+  if command -v dig >/dev/null 2>&1; then
+    dig @"${COREDNS_LB_IP}" NS "${COREDNS_ZONE}" +time=3 +tries=1 || true
+  fi
+else
+  echo "WARNING: ${SHARED_DIR}/kuadrant-coredns-ip missing; DNS zone resolution may fail" >&2
+fi
+
 CFSSL_BIN="$(command -v cfssl || true)"
 if [[ -z "${CFSSL_BIN}" ]]; then
   echo "ERROR: cfssl not found in the kuadrant-testsuite image" >&2
@@ -53,6 +90,18 @@ echo "=== Generating ${SECRETS_FOR_DYNACONF} ==="
 # Disable tracing while writing credentials into the config file
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
+DNS_BLOCK=""
+if [[ -n "${COREDNS_LB_IP}" ]]; then
+  DNS_BLOCK="$(cat <<DNS_EOF
+  dns:
+    coredns_zone: "${COREDNS_ZONE}"
+    dns_server:
+      geo_code: "DE"
+      address: "${COREDNS_LB_IP}"
+    default_geo_server: "${COREDNS_LB_IP}"
+DNS_EOF
+)"
+fi
 cat > "${SECRETS_FOR_DYNACONF}" <<EOF
 default:
   cfssl: "${CFSSL_BIN}"
@@ -69,6 +118,7 @@ default:
     issuer:
       name: "${CLUSTER_ISSUER_NAME}"
       kind: "ClusterIssuer"
+${DNS_BLOCK}
   tools:
     project: "${TOOLS_NAMESPACE}"
   keycloak:

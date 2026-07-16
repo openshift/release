@@ -4,8 +4,9 @@ set -euo pipefail
 
 # Deploy kuadrant-coredns matching the known-good ocpz-m42lp36 / rhcl-mc1 LPAR
 # stacks: CoreDNS with the Kuadrant plugin, zone k.example.com, LoadBalancer
-# pinned to .240 from the existing MetalLB default-pool (install-metallb).
-# Do not create a second IPAddressPool — MetalLB rejects overlapping CIDRs.
+# pinned to .241 from the existing MetalLB default-pool (install-metallb).
+# .240 is left for Istio Gateway LBs (verify-gateway / smoke). Do not create a
+# second IPAddressPool — MetalLB rejects overlapping CIDRs.
 
 derive_subnet_octet() {
   local subnet cidr
@@ -100,6 +101,11 @@ data:
         }
         kuadrant
         prometheus 0.0.0.0:9153
+    }
+    . {
+        forward . /etc/resolv.conf
+        log
+        errors
     }
 ---
 apiVersion: apps/v1
@@ -196,13 +202,9 @@ metadata:
     app.kubernetes.io/instance: kuadrant
     app.kubernetes.io/name: coredns
   annotations:
-    metallb.universe.tf/address-pool: ${METALLB_POOL_NAME}
-    metallb.universe.tf/loadBalancerIPs: ${COREDNS_LB_IP}
-    metallb.io/address-pool: ${METALLB_POOL_NAME}
     metallb.io/loadBalancerIPs: ${COREDNS_LB_IP}
 spec:
   type: LoadBalancer
-  loadBalancerIP: ${COREDNS_LB_IP}
   selector:
     app.kubernetes.io/instance: kuadrant
     app.kubernetes.io/name: coredns
@@ -220,6 +222,7 @@ EOF
 oc rollout status deployment/kuadrant-coredns -n "${COREDNS_NAMESPACE}" --timeout=300s
 
 echo "=== Waiting for kuadrant-coredns LoadBalancer (${COREDNS_LB_IP}) ==="
+assigned=""
 for _ in $(seq 1 60); do
   assigned="$(oc get svc kuadrant-coredns -n "${COREDNS_NAMESPACE}" \
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
@@ -227,13 +230,18 @@ for _ in $(seq 1 60); do
   [[ "${assigned}" == "${COREDNS_LB_IP}" ]] && break
   sleep 10
 done
-assigned="$(oc get svc kuadrant-coredns -n "${COREDNS_NAMESPACE}" \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
 if [[ "${assigned}" != "${COREDNS_LB_IP}" ]]; then
-  echo "WARNING: kuadrant-coredns LB IP is ${assigned:-<unset>} (wanted ${COREDNS_LB_IP})" >&2
+  echo "ERROR: kuadrant-coredns LB IP is ${assigned:-<unset>} (wanted ${COREDNS_LB_IP})" >&2
   oc get svc kuadrant-coredns -n "${COREDNS_NAMESPACE}" -o yaml >&2 || true
-  oc get ipaddresspool -n "${METALLB_NAMESPACE}" -o wide >&2 || true
+  oc get ipaddresspool,l2advertisement -n "${METALLB_NAMESPACE}" -o wide >&2 || true
+  oc get events -n "${COREDNS_NAMESPACE}" --sort-by='.lastTimestamp' >&2 | tail -40 || true
+  oc logs -n "${METALLB_NAMESPACE}" -l app=metallb --tail=80 >&2 || true
+  exit 1
 fi
+
+echo "${COREDNS_LB_IP}" >"${SHARED_DIR}/kuadrant-coredns-ip"
+echo "${COREDNS_ZONE}" >"${SHARED_DIR}/kuadrant-coredns-zone"
+echo "Wrote ${SHARED_DIR}/kuadrant-coredns-ip=${COREDNS_LB_IP} zone=${COREDNS_ZONE}"
 
 echo "=== kuadrant-coredns install complete ==="
 oc get deploy,svc,pods -n "${COREDNS_NAMESPACE}" -o wide
