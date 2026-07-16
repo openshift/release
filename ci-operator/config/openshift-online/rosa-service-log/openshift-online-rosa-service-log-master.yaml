@@ -80,16 +80,6 @@ tests:
     echo "Go Version: $(go version)"
     mkdir -p secrets
     cp /opt/app-root/osl-secrets/* secrets/
-    test -f secrets/db.host || printf '%s' 'localhost' > secrets/db.host
-    test -f secrets/db.port || printf '%s' '5432' > secrets/db.port
-    test -f secrets/db.name || printf '%s' 'ocmservicelog' > secrets/db.name
-    test -f secrets/db.user || printf '%s' 'ocm_service_log' > secrets/db.user
-    test -f secrets/db.password || printf '%s' 'foobar-bizz-buzz' > secrets/db.password
-    test -f secrets/rhsm.ca || cp test/support/redhat-it.crt secrets/rhsm.ca
-    # OCM/AMS testing credentials must come from Vault (openshift-online-osl-secrets).
-    # Do not hardcode clientId/clientSecret in this public repository.
-    test -f secrets/ocm-service.clientId || { echo "missing secrets/ocm-service.clientId from openshift-online-osl-secrets"; exit 1; }
-    test -f secrets/ocm-service.clientSecret || { echo "missing secrets/ocm-service.clientSecret from openshift-online-osl-secrets"; exit 1; }
     for dir in cmd/ocm-service-log pkg/services test/integration; do
       ln -sfn "$(pwd)/secrets" "$dir/secrets"
       ln -sfn "$(pwd)/config" "$dir/config"
@@ -120,16 +110,6 @@ tests:
     echo "Go Version: $(go version)"
     mkdir -p secrets
     cp /opt/app-root/osl-secrets/* secrets/
-    test -f secrets/db.host || printf '%s' 'localhost' > secrets/db.host
-    test -f secrets/db.port || printf '%s' '5432' > secrets/db.port
-    test -f secrets/db.name || printf '%s' 'ocmservicelog' > secrets/db.name
-    test -f secrets/db.user || printf '%s' 'ocm_service_log' > secrets/db.user
-    test -f secrets/db.password || printf '%s' 'foobar-bizz-buzz' > secrets/db.password
-    test -f secrets/rhsm.ca || cp test/support/redhat-it.crt secrets/rhsm.ca
-    # OCM/AMS testing credentials must come from Vault (openshift-online-osl-secrets).
-    # Do not hardcode clientId/clientSecret in this public repository.
-    test -f secrets/ocm-service.clientId || { echo "missing secrets/ocm-service.clientId from openshift-online-osl-secrets"; exit 1; }
-    test -f secrets/ocm-service.clientSecret || { echo "missing secrets/ocm-service.clientSecret from openshift-online-osl-secrets"; exit 1; }
     for dir in cmd/ocm-service-log pkg/services test/integration; do
       ln -sfn "$(pwd)/secrets" "$dir/secrets"
       ln -sfn "$(pwd)/config" "$dir/config"
@@ -143,6 +123,71 @@ tests:
   secrets:
   - mount_path: /opt/app-root/osl-secrets
     name: openshift-online-osl-secrets
+- as: coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    export GOPATH=/go
+    export PATH="/usr/local/go/bin:/go/bin:${PATH}"
+    export HOME=/tmp
+    export GOCACHE=$(mktemp -d)
+    export GOMODCACHE=$(mktemp -d)
+    export XDG_CONFIG_HOME=$HOME/.config
+    mkdir -p "$XDG_CONFIG_HOME/containers"
+    { echo 'unqualified-search-registries = ["registry.access.redhat.com", "registry.redhat.io", "docker.io"]'; echo 'short-name-mode = "permissive"'; } >"$XDG_CONFIG_HOME/containers/registries.conf"
+    export GOTOOLCHAIN=go1.25.10
+    echo "Go Version: $(go version)"
+    mkdir -p secrets
+    cp /opt/app-root/osl-secrets/* secrets/
+    for dir in cmd/ocm-service-log pkg/services test/integration; do
+      ln -sfn "$(pwd)/secrets" "$dir/secrets"
+      ln -sfn "$(pwd)/config" "$dir/config"
+    done
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - mount_path: /opt/app-root/osl-secrets
+    name: openshift-online-osl-secrets
+  - mount_path: /var/run/codecov-secret
+    name: rosa-service-log-codecov
+- as: publish-coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    export GOPATH=/go
+    export PATH="/usr/local/go/bin:/go/bin:${PATH}"
+    export HOME=/tmp
+    export GOCACHE=$(mktemp -d)
+    export GOMODCACHE=$(mktemp -d)
+    export XDG_CONFIG_HOME=$HOME/.config
+    mkdir -p "$XDG_CONFIG_HOME/containers"
+    { echo 'unqualified-search-registries = ["registry.access.redhat.com", "registry.redhat.io", "docker.io"]'; echo 'short-name-mode = "permissive"'; } >"$XDG_CONFIG_HOME/containers/registries.conf"
+    export GOTOOLCHAIN=go1.25.10
+    echo "Go Version: $(go version)"
+    mkdir -p secrets
+    cp /opt/app-root/osl-secrets/* secrets/
+    for dir in cmd/ocm-service-log pkg/services test/integration; do
+      ln -sfn "$(pwd)/secrets" "$dir/secrets"
+      ln -sfn "$(pwd)/config" "$dir/config"
+    done
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  postsubmit: true
+  secrets:
+  - mount_path: /opt/app-root/osl-secrets
+    name: openshift-online-osl-secrets
+  - mount_path: /var/run/codecov-secret
+    name: rosa-service-log-codecov
 zz_generated_metadata:
   branch: master
   org: openshift-online
