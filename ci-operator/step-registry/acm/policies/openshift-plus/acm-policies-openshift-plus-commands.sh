@@ -23,10 +23,13 @@ typeset results=""
 typeset notready=""
 typeset candidates=""
 typeset try=""
+typeset -i policyCount=0
 for try in $(seq "${retries}"); do
   results=$(oc get policies -n policies) || { : "Try ${try}/${retries}: API request failed, retrying in 30 seconds"; sleep 30; continue; }
-  typeset -i policyCount=0
-  policyCount=$(echo "${results}" | grep -c -v '^NAME' || true)
+  policyCount=0
+  if [[ -n "${results}" ]]; then
+    policyCount=$(echo "${results}" | grep -c -v '^NAME' || true)
+  fi
   if (( policyCount == 0 )); then
     : "Try ${try}/${retries}: No policies found yet. Checking again in 30 seconds"
     sleep 30

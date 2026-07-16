@@ -68,7 +68,8 @@ RecordTestResult() {
 # Function to generate JUnit XML
 GenerateJunitXml() {
     typeset junitFile="${ARTIFACT_DIR}/junit_acm-opp-app.xml"
-    typeset -i totalDuration=$(( $(date +%s) - startTime ))
+    typeset -i totalDuration=0
+    totalDuration=$(( $(date +%s) - startTime ))
 
     # Count test results
     typeset -i totalTests=${#allTestCasesArr[@]}
@@ -299,7 +300,8 @@ oc get quayintegration quay -o yaml || true
 typeset -i case1Start=0
 case1Start=$(date +%s)
 if RunTestCase1; then
-    typeset -i case1Duration=$(( $(date +%s) - case1Start ))
+    typeset -i case1Duration=0
+    case1Duration=$(( $(date +%s) - case1Start ))
     RecordTestResult "deploy-opp-application" "passed" "" "${case1Duration}"
     : "Test Case 1 (Deploy OPP Application) Result: PASSED"
 
@@ -307,16 +309,19 @@ if RunTestCase1; then
     typeset -i case2Start=0
     case2Start=$(date +%s)
     if RunTestCase2; then
-        typeset -i case2Duration=$(( $(date +%s) - case2Start ))
+        typeset -i case2Duration=0
+        case2Duration=$(( $(date +%s) - case2Start ))
         RecordTestResult "test-acs-integration" "passed" "" "${case2Duration}"
         : "Test Case 2 (Test ACS Integration) Result: PASSED"
     else
-        typeset -i case2Duration=$(( $(date +%s) - case2Start ))
+        typeset -i case2Duration=0
+        case2Duration=$(( $(date +%s) - case2Start ))
         RecordTestResult "test-acs-integration" "failed" "ACS integration test failed" "${case2Duration}"
         : "Test Case 2 (Test ACS Integration) Result: FAILED"
     fi
 else
-    typeset -i case1Duration=$(( $(date +%s) - case1Start ))
+    typeset -i case1Duration=0
+    case1Duration=$(( $(date +%s) - case1Start ))
     : "Test Case 1 (Deploy OPP Application) Result: FAILED"
     : "Test Case 1 failed, skipping remaining test cases..."
     RecordTestResult "deploy-opp-application" "failed" "OPP application deployment failed" "${case1Duration}"

@@ -100,7 +100,7 @@ TestClusterHealth() {
 
     # ClusterOperators: Available=True, Degraded!=True
     typeset coProblems=""
-    coProblems="$(oc get clusteroperators -o json | jq -r '
+    if ! coProblems="$(oc get clusteroperators -o json | jq -r '
         .items[]
         | select(
             (.status.conditions // [] | map(select(.type=="Available")) | first | .status) != "True"
@@ -108,7 +108,10 @@ TestClusterHealth() {
             (.status.conditions // [] | map(select(.type=="Degraded")) | first | .status) == "True"
         )
         | .metadata.name
-    ')" || true
+    ')"; then
+        AddResult "cluster-health" "fail" "Failed to query ClusterOperators"
+        return
+    fi
 
     if [[ -n "${coProblems}" ]]; then
         failMsg="Unhealthy ClusterOperators: ${coProblems//$'\n'/, }"
@@ -119,13 +122,16 @@ TestClusterHealth() {
 
     # Nodes: all Ready
     typeset nodeProblems=""
-    nodeProblems="$(oc get nodes -o json | jq -r '
+    if ! nodeProblems="$(oc get nodes -o json | jq -r '
         .items[]
         | select(
             (.status.conditions // [] | map(select(.type=="Ready")) | first | .status) != "True"
         )
         | .metadata.name
-    ')" || true
+    ')"; then
+        AddResult "cluster-health" "fail" "Failed to query nodes"
+        return
+    fi
 
     if [[ -n "${nodeProblems}" ]]; then
         typeset nodeMsg="Not-Ready nodes: ${nodeProblems//$'\n'/, }"
@@ -141,9 +147,12 @@ TestClusterHealth() {
 
     # ClusterVersion: Available=True
     typeset cvAvailable=""
-    cvAvailable="$(oc get clusterversion version -o json | jq -r '
+    if ! cvAvailable="$(oc get clusterversion version -o json | jq -r '
         .status.conditions // [] | map(select(.type=="Available")) | first | .status
-    ')" || true
+    ')"; then
+        AddResult "cluster-health" "fail" "Failed to query ClusterVersion"
+        return
+    fi
 
     if [[ "${cvAvailable}" != "True" ]]; then
         typeset cvMsg="ClusterVersion Available=${cvAvailable:-unknown}"
@@ -180,11 +189,16 @@ TestOppOperators() {
 
         # Find CSV matching this operator prefix
         typeset csvInfo=""
-        csvInfo="$(oc get csv --all-namespaces -o json | jq -r --arg prefix "${op}" '
+        if ! csvInfo="$(oc get csv --all-namespaces -o json | jq -r --arg prefix "${op}" '
             .items[]
             | select(.metadata.name | startswith($prefix))
             | "\(.metadata.namespace)/\(.metadata.name)/\(.status.phase)"
-        ' | head -1)" || true
+        ' | head -1)"; then
+            typeset apiMsg="Failed to query CSVs for ${op}"
+            : "FAIL: ${apiMsg}"
+            if [[ -n "${failMsg}" ]]; then failMsg="${failMsg}; ${apiMsg}"; else failMsg="${apiMsg}"; fi
+            continue
+        fi
 
         if [[ -z "${csvInfo}" ]]; then
             typeset notFoundMsg="CSV not found for ${op}"
@@ -219,14 +233,19 @@ TestOppOperators() {
         sleep "${SMOKE_SETTLE_SECONDS}"
 
         typeset notReadyPods=""
-        notReadyPods="$(oc get pods -n "${csvNs}" -o json | jq -r '
+        if ! notReadyPods="$(oc get pods -n "${csvNs}" -o json | jq -r '
             .items[]
             | select(.status.phase != "Succeeded")
             | select(
                 (.status.containerStatuses // [] | map(select(.ready != true)) | length) > 0
             )
             | .metadata.name
-        ')" || true
+        ')"; then
+            typeset podApiMsg="Failed to query pods in ${csvNs}"
+            : "FAIL: ${podApiMsg}"
+            if [[ -n "${failMsg}" ]]; then failMsg="${failMsg}; ${podApiMsg}"; else failMsg="${podApiMsg}"; fi
+            continue
+        fi
 
         if [[ -n "${notReadyPods}" ]]; then
             typeset podMsg="Not-ready pods in ${csvNs}: ${notReadyPods//$'\n'/, }"
@@ -258,7 +277,10 @@ TestAcmConnectivity() {
 
     # Check if ManagedCluster resources exist
     typeset -i mcCount=0
-    mcCount=$(oc get managedclusters -o json | jq '.items | length') || true
+    if ! mcCount=$(oc get managedclusters -o json | jq '.items | length'); then
+        AddResult "acm-connectivity" "fail" "Failed to query ManagedClusters"
+        return
+    fi
 
     if [[ "${mcCount}" -eq 0 ]]; then
         : "SKIP: No ManagedCluster resources found"
@@ -267,13 +289,16 @@ TestAcmConnectivity() {
     fi
 
     typeset mcProblems=""
-    mcProblems="$(oc get managedclusters -o json | jq -r '
+    if ! mcProblems="$(oc get managedclusters -o json | jq -r '
         .items[]
         | select(
             (.status.conditions // [] | map(select(.type=="ManagedClusterConditionAvailable")) | first | .status) != "True"
         )
         | .metadata.name
-    ')" || true
+    ')"; then
+        AddResult "acm-connectivity" "fail" "Failed to query ManagedCluster conditions"
+        return
+    fi
 
     if [[ -n "${mcProblems}" ]]; then
         failMsg="ManagedClusters not available: ${mcProblems//$'\n'/, }"
@@ -299,10 +324,13 @@ TestAcsSensors() {
 
     # Check SecuredCluster CR status first
     typeset scStatus=""
-    scStatus="$(oc get securedclusters.platform.stackrox.io --all-namespaces -o json | jq -r '
+    if ! scStatus="$(oc get securedclusters.platform.stackrox.io --all-namespaces -o json | jq -r '
         .items[]
         | "\(.metadata.namespace)/\(.metadata.name)/\(.status.conditions // [] | map(select(.type=="Deployed" or .type=="Initialized")) | map(.status) | join(","))"
-    ' | head -1)" || true
+    ' | head -1)"; then
+        AddResult "acs-sensors" "fail" "Failed to query SecuredCluster resources"
+        return
+    fi
 
     if [[ -n "${scStatus}" ]]; then
         typeset scNs="" scName="" scConds=""
@@ -366,26 +394,33 @@ TestQuayPull() {
 
     # Find the Quay registry route
     typeset quayRoute=""
-    quayRoute="$(oc get routes --all-namespaces -o json | jq -r '
+    if ! quayRoute="$(oc get routes --all-namespaces -o json | jq -r '
         .items[]
         | select(.metadata.name | test("quay"; "i"))
         | select(.spec.host | test("quay"; "i"))
         | .spec.host
-    ' | head -1)" || true
+    ' | head -1)"; then
+        : "Route query failed, trying QuayRegistry CR..."
+    fi
 
     if [[ -z "${quayRoute}" ]]; then
         # Try looking for QuayRegistry CR to find the route
-        quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json | jq -r '
+        if ! quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json | jq -r '
             .items[0].status.registryEndpoint // empty
-        ' | sed 's|^https://||')" || true
+        ' | sed 's|^https://||')"; then
+            : "QuayRegistry CR query failed"
+        fi
     fi
 
     if [[ -z "${quayRoute}" ]]; then
         # Check if Quay operator is even installed
         typeset quayCsv=""
-        quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
+        if ! quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
             .items[] | select(.metadata.name | startswith("quay-operator")) | .metadata.name
-        ' | head -1)" || true
+        ' | head -1)"; then
+            AddResult "quay-pull" "fail" "Failed to query CSVs for Quay operator"
+            return
+        fi
 
         if [[ -z "${quayCsv}" ]]; then
             : "SKIP: Quay operator not installed"
@@ -404,7 +439,9 @@ TestQuayPull() {
     # Attempt to pull the Quay health endpoint (API check instead of image pull
     # since we may not have registry credentials configured)
     typeset httpCode=""
-    httpCode="$(curl -sk -o /dev/null -w '%{http_code}' "https://${quayRoute}/api/v1/discovery" --max-time 30)" || true
+    if ! httpCode="$(curl -sk -o /dev/null -w '%{http_code}' "https://${quayRoute}/api/v1/discovery" --max-time 30)"; then
+        httpCode=""
+    fi
 
     if [[ "${httpCode}" =~ ^(200|401|403)$ ]]; then
         : "PASS: Quay registry responding (HTTP ${httpCode}) at ${quayRoute}"

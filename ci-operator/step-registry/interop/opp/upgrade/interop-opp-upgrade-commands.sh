@@ -38,19 +38,19 @@ DebugOnExit() {
         oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read -r node; do
             : "### oc describe node ${node} ###"
             oc describe node "${node}" || true
-        done
+        done || true
 
         : "# Abnormal ClusterOperators"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read -r co; do
             : "### oc describe co ${co} ###"
             oc describe co "${co}" || true
-        done
+        done || true
 
         : "# Abnormal MachineConfigPools"
         oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read -r mcp; do
             : "### oc describe mcp ${mcp} ###"
             oc describe mcp "${mcp}" || true
-        done
+        done || true
 
         : "# OPP Operator CSVs"
         oc get csv -A || : "unavailable"
@@ -59,7 +59,9 @@ DebugOnExit() {
 
 trap 'exitCode=$?; DebugOnExit' EXIT TERM
 
-KUBECONFIG="" oc --loglevel=8 registry login
+set +x
+KUBECONFIG="" oc registry login
+set -x
 
 ResolveTargetImage() {
     typeset image="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
