@@ -1,0 +1,28 @@
+workflow:
+  as: cluster-network-operator-ovn-secondary-encap
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      EXTRA_MG_ARGS: --host-network
+      EXTRANET_NETWORK_SUBNET_V4: 192.168.221.0/24
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="extranet"
+        EXTRANET_NETWORK_SUBNET_V4='192.168.221.0/24'
+    pre:
+      - ref: baremetalds-devscripts-conf-extranetwork
+      - chain: baremetalds-ofcir-pre
+      - ref: baremetalds-e2e-ovn-debug-enable-console
+      - ref: cluster-network-operator-ovn-secondary-encap-pre
+    test:
+      - ref: cluster-network-operator-ovn-secondary-encap-validate
+    post:
+      - ref: baremetalds-e2e-ovn-debug-console-gather
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    This workflow provisions a baremetal OVN cluster with an additional extranet
+    network, injects openshift-ovn-kubernetes/env-overrides with per-node
+    OVN_ENCAP_IP values derived from the secondary interface, and validates that
+    ovnkube-node uses the secondary interface address for encapsulation.
