@@ -106,6 +106,21 @@ PROXY_COLLECTOR_PID=""
 DNS_LOG_DIR="${ARTIFACT_DIR}/dns-diagnostics-logs"
 DNS_COLLECTOR_PIDS=()
 
+wait_for_pids() {
+  local pid
+  for pid in "$@"; do
+    [[ -n "${pid}" ]] || continue
+    wait "${pid}" 2>/dev/null || true
+  done
+}
+
+kill_pid_tree() {
+  local pid="$1"
+  [[ -n "${pid}" ]] || return 0
+  pkill -P "${pid}" 2>/dev/null || true
+  kill "${pid}" 2>/dev/null || true
+}
+
 # Gateway/istio-proxy pods are created and deleted by the testsuite during smoke.
 # A post-smoke dump is too late; follow istio-proxy logs concurrently into
 # ARTIFACT_DIR while make smoke runs so wasm load errors survive teardown.
@@ -145,25 +160,28 @@ start_istio_proxy_log_collector() {
 stop_istio_proxy_log_collector() {
   echo "=== Stopping concurrent istio-proxy log collector ==="
   if [[ -n "${PROXY_COLLECTOR_PID}" ]] && kill -0 "${PROXY_COLLECTOR_PID}" 2>/dev/null; then
-    pkill -P "${PROXY_COLLECTOR_PID}" 2>/dev/null || true
-    kill "${PROXY_COLLECTOR_PID}" 2>/dev/null || true
+    kill_pid_tree "${PROXY_COLLECTOR_PID}"
   elif [[ -f "${PROXY_LOG_DIR}/.collector.pid" ]]; then
-    local pid
-    pid="$(cat "${PROXY_LOG_DIR}/.collector.pid" 2>/dev/null || true)"
-    if [[ -n "${pid}" ]]; then
-      pkill -P "${pid}" 2>/dev/null || true
-      kill "${pid}" 2>/dev/null || true
-    fi
+    kill_pid_tree "$(cat "${PROXY_LOG_DIR}/.collector.pid" 2>/dev/null || true)"
   fi
   if [[ -d "${PROXY_LOG_DIR}/.pids" ]]; then
     local f
     for f in "${PROXY_LOG_DIR}/.pids"/*.pid; do
       [[ -f "${f}" ]] || continue
-      kill "$(cat "${f}")" 2>/dev/null || true
+      kill_pid_tree "$(cat "${f}")"
     done
   fi
   sleep 1
-  wait 2>/dev/null || true
+  if [[ -n "${PROXY_COLLECTOR_PID}" ]]; then
+    wait_for_pids "${PROXY_COLLECTOR_PID}"
+  fi
+  if [[ -d "${PROXY_LOG_DIR}/.pids" ]]; then
+    local f
+    for f in "${PROXY_LOG_DIR}/.pids"/*.pid; do
+      [[ -f "${f}" ]] || continue
+      wait_for_pids "$(cat "${f}")"
+    done
+  fi
 
   echo "--- captured istio-proxy log files ---"
   ls -la "${PROXY_LOG_DIR}"/*_istio-proxy.log 2>/dev/null || echo "(no proxy log files captured)"
@@ -243,18 +261,18 @@ stop_dns_log_collector() {
   echo "=== Stopping concurrent DNS diagnostics collector ==="
   local pid
   for pid in "${DNS_COLLECTOR_PIDS[@]}"; do
-    [[ -n "${pid}" ]] || continue
-    pkill -P "${pid}" 2>/dev/null || true
-    kill "${pid}" 2>/dev/null || true
+    kill_pid_tree "${pid}"
   done
   if [[ -f "${DNS_LOG_DIR}/.collector.pids" ]]; then
     for pid in $(cat "${DNS_LOG_DIR}/.collector.pids" 2>/dev/null || true); do
-      pkill -P "${pid}" 2>/dev/null || true
-      kill "${pid}" 2>/dev/null || true
+      kill_pid_tree "${pid}"
     done
   fi
   sleep 1
-  wait 2>/dev/null || true
+  wait_for_pids "${DNS_COLLECTOR_PIDS[@]}"
+  if [[ -f "${DNS_LOG_DIR}/.collector.pids" ]]; then
+    wait_for_pids $(cat "${DNS_LOG_DIR}/.collector.pids" 2>/dev/null || true)
+  fi
 
   echo "--- captured DNS diagnostic files ---"
   ls -la "${DNS_LOG_DIR}" 2>/dev/null || echo "(none)"
@@ -362,8 +380,8 @@ if [[ "${RUN_SMOKE}" == "true" ]]; then
     echo "WARNING: smoke tests reported failures" >&2
     FAILED=1
   fi
-  stop_istio_proxy_log_collector
   stop_dns_log_collector
+  stop_istio_proxy_log_collector
   dump_s390x_smoke_diagnostics
 fi
 

@@ -268,13 +268,12 @@ EOF
 echo "=== Creating the DNS provider Secret (${DNS_PROVIDER_SECRET_NAME}) ==="
 # The DNS provider credentials are environment specific. When a credentials
 # directory with a secret.yaml is mounted (see DNS_CREDS_DIR), use its contents;
-# otherwise create a placeholder so DNS-independent tests can still run. Do not
-# echo the contents.
+# otherwise create the CoreDNS provider Secret used on ocpz-m42lp36 / mc1.
 for ns in kuadrant kuadrant2; do
   if [[ -f "${DNS_CREDS_DIR}/secret.yaml" ]]; then
     oc apply -n "${ns}" -f "${DNS_CREDS_DIR}/secret.yaml"
   else
-    echo "WARNING: no DNS credentials mounted at ${DNS_CREDS_DIR}; creating a placeholder ${DNS_PROVIDER_SECRET_NAME} in ${ns}. DNS/TLS-dependent tests will be limited." >&2
+    echo "Creating CoreDNS provider Secret ${DNS_PROVIDER_SECRET_NAME} in ${ns} (zone ${COREDNS_ZONE}, m42lp36/mc1 pattern)"
     cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Secret
@@ -282,10 +281,10 @@ metadata:
   name: ${DNS_PROVIDER_SECRET_NAME}
   namespace: ${ns}
   annotations:
-    base_domain: example.com
-type: Opaque
+    base_domain: ${COREDNS_ZONE}
+type: kuadrant.io/coredns
 stringData:
-  placeholder: "true"
+  ZONES: ${COREDNS_ZONE}
 EOF
   fi
 done

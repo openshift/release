@@ -1,0 +1,52 @@
+ref:
+  as: kuadrant-s390x-install-coredns
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: kuadrant-s390x-install-coredns-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 20m0s
+  env:
+  - name: METALLB_NAMESPACE
+    default: "metallb-system"
+    documentation: |-
+      Namespace where MetalLB IPAddressPool / L2Advertisement for CoreDNS live.
+  - name: COREDNS_NAMESPACE
+    default: "kuadrant-coredns"
+    documentation: |-
+      Namespace for the kuadrant-coredns Deployment and LoadBalancer Service.
+  - name: COREDNS_ZONE
+    default: "k.example.com"
+    documentation: |-
+      Authoritative DNS zone served by kuadrant-coredns (Corefile + provider Secret
+      ZONES). Matches ocpz-m42lp36 / rhcl-mc1 LPAR reference clusters.
+  - name: COREDNS_IMAGE
+    default: "quay.io/kuadrant/coredns-kuadrant:latest"
+    documentation: |-
+      CoreDNS image with the Kuadrant plugin (same as m42lp36 / mc1).
+  - name: COREDNS_LB_HOST
+    default: "240"
+    documentation: |-
+      Host octet for the dedicated CoreDNS LoadBalancer IP when deriving from the
+      libvirt lease /24 (mc1 uses 192.168.122.240).
+  - name: COREDNS_LOADBALANCER_IP
+    default: ""
+    documentation: |-
+      Optional explicit CoreDNS LoadBalancer IP. When empty, derives
+      192.168.<lease.subnet>.<COREDNS_LB_HOST>.
+  - name: COREDNS_METALLB_POOL_NAME
+    default: "coredns-pool"
+    documentation: |-
+      Dedicated MetalLB IPAddressPool name for kuadrant-coredns (mc1 pattern).
+  - name: COREDNS_METALLB_ADV_NAME
+    default: "coredns-l2"
+    documentation: |-
+      L2Advertisement for the CoreDNS MetalLB pool.
+  documentation: |-
+    Deploys kuadrant-coredns with the Kuadrant plugin and a dedicated MetalLB
+    LoadBalancer at .240 in the lease /24, matching the ocpz-m42lp36 / rhcl-mc1
+    s390x reference stacks. Run after install-metallb and before install-operator.
