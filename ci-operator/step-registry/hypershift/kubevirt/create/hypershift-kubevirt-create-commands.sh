@@ -276,7 +276,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
   LOCALNET_SUBNET="192.168.223.0/24"
 
   echo "Waiting for VMIs to be running..."
-  for i in $(seq 1 60); do
+  for _ in $(seq 1 60); do
     RUNNING_COUNT=$(oc get vmi -n "${LOCALNET_NAMESPACE}" --no-headers 2>/dev/null \
       | grep -c Running || true)
     if [[ "${RUNNING_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
@@ -330,7 +330,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
   NESTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
   if [[ -f "${NESTED_KUBECONFIG}" ]]; then
     echo "Waiting for OVN node pods to be ready in hosted cluster..."
-    for i in $(seq 1 60); do
+    for _ in $(seq 1 60); do
       OVN_READY_COUNT=$(KUBECONFIG="${NESTED_KUBECONFIG}" oc get pods -n openshift-ovn-kubernetes \
         -l app=ovnkube-node --no-headers 2>/dev/null | grep -c Running || true)
       if [[ "${OVN_READY_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
