@@ -154,10 +154,16 @@ finalize() {
 trap finalize EXIT
 
 unset GOFLAGS
+
+EXTRA_ARGS="--region ${LOCATION}"
+if [[ "${ARO_HCP_PROVISION_ABORT_IF_EXISTS:-true}" == "true" ]]; then
+  EXTRA_ARGS+=" --abort-if-regional-exist"
+fi
+
 make -o tooling/templatize/templatize entrypoint/Region \
   DEPLOY_ENV="${DEPLOY_ENV}" \
   OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}" \
-  EXTRA_ARGS="--region ${LOCATION} --abort-if-regional-exist" \
+  EXTRA_ARGS="${EXTRA_ARGS}" \
   TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz \
   ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml \
   CONFIG_OUTPUT=${CONFIG_PROV}
