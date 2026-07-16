@@ -6,26 +6,46 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'install_hub_operators' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
 
-# TODO: Implement hub operator installation using Ansible playbook
-# Expected playbook: repos/eco-ci-cd/playbooks/telco-kpis/install-hub-operators.yml
-#
-# Implementation steps:
-# 1. Source common functions and setup environment
-# 2. Build Ansible inventory with hub cluster configuration
-# 3. Execute playbook: ansible-playbook ./playbooks/telco-kpis/install-hub-operators.yml
-# 4. Playbook should install:
-#    - Advanced Cluster Management (ACM) operator
-#    - Assisted Service operator (for ZTP spoke deployments)
-#    - Local Storage Operator (if needed for hub storage)
-#    - MultiClusterHub custom resource
-# 5. Wait for all operators to be ready and operational
-# 6. Verify MultiClusterHub is in Running state
-#
-# Environment variables:
-#   HUB_CLUSTER: Hub cluster name
-#   DEBUG: Enable Ansible debug output
-#   ECO_CI_CD_IMAGE: Container image for Ansible execution
+main() {
+    echo "Installing hub operators on: ${HUB_CLUSTER}"
 
-echo "TODO: Install hub operators on cluster ${HUB_CLUSTER}"
-echo "This step will execute Ansible playbook for hub operator installation"
-echo "Required playbook: repos/eco-ci-cd/playbooks/telco-kpis/install-hub-operators.yml"
+    setup_ansible_inventory "${HUB_CLUSTER}" "${HUB_CLUSTER}"
+
+    cd /eco-ci-cd
+
+    local kubeconfig="/home/telcov10n/project/generated/${HUB_CLUSTER}/auth/kubeconfig"
+
+    DEBUG_FLAG="-vv"
+    if [ "${DEBUG}" = "true" ]; then
+        DEBUG_FLAG="-vvv"
+    fi
+
+    local extra_vars=(
+        -e "kubeconfig=${kubeconfig}"
+        -e "version=${VERSION}"
+        -e "disconnected=true"
+        -e "mirror_only=false"
+        -e "ocp_operator_mirror_skip_internal_registry_cleanup=true"
+    )
+
+    if [[ -n "${HUB_LOCKDOWN_URI:-}" ]]; then
+        echo "Using hub lockdown: ${HUB_LOCKDOWN_URI}"
+        extra_vars+=(-e "hub_lockdown_uri=${HUB_LOCKDOWN_URI}")
+    fi
+
+    if [[ "${GENERATE_HUB_LOCKDOWN:-false}" == "true" ]]; then
+        echo "Hub lockdown generation enabled"
+        extra_vars+=(-e "generate_hub_lockdown=true")
+        extra_vars+=(-e "hub_cluster=${HUB_CLUSTER}")
+        extra_vars+=(-e "architecture=${ARCHITECTURE:-x86_64}")
+    fi
+
+    ansible-playbook ./playbooks/telco-kpis/deploy-ocp-operators.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        "${extra_vars[@]}" \
+        ${DEBUG_FLAG}
+
+    echo "Hub operator installation completed: ${HUB_CLUSTER}"
+}
+
+main
