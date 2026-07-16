@@ -197,8 +197,13 @@ RunPass() {
                 -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' || true)"
             [[ "${succeededStatus}" == "True" ]] && return 0
             if [[ "${failedStatus}" == "True" ]]; then
+                # Top-level migration conditions
                 HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
                     -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}' \
+                    1>&2 || true
+                # Per-VM conditions (detailed failure reason per individual VM)
+                HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+                    -o jsonpath='{range .status.vms[*]}{"VM "}{.name}{":"}{"\n"}{range .conditions[*]}{"  "}{.type}{"="}{.status}{" — "}{.message}{"\n"}{end}{end}' \
                     1>&2 || true
                 return 1
             fi
@@ -261,13 +266,23 @@ spec:
 " | ApplyManifest_
     }
 
-    # MTV leaves source VMs stopped after live migration; delete each from destination
-    # before Plan creation so incoming VMs do not collide with pre-existing objects.
-    # --ignore-not-found makes this a no-op on Pass 1 where the destination is empty.
+    # After a live migration MTV leaves the source VM stopped and its PVC intact.
+    # Before each pass, delete the VM *and* the root PVC/DataVolume from the destination
+    # so MTV does not hit a naming conflict when it tries to (re-)create them.
+    # --ignore-not-found makes every delete a no-op on Pass 1 where the destination is empty.
     ClearDestVms_() {
-        typeset vmNameIter
+        typeset vmNameIter dvName
         for vmNameIter in "${vmNamesArr[@]}"; do
+            dvName="${vmNameIter}-rootdisk"
+            # VM must be deleted first so its ownerRef on the DataVolume is released.
             DstOc delete vm "${vmNameIter}" -n "${targetNs}" \
+                --ignore-not-found=true --wait=true --timeout="${MTV_VM_DELETE_TIMEOUT}"
+            # DataVolume deletion may be blocked by CDI finalizers; best-effort.
+            DstOc delete datavolume "${dvName}" -n "${targetNs}" \
+                --ignore-not-found=true --wait=true --timeout="${MTV_VM_DELETE_TIMEOUT}" \
+                2>/dev/null || true
+            # PVC must be fully deleted before MTV tries to recreate it.
+            DstOc delete pvc "${dvName}" -n "${targetNs}" \
                 --ignore-not-found=true --wait=true --timeout="${MTV_VM_DELETE_TIMEOUT}"
         done
     }
@@ -448,6 +463,18 @@ RunPass \
     "${srcKc}" "${dstKc}" \
     "${MTV_BIDIR_FORWARD_PLAN_NAME}" "${MTV_BIDIR_FORWARD_MIGRATION_NAME}" \
 || overallRc=$?
+
+# Inter-pass settle wait: gives MTV's inventory scanner time to index the newly
+# arrived VM on the destination, and allows any storage/network resources created
+# during Pass 1 to stabilise before Pass 2 begins.
+if [[ -n "${MTV_INTER_PASS_WAIT}" && "${MTV_INTER_PASS_WAIT}" != "0" && "${MTV_INTER_PASS_WAIT}" != "0s" ]]; then
+    typeset -i _waitSecs
+    _waitSecs="$(ParseOcWaitDurationSeconds "${MTV_INTER_PASS_WAIT}")"
+    if (( _waitSecs > 0 )); then
+        : "Inter-pass settle wait: ${MTV_INTER_PASS_WAIT}"
+        sleep "${_waitSecs}"
+    fi
+fi
 
 # Pass 2: reverse (destination → source) — same VM, now on destination
 RunPass \

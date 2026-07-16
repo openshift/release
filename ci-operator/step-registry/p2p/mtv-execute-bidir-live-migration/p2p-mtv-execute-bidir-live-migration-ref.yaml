@@ -24,10 +24,18 @@ ref:
       Separate Plan/Migration names (MTV_BIDIR_REVERSE_PLAN_NAME / MIGRATION_NAME).
       Same preflights ensure CCLM gates and sync controllers are still healthy.
 
-    Pre-migration cleanup: before each pass, any existing VM with the same name is deleted
-    from the destination spoke (MTV leaves the source VM in a stopped state after a live
-    migration). --ignore-not-found makes this a safe no-op on the first pass where the
-    destination is initially empty. Timeout controlled by MTV_VM_DELETE_TIMEOUT.
+    Pre-migration cleanup: before each pass, the VM object, DataVolume, and root PVC
+    (${vmName}-rootdisk) are deleted from the destination spoke. Deleting only the VM is
+    insufficient — after a live migration MTV leaves the source PVC intact, and if that
+    PVC is not removed before the next pass, MTV immediately fails the Migration CR with
+    a naming conflict when it tries to recreate the storage on the destination.
+    --ignore-not-found makes every delete a safe no-op on Pass 1 where the destination
+    is initially empty. Timeout controlled by MTV_VM_DELETE_TIMEOUT.
+
+    Inter-pass settle wait (MTV_INTER_PASS_WAIT, default 60s): a configurable pause
+    between Pass 1 and Pass 2 gives MTV's inventory scanner time to index the newly
+    arrived VM on the destination and allows storage/network resources to stabilise
+    before the reverse migration starts. Set to "0" to skip.
 
     Post-migration verification (per pass, four checks):
       1. Destination VMs Running   — all VMIs reach Running phase on the destination spoke.
@@ -124,7 +132,15 @@ ref:
     documentation: Optional explicit kubeconfig for the destination spoke (overrides index discovery).
   - name: MTV_VM_DELETE_TIMEOUT
     default: "5m"
-    documentation: oc delete timeout for removing a leftover VM from the destination spoke before each migration pass.
+    documentation: oc delete timeout for removing a leftover VM, DataVolume, and PVC from the destination spoke before each migration pass.
+  - name: MTV_INTER_PASS_WAIT
+    default: "60s"
+    documentation: |-
+      Wait between Pass 1 and Pass 2 to allow MTV's inventory scanner to index the
+      newly arrived VM on the destination, and to let storage/network resources
+      created during Pass 1 fully stabilise before the reverse migration starts.
+      Set to "0" or "0s" to skip. Accepts the same format as other oc wait timeouts
+      (e.g. "30s", "2m").
   - name: MTV_VM_IP_WAIT
     default: "2m"
     documentation: |-
