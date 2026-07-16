@@ -1,29 +1,8 @@
-base_images:
-  ocp_4.18_base-rhel9:
-    name: "4.18"
-    namespace: ocp
-    tag: base-rhel9
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
-images:
-  items:
-  - dockerfile_literal: |-
-      FROM golang:1.23 AS builder
-      RUN git clone --depth 1 --branch release-4.18 https://github.com/openshift/lvm-operator.git /go/src/github.com/openshift/lvm-operator
-      WORKDIR /go/src/github.com/openshift/lvm-operator/test/integration
-      RUN go mod download
-      RUN GO_COMPLIANCE_POLICY=exempt_all CGO_ENABLED=0 go build -o /tmp/integration-test .
-      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
-      COPY --from=builder /tmp/integration-test /integration-test
-      ENTRYPOINT ["/integration-test"]
-    inputs:
-      ocp_4.18_base-rhel9:
-        as:
-        - registry.access.redhat.com/ubi9/ubi-minimal:latest
-    to: lvm-operator-integration-test
 releases:
   initial:
     candidate:
@@ -61,8 +40,14 @@ tests:
     - as: lvms-sno-integration-test
       cli: latest
       commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
-      from: lvm-operator-integration-test
+        COMMIT=$(cat ${SHARED_DIR}/lvm_source_commit)
+        cd /tmp && git init src && cd src
+        git remote add origin https://github.com/openshift/lvm-operator.git
+        git fetch --depth 1 origin ${COMMIT} && git checkout FETCH_HEAD
+        cd test/integration
+        GO_COMPLIANCE_POLICY=exempt_all CGO_ENABLED=0 go build -o /tmp/integration-test .
+        /tmp/integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
+      from: root
       resources:
         requests:
           cpu: "1"
@@ -86,8 +71,14 @@ tests:
     - as: lvms-sno-integration-test
       cli: latest
       commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
-      from: lvm-operator-integration-test
+        COMMIT=$(cat ${SHARED_DIR}/lvm_source_commit)
+        cd /tmp && git init src && cd src
+        git remote add origin https://github.com/openshift/lvm-operator.git
+        git fetch --depth 1 origin ${COMMIT} && git checkout FETCH_HEAD
+        cd test/integration
+        GO_COMPLIANCE_POLICY=exempt_all CGO_ENABLED=0 go build -o /tmp/integration-test .
+        /tmp/integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
+      from: root
       resources:
         requests:
           cpu: "1"
@@ -106,8 +97,14 @@ tests:
     - as: lvms-mno-integration-test
       cli: latest
       commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
-      from: lvm-operator-integration-test
+        COMMIT=$(cat ${SHARED_DIR}/lvm_source_commit)
+        cd /tmp && git init src && cd src
+        git remote add origin https://github.com/openshift/lvm-operator.git
+        git fetch --depth 1 origin ${COMMIT} && git checkout FETCH_HEAD
+        cd test/integration
+        GO_COMPLIANCE_POLICY=exempt_all CGO_ENABLED=0 go build -o /tmp/integration-test .
+        /tmp/integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: root
       resources:
         requests:
           cpu: "1"
@@ -131,8 +128,14 @@ tests:
     - as: lvms-mno-integration-test
       cli: latest
       commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
-      from: lvm-operator-integration-test
+        COMMIT=$(cat ${SHARED_DIR}/lvm_source_commit)
+        cd /tmp && git init src && cd src
+        git remote add origin https://github.com/openshift/lvm-operator.git
+        git fetch --depth 1 origin ${COMMIT} && git checkout FETCH_HEAD
+        cd test/integration
+        GO_COMPLIANCE_POLICY=exempt_all CGO_ENABLED=0 go build -o /tmp/integration-test .
+        /tmp/integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: root
       resources:
         requests:
           cpu: "1"
@@ -158,8 +161,14 @@ tests:
     - as: lvms-sno-integration-test
       cli: latest
       commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
-      from: lvm-operator-integration-test
+        COMMIT=$(cat ${SHARED_DIR}/lvm_source_commit)
+        cd /tmp && git init src && cd src
+        git remote add origin https://github.com/openshift/lvm-operator.git
+        git fetch --depth 1 origin ${COMMIT} && git checkout FETCH_HEAD
+        cd test/integration
+        GO_COMPLIANCE_POLICY=exempt_all CGO_ENABLED=0 go build -o /tmp/integration-test .
+        /tmp/integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
+      from: root
       resources:
         requests:
           cpu: "1"
@@ -177,8 +186,14 @@ tests:
     - as: lvms-mno-integration-test
       cli: latest
       commands: |
-        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
-      from: lvm-operator-integration-test
+        COMMIT=$(cat ${SHARED_DIR}/lvm_source_commit)
+        cd /tmp && git init src && cd src
+        git remote add origin https://github.com/openshift/lvm-operator.git
+        git fetch --depth 1 origin ${COMMIT} && git checkout FETCH_HEAD
+        cd test/integration
+        GO_COMPLIANCE_POLICY=exempt_all CGO_ENABLED=0 go build -o /tmp/integration-test .
+        /tmp/integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: root
       resources:
         requests:
           cpu: "1"
