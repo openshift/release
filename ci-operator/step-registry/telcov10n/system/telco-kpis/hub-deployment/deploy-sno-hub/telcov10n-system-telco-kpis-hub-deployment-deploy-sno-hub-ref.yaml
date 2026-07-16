@@ -1,9 +1,6 @@
 ref:
   as: telcov10n-system-telco-kpis-hub-deployment-deploy-sno-hub
-  from_image:
-    namespace: telcov10n-ci
-    name: eco-ci-cd
-    tag: eco-ci-cd
+  from: dev-eco-ci-cd
   commands: telcov10n-system-telco-kpis-hub-deployment-deploy-sno-hub-commands.sh
   timeout: 3h
   resources:
@@ -12,26 +9,32 @@ ref:
       memory: 200Mi
   env:
     - name: HUB_CLUSTER
-      default: "dev-kpi-01"
+      default: "kni-qe-70"
       documentation: Hub cluster name to deploy (dev-kpi-01, dev-kpi-02, dev-kpi-03, dev-kpi-04, kni-qe-70, kni-qe-71)
-    - name: VERSION
-      default: "4.18"
-      documentation: OpenShift version to deploy
-    - name: OCP_RELEASE_IMAGE
-      default: ""
-      documentation: Optional OCP release pull spec (if empty, uses VERSION)
-    - name: DISABLE_INSIGHTS
-      default: "true"
-      documentation: Disable Red Hat Insights operator
-    - name: DEBUG
-      default: "false"
-      documentation: Enable Ansible debug output
-    - name: SKIP_REBUILD_IMAGE
-      default: "false"
-      documentation: Skip test-runner image rebuild
-    - name: ECO_CI_CD_IMAGE
-      default: "quay.io/telcov10n-ci/eco-ci-cd:latest"
-      documentation: Container image for Ansible execution
+    - name: INFRA_SETTINGS
+      default: '{}'
+      documentation: >-
+        JSON object for per-step infrastructure configuration overrides from CI config.
+        Values here take precedence over INFRA_SETTINGS_DEFAULTS.
+    - name: INFRA_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "deploy_sno_hub": {
+            "skip": false,
+            "version": "4.21",
+            "ocp_release_image": "",
+            "disable_insights": true,
+            "debug": false
+          }
+        }
+      documentation: >-
+        JSON object for per-step infrastructure configuration. The "deploy_sno_hub" key supports:
+        skip (bool) - when true, skip this step entirely and exit 0;
+        version (str) - OpenShift version to deploy;
+        ocp_release_image (str) - optional OCP release pull spec (if empty, uses version);
+        disable_insights (bool) - disable Red Hat Insights operator;
+        debug (bool) - when true, enables Ansible -vvv verbose output.
+        Values are exported as uppercase env vars.
   credentials:
     # Common hypervisor (shared across all spokes)
     - namespace: test-credentials

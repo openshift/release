@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+source "${SHARED_DIR}/telco-kpis-common-functions.sh"
+
+export_env_vars_from_json 'deploy_sno_hub' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
+
 # TODO: Implement SNO hub deployment using Ansible playbook
 # Expected playbook: repos/eco-ci-cd/playbooks/telco-kpis/deploy-sno-hub.yml
 #

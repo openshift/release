@@ -1,9 +1,6 @@
 ref:
   as: telcov10n-system-telco-kpis-hub-deployment-hub-config
-  from_image:
-    namespace: telcov10n-ci
-    name: eco-ci-cd
-    tag: eco-ci-cd
+  from: dev-eco-ci-cd
   commands: telcov10n-system-telco-kpis-hub-deployment-hub-config-commands.sh
   timeout: 1h
   resources:
@@ -12,23 +9,30 @@ ref:
       memory: 200Mi
   env:
     - name: HUB_CLUSTER
-      default: "dev-kpi-01"
+      default: "kni-qe-70"
       documentation: Hub cluster to configure
-    - name: GITLAB_REPO_URL
-      default: "https://gitlab.cee.redhat.com/ccardeno/ztp-site-configs-ci.git"
-      documentation: GitLab repository URL for ZTP site configurations
-    - name: GITLAB_REPO_BRANCH
-      default: "telco-kpis"
-      documentation: GitLab repository branch for ZTP site configurations
-    - name: DEBUG
-      default: "false"
-      documentation: Enable Ansible debug output
-    - name: SKIP_REBUILD_IMAGE
-      default: "false"
-      documentation: Skip test-runner image rebuild
-    - name: ECO_CI_CD_IMAGE
-      default: "quay.io/telcov10n-ci/eco-ci-cd:latest"
-      documentation: Container image for Ansible execution
+    - name: INFRA_SETTINGS
+      default: '{}'
+      documentation: >-
+        JSON object for per-step infrastructure configuration overrides from CI config.
+        Values here take precedence over INFRA_SETTINGS_DEFAULTS.
+    - name: INFRA_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "hub_config": {
+            "skip": false,
+            "gitlab_repo_url": "https://gitlab.cee.redhat.com/ccardeno/ztp-site-configs-ci.git",
+            "gitlab_repo_branch": "telco-kpis",
+            "debug": false
+          }
+        }
+      documentation: >-
+        JSON object for per-step infrastructure configuration. The "hub_config" key supports:
+        skip (bool) - when true, skip this step entirely and exit 0;
+        gitlab_repo_url (str) - GitLab repository URL for ZTP site configurations;
+        gitlab_repo_branch (str) - GitLab repository branch for ZTP site configurations;
+        debug (bool) - when true, enables Ansible -vvv verbose output.
+        Values are exported as uppercase env vars.
   credentials:
     # Common hypervisor (shared across all spokes)
     - namespace: test-credentials
