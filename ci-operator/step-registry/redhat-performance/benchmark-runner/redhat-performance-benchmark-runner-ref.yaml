@@ -24,9 +24,6 @@ ref:
   - name: SCALE
     default: ""
     documentation: Number of VMs/pods for scale workloads.
-  - name: REDIS
-    default: ""
-    documentation: Redis endpoint for scale workload synchronization.
   - name: THREADS_LIMIT
     default: ""
     documentation: Maximum concurrent threads for scale workloads.
@@ -42,11 +39,93 @@ ref:
   - name: WORKLOAD
     default: sysbench_pod
     documentation: Benchmark workload to run (e.g. sysbench_pod, uperf_pod).
+  - name: BASE_DOMAIN
+    default: ""
+    documentation: Cluster base domain.
+  - name: ELASTICSEARCH
+    default: ""
+    documentation: Elasticsearch host for indexing benchmark results.
+  - name: ELASTICSEARCH_PORT
+    default: ""
+    documentation: Elasticsearch port (e.g. 9200).
+  - name: ELASTICSEARCH_USER
+    default: ""
+    documentation: Elasticsearch username for authenticated access.
+  - name: ELASTICSEARCH_PASSWORD
+    default: ""
+    documentation: Elasticsearch password for authenticated access.
+  - name: ELASTICSEARCH_URL_PROTOCOL
+    default: ""
+    documentation: Elasticsearch URL protocol (http or https). Defaults to http if not set.
+  - name: LSO_NODE
+    default: ""
+    documentation: Target node for LSO local storage provisioning.
+  - name: WORKER_DISK_PREFIX
+    default: ""
+    documentation: Disk device prefix for worker nodes (e.g. /dev/sd).
+  - name: SCALE_NODES
+    default: ""
+    documentation: Node list for scale workload distribution.
+  - name: WINDOWS_URL
+    default: ""
+    documentation: HTTP URL to default Windows QCOW2 image for DataVolume import.
+  - name: WINMSSQL_URL
+    default: ""
+    documentation: HTTP URL to Windows MSSQL QCOW2 image. Overrides WINDOWS_URL for winmssql_vm workload.
+  - name: WINDOWS_SERVER_2022_URL
+    default: ""
+    documentation: HTTP URL to Windows Server 2022 QCOW2 image.
+  - name: WINDOWS_SERVER_2025_URL
+    default: ""
+    documentation: HTTP URL to Windows Server 2025 QCOW2 image.
+  - name: PIN_NODE0
+    default: ""
+    documentation: Node name for pinning workloads to specific node (index 0).
+  - name: PIN_NODE1
+    default: ""
+    documentation: Node name for pinning workloads to specific node (index 1).
+  - name: PIN_NODE2
+    default: ""
+    documentation: Node name for pinning workloads to specific node (index 2).
+  - name: BASTION_ADDRESS
+    default: ""
+    documentation: Bastion/jump host IP for SSH access to cluster.
   resources:
     requests:
       cpu: 100m
       memory: 200Mi
-  documentation: >-
-    Runs benchmark-runner native workloads (python3.14 /benchmark_runner/main/main.py)
-    in the test cluster. Workloads run as native K8s Jobs (no benchmark-operator).
-    Used for PerfCI workloads (e.g. sysbench, uperf, hammerdb, vdbench, bootstorm, winmssql).
+  documentation: |-
+    Runs benchmark-runner workloads (sysbench, uperf, hammerdb, vdbench, bootstorm, winmssql)
+    via python3.14 /benchmark_runner/main/main.py.
+
+    Config resolution (highest priority first):
+      1. env vars — set in ci-operator test config (non-sensitive values only)
+      2. SHARED_DIR files — written by a pre step from the consuming team's own Vault
+      3. /secret/ — benchmark-runner-perfci-config Vault secret (auto-mounted)
+    When any SHARED_DIR config file exists (including an empty file), /secret/
+    fallback is disabled for all config keys — the external team owns the
+    config and missing or empty keys stay unset.
+
+    Cluster access (checked in priority order):
+      1. KUBECONFIG env var — cloud clusters provisioned by ci-operator workflows
+      2. SHARED_DIR/cluster_address + SHARED_DIR/provision_private_key — external bare-metal
+      3. /secret/cluster_address + /secret/provision_private_key — CNV PerfScale bare-metal
+      4. /secret/bastion_address + /secret/jh_priv_ssh_key — bastion SSH fallback
+
+    Cross-team usage: external teams reference this step directly without forking.
+    To override sensitive config, write an inline pre step that copies values from
+    your own Vault secret into SHARED_DIR. The script reads SHARED_DIR files before
+    falling back to /secret/. Example:
+
+      pre:
+      - as: inject-config
+        commands: |
+          for f in /team-secret/*; do
+            cp "$f" "${SHARED_DIR}/$(basename "$f")"
+          done
+        credentials:
+        - name: your-team-benchmark-config
+          mount_path: /team-secret
+          namespace: test-credentials
+      test:
+      - ref: redhat-performance-benchmark-runner
