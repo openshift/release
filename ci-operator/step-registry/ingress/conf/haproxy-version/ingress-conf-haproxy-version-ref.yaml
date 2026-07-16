@@ -1,6 +1,6 @@
 ref:
   as: ingress-conf-haproxy-version
-  from: installer
+  from: cli
   commands: ingress-conf-haproxy-version-commands.sh
   resources:
     requests:
@@ -10,12 +10,13 @@ ref:
   - name: HAPROXY_VERSION
     default: ""
     documentation: |-
-      The HAProxy version to configure on the default IngressController at
-      install time (e.g. "2.8"). This value is written into the
-      spec.haproxyVersion field of the IngressController manifest.
+      The HAProxy version to use as the default for all IngressControllers
+      (e.g. "2.8"). This value is set as an unsupported annotation on
+      ingresses.config.openshift.io/cluster, which the ingress operator
+      reads to override the compiled default HAProxy version.
   documentation: |-
-    Configures the default IngressController to use a specific HAProxy version
-    at install time by writing an IngressController manifest to SHARED_DIR.
-    The cluster must have the IngressControllerMultipleHAProxyVersions feature
-    gate enabled (TechPreviewNoUpgrade). This step should run before
-    ipi-install-install in the workflow.
+    Configures the cluster-wide default HAProxy version by annotating
+    ingresses.config.openshift.io/cluster with an unsupported override.
+    This affects all IngressControllers that do not have an explicit
+    spec.haproxyVersion set, including those created by tests. This step
+    must run after cluster installation (after ipi-install).
