@@ -3,7 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-: "${ARO_HCP_SUITE_NAME:?ARO_HCP_SUITE_NAME must be set}"
 : "${BACKEND_IMAGE:?BACKEND_IMAGE must be set}"
 : "${FRONTEND_IMAGE:?FRONTEND_IMAGE must be set}"
 : "${ADMIN_API_IMAGE:?ADMIN_API_IMAGE must be set}"
@@ -159,8 +158,12 @@ export KUBECONFIG=mgmt-kubeconfig
 az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
 make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
 
-# Suite upgrades svc and mgmt regional components via pipeline/RP.* using OVERRIDE_CONFIG_FILE.
-SKIP_CERT_VERIFICATION=true ./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" \
+# UpgradeBarrier needs the spec count so it can wait for all participants before
+# electing a runner to execute "make entrypoint/Region".
+UPGRADE_SPEC_COUNT=$(./test/aro-hcp-tests list tests --suite upgrade/in-place --output names | grep -c .)
+export UPGRADE_SPEC_COUNT
+
+SKIP_CERT_VERIFICATION=true ./test/aro-hcp-tests run-suite upgrade/in-place \
   --junit-path="${ARTIFACT_DIR}/junit.xml" \
   --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" \
   --max-concurrency 100
