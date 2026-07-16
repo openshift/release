@@ -58,12 +58,12 @@ mirror_image() {
 
         if [[ "${i}" == "6" ]]; then
             log "ERROR Failed to mirror $IMAGE_REPO:$tag"
+            # Last lines only — full oc output can be chatty and may include auth detail.
             if [[ -s "$mirror_log" ]]; then
-                cp "$mirror_log" "${ARTIFACT_DIR}/oc-mirror-${tag}.log"
-                log "ERROR oc image mirror output (also ${ARTIFACT_DIR}/oc-mirror-${tag}.log):"
-                while IFS= read -r line || [[ -n "$line" ]]; do
+                log "ERROR oc image mirror (last 20 lines):"
+                tail -n 20 "$mirror_log" | while IFS= read -r line || [[ -n "$line" ]]; do
                     log "ERROR $line"
-                done <"$mirror_log"
+                done
             fi
             return 1
         fi
