@@ -1,9 +1,6 @@
 ref:
   as: telcov10n-system-telco-kpis-hub-deployment-install-hub-operators
-  from_image:
-    namespace: telcov10n-ci
-    name: eco-ci-cd
-    tag: eco-ci-cd
+  from: dev-eco-ci-cd
   commands: telcov10n-system-telco-kpis-hub-deployment-install-hub-operators-commands.sh
   timeout: 1h
   resources:
@@ -12,26 +9,38 @@ ref:
       memory: 200Mi
   env:
     - name: HUB_CLUSTER
-      default: "dev-kpi-01"
+      default: "kni-qe-70"
       documentation: Hub cluster name where operators will be installed
-    - name: HUB_LOCKDOWN_URI
-      default: ""
-      documentation: URL to hub lockdown JSON file
-    - name: GENERATE_HUB_LOCKDOWN
-      default: "false"
-      documentation: Generate hub lockdown JSON after operator installation
-    - name: ARCHITECTURE
-      default: "x86_64"
-      documentation: Target architecture (x86_64 or arm64)
-    - name: DEBUG
-      default: "false"
-      documentation: Enable Ansible debug output
-    - name: SKIP_REBUILD_IMAGE
-      default: "false"
-      documentation: Skip test-runner image rebuild
-    - name: ECO_CI_CD_IMAGE
-      default: "quay.io/telcov10n-ci/eco-ci-cd:latest"
-      documentation: Container image for Ansible execution
+    - name: INFRA_SETTINGS
+      default: '{}'
+      documentation: >-
+        JSON object for per-step infrastructure configuration overrides from CI config.
+        Values here take precedence over INFRA_SETTINGS_DEFAULTS.
+    - name: INFRA_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "install_hub_operators": {
+            "skip": false,
+            "hub_lockdown_uri": "",
+            "generate_hub_lockdown": false,
+            "architecture": "x86_64",
+            "debug": false
+          }
+        }
+      documentation: >-
+        JSON object for per-step infrastructure configuration. The "install_hub_operators" key supports:
+        skip (bool) - when true, skip this step entirely and exit 0;
+        hub_lockdown_uri (str) - optional URL to hub lockdown JSON. If provided, operators are
+        installed using exact CSVs from lockdown. Recommended defaults (symlinks to latest verified
+        lockdowns):
+        x86_64: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json
+        arm64: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-arm64.json
+        Version-specific URLs are also available (e.g. lockdown-hub-4.21-x86_64.json).
+        Empty string skips lockdown;
+        generate_hub_lockdown (bool) - generate hub lockdown JSON after operator installation;
+        architecture (str) - target architecture (x86_64 or arm64);
+        debug (bool) - when true, enables Ansible -vvv verbose output.
+        Values are exported as uppercase env vars.
   credentials:
     # Common hypervisor (shared across all spokes)
     - namespace: test-credentials

@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+source "${SHARED_DIR}/telco-kpis-common-functions.sh"
+
+export_env_vars_from_json 'install_hub_operators' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
+
 # TODO: Implement hub operator installation using Ansible playbook
 # Expected playbook: repos/eco-ci-cd/playbooks/telco-kpis/install-hub-operators.yml
 #
