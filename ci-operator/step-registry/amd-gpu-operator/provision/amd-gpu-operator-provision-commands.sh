@@ -94,8 +94,11 @@ remote:
 
 ${PCI_DEVICES_YAML}
 wait_timeout: ${WAIT_TIMEOUT:-3600}
-no_wait: false
 version_channel: ${VERSION_CHANNEL:-stable}
+
+snapshot:
+  enabled: ${SNAPSHOT_ENABLED:-true}
+  max_cached: ${SNAPSHOT_MAX_CACHED:-3}
 
 operators:
   install: false
