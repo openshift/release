@@ -14,7 +14,13 @@ ref:
   - name: METALLB_NAMESPACE
     default: "metallb-system"
     documentation: |-
-      Namespace where MetalLB IPAddressPool / L2Advertisement for CoreDNS live.
+      Namespace of the MetalLB IPAddressPool created by install-metallb.
+  - name: METALLB_POOL_NAME
+    default: "default-pool"
+    documentation: |-
+      Existing MetalLB IPAddressPool to allocate the CoreDNS LoadBalancer IP from.
+      Must match kuadrant-s390x-install-metallb (do not create a second overlapping
+      pool — MetalLB's admission webhook rejects CIDR overlaps).
   - name: COREDNS_NAMESPACE
     default: "kuadrant-coredns"
     documentation: |-
@@ -31,22 +37,16 @@ ref:
   - name: COREDNS_LB_HOST
     default: "240"
     documentation: |-
-      Host octet for the dedicated CoreDNS LoadBalancer IP when deriving from the
-      libvirt lease /24 (mc1 uses 192.168.122.240).
+      Host octet for the CoreDNS LoadBalancer IP when deriving from the libvirt
+      lease /24 (mc1 uses 192.168.122.240). Must fall within METALLB_POOL_NAME.
   - name: COREDNS_LOADBALANCER_IP
     default: ""
     documentation: |-
       Optional explicit CoreDNS LoadBalancer IP. When empty, derives
-      192.168.<lease.subnet>.<COREDNS_LB_HOST>.
-  - name: COREDNS_METALLB_POOL_NAME
-    default: "coredns-pool"
-    documentation: |-
-      Dedicated MetalLB IPAddressPool name for kuadrant-coredns (mc1 pattern).
-  - name: COREDNS_METALLB_ADV_NAME
-    default: "coredns-l2"
-    documentation: |-
-      L2Advertisement for the CoreDNS MetalLB pool.
+      192.168.<lease.subnet>.<COREDNS_LB_HOST> and pins it via MetalLB annotations.
   documentation: |-
-    Deploys kuadrant-coredns with the Kuadrant plugin and a dedicated MetalLB
-    LoadBalancer at .240 in the lease /24, matching the ocpz-m42lp36 / rhcl-mc1
-    s390x reference stacks. Run after install-metallb and before install-operator.
+    Deploys kuadrant-coredns with the Kuadrant plugin and pins its LoadBalancer
+    Service to .240 from the existing install-metallb default-pool (no second
+    IPAddressPool — overlapping CIDRs are rejected by MetalLB). Matches the
+    ocpz-m42lp36 / rhcl-mc1 zone and image. Run after install-metallb and before
+    install-operator.

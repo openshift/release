@@ -3,8 +3,9 @@
 set -euo pipefail
 
 # Deploy kuadrant-coredns matching the known-good ocpz-m42lp36 / rhcl-mc1 LPAR
-# stacks: CoreDNS with the Kuadrant plugin, zone k.example.com, LoadBalancer on a
-# dedicated MetalLB pool at .240 in the libvirt lease /24.
+# stacks: CoreDNS with the Kuadrant plugin, zone k.example.com, LoadBalancer
+# pinned to .240 from the existing MetalLB default-pool (install-metallb).
+# Do not create a second IPAddressPool — MetalLB rejects overlapping CIDRs.
 
 derive_subnet_octet() {
   local subnet cidr
@@ -54,29 +55,13 @@ if [[ -z "${COREDNS_LB_IP}" ]]; then
   echo "ERROR: could not derive CoreDNS LB IP. Set COREDNS_LOADBALANCER_IP explicitly." >&2
   exit 1
 fi
-echo "CoreDNS LoadBalancer IP: ${COREDNS_LB_IP}"
+echo "CoreDNS LoadBalancer IP: ${COREDNS_LB_IP} (from existing pool ${METALLB_POOL_NAME})"
 
-echo "=== Ensuring dedicated MetalLB pool ${COREDNS_METALLB_POOL_NAME} (${COREDNS_LB_IP}) ==="
-oc apply -f - <<EOF
-apiVersion: metallb.io/v1beta1
-kind: IPAddressPool
-metadata:
-  name: ${COREDNS_METALLB_POOL_NAME}
-  namespace: ${METALLB_NAMESPACE}
-spec:
-  autoAssign: true
-  addresses:
-  - ${COREDNS_LB_IP}-${COREDNS_LB_IP}
----
-apiVersion: metallb.io/v1beta1
-kind: L2Advertisement
-metadata:
-  name: ${COREDNS_METALLB_ADV_NAME}
-  namespace: ${METALLB_NAMESPACE}
-spec:
-  ipAddressPools:
-  - ${COREDNS_METALLB_POOL_NAME}
-EOF
+if ! oc get ipaddresspool "${METALLB_POOL_NAME}" -n "${METALLB_NAMESPACE}" >/dev/null 2>&1; then
+  echo "ERROR: MetalLB IPAddressPool ${METALLB_POOL_NAME} not found in ${METALLB_NAMESPACE}; run install-metallb first." >&2
+  oc get ipaddresspool -n "${METALLB_NAMESPACE}" -o wide >&2 || true
+  exit 1
+fi
 
 echo "=== Deploying kuadrant-coredns (zone ${COREDNS_ZONE}) ==="
 oc apply -f - <<EOF
@@ -211,9 +196,13 @@ metadata:
     app.kubernetes.io/instance: kuadrant
     app.kubernetes.io/name: coredns
   annotations:
-    metallb.universe.tf/address-pool: ${COREDNS_METALLB_POOL_NAME}
+    metallb.universe.tf/address-pool: ${METALLB_POOL_NAME}
+    metallb.universe.tf/loadBalancerIPs: ${COREDNS_LB_IP}
+    metallb.io/address-pool: ${METALLB_POOL_NAME}
+    metallb.io/loadBalancerIPs: ${COREDNS_LB_IP}
 spec:
   type: LoadBalancer
+  loadBalancerIP: ${COREDNS_LB_IP}
   selector:
     app.kubernetes.io/instance: kuadrant
     app.kubernetes.io/name: coredns
@@ -243,6 +232,7 @@ assigned="$(oc get svc kuadrant-coredns -n "${COREDNS_NAMESPACE}" \
 if [[ "${assigned}" != "${COREDNS_LB_IP}" ]]; then
   echo "WARNING: kuadrant-coredns LB IP is ${assigned:-<unset>} (wanted ${COREDNS_LB_IP})" >&2
   oc get svc kuadrant-coredns -n "${COREDNS_NAMESPACE}" -o yaml >&2 || true
+  oc get ipaddresspool -n "${METALLB_NAMESPACE}" -o wide >&2 || true
 fi
 
 echo "=== kuadrant-coredns install complete ==="
