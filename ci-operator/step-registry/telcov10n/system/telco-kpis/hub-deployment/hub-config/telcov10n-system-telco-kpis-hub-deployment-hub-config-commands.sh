@@ -6,28 +6,49 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'hub_config' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
 
-# TODO: Implement hub cluster configuration using Ansible playbook
-# Expected playbook: repos/eco-ci-cd/playbooks/telco-kpis/hub-config.yml
-#
-# Implementation steps:
-# 1. Source common functions and setup environment
-# 2. Build Ansible inventory with hub cluster configuration
-# 3. Execute playbook: ansible-playbook ./playbooks/telco-kpis/hub-config.yml
-# 4. Playbook should configure:
-#    - OpenShift GitOps (ArgoCD) for ZTP workflows
-#    - ACM policies for spoke cluster compliance
-#    - ClusterImageSet resources for available OCP versions
-#    - SiteConfig and PolicyGenTemplate CRDs
-#    - Configure assisted service for spoke provisioning
-#    - Setup Git repository integration for ZTP manifests
-# 5. Verify ArgoCD applications are synced and healthy
-# 6. Validate hub is ready to provision spoke clusters via ZTP
-#
-# Environment variables:
-#   HUB_CLUSTER: Hub cluster name to configure
-#   DEBUG: Enable Ansible debug output
-#   ECO_CI_CD_IMAGE: Container image for Ansible execution
+main() {
+    echo "Configuring hub cluster: ${HUB_CLUSTER}"
 
-echo "TODO: Configure hub cluster ${HUB_CLUSTER} for ZTP spoke deployments"
-echo "This step will execute Ansible playbook for hub configuration"
-echo "Required playbook: repos/eco-ci-cd/playbooks/telco-kpis/hub-config.yml"
+    setup_ansible_inventory "${HUB_CLUSTER}" "${HUB_CLUSTER}"
+
+    cd /eco-ci-cd
+
+    local kubeconfig="/home/telcov10n/project/generated/${HUB_CLUSTER}/auth/kubeconfig"
+
+    DEBUG_FLAG="-vv"
+    if [ "${DEBUG}" = "true" ]; then
+        DEBUG_FLAG="-vvv"
+    fi
+
+    echo "=== Step 1/4: Configure LVM storage ==="
+    ansible-playbook ./playbooks/ran/hub-sno-configure-lvm-storage.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        -e "kubeconfig=${kubeconfig}" \
+        ${DEBUG_FLAG}
+
+    echo "=== Step 2/4: Configure ACM ==="
+    ansible-playbook ./playbooks/ran/hub-sno-configure-acm.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        -e "kubeconfig=${kubeconfig}" \
+        -e "ocp_version=${VERSION}" \
+        ${DEBUG_FLAG}
+
+    echo "=== Step 3/4: Configure kustomize plugin ==="
+    ansible-playbook ./playbooks/ran/hub-sno-configure-kustomize-plugin.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        -e "kubeconfig=${kubeconfig}" \
+        -e "ocp_version=${VERSION}" \
+        ${DEBUG_FLAG}
+
+    echo "=== Step 4/4: Configure GitOps ==="
+    ansible-playbook ./playbooks/ran/hub-sno-configure-gitops.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        -e "kubeconfig=${kubeconfig}" \
+        -e "gitlab_repo_url=${GITLAB_REPO_URL}" \
+        -e "gitlab_repo_branch=${GITLAB_REPO_BRANCH}" \
+        ${DEBUG_FLAG}
+
+    echo "Hub configuration completed: ${HUB_CLUSTER}"
+}
+
+main
