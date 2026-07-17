@@ -24,6 +24,12 @@ resources:
 tests:
 - as: sonarcloud
   commands: |
+    export HOME="/tmp"
+    make setup-envtest
+    export ENVTEST_K8S_VERSION=$(go list -m -f '{{ .Version }}' k8s.io/api | awk -F'[v.]' '{printf "1.%d", $3}')
+    export KUBEBUILDER_ASSETS=$(./bin/setup-envtest use "${ENVTEST_K8S_VERSION}" --bin-dir ./bin -p path)
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -32,6 +38,12 @@ tests:
     name: acm-sonarcloud-token
 - as: sonarcloud-postsubmit
   commands: |
+    export HOME="/tmp"
+    make setup-envtest
+    export ENVTEST_K8S_VERSION=$(go list -m -f '{{ .Version }}' k8s.io/api | awk -F'[v.]' '{printf "1.%d", $3}')
+    export KUBEBUILDER_ASSETS=$(./bin/setup-envtest use "${ENVTEST_K8S_VERSION}" --bin-dir ./bin -p path)
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
