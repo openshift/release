@@ -12,8 +12,13 @@ oc config view
 oc projects
 
 # Create the performance profile setup
+if [[ $TYPE == "sno" ]]; then
+  MCP_NAME="master"
+else
+  MCP_NAME="worker"
+fi
 
-oc patch --type=merge --patch='{"spec":{"maxUnavailable":"100%"}}' machineconfigpool/worker
+oc patch --type=merge --patch='{"spec":{"maxUnavailable":"100%"}}' machineconfigpool/${MCP_NAME}
 
 cat << EOF| oc apply -f -
 apiVersion: performance.openshift.io/v2
@@ -22,7 +27,7 @@ metadata:
   name: cpt-pao
   annotations:
     kubeletconfig.experimental: |
-      {"allowedUnsafeSysctls":["net.ipv6.conf.all.accept_ra"]}
+      {"allowedUnsafeSysctls":["net.ipv6.conf.all.accept_ra"],"maxPods":${MAX_PODS}}
 spec:
   cpu:
     isolated: ${ISOLATED_CORES}
@@ -34,9 +39,9 @@ spec:
     - count: ${HUGEPAGES_COUNT}
       size: 1G
   machineConfigPoolSelector:
-    pools.operator.machineconfiguration.openshift.io/worker: ''
+    pools.operator.machineconfiguration.openshift.io/${MCP_NAME}: ''
   nodeSelector:
-    node-role.kubernetes.io/worker: ""
+    node-role.kubernetes.io/${MCP_NAME}: ""
   workloadHints:
     realTime: false
     highPowerConsumption: false
@@ -50,8 +55,12 @@ spec:
     userLevelNetworking: false
 EOF
 
-# Added a 5 minutes delay as Performance operator will take sometime to update updatedMachineCount
-sleep 300
+# Added a 5 minutes delay as Performance operator will take sometime to update updatedMachineCount in case of MNO cluster
+# Added a 15 minutes delay as SNO cluster will go for reboot after applying the performance profile
+if [[ $TYPE == "sno" ]]; then
+  sleep 900
+else
+  sleep 300
+fi
 
-kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=60m mcp worker
-oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
+oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=40m

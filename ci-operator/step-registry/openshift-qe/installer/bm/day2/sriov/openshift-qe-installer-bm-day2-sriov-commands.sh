@@ -133,3 +133,25 @@ else
     resourceName: ${SRIOV_RESOURCE_NAME}
 EOF
 fi
+
+if [ "${NODE_DENSITY_CNI_WORKLOAD}" == "true" ]; then
+  # Create the SRIOV network policy for Node Density CNI Workload
+  cat << EOF| oc apply -f -
+  apiVersion: sriovnetwork.openshift.io/v1
+  kind: SriovNetwork
+  metadata:
+    name: sriov-net-node-density
+    namespace: openshift-sriov-network-operator
+  spec:
+    ipam: |
+      {
+        "type": "whereabouts",
+        "range": "172.20.0.0/16"
+      }
+    logLevel: info
+    networkNamespace: node-density-cni-0
+    resourceName: ${SRIOV_RESOURCE_NAME}
+    spoofChk: "off"
+    trust: "on"
+EOF
+fi
