@@ -11,13 +11,23 @@ ref:
       memory: 8Gi
   timeout: 3h0m0s
   env:
-  - name: TESTSUITE_DIR
-    default: "/opt/workdir/kuadrant-testsuite"
+  - name: TESTSUITE_S390X_IMAGE
+    default: "quay.io/vray_rh/rhcl-testsuite:stablev1"
     documentation: |-
-      Path to the Kuadrant testsuite already present in the kuadrant-testsuite
-      image (FROM quay.io/kuadrant/testsuite). Sources and Poetry deps are baked
-      in at image build time. The step runs from this path (no clone/copy) so
-      Poetry reuses the image virtualenv under /opt/workdir/virtualenvs.
+      s390x-native Kuadrant testsuite image run as an in-cluster Job on an s390x
+      worker node. Running on the cluster network is what lets the test client
+      resolve *.COREDNS_ZONE (CoreDNS ClusterIP) and reach the Gateway MetalLB
+      IPs directly, unlike the amd64 build-farm step pod.
+  - name: TEST_RUNNER_NAMESPACE
+    default: "kuadrant-testrunner"
+    documentation: |-
+      Namespace created on the target cluster to host the test-runner Job, its
+      config Secret (dynaconf settings + admin kubeconfig) and resolver ConfigMap.
+  - name: JOB_ACTIVE_DEADLINE
+    default: "10200"
+    documentation: |-
+      activeDeadlineSeconds for the test-runner Job (default ~2h50m, kept under
+      the step timeout so results/diagnostics can still be collected).
   - name: PYTEST_FLAGS
     default: "-n1"
     documentation: |-
@@ -30,7 +40,7 @@ ref:
     default: "false"
     documentation: |-
       When "true", run `make kuadrant` (single-cluster Kuadrant tests, excludes
-      ui/playwright). Uses the same CoreDNS getaddrinfo bridge as smoke.
+      ui/playwright) inside the same in-cluster Job as smoke.
   - name: HTTPBIN_IMAGE
     default: "quay.io/vray_rh/rhcl_testsuite_dependencies:httpbin-s390x"
     documentation: |-
@@ -59,8 +69,9 @@ ref:
   - name: COREDNS_NAMESPACE
     default: "kuadrant-coredns"
     documentation: |-
-      Namespace of the kuadrant-coredns Service port-forwarded for client DNS
-      resolution during smoke (avoids rewriting /etc/resolv.conf).
+      Namespace of the kuadrant-coredns Service. Its ClusterIP is passed to the
+      in-cluster Job so *.COREDNS_ZONE lookups resolve against CoreDNS directly.
+      Overridden by SHARED_DIR/kuadrant-coredns-namespace when present.
   - name: CLUSTER_ISSUER_NAME
     default: "selfsigned-cluster-issuer"
     documentation: |-
@@ -82,17 +93,17 @@ ref:
     documentation: |-
       Keycloak admin password written into the testsuite config.
   documentation: |-
-    Runs the Kuadrant end-to-end testsuite from the kuadrant-testsuite pipeline
-    image (FROM quay.io/kuadrant/testsuite). That image already contains the
-    testsuite sources and Poetry dependencies, so this step does not clone or
-    copy the repo. It runs from the baked-in WORKDIR to reuse the image
-    virtualenv, writes dynaconf overrides to SECRETS_FOR_DYNACONF on a writable
-    path (tool Routes + s390x workload images), runs smoke tests (make kuadrant
-    and polish-junit are temporarily disabled while stabilizing), streams
-    gateway istio-proxy logs concurrently into ARTIFACT_DIR during smoke (pods
-    are deleted by fixtures before a post-dump can see them), streams DNS
-    operator / DNSPolicy / DNSRecord diagnostics during smoke, dumps
-    Kuadrant/WasmPlugin/RateLimitPolicy/Limitador diagnostics to ARTIFACT_DIR,
-    and copies reports to ${ARTIFACT_DIR}. The OpenShift CLI is injected via
-    cli: latest. The image ENTRYPOINT is overridden by ci-operator; make
-    targets are invoked explicitly.
+    Runs the Kuadrant end-to-end testsuite as an in-cluster Job on the s390x
+    cluster instead of from the amd64 build-farm step pod. The step pod lives on
+    a different network than the leased cluster, so it cannot resolve the private
+    CoreDNS zone (*.k.example.com) nor reach the Gateway MetalLB IPs; that is why
+    DNSPolicy/TLSPolicy tests failed with "Name or service not known" while the
+    public *.apps ingress tests passed. This mirrors the working m42lp36 bastion
+    topology by running the test client on the cluster network.
+
+    The step (running on the build farm) generates dynaconf settings and a small
+    getaddrinfo resolver plugin, mounts them plus the admin kubeconfig into a Job
+    that uses TESTSUITE_S390X_IMAGE on an s390x worker node, streams the Job logs
+    into ARTIFACT_DIR, recovers JUnit reports from the log stream, and collects
+    istio-proxy / DNS diagnostics from the cluster concurrently. The OpenShift
+    CLI is injected via cli: latest.
