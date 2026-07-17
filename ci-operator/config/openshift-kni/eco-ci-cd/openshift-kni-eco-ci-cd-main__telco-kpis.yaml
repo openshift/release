@@ -61,17 +61,7 @@ tests:
             }
           }
         }
-      PR_ONLY: "true"
       SPOKE_CLUSTER: spree-02
-      TIMEOUT: +10 min
-    post:
-    - ref: telcov10n-system-telco-kpis-wait-to-debug
-    pre:
-    - ref: telcov10n-system-telco-kpis-common-functions-generator
-    - ref: telcov10n-system-telco-kpis-deploy-vm-bastion
-    - chain: telcov10n-system-telco-kpis-hub-deployment
-    - ref: telcov10n-system-telco-kpis-spoke-deployment-mirror-spoke-operators
-    - ref: telcov10n-system-telco-kpis-mirror-ran-test-images
     test:
     - as: infra-complete
       commands: echo "ZTP infrastructure deployment completed successfully"
@@ -80,6 +70,7 @@ tests:
         requests:
           cpu: 100m
           memory: 100Mi
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
 - as: run-1hr-tests
   capabilities:
   - intranet
@@ -134,7 +125,6 @@ tests:
             }
           }
         }
-      PR_ONLY: "true"
       REPORTING_SETTINGS: |-
         {
           "generate_report": { "development_mode": true }
@@ -153,31 +143,8 @@ tests:
           "reboot": { "reboot_count": "1" },
           "rds_compare": { "continue_on_fail": true }
         }
-      TIMEOUT: +10 min
       VERSION: "4.21"
-      ZTP_CLUSTERS_PATH: siteconfig
-      ZTP_GIT_BRANCH: ""
-      ZTP_GIT_REPO: https://gitlab.cee.redhat.com/ocp-edge-qe/ztp-site-configs.git
-      ZTP_POLICIES_PATH: policygentemplates
-    post:
-    - ref: telcov10n-system-telco-kpis-wait-to-debug
-    - chain: telcov10n-system-telco-kpis-reporting
-    pre:
-    - ref: telcov10n-system-telco-kpis-common-functions-generator
-    - chain: telcov10n-system-telco-kpis-hub-deployment
-    - chain: telcov10n-system-telco-kpis-spoke-deployment
-    - ref: telcov10n-system-telco-kpis-mirror-ran-test-images
-    test:
-    - ref: telcov10n-system-telco-kpis-collect-node-info
-    - ref: telcov10n-system-telco-kpis-tests-run-ztp-ai-deployment-time-test
-    - ref: telcov10n-system-telco-kpis-tests-run-bios-validation-test
-    - ref: telcov10n-system-telco-kpis-tests-run-oslat-test
-    - ref: telcov10n-system-telco-kpis-tests-run-cyclictest-test
-    - ref: telcov10n-system-telco-kpis-tests-run-ptp-test
-    - ref: telcov10n-system-telco-kpis-tests-run-cpu-util-test
-    - ref: telcov10n-system-telco-kpis-tests-run-reboot-test
-    - ref: telcov10n-system-telco-kpis-tests-run-rfc2544-test
-    - ref: telcov10n-system-telco-kpis-tests-run-rds-compare-test
+    workflow: telcov10n-system-telco-kpis-tests
 zz_generated_metadata:
   branch: main
   org: openshift-kni
