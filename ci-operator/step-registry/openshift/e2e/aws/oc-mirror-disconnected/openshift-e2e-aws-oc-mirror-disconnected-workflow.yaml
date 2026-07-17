@@ -1,0 +1,100 @@
+workflow:
+  as: openshift-e2e-aws-oc-mirror-disconnected
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: aws-provision-vpc-disconnected
+    - chain: aws-provision-bastionhost
+    - ref: mirror-images-by-oc-mirror-to-disk
+    - ref: mirror-images-by-oc-mirror-from-disk
+    - ref: aws-provision-vpc-disconnect-internet
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-mirror
+    - ref: ipi-install-monitoringpvc
+    - ref: proxy-config-generate
+    - ref: aws-provision-cco-manual-users-static
+    - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-install-install-aws
+    - ref: ipi-install-times-collection
+    - ref: nodes-readiness
+    - ref: multiarch-validate-nodes
+    - as: disable-default-sources
+      from: cli
+      commands: |-
+        set -euo pipefail
+        if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        oc patch OperatorHub cluster --type json \
+          -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 5m0s
+      grace_period: 5m0s
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post-disconnected
+  env:
+  - name: ENABLE_IDMS
+    default: "yes"
+    documentation: |-
+      Use ImageDigestMirrorSet (IDMS) instead of the legacy
+      ImageContentSourcePolicy. Should remain "yes" for OCP 4.13+.
+  - name: PUBLISH
+    default: "Internal"
+    documentation: Cluster publish strategy for disconnected install.
+  - name: ADD_INGRESS_RECORDS_MANUALLY
+    default: "yes"
+    documentation: Manually create ingress DNS records for private clusters.
+  - name: ZONES_COUNT
+    default: "2"
+    documentation: |-
+      Number of availability zones. Default 2 to avoid regions with fewer than 3 AZs.
+  - name: DISK_ARCHIVE_DIR
+    default: "/tmp/oc-mirror-archive"
+    documentation: |-
+      Path on the bastion host where oc-mirror stores the disk archive between
+      the mirror-to-disk and disk-to-mirror phases.
+  - name: MIRROR_IN_BASTION
+    default: "yes"
+    documentation: |-
+      Passed through to legacy mirror steps. Kept for compatibility with the
+      ipi-conf-mirror and post-deprovision steps.
+  documentation: |-
+    The openshift-e2e-aws-oc-mirror-disconnected workflow runs the standard
+    OpenShift e2e suite against a cluster installed from a fully air-gapped
+    mirror registry. The mirroring is performed by oc-mirror v2 using its
+    two-phase approach:
+
+      1. mirror-to-disk  : oc-mirror mirrors the OCP release payload from
+         the source registry to a disk archive (file://) on the bastion host
+         while the bastion still has internet access.
+
+      2. disk-to-mirror  : oc-mirror pushes the disk archive into the bastion
+         mirror registry (docker://<bastion>:5000) without any internet access,
+         simulating a true air-gap import.
+
+      3. disconnect       : the Internet Gateway routes are removed from the VPC
+         route tables so that neither the bastion nor the cluster nodes can reach
+         the public internet during or after cluster installation.
+
+      4. install          : the cluster is installed pointing exclusively at the
+         bastion mirror registry, with IDMS and the registry CA injected into
+         install-config.yaml.
+
+      5. e2e test         : the standard openshift-e2e-test suite is executed
+         through the bastion proxy.
+
+    This workflow is a drop-in replacement for openshift-e2e-aws-disconnected
+    for teams that need to validate oc-mirror's two-phase air-gap workflow.
