@@ -550,6 +550,40 @@ then
 	exit 0
 fi
 
+echo "mcornea patching rhcos10 with el9 kernel and wait"
+# Apply the changes
+oc apply -f- <<EOF
+apiVersion: v1
+items:
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: worker
+    name: os-layer-custom-worker
+  spec:
+    osImageURL: quay.io/mcornea/rhel-coreos-10@sha256:214f79c33bd68cc670aad6935ce8456909f1248a86e77b87aa9a2691903bf878
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: master
+    name: os-layer-custom-master
+  spec:
+    osImageURL: quay.io/mcornea/rhel-coreos-10@sha256:214f79c33bd68cc670aad6935ce8456909f1248a86e77b87aa9a2691903bf878
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: infra
+    name: os-layer-custom-infra
+  spec:
+    osImageURL: quay.io/mcornea/rhel-coreos-10@sha256:214f79c33bd68cc670aad6935ce8456909f1248a86e77b87aa9a2691903bf878
+kind: List
+metadata:
+  resourceVersion: ""
+EOF
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -760,3 +794,5 @@ else
        echo "No machineset was found or abnormal machineset"
 fi
 
+# Wait for cluster to stabilize
+oc adm wait-for-stable-cluster --minimum-stable-period 5m
