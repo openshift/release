@@ -1,0 +1,90 @@
+ref:
+  as: p2p-install-cnv-hub
+  from: cli
+  commands: p2p-install-cnv-hub-commands.sh
+  timeout: 2h0m0s
+  grace_period: 30m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Install CNV (OpenShift Virtualization / KubeVirt) on the ACM hub cluster via ACM Policy
+    targeting the local-cluster ManagedCluster.
+
+    In ACM, the hub cluster is registered as the ManagedCluster "local-cluster", which resides
+    in the "default" ManagedClusterSet. This step binds that ClusterSet to the policy namespace,
+    then creates a Policy, Placement (predicates: name=local-cluster), and PlacementBinding so
+    ACM enforces the CNV ConfigurationPolicy exclusively on the hub — the same declarative path
+    used for spokes in p2p-acm-cnv-install-policy.
+
+    Why a separate step from p2p-acm-cnv-install-policy:
+      - That step builds its Placement from SHARED_DIR spoke cluster names and spoke-specific
+        ClusterSet bindings. It does not include local-cluster.
+      - The hub requires decentralizedLiveMigration=true and this step additionally waits for
+        virt-synchronization-controller (CCLM requirement) using KUBECONFIG.
+
+    What this step does:
+    1. Resolves kubevirt-hyperconverged startingCSV from the hub PackageManifest.
+       When CNV_HUB_INSTALL_MAJOR_MINOR is set, pins to the latest patch of that major.minor.
+    2. Creates ManagedClusterSetBinding for "default" ClusterSet in the policy namespace.
+    3. Applies an ACM Policy (Namespace + OperatorGroup + Subscription + HyperConverged CR)
+       with remediationAction: enforce, targeting local-cluster via name predicate.
+       HyperConverged has spec.featureGates.decentralizedLiveMigration=true.
+    4. Waits for HyperConverged Available on the hub via KUBECONFIG.
+    5. Waits for DecentralizedLiveMigration featureGate to be active in KubeVirt on hub.
+    6. Waits for virt-synchronization-controller Deployment Available on hub.
+    7. Waits for the ODF virt StorageClass and annotates it as the KubeVirt default
+       (ODF creates ocs-storagecluster-ceph-rbd-virtualization once the
+       virtualmachines.kubevirt.io CRD is registered by CNV on hub).
+
+    Prerequisites:
+    - p2p-install-odf-hub must complete first — ODF must be Available so it can detect the
+      KubeVirt CRD registered by CNV and create the virt StorageClass.
+    - ACM MultiClusterHub must be Available (local-cluster ManagedCluster must be registered).
+
+    Writes diagnostics to ${ARTIFACT_DIR}/cnv-hub/ on both success and failure.
+  env:
+  - name: CNV_HUB_CHANNEL
+    default: "stable"
+    documentation: |-
+      OLM channel for the kubevirt-hyperconverged Subscription on the hub
+      (e.g. "stable", "stable-4.21"). Use "stable" to pick the latest available release.
+  - name: CNV_HUB_SOURCE
+    default: "redhat-operators"
+    documentation: OLM CatalogSource name for the kubevirt-hyperconverged Subscription on hub.
+  - name: CNV_HUB_SOURCE_NAMESPACE
+    default: "openshift-marketplace"
+    documentation: Namespace of the OLM CatalogSource on hub.
+  - name: CNV_HUB_INSTALL_MAJOR_MINOR
+    default: ""
+    documentation: |-
+      When non-empty (e.g. "4.21"), pins the hub CNV install to the latest patch release of
+      that major.minor by resolving startingCSV from the hub PackageManifest. Leave empty to
+      install the channel's current head version.
+  - name: CNV_HUB_POLICY_NAMESPACE
+    default: "install-cnv-hub"
+    documentation: |-
+      Namespace on the hub for the ACM Policy, Placement, PlacementBinding, and
+      ManagedClusterSetBinding resources. Intentionally separate from the spoke CNV policy
+      namespace (install-cnv) to avoid cross-contamination.
+  - name: CNV_HUB_WAIT_TIMEOUT_MINUTES
+    default: "60"
+    documentation: |-
+      Timeout in minutes for each wait: HyperConverged Available, DecentralizedLiveMigration
+      featureGate, and virt-synchronization-controller Available.
+  - name: CNV_HUB_POLL_INTERVAL_SECONDS
+    default: "30"
+    documentation: Sleep interval between status polls (HyperConverged, featureGate, sync controller).
+  - name: CNV_HUB_VIRT_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: |-
+      StorageClass that ODF creates once the virtualmachines.kubevirt.io CRD is registered.
+      This step waits for it and annotates it storageclass.kubevirt.io/is-default-virt-class=true
+      so MTV and KubeVirt default to it for VM PVCs on the hub. Set to empty string to skip.
+  - name: CNV_HUB_VIRT_SC_WAIT_TIMEOUT_MINUTES
+    default: "15"
+    documentation: |-
+      Max minutes to wait for the ODF virt StorageClass to appear after HyperConverged Available.
+      ODF may take several minutes to detect the KubeVirt CRD and create the SC.
+      If not found within this window, the step logs a warning and continues (non-fatal).
