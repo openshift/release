@@ -60,6 +60,51 @@ if [[ "$ENABLE_SHARED_VPC" == "yes" ]]; then
   SHARED_VPC_SWITCH="--shared-vpc-role-arn ${shared_vpc_role_arn}"
 fi
 
+# Cleanup orphaned operator roles before creating new ones to avoid hitting IAM quota
+echo "Checking for orphaned operator roles to clean up..."
+
+CUTOFF_TIME=$(date -u -d '4 hours ago' '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date -u -v-4H '+%Y-%m-%dT%H:%M:%S')
+echo "Deleting operator roles created before ${CUTOFF_TIME}"
+
+MAX_ROLES_TO_DELETE=25
+
+set +e
+old_roles=$(rosa list operator-roles --output json 2>/dev/null | \
+  jq -r --arg cutoff "$CUTOFF_TIME" \
+  '.[] | select(.CreatedAt < $cutoff) | select(.Prefix | startswith("ci-rosa")) | .Prefix' 2>/dev/null | \
+  sort -u | head -n $MAX_ROLES_TO_DELETE)
+set -e
+
+if [[ -n "$old_roles" ]]; then
+  echo "Found orphaned operator role prefixes to delete:"
+  echo "$old_roles"
+
+  deleted_count=0
+  failed_count=0
+
+  while IFS= read -r prefix; do
+    if [[ -n "$prefix" ]]; then
+      echo "Attempting to delete operator roles with prefix: ${prefix}"
+      set +e
+      rosa delete operator-roles -y --mode auto --prefix "${prefix}" 2>&1 | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
+      delete_result=$?
+      set -e
+
+      if [[ $delete_result -eq 0 ]]; then
+        echo "Successfully deleted operator roles with prefix: ${prefix}"
+        deleted_count=$((deleted_count + 1))
+      else
+        echo "WARNING: Failed to delete operator roles with prefix: ${prefix} (may already be deleted or in use)"
+        failed_count=$((failed_count + 1))
+      fi
+    fi
+  done <<< "$old_roles"
+
+  echo "Cleanup summary: ${deleted_count} prefixes deleted, ${failed_count} failed"
+else
+  echo "No orphaned operator roles found older than 4 hours"
+fi
+
 # Create operator roles
 echo "Create the operator roles with the prefix ${OPERATOR_ROLES_PREFIX}..."
 rosa create operator-roles -y --mode auto \
