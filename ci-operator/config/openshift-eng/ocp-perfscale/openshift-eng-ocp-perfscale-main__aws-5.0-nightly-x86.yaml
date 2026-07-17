@@ -552,6 +552,43 @@ tests:
     - ref: wait
     workflow: openshift-qe-installer-aws-ovn-ipsec
   timeout: 14h0m0s
+- always_run: false
+  as: ipsec-libreswan-reboot-100nodes-baseline
+  optional: true
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "97"
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: quay.io/openshift-release-dev/ocp-release:4.18.49-x86_64
+      ENABLE_REBOOT_CHECK: "true"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.xlarge
+      REBOOT_TYPE: HARD_REBOOT
+      SET_ENV_BY_PLATFORM: custom
+      USER_TAGS: |
+        TicketId OCPBUGS-86429
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - ref: enable-node-coredumps
+    - ref: openshift-qe-ipsec-reboot-validation
+    - ref: cucushift-installer-check-reboot-nodes
+    - ref: openshift-qe-ipsec-reboot-validation-post
+    - ref: wait
+    workflow: openshift-qe-installer-aws-ovn-ipsec
+  timeout: 14h0m0s
 - as: udn-density-l3-24nodes
   cron: 0 2 * * *
   reporter_config:
