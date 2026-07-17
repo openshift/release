@@ -308,16 +308,17 @@ step_name = sys.argv[1]
 overrides_raw = sys.argv[2] if len(sys.argv) > 2 else ''
 defaults_raw = sys.argv[3] if len(sys.argv) > 3 else ''
 
-def parse_json(raw):
+def parse_json(raw, label):
     if not raw or raw.strip() == '{}':
         return {}
     try:
         return json.loads(raw)
-    except (json.JSONDecodeError, ValueError):
-        return {}
+    except (json.JSONDecodeError, ValueError) as exc:
+        print(f'ERROR: malformed JSON in {label}: {exc}', file=sys.stderr)
+        sys.exit(1)
 
-defaults_all = parse_json(defaults_raw)
-overrides_all = parse_json(overrides_raw)
+defaults_all = parse_json(defaults_raw, 'settings_defaults')
+overrides_all = parse_json(overrides_raw, 'settings')
 
 defaults = defaults_all.get(step_name, {})
 overrides = overrides_all.get(step_name, {})
