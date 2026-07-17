@@ -126,6 +126,35 @@ fi
 echo "Will fence ${FENCE_NODE}, expect VM to migrate to ${SURVIVE_NODE}"
 
 # -------------------------------------------------------------------------
+# Idempotent recovery: power on the fenced VM and restore STONITH action
+# -------------------------------------------------------------------------
+RECOVERY_NEEDED=false
+
+recover_fenced_node() {
+  if [[ "${RECOVERY_NEEDED}" != "true" ]]; then
+    return 0
+  fi
+  echo "--- Recovery trap: restoring ${FENCE_NODE} ---"
+  RECOVERY_NEEDED=false
+
+  local fence_vm="ostest_${FENCE_NODE//-/_}"
+  ssh "${SSHOPTS[@]}" "root@${IP}" \
+    "virsh -c qemu:///system domstate ${fence_vm} | grep -q running || virsh -c qemu:///system start ${fence_vm}" || true
+
+  sleep 30
+
+  run_on_node "${SURVIVE_NODE}" \
+    "sudo pcs stonith update ${FENCE_NODE}_redfish action=reboot --force" || true
+
+  oc wait "node/${FENCE_NODE}" --for=condition=Ready --timeout=10m || true
+
+  run_on_node "${SURVIVE_NODE}" "sudo pcs resource cleanup etcd" || true
+  echo "--- Recovery trap complete ---"
+}
+
+trap recover_fenced_node EXIT
+
+# -------------------------------------------------------------------------
 # Fence the node running the VM
 # -------------------------------------------------------------------------
 echo "--- Fencing ${FENCE_NODE} ---"
@@ -133,6 +162,7 @@ echo "--- Fencing ${FENCE_NODE} ---"
 echo "Setting STONITH action to off for ${FENCE_NODE}..."
 run_on_node "${SURVIVE_NODE}" \
   "sudo pcs stonith update ${FENCE_NODE}_redfish action=off --force"
+RECOVERY_NEEDED=true
 
 echo "Fencing ${FENCE_NODE}..."
 run_on_node "${SURVIVE_NODE}" \
@@ -179,28 +209,28 @@ fi
 echo "VM HA validation PASSED: VM migrated from ${FENCE_NODE} to ${SURVIVE_NODE}"
 
 # -------------------------------------------------------------------------
-# Recover the fenced node
+# Recover the fenced node (uses the same idempotent function as the trap)
 # -------------------------------------------------------------------------
-echo "--- Recovering ${FENCE_NODE} ---"
-
-FENCE_VM="ostest_${FENCE_NODE//-/_}"
-echo "Starting ${FENCE_VM} on hypervisor..."
-ssh "${SSHOPTS[@]}" "root@${IP}" "virsh -c qemu:///system start ${FENCE_VM}" || true
-
-echo "Restoring STONITH action to reboot for ${FENCE_NODE}..."
-sleep 30
-run_on_node "${SURVIVE_NODE}" \
-  "sudo pcs stonith update ${FENCE_NODE}_redfish action=reboot --force"
-
-echo "Waiting for ${FENCE_NODE} to become Ready..."
-oc wait "node/${FENCE_NODE}" --for=condition=Ready --timeout=10m
-
-echo "Cleaning up etcd resource..."
-run_on_node "${SURVIVE_NODE}" "sudo pcs resource cleanup etcd" || true
+recover_fenced_node
+trap - EXIT
 
 echo "Verifying cluster health..."
-run_on_node "${SURVIVE_NODE}" "sudo pcs status" || true
-oc get nodes
-oc get vmi -n default
+
+oc wait "node/${NODE_0}" "node/${NODE_1}" --for=condition=Ready --timeout=5m
+echo "All nodes Ready"
+
+run_on_node "${SURVIVE_NODE}" \
+  "sudo pcs status | tee /dev/stderr | grep -qv 'Failed Actions:'" || {
+    echo "ERROR: pcs reports failed actions after recovery"
+    exit 1
+  }
+
+VMI_FINAL=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.phase}')
+if [[ "${VMI_FINAL}" != "Running" ]]; then
+  echo "ERROR: VMI is not Running after recovery (phase=${VMI_FINAL})"
+  oc get vmi -n default -o yaml || true
+  exit 1
+fi
+echo "VMI is Running"
 
 echo "--- VM HA fencing test complete ---"

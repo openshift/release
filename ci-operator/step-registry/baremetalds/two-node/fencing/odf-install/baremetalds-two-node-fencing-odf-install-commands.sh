@@ -76,17 +76,15 @@ fi
 echo "[hypervisor] ${VM} is shut off"
 
 mon_img="${POOL_DIR}/${VM}_${MON_TARGET}.img"
-if [[ -f "${mon_img}" ]]; then
-  truncate -s "${MON_SIZE}" "${mon_img}"
-  echo "[hypervisor] Truncated ${mon_img} to ${MON_SIZE}"
-else
-  echo "[hypervisor] WARNING: ${mon_img} not found, skipping truncate"
+if [[ ! -f "${mon_img}" ]]; then
+  echo "[hypervisor] ERROR: ${mon_img} not found"
+  exit 1
 fi
+truncate -s "${MON_SIZE}" "${mon_img}"
+echo "[hypervisor] Truncated ${mon_img} to ${MON_SIZE}"
 
-virt-xml "${VM}" --edit target="${OSD_TARGET}" --disk serial="${OSD_SERIAL}" 2>/dev/null || \
-  echo "[hypervisor] WARNING: Could not set serial on ${VM} ${OSD_TARGET}"
-virt-xml "${VM}" --edit target="${MON_TARGET}" --disk serial="${MON_SERIAL}" 2>/dev/null || \
-  echo "[hypervisor] WARNING: Could not set serial on ${VM} ${MON_TARGET}"
+virt-xml "${VM}" --edit target="${OSD_TARGET}" --disk serial="${OSD_SERIAL}"
+virt-xml "${VM}" --edit target="${MON_TARGET}" --disk serial="${MON_SERIAL}"
 echo "[hypervisor] ${VM}: ${OSD_TARGET}=${OSD_SERIAL}, ${MON_TARGET}=${MON_SERIAL}"
 
 echo "[hypervisor] Starting ${VM}..."
