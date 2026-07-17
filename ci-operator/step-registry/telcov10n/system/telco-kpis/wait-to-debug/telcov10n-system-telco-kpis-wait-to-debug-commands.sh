@@ -8,7 +8,7 @@ echo "************ Fix user IDs in a container ************"
 function pr_debug_mode_waiting {
 
   echo "################################################################################"
-  echo "# Using pull request ${PULL_NUMBER}. Entering in the debug mode waiting..."
+  echo "# ${PULL_NUMBER:+PR ${PULL_NUMBER} — }Entering in the debug mode waiting..."
   echo "################################################################################"
 
   TZ=UTC
