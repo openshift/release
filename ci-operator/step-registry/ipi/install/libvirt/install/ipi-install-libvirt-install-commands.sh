@@ -365,16 +365,30 @@ function collect_bootstrap() {
 function collect_control_plane_logs() {
 	local DIR=$1
 	local ID=$2
-	local cluster_name cluster_domain hostname FROM TO
+	local cluster_name cluster_domain infra_id hostname FROM TO
 
 	[[ -f "${DIR}/terraform.tfvars.json" ]] || return 0
-	cluster_domain=$(sed -n -r -e 's,^ *"cluster_domain": "([^"]*).*$,\1,p' "${DIR}/terraform.tfvars.json")
+	set +e
+	if command -v jq >/dev/null 2>&1; then
+		cluster_domain=$(jq -r '.cluster_domain // empty' "${DIR}/terraform.tfvars.json")
+	else
+		cluster_domain=$(sed -n -r -e 's,^ *"cluster_domain": "([^"]*)".*,\1,p' "${DIR}/terraform.tfvars.json")
+	fi
+	set -e
 	if [[ -z "${cluster_domain}" ]]; then
 		echo "collect_control_plane: could not determine cluster_domain"
 		return 0
 	fi
 	if [[ -f "${DIR}/metadata.json" ]]; then
-		cluster_name=$(sed -n -r -e 's/.*"clusterName"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${DIR}/metadata.json" | head -n1)
+		set +e
+		if command -v jq >/dev/null 2>&1; then
+			cluster_name=$(jq -r '.clusterName // empty' "${DIR}/metadata.json")
+			infra_id=$(jq -r '.infraID // empty' "${DIR}/metadata.json")
+		else
+			cluster_name=$(yq eval -r '.clusterName // ""' "${DIR}/metadata.json")
+			infra_id=$(yq eval -r '.infraID // ""' "${DIR}/metadata.json")
+		fi
+		set -e
 	fi
 	if [[ -z "${cluster_name:-}" && -f "${SHARED_DIR}/install-config.yaml" ]]; then
 		if command -v yq-v4 >/dev/null 2>&1; then
@@ -390,7 +404,11 @@ function collect_control_plane_logs() {
 
 	set +e
 	for ((i=0; i<${MASTER_REPLICAS}; i++)); do
-		hostname="${cluster_name}-master-${i}.${cluster_domain}"
+		if [[ -n "${infra_id:-}" ]]; then
+			hostname="${cluster_name}-${infra_id}-master-${i}.${cluster_domain}"
+		else
+			hostname="${cluster_name}-master-${i}.${cluster_domain}"
+		fi
 		echo "collect_control_plane: ssh ${hostname}:${BASTION_SSH_PORTS[${RESOURCE_ID}]}"
 		mock-nss.sh ssh \
 			-o 'ConnectTimeout=5' \
@@ -531,10 +549,29 @@ if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "tru
 	fi
 fi
 
-# CI workaround: inject xml.xslt before terraform init (see comment above).
+# openshift-install hardcodes libvirt pool path /var/lib/libvirt/openshift-images/<cluster_id>
+# (data/data/libvirt/cluster/main.tf). Opt-in LIBVIRT_IMAGE_PATH rewrites that before terraform apply
+# so VPN OZ hosts can place qcow2 on the 2TB /home volume (same parent as UPI multiarch-ci-pool).
+DEFAULT_LIBVIRT_IMAGE_PATH="/var/lib/libvirt/openshift-images"
+LIBVIRT_IMAGE_PATH="${LIBVIRT_IMAGE_PATH:-${DEFAULT_LIBVIRT_IMAGE_PATH}}"
+NEED_LIBVIRT_IMAGE_PATH_PATCH="false"
+if [[ "${LIBVIRT_IMAGE_PATH}" != "${DEFAULT_LIBVIRT_IMAGE_PATH}" ]]; then
+	NEED_LIBVIRT_IMAGE_PATH_PATCH="true"
+	echo "LIBVIRT_IMAGE_PATH=${LIBVIRT_IMAGE_PATH} (rewriting installer pool paths away from ${DEFAULT_LIBVIRT_IMAGE_PATH})"
+fi
+
+NEED_ACPI_PATCH="false"
 if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
+	NEED_ACPI_PATCH="true"
+fi
+
+# CI workarounds: wrap terraform before first init (unpackAndInit has no poller gap).
+# - s390x ACPI: inject xml.xslt on libvirt_domain (see comment above).
+# - LIBVIRT_IMAGE_PATH: rewrite hardcoded openshift-images pool paths.
+if [[ "${NEED_ACPI_PATCH}" == "true" || "${NEED_LIBVIRT_IMAGE_PATH_PATCH}" == "true" ]]; then
 	xsl="${dir}/s390x-strip-acpi.xsl"
-	cat > "${xsl}" <<'XSL_EOF'
+	if [[ "${NEED_ACPI_PATCH}" == "true" ]]; then
+		cat > "${xsl}" <<'XSL_EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
   <xsl:output method="xml" encoding="UTF-8" indent="yes"/>
@@ -546,31 +583,43 @@ if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "tru
   <xsl:template match="acpi"/>
 </xsl:stylesheet>
 XSL_EOF
-	patch_tf="${dir}/ipi-libvirt-s390x-patch-libvirt-domain-tf.sh"
+	fi
+	patch_tf="${dir}/ipi-libvirt-patch-terraform-tf.sh"
 	cat > "${patch_tf}" <<'PATCH_EOF'
 #!/bin/bash
 set -euo pipefail
 work="${1:?}"
-xsl="${2:?}"
+xsl="${2:-}"
+image_path="${3:-}"
+default_image_path="/var/lib/libvirt/openshift-images"
 [[ -d "${work}" ]] || exit 0
 while IFS= read -r -d '' tf; do
-	if grep -q 'ipi-ci-s390x-strip-acpi' "${tf}" 2>/dev/null; then
-		continue
+	if [[ -n "${image_path}" && "${image_path}" != "${default_image_path}" ]]; then
+		if grep -q "${default_image_path}" "${tf}" 2>/dev/null; then
+			# Installer embeds: path = "/var/lib/libvirt/openshift-images/${var.cluster_id}"
+			# Portable in-place sed (GNU sed -i and BSD sed -i '' both differ; use temp file).
+			sed "s|\"${default_image_path}/|\"${image_path}/|g" "${tf}" > "${tf}.ipi_pool_path.$$" && mv "${tf}.ipi_pool_path.$$" "${tf}"
+		fi
 	fi
-	if ! grep -q 'resource "libvirt_domain"' "${tf}" 2>/dev/null; then
-		continue
+	if [[ -n "${xsl}" && -f "${xsl}" ]]; then
+		if grep -q 'ipi-ci-s390x-strip-acpi' "${tf}" 2>/dev/null; then
+			continue
+		fi
+		if ! grep -q 'resource "libvirt_domain"' "${tf}" 2>/dev/null; then
+			continue
+		fi
+		awk -v xsl="${xsl}" '
+			/resource "libvirt_domain"/ {
+				print
+				print "  # ipi-ci-s390x-strip-acpi: XSLT strips ACPI for RHEL 9 QEMU s390-ccw-virtio-rhel9.*"
+				print "  xml {"
+				print "    xslt = file(\"" xsl "\")"
+				print "  }"
+				next
+			}
+			{ print }
+		' "${tf}" > "${tf}.ipi_acpi_xslt.$$" && mv "${tf}.ipi_acpi_xslt.$$" "${tf}"
 	fi
-	awk -v xsl="${xsl}" '
-		/resource "libvirt_domain"/ {
-			print
-			print "  # ipi-ci-s390x-strip-acpi: XSLT strips ACPI for RHEL 9 QEMU s390-ccw-virtio-rhel9.*"
-			print "  xml {"
-			print "    xslt = file(\"" xsl "\")"
-			print "  }"
-			next
-		}
-		{ print }
-	' "${tf}" > "${tf}.ipi_acpi_xslt.$$" && mv "${tf}.ipi_acpi_xslt.$$" "${tf}"
 done < <(find "${work}" -name '*.tf' -print0 2>/dev/null)
 PATCH_EOF
 	chmod +x "${patch_tf}"
@@ -593,16 +642,20 @@ PATCH_EOF
 		if ! mv "${tfbin}" "${tfbin}.real" 2>/dev/null; then
 			exit 0
 		fi
+		# Pass empty xsl path when ACPI patch is off so the patch script skips XSLT injection.
+		xsl_arg=""
+		if [[ "${NEED_ACPI_PATCH}" == "true" ]]; then
+			xsl_arg="${xsl}"
+		fi
 		cat >"${tfbin}" <<EOF
 #!/bin/bash
 set -euo pipefail
 REAL="${tfbin}.real"
 PATCH="${patch_tf}"
-XSL="${xsl}"
-if [[ "\${ARCH:-}" == "s390x" && "\${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
-	if [[ "\$1" == "init" || "\$1" == "plan" || "\$1" == "apply" ]]; then
-		bash "\${PATCH}" "\$(pwd)" "\${XSL}"
-	fi
+XSL="${xsl_arg}"
+IMAGE_PATH="${LIBVIRT_IMAGE_PATH}"
+if [[ "\$1" == "init" || "\$1" == "plan" || "\$1" == "apply" ]]; then
+	bash "\${PATCH}" "\$(pwd)" "\${XSL}" "\${IMAGE_PATH}"
 fi
 exec "\${REAL}" "\$@"
 EOF

@@ -39,6 +39,16 @@ ref:
       <acpi/> (RHEL 9 QEMU s390-ccw-virtio-rhel9.*). The provider runs xsltproc; this step installs
       libxslt (EL9 RPM unpack from public mirrors as UID 1000 via cpio or python3 newc unpack, or package managers when root) when needed. Fragile across installer versions; prefer a
       provider fix or hypervisor hook for production.
+  - name: LIBVIRT_IMAGE_PATH
+    default: "/var/lib/libvirt/openshift-images"
+    documentation: |-
+      Parent directory for the per-cluster libvirt dir pool created by openshift-install
+      (path becomes ${LIBVIRT_IMAGE_PATH}/${cluster_id}). The installer hardcodes
+      /var/lib/libvirt/openshift-images; when this differs, the step rewrites terraform
+      pool paths before init/apply. Use /home/libvirt/openshift-images on IBM Z VPN hosts
+      where the 2TB volume is under /home and root is ~70G (UPI multiarch-ci-pool already
+      lives there). Leave the default for Power and hosts that mount the large volume at
+      the installer path.
   resources:
     requests:
       cpu: 1000m
