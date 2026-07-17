@@ -60,6 +60,8 @@ elif [[ "${INSTALL_FROM_LATEST}" == "true" ]]; then
   extract_hcp_cli "${OPERATOR_IMAGE}"
 fi
 
+INSTALL_HELP=$("${HCP_CLI}" install --help 2>&1 || true)
+
 if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --tech-preview-no-upgrade"
 fi
@@ -95,14 +97,13 @@ if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
 fi
 
 OCP_VERSION="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep -oP '(?<=^  Version:  ).*$' | grep -oE '^[0-9]+\.[0-9]+')"
-EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=registry.ci.openshift.org/ocp/${OCP_VERSION}:cluster-api-provider-kubevirt"
+if echo "${INSTALL_HELP}" | grep -q -- '--additional-operator-env-vars'; then
+  EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=registry.ci.openshift.org/ocp/${OCP_VERSION}:cluster-api-provider-kubevirt"
+fi
 
 case "${CLOUD_PROVIDER}" in
   AWS)
-    # Some jobs (e.g. upgrade-hypershift-operator) install from a release-tagged
-    # HyperShift image, not main. New CLI flags must be gated behind toggles so
-    # older operator versions that lack those flags are not broken.
-    if [ "${ENABLE_SCALE_FROM_ZERO}" == "true" ]; then
+    if echo "${INSTALL_HELP}" | grep -q -- '--scale-from-zero-provider'; then
       EXTRA_ARGS="${EXTRA_ARGS} --scale-from-zero-provider aws --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials"
     fi
 
