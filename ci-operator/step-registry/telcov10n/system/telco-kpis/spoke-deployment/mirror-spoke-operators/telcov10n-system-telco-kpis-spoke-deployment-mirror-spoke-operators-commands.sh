@@ -6,33 +6,48 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'mirror_spoke_operators' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
 
-# TODO: Implement operator mirroring using Ansible playbook
-# Expected playbook: repos/eco-ci-cd/playbooks/telco-kpis/mirror-spoke-operators.yml
-#
-# Implementation steps:
-# 1. Source common functions and setup environment
-# 2. Build Ansible inventory with hub cluster configuration
-# 3. Execute playbook: ansible-playbook ./playbooks/telco-kpis/mirror-spoke-operators.yml
-# 4. Playbook should:
-#    - Configure container registry credentials on hub
-#    - Use oc-mirror or similar to mirror operator catalogs:
-#      * Performance Addon Operator
-#      * SR-IOV Network Operator
-#      * PTP Operator
-#      * Local Storage Operator
-#      * Logging Operator
-#      * Other telco/RAN operators as needed
-#    - Create ImageContentSourcePolicy for redirecting spoke pulls to hub registry
-#    - Create CatalogSource resources pointing to mirrored catalogs
-#    - Verify mirrored catalog pods are running and healthy
-# 5. Store catalog manifests for use in ZTP spoke deployments
-#
-# Environment variables:
-#   HUB_CLUSTER: Hub cluster hosting the mirror
-#   VERSION: OCP version for operator catalog
-#   DEBUG: Enable Ansible debug output
-#   ECO_CI_CD_IMAGE: Container image for Ansible execution
+main() {
+    echo "Mirroring spoke operators to hub: ${HUB_CLUSTER}"
 
-echo "TODO: Mirror spoke operators to hub cluster ${HUB_CLUSTER} for version ${VERSION}"
-echo "This step will execute Ansible playbook for operator catalog mirroring"
-echo "Required playbook: repos/eco-ci-cd/playbooks/telco-kpis/mirror-spoke-operators.yml"
+    setup_ansible_inventory "${HUB_CLUSTER}" "${HUB_CLUSTER}"
+
+    cd /eco-ci-cd
+
+    local kubeconfig="/home/telcov10n/project/generated/${HUB_CLUSTER}/auth/kubeconfig"
+
+    DEBUG_FLAG="-vv"
+    if [ "${DEBUG}" = "true" ]; then
+        DEBUG_FLAG="-vvv"
+    fi
+
+    local extra_vars=(
+        -e "kubeconfig=${kubeconfig}"
+        -e "disconnected=true"
+        -e "mirror_only=true"
+        -e "ocp_operator_mirror_skip_internal_registry_cleanup=true"
+        -e "ocp_operator_mirror_skip_manifest_apply=true"
+    )
+
+    if [[ -n "${SPOKE_LOCKDOWN_URI:-}" ]]; then
+        echo "Using spoke lockdown: ${SPOKE_LOCKDOWN_URI}"
+        extra_vars+=(-e "spoke_lockdown_uri=${SPOKE_LOCKDOWN_URI}")
+    else
+        extra_vars+=(-e "version=${VERSION}")
+    fi
+
+    if [[ "${GENERATE_SPOKE_LOCKDOWN:-false}" == "true" ]]; then
+        echo "Spoke lockdown generation enabled"
+        extra_vars+=(-e "generate_spoke_lockdown=true")
+        extra_vars+=(-e "hub_name=${HUB_CLUSTER}")
+        extra_vars+=(-e "architecture=${ARCHITECTURE:-x86_64}")
+    fi
+
+    ansible-playbook ./playbooks/telco-kpis/mirror-spoke-operators.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        "${extra_vars[@]}" \
+        ${DEBUG_FLAG}
+
+    echo "Spoke operator mirroring completed: ${HUB_CLUSTER}"
+}
+
+main
