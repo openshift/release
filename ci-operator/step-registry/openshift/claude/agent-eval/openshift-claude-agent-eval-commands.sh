@@ -163,6 +163,19 @@ EVAL_DURATION=$(( $(date +%s) - EVAL_START ))
 echo "eval-run completed in ${EVAL_DURATION}s (exit ${EVAL_EXIT})"
 
 # -----------------------------------------------------------------------
+# Verify eval produced results (guards against orchestrator exiting early)
+# -----------------------------------------------------------------------
+RUNS_DIR="${AGENT_EVAL_RUNS_DIR:-eval/runs}"
+if [[ "${EVAL_EXIT}" -eq 0 ]]; then
+    RESULT_FILES=$(find "${RUNS_DIR}" -path "*/${RUN_ID}/run_result.json" -type f -print -quit 2>/dev/null)
+    if [[ -z "${RESULT_FILES}" ]]; then
+        echo "ERROR: eval-run exited 0 but no run_result.json found for run ${RUN_ID} in ${RUNS_DIR}."
+        echo "The orchestrator likely exited without completing execution."
+        EVAL_EXIT=1
+    fi
+fi
+
+# -----------------------------------------------------------------------
 # Generate JUnit XML
 # -----------------------------------------------------------------------
 JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-eval.xml"
