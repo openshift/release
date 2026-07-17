@@ -159,7 +159,15 @@ install-regulus() {
 install-regulus 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Generate Regulus lab.config 
+# Read ES credentials from mounted secret (optional - will be empty if not present)
+# ─────────────────────────────────────────────────────────────────────────────
+ES_PASSWORD=$(cat "/secret/perfscale-prod/password" 2>/dev/null || echo "")
+ES_USERNAME=$(cat "/secret/perfscale-prod/username" 2>/dev/null || echo "")
+ES_HOST=$(cat "/secret/perfscale-prod/host" 2>/dev/null || echo "")
+ES_PROTOCOL="https"  # Always https in Prow environment
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Generate Regulus lab.config
 # ─────────────────────────────────────────────────────────────────────────────
 vars=(
   KUBECONFIG
@@ -183,6 +191,10 @@ vars=(
   TREX_SRIOV_INTERFACE_2
   TREX_DPDK_NIC_MODEL
   REM_DPDK_CONFIG
+  ES_PROTOCOL
+  ES_HOST
+  ES_USERNAME
+  ES_PASSWORD
 )
 
 if [ -e  /tmp/lab.config ]; then
