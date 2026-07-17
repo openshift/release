@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  stolostron_builder_go1.26-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.26-linux
 build_root:
   image_stream_tag:
     name: builder
@@ -12,9 +16,19 @@ images:
   items:
   - dockerfile_path: build/Dockerfile.rhtap
     from: base
+    inputs:
+      stolostron_builder_go1.26-linux:
+        as:
+        - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.26
+    optional: true
     to: dynamic-scoring-controller
   - dockerfile_path: build/Dockerfile.addon.rhtap
     from: base
+    inputs:
+      stolostron_builder_go1.26-linux:
+        as:
+        - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.26
+    optional: true
     to: dynamic-scoring-addon
 resources:
   '*':
