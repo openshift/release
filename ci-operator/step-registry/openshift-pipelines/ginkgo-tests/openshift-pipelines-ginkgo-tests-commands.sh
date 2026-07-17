@@ -18,6 +18,17 @@ fi
 
 cd /tmp/release-tests-ginkgo
 
+# Snapshot kubeconfig before running parallel tests.
+# The install step runs for several hours; during that time 'oc' may rewrite the
+# kubeconfig in-place (token refresh). The Go Kubernetes client used by the test
+# code is a strict YAML parser and fails if the file is corrupted mid-run, while
+# 'oc whoami' above succeeds because the oc CLI is lenient. Taking an immutable
+# copy here ensures all parallel ginkgo workers read a stable file.
+CLEAN_KUBECONFIG="$(mktemp /tmp/kubeconfig-clean-XXXXXX)"
+cp "${KUBECONFIG}" "${CLEAN_KUBECONFIG}"
+export KUBECONFIG="${CLEAN_KUBECONFIG}"
+trap 'rm -f "${CLEAN_KUBECONFIG}"' EXIT
+
 # Load e2e secrets from vault-synced secret (aws-osp-qe in test-credentials)
 # Disable tracing to avoid logging secret values
 set +x
