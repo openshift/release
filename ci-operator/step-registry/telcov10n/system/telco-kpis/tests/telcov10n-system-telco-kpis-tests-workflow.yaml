@@ -1,0 +1,31 @@
+workflow:
+  as: telcov10n-system-telco-kpis-tests
+  steps:
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    - chain: telcov10n-system-telco-kpis-hub-deployment
+    - chain: telcov10n-system-telco-kpis-spoke-deployment
+    - ref: telcov10n-system-telco-kpis-mirror-ran-test-images
+    test:
+    - ref: telcov10n-system-telco-kpis-collect-node-info
+    - ref: telcov10n-system-telco-kpis-tests-run-ztp-ai-deployment-time-test
+    - ref: telcov10n-system-telco-kpis-tests-run-bios-validation-test
+    - ref: telcov10n-system-telco-kpis-tests-run-oslat-test
+    - ref: telcov10n-system-telco-kpis-tests-run-cyclictest-test
+    - ref: telcov10n-system-telco-kpis-tests-run-ptp-test
+    - ref: telcov10n-system-telco-kpis-tests-run-cpu-util-test
+    - ref: telcov10n-system-telco-kpis-tests-run-reboot-test
+    - ref: telcov10n-system-telco-kpis-tests-run-rfc2544-test
+    - ref: telcov10n-system-telco-kpis-tests-run-rds-compare-test
+    post:
+    - ref: telcov10n-system-telco-kpis-wait-to-debug
+    - chain: telcov10n-system-telco-kpis-reporting
+    env:
+      PR_ONLY: "true"
+      TIMEOUT: +10 min
+  documentation: |-
+    Runs the full telco-kpis test pipeline on an existing ZTP infrastructure. Deploys the hub and
+    spoke clusters, mirrors RAN test images, then executes all KPI tests in sequence: node-info
+    collection, ZTP AI deployment time validation, BIOS validation, oslat, cyclictest, PTP, CPU
+    utilization, reboot, RFC2544 throughput/latency, and RDS comparison. Post-test steps include
+    optional debug hold and automated reporting (Polarion/TestRail upload).
