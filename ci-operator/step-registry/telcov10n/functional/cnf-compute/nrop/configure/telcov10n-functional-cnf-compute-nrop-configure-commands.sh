@@ -52,3 +52,8 @@ echo "Copy must gather to artifacts directory"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
     "${BASTION_USER}@${BASTION_IP}":/tmp/wip/artifacts/* "${ARTIFACT_DIR}"
 
+echo "Copy kubeconfig to SHARED_DIR for TLS scanner"
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
+    "${BASTION_USER}@${BASTION_IP}":/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig \
+    "${SHARED_DIR}/kubeconfig"
+
