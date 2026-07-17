@@ -9,7 +9,7 @@ export_env_vars_from_json 'mirror_spoke_operators' "${INFRA_SETTINGS:-}" "${INFR
 main() {
     echo "Mirroring spoke operators to hub: ${HUB_CLUSTER}"
 
-    setup_ansible_inventory "${HUB_CLUSTER}" "${HUB_CLUSTER}"
+    setup_ansible_inventory "${SPOKE_CLUSTER:-dummy-spoke}" "${HUB_CLUSTER}"
 
     cd /eco-ci-cd
 

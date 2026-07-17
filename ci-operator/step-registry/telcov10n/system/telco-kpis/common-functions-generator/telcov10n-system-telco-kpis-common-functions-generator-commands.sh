@@ -192,7 +192,7 @@ setup_ansible_inventory() {
             local hub_host_vars_file
             hub_host_vars_file="/eco-ci-cd/inventories/ocp-deployment/host_vars/${hub_host_name}"
 
-            if [[ -f "${hub_host_vars_file}" ]]; then
+            if [[ -f "${hub_host_vars_file}" ]] && [[ "${spoke_cluster}" != "${hub_cluster}" ]]; then
                 echo "ERROR: host_vars collision — hub '${hub_cluster}' host '${hub_host_name}' would overwrite spoke '${spoke_cluster}' host_vars"
                 return 1
             fi
