@@ -16,7 +16,7 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-NODES=($(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | sort))
+mapfile -t NODES < <(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | sort)
 if [[ ${#NODES[@]} -ne 2 ]]; then
   echo "ERROR: Expected exactly 2 master nodes, found ${#NODES[@]}"
   exit 1

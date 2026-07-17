@@ -25,7 +25,7 @@ run_on_node() {
   oc debug -n default "node/${node}" -- chroot /host bash -c "$*"
 }
 
-NODES=($(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | sort))
+mapfile -t NODES < <(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | sort)
 NODE_0="${NODES[0]}"
 NODE_1="${NODES[1]}"
 echo "Cluster nodes: ${NODE_0}, ${NODE_1}"
