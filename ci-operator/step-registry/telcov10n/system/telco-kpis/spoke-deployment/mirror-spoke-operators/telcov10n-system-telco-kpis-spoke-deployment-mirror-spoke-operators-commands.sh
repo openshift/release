@@ -15,8 +15,8 @@ main() {
 
     local kubeconfig="/home/telcov10n/project/generated/${HUB_CLUSTER}/auth/kubeconfig"
 
-    DEBUG_FLAG="-vv"
-    if [ "${DEBUG}" = "true" ]; then
+    local DEBUG_FLAG="-vv"
+    if [[ "${DEBUG:-false}" == "true" ]]; then
         DEBUG_FLAG="-vvv"
     fi
 
