@@ -1,7 +1,7 @@
 ref:
-  as: hypershift-review-agent-process
+  as: review-agent-process
   from: claude-ai-helpers
-  commands: hypershift-review-agent-process-commands.sh
+  commands: review-agent-process-commands.sh
   env:
   - name: CLAUDE_CODE_USE_VERTEX
     default: "1"
@@ -19,6 +19,16 @@ ref:
     default: "/var/run/claude-code-service-account/claude-prow"
     documentation: |-
       Path to the Google Cloud service account JSON key file for Vertex AI authentication.
+  - name: REVIEW_AGENT_FORK_REPO
+    default: ""
+    documentation: |-
+      Fork repo URL to clone and push to (e.g. https://github.com/hypershift-community/hypershift).
+      Set by the team's wrapper workflow.
+  - name: REVIEW_AGENT_UPSTREAM_REPO
+    default: ""
+    documentation: |-
+      Upstream owner/repo for gh CLI PR operations (e.g. openshift/hypershift).
+      Set by the team's wrapper workflow.
   - name: MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_TARGET_PR
     default: ""
     documentation: |-
@@ -42,7 +52,10 @@ ref:
     name: hypershift-team-claude-prow
     mount_path: /var/run/claude-code-service-account
   documentation: |-
-    Process step for the HyperShift Review Agent.
+    Process step for the generic Review Agent.
     Uses the /openshift-developer:address-review-pr skill to address
     review comments on a single PR. Designed for presubmit use:
     PULL_NUMBER is provided by the Prow presubmit context.
+
+    Requires REVIEW_AGENT_FORK_REPO and REVIEW_AGENT_UPSTREAM_REPO
+    to be set by the wrapper workflow.
