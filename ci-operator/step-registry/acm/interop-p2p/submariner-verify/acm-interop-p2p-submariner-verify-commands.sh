@@ -1,18 +1,28 @@
 #!/bin/bash
 #
-# Step 3 of 3: Submariner Connectivity Verification
+# Submariner Connectivity Verification
 #
 # Responsibilities:
-#   - Install subctl to /tmp/bin/ (step-local; NOT in SHARED_DIR)
 #   - Show tunnel connection status on each spoke
 #   - Wait for all IPsec tunnels to reach "connected" state
-#   - Pre-warm the Lighthouse service-discovery pipeline before subctl verify
-#   - Run 'subctl verify' for connectivity and service-discovery tests
+#   - Assert no Globalnet subnets (242.x)
+#   - Pre-warm the Lighthouse service-discovery pipeline
+#   - Optionally run 'subctl verify' when SUBMARINER_RUN_SUBCTL_VERIFY=true
+#     (subctl is installed step-local to /tmp/bin when needed)
+#   - Probe bidirectional CCLM sync TCP paths:
+#       hub↔spoke (when SUBMARINER_VERIFY_HUB_SPOKE=true)
+#       spoke↔spoke pairs (existing behaviour)
 #
 # Globalnet is NOT used: warmup exports a Service and waits for ServiceImport
 # plus EndpointSlice propagation (pod IPs), not GlobalIngressIP allocation.
 #
-# WHY subctl is downloaded here (not read from SHARED_DIR):
+# WHY subctl is optional:
+#   When using acm-interop-p2p-submariner-addon (ACM-native install), subctl is
+#   not required for installation. subctl verify is preserved as an opt-in check
+#   (SUBMARINER_RUN_SUBCTL_VERIFY=true) for detailed connectivity diagnostics.
+#   By default it is disabled so this step runs without downloading subctl.
+#
+# WHY binaries are NOT stored in SHARED_DIR when needed:
 #   Storing large binaries in SHARED_DIR causes CI operator to fail with
 #   "Request entity too large" when serialising SHARED_DIR into a Kubernetes
 #   Secret between steps (3 MB limit).  Each step installs its own copy.
@@ -28,12 +38,15 @@ eval "$(
 # ── Constants ─────────────────────────────────────────────────────────────────
 typeset -r subctlBin="/tmp/bin/subctl"
 typeset -i spokeCount="${ACM_SPOKE_CLUSTER_COUNT}"
+typeset runSubctlVerify="${SUBMARINER_RUN_SUBCTL_VERIFY}"
+typeset verifyHubSpoke="${SUBMARINER_VERIFY_HUB_SPOKE}"
 
 typeset -a spokeKubeconfigsArr=()
 typeset -a spokeNamesArr=()
 
-# ── InstallSubctl — install subctl to /tmp/bin/ ───────────────────────────────
+# ── InstallSubctl — install subctl to /tmp/bin/ (only when opt-in) ───────────
 InstallSubctl() {
+    [[ "${runSubctlVerify}" == "true" ]] || return 0
     mkdir -p /tmp/bin
     if [[ -x "${subctlBin}" ]]; then
         return 0
@@ -60,11 +73,18 @@ LoadSpokeConfig() {
     true
 }
 
-# ── ShowConnections — display tunnel connection status on one spoke ───────────
+# ── ShowConnections — display gateway tunnel status using oc (no subctl needed) ─
 ShowConnections() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset label="${2:-cluster}"; (($#)) && shift
 
-    KUBECONFIG="${kubeconfig}" "${subctlBin}" show connections || true
+    : "Gateway connections on '${label}':"
+    KUBECONFIG="${kubeconfig}" oc get gateways.submariner.io \
+        -n submariner-operator -o wide || true
+
+    if [[ "${runSubctlVerify}" == "true" && -x "${subctlBin}" ]]; then
+        KUBECONFIG="${kubeconfig}" "${subctlBin}" show connections || true
+    fi
     true
 }
 
@@ -255,18 +275,34 @@ EOF
 }
 
 # ── AssertNoGlobalnetSubnets — fail if Globalnet 242.x routes are advertised ──
+# Uses oc to read gateway endpoint subnets — no subctl needed.
 AssertNoGlobalnetSubnets() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset spokeName="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
 
-    typeset connOutput
-    connOutput="$(KUBECONFIG="${kubeconfig}" "${subctlBin}" show connections || true)"
+    typeset remoteSubnets
+    remoteSubnets="$(
+        KUBECONFIG="${kubeconfig}" oc get gateways.submariner.io \
+            -n submariner-operator -o json \
+            | jq -r '.items[].status.connections[].endpoint.subnets[]?' || true
+    )"
 
-    if grep -E '242\.[0-9]+\.[0-9]+\.[0-9]+' <<< "${connOutput}"; then
-        : "Globalnet subnets (242.x.x.x) advertised on '${spokeName}' — incompatible with CCLM pod IP sync"
+    if grep -E '^242\.' <<< "${remoteSubnets}"; then
+        : "Globalnet subnets (242.x.x.x) in gateway connections on '${clusterName}' — incompatible with CCLM"
         false
     fi
 
+    # Also check via subctl if available (provides richer output).
+    if [[ "${runSubctlVerify}" == "true" && -x "${subctlBin}" ]]; then
+        typeset connOutput
+        connOutput="$(KUBECONFIG="${kubeconfig}" "${subctlBin}" show connections || true)"
+        if grep -E '242\.[0-9]+\.[0-9]+\.[0-9]+' <<< "${connOutput}"; then
+            : "Globalnet subnets (242.x.x.x) via subctl on '${clusterName}' — incompatible with CCLM"
+            false
+        fi
+    fi
+
+    : "No Globalnet subnets on '${clusterName}'"
     true
 }
 
@@ -342,12 +378,19 @@ VerifyCclmSyncPath() {
     true
 }
 
-# ── VerifyConnectivity — run subctl verify between two spokes ─────────────────
+# ── VerifyConnectivity — run subctl verify between two clusters (opt-in) ──────
+# Only executed when SUBMARINER_RUN_SUBCTL_VERIFY=true. When false, connectivity
+# is validated via the oc-native gateway status and tunnel checks above.
 VerifyConnectivity() {
     typeset kc1="${1:?}"; (($#)) && shift
     typeset kc2="${1:?}"; (($#)) && shift
     typeset name1="${1:?}"; (($#)) && shift
     typeset name2="${1:?}"; (($#)) && shift
+
+    [[ "${runSubctlVerify}" == "true" ]] || {
+        : "Skipping subctl verify for '${name1}↔${name2}' (SUBMARINER_RUN_SUBCTL_VERIFY=false)"
+        return 0
+    }
 
     typeset ctx1="${name1}-admin"
     typeset ctx2="${name2}-admin"
@@ -400,17 +443,23 @@ VerifyConnectivity() {
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 command -v oc 1>/dev/null
-command -v curl 1>/dev/null
 
 LoadSpokeConfig
+# Install subctl only when explicitly requested.
+[[ "${runSubctlVerify}" == "true" ]] && command -v curl 1>/dev/null
 InstallSubctl
 
 typeset -i submarinerStepRc=0
 (
     typeset -i i j
+
+    # Show initial gateway status — works without subctl via oc.
     for ((i = 0; i < spokeCount; i++)); do
-        ShowConnections "${spokeKubeconfigsArr[i]}"
+        ShowConnections "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
     done
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        ShowConnections "${KUBECONFIG}" "hub"
+    fi
 
     WaitForConnectionsEstablished 600
 
@@ -419,7 +468,11 @@ typeset -i submarinerStepRc=0
             "${spokeKubeconfigsArr[i]}" \
             "${spokeNamesArr[i]}"
     done
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        AssertNoGlobalnetSubnets "${KUBECONFIG}" "hub"
+    fi
 
+    # Service-discovery warmup and subctl verify — spoke↔spoke pairs.
     for ((i = 0; i < spokeCount; i++)); do
         for ((j = i + 1; j < spokeCount; j++)); do
             WarmUpServiceDiscovery \
@@ -437,6 +490,12 @@ typeset -i submarinerStepRc=0
                 "${spokeKubeconfigsArr[j]}" \
                 "${spokeNamesArr[i]}" \
                 "${spokeNamesArr[j]}"
+        done
+    done
+
+    # CCLM sync TCP probes — spoke↔spoke pairs.
+    for ((i = 0; i < spokeCount; i++)); do
+        for ((j = i + 1; j < spokeCount; j++)); do
             VerifyCclmSyncPath \
                 "${spokeKubeconfigsArr[i]}" \
                 "${spokeKubeconfigsArr[j]}" \
@@ -445,10 +504,26 @@ typeset -i submarinerStepRc=0
         done
     done
 
-    : "Final connection status after verify"
+    # Hub↔spoke CCLM sync TCP probes — when ACM hub participates in Submariner mesh.
+    # Required for hub↔spoke CCLM migration. Set SUBMARINER_VERIFY_HUB_SPOKE=true
+    # when acm-interop-p2p-submariner-addon enrolled local-cluster.
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        for ((i = 0; i < spokeCount; i++)); do
+            VerifyCclmSyncPath \
+                "${KUBECONFIG}" \
+                "${spokeKubeconfigsArr[i]}" \
+                "hub" \
+                "${spokeNamesArr[i]}"
+        done
+    fi
+
+    : "Final gateway connection status"
     for ((i = 0; i < spokeCount; i++)); do
-        ShowConnections "${spokeKubeconfigsArr[i]}"
+        ShowConnections "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
     done
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        ShowConnections "${KUBECONFIG}" "hub"
+    fi
     true
 ) || submarinerStepRc=$?
 
