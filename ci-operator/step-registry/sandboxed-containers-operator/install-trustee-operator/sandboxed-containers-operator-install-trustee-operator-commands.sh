@@ -47,7 +47,7 @@ fi
 
 if [[ -z "${HELM_CHART_IMAGE:-}" ]]; then
   echo ">>> ERROR: HELM_CHART_IMAGE is required but not set" >&2
-  return 1
+  exit 1
 fi
 
 # Show configuration
