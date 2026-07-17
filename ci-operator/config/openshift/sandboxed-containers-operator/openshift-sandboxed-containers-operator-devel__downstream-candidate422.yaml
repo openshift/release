@@ -107,27 +107,30 @@ tests:
     report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
       {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
       <{{.Status.URL}}|View logs>'
-  restrict_network_access: false
+  restrict_network_access: true
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.13.0-1783962500
       CATALOG_SOURCE_NAME: brew-catalog
       CUSTOM_AZURE_REGION: eastus
       ENABLE_MUST_GATHER: "true"
       ENABLEPEERPODS: "true"
+      HELM_CHART_IMAGE: quay.io/tbuskey/trustee-helm-charts:v1.13a
       INITDATA: ""
       INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.22.el9
+      KATA_RPM_VERSION: 3.31.0-3.rhaos4.22.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       RUNTIMECLASS: kata-remote
-      SLEEP_DURATION: 0h
+      SLEEP_DURATION: 8h
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;~C00133&
       TEST_RELEASE_TYPE: Pre-GA
-      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_SCENARIOS: C00316
       TEST_TIMEOUT: "90"
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.2.0-1784100554
+      TRUSTEE_INSTALL: "true"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: coco
     workflow: sandboxed-containers-operator-e2e-azure

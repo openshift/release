@@ -69,20 +69,14 @@ Build and push to the registry and tag of your choice:
 # Defaults (helm v3.17.3, charts from main)
 podman build -t quay.io/$ORG/trustee-helm-charts:latest .
 
-CHARTS_TAGS=main
 IMAGE_VERSION=v1.13
+CHARTS_TAGS=main
 ORG=tbuskey
 
 # Pin a specific chart ref
-podman build \
-  --build-arg CHARTS_TAG=$CHARTS_TAG \
-  -t quay.io/$ORG/trustee-helm-charts:$IMAGE_VERSION .
-
+podman build --build-arg CHARTS_TAG=$CHARTS_TAG -t quay.io/$ORG/trustee-helm-charts:$IMAGE_VERSION .
 # Override helm version too
-podman build \
-  --build-arg HELM_VERSION=v3.16.4 \
-  --build-arg CHARTS_TAG=$CHARTS_TAG \
-  -t quay.io/$ORG/trustee-helm-charts:$IMAGE_VERSION .
+podman build --build-arg HELM_VERSION=v3.16.4  --build-arg CHARTS_TAG=$CHARTS_TAG -t quay.io/$ORG/trustee-helm-charts:$IMAGE_VERSION .
 
 podman push quay.io/$ORG/trustee-helm-charts:$IMAGE_VERSION
 ```
