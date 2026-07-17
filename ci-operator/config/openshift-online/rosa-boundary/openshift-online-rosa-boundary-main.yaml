@@ -68,37 +68,7 @@ tests:
   commands: |
     set -euo pipefail
     export LOCALSTACK_AUTH_TOKEN=$(cat /etc/localstack-secret/localstack-token)
-    export AWS_DEFAULT_REGION=us-east-2
-    export AWS_ACCESS_KEY_ID=test
-    export AWS_SECRET_ACCESS_KEY=test
-    export LOCALSTACK_ENDPOINT=http://localhost:4566
-
-    # Start LocalStack Pro as a container (mirrors compose.ci.yml)
-    podman run -d \
-      --name localstack \
-      --user root \
-      -p 4566:4566 \
-      -e LOCALSTACK_AUTH_TOKEN="${LOCALSTACK_AUTH_TOKEN}" \
-      -e SERVICES=s3,iam,lambda,logs,kms,sts,ec2,ecs,efs,ssm \
-      -e LAMBDA_EXECUTOR=local \
-      -e ECS_EXECUTOR=local \
-      -e AWS_DEFAULT_REGION=us-east-2 \
-      -e DISABLE_EVENTS=true \
-      -v /workspace/rosa-boundary/tests/localstack/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh:z \
-      localstack/localstack-pro:latest
-
-    echo "Waiting for LocalStack ECS service (timeout: 180s)..."
-    TIMEOUT=180; elapsed=0
-    until curl -sf http://localhost:4566/_localstack/health 2>/dev/null | \
-        python3 -c "import sys,json; h=json.load(sys.stdin); exit(0 if h['services'].get('ecs') in ('available','running') else 1)" 2>/dev/null; do
-      [ $elapsed -ge $TIMEOUT ] && { echo "ERROR: LocalStack did not become ready"; exit 1; }
-      printf "  waiting... (%ds)\n" "$elapsed"
-      sleep 5; elapsed=$((elapsed + 5))
-    done
-    echo "LocalStack ready."
-
-    cd /workspace/rosa-boundary/tests/localstack
-    pytest integration/ -v -m "not slow" --tb=short --junit-xml="${ARTIFACT_DIR}/junit_localstack.xml"
+    exec /workspace/rosa-boundary/tests/localstack/ci-run.sh
   container:
     from: localstack-test-runner
   nested_podman: true
