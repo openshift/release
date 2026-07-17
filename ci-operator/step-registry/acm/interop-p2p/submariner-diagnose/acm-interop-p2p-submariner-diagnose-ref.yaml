@@ -1,0 +1,45 @@
+ref:
+  as: acm-interop-p2p-submariner-diagnose
+  from: cli
+  commands: acm-interop-p2p-submariner-diagnose-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  timeout: 20m0s
+  grace_period: 5m0s
+  env:
+    - name: ACM_SPOKE_CLUSTER_COUNT
+      default: "2"
+      documentation: Number of ACM spoke clusters to collect diagnostics for.
+    - name: SUBMARINER_VERIFY_HUB_SPOKE
+      default: "false"
+      documentation: |-
+        When true, also collects diagnostics from the hub cluster (KUBECONFIG).
+        Set to "true" for hub-spoke CCLM jobs where the hub participates in the
+        Submariner mesh. Enables hub entries in show all, diagnose all,
+        firewall inter-cluster, and subctl gather.
+  documentation: |-
+    Submariner diagnostic collection step — intended for the post phase to collect
+    debugging data after a submariner-verify failure.
+
+    Based on https://submariner.io/operations/troubleshooting/
+
+    What this step does (in order):
+      1. oc-native Gateway CR dump (gateways.submariner.io -o yaml) on each cluster.
+         Captures connection status, latency, remote CIDRs, cable driver, NAT state.
+      2. Pod logs (last 200 lines, plus previous container logs) for all Submariner
+         components: gateway, routeagent, operator, lighthouse-agent, lighthouse-coredns.
+      3. subctl show all — overview of gateways, connections, endpoints, networks,
+         and component versions on each cluster.
+      4. subctl diagnose all — automated health checks covering firewall ports,
+         kube-proxy mode, MTU, pod status, k8s version compatibility, and CNI
+         configuration on each cluster.
+      5. subctl diagnose firewall inter-cluster — bidirectional firewall probe between
+         each cluster pair (hub↔spoke when SUBMARINER_VERIFY_HUB_SPOKE=true; all
+         spoke↔spoke pairs always).
+      6. subctl gather — collects a full debug bundle (logs, CRDs, events, network
+         config) for all clusters and saves the tarball to ARTIFACT_DIR.
+
+    All output is written to ${ARTIFACT_DIR}/submariner-diagnose/ and visible in
+    Prow artifacts. This step always exits 0 so it never blocks cluster teardown.
