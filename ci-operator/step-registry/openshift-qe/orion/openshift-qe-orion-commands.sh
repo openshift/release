@@ -52,12 +52,22 @@ case "$ES_TYPE" in
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
     if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_TYPE}" == "periodic" ]] && [[ "${JOB_NAME}" == *"payload"* ]] && [[ -z "${PULL_NUMBER}" ]]; then
-        JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
-        JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
-        JIRA_URL=https://redhat.atlassian.net/
-        export JIRA_TOKEN JIRA_EMAIL JIRA_URL
-        # We use orion's default JIRA project and components
-        ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
+        IS_PR_PAYLOAD=false
+        if [[ -n "${BUILD_ID:-}" ]]; then
+            PROWJOB_URL="https://storage.googleapis.com/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+            if curl -fsSL --retry 3 "$PROWJOB_URL" -o /tmp/prowjob.json 2>/dev/null; then
+                if jq -e '.metadata.labels["prow.k8s.io/refs.pull"]' /tmp/prowjob.json >/dev/null 2>&1; then
+                    IS_PR_PAYLOAD=true
+                fi
+            fi
+        fi
+        if [[ "${IS_PR_PAYLOAD}" == "false" ]]; then
+            JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
+            JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
+            JIRA_URL=https://redhat.atlassian.net/
+            export JIRA_TOKEN JIRA_EMAIL JIRA_URL
+            ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
+        fi
     fi
     ;;
   quay-qe)
