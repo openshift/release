@@ -48,6 +48,13 @@ apply_idms() {
     }
 
     yq-v4 -i ".metadata.name = \"${IDMS_NAME}\"" "$idms_file"
+    cp "$idms_file" "${ARTIFACT_DIR}/idms.yaml" 2>/dev/null || true
+    cp "$idms_file" "${SHARED_DIR}/idms.yaml" 2>/dev/null || true
+
+    if [[ "${SKIP_IDMS:-false}" == "true" ]]; then
+        log "SKIP_IDMS=true: IDMS saved to SHARED_DIR for deferred application by test code"
+        return
+    fi
 
     local mcp_configs_before
     mcp_configs_before=$(oc get mcp -o jsonpath="$MCP_CONFIG_JSONPATH" 2>/dev/null || true)
@@ -57,7 +64,6 @@ apply_idms() {
         log "ERROR: Failed to apply IDMS"
         exit 1
     }
-    cp "$idms_file" "${ARTIFACT_DIR}/idms.yaml" 2>/dev/null || true
 
     wait_for_mcp_rollout "$mcp_configs_before"
 }
@@ -120,6 +126,7 @@ main() {
     wait_for_catalogsource
 
     echo "${CATALOG_SOURCE_NAME}" > "${SHARED_DIR}/catsrc_name"
+    echo "${CATALOG_IMAGE}" > "${SHARED_DIR}/catalog_image"
     if [[ "$CATALOG_MODE" != "direct" ]]; then
         echo "${FBC_COMMIT_SHA}" > "${SHARED_DIR}/rhwa_fbc_commit_sha"
         log "=== Done. Commit SHA exported to \${SHARED_DIR}/rhwa_fbc_commit_sha ==="
