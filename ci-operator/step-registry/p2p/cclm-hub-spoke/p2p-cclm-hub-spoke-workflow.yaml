@@ -1,0 +1,85 @@
+workflow:
+  as: p2p-cclm-hub-spoke
+  steps:
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: install-operators
+    - ref: p2p-install-odf-hub
+    - ref: acm-mch
+    - ref: acm-interop-p2p-cluster-install
+    - ref: acm-fetch-managed-clusters
+    - ref: p2p-install-cnv-hub
+    - ref: p2p-acm-cnv-install-policy
+    - ref: p2p-install-odf-spokes
+    - chain: acm-interop-p2p-submariner-install
+    - ref: p2p-mtv-additional-config
+    - ref: p2p-mtv-register-providers
+    - chain: p2p-cclm-hub-spoke-migration-test
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: acm-inspector
+    - ref: gather-aws-console
+    - ref: acm-interop-p2p-cluster-uninstall
+    - chain: ipi-deprovision
+    - ref: firewatch-report-issues
+  documentation: |-
+    End-to-end workflow for bi-directional Cross-Cluster Live Migration (CCLM)
+    between the ACM hub cluster and a managed spoke cluster using MTV (Migration
+    Toolkit for Virtualization). All cluster management is performed via ACM.
+
+    Infrastructure provisioned:
+      - Hub cluster: IPI on AWS (m6a.2xlarge control-plane, configurable workers)
+      - Spoke cluster(s): Hive/ACM-provisioned on AWS via acm-interop-p2p-cluster-install
+
+    Pre phase (hub cluster provisioning):
+      ipi-conf → ipi-conf-aws → ipi-install-monitoringpvc → ipi-install
+
+    Test phase (in order):
+      1.  cucushift-installer-check-cluster-health  — baseline hub cluster health
+      2.  install-operators                         — ACM + MTV via OLM on hub
+      3.  p2p-install-odf-hub                      — ODF on hub (RWX storage for hub VMs)
+      4.  acm-mch                                  — ACM MultiClusterHub Available
+      5.  acm-interop-p2p-cluster-install          — provision spoke cluster via Hive
+      6.  acm-fetch-managed-clusters               — populate SHARED_DIR spoke kubeconfigs
+      7.  p2p-install-cnv-hub                      — CNV on hub via ACM local-cluster policy
+                                                     (DecentralizedLiveMigration featureGate,
+                                                     virt-synchronization-controller, virt SC)
+      8.  p2p-acm-cnv-install-policy               — CNV on spoke via ACM ConfigurationPolicy
+      9.  p2p-install-odf-spokes                   — ODF on spoke (RWX storage for spoke VMs)
+      10. acm-interop-p2p-submariner-install        — Submariner via ACM ManagedClusterAddon
+                                                     (enrolls hub + spoke; no subctl;
+                                                     GlobalNet=false for CCLM pod IP routing)
+      11. p2p-mtv-additional-config                — ForkliftController with CCLM feature gate
+      12. p2p-mtv-register-providers               — spoke registered as MTV OpenShift Provider
+                                                     via ACM ManifestWork RBAC + token secret
+      13. p2p-cclm-hub-spoke-migration-test chain:
+          a. p2p-create-hub-spoke-test-vms         — ODF-backed RWX VMs on hub + spoke
+          b. p2p-mtv-create-hub-spoke-maps         — NetworkMap + StorageMap hub↔spoke
+          c. p2p-mtv-execute-hub-spoke-migration   — hub→spoke CCLM, then spoke→hub CCLM
+                                                     (preflights, Plan+Migration CRs, JUnit)
+
+    Post phase (always runs):
+      acm-fetch-operator-versions → acm-must-gather → acm-inspector →
+      gather-aws-console → acm-interop-p2p-cluster-uninstall → ipi-deprovision →
+      firewatch-report-issues
+
+    ACM role:
+      - ManagedClusterHub manages spoke lifecycle (Hive ClusterDeployment)
+      - ConfigurationPolicy installs CNV on spoke clusters
+      - local-cluster policy installs CNV on hub
+      - ManifestWork pushes MTV RBAC to spoke
+      - ManagedClusterAddon installs Submariner on hub + spoke (ACM-native, no subctl)
+
+    MTV role (migration engine):
+      - ForkliftController on hub with FEATURE_OCP_LIVE_MIGRATION=true
+      - "host" provider (auto-created) = hub cluster
+      - Spoke provider = registered via token from ManifestWork SA
+      - Plan + Migration CRs drive the actual CCLM
