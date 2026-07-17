@@ -3,33 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Each ci-operator step runs in its own pod; git state does not carry over.
-aro_hcp_git_checkout() {
-  local ref="$1"
-  if [[ -z "${ref}" ]]; then
-    echo "ERROR: git checkout ref must not be empty"
-    return 1
-  fi
-
-  echo "Checking out ${ref}"
-  git fetch --tags origin 2>/dev/null || true
-  git fetch --unshallow origin 2>/dev/null || true
-  git fetch origin "${ref}" 2>/dev/null || true
-  if ! git rev-parse --verify --quiet "${ref}^{commit}" >/dev/null; then
-    echo "ERROR: ref ${ref} is not available locally after fetch"
-    return 1
-  fi
-  if ! git checkout "${ref}"; then
-    echo "ERROR: failed to checkout ${ref}"
-    return 1
-  fi
-  git rev-parse HEAD
-}
-
-if [[ -n "${PROVISION_GIT_REF:-}" ]]; then
-  aro_hcp_git_checkout "${PROVISION_GIT_REF}"
-fi
-
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
     export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi

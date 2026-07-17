@@ -13,7 +13,7 @@ set -o pipefail
 : "${KUBE_APPLIER_IMAGE:?KUBE_APPLIER_IMAGE must be set}"
 
 if [[ ! -f "${SHARED_DIR}/config.yaml" ]]; then
-  echo "ERROR: ${SHARED_DIR}/config.yaml missing; run aro-hcp-provision-environment first"
+  echo "ERROR: ${SHARED_DIR}/config.yaml missing; run aro-hcp-provision-from-main first"
   exit 1
 fi
 

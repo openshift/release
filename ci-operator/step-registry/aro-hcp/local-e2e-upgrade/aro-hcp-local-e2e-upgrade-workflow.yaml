@@ -8,9 +8,10 @@ workflow:
     pre:
       - ref: aro-hcp-lease-acquire
       - ref: aro-hcp-write-config
-      - ref: aro-hcp-provision-environment
+      - ref: aro-hcp-provision-from-main
     test:
       - ref: aro-hcp-test-local-upgrade
+      - ref: aro-hcp-test-local
     post:
       - ref: aro-hcp-deprovision-tracked-resource-groups
       - ref: aro-hcp-gather-provision-failure
@@ -22,7 +23,8 @@ workflow:
       - ref: aro-hcp-deprovision-environment
       - ref: aro-hcp-lease-release
   documentation: |-
-    Acquire runtime leases, render and provision regional infrastructure from
-    PROVISION_GIT_REF (main baseline images), then run the upgrade suite on the PR
-    head clone with OVERRIDE_CONFIG_FILE built from PR pipeline images and
-    hypershift config for in-place svc and mgmt component upgrades.
+    Acquire runtime leases, provision a main-branch baseline via
+    aro-hcp-provision-from-main (ACR images from images-push), run
+    upgrade/in-place on the PR head with OVERRIDE_CONFIG_FILE built from PR
+    pipeline images and hypershift config, then run the regular local e2e
+    suite against the upgraded environment.
