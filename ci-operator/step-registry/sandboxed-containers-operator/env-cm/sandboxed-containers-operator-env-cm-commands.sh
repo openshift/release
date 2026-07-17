@@ -1,6 +1,15 @@
 #!/bin/bash
 
+if test -s "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 configmap_path="${SHARED_DIR:-$(pwd)}/env-cm.yaml"
+
+if [[ -f "${SHARED_DIR}/disconnected_catalog_source_name" ]]; then
+    CATALOG_SOURCE_NAME=$(cat "${SHARED_DIR}/disconnected_catalog_source_name")
+    echo "Using disconnected CatalogSource: ${CATALOG_SOURCE_NAME}"
+fi
 
 # TODO: still needed? 600 seconds will cause the step timeout?
 #echo "Giving a 10min stabilization time for AWS fresh 4.18 cluster before applying kataconfig as workaround for KATA-3451"
@@ -114,25 +123,28 @@ wait_for_catsrc() {
 
 
 if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
-  mirror_konflux
-
-  default_catsrc_image="quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
-  # Only resolve the tag if it's :latest
-  # Other tags (specific versions like 1.11.1-1766149846 or SHAs) are passed through unchanged
-  if [[ "${CATALOG_SOURCE_IMAGE}" = "${default_catsrc_image}:latest" ]]; then
-    catsrc_image_tag=$(latest_catsrc_image_tag)
-    CATALOG_SOURCE_IMAGE="${default_catsrc_image}:${catsrc_image_tag}"
-    echo "Resolved :latest to tag: ${catsrc_image_tag}"
+  if [[ -f "${SHARED_DIR}/disconnected_catalog_source_name" ]]; then
+    # Disconnected: mirror-operator already created and mirrored the CatalogSource
+    echo "Disconnected Pre-GA: CatalogSource already configured by mirror-operator"
   else
-    echo "Using provided catalog image: ${CATALOG_SOURCE_IMAGE}"
+    # Connected: create CatalogSource pointing to Konflux FBC directly
+    mirror_konflux
+
+    default_catsrc_image="quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
+    if [[ "${CATALOG_SOURCE_IMAGE}" = "${default_catsrc_image}:latest" ]]; then
+      catsrc_image_tag=$(latest_catsrc_image_tag)
+      CATALOG_SOURCE_IMAGE="${default_catsrc_image}:${catsrc_image_tag}"
+      echo "Resolved :latest to tag: ${catsrc_image_tag}"
+    else
+      echo "Using provided catalog image: ${CATALOG_SOURCE_IMAGE}"
+    fi
+
+    create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
+    wait_for_catsrc "${CATALOG_SOURCE_NAME}"
+
+    echo "CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE}" > "${SHARED_DIR}/catalog-source-image.env"
+    echo "Saved resolved CATALOG_SOURCE_IMAGE to ${SHARED_DIR}/catalog-source-image.env"
   fi
-
-  create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
-  wait_for_catsrc "${CATALOG_SOURCE_NAME}"
-
-  # Save resolved CATALOG_SOURCE_IMAGE for subsequent steps
-  echo "CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE}" > "${SHARED_DIR}/catalog-source-image.env"
-  echo "Saved resolved CATALOG_SOURCE_IMAGE to ${SHARED_DIR}/catalog-source-image.env"
 else
   if [[ -n "$CATALOG_SOURCE_IMAGE" ]]; then
     echo "CATALOG_SOURCE_IMAGE can only be used when TEST_RELEASE_TYPE==Pre-GA ($CATALOG_SOURCE_IMAGE)"

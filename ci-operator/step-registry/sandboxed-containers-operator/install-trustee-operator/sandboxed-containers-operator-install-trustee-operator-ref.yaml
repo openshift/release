@@ -1,11 +1,8 @@
 ref:
   as: sandboxed-containers-operator-install-trustee-operator
-  from: tools-with-helm
+  from: upi-installer
   grace_period: 10m
   commands: sandboxed-containers-operator-install-trustee-operator-commands.sh
-  dependencies:
-  - name: pipeline:trustee-charts
-    env: IMAGE_TRUSTEE_CHARTS
   resources:
     requests:
       cpu: 1000m
@@ -28,14 +25,13 @@ ref:
       Note: The CatalogSource name is hardcoded in the helm chart and cannot be overridden.
       Example: "quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656"
   - name: TRUSTEE_CHARTS_REPO
-    default: "https://github.com/confidential-devhub/charts"
+    default: "https://gitlab.cee.redhat.com/osc/midstream/charts.git"
     documentation: |-
-      The git repository URL for trustee Helm charts. Used as a fallback when
-      IMAGE_TRUSTEE_CHARTS is not set.
+      The git repository URL for trustee Helm charts.
   - name: TRUSTEE_CHARTS_REF
     default: "main"
     documentation: |-
-      The git ref (branch/tag/commit) to use from the confidential-devhub/charts repository
+      The git ref (branch/tag/commit) to use from the charts repository
   - name: KBS_CLIENT_TAG
     default: ""
     documentation: |-
@@ -43,18 +39,6 @@ ref:
       discovers the latest v.X.Y.Z tag using skopeo. Override to pin a specific version
       (e.g., "v0.19.0"). Fallback is v0.19.0 if skopeo lookup fails.
   documentation: |-
-    A step that installs the trustee operator and operands on the cluster using pre-rendered
-    manifests embedded in the script. First installs the trustee-operator, waits for it to be
-    ready, then installs the trustee-operands with the derived cluster domain. After installation,
-    retrieves the Trustee KBS service URL and saves it to ${SHARED_DIR}/TRUSTEE_URL,
-    ${SHARED_DIR}/TRUSTEE_HOST, and ${SHARED_DIR}/TRUSTEE_PORT for use by subsequent test steps.
-    Also creates INITDATA for confidential containers including TLS certificate and image security
-    policy, saving both the encoded INITDATA and plain text initdata.toml to ${SHARED_DIR}.
-    When TRUSTEE_INSTALL=true, updates the osc-config ConfigMap with the generated TRUSTEE_URL
-    and INITDATA values, overriding any empty values set in the job configuration. Finally,
-    verifies Trustee connectivity by creating a kbs-client pod, testing resource fetching, and
-    capturing KBS pod logs showing attestation attempts to ${ARTIFACT_DIR}/kbs-attestation-logs.txt
-    for inclusion in CI job artifacts.
-
-    NO NETWORK ACCESS REQUIRED: This step uses pre-rendered manifests with runtime variable
-    substitution via sed, eliminating the need for helm or git. Works with restrict_network_access: true.
+    Installs the trustee operator and operands on the cluster using helm charts.
+    Charts are cloned from TRUSTEE_CHARTS_REPO (defaults to internal GitLab).
+    Helm is installed at runtime from get.helm.sh.

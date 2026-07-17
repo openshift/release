@@ -1,0 +1,51 @@
+workflow:
+  as: sandboxed-containers-operator-e2e-aro-disconnected
+  steps:
+    env:
+      ARO_API_SERVER_VISIBILITY: Private
+      ARO_INGRESS_VISIBILITY: Private
+      ARO_OUTBOUND_TYPE: UserDefinedRouting
+      ARO_BYO_NSG: "true"
+      BLOCK_OUTBOUND_INTERNET: "false"
+      ARO_WORKER_COUNT: "3"
+      ARO_WORKER_VM_SIZE: Standard_D8s_v3
+      BASTION_BOOT_IMAGE: "azureopenshift:aro4:aro_417:417.94.20240701"
+      BASTION_VM_SIZE: "Standard_D4s_v3"
+      OPERATORS_TO_MIRROR: "sandboxed-containers-operator"
+      SLEEP_DURATION: 3h
+      TEST_PARALLEL: 1
+      FORCE_SUCCESS_EXIT: "no"
+      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
+      MUST_GATHER_TIMEOUT: "35m"
+      ENABLE_MUST_GATHER: "false"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
+      TEST_FILTERS: ~Disruptive&
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: aro-provision-vnet
+    - chain: azure-provision-bastionhost
+    - ref: proxy-config-generate
+    - ref: openshift-cluster-bot-rbac
+    - ref: sandboxed-containers-operator-provision-acr-endpoint
+    - ref: aro-provision-nsg
+    - ref: aro-provision-cluster
+    - ref: sandboxed-containers-operator-ipi-conf-configure-acr-pull-secret
+    - ref: sandboxed-containers-operator-api-tunnel-disconnected-aro
+    - ref: sandboxed-containers-operator-mirror-operator
+    - chain: sandboxed-containers-operator-pre
+    - ref: sandboxed-containers-operator-install-trustee-operator
+    test:
+    - ref: openshift-extended-test
+    post:
+    - ref: cucushift-installer-wait
+      timeout: 12h10m0s
+      best_effort: true
+      optional_on_success: true
+    - ref: sandboxed-containers-operator-gather-must-gather
+    - ref: sandboxed-containers-operator-post
+    - ref: aro-deprovision
+  documentation: |-
+    Run openshift-extended-test on a disconnected ARO cluster
+    with sandboxed containers deployed. Uses ARO provisioning steps
+    with private/disconnected configuration and the OSC pre chain for
+    operator setup.
