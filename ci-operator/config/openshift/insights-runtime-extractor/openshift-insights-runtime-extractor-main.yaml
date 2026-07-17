@@ -97,6 +97,30 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: soak-test
+  cron: 30 4 1-7,15-21 * 1
+  steps:
+    cluster_profile: aws-observability
+    env:
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
+    test:
+    - as: soak-test
+      cli: latest
+      commands: |
+        GIT_SSL_NO_VERIFY=true git clone https://gitlab.cee.redhat.com/ikanse/soak-test.git /tmp/soak-test
+        cd /tmp/soak-test
+        ./ci/run-soak-test.sh
+      dependencies:
+      - env: INSIGHTS_RUNTIME_EXPORTER
+        name: insights-runtime-exporter
+      - env: INSIGHTS_RUNTIME_EXTRACTOR
+        name: insights-runtime-extractor
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1h30m0s
+    workflow: cucushift-installer-rehearse-aws-ipi
 - always_run: false
   as: tls-scanner
   optional: true
