@@ -1,8 +1,19 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   image_stream_tag:
     name: eco-ci-cd
     namespace: telcov10n-ci
     tag: eco-ci-cd
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -125,6 +136,24 @@ tests:
       TEST_ENV: stage
       VERSION: "4.14"
     workflow: telcov10n-functional-cnf-compute-nrop-testing
+- as: e2e-telcov10n-nrop-tls-scanner-5-0-nightly
+  capabilities:
+  - intranet
+  cron: 0 8 * * 0
+  steps:
+    env:
+      CLUSTER_NAME: helix47
+      OCP_VERSION_RELEASE_TYPE: nightly
+      OPERATORS: |
+        [
+          { "name": "numaresources-operator", "catalog": "numaresources-operator-fbc", "og_name": "numaresources-operator", "nsname": "openshift-numaresources", "deploy_default_config": false, "fbc_iib_repo": "latest", "channel": "5.0", "ocp_operator_mirror_fbc_image_base": "quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-5-0" }
+        ]
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-numaresources
+      SCANNER_CPU: "2"
+      TEST_ENV: stage
+      VERSION: "5.0"
+    workflow: telcov10n-functional-cnf-compute-nrop-tls-scanner
 zz_generated_metadata:
   branch: main
   org: openshift-kni
