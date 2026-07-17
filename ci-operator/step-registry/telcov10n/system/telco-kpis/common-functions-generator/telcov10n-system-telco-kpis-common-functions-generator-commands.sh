@@ -189,11 +189,18 @@ setup_ansible_inventory() {
             [[ -d "${hub_host_dir}" ]] || continue
             local hub_host_name
             hub_host_name=$(basename "${hub_host_dir}")
+            local hub_host_vars_file
+            hub_host_vars_file="/eco-ci-cd/inventories/ocp-deployment/host_vars/${hub_host_name}"
+
+            if [[ -f "${hub_host_vars_file}" ]]; then
+                echo "ERROR: host_vars collision — hub '${hub_cluster}' host '${hub_host_name}' would overwrite spoke '${spoke_cluster}' host_vars"
+                return 1
+            fi
+
             echo "Process hub host inventory: ${hub_host_name}"
-            process_inventory "${hub_host_dir}" \
-                /eco-ci-cd/inventories/ocp-deployment/host_vars/"${hub_host_name}"
+            process_inventory "${hub_host_dir}" "${hub_host_vars_file}"
             setup_ssh_jump "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
-                /eco-ci-cd/inventories/ocp-deployment/host_vars/"${hub_host_name}"
+                "${hub_host_vars_file}"
         done
     fi
 
