@@ -74,7 +74,12 @@ class EffectiveEnvResolver:
 
         for test in config.get('tests', []):
             if test.get('as') == job_name:
-                return test.get('steps', {}).get('env', {}) or {}
+                steps = test.get('steps')
+                if isinstance(steps, dict):
+                    return steps.get('env') or {}
+                env = test.get('env')
+                if env:
+                    return env
         return {}
 
     def extract_workflow_name(self, config_file: Path, job_name: str) -> Optional[str]:
@@ -84,7 +89,11 @@ class EffectiveEnvResolver:
 
         for test in config.get('tests', []):
             if test.get('as') == job_name:
-                return test.get('steps', {}).get('workflow')
+                steps = test.get('steps')
+                if isinstance(steps, dict):
+                    return steps.get('workflow')
+                if test.get('workflow'):
+                    return test.get('workflow')
         return None
 
     def get_workflow_env(self, workflow_name: str) -> Dict[str, str]:
