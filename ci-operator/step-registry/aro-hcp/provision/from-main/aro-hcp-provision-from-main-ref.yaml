@@ -37,7 +37,11 @@ ref:
     Provision an ARO HCP baseline environment from the main branch.
     Used as the first phase of upgrade-path validation: the environment
     is created from main, then upgraded to the PR branch in a subsequent step.
-    Resolves main's HEAD commit SHA and looks up the corresponding images
-    in ACR (pushed by the postsubmit images-push job), polling until
-    available. If HEAD's images never appear, walks back through recent
-    history to find the newest commit with images already pushed.
+    Uses the Prow-provided PULL_BASE_SHA to check out the exact base
+    commit (no network fetch required). Detects rehearsal runs via the
+    JOB_NAME prefix and fetches main explicitly; non-rehearsal runs
+    with an invalid PULL_BASE_SHA fail immediately.
+    Resolves the base commit's images in ACR (pushed by the postsubmit
+    images-push job), polling until available. If the base commit's
+    images never appear, walks back through recent history to find the
+    newest commit with images already pushed.
