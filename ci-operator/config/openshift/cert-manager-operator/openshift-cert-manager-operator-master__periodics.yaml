@@ -1,0 +1,186 @@
+base_images:
+  base-rhel9:
+    name: "4.22"
+    namespace: ocp
+    tag: base-rhel9
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: images/ci/Dockerfile
+    from: base-rhel9
+    to: cert-manager-operator
+  - dockerfile_path: images/ci/certmanager.Dockerfile
+    from: base-rhel9
+    to: cert-manager
+  - dockerfile_path: images/ci/istiocsr.Dockerfile
+    from: base-rhel9
+    to: cert-manager-istio-csr
+  - dockerfile_path: images/ci/trustmanager.Dockerfile
+    from: base-rhel9
+    to: cert-manager-trust-manager
+operator:
+  bundles:
+  - as: cert-manager-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: openshift.io/cert-manager-operator:.*
+    with: pipeline:cert-manager-operator
+  - pullspec: quay.io/jetstack/cert-manager-controller:.*
+    with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-webhook:.*
+    with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:.*
+    with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-istio-csr:.*
+    with: pipeline:cert-manager-istio-csr
+  - pullspec: quay.io/jetstack/trust-manager:.*
+    with: pipeline:cert-manager-trust-manager
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-operator
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 0 4 * * *
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace cert-manager-operator
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n cert-manager-operator "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: cert-manager-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {AWS,Generic} && CredentialsMode: isSubsetOf {Mint} && !TechPreview' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: e2e-operator-aws-proxy
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-proxy
+- as: e2e-operator-azure-ovn
+  cron: 0 12 * * *
+  steps:
+    cluster_profile: openshift-org-azure
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {Azure} && CredentialsMode: isSubsetOf {Mint}' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-azure-ovn
+- as: e2e-operator-azure-workload-identity
+  cron: 0 16 * * *
+  steps:
+    cluster_profile: openshift-org-azure
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {Azure} && CredentialsMode: isSubsetOf {Manual}' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- as: e2e-operator-gcp-workload-identity
+  cron: 0 20 * * *
+  steps:
+    cluster_profile: openshift-org-gcp
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {GCP} && CredentialsMode: isSubsetOf {Manual}' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cert-manager-operator
+  variant: periodics
