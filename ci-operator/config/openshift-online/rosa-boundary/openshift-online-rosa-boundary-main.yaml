@@ -34,6 +34,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: coverage
+  commands: |
+    make codecov
+  container:
+    from: src
+  secrets:
+  - mount_path: /var/run/codecov-secret
+    name: rosa-boundary-codecov
 - as: lambda-unit-tests
   commands: |
     export UV_CACHE_DIR=/tmp/uv-cache
@@ -42,6 +50,15 @@ tests:
     uv run pytest test_handler.py -v
   container:
     from: lambda-test-runner
+- as: publish-coverage
+  commands: |
+    make codecov
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /var/run/codecov-secret
+    name: rosa-boundary-codecov
 zz_generated_metadata:
   branch: main
   org: openshift-online
