@@ -11,7 +11,76 @@ resources:
       cpu: 200m
       memory: 300Mi
 tests:
-- as: telco-kpis-ztp-tests
+- as: deploy-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#telco-kpis-ci-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: kni-qe-70
+      INFRA_SETTINGS: |-
+        {
+          "deploy_sno_hub": {
+            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
+          },
+          "install_hub_operators": {
+            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
+          },
+          "mirror_spoke_operators": {
+            "version": "4.21",
+            "spoke_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json"
+          },
+          "mirror_ran_test_images": {
+            "ran_images": {
+              "images": [
+                "quay.io/telcov10n-ci/oslat:latest",
+                "quay.io/telcov10n-ci/cyclictest:latest",
+                "quay.io/telcov10n-ci/cnf-tests:4.8",
+                "quay.io/telcov10n-ci/stress-ng:latest",
+                "quay.io/telcov10n-ci/cnf-gotests-client:latest",
+                "quay.io/telcov10n-ci/dpdk-testpmd:latest",
+                "quay.io/telcov10n-ci/process-exporter:ppid-2",
+                "quay.io/telcov10n-ci/fedora-stress-ng:latest",
+                "quay.io/telcov10n-ci/curl:latest",
+                "quay.io/telcov10n-ci/sampleapp:latest",
+                "quay.io/telcov10n-ci/kubectl:latest",
+                "quay.io/telcov10n-ci/rtla:latest",
+                "quay.io/telcov10n-ci/oran-subscriber:latest"
+              ]
+            }
+          }
+        }
+      PR_ONLY: "true"
+      SPOKE_CLUSTER: spree-02
+      TIMEOUT: +10 min
+    post:
+    - ref: telcov10n-system-telco-kpis-wait-to-debug
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    - ref: telcov10n-system-telco-kpis-deploy-vm-bastion
+    - chain: telcov10n-system-telco-kpis-hub-deployment
+    - ref: telcov10n-system-telco-kpis-spoke-deployment-mirror-spoke-operators
+    - ref: telcov10n-system-telco-kpis-mirror-ran-test-images
+    test:
+    - as: infra-complete
+      commands: echo "ZTP infrastructure deployment completed successfully"
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+- as: run-1hr-tests
   capabilities:
   - intranet
   cron: 0 6 31 2 *
@@ -70,7 +139,6 @@ tests:
         {
           "generate_report": { "development_mode": true }
         }
-      SPOKE: spree-02
       SPOKE_CLUSTER: spree-02
       TEST_SETTINGS: |-
         {
