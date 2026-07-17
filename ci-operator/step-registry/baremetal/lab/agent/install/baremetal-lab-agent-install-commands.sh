@@ -8,7 +8,8 @@ set -o nounset
 # Trap to kill children processes
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 # Save exit code for must-gather to generate junit
-trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
 [ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
@@ -169,9 +170,10 @@ case "${BOOT_MODE}" in
       # on a single-arch payload migrated to a multi-arch cluster)
       continue
     fi
-    if [ "${transfer_protocol_type}" == "cifs" ]; then
+    if [ "${transfer_protocol_type}" == "NFS" ]; then
       IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-      iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.${arch}.iso"
+      timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" ln -s "${DATA_STORAGE}/html/${CLUSTER_NAME}.${gnu_arch}.iso" "/opt/nfs/${CLUSTER_NAME}.${gnu_arch}.iso"
+      iso_path="${IP_ADDRESS}/${CLUSTER_NAME}.${gnu_arch}.iso"
     else
       # Assuming HTTP or HTTPS
       iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"

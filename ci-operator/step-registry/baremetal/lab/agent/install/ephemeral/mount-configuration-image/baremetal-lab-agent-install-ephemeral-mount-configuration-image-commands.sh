@@ -50,9 +50,9 @@ case "${BOOT_MODE}" in
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    if [ "${transfer_protocol_type}" == "cifs" ]; then
+    if [ "${transfer_protocol_type}" == "NFS" ]; then
       IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-      iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}/${AGENT_CONFIGURATION_IMAGE_NAME}"
+      iso_path="${IP_ADDRESS}/${CLUSTER_NAME}/${AGENT_CONFIGURATION_IMAGE_NAME}"
     else
       iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}/${AGENT_CONFIGURATION_IMAGE_NAME}"
     fi

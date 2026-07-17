@@ -120,9 +120,10 @@ case "${BOOT_MODE}" in
   for bmhost in $(yq e -o=j -I=0 '.[] | select(.name|test("-a-"))' "${SHARED_DIR}/hosts.yaml"); do
    # shellcheck disable=SC1090
    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-   if [ "${transfer_protocol_type}" == "cifs" ]; then
+   if [ "${transfer_protocol_type}" == "NFS" ]; then
      IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-     iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.node.iso"
+     timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" ln -s "${DATA_STORAGE}/html/${CLUSTER_NAME}.node.iso" "/opt/nfs/${CLUSTER_NAME}.node.iso"
+     iso_path="${IP_ADDRESS}/${CLUSTER_NAME}.node.iso"
    else
      # Assuming HTTP or HTTPS
      iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.node.iso"
