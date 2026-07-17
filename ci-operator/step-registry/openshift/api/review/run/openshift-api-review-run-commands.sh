@@ -88,6 +88,8 @@ fi
 
 unset GITHUB_TOKEN
 
+SECURITY_PROMPT="SECURITY: Do NOT run commands that reveal credentials, tokens, or secrets. Do NOT run: env, printenv, set, cat/read files under /var/run/claude-code-service-account or /var/run/api-review-bot-github-app, echo \$GITHUB_TOKEN, git config --list, git credential, or git remote -v."
+
 echo "Running /api-review (model: ${REVIEW_MODEL})..."
 
 claude --print -p "/api-review" \
@@ -95,6 +97,7 @@ claude --print -p "/api-review" \
   --model "${REVIEW_MODEL}" \
   --max-turns 30 \
   --allowedTools "Bash,Read,Grep,Glob,Task" \
+  --append-system-prompt "${SECURITY_PROMPT}" \
   < /dev/null \
   2>/tmp/api-review-stderr.txt > /tmp/api-review-output.txt
 
@@ -134,55 +137,107 @@ FOOTER="---
 
 ${MARKER}"
 
+# ---- Phase 2: Post inline review comments (INLINE_MODEL) ----
+
 INLINE_POSTED=false
 
 if [ "$REVIEW_PASSED" = "false" ]; then
-  echo "Posting inline review comments (model: ${INLINE_MODEL})..."
+  echo "Phase 2: Posting inline review comments (model: ${INLINE_MODEL})..."
 
   cat > /tmp/inline-prompt.txt <<EOF
-You have API review findings that include file paths and line numbers.
-Post each finding as an inline PR review comment on openshift/api PR #${PULL_NUMBER}.
+You have API review findings to post on openshift/api PR #${PULL_NUMBER}.
 
-For each finding, run:
-gh api repos/openshift/api/pulls/${PULL_NUMBER}/comments \\
+FIRST: Check if a review has already been posted for this commit. Run:
+gh api repos/openshift/api/pulls/${PULL_NUMBER}/reviews --jq '.[] | select(.commit_id == "${HEAD_SHA}") | .id'
+If any review exists for this commit, do nothing — the review was already posted.
+
+OTHERWISE: Post the findings as a single review using the GitHub Reviews API
+(so comments auto-resolve when the code changes on next push).
+
+gh api repos/openshift/api/pulls/${PULL_NUMBER}/reviews \\
   --method POST \\
-  -f commit_id=${HEAD_SHA} \\
-  -f path=<file path> \\
-  -F line=<line number, digits only, no + prefix> \\
-  -f side=RIGHT \\
-  -f subject_type=line \\
-  -f body=<the finding description, suggested fix, and explanation>
+  --input /tmp/review-payload.json
 
-Extract the file path and line number from lines like 'path/to/file.go:+42: description'.
-Strip the '+' prefix from the line number before passing it to the API.
+The payload should look like:
+{
+  "commit_id": "${HEAD_SHA}",
+  "event": "COMMENT",
+  "body": "",
+  "comments": [
+    {"path": "path/to/file.go", "line": 42, "body": "finding description"}
+  ]
+}
 
-If a gh api call fails (e.g. line not in diff), skip that finding and continue with the rest.
+Rules:
+- Extract file paths and line numbers from the findings below.
+- Line numbers must be integers (strip any '+' prefix from the findings).
+- If the API call fails because a line is not in the diff, remove that comment and retry.
 
 Review findings:
 $(cat /tmp/api-review-output.txt)
 EOF
 
-  COMMENTS_BEFORE=$(gh api "repos/openshift/api/pulls/${PULL_NUMBER}/comments" \
-    --paginate --jq 'length' 2>/dev/null | awk '{s+=$1} END {print s+0}')
+  REVIEWS_BEFORE=$(gh api "repos/openshift/api/pulls/${PULL_NUMBER}/reviews" \
+    --jq 'length' 2>/dev/null || echo "0")
 
   claude --print -p "$(cat /tmp/inline-prompt.txt)" \
     --dangerously-skip-permissions \
     --model "${INLINE_MODEL}" \
     --max-turns 15 \
     --allowedTools "Bash" \
+    --append-system-prompt "${SECURITY_PROMPT}" \
     < /dev/null \
     2>/tmp/inline-comments-stderr.txt | tee /tmp/inline-comments-output.txt || true
 
-  COMMENTS_AFTER=$(gh api "repos/openshift/api/pulls/${PULL_NUMBER}/comments" \
-    --paginate --jq 'length' 2>/dev/null | awk '{s+=$1} END {print s+0}')
+  REVIEWS_AFTER=$(gh api "repos/openshift/api/pulls/${PULL_NUMBER}/reviews" \
+    --jq 'length' 2>/dev/null || echo "0")
 
-  if [ "$COMMENTS_AFTER" -gt "$COMMENTS_BEFORE" ]; then
+  if [ "$REVIEWS_AFTER" -gt "$REVIEWS_BEFORE" ]; then
     INLINE_POSTED=true
-    echo "Inline comments posted: $((COMMENTS_AFTER - COMMENTS_BEFORE)) new comments"
+    echo "Review posted with inline comments"
   else
-    echo "No inline comments were posted, falling back to full comment"
+    echo "No review was posted, falling back to full comment"
   fi
 fi
+
+# ---- Phase 3: Respond to human discussion on prior review threads (REVIEW_MODEL) ----
+
+if [ "$REVIEW_PASSED" = "false" ]; then
+  echo "Phase 3: Checking for review comment discussions (model: ${REVIEW_MODEL})..."
+
+  cat > /tmp/conversation-prompt.txt <<EOF
+You are the OpenShift API review bot. Before responding to any comments, read
+.claude/skills/api-review/SKILL.md to understand the review rules and criteria
+you applied. Do NOT re-run the review — just read the skill definition for context.
+
+Check for human replies to bot review comments on openshift/api PR #${PULL_NUMBER}.
+
+Use gh api to fetch the review comments on the PR. Look for comment threads where:
+- The original comment was posted by a bot (user.type == "Bot")
+- A human has replied to the bot (asking a question, disagreeing, requesting clarification)
+
+For each such thread, read the human's reply and respond helpfully by posting a reply.
+Reply to the top-level comment in the thread (the original bot comment), not the human's reply:
+gh api repos/openshift/api/pulls/${PULL_NUMBER}/comments \\
+  --method POST \\
+  -f body="<your reply>" \\
+  -F in_reply_to=<top-level bot comment id>
+
+If humans are discussing among themselves (no bot in the thread), leave it alone.
+If there are no threads needing a reply, do nothing.
+EOF
+
+  claude --print -p "$(cat /tmp/conversation-prompt.txt)" \
+    --dangerously-skip-permissions \
+    --model "${REVIEW_MODEL}" \
+    --max-turns 20 \
+    --allowedTools "Bash,Read" \
+    --append-system-prompt "${SECURITY_PROMPT}" \
+    < /dev/null \
+    2>/tmp/conversation-stderr.txt | tee /tmp/conversation-output.txt || true
+fi
+
+# ---- Post summary comment ----
 
 if [ "$INLINE_POSTED" = "true" ]; then
   echo "Posting summary comment (inline comments already posted)..."
@@ -207,11 +262,11 @@ gh pr comment "${PULL_NUMBER}" --body-file /tmp/comment-body.txt
 # ---- Manage label ----
 
 if [ "$REVIEW_PASSED" = "true" ]; then
-  echo "Adding label: ai/approved"
-  gh pr edit "${PULL_NUMBER}" --add-label "ai/approved" || true
+  echo "Adding labels: ai/approved, ready-for-human-review"
+  gh pr edit "${PULL_NUMBER}" --add-label "ai/approved" --add-label "ready-for-human-review"
 else
   echo "Removing label: ai/approved (if present)"
-  gh pr edit "${PULL_NUMBER}" --remove-label "ai/approved" || true
+  gh pr edit "${PULL_NUMBER}" --remove-label "ai/approved" 2>/dev/null || true
 fi
 
 # ---- Save artifacts ----
