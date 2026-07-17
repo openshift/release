@@ -97,7 +97,6 @@ if ! curl -fsSL --fail --retry 8 --retry-all-errors https://github.com/cloud-bul
 fi
 chmod +x ocp-metadata
 CLUSTER_METADATA=$(./ocp-metadata)
-EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 
 # Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
@@ -183,6 +182,7 @@ if [[ "${JOB_TYPE}" == "periodic" ]]; then
 elif [[ "${JOB_TYPE}" == "presubmit" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
     pull_number="${PULL_NUMBER}"
     job_type="pull"
+    CLUSTER_METADATA=$(echo "${CLUSTER_METADATA}" | python -c "import sys,json; d=json.load(sys.stdin); d['organization']='${REPO_OWNER}'; d['repository']='${REPO_NAME}'; print(json.dumps(d))")
     EXTRA_FLAGS+=" --pr-analysis"
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
     # Indicates a ci test triggered in PR against a pull request
@@ -196,6 +196,8 @@ elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
     # Indicates a rehearsal in PR against openshift/release repo
     job_type="(periodic OR rehearse)"
 fi
+
+EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 
 set +e
 set -o pipefail
