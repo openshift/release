@@ -11,7 +11,7 @@ log(){
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
 LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
-STALE_LEASE_HOURS="${STALE_LEASE_HOURS:-4}"
+STALE_LEASE_HOURS="${STALE_LEASE_HOURS:-1}"
 ERROR_REPLACE_HOURS="${ERROR_REPLACE_HOURS:-1}"
 DRY_RUN="${DRY_RUN:-false}"
 
@@ -217,10 +217,22 @@ while IFS= read -r cluster_json; do
             API_URL=$(echo "${OCM_CLUSTER_JSON}" | jq -r '.api.url // ""')
             ACTUAL_VERSION=$(echo "${OCM_CLUSTER_JSON}" | jq -r '.openshift_version // ""')
             VERSION_LABEL=$(echo "${ACTUAL_VERSION}" | cut -d. -f1,2)
+            CLUSTER_HREF=$(echo "${OCM_CLUSTER_JSON}" | jq -r '.href // empty')
             log "REGISTER: ${NAME} is ready, registering in lease inventory"
             if ! dry_run_guard "Would register ${NAME}"; then
                 register_lease "${NAME}" "available" "${OCM_CLUSTER_ID}" "${TYPE}" "${ENV}" "${REGION}" "${VERSION_LABEL}" "${API_URL}" "${ACTUAL_VERSION}"
                 log "Registered ${NAME} (${OCM_CLUSTER_ID}) in lease inventory"
+                # Set expiration to +28 days to prevent OCM auto-deletion
+                if [[ -n "${CLUSTER_HREF}" ]]; then
+                    EXPIRATION=$(date -u -d "+28 days" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v+28d '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || true)
+                    if [[ -n "${EXPIRATION}" ]]; then
+                        if echo "{\"expiration_timestamp\": \"${EXPIRATION}\"}" | ocm patch "${CLUSTER_HREF}" 2>/dev/null; then
+                            log "Set expiration for ${NAME} to ${EXPIRATION}"
+                        else
+                            log "WARNING: Failed to set expiration for ${NAME} (org may need bypass_max_expiration capability)"
+                        fi
+                    fi
+                fi
             fi
             echo "REGISTERED: ${NAME} (already ready in OCM)" >> "${REPORT}"
         elif [[ "${OCM_STATE}" == "installing" || "${OCM_STATE}" == "pending" || "${OCM_STATE}" == "waiting" ]]; then
@@ -345,6 +357,19 @@ while IFS= read -r cluster_json; do
 
     register_lease "${NAME}" "available" "${CLUSTER_ID}" "${TYPE}" "${ENV}" "${REGION}" "${VERSION_LABEL}" "${API_URL}" "${ACTUAL_VERSION}"
     log "Registered ${NAME} (${CLUSTER_ID}) in lease inventory"
+
+    # Set expiration to +28 days to prevent OCM auto-deletion
+    CLUSTER_HREF=$(echo "${CLUSTER_JSON}" | jq -r '.href // empty')
+    if [[ -n "${CLUSTER_HREF}" ]]; then
+        EXPIRATION=$(date -u -d "+28 days" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v+28d '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || true)
+        if [[ -n "${EXPIRATION}" ]]; then
+            if echo "{\"expiration_timestamp\": \"${EXPIRATION}\"}" | ocm patch "${CLUSTER_HREF}" 2>/dev/null; then
+                log "Set expiration for ${NAME} to ${EXPIRATION}"
+            else
+                log "WARNING: Failed to set expiration for ${NAME} (org may need bypass_max_expiration capability)"
+            fi
+        fi
+    fi
 done < <(echo "${DESIRED_NAMES}")
 
 # ---------------------------------------------------------------
@@ -434,7 +459,32 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
     CLUSTER_OCM_ENV=$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')
     ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
-    OCM_STATUS=$(ocm describe cluster "${CLUSTER_ID}" --json 2>/dev/null | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unreachable")
+    OCM_RESPONSE=$(ocm describe cluster "${CLUSTER_ID}" --json 2>/dev/null || echo "")
+    if [[ -z "${OCM_RESPONSE}" ]]; then
+        log "WARNING: ${CM_NAME} OCM unreachable (connectivity issue), skipping health check"
+        HEALTHY=$((HEALTHY + 1))
+        echo "SKIPPED: ${CM_NAME} (OCM unreachable)" >> "${REPORT}"
+        continue
+    fi
+
+    OCM_STATUS=$(echo "${OCM_RESPONSE}" | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unknown")
+    OCM_ID=$(echo "${OCM_RESPONSE}" | jq -r '.id // ""' 2>/dev/null || true)
+
+    # 404 means cluster was deleted from OCM
+    if [[ -z "${OCM_ID}" || "${OCM_ID}" == "404" ]]; then
+        log "UNHEALTHY: ${CM_NAME} no longer exists in OCM (deleted or expired)"
+        if [[ "${STATUS}" != "error" ]] && ! dry_run_guard "Would mark ${CM_NAME} as error"; then
+            lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                "metadata": {
+                    "labels": { "rosa-cluster-lease/status": "error" },
+                    "annotations": { "rosa-cluster-lease/error-reason": "Cluster deleted from OCM", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
+                }
+            }' || true
+        fi
+        UNHEALTHY=$((UNHEALTHY + 1))
+        echo "UNHEALTHY: ${CM_NAME} (deleted from OCM)" >> "${REPORT}"
+        continue
+    fi
 
     if [[ "${OCM_STATUS}" != "ready" ]]; then
         log "UNHEALTHY: ${CM_NAME} OCM status is ${OCM_STATUS}"
