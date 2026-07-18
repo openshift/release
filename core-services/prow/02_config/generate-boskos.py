@@ -630,12 +630,10 @@ CONFIG = {
     },
     'quay-aws-quota-slice': {
         'us-east-1': 20,
-        'us-west-1': 20,
     },
     'aws-quay-qe-quota-slice': {
         'us-east-1': 30,
         'us-east-2': 30,
-        'us-west-1': 30,
         'us-west-2': 30,
     },
     'gcp-quay-qe-quota-slice': {
