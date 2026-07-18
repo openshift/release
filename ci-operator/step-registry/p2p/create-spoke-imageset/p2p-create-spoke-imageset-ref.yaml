@@ -1,0 +1,44 @@
+ref:
+  as: p2p-create-spoke-imageset
+  from: cli
+  commands: p2p-create-spoke-imageset-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  env:
+  - name: ACM_SPOKE_CLUSTER_INITIAL_VERSION
+    default: "4.23"
+    documentation: |-
+      Target OCP version for spoke clusters (e.g. "4.23"). Used to name the
+      ClusterImageSet as img<release-tag>-x86-64 and to verify that the created
+      resource is discoverable by the img<version>.* prefix search in
+      acm-interop-p2p-cluster-install.
+  documentation: |-
+    Creates a Hive ClusterImageSet on the hub cluster pointing to the nightly
+    OCP release image resolved by ci-operator (RELEASE_IMAGE_LATEST).
+
+    This step is needed when ACM_SPOKE_CLUSTER_INITIAL_VERSION targets a
+    pre-GA OCP version (e.g. 4.23 nightly) for which no GA ClusterImageSet
+    is registered in the hub's Hive instance. Without this step, the
+    acm-interop-p2p-cluster-install step exits with:
+      "No cluster image set found for version '<version>'"
+
+    How it works:
+      1. Extracts the image tag from RELEASE_IMAGE_LATEST
+         (injected by ci-operator when a 'latest' nightly release is defined).
+      2. Creates a ClusterImageSet named img<tag>-x86-64 via jq + yq + oc apply,
+         idempotent across re-runs.
+      3. Verifies the ClusterImageSet is discoverable using the same
+         img<version>.* prefix search performed by acm-interop-p2p-cluster-install.
+
+    The hub cluster's pull secret already includes registry.ci.openshift.org
+    (injected by the CI cluster profile), so Hive can pull the nightly image
+    during spoke cluster provisioning.
+
+    Prerequisites:
+      - ACM MultiClusterHub must be installed and Available (acm-mch step).
+      - Hive CRDs (ClusterImageSet) must be present on the hub cluster.
+
+    Must run after: acm-mch
+    Must run before: acm-interop-p2p-cluster-install
