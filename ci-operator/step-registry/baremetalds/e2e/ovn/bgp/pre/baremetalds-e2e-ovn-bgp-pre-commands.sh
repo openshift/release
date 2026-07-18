@@ -294,6 +294,32 @@ until oc wait -n openshift-frr-k8s deployment --all --for condition=Available --
   sleep 5
 done
 
+# Workaround: Kubernetes >=1.36 rejects CRDs that declare format:int32 with
+# maximum:4294967295 (above signed int32 max). That makes *any* FRRConfiguration
+# apply fail with "Maximum boundary value must be of type integer with format int32"
+# even when the ASN value itself is valid. Upstream fix uses format:int64:
+# https://github.com/metallb/frr-k8s/commit/7c71d152be3b2383350f475b951ceab0a4323624
+# https://github.com/metallb/metallb/issues/3034
+echo "Patching FRRConfiguration CRD ASN fields to format int64 (K8s 1.36+ validation)..."
+oc get crd frrconfigurations.frrk8s.metallb.io -o json | python3 -c '
+import json, sys
+crd = json.load(sys.stdin)
+for v in crd.get("spec", {}).get("versions", []):
+    schema = v.get("schema", {}).get("openAPIV3Schema", {})
+    try:
+        routers = schema["properties"]["spec"]["properties"]["bgp"]["properties"]["routers"]["items"]["properties"]
+    except KeyError:
+        continue
+    if "asn" in routers:
+        routers["asn"]["format"] = "int64"
+    neighbors = routers.get("neighbors", {}).get("items", {}).get("properties", {})
+    if "asn" in neighbors:
+        neighbors["asn"]["format"] = "int64"
+    if "localASN" in neighbors:
+        neighbors["localASN"]["format"] = "int64"
+json.dump(crd, sys.stdout)
+' | oc replace -f -
+
 # Override FRR-K8s frr and reloader containers only (CNO uses one image for all containers;
 # upstream FRR image works only for frr/reloader). Make CNO Unmanaged and set those images.
 # This is used while waiting for OCP builds with FRR 10.
