@@ -41,6 +41,39 @@ ocm_get_cluster() {
     echo "${response}" | jq '.items[0] // empty | select(.aws.tags["rosa-cluster-lease"] == "true")' 2>/dev/null
 }
 
+# Query OCM for a cluster by ID. Sets globals:
+#   OCM_CHECK_RESULT: "unreachable", "not-found", or "ok"
+#   OCM_CHECK_STATUS: cluster state (e.g. "ready", "installing") when result is "ok"
+#   OCM_CHECK_RESPONSE: full JSON response when result is "ok"
+ocm_check_cluster() {
+    local cluster_id="$1" ocm_env="${2:-staging}"
+    OCM_CHECK_RESULT="" OCM_CHECK_STATUS="" OCM_CHECK_RESPONSE=""
+    ocm_ensure_env "${ocm_env}"
+    local response rc
+    if response=$(ocm get /api/clusters_mgmt/v1/clusters/"${cluster_id}" 2>&1); then
+        rc=0
+    else
+        rc=$?
+    fi
+    if [[ -z "${response}" ]]; then
+        OCM_CHECK_RESULT="unreachable"
+        return
+    fi
+    local ocm_id
+    ocm_id=$(echo "${response}" | jq -r '.id // ""' 2>/dev/null || true)
+    if [[ "${ocm_id}" == "404" ]]; then
+        OCM_CHECK_RESULT="not-found"
+        return
+    fi
+    if (( rc != 0 )) || [[ -z "${ocm_id}" ]]; then
+        OCM_CHECK_RESULT="unreachable"
+        return
+    fi
+    OCM_CHECK_RESULT="ok"
+    OCM_CHECK_STATUS=$(echo "${response}" | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unknown")
+    OCM_CHECK_RESPONSE="${response}"
+}
+
 register_lease() {
     local name="$1" status="$2" cluster_id="$3" type="$4" env="$5" region="$6" version="$7"
     local api_url="${8:-}" actual_version="${9:-}"
@@ -419,25 +452,54 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
             echo "RECOVERED: ${CM_NAME} (stale ${LEASE_HOURS}h)" >> "${REPORT}"
             continue
         fi
-        HEALTHY=$((HEALTHY + 1))
+    fi
+
+    # Check OCM health for in-use clusters (report only, no action while job is running)
+    if [[ "${STATUS}" == "in-use" ]]; then
+        ocm_check_cluster "${CLUSTER_ID}" "$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')"
+        if [[ "${OCM_CHECK_RESULT}" == "unreachable" ]]; then
+            echo "IN-USE: ${CM_NAME} by ${HOLDER} (OCM unreachable)" >> "${REPORT}"
+        elif [[ "${OCM_CHECK_RESULT}" == "not-found" || "${OCM_CHECK_STATUS}" != "ready" ]]; then
+            log "WARNING: ${CM_NAME} in-use by ${HOLDER} but OCM status is ${OCM_CHECK_RESULT}/${OCM_CHECK_STATUS}"
+            UNHEALTHY=$((UNHEALTHY + 1))
+            echo "IN-USE WARNING: ${CM_NAME} by ${HOLDER} (OCM: ${OCM_CHECK_STATUS:-${OCM_CHECK_RESULT}})" >> "${REPORT}"
+        else
+            HEALTHY=$((HEALTHY + 1))
+            echo "IN-USE: ${CM_NAME} by ${HOLDER} (OCM: ${OCM_CHECK_STATUS})" >> "${REPORT}"
+        fi
         continue
     fi
 
-    # Skip health checks for in-use and provisioning clusters
-    if [[ "${STATUS}" == "in-use" || "${STATUS}" == "provisioning" ]]; then
-        HEALTHY=$((HEALTHY + 1))
+    # Verify provisioning clusters still exist in OCM
+    if [[ "${STATUS}" == "provisioning" ]]; then
+        ocm_check_cluster "${CLUSTER_ID}" "$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')"
+        if [[ "${OCM_CHECK_RESULT}" == "unreachable" ]]; then
+            log "WARNING: ${CM_NAME} OCM unreachable, skipping provisioning check"
+            echo "SKIPPED: ${CM_NAME} (OCM unreachable)" >> "${REPORT}"
+        elif [[ "${OCM_CHECK_RESULT}" == "not-found" ]]; then
+            log "STALE PROVISIONING: ${CM_NAME} no longer exists in OCM, removing ConfigMap"
+            if dry_run_guard "Would delete stale provisioning ConfigMap ${CM_NAME}"; then
+                echo "DRY RUN: ${CM_NAME} (stale provisioning, would remove)" >> "${REPORT}"
+            elif lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}"; then
+                echo "STALE PROVISIONING: ${CM_NAME} (removed, will reprovision next run)" >> "${REPORT}"
+            else
+                log "WARNING: Failed to delete stale ConfigMap ${CM_NAME}"
+                echo "STALE PROVISIONING: ${CM_NAME} (delete failed)" >> "${REPORT}"
+            fi
+            UNHEALTHY=$((UNHEALTHY + 1))
+        else
+            HEALTHY=$((HEALTHY + 1))
+        fi
         continue
     fi
 
     # Check if maintenance (upgrade) has completed
     if [[ "${STATUS}" == "maintenance" ]]; then
         UPGRADE_TARGET=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/upgrade-target"] // ""')
-        CLUSTER_OCM_ENV=$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')
-        ocm_ensure_env "${CLUSTER_OCM_ENV}"
-        OCM_STATUS=$(ocm describe cluster "${CLUSTER_ID}" --json 2>/dev/null | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unknown")
-        CURRENT_VERSION=$(ocm describe cluster "${CLUSTER_ID}" --json 2>/dev/null | jq -r '.openshift_version // ""' 2>/dev/null || true)
+        ocm_check_cluster "${CLUSTER_ID}" "$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')"
+        CURRENT_VERSION=$(echo "${OCM_CHECK_RESPONSE}" | jq -r '.openshift_version // ""' 2>/dev/null || true)
 
-        if [[ "${OCM_STATUS}" == "ready" && -n "${UPGRADE_TARGET}" && "${CURRENT_VERSION}" == "${UPGRADE_TARGET}" ]]; then
+        if [[ "${OCM_CHECK_STATUS}" == "ready" && -n "${UPGRADE_TARGET}" && "${CURRENT_VERSION}" == "${UPGRADE_TARGET}" ]]; then
             log "UPGRADE COMPLETE: ${CM_NAME} upgraded to ${CURRENT_VERSION}"
             VERSION_LABEL=$(echo "${CURRENT_VERSION}" | cut -d. -f1,2)
             if ! dry_run_guard "Would restore ${CM_NAME} to available"; then
@@ -455,23 +517,16 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         continue
     fi
 
-    # Check OCM cluster status
-    CLUSTER_OCM_ENV=$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')
-    ocm_ensure_env "${CLUSTER_OCM_ENV}"
+    # Check OCM cluster status (available/error clusters)
+    ocm_check_cluster "${CLUSTER_ID}" "$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')"
 
-    OCM_RESPONSE=$(ocm describe cluster "${CLUSTER_ID}" --json 2>/dev/null || echo "")
-    if [[ -z "${OCM_RESPONSE}" ]]; then
+    if [[ "${OCM_CHECK_RESULT}" == "unreachable" ]]; then
         log "WARNING: ${CM_NAME} OCM unreachable (connectivity issue), skipping health check"
-        HEALTHY=$((HEALTHY + 1))
         echo "SKIPPED: ${CM_NAME} (OCM unreachable)" >> "${REPORT}"
         continue
     fi
 
-    OCM_STATUS=$(echo "${OCM_RESPONSE}" | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unknown")
-    OCM_ID=$(echo "${OCM_RESPONSE}" | jq -r '.id // ""' 2>/dev/null || true)
-
-    # 404 means cluster was deleted from OCM
-    if [[ -z "${OCM_ID}" || "${OCM_ID}" == "404" ]]; then
+    if [[ "${OCM_CHECK_RESULT}" == "not-found" ]]; then
         log "UNHEALTHY: ${CM_NAME} no longer exists in OCM (deleted or expired)"
         if [[ "${STATUS}" != "error" ]] && ! dry_run_guard "Would mark ${CM_NAME} as error"; then
             lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
@@ -486,18 +541,18 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         continue
     fi
 
-    if [[ "${OCM_STATUS}" != "ready" ]]; then
-        log "UNHEALTHY: ${CM_NAME} OCM status is ${OCM_STATUS}"
+    if [[ "${OCM_CHECK_STATUS}" != "ready" ]]; then
+        log "UNHEALTHY: ${CM_NAME} OCM status is ${OCM_CHECK_STATUS}"
         if [[ "${STATUS}" != "error" ]] && ! dry_run_guard "Would mark ${CM_NAME} as error"; then
             lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
                 "metadata": {
                     "labels": { "rosa-cluster-lease/status": "error" },
-                    "annotations": { "rosa-cluster-lease/error-reason": "OCM status: '"${OCM_STATUS}"'", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
+                    "annotations": { "rosa-cluster-lease/error-reason": "OCM status: '"${OCM_CHECK_STATUS}"'", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
                 }
             }' || true
         fi
         UNHEALTHY=$((UNHEALTHY + 1))
-        echo "UNHEALTHY: ${CM_NAME} (OCM: ${OCM_STATUS})" >> "${REPORT}"
+        echo "UNHEALTHY: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS})" >> "${REPORT}"
         continue
     fi
 
