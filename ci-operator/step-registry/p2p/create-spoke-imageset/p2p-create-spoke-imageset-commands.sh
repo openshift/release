@@ -3,28 +3,39 @@
 # resolved by ci-operator (RELEASE_IMAGE_LATEST), so that acm-interop-p2p-cluster-install
 # can provision spoke clusters at a pre-GA OCP version that has no GA ClusterImageSet yet.
 #
-# The ClusterImageSet is named img<tag>-x86-64, where <tag> is extracted from
-# RELEASE_IMAGE_LATEST. This satisfies the img<version>.* prefix search in
-# acm-interop-p2p-cluster-install.
+# The ClusterImageSet is named img<version>.0-ci-nightly-x86-64, where <version> comes
+# from ACM_SPOKE_CLUSTER_INITIAL_VERSION. This satisfies the img<version>.* prefix search
+# in acm-interop-p2p-cluster-install.
 #
 # Required environment variables (injected by ci-operator):
-#   RELEASE_IMAGE_LATEST              – nightly release image URI
+#   RELEASE_IMAGE_LATEST              – nightly release image URI (may be tag or sha256 digest)
 #     e.g. registry.ci.openshift.org/ocp/release:4.23.0-0.nightly-2026-07-15-024904
+#      OR  registry.build10.ci.openshift.org/ci-op-XXXXX/release@sha256:<digest>
 #
 # Required environment variables (declared in ref.yaml):
 #   ACM_SPOKE_CLUSTER_INITIAL_VERSION – target OCP version, e.g. "4.23"
 set -euxo pipefail; shopt -s inherit_errexit
 
-# Extract the image tag (everything after the last colon).
-typeset releaseTag="${RELEASE_IMAGE_LATEST##*:}"
-typeset imageSetName="img${releaseTag}-x86-64"
+# Install jq (not present in the cli image by default).
+eval "$(
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+)"; EnsureReqs jq yq
+
+# Construct a ClusterImageSet name from the OCP version declared in the config.
+# RELEASE_IMAGE_LATEST may be a sha256 digest ref (not a human-readable tag), so
+# we derive the name from ACM_SPOKE_CLUSTER_INITIAL_VERSION instead.
+typeset imageSetName="img${ACM_SPOKE_CLUSTER_INITIAL_VERSION}.0-ci-nightly-x86-64"
 typeset spokeVersion="${ACM_SPOKE_CLUSTER_INITIAL_VERSION}"
 
 : "Release image : ${RELEASE_IMAGE_LATEST}"
 : "ClusterImageSet: ${imageSetName}"
 
 # Create (or idempotently update) the ClusterImageSet using jq data marshalling
-# to avoid injecting shell variables directly into YAML.
+# to avoid injecting shell variables directly into YAML/JSON.
+# oc apply accepts JSON directly, so no yq conversion is needed.
 jq -cn \
     --arg name  "${imageSetName}" \
     --arg image "${RELEASE_IMAGE_LATEST}" \
@@ -34,7 +45,6 @@ jq -cn \
         "metadata":   {"name": $name},
         "spec":       {"releaseImage": $image}
     }' |
-yq -p json -o yaml eval . |
 oc apply -f -
 
 # Confirm the resource is now accessible.

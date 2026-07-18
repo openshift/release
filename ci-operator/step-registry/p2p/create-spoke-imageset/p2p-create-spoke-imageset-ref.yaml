@@ -10,10 +10,10 @@ ref:
   - name: ACM_SPOKE_CLUSTER_INITIAL_VERSION
     default: "4.23"
     documentation: |-
-      Target OCP version for spoke clusters (e.g. "4.23"). Used to name the
-      ClusterImageSet as img<release-tag>-x86-64 and to verify that the created
-      resource is discoverable by the img<version>.* prefix search in
-      acm-interop-p2p-cluster-install.
+      Target OCP version for spoke clusters (e.g. "4.23"). Used to derive the
+      ClusterImageSet name as img<version>.0-ci-nightly-x86-64 and to verify
+      that the created resource is discoverable by the img<version>.* prefix
+      search in acm-interop-p2p-cluster-install.
   documentation: |-
     Creates a Hive ClusterImageSet on the hub cluster pointing to the nightly
     OCP release image resolved by ci-operator (RELEASE_IMAGE_LATEST).
@@ -25,11 +25,14 @@ ref:
       "No cluster image set found for version '<version>'"
 
     How it works:
-      1. Extracts the image tag from RELEASE_IMAGE_LATEST
-         (injected by ci-operator when a 'latest' nightly release is defined).
-      2. Creates a ClusterImageSet named img<tag>-x86-64 via jq + yq + oc apply,
-         idempotent across re-runs.
-      3. Verifies the ClusterImageSet is discoverable using the same
+      1. Installs jq via EnsureReqs (not present in the cli base image).
+      2. Derives the ClusterImageSet name from ACM_SPOKE_CLUSTER_INITIAL_VERSION
+         as img<version>.0-ci-nightly-x86-64. RELEASE_IMAGE_LATEST may be a
+         sha256 digest ref rather than a tagged ref, so it cannot be used for
+         naming — only the image URI (spec.releaseImage) is taken from it.
+      3. Creates the ClusterImageSet via jq + oc apply -f - (JSON accepted by
+         oc apply directly), idempotent across re-runs.
+      4. Verifies the ClusterImageSet is discoverable using the same
          img<version>.* prefix search performed by acm-interop-p2p-cluster-install.
 
     The hub cluster's pull secret already includes registry.ci.openshift.org
