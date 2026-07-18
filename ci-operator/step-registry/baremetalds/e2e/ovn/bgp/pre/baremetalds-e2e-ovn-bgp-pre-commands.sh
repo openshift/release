@@ -5,7 +5,7 @@ set -o pipefail
 
 # Fetch packet basic configuration
 source "${SHARED_DIR}/packet-conf.sh"
-ssh "${SSHOPTS[@]}" "root@${IP}" "FRR_IMAGE='$FRR_IMAGE'" bash -x - << 'EOFTOP'
+ssh "${SSHOPTS[@]}" "root@${IP}" "FRR_IMAGE='$FRR_IMAGE' ADVERTISE_DEFAULT_NETWORK='${ADVERTISE_DEFAULT_NETWORK:-true}'" bash -x - << 'EOFTOP'
 #!/bin/bash
 set -o nounset
 set -o errexit
@@ -243,13 +243,19 @@ fi
 # we will potentially deploy multiple networks, each on its own VRF
 declare -A vrf_neighbors
 
-# Collect IPs for the default VRF from both current cluster nodes and any spare baremetal hosts
-# pre-configured in the ostestbm network (via virsh DHCP entries). This ensures nodes provisioned
-# dynamically during tests (e.g. via MachineSet scaling) are already known to the external FRR,
-# preventing BGP session rejections that cause frr-status container crashes on new nodes.
-node_ips=$($KCLI get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')
-spare_ips=$(sudo virsh net-dumpxml ostestbm | xmllint --xpath '/network//host/@ip' - | cut -d '=' -f2 | tr -d \" | xargs 2>/dev/null || true)
-vrf_neighbors["default"]=$(echo "$node_ips $spare_ips" | tr ' ' '\n' | sort -u | xargs)
+# Optionally advertise the default/pod network. When disabled, only extra networks (e.g. extranet)
+# get external FRR peering, FRRConfiguration, and RouteAdvertisements.
+if [ "${ADVERTISE_DEFAULT_NETWORK:-true}" = "true" ]; then
+  # Collect IPs for the default VRF from both current cluster nodes and any spare baremetal hosts
+  # pre-configured in the ostestbm network (via virsh DHCP entries). This ensures nodes provisioned
+  # dynamically during tests (e.g. via MachineSet scaling) are already known to the external FRR,
+  # preventing BGP session rejections that cause frr-status container crashes on new nodes.
+  node_ips=$($KCLI get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')
+  spare_ips=$(sudo virsh net-dumpxml ostestbm | xmllint --xpath '/network//host/@ip' - | cut -d '=' -f2 | tr -d \" | xargs 2>/dev/null || true)
+  vrf_neighbors["default"]=$(echo "$node_ips $spare_ips" | tr ' ' '\n' | sort -u | xargs)
+else
+  echo "ADVERTISE_DEFAULT_NETWORK=false: skipping default network BGP peering and RouteAdvertisements"
+fi
 
 # deploy an agnhost container isolated on a macvlan network
 deploy_agnhost_container agnhost
@@ -426,15 +432,18 @@ ${network_selector}
 EOF
 done
 
-CLUSTER_NETWORK_V4="10.128.0.0/14"
-$IP route add $CLUSTER_NETWORK_V4 via 192.168.111.3 dev ostestbm || true
-$IPTABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V4} -i ostestbm -j ACCEPT
-$IPTABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V4} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-$IPTABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V4} ! -d 192.168.111.1/24 -j MASQUERADE
+# Host routes for the advertised default pod network via the external FRR container.
+if [ "${ADVERTISE_DEFAULT_NETWORK:-true}" = "true" ]; then
+  CLUSTER_NETWORK_V4="10.128.0.0/14"
+  $IP route add $CLUSTER_NETWORK_V4 via 192.168.111.3 dev ostestbm || true
+  $IPTABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V4} -i ostestbm -j ACCEPT
+  $IPTABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V4} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  $IPTABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V4} ! -d 192.168.111.1/24 -j MASQUERADE
 
-CLUSTER_NETWORK_V6="fd01::/48"
-$IP -6 route add $CLUSTER_NETWORK_V6 via fd2e:6f44:5dd8:c956::3 dev ostestbm || true
-$IP6TABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V6} -i ostestbm -j ACCEPT
-$IP6TABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V6} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-$IP6TABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V6} ! -d fd2e:6f44:5dd8:c956::1 -j MASQUERADE
+  CLUSTER_NETWORK_V6="fd01::/48"
+  $IP -6 route add $CLUSTER_NETWORK_V6 via fd2e:6f44:5dd8:c956::3 dev ostestbm || true
+  $IP6TABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V6} -i ostestbm -j ACCEPT
+  $IP6TABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V6} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  $IP6TABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V6} ! -d fd2e:6f44:5dd8:c956::1 -j MASQUERADE
+fi
 EOFTOP
