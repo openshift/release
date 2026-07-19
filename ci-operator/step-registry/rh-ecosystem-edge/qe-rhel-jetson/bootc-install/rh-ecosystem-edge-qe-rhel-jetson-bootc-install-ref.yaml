@@ -1,0 +1,52 @@
+ref:
+  as: rh-ecosystem-edge-qe-rhel-jetson-bootc-install
+  from: qe-rhel-jetson
+  commands: rh-ecosystem-edge-qe-rhel-jetson-bootc-install-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: qe-rhel-jetson-jetson-ssh-key
+      mount_path: /var/run/secrets/jetson-ssh-key
+  env:
+    - name: JETSON_HOSTNAME
+      default: "10.26.2.85"
+      documentation: IP address of the target Jetson device (hostname not resolvable from CI pods)
+    - name: BOOTC_IMAGE_TAG
+      default: "6.2.2_5.14.0_687.12.1_060326073202"
+      documentation: Tag of the bootc image to install
+    - name: BOOTC_IMAGE_BASE
+      default: quay.io/redhat-user-workloads/jetpack-for-rhel-tenant/rhel-98-bootc
+      documentation: Base image path without tag
+    - name: RESERVATION_HOURS
+      default: "24"
+      documentation: Hours the Beaker reservation lasts; boot order restores 2h before expiry
+    - name: REGISTRY_USERNAME
+      default: ""
+      documentation: GitLab registry token username; leave empty to skip registry login
+    - name: REGISTRY_PASSWORD
+      default: ""
+      documentation: GitLab registry token password; leave empty to skip registry login
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 2h0m0s
+  documentation: |-
+    Install a bootc image on a Jetson Beaker machine using the Ansible playbook
+    from the qe-rhel-jetson repo (beaker/ansible/install_bootc_v3.yml).
+
+    The playbook:
+      1. Installs podman on the device
+      2. Saves the original EFI boot order
+      3. Logs into registry.gitlab.com and pulls the bootc image
+      4. Runs: podman run ... <image> bootc install to-existing-root
+      5. Sets a systemd timer to restore PXE boot order before reservation expires
+      6. Reboots and verifies the deployment
+
+    Required secrets in test-credentials namespace:
+      - qe-rhel-jetson-jetson-ssh: SSH credentials (keys: username, password)
+
+    Optional registry credentials (via env vars REGISTRY_USERNAME / REGISTRY_PASSWORD):
+      Registry login is skipped when both vars are empty, allowing rehearsals to pass
+      without the qe-rhel-jetson-registry secret. Set them via the job env or a secret
+      once the secret exists in test-credentials.

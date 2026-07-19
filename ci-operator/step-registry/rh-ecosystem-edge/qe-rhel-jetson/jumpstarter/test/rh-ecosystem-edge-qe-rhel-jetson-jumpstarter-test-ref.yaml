@@ -1,0 +1,39 @@
+ref:
+  as: rh-ecosystem-edge-qe-rhel-jetson-jumpstarter-test
+  from: qe-rhel-jetson
+  commands: rh-ecosystem-edge-qe-rhel-jetson-jumpstarter-test-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: qe-rhel-jetson-jumpstarter
+      mount_path: /var/run/secrets/jumpstarter
+    - namespace: test-credentials
+      name: qe-rhel-jetson-jetson-ssh
+      mount_path: /var/run/secrets/jetson-ssh
+  env:
+    - name: JUMPSTARTER_LEASE_NAME
+      documentation: Name of the pre-reserved Jumpstarter lease for the Jetson device
+    - name: TEST_SUITE
+      default: tests_suites/
+      documentation: pytest test path or suite directory to run
+    - name: SKIP_PREPULL
+      default: "0"
+      documentation: Set to 1 to skip NGC container image pre-pull on the device
+    - name: EXPECTED_RHEL_MAJOR
+      default: "9"
+      documentation: Expected RHEL major version on the Jetson device
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 3h0m0s
+  documentation: |-
+    Run the qe-rhel-jetson test suite on a physical NVIDIA Jetson device via Jumpstarter.
+
+    Uses the Jumpstarter framework to acquire a hardware lease, flash a RHEL image to the
+    device, and run pytest test suites over SSH through a Jumpstarter TCP port-forward tunnel.
+
+    Required secrets in test-credentials namespace:
+      - qe-rhel-jetson-jumpstarter: Jumpstarter client config (key: config)
+      - qe-rhel-jetson-jetson-ssh: Jetson SSH credentials (keys: username, password)
+
+    The JUMPSTARTER_LEASE_NAME env var must be set to the name of the leased Jetson device.
