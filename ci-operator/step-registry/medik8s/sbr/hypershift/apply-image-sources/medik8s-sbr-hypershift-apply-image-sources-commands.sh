@@ -9,6 +9,10 @@ declare GITLAB_RAW="https://gitlab.cee.redhat.com/dragonfly/rhwa-fbc/-/raw"
 
 log() { echo "[$(date --utc +%FT%T.%3NZ)] $*"; }
 
+declare -a _tmp_files=()
+cleanup() { rm -f "${_tmp_files[@]}"; }
+trap cleanup EXIT
+
 # gitlab.cee regularly returns 503s lasting 30+ seconds; exponential backoff
 # (2+4+8+16+32 = 62s window) is more reliable than curl's built-in --retry
 # which doesn't retry on HTTP 5xx.  Mirrors medik8s-lib.sh gitlab_fetch().
@@ -31,10 +35,9 @@ gitlab_fetch() {
 # Resolve FBC commit SHA if not provided
 if [[ -z "$FBC_COMMIT_SHA" ]]; then
     encoded_ref=$(jq -rn --arg ref "$GIT_REF" '$ref | @uri')
-    commit_file=$(mktemp)
+    commit_file=$(mktemp); _tmp_files+=("$commit_file")
     gitlab_fetch "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" "$commit_file"
     FBC_COMMIT_SHA=$(jq -r .id "$commit_file")
-    rm -f "$commit_file"
     if [[ -z "$FBC_COMMIT_SHA" || "$FBC_COMMIT_SHA" == "null" ]]; then
         echo "ERROR: failed to resolve FBC commit SHA for ref '${GIT_REF}' (got: '${FBC_COMMIT_SHA}')"
         exit 1
@@ -45,8 +48,7 @@ else
 fi
 
 # Fetch IDMS yaml from rhwa-fbc
-idms_file=$(mktemp)
-trap 'rm -f "$idms_file"' EXIT
+idms_file=$(mktemp); _tmp_files+=("$idms_file")
 gitlab_fetch "${GITLAB_RAW}/${FBC_COMMIT_SHA}/.tekton/images-mirror-set.yaml" "$idms_file"
 log "Fetched IDMS from rhwa-fbc commit ${FBC_COMMIT_SHA}"
 
@@ -66,13 +68,12 @@ HC_NAME="$(cat "${SHARED_DIR}/cluster-name")"
 HC_NAMESPACE="clusters"
 
 log "Patching HostedCluster ${HC_NAMESPACE}/${HC_NAME} with imageContentSources..."
-patch_file=$(mktemp)
+patch_file=$(mktemp); _tmp_files+=("$patch_file")
 jq -n --argjson ics "$image_content_sources" \
     '{"spec":{"imageContentSources": $ics}}' > "$patch_file"
 oc patch hostedcluster "${HC_NAME}" -n "${HC_NAMESPACE}" \
     --type=merge \
     --patch-file "$patch_file"
-rm -f "$patch_file"
 log "Patch applied — waiting for NodePool to acknowledge the config change (up to 2m)..."
 
 # After patching HostedCluster.spec.imageContentSources, the NodePool controller takes a
