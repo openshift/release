@@ -36,6 +36,9 @@ tests:
     env:
       BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4s_v5
+      NMSTATE_OPERATOR_CREATE_CUSTOM_RESOURCE: "true"
+      NMSTATE_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      NMSTATE_OPERATOR_SUB_SOURCE_IMAGE: registry.redhat.io/redhat/redhat-operator-index:v4.22
     test:
     - as: install-cnv
       cli: latest
@@ -77,17 +80,17 @@ tests:
           cpu: 100m
           memory: 600Mi
       timeout: 1h0m0s
+    - ref: operatorhub-subscribe-nmstate-operator
     - as: validate
       cli: latest
       commands: |
         set -e
         # CI-specific exclusions (these checks detect real issues on customer clusters):
-        # 11-host-network: nmstate operator is not deployed on CI clusters
         # 20-bare-metal: CI clusters are cloud-hosted, bare-metal detection always fails
         # 70-live-migration: CI default StorageClass is RWO, live migration needs RWX
         # 75-snapshots: CI StorageClass has no VolumeSnapshotClass configured
         # 80-high-performance: CI nodes lack dedicated CPU manager configuration
-        SKIP_CHECKS="11-host-network,20-bare-metal,70-live-migration,75-snapshots,80-high-performance"
+        SKIP_CHECKS="20-bare-metal,70-live-migration,75-snapshots,80-high-performance"
         oc adm must-gather --image="${VCV_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- SKIP_CHECKS=${SKIP_CHECKS} /usr/bin/gather
         MG_SUBDIR=$(find ${ARTIFACT_DIR}/must-gather-output -path "*/virt-cluster-validate" -type d | head -1)
         if [[ -z "${MG_SUBDIR}" ]]; then
@@ -116,6 +119,9 @@ tests:
     cluster_profile: gcp-virtualization
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
+      NMSTATE_OPERATOR_CREATE_CUSTOM_RESOURCE: "true"
+      NMSTATE_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      NMSTATE_OPERATOR_SUB_SOURCE_IMAGE: registry.redhat.io/redhat/redhat-operator-index:v4.22
     test:
     - as: install-cnv
       cli: latest
@@ -157,17 +163,17 @@ tests:
           cpu: 100m
           memory: 600Mi
       timeout: 1h0m0s
+    - ref: operatorhub-subscribe-nmstate-operator
     - as: validate
       cli: latest
       commands: |
         set -e
         # CI-specific exclusions (these checks detect real issues on customer clusters):
-        # 11-host-network: nmstate operator is not deployed on CI clusters
         # 20-bare-metal: CI clusters are cloud-hosted, bare-metal detection always fails
         # 70-live-migration: CI default StorageClass is RWO, live migration needs RWX
         # 75-snapshots: CI StorageClass has no VolumeSnapshotClass configured
         # 80-high-performance: CI nodes lack dedicated CPU manager configuration
-        SKIP_CHECKS="11-host-network,20-bare-metal,70-live-migration,75-snapshots,80-high-performance"
+        SKIP_CHECKS="20-bare-metal,70-live-migration,75-snapshots,80-high-performance"
         oc adm must-gather --image="${VCV_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- SKIP_CHECKS=${SKIP_CHECKS} /usr/bin/gather
         MG_SUBDIR=$(find ${ARTIFACT_DIR}/must-gather-output -path "*/virt-cluster-validate" -type d | head -1)
         if [[ -z "${MG_SUBDIR}" ]]; then
