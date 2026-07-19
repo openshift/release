@@ -9,11 +9,32 @@ declare GITLAB_RAW="https://gitlab.cee.redhat.com/dragonfly/rhwa-fbc/-/raw"
 
 log() { echo "[$(date --utc +%FT%T.%3NZ)] $*"; }
 
+# gitlab.cee regularly returns 503s lasting 30+ seconds; exponential backoff
+# (2+4+8+16+32 = 62s window) is more reliable than curl's built-in --retry
+# which doesn't retry on HTTP 5xx.  Mirrors medik8s-lib.sh gitlab_fetch().
+gitlab_fetch() {
+    local url="$1" output="$2" max_attempts="${3:-6}"
+    local attempt delay
+    for attempt in $(seq 1 "$max_attempts"); do
+        if curl --insecure -sSf --connect-timeout 10 --max-time 60 \
+            "$url" -o "$output" 2>/dev/null; then
+            return 0
+        fi
+        delay=$(( 2 ** attempt ))
+        log "WARNING: GitLab fetch attempt ${attempt}/${max_attempts} failed (retrying in ${delay}s)..."
+        sleep "$delay"
+    done
+    log "ERROR: Failed to fetch ${url} after ${max_attempts} attempts"
+    return 1
+}
+
 # Resolve FBC commit SHA if not provided
 if [[ -z "$FBC_COMMIT_SHA" ]]; then
     encoded_ref=$(jq -rn --arg ref "$GIT_REF" '$ref | @uri')
-    FBC_COMMIT_SHA=$(curl --insecure -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
-        "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" | jq -r .id)
+    commit_file=$(mktemp)
+    gitlab_fetch "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" "$commit_file"
+    FBC_COMMIT_SHA=$(jq -r .id "$commit_file")
+    rm -f "$commit_file"
     if [[ -z "$FBC_COMMIT_SHA" || "$FBC_COMMIT_SHA" == "null" ]]; then
         echo "ERROR: failed to resolve FBC commit SHA for ref '${GIT_REF}' (got: '${FBC_COMMIT_SHA}')"
         exit 1
@@ -25,25 +46,33 @@ fi
 
 # Fetch IDMS yaml from rhwa-fbc
 idms_file=$(mktemp)
-# --insecure: gitlab.cee uses internal RH CA not trusted by CI pods
-curl --insecure -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 60 \
-    "${GITLAB_RAW}/${FBC_COMMIT_SHA}/.tekton/images-mirror-set.yaml" -o "$idms_file"
+trap 'rm -f "$idms_file"' EXIT
+gitlab_fetch "${GITLAB_RAW}/${FBC_COMMIT_SHA}/.tekton/images-mirror-set.yaml" "$idms_file"
 log "Fetched IDMS from rhwa-fbc commit ${FBC_COMMIT_SHA}"
 
 # Convert imageDigestMirrors → imageContentSources (same structure, drop mirrorSourcePolicy).
 # Use yq to convert YAML→JSON then jq to reshape, avoiding yq version compatibility issues.
 image_content_sources=$(yq-v4 -o=json '.' "$idms_file" | \
-    jq '[.spec.imageDigestMirrors[] | {source: .source, mirrors: .mirrors}]')
-log "Extracted $(echo "$image_content_sources" | jq 'length') image mirror entries"
+    jq '[(.spec.imageDigestMirrors // [])[] | {source: .source, mirrors: .mirrors}]')
+entry_count=$(echo "$image_content_sources" | jq 'length')
+if [[ "$entry_count" -eq 0 ]]; then
+    log "ERROR: no imageDigestMirrors entries found in IDMS file — upstream YAML may have changed"
+    exit 1
+fi
+log "Extracted ${entry_count} image mirror entries"
 
 # HostedCluster name written by hypershift-aws-create; namespace is always "clusters"
 HC_NAME="$(cat "${SHARED_DIR}/cluster-name")"
 HC_NAMESPACE="clusters"
 
 log "Patching HostedCluster ${HC_NAMESPACE}/${HC_NAME} with imageContentSources..."
+patch_file=$(mktemp)
+jq -n --argjson ics "$image_content_sources" \
+    '{"spec":{"imageContentSources": $ics}}' > "$patch_file"
 oc patch hostedcluster "${HC_NAME}" -n "${HC_NAMESPACE}" \
     --type=merge \
-    --patch "{\"spec\":{\"imageContentSources\":${image_content_sources}}}"
+    --patch-file "$patch_file"
+rm -f "$patch_file"
 log "Patch applied — waiting for NodePool to acknowledge the config change (up to 2m)..."
 
 # After patching HostedCluster.spec.imageContentSources, the NodePool controller takes a
