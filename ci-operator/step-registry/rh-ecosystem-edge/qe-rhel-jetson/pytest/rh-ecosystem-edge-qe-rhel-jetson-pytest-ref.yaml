@@ -1,0 +1,29 @@
+ref:
+  as: rh-ecosystem-edge-qe-rhel-jetson-pytest
+  from: qe-rhel-jetson
+  commands: rh-ecosystem-edge-qe-rhel-jetson-pytest-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: qe-rhel-jetson-jetson-ssh-key
+      mount_path: /var/run/secrets/jetson-ssh-key
+  env:
+    - name: JETSON_HOSTNAME
+      default: "10.26.2.85"
+      documentation: IP address of the target Jetson device (hostname not resolvable from CI pods)
+    - name: TEST_SUITE
+      default: "tests_suites/"
+      documentation: pytest test path or suite directory to run
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 2h0m0s
+  documentation: |-
+    Run the qe-rhel-jetson pytest test suite against a Jetson Beaker machine.
+
+    Tests run from the CI pod and connect to the Jetson via SSH using the
+    mounted SSH key. The conftest.py fixture collects hardware info, validates
+    versions, and provides an ssh() fixture to each test class.
+
+    Required secrets in test-credentials namespace:
+      - qe-rhel-jetson-jetson-ssh-key: SSH key (key: id_rsa)
