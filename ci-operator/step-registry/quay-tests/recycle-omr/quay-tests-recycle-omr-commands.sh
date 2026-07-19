@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# When OMR was installed on the bastion (build-from-source), there is no
+# separate EC2 instance to destroy via Terraform — the bastion itself is
+# torn down by the aws-deprovision-stacks step.
+if [ "${OMR_FROM_SOURCE:-false}" = "true" ]; then
+  echo "OMR was installed on bastion host, skipping Terraform destroy."
+  exit 0
+fi
 
 # Read terraform state from SHARED_DIR (saved by provisioning-omr-disconnected step)
 mkdir -p terraform_omr && cd terraform_omr

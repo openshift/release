@@ -9,7 +9,87 @@ podman -v
 skopeo -v
 HOME_PATH=$(pwd) && echo $HOME_PATH
 
-#Create new AWS EC2 Instatnce to deploy Quay OMR
+# ─── Build-from-source path: install OMR directly on the bastion host ───
+if [ "${OMR_FROM_SOURCE}" = true ]; then
+  echo "=== OMR build-from-source: installing on bastion host ==="
+
+  # Read bastion details from SHARED_DIR (created by aws-provision-bastionhost)
+  BASTION_PUBLIC=$(cat "${SHARED_DIR}/bastion_public_address")
+  BASTION_PRIVATE=$(cat "${SHARED_DIR}/bastion_private_address")
+  BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user")
+  SSH_KEY="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
+  SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ConnectionAttempts=3"
+
+  echo "Bastion public: ${BASTION_PUBLIC}"
+  echo "Bastion private: ${BASTION_PRIVATE}"
+
+  # Step 1: Extract mirror-registry.tar.gz from CI-built pipeline image
+  echo "Extracting mirror-registry.tar.gz from CI-built pipeline image..."
+  MIRROR_REGISTRY_PULLSPEC=$(oc get istag pipeline:mirror-registry -o jsonpath='{.image.dockerImageReference}')
+  echo "Resolved pipeline image: ${MIRROR_REGISTRY_PULLSPEC}"
+  oc image extract "${MIRROR_REGISTRY_PULLSPEC}" \
+    --path /mirror-registry.tar.gz:/tmp \
+    --confirm --insecure \
+    --registry-config="/var/run/ci-credentials/registry/.dockerconfigjson"
+  ls -lh /tmp/mirror-registry.tar.gz
+
+  # Step 2: SCP the tar.gz to the bastion host
+  echo "Uploading mirror-registry.tar.gz to bastion..."
+  scp ${SSH_OPTS} -i "${SSH_KEY}" \
+    /tmp/mirror-registry.tar.gz \
+    "${BASTION_SSH_USER}@${BASTION_PUBLIC}:/tmp/mirror-registry.tar.gz"
+
+  # Clean up local copy
+  rm -f /tmp/mirror-registry.tar.gz
+
+  # Step 3: Get the bastion's private DNS name for the OMR hostname
+  BASTION_PRIVATE_DNS=$(ssh ${SSH_OPTS} -i "${SSH_KEY}" \
+    "${BASTION_SSH_USER}@${BASTION_PUBLIC}" \
+    "curl -s http://169.254.169.254/latest/meta-data/local-hostname")
+  echo "Bastion private DNS: ${BASTION_PRIVATE_DNS}"
+
+  # Step 4: Install OMR on the bastion
+  echo "Installing mirror-registry on bastion..."
+  ssh ${SSH_OPTS} -i "${SSH_KEY}" \
+    "${BASTION_SSH_USER}@${BASTION_PUBLIC}" \
+    "sudo yum install -y podman openssl && \
+     cd /tmp && \
+     tar -xzf mirror-registry.tar.gz && \
+     chmod +x mirror-registry && \
+     ./mirror-registry --version && \
+     sudo ./mirror-registry install \
+       --quayHostname ${BASTION_PRIVATE_DNS} \
+       --quayRoot /var/lib/quay \
+       --initPassword password \
+       --initUser quay -v"
+
+  # Step 5: Save the OMR endpoint for downstream steps
+  # Downstream steps (mirror-images-oc-mirror, ipi-conf-mirror) read OMR_HOST_NAME
+  echo "${BASTION_PRIVATE}" > "${SHARED_DIR}/OMR_HOST_NAME"
+  echo "omr-bastion" > "${SHARED_DIR}/OMR_CI_NAME"
+
+  # Save the CA cert from the bastion
+  scp ${SSH_OPTS} -i "${SSH_KEY}" \
+    "${BASTION_SSH_USER}@${BASTION_PUBLIC}:/var/lib/quay/quay-rootCA/rootCA.pem" \
+    "${SHARED_DIR}/rootCA.pem" || true
+
+  # Create an empty terraform.tgz so recycle-omr doesn't fail
+  tar -czf "${SHARED_DIR}/terraform.tgz" --files-from /dev/null
+
+  # Test OMR by pushing a test image
+  echo "Testing OMR push via bastion..."
+  skopeo copy \
+    docker://docker.io/fedora@sha256:895cdfba5eb6a009a26576cb2a8bc199823ca7158519e36e4d9effcc8b951b47 \
+    docker://"${BASTION_PRIVATE}":8443/quaytest/test:latest \
+    --dest-tls-verify=false --dest-creds quay:password || true
+
+  echo "=== OMR build-from-source installation complete ==="
+  exit 0
+fi
+
+# ─── Legacy path: create a separate EC2 instance via Terraform ───
+
+#Create new AWS EC2 Instance to deploy Quay OMR
 OMR_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-omr-secret/access_key)
 OMR_AWS_SECRET_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key)
 
@@ -88,16 +168,6 @@ ami_id=$(jq -r .images.aws.regions[\"${REGION}\"].image <omr-ami-images.json)
 
 mkdir -p terraform_omr && cd terraform_omr
 
-# Build-from-source path: extract mirror-registry.tar.gz directly from CI-built pipeline image
-# This avoids passing the large tarball (826MB) through SHARED_DIR (3MB K8s secret limit)
-if [ "${OMR_FROM_SOURCE}" = true ]; then
-  echo "Extracting mirror-registry.tar.gz from CI-built pipeline image..."
-  MIRROR_REGISTRY_PULLSPEC=$(oc get istag pipeline:mirror-registry -o jsonpath='{.image.dockerImageReference}')
-  echo "Resolved pipeline image: ${MIRROR_REGISTRY_PULLSPEC}"
-  oc image extract "${MIRROR_REGISTRY_PULLSPEC}" --path /mirror-registry.tar.gz:/tmp --confirm --insecure --registry-config="/var/run/ci-credentials/registry/.dockerconfigjson"
-  ls -lh /tmp/mirror-registry.tar.gz
-fi
-
 cat >>variables.tf <<EOF
 variable "quay_build_worker_key" {
 }
@@ -107,7 +177,6 @@ variable "quay_build_instance_name" {
 }
 EOF
 
-# Part 1: Provider, key pair, security group, and instance resource preamble
 cat >>create_aws_ec2.tf <<EOF
 provider "aws" {
   region = "${REGION}"
@@ -147,28 +216,6 @@ resource "aws_instance" "quaybuilder" {
   root_block_device {
     volume_size = 200
   }
-EOF
-
-# Part 2: Provisioner blocks (conditional on build-from-source vs image-based)
-if [ "${OMR_FROM_SOURCE}" = true ]; then
-  # Build-from-source path: upload pre-built tar.gz via file provisioner
-  cat >>create_aws_ec2.tf <<'TFEOF'
-  provisioner "file" {
-    source      = "/tmp/mirror-registry.tar.gz"
-    destination = "/home/ec2-user/mirror-registry.tar.gz"
-  }
-  provisioner "remote-exec" {
-    inline = [
-      "sudo yum install podman openssl -y",
-      "tar -xzvf mirror-registry.tar.gz",
-      "./mirror-registry --version",
-      "./mirror-registry install --quayHostname ${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
-    ]
-  }
-TFEOF
-else
-  # Legacy path: pull image on EC2 and extract tar.gz via podman cp
-  cat >>create_aws_ec2.tf <<EOF
   provisioner "remote-exec" {
     inline = [
       "sudo yum install podman openssl -y",
@@ -183,9 +230,7 @@ else
     ]
   }
 EOF
-fi
 
-# Part 3: Connection, tags, and output
 cat >>create_aws_ec2.tf <<'TFEOF'
   connection {
     type        = "ssh"
@@ -210,11 +255,6 @@ export TF_VAR_quay_build_worker_key="${OMR_CI_NAME}"
 export TF_VAR_quay_build_worker_security_group="${OMR_CI_NAME}"
 terraform init
 terraform apply -auto-approve
-
-# Clean up the large tarball from /tmp to avoid exceeding the 3MB K8s secret sync limit
-if [ "${OMR_FROM_SOURCE}" = true ]; then
-  rm -f /tmp/mirror-registry.tar.gz
-fi
 
 #Share the OMR HOSTNAME, Terraform Var and Terraform Directory
 tar -cvzf terraform.tgz --exclude=".terraform" *
