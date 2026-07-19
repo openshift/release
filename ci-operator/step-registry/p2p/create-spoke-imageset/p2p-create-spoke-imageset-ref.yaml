@@ -10,44 +10,48 @@ ref:
   - name: ACM_SPOKE_CLUSTER_INITIAL_VERSION
     default: "4.23"
     documentation: |-
-      Target OCP version for spoke clusters (e.g. "4.23"). Used to query the
-      release controller for the latest accepted nightly at that version, and
-      to derive the ClusterImageSet name as img<nightly-tag>-x86-64.
+      Target OCP version for spoke clusters (e.g. "4.23"). Used to derive the
+      ClusterImageSet name as img<version>.0-ci-nightly-x86-64, which satisfies
+      the img<version>.* prefix search in acm-interop-p2p-cluster-install.
   documentation: |-
-    Creates a Hive ClusterImageSet on the hub cluster pointing to the latest
-    accepted nightly OCP release from the official release controller
-    (registry.ci.openshift.org/ocp/release).
+    Creates a Hive ClusterImageSet on the hub cluster pointing to RELEASE_IMAGE_LATEST
+    (the CI build-namespace nightly mirror) so that acm-interop-p2p-cluster-install can
+    provision spoke clusters at a pre-GA OCP version that has no GA ClusterImageSet yet.
 
-    This step is needed when ACM_SPOKE_CLUSTER_INITIAL_VERSION targets a
-    pre-GA OCP version (e.g. 4.23 nightly) for which no GA ClusterImageSet
-    is registered in the hub's Hive instance. Without this step, the
-    acm-interop-p2p-cluster-install step exits with:
+    This step is needed when ACM_SPOKE_CLUSTER_INITIAL_VERSION targets a pre-GA OCP
+    version (e.g. 4.23 nightly) for which no GA ClusterImageSet is registered in the
+    hub's Hive instance. Without this step, acm-interop-p2p-cluster-install exits with:
       "No cluster image set found for version '<version>'"
 
-    Why RELEASE_IMAGE_LATEST is NOT used:
-      RELEASE_IMAGE_LATEST resolves to an ephemeral CI build-namespace mirror
-      (registry.build*.ci.openshift.org). The openshift-install binary treats
-      this as an "unknown architecture" release image override, and the bootstrap
-      machines spawned by Hive cannot reliably pull all cluster operator images
-      from that internal registry. This causes the bootkube cb-bootstrap stage
-      to time out (observed failure mode: BootstrapFailed after 45 min timeout).
+    Why RELEASE_IMAGE_LATEST (CI build-namespace mirror) is used:
+      RELEASE_IMAGE_LATEST is the same CI build-namespace mirror image used by the hub
+      cluster bootstrap (registry.build*.ci.openshift.org/ci-op-<id>/release@sha256:...).
+      This registry is publicly reachable but requires CI credentials. When this step is
+      paired with ACM_SPOKE_PULL_SECRET_FILE=pull-secret in acm-interop-p2p-cluster-install,
+      the Hive spoke pull secret carries the CI-augmented credentials (from
+      CLUSTER_PROFILE_DIR/pull-secret) so the spoke bootstrap EC2 machines can authenticate
+      to and pull component images from the CI mirror — matching the hub's bootstrap speed.
+
+      Using config.json (without CI credentials) for a CI build-namespace image causes auth
+      failures on bootstrap EC2 machines, leading to a 45-minute Hive bootstrap timeout
+      (observed failure mode: BootstrapFailed at bootkube cb-bootstrap stage).
 
     How it works:
       1. Installs jq via EnsureReqs (not present in the cli base image).
-      2. Queries the release controller API for the latest accepted nightly:
-           https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/<version>.0-0.nightly/latest
-         This returns the pull spec at registry.ci.openshift.org/ocp/release,
-         which is the official release image with proper architecture metadata,
-         accessible from bootstrap machines via the cluster profile pull secret.
-      3. Creates the ClusterImageSet named img<nightly-tag>-x86-64 via
-         jq + oc apply -f - (JSON accepted directly), idempotent across re-runs.
-      4. Verifies the ClusterImageSet is discoverable using the same
-         img<version>.* prefix search performed by acm-interop-p2p-cluster-install.
+      2. Creates the ClusterImageSet named img<version>.0-ci-nightly-x86-64 pointing to
+         RELEASE_IMAGE_LATEST, via jq + oc apply -f - (idempotent across re-runs).
+      3. Verifies the ClusterImageSet is discoverable using the same img<version>.*
+         prefix search performed by acm-interop-p2p-cluster-install.
+
+    Must be used together with:
+      ACM_SPOKE_PULL_SECRET_FILE=pull-secret in acm-interop-p2p-cluster-install, so the
+      spoke bootstrap machines carry CI credentials to pull from the CI build registry.
 
     Prerequisites:
       - ACM MultiClusterHub must be installed and Available (acm-mch step).
       - Hive CRDs (ClusterImageSet) must be present on the hub cluster.
-      - Network access to amd64.ocp.releases.ci.openshift.org (available in CI).
+      - RELEASE_IMAGE_LATEST must be set (automatically by ci-operator when
+        releases: latest: ... is in the CI config).
 
     Must run after: acm-mch
     Must run before: acm-interop-p2p-cluster-install
