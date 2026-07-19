@@ -79,6 +79,8 @@ echo "target_release_image_repo: ${target_release_image_repo}"
 # since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
 # unset KUBECONFIG to ensure this step always interact with the build farm.
 KUBECONFIG="" oc registry login
+mkdir -p "${HOME}/.docker"
+cp /tmp/pull-secret.json "${HOME}/.docker/config.json"
 
 run_command "which oc"
 run_command "oc version --client"
