@@ -7,7 +7,9 @@ set -eu -o pipefail
 # If the test phase was never reached (pre-phase failure), skip silently so that
 # downstream post steps (hypershift-dump, hypershift-aws-destroy) can still run.
 if [[ -f "${SHARED_DIR}/management_kubeconfig" ]]; then
-    cp "${SHARED_DIR}/management_kubeconfig" "${SHARED_DIR}/kubeconfig"
+    if ! cp "${SHARED_DIR}/management_kubeconfig" "${SHARED_DIR}/kubeconfig"; then
+        echo "ERROR: failed to restore management kubeconfig — post steps may target the wrong cluster"
+    fi
 else
     echo "management_kubeconfig not found — kubeconfig switch was never made, no restore needed"
 fi
