@@ -98,6 +98,11 @@ trap atexit_handler EXIT TERM INT
 configure_claude
 
 # Use the edge-tooling source pre-installed in the image
+# TODO: Remove this once the doctor-workflow branch is merged into main
+cd /tmp
+git clone https://github.com/ggiguash/edge-tooling.git -b doctor-workflow
+EDGE_TOOLING_DIR="/tmp/edge-tooling"
+
 SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/lvms-ci"
 cd "${SRC_DIR}"
