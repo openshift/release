@@ -42,23 +42,24 @@ if [ "${OMR_FROM_SOURCE}" = true ]; then
   # Clean up local copy
   rm -f /tmp/mirror-registry.tar.gz
 
-  # Step 3: Get the bastion's private DNS name for the OMR hostname
-  BASTION_PRIVATE_DNS=$(ssh ${SSH_OPTS} -i "${SSH_KEY}" \
-    "${BASTION_SSH_USER}@${BASTION_PUBLIC}" \
-    "curl -s http://169.254.169.254/latest/meta-data/local-hostname")
-  echo "Bastion private DNS: ${BASTION_PRIVATE_DNS}"
+  # Step 3: Validate bastion address is available for OMR hostname
+  if [[ -z "${BASTION_PRIVATE}" ]]; then
+    echo "ERROR: bastion_private_address is empty. Check aws-provision-bastionhost output."
+    exit 1
+  fi
 
   # Step 4: Install OMR on the bastion
-  echo "Installing mirror-registry on bastion..."
+  echo "Installing mirror-registry on bastion (using bastion private address: ${BASTION_PRIVATE})..."
   ssh ${SSH_OPTS} -i "${SSH_KEY}" \
     "${BASTION_SSH_USER}@${BASTION_PUBLIC}" \
-    "sudo yum install -y podman openssl && \
+    "sudo bootc usroverlay && \
+     sudo yum install -y podman openssl && \
      cd /tmp && \
      tar -xzf mirror-registry.tar.gz && \
      chmod +x mirror-registry && \
      ./mirror-registry --version && \
      sudo ./mirror-registry install \
-       --quayHostname ${BASTION_PRIVATE_DNS} \
+       --quayHostname ${BASTION_PRIVATE} \
        --quayRoot /var/lib/quay \
        --initPassword password \
        --initUser quay -v"
