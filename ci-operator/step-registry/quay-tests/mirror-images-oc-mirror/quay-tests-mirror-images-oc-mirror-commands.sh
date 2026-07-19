@@ -7,6 +7,7 @@ set -o pipefail
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+export REGISTRY_AUTH_FILE=/var/run/ci-credentials/registry/.dockerconfigjson
 mkdir -p "${XDG_RUNTIME_DIR}"
 
 function run_command() {
@@ -193,6 +194,7 @@ mkdir -p "${XDG_RUNTIME_DIR}/containers/"
 cp -rf "${new_pull_secret}" "${XDG_RUNTIME_DIR}/containers/auth.json"
 
 unset REGISTRY_AUTH_PREFERENCE
+unset REGISTRY_AUTH_FILE
 
 # Build oc-mirror command
 mirrorCmd="${oc_mirror_bin} -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir}"
