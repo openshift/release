@@ -388,11 +388,18 @@ ocEOF
         cluster.open-cluster-management.io/credentials="" \
         -n "${clusterName}" --overwrite
 
-    # Create pull-secret for accessing container registries
-    : "Creating pull-secret"
+    # Create pull-secret for accessing container registries.
+    # ACM_SPOKE_PULL_SECRET_FILE selects which cluster-profile credential file to use:
+    #   config.json  – base OpenShift pull secret (default; works for GA/nightly images
+    #                  hosted on quay.io or registry.ci.openshift.org)
+    #   pull-secret  – CI-augmented pull secret; required when the spoke ClusterImageSet
+    #                  points to a CI build-namespace image
+    #                  (registry.build*.ci.openshift.org) so the bootstrap EC2 machines
+    #                  can authenticate to that registry.
+    : "Creating pull-secret from ${CLUSTER_PROFILE_DIR}/${ACM_SPOKE_PULL_SECRET_FILE}"
     oc -n "${clusterName}" create secret generic pull-secret \
         --type=kubernetes.io/dockerconfigjson \
-        --from-file=.dockerconfigjson="${CLUSTER_PROFILE_DIR}/config.json" \
+        --from-file=.dockerconfigjson="${CLUSTER_PROFILE_DIR}/${ACM_SPOKE_PULL_SECRET_FILE}" \
         --dry-run=client -o yaml --save-config | oc apply -f -
 
     # Create SSH key secrets for node access
