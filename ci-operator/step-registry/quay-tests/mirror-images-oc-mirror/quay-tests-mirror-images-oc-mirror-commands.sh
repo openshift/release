@@ -187,152 +187,46 @@ if ! isPreVersion "4.19" && ! check_signed "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OV
     echo "Will use --ignore-release-signature for unsigned release"
 fi
 
-# ──────────────────────────────────────────────────────────────────────
-# Bastion-local mode: run oc-mirror ON the bastion host via SSH
-# ──────────────────────────────────────────────────────────────────────
-if [[ "${OMR_FROM_SOURCE:-false}" == "true" ]]; then
-  echo "=== Bastion-local oc-mirror mode (OMR_FROM_SOURCE=true) ==="
+# Set up auth for oc-mirror
+# oc-mirror only respects ~/.docker/config.json -> ${XDG_RUNTIME_DIR}/containers/auth.json
+mkdir -p "${XDG_RUNTIME_DIR}/containers/"
+cp -rf "${new_pull_secret}" "${XDG_RUNTIME_DIR}/containers/auth.json"
 
-  BASTION_PUBLIC=$(cat "${SHARED_DIR}/bastion_public_address")
-  BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user")
-  SSH_KEY="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
-  SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ConnectionAttempts=3"
+unset REGISTRY_AUTH_PREFERENCE
 
-  echo "Bastion host: ${BASTION_SSH_USER}@${BASTION_PUBLIC}"
+# Build oc-mirror command
+mirrorCmd="${oc_mirror_bin} -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir}"
 
-  BASTION_WORK_DIR="/tmp/oc-mirror-work"
-
-  # Prepare the bastion working directory
-  ssh ${SSH_OPTS} -i "${SSH_KEY}" "${BASTION_SSH_USER}@${BASTION_PUBLIC}" \
-    "mkdir -p ${BASTION_WORK_DIR}"
-
-  # SCP oc-mirror binary to bastion
-  echo "Uploading oc-mirror binary to bastion..."
-  scp ${SSH_OPTS} -i "${SSH_KEY}" \
-    "${oc_mirror_bin}" \
-    "${BASTION_SSH_USER}@${BASTION_PUBLIC}:${BASTION_WORK_DIR}/oc-mirror"
-
-  # SCP imageset-config to bastion
-  echo "Uploading imageset-config to bastion..."
-  scp ${SSH_OPTS} -i "${SSH_KEY}" \
-    "${image_set_config}" \
-    "${BASTION_SSH_USER}@${BASTION_PUBLIC}:${BASTION_WORK_DIR}/image_set_config.yaml"
-
-  # SCP auth.json to bastion
-  echo "Uploading auth.json to bastion..."
-  scp ${SSH_OPTS} -i "${SSH_KEY}" \
-    "${new_pull_secret}" \
-    "${BASTION_SSH_USER}@${BASTION_PUBLIC}:${BASTION_WORK_DIR}/auth.json"
-
-  # SCP CA cert to bastion if available
-  if [[ -f "${SHARED_DIR}/rootCA.pem" ]]; then
-    echo "Uploading CA cert to bastion..."
-    scp ${SSH_OPTS} -i "${SSH_KEY}" \
-      "${SHARED_DIR}/rootCA.pem" \
-      "${BASTION_SSH_USER}@${BASTION_PUBLIC}:${BASTION_WORK_DIR}/rootCA.pem"
-  fi
-
-  # Build the oc-mirror command to run on bastion
-  # Use the OMR private DNS as the target (the cert is issued for this hostname)
-  bastion_mirror_cmd="cd ${BASTION_WORK_DIR} && chmod +x oc-mirror"
-  bastion_mirror_cmd="${bastion_mirror_cmd} && mkdir -p \${HOME}/.docker"
-  bastion_mirror_cmd="${bastion_mirror_cmd} && cp ${BASTION_WORK_DIR}/auth.json \${HOME}/.docker/config.json"
-  bastion_mirror_cmd="${bastion_mirror_cmd} && ${BASTION_WORK_DIR}/oc-mirror"
-  bastion_mirror_cmd="${bastion_mirror_cmd} -c ${BASTION_WORK_DIR}/image_set_config.yaml"
-  bastion_mirror_cmd="${bastion_mirror_cmd} docker://${target_release_image_repo}"
-  bastion_mirror_cmd="${bastion_mirror_cmd} --dest-tls-verify=false --v2"
-  bastion_mirror_cmd="${bastion_mirror_cmd} --workspace file://${BASTION_WORK_DIR}"
-  if [[ -n "${extra_flags}" ]]; then
-    bastion_mirror_cmd="${bastion_mirror_cmd} ${extra_flags}"
-  fi
-
-  # Execute oc-mirror on the bastion with retry logic
-  MAX_ATTEMPTS=5
-  ATTEMPT=0
-  SUCCESS=false
-  while [[ "${SUCCESS}" == "false" ]] && (( ATTEMPT++ < MAX_ATTEMPTS )); do
-    echo "Mirroring images on bastion attempt ${ATTEMPT}/${MAX_ATTEMPTS}..."
-    if ssh ${SSH_OPTS} -i "${SSH_KEY}" "${BASTION_SSH_USER}@${BASTION_PUBLIC}" \
-         "${bastion_mirror_cmd}"; then
-      echo "Mirroring images succeeded on attempt ${ATTEMPT}"
-      SUCCESS=true
-    else
-      echo "Mirroring images attempt ${ATTEMPT} failed, retrying in 120s..."
-      sleep 120
-    fi
-  done
-
-  if [[ "${SUCCESS}" == "false" ]]; then
-    echo "Mirroring images failed after ${MAX_ATTEMPTS} attempts"
-    exit 1
-  fi
-
-  # SCP results back from the bastion
-  result_folder="${oc_mirror_dir}/working-dir/cluster-resources"
-  mkdir -p "${result_folder}"
-
-  echo "Downloading IDMS results from bastion..."
-  scp ${SSH_OPTS} -i "${SSH_KEY}" \
-    "${BASTION_SSH_USER}@${BASTION_PUBLIC}:${BASTION_WORK_DIR}/working-dir/cluster-resources/idms-oc-mirror.yaml" \
-    "${result_folder}/idms-oc-mirror.yaml" || true
-
-  scp ${SSH_OPTS} -i "${SSH_KEY}" \
-    "${BASTION_SSH_USER}@${BASTION_PUBLIC}:${BASTION_WORK_DIR}/working-dir/cluster-resources/itms-oc-mirror.yaml" \
-    "${result_folder}/itms-oc-mirror.yaml" 2>/dev/null || true
-
-  idms_file="${result_folder}/idms-oc-mirror.yaml"
-  itms_file="${result_folder}/itms-oc-mirror.yaml"
-
-# ──────────────────────────────────────────────────────────────────────
-# Remote mode: run oc-mirror from the CI pod (original behavior)
-# ──────────────────────────────────────────────────────────────────────
-else
-  echo "=== Remote oc-mirror mode (OMR_FROM_SOURCE=false) ==="
-
-  # Set up auth for oc-mirror
-  # oc-mirror only respects ~/.docker/config.json -> ${XDG_RUNTIME_DIR}/containers/auth.json
-  mkdir -p "${XDG_RUNTIME_DIR}/containers/"
-  cp -rf "${new_pull_secret}" "${XDG_RUNTIME_DIR}/containers/auth.json"
-
-  unset REGISTRY_AUTH_PREFERENCE
-
-  # Build oc-mirror command
-  mirrorCmd="${oc_mirror_bin} -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir}"
-
-  # ref OCPBUGS-56009: add --ignore-release-signature for unsigned releases >= 4.19
-  if [[ -n "${extra_flags}" ]]; then
-      mirrorCmd="${mirrorCmd} ${extra_flags}"
-  fi
-
-  # Execute the oc-mirror command with retry logic
-  MAX_ATTEMPTS=5
-  ATTEMPT=0
-  SUCCESS=false
-  while [[ "${SUCCESS}" == "false" ]] && (( ATTEMPT++ < MAX_ATTEMPTS )); do
-    echo "Mirroring images attempt ${ATTEMPT}/${MAX_ATTEMPTS}..."
-    if eval "${mirrorCmd}"; then
-      echo "Mirroring images succeeded on attempt ${ATTEMPT}"
-      SUCCESS=true
-    else
-      echo "Mirroring images attempt ${ATTEMPT} failed, retrying in 120s..."
-      sleep 120
-    fi
-  done
-
-  if [[ "${SUCCESS}" == "false" ]]; then
-    echo "Mirroring images failed after ${MAX_ATTEMPTS} attempts"
-    exit 1
-  fi
-
-  # Process oc-mirror output
-  result_folder="${oc_mirror_dir}/working-dir"
-  idms_file="${result_folder}/cluster-resources/idms-oc-mirror.yaml"
-  itms_file="${result_folder}/cluster-resources/itms-oc-mirror.yaml"
+# ref OCPBUGS-56009: add --ignore-release-signature for unsigned releases >= 4.19
+if [[ -n "${extra_flags}" ]]; then
+    mirrorCmd="${mirrorCmd} ${extra_flags}"
 fi
 
-# ──────────────────────────────────────────────────────────────────────
-# Common: Process IDMS results and generate install-config patch
-# ──────────────────────────────────────────────────────────────────────
+# Execute the oc-mirror command with retry logic
+MAX_ATTEMPTS=5
+ATTEMPT=0
+SUCCESS=false
+while [[ "${SUCCESS}" == "false" ]] && (( ATTEMPT++ < MAX_ATTEMPTS )); do
+  echo "Mirroring images attempt ${ATTEMPT}/${MAX_ATTEMPTS}..."
+  if eval "${mirrorCmd}"; then
+    echo "Mirroring images succeeded on attempt ${ATTEMPT}"
+    SUCCESS=true
+  else
+    echo "Mirroring images attempt ${ATTEMPT} failed, retrying in 120s..."
+    sleep 120
+  fi
+done
+
+if [[ "${SUCCESS}" == "false" ]]; then
+  echo "Mirroring images failed after ${MAX_ATTEMPTS} attempts"
+  exit 1
+fi
+
+# Process oc-mirror output
+result_folder="${oc_mirror_dir}/working-dir"
+idms_file="${result_folder}/cluster-resources/idms-oc-mirror.yaml"
+itms_file="${result_folder}/cluster-resources/itms-oc-mirror.yaml"
+
 if [ ! -s "${idms_file}" ]; then
     echo "${idms_file} not found, exit..."
     exit 1

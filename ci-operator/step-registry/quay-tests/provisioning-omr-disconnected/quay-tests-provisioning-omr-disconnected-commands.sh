@@ -9,87 +9,6 @@ podman -v
 skopeo -v
 HOME_PATH=$(pwd) && echo $HOME_PATH
 
-# ─── Build-from-source path: install OMR directly on the bastion host ───
-if [ "${OMR_FROM_SOURCE}" = true ]; then
-  echo "=== OMR build-from-source: installing on bastion host ==="
-
-  # Read bastion details from SHARED_DIR (created by aws-provision-bastionhost)
-  BASTION_PUBLIC=$(cat "${SHARED_DIR}/bastion_public_address")
-  BASTION_PRIVATE=$(cat "${SHARED_DIR}/bastion_private_address")
-  BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user")
-  SSH_KEY="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
-  SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ConnectionAttempts=3"
-
-  echo "Bastion public: ${BASTION_PUBLIC}"
-  echo "Bastion private: ${BASTION_PRIVATE}"
-
-  # Step 1: Extract mirror-registry.tar.gz from CI-built pipeline image
-  echo "Extracting mirror-registry.tar.gz from CI-built pipeline image..."
-  MIRROR_REGISTRY_PULLSPEC=$(oc get istag pipeline:mirror-registry -o jsonpath='{.image.dockerImageReference}')
-  echo "Resolved pipeline image: ${MIRROR_REGISTRY_PULLSPEC}"
-  oc image extract "${MIRROR_REGISTRY_PULLSPEC}" \
-    --path /mirror-registry.tar.gz:/tmp \
-    --confirm --insecure \
-    --registry-config="/var/run/ci-credentials/registry/.dockerconfigjson"
-  ls -lh /tmp/mirror-registry.tar.gz
-
-  # Step 2: SCP the tar.gz to the bastion host
-  echo "Uploading mirror-registry.tar.gz to bastion..."
-  scp ${SSH_OPTS} -i "${SSH_KEY}" \
-    /tmp/mirror-registry.tar.gz \
-    "${BASTION_SSH_USER}@${BASTION_PUBLIC}:/tmp/mirror-registry.tar.gz"
-
-  # Clean up local copy
-  rm -f /tmp/mirror-registry.tar.gz
-
-  # Step 3: Validate bastion address is available for OMR hostname
-  if [[ -z "${BASTION_PRIVATE}" ]]; then
-    echo "ERROR: bastion_private_address is empty. Check aws-provision-bastionhost output."
-    exit 1
-  fi
-
-  # Step 4: Install OMR on the bastion
-  echo "Installing mirror-registry on bastion (using bastion private address: ${BASTION_PRIVATE})..."
-  ssh ${SSH_OPTS} -i "${SSH_KEY}" \
-    "${BASTION_SSH_USER}@${BASTION_PUBLIC}" \
-    "sudo bootc usroverlay && \
-     sudo yum install -y podman openssl && \
-     cd /tmp && \
-     tar -xzf mirror-registry.tar.gz && \
-     chmod +x mirror-registry && \
-     ./mirror-registry --version && \
-     sudo ./mirror-registry install \
-       --quayHostname ${BASTION_PRIVATE} \
-       --quayRoot /var/lib/quay \
-       --initPassword password \
-       --initUser quay -v"
-
-  # Step 5: Save the OMR endpoint for downstream steps
-  # Downstream steps (mirror-images-oc-mirror, ipi-conf-mirror) read OMR_HOST_NAME
-  echo "${BASTION_PRIVATE}" > "${SHARED_DIR}/OMR_HOST_NAME"
-  echo "omr-bastion" > "${SHARED_DIR}/OMR_CI_NAME"
-
-  # Save the CA cert from the bastion
-  scp ${SSH_OPTS} -i "${SSH_KEY}" \
-    "${BASTION_SSH_USER}@${BASTION_PUBLIC}:/var/lib/quay/quay-rootCA/rootCA.pem" \
-    "${SHARED_DIR}/rootCA.pem" || true
-
-  # Create an empty terraform.tgz so recycle-omr doesn't fail
-  tar -czf "${SHARED_DIR}/terraform.tgz" --files-from /dev/null
-
-  # Test OMR by pushing a test image
-  echo "Testing OMR push via bastion..."
-  skopeo copy \
-    docker://docker.io/fedora@sha256:895cdfba5eb6a009a26576cb2a8bc199823ca7158519e36e4d9effcc8b951b47 \
-    docker://"${BASTION_PRIVATE}":8443/quaytest/test:latest \
-    --dest-tls-verify=false --dest-creds quay:password || true
-
-  echo "=== OMR build-from-source installation complete ==="
-  exit 0
-fi
-
-# ─── Legacy path: create a separate EC2 instance via Terraform ───
-
 #Create new AWS EC2 Instance to deploy Quay OMR
 OMR_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-omr-secret/access_key)
 OMR_AWS_SECRET_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key)
@@ -178,6 +97,95 @@ variable "quay_build_instance_name" {
 }
 EOF
 
+# ─── Build-from-source path: extract mirror-registry.tar.gz from CI-built image ───
+if [ "${OMR_FROM_SOURCE:-false}" = "true" ]; then
+  echo "=== OMR build-from-source: extracting mirror-registry from CI pipeline image ==="
+
+  # Extract mirror-registry.tar.gz from CI-built pipeline image
+  MIRROR_REGISTRY_PULLSPEC=$(oc get istag pipeline:mirror-registry -o jsonpath='{.image.dockerImageReference}')
+  echo "Resolved pipeline image: ${MIRROR_REGISTRY_PULLSPEC}"
+  oc image extract "${MIRROR_REGISTRY_PULLSPEC}" \
+    --path /mirror-registry.tar.gz:/tmp \
+    --confirm --insecure \
+    --registry-config="/var/run/ci-credentials/registry/.dockerconfigjson"
+  ls -lh /tmp/mirror-registry.tar.gz
+
+  # The EC2 provisioner will use a file provisioner to upload and install the tarball
+  OMR_TARBALL_LOCAL="/tmp/mirror-registry.tar.gz"
+
+  cat >>create_aws_ec2.tf <<EOF
+provider "aws" {
+  region = "${REGION}"
+  access_key = "${OMR_AWS_ACCESS_KEY}"
+  secret_key = "${OMR_AWS_SECRET_KEY}"
+}
+resource "aws_key_pair" "quaybuilder0710" {
+  key_name   = var.quay_build_worker_key
+  public_key = file("./quaybuilder.pub")
+}
+resource "aws_security_group" "quaybuilder" {
+  name        = var.quay_build_worker_security_group
+  description = "Allow all inbound traffic"
+  vpc_id      = "${VpcId}"
+  ingress {
+    description = "traffic into quaybuilder VPC"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+resource "aws_instance" "quaybuilder" {
+  key_name      = aws_key_pair.quaybuilder0710.key_name
+  ami           = "${ami_id}"
+  instance_type = "m6i.2xlarge"
+  associate_public_ip_address = true
+  vpc_security_group_ids = [aws_security_group.quaybuilder.id]
+  subnet_id = "${PublicSubnet}"
+
+  root_block_device {
+    volume_size = 200
+  }
+  provisioner "file" {
+    source      = "${OMR_TARBALL_LOCAL}"
+    destination = "/home/ec2-user/mirror-registry.tar.gz"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "sudo yum install podman openssl -y",
+      "cd /home/ec2-user",
+      "tar -xzvf mirror-registry.tar.gz",
+      "./mirror-registry --version",
+      "./mirror-registry install --quayHostname \${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
+    ]
+  }
+EOF
+
+  cat >>create_aws_ec2.tf <<'TFEOF'
+  connection {
+    type        = "ssh"
+    host        = self.public_ip
+    user        = "ec2-user"
+    private_key = file("./quaybuilder")
+  }
+  tags = {
+    Name = var.quay_build_instance_name
+  }
+}
+output "instance_public_dns" {
+  value = aws_instance.quaybuilder.public_dns
+}
+TFEOF
+
+# ─── Legacy path: pull OMR image from brew/released tarball on the EC2 ───
+else
+
 cat >>create_aws_ec2.tf <<EOF
 provider "aws" {
   region = "${REGION}"
@@ -247,6 +255,8 @@ output "instance_public_dns" {
   value = aws_instance.quaybuilder.public_dns
 }
 TFEOF
+
+fi
 
 cp /var/run/quay-qe-omr-secret/quaybuilder . && cp /var/run/quay-qe-omr-secret/quaybuilder.pub .
 chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >>quaybuilder
