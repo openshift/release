@@ -27,7 +27,7 @@ fi
 log "Waiting for ${EXPECTED_NODES} Ready node(s) at current revision (timeout ${TIMEOUT}s)..."
 elapsed=0
 while true; do
-    node_json=$(oc get nodes -o json 2>/dev/null)
+    node_json=$(oc get nodes -o json 2>/dev/null) || { sleep "$INTERVAL"; elapsed=$((elapsed + INTERVAL)); continue; }
 
     total=$(echo "$node_json" | jq '.items | length')
     ready=$(echo "$node_json" | jq '[.items[] | select(.status.conditions[]? | select(.type == "Ready" and .status == "True"))] | length')

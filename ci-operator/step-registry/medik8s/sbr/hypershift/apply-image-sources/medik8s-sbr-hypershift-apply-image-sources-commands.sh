@@ -18,14 +18,15 @@ trap cleanup EXIT
 # which doesn't retry on HTTP 5xx.  Mirrors medik8s-lib.sh gitlab_fetch().
 gitlab_fetch() {
     local url="$1" output="$2" max_attempts="${3:-6}"
-    local attempt delay
+    local attempt delay curl_err
     for attempt in $(seq 1 "$max_attempts"); do
+        curl_err=$(mktemp); _tmp_files+=("$curl_err")
         if curl --insecure -sSf --connect-timeout 10 --max-time 60 \
-            "$url" -o "$output" 2>/dev/null; then
+            "$url" -o "$output" 2>"$curl_err"; then
             return 0
         fi
         delay=$(( 2 ** attempt ))
-        log "WARNING: GitLab fetch attempt ${attempt}/${max_attempts} failed (retrying in ${delay}s)..."
+        log "WARNING: GitLab fetch attempt ${attempt}/${max_attempts} failed: $(cat "$curl_err") (retrying in ${delay}s)..."
         sleep "$delay"
     done
     log "ERROR: Failed to fetch ${url} after ${max_attempts} attempts"
