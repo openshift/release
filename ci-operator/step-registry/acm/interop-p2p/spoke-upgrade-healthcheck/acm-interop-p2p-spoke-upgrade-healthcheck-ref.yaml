@@ -6,7 +6,7 @@ ref:
     tag: latest
   grace_period: 10m
   commands: acm-interop-p2p-spoke-upgrade-healthcheck-commands.sh
-  timeout: 5h0m0s
+  timeout: 6h0m0s
   cli: latest
   resources:
     limits:
@@ -16,11 +16,18 @@ ref:
       memory: 100Mi
   env:
   - name: ACM_SPOKE_MCP_MINUTES_PER_NODE
-    default: "35"
-    documentation: Minutes of MCP wait budget per node (cucushift default 20). Rehearsal #2065916519451201536 needed ~33m/node on a 6-node spoke.
+    default: "40"
+    documentation: |-
+      Minutes of MCP wait budget per node (cucushift default 20).
+      History: rehearsal #2065916519451201536 needed ~33m/node on a 6-node spoke (default was 35).
+      Rehearsal #2078709101298192384 (2026-07-19) exhausted exactly 35m/node (6 nodes → 210 min
+      budget) with 1 degraded worker still updating — increased to 40 min/node (240 min for 6 nodes).
   - name: ACM_SPOKE_MCP_READY_TIMEOUT_MINUTES
-    default: "210"
-    documentation: Minimum MCP wait budget in minutes regardless of node count. Floor above rehearsal failure (~196m) before cucushift 20m/node cap (120m on 6 nodes).
+    default: "240"
+    documentation: |-
+      Minimum MCP wait budget in minutes regardless of node count.
+      Floor raised from 210 → 240 to match the new 40 min/node default on 6-node spokes
+      (rehearsal #2078709101298192384 hit the 210-min floor exactly with 1 degraded node remaining).
   - name: ACM_SPOKE_CO_READY_TIMEOUT_MINUTES
     default: "45"
     documentation: Cluster operator stability wait budget in minutes (cucushift default 30). Poll interval is 60s.
@@ -28,7 +35,7 @@ ref:
     Post-upgrade health check on the ACM managed spoke cluster. Uses the same logic as
     cucushift-upgrade-healthcheck against ${SHARED_DIR}/managed-cluster-kubeconfig (MCP, cluster
     operators, nodes, pods). Requires acm-interop-p2p-cluster-install.
-    Step timeout (5h) covers max(MCP floor, nodes×MCP-per-node) + CO wait + margin; grace_period
+    Step timeout (6h) covers max(MCP floor, nodes×MCP-per-node) + CO wait + margin; grace_period
     allows failure diagnostics via EXIT trap.
     On failure, writes spoke-<name>-upgrade-healthcheck-failure.txt to ${ARTIFACT_DIR} (ClusterVersion,
     unhealthy MCP/node/CO describe, MCO pods) via EXIT trap before the step exits.
