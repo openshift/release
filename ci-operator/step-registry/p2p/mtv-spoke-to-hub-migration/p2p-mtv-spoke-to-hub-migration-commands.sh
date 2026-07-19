@@ -1,19 +1,20 @@
 #!/bin/bash
 #
-# Execute bi-directional MTV cross-cluster live migration (CCLM) between the ACM hub and a spoke.
+# Execute the SPOKE→HUB direction of MTV cross-cluster live migration (CCLM).
 #
-# The hub is simultaneously the MTV management plane (where Plans and Migrations are created)
-# and a KubeVirt cluster that serves as a migration endpoint. The hub "host" provider
-# (auto-created by MTV) represents the hub cluster itself.
+# This is a directional wrapper for p2p-mtv-execute-hub-spoke-migration: it hardcodes
+# P2P_MIGRATION_DIRECTION="spoke-to-hub" so that it can appear AFTER a spoke upgrade step
+# in a chain, independently of any hub→spoke migration step that ran earlier.
 #
-# Two sequential directions:
-#   Hub→Spoke: P2P_HS_VM_COUNT VMs (prefix MTV_HS_HUB_VM_PREFIX) from hub cluster → spoke.
-#   Spoke→Hub: P2P_HS_VM_COUNT VMs (prefix MTV_HS_SPOKE_VM_PREFIX) from spoke → hub cluster.
+# Use this step when you need the sequence:
+#   hub→spoke migration → upgrade spoke → [health checks] → spoke→hub migration
 #
-# Each direction runs full CCLM preflights: providers and maps Ready, DecentralizedLiveMigration
-# featureGate on both hub and spoke (patched via HCO when missing), virt-synchronization-controller
-# Available on both, Submariner no-Globalnet check, inventory refresh, all source VMs Running,
-# TCP probe to destination sync controller, storage class mapped.
+# The spoke VMs (prefix MTV_HS_SPOKE_VM_PREFIX) that were migrated to the spoke in the
+# prior hub→spoke pass are now migrated back to the hub cluster.
+#
+# All preflight checks run identically to the bidirectional step:
+#   providers/maps Ready, DecentralizedLiveMigration featureGate, virt-synchronization-controller
+#   Available, Submariner no-Globalnet, inventory refresh, source VMs Running, TCP sync probe.
 #
 # ACM hub kubeconfig (KUBECONFIG from ci-operator) is used for both MTV API operations and
 # hub cluster KubeVirt/VM operations.
@@ -843,14 +844,10 @@ typeset hubToSpokeTargetNs="${MTV_HS_HUB_TO_SPOKE_TARGET_NAMESPACE}"
 typeset spokeToHubTargetNs="${MTV_HS_SPOKE_TO_HUB_TARGET_NAMESPACE}"
 
 typeset -i cclmStepRc=0
-# P2P_MIGRATION_DIRECTION controls which directions to run:
-#   both        – hub→spoke then spoke→hub (default, backward-compatible)
-#   hub-to-spoke – only the hub→spoke direction
-#   spoke-to-hub – only the spoke→hub direction
-# The p2p-mtv-spoke-to-hub-migration wrapper ref hardcodes this to "spoke-to-hub"
-# so it can appear after a spoke upgrade in the same chain without conflicting with
-# a prior hub-to-spoke invocation.
-typeset cclmDirection="${P2P_MIGRATION_DIRECTION:-both}"
+# Direction is hardcoded to spoke-to-hub regardless of any P2P_MIGRATION_DIRECTION env var
+# set in the CI job, ensuring this step always runs only spoke→hub regardless of what the
+# prior hub→spoke migration step (p2p-mtv-execute-hub-spoke-migration) was configured to do.
+typeset cclmDirection="spoke-to-hub"
 (
     trap OnError ERR
 
