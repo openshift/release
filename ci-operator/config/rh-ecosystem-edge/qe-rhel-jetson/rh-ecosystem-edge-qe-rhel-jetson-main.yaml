@@ -11,21 +11,23 @@ build_root:
 images:
   items:
   - dockerfile_literal: |
+      FROM src AS source
       FROM ubi-python
       USER 0
       RUN dnf install -y git && \
           ln -sf /usr/bin/python3.12 /usr/bin/python && \
           ln -sf /usr/bin/pip3.12 /usr/bin/pip && \
-          pip install --no-cache-dir ruff pytest PyYAML requests paramiko && \
+          pip install --no-cache-dir ruff pytest PyYAML requests paramiko fabric jumpstarter && \
           dnf clean all
-      COPY . /workspace/
+      COPY --from=source /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson/beaker/ansible /opt/qe-rhel-jetson-ansible
+      COPY --from=source /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson/jumpstarter /opt/qe-rhel-jetson-jumpstarter
+      COPY --from=source /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson /workspace
       WORKDIR /workspace
     from: ubi-python
     inputs:
       src:
-        paths:
-        - destination_dir: .
-          source_path: /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson
+        as:
+        - src
     to: qe-rhel-jetson
 resources:
   '*':
@@ -42,6 +44,41 @@ tests:
   container:
     from: qe-rhel-jetson
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: pytest
+  capabilities:
+  - intranet
+  cluster: build07
+  optional: true
+  restrict_network_access: false
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    test:
+    - ref: rh-ecosystem-edge-qe-rhel-jetson-pytest
+- as: bootc-install
+  capabilities:
+  - intranet
+  cluster: build07
+  optional: true
+  restrict_network_access: false
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      BOOTC_IMAGE_BASE: quay.io/redhat-user-workloads/jetpack-for-rhel-tenant/rhel-102-bootc
+      BOOTC_IMAGE_TAG: 7.2_6.12.0-211.20.1_062526071550
+    test:
+    - ref: rh-ecosystem-edge-qe-rhel-jetson-bootc-install
+- as: jumpstarter-tests
+  capabilities:
+  - intranet
+  cluster: build07
+  optional: true
+  restrict_network_access: false
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      JUMPSTARTER_LEASE_NAME: jetson-agx-orin-ci
+    test:
+    - ref: rh-ecosystem-edge-qe-rhel-jetson-jumpstarter-test
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
