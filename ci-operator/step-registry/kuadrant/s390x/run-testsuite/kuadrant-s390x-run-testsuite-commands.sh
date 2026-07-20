@@ -159,22 +159,36 @@ def _dns_query_a(name: str) -> str | None:
     question = _encode_name(name) + struct.pack("!HH", 1, 1)  # A IN
     header = struct.pack("!HHHHHH", 0xC0DE, 0x0100, 1, 0, 0, 0)
     payload = header + question
+
+    # Try UDP first (standard DNS), fallback to TCP if needed
     try:
-        with socket.create_connection((_DNS_HOST, _DNS_PORT), timeout=3.0) as sock:
-            sock.sendall(struct.pack("!H", len(payload)) + payload)
-            sock.settimeout(3.0)
-            length_bytes = sock.recv(2)
-            if len(length_bytes) < 2:
-                return None
-            (msg_len,) = struct.unpack("!H", length_bytes)
-            data = b""
-            while len(data) < msg_len:
-                chunk = sock.recv(msg_len - len(data))
-                if not chunk:
-                    break
-                data += chunk
-    except OSError:
-        return None
+        # UDP query - no length prefix needed
+        udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        udp_sock.settimeout(2.0)
+        udp_sock.sendto(payload, (_DNS_HOST, _DNS_PORT))
+        data, _ = udp_sock.recvfrom(512)  # Standard DNS UDP packet size
+        udp_sock.close()
+    except OSError as e:
+        # UDP failed, try TCP
+        print(f"[kuadrant_coredns_resolve] UDP query for {name} failed: {e}, trying TCP", file=sys.stderr)
+        try:
+            with socket.create_connection((_DNS_HOST, _DNS_PORT), timeout=3.0) as sock:
+                sock.sendall(struct.pack("!H", len(payload)) + payload)
+                sock.settimeout(3.0)
+                length_bytes = sock.recv(2)
+                if len(length_bytes) < 2:
+                    print(f"[kuadrant_coredns_resolve] TCP query for {name} failed: short read", file=sys.stderr)
+                    return None
+                (msg_len,) = struct.unpack("!H", length_bytes)
+                data = b""
+                while len(data) < msg_len:
+                    chunk = sock.recv(msg_len - len(data))
+                    if not chunk:
+                        break
+                    data += chunk
+        except OSError as e2:
+            print(f"[kuadrant_coredns_resolve] TCP query for {name} also failed: {e2}", file=sys.stderr)
+            return None
     if len(data) < 12:
         return None
     ancount = struct.unpack("!H", data[6:8])[0]
@@ -215,7 +229,10 @@ def _patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
     if host_str and _DNS_HOST and _belongs_to_zone(host_str):
         ip = _dns_query_a(host_str)
         if ip:
+            print(f"[kuadrant_coredns_resolve] {host_str} -> {ip} (via CoreDNS)", file=sys.stderr)
             return _ORIG_GETADDRINFO(ip, port, family, type, proto, flags)
+        else:
+            print(f"[kuadrant_coredns_resolve] {host_str} -> NO ANSWER from CoreDNS at {_DNS_HOST}:{_DNS_PORT}", file=sys.stderr)
     return _ORIG_GETADDRINFO(host, port, family, type, proto, flags)
 
 
@@ -227,6 +244,13 @@ def install() -> None:
             f"via {_DNS_HOST}:{_DNS_PORT}",
             file=sys.stderr,
         )
+        # Test DNS connectivity on initialization
+        if _DNS_HOST:
+            test_ip = _dns_query_a("test.{0}".format(_ZONE))
+            if test_ip:
+                print(f"[kuadrant_coredns_resolve] DNS connectivity OK (test query returned {test_ip})", file=sys.stderr)
+            else:
+                print(f"[kuadrant_coredns_resolve] WARNING: DNS test query failed - CoreDNS might not be ready", file=sys.stderr)
 
 
 def pytest_configure(config):  # noqa: ARG001
@@ -606,6 +630,60 @@ echo "=== Test-runner diagnostics ==="
 oc -n "${TEST_RUNNER_NAMESPACE}" get pods -o wide 2>&1 || true
 oc -n "${TEST_RUNNER_NAMESPACE}" describe job "${JOB_NAME}" 2>&1 \
   | tee "${ARTIFACT_DIR}/kuadrant-testrunner-job-describe.txt" || true
+
+# Enhanced diagnostics on failure - capture state before cleanup
+if [[ "${FAILED}" -ne 0 ]]; then
+  echo "=== Capturing diagnostic state before cleanup ===" >&2
+
+  # Backend pod logs (MockServer or httpbin)
+  echo "=== Backend pods in kuadrant namespace ===" | tee "${ARTIFACT_DIR}/backend-diagnostics.log"
+  oc get pods -n kuadrant -l app=backend -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log" || true
+  for pod in $(oc get pods -n kuadrant -l app=backend -o name 2>/dev/null); do
+    pod_name=$(basename "${pod}")
+    echo "=== Logs for ${pod_name} ===" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
+    oc logs -n kuadrant "${pod_name}" --all-containers=true --tail=200 2>&1 | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log" || true
+    echo "=== Describe ${pod_name} ===" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
+    oc describe pod -n kuadrant "${pod_name}" 2>&1 | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log" || true
+  done
+
+  # Routes and Services
+  echo "=== OpenShift Routes in kuadrant namespace ===" | tee "${ARTIFACT_DIR}/route-diagnostics.log"
+  oc get routes -n kuadrant -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/route-diagnostics.log" || true
+  oc get routes -n kuadrant -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/route-diagnostics.yaml" || true
+
+  echo "=== Services in kuadrant namespace ===" | tee -a "${ARTIFACT_DIR}/route-diagnostics.log"
+  oc get svc -n kuadrant -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/route-diagnostics.log" || true
+
+  # Endpoints
+  echo "=== Service Endpoints ===" | tee -a "${ARTIFACT_DIR}/route-diagnostics.log"
+  oc get endpoints -n kuadrant 2>&1 | tee -a "${ARTIFACT_DIR}/route-diagnostics.log" || true
+
+  # HTTPRoutes (if any)
+  echo "=== HTTPRoutes in kuadrant namespace ===" | tee -a "${ARTIFACT_DIR}/route-diagnostics.log"
+  oc get httproutes -n kuadrant -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/httproutes.yaml" || true
+
+  # Gateway status
+  echo "=== Gateway status ===" | tee "${ARTIFACT_DIR}/gateway-status.log"
+  oc get gateways -A -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/gateway-status.log" || true
+  oc get gateways -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/gateway-status.yaml" || true
+
+  # RateLimitPolicies and AuthPolicies
+  echo "=== Kuadrant Policies ===" | tee "${ARTIFACT_DIR}/policies.log"
+  oc get ratelimitpolicies -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/policies.yaml" || true
+  oc get authpolicies -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/policies.yaml" || true
+
+  # Test a sample Route from inside cluster
+  echo "=== Testing Route connectivity from cluster ===" | tee "${ARTIFACT_DIR}/route-connectivity-test.log"
+  sample_route=$(oc get route -n kuadrant -o jsonpath='{.items[0].spec.host}' 2>/dev/null || echo "")
+  if [[ -n "${sample_route}" ]]; then
+    echo "Testing route: http://${sample_route}/get" | tee -a "${ARTIFACT_DIR}/route-connectivity-test.log"
+    oc run curl-test --image=curlimages/curl:latest --rm -i --restart=Never -- \
+      curl -v -H "Host: ${sample_route}" "http://${sample_route}/get" 2>&1 \
+      | tee -a "${ARTIFACT_DIR}/route-connectivity-test.log" || true
+  fi
+
+  echo "=== Diagnostic capture complete ===" >&2
+fi
 
 echo "=== Copying test artifacts to ${ARTIFACT_DIR} ==="
 if ls "${RESULTS_DIR}"/junit-*.xml >/dev/null 2>&1; then
