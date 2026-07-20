@@ -4,6 +4,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
+# separate SHARED_DIR subdirectory so mgmt and infra files never collide.
+if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
+  LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
+  SHARED_DIR="${SHARED_DIR}/infra"
+  mkdir -p "${SHARED_DIR}"
+fi
+
 # Info output
 echo "Info: rhcos-conf-osstream running, OSSTREAM='${OSSTREAM:-<unset>}', OS_IMAGE_STREAM_MCP_MASTER='${OS_IMAGE_STREAM_MCP_MASTER:-<unset>}', OS_IMAGE_STREAM_MCP_WORKER='${OS_IMAGE_STREAM_MCP_WORKER:-<unset>}'"
 

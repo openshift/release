@@ -1,11 +1,11 @@
 chain:
-  as: upi-conf-libvirt-infra
+  as: upi-libvirt-infra-conf
   steps:
-  - ref: ipi-install-rbac-infra
-  - ref: upi-conf-libvirt-network-infra
-  - ref: upi-conf-libvirt-agent-infra
-  - ref: upi-conf-libvirt-infra-install-config
-  - ref: ipi-conf-debug-kdump-configure-logs-infra
+  - ref: upi-libvirt-infra-rbac
+  - ref: upi-libvirt-infra-conf-network
+  - ref: upi-libvirt-infra-conf-agent
+  - ref: upi-libvirt-infra-conf-install-config
+  - ref: upi-libvirt-infra-conf-kdump
   env:
   - name: CRASH_KERNEL_MEMORY
     default: "2G-4G:384M,4G-16G:512M,16G-64G:1G,64G-128G:2G,128G-:4G"
@@ -20,7 +20,6 @@ chain:
   - name: KDUMP_KEXEC_ARGS
     default: "--dt-no-old-root -s"
   documentation: |-
-    Infra-cluster variant of upi-conf-libvirt. All steps use -infra wrapper refs
-    (unique as: names) so they can coexist with the mgmt cluster steps in one workflow.
-    Every wrapper ref declares CLUSTER_ROLE=infra, causing scripts to use
-    $LEASED_RESOURCE_INFRA and write to $SHARED_DIR/infra/.
+    Infra-cluster config chain. All steps use uniquely-named infra refs (upi-libvirt-infra-*)
+    so they coexist with mgmt steps in one workflow. Every ref has CLUSTER_ROLE=infra so
+    scripts use $LEASED_RESOURCE_INFRA and write to $SHARED_DIR/infra/.
