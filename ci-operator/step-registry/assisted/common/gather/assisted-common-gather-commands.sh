@@ -7,7 +7,7 @@ set -o pipefail
 echo "************ assisted common gather command ************"
 
 # shellcheck disable=SC2154
-cat > gather_logs.yaml <<-EOF
+cat > gather_logs.yaml <<-'EOF'
 - name: Gather logs and debug information and save them for debug purpose
   hosts: all
   vars:
@@ -33,7 +33,7 @@ cat > gather_logs.yaml <<-EOF
           setsid sos report --batch --tmp-dir "{{ LOGS_DIR }}" --all-logs
             -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,dnf
             -k podman.all -k podman.logs
-      ignore_errors: true
+        ignore_errors: true
 
       # Strip libvirt auth token from sosreport archives. The libvirt plugin
       # collects /run/libvirt/ which includes the daemon authentication token
