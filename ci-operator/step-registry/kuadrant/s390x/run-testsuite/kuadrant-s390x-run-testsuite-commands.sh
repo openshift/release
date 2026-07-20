@@ -313,7 +313,8 @@ spec:
       containers:
       - name: testsuite
         image: ${TESTSUITE_S390X_IMAGE}
-        imagePullPolicy: IfNotPresent
+        # Always: same tag (stablev1) may be rebuilt; avoid stale node cache.
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
