@@ -1,0 +1,28 @@
+ref:
+  as: upi-libvirt-cleanup-post-infra
+  from: libvirt-installer
+  grace_period: 10m
+  commands: upi-libvirt-cleanup-post-commands.sh
+  env:
+  - name: CLUSTER_ROLE
+    default: "infra"
+    documentation: |-
+      Fixed to "infra": redirects to $LEASED_RESOURCE_INFRA so the correct
+      infra cluster host is cleaned up.
+  - name: POOL_NAME
+    default: "multiarch-ci-pool"
+  - name: HTTPD_POOL_NAME
+    default: "httpd"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 300Mi
+  dnsConfig:
+    nameservers:
+    - 172.30.38.188
+    searches:
+    - "bastion-z.svc.cluster.local"
+    - "bastion-ppc64le-libvirt.svc.cluster.local"
+  documentation: |-
+    Infra-cluster variant of upi-libvirt-cleanup-post. Runs the same cleanup script
+    but with CLUSTER_ROLE=infra so it targets $LEASED_RESOURCE_INFRA.

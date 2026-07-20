@@ -12,34 +12,23 @@ workflow:
     - resource_type: libvirt-s390x-quota-slice
       env: LEASED_RESOURCE_INFRA    # infra cluster host
     pre:
-    # ── Management cluster (uses $LEASED_RESOURCE) ──────────────────────
+    # ── Management cluster (CLUSTER_ROLE=mgmt, uses $LEASED_RESOURCE) ────
     - ref: upi-libvirt-cleanup-pre
     - chain: upi-conf-libvirt
-      env:
-        CLUSTER_ROLE: mgmt
     - ref: ipi-debug-missing-static-pod-controller-degraded
     - ref: ipi-conf-etcd-on-ramfs
     - chain: upi-install-libvirt
-      env:
-        CLUSTER_ROLE: mgmt
 
-    # ── Infra cluster (uses $LEASED_RESOURCE_INFRA) ──────────────────────
-    # CLUSTER_ROLE=infra causes each script to remap LEASED_RESOURCE → LEASED_RESOURCE_INFRA
-    - ref: upi-libvirt-cleanup-pre-infra  # dedicated ref: exports LEASED_RESOURCE=$LEASED_RESOURCE_INFRA
-    - chain: upi-conf-libvirt
-      env:
-        CLUSTER_ROLE: infra
+    # ── Infra cluster (CLUSTER_ROLE=infra, uses $LEASED_RESOURCE_INFRA) ──
+    - ref: upi-libvirt-cleanup-pre-infra
+    - chain: upi-conf-libvirt-infra
     - ref: ipi-debug-missing-static-pod-controller-degraded
     - ref: ipi-conf-etcd-on-ramfs
-    - chain: upi-install-libvirt
-      env:
-        CLUSTER_ROLE: infra
+    - chain: upi-install-libvirt-infra
     test:
     - ref: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra-test-print
     post:
     - ref: ipi-conf-debug-kdump-gather-logs
     - chain: gather
     - ref: upi-libvirt-cleanup-post
-    - ref: upi-libvirt-cleanup-post
-      env:
-        CLUSTER_ROLE: infra
+    - ref: upi-libvirt-cleanup-post-infra
