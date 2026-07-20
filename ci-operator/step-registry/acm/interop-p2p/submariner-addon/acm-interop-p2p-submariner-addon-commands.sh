@@ -176,7 +176,7 @@ ApplyManagedClusterAddon() {
 
     oc create -f - --dry-run=client -o yaml --save-config <<EOF | oc apply -f -
 apiVersion: addon.open-cluster-management.io/v1alpha1
-kind: ManagedClusterAddon
+kind: ManagedClusterAddOn
 metadata:
   name: submariner
   namespace: ${ns}
@@ -185,7 +185,7 @@ metadata:
 spec:
   installNamespace: submariner-operator
 EOF
-    : "ManagedClusterAddon/submariner applied in namespace '${ns}' (cluster=${clusterName})"
+    : "ManagedClusterAddOn/submariner applied in namespace '${ns}' (cluster=${clusterName})"
 }
 
 # WaitAddonAvailable — poll until ManagedClusterAddon/submariner is Available.
@@ -222,6 +222,19 @@ trap DumpDiagnostics ERR
 LoadClusterList
 
 : "Enrolling ${#clusterNamesArr[@]} clusters in Submariner mesh: ${clusterNamesArr[*]}"
+
+# Wait for the ManagedClusterAddon CRD to be Established before Phase 1.
+# The MCE addon manager registers managedclusteraddons.addon.open-cluster-management.io
+# asynchronously after the MultiClusterHub becomes Available.  If we call
+# `oc create --dry-run=client -o yaml` while the CRD is still being created, oc's
+# API discovery cache has no mapping for the kind and the command fails immediately
+# with "no matches for kind ManagedClusterAddOn" — even though the SubmarinerConfig CRD
+# (registered by a separate Submariner controller) is already available.
+: "Waiting for managedclusteraddons.addon.open-cluster-management.io CRD to be Established..."
+oc wait --for=condition=Established \
+    crd/managedclusteraddons.addon.open-cluster-management.io \
+    --timeout=300s 1>/dev/null
+: "ManagedClusterAddon CRD is Established — proceeding with addon configuration"
 
 # Phase 1: apply credentials, SubmarinerConfig, and ManagedClusterAddon for all clusters.
 typeset -i i
