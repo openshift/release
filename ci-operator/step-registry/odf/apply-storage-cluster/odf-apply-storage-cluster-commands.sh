@@ -1,13 +1,8 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
-# Wait for StorageCluster CRD to be created before applying the manifest.
-timeout 5m bash -o pipefail -O inherit_errexit -euxc '
-    until oc get crd storageclusters.ocs.openshift.io >/dev/null; do
-        sleep 5
-    done
-    true
-'
+# Wait for StorageCluster CRD to be registered before applying the manifest.
+oc wait crd storageclusters.ocs.openshift.io --for=condition=Established --timeout=5m
 
 # Deploy StorageCluster (idempotent via oc apply).
 {
