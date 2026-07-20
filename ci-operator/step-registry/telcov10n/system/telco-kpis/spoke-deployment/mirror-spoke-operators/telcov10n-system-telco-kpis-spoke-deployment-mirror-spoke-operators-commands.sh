@@ -5,6 +5,7 @@ set -euo pipefail
 source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'mirror_spoke_operators' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
+setup_debug_on_fail
 
 main() {
     echo "Mirroring spoke operators to hub: ${HUB_CLUSTER}"

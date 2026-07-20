@@ -10,6 +10,7 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'ptp' "${TEST_SETTINGS:-}" "${TEST_SETTINGS_DEFAULTS:-}"
 setup_continue_on_fail
+setup_debug_on_fail
 
 main() {
     echo "Running PTP test for spoke: ${SPOKE_CLUSTER}"

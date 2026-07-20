@@ -405,6 +405,77 @@ setup_continue_on_fail() {
         trap 'echo "ERROR: Test failed (exit code $?) but CONTINUE_ON_FAIL=true — continuing"; exit 0' ERR
     fi
 }
+
+# ----------------------------------------------------------------------
+# setup_debug_on_fail
+#
+# When DEBUG_ON_FAIL=true AND running in a PR (PULL_NUMBER set),
+# sets an EXIT trap that enters a debug wait loop on non-zero exit.
+# Unlike continue_on_fail, this preserves the original exit code.
+# The step's full context (inventory, vaults, env) remains available
+# for interactive debugging via the pod terminal.
+#
+# Uses TIMEOUT env var (default: "+10 min") to control how long to wait.
+# Sentinel files /tmp/debug.done and /tmp/keep.debugging control the loop.
+# ----------------------------------------------------------------------
+
+setup_debug_on_fail() {
+    if [[ "${DEBUG_ON_FAIL:-false}" != "true" ]]; then
+        return 0
+    fi
+    if [[ -z "${PULL_NUMBER:-}" ]]; then
+        echo "DEBUG_ON_FAIL enabled but not a PR run — skipping debug trap"
+        return 0
+    fi
+    echo "DEBUG_ON_FAIL enabled — will enter debug mode on failure (PR ${PULL_NUMBER})"
+    trap '__debug_on_fail_exit_handler' EXIT
+}
+
+__debug_on_fail_exit_handler() {
+    local exit_code=$?
+    if [[ ${exit_code} -eq 0 ]]; then
+        return 0
+    fi
+
+    echo
+    echo "################################################################################"
+    echo "# PR ${PULL_NUMBER:-} — Step failed (exit code ${exit_code}). Entering debug mode..."
+    echo "################################################################################"
+
+    TZ=UTC
+    local end_time
+    end_time=$(date -d "${TIMEOUT:-+10 min}" +%s)
+    local debug_done=/tmp/debug.done
+    local keep_debugging=/tmp/keep.debugging
+
+    while sleep 1m; do
+        [[ -f "${debug_done}" ]] && break
+        echo
+        echo "-------------------------------------------------------------------"
+        echo "'${debug_done}' not found. Debugging can continue..."
+        local now
+        now=$(date +%s)
+        if [[ "${end_time}" -lt "${now}" ]]; then
+            if [[ -f "${keep_debugging}" ]]; then
+                echo "To quit debugging: rm -f ${keep_debugging}"
+                continue
+            else
+                echo "Timeout reached. Exiting debug mode..."
+                break
+            fi
+        else
+            echo "Now:     $(date -d "@${now}")"
+            echo "Timeout: $(date -d "@${end_time}")"
+        fi
+        echo "[Note]:"
+        echo "- To exit debug mode early: touch ${debug_done}"
+        echo "- To extend past timeout:   touch ${keep_debugging}"
+    done
+
+    echo
+    echo "Exiting debug mode with original exit code: ${exit_code}"
+    exit ${exit_code}
+}
 EOF
 
 echo "Shared functions written to ${SHARED_DIR}/telco-kpis-common-functions.sh"
