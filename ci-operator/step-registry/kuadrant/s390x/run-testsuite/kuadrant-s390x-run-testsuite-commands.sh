@@ -239,10 +239,21 @@ PY
 # ---------------------------------------------------------------------------
 # 3. Build the in-container command (smoke and/or full kuadrant suite)
 # ---------------------------------------------------------------------------
+# protobuf ≥6.33.0 ships broken s390x upb wheels (protocolbuffers/protobuf#24103).
+# Image may pin 6.32.1, but `make` → poetry sync upgrades from an unlocked/
+# newer lock entry. Re-pin pyproject+lock in the Job before make so sync stays
+# on 6.32.1.
+PROTOBUF_PIN="${PROTOBUF_PIN:-6.32.1}"
 PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve"
 CONTAINER_SCRIPT="set -o pipefail
 cd /opt/workdir/kuadrant-testsuite
 rc=0
+echo '=== Pinning protobuf==${PROTOBUF_PIN} for s390x (avoid broken upb ≥6.33.0) ==='
+# testsuite deps live in Poetry group "main" (see Dockerfile.s390x).
+if ! poetry add --group main --no-interaction 'protobuf==${PROTOBUF_PIN}'; then
+  poetry add --no-interaction 'protobuf==${PROTOBUF_PIN}'
+fi
+poetry run python -c \"from importlib.metadata import version; print('protobuf', version('protobuf'))\"
 "
 if [[ "${RUN_SMOKE}" == "true" ]]; then
   CONTAINER_SCRIPT+="echo '=== make smoke ==='
