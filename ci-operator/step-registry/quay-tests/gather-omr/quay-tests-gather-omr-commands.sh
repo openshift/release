@@ -23,7 +23,7 @@ if [[ ! -s "${SHARED_DIR}/terraform.tgz" ]]; then
 fi
 
 WORK_DIR=$(mktemp -d)
-cd "${WORK_DIR}"
+cd "${WORK_DIR}" || exit
 tar -xzf "${SHARED_DIR}/terraform.tgz" quaybuilder 2>/dev/null
 if [[ ! -f quaybuilder ]]; then
     echo "quaybuilder SSH key not found inside terraform.tgz, skipping gather"
