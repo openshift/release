@@ -7,30 +7,46 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 export_env_vars_from_json 'mirror_ran_test_images' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
 setup_debug_on_fail
 
-# TODO: Implement RAN test image mirroring using Ansible playbook
-# Expected playbook: repos/eco-ci-cd/playbooks/telco-kpis/mirror-ran-test-images.yml
-#
-# Implementation steps:
-# 1. Source common functions and setup environment
-# 2. Build Ansible inventory with spoke cluster configuration
-# 3. Execute playbook: ansible-playbook ./playbooks/telco-kpis/mirror-ran-test-images.yml
-# 4. Playbook should mirror test images to spoke's local registry:
-#    - eco-gotests test runner image
-#    - oslat workload image
-#    - cyclictest workload image
-#    - ptp test utilities
-#    - CPU utilization test images
-#    - Any other test-specific container images
-# 5. Create ImageContentSourcePolicy if needed to redirect image pulls
-# 6. Verify images are accessible from spoke cluster nodes
-# 7. Store image manifest list for test reference
-#
-# Environment variables:
-#   SPOKE_CLUSTER: Spoke cluster for image mirroring
-#   HUB_CLUSTER: Hub cluster managing the spoke
-#   DEBUG: Enable Ansible debug output
-#   ECO_CI_CD_IMAGE: Container image for Ansible execution
+main() {
+    echo "Mirroring RAN test images for spoke: ${SPOKE_CLUSTER}, hub: ${HUB_CLUSTER}"
 
-echo "TODO: Mirror RAN test images to spoke cluster ${SPOKE_CLUSTER}"
-echo "This step will execute Ansible playbook for test image mirroring"
-echo "Required playbook: repos/eco-ci-cd/playbooks/telco-kpis/mirror-ran-test-images.yml"
+    setup_ansible_inventory "${SPOKE_CLUSTER:-dummy-spoke}" "${HUB_CLUSTER}"
+
+    cd /eco-ci-cd
+
+    local DEBUG_FLAG="-vv"
+    if [[ "${DEBUG:-false}" == "true" ]]; then
+        DEBUG_FLAG="-vvv"
+    fi
+
+    if [[ -z "${RAN_IMAGES:-}" ]]; then
+        echo "WARNING: RAN_IMAGES is empty. No images to mirror."
+        echo "Set ran_images in INFRA_SETTINGS in the CI config. Example:"
+        echo '  {"mirror_ran_test_images": {"ran_images": {"images": ["quay.io/telcov10n-ci/oslat:latest", ...]}}}'
+        exit 1
+    fi
+
+    local images_payload
+    images_payload=$(python3 -c "
+import json, sys
+raw = json.loads(sys.argv[1])
+source_images = raw.get('images', [])
+result = []
+for src in source_images:
+    name_tag = src.rsplit('/', 1)[-1]
+    result.append({'source': src, 'dest': 'ran-test/' + name_tag})
+print(json.dumps(result))
+" "${RAN_IMAGES}")
+
+    echo "Mirroring $(echo "${images_payload}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))') image(s)"
+
+    ansible-playbook ./playbooks/telco-kpis/mirror-images.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        -e "images=${images_payload}" \
+        -e "registry_host=disconnected.registry.local" \
+        ${DEBUG_FLAG}
+
+    echo "RAN test image mirroring completed for hub: ${HUB_CLUSTER}"
+}
+
+main
