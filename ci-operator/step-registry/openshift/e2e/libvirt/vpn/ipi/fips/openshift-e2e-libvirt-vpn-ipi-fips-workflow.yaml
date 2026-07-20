@@ -5,20 +5,18 @@ workflow:
       IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH: "true"
       LIBVIRT_POOL_NAME: multiarch-ci-pool
       LIBVIRT_IMAGE_PATH: "/home/libvirt/openshift-images"
+      WORKER_REPLICAS: "0"
+      COMPUTE_COUNT: "2"
     allow_best_effort_post_steps: true
     pre:
     - ref: upi-libvirt-cleanup-pre
     - chain: ipi-libvirt-pre
     - ref: fips-check
+    - ref: ipi-install-libvirt-virsh-workers
     test:
     - chain: openshift-e2e-libvirt-test
     post:
     - chain: ipi-libvirt-post
   documentation: |-
-    IBM Z VPN (phc-cicd) CI with IPI libvirt provisioning and FIPS validation. Same as
-    openshift-e2e-libvirt-fips (ipi-libvirt-pre then fips-check) but prefixed with
-    upi-libvirt-cleanup-pre like openshift-e2e-libvirt-vpn-ipi. Set USE_EXTERNAL_DNS=true
-    and cluster_profile libvirt-s390x-vpn-oz so install-config matches UPI VPN naming.
-
-    See openshift-e2e-libvirt-vpn-ipi workflow documentation for LIBVIRT_POOL_NAME
-    (multiarch-ci-pool on /home) and the s390x ACPI / QEMU machine-type caveat.
+    FIPS variant of openshift-e2e-libvirt-vpn-ipi hybrid (terraform masters + virsh workers).
+    fips-check runs after install and before virsh workers so the API is up for the check.

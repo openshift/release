@@ -470,9 +470,11 @@ do
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainVcpu] 6
 done
 # Bump the libvirt workers memory to 16GB
-yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] ${WORKER_MEMORY}
-# Bump the libvirt workers disk to to 30GB
-yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] ${WORKER_DISK}
+if [[ "${WORKER_REPLICAS}" != "0" && -f "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" ]]; then
+  yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] ${WORKER_MEMORY}
+  # Bump the libvirt workers disk to to 30GB
+  yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] ${WORKER_DISK}
+fi
 
 # Opt-in: point machine-api volumes at an existing libvirt pool (e.g. UPI multiarch-ci-pool on /home)
 # instead of the per-cluster pool openshift-install would create under /var/lib/libvirt/openshift-images.
@@ -482,7 +484,9 @@ if [[ -n "${LIBVIRT_POOL_NAME:-}" ]]; then
 	do
 		yq write --inplace "${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml" spec.providerSpec.value.volume[poolName] "${LIBVIRT_POOL_NAME}"
 	done
-	yq write --inplace "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" spec.template.spec.providerSpec.value.volume[poolName] "${LIBVIRT_POOL_NAME}"
+	if [[ "${WORKER_REPLICAS}" != "0" && -f "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" ]]; then
+		yq write --inplace "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" spec.template.spec.providerSpec.value.volume[poolName] "${LIBVIRT_POOL_NAME}"
+	fi
 fi
 
 while IFS= read -r -d '' item
