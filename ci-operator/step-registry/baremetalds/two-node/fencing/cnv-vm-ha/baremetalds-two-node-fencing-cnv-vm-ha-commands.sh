@@ -48,15 +48,44 @@ echo "StorageClass ${CNV_STORAGE_CLASS} available"
 echo "--- Waiting for golden images ---"
 if ! oc wait DataImportCron -n openshift-virtualization-os-images \
     --all --for=condition=UpToDate --timeout=40m; then
-  echo "WARNING: Not all golden images are ready, checking if Fedora is available..."
+  echo "WARNING: Not all golden images are ready, dumping diagnostics..."
+  echo ""
+  echo "=== DataImportCron status ==="
+  oc get dataimportcron -n openshift-virtualization-os-images -o wide || true
+  echo ""
+  echo "=== DataVolume status ==="
+  oc get datavolume -n openshift-virtualization-os-images -o wide || true
+  echo ""
+  echo "=== PVC status ==="
+  oc get pvc -n openshift-virtualization-os-images -o wide || true
+  echo ""
+  echo "=== VolumeSnapshot status ==="
+  oc get volumesnapshot -n openshift-virtualization-os-images || true
+  echo ""
+  echo "=== CDI importer pods ==="
+  oc get pods -n openshift-virtualization-os-images || true
+  echo ""
+  echo "=== Failed/pending importer pod logs (last 30 lines each) ==="
+  for pod in $(oc get pods -n openshift-virtualization-os-images \
+      --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
+    echo "--- ${pod} ---"
+    oc logs "${pod}" -n openshift-virtualization-os-images --tail=30 2>/dev/null || true
+  done
+  echo ""
+  echo "=== Default StorageClass ==="
+  oc get sc -o custom-columns='NAME:.metadata.name,DEFAULT:.metadata.annotations.storageclass\.kubernetes\.io/is-default-class' || true
+  echo ""
+  echo "=== Events in openshift-virtualization-os-images (last 20) ==="
+  oc get events -n openshift-virtualization-os-images --sort-by='.lastTimestamp' | tail -20 || true
+  echo ""
+  echo "Checking if Fedora is available despite timeout..."
 fi
 
 FEDORA_SNAP=$(oc get volumesnapshot -n openshift-virtualization-os-images \
-  -o jsonpath='{.items[?(@.status.readyToUse==true)].metadata.name}' | tr ' ' '\n' | grep fedora | head -1)
+  -o jsonpath='{.items[?(@.status.readyToUse==true)].metadata.name}' | tr ' ' '\n' | grep fedora | head -1 || true)
 
 if [[ -z "${FEDORA_SNAP}" ]]; then
   echo "ERROR: No ready Fedora VolumeSnapshot found in openshift-virtualization-os-images"
-  oc get volumesnapshot -n openshift-virtualization-os-images
   exit 1
 fi
 echo "Using Fedora snapshot: ${FEDORA_SNAP}"
