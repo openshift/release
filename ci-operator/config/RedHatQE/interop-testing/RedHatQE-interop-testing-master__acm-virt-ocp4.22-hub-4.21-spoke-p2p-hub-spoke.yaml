@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.23"
+    name: "4.22"
     namespace: ocp
     tag: cli
   fetch-managed-clusters:
@@ -8,14 +8,14 @@ base_images:
     namespace: acm-qe
     tag: fetch-managed-clusters
   installer:
-    name: "4.23"
+    name: "4.22"
     namespace: ocp
     tag: installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.23
+    tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
   - dockerfile_literal: |
@@ -33,33 +33,36 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.23"
+      version: "4.21"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.23"
+      version: "4.22"
 resources:
   '*':
     requests:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: cclm-hub-spoke-aws-p2p-lp-interop
+- as: cclm-hub-spoke-upgrade-aws-p2p-lp-interop
   cron: 0 1 28 2 *
   steps:
     cluster_profile: aws-cspi-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ACM_SPOKE_CLUSTER_COUNT: "1"
-      ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.23"
+      ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.21"
       ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
       ACM_SPOKE_CP_TYPE: m6a.2xlarge
       ACM_SPOKE_PULL_SECRET_FILE: pull-secret
       ACM_SPOKE_WORKER_TYPE: c5n.metal
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       CNV_ENABLE_CCLM: "true"
+      CNV_HUB_INSTALL_MAJOR_MINOR: "4.22"
+      CNV_POLICY_INSTALL_MAJOR_MINOR: "4.21"
       COMPUTE_NODE_TYPE: c5n.metal
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIREWATCH_CONFIG: |
@@ -80,13 +83,16 @@ tests:
               {"step": "p2p-mtv-register-providers", "failure_type": "all", "classification": "MTV provider registration failure", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "p2p-create-hub-spoke-test-vms", "failure_type": "all", "classification": "Hub-spoke CCLM test VM creation failure", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_additional_labels": ["!default", "interop-tests"]},
               {"step": "p2p-mtv-create-hub-spoke-maps", "failure_type": "all", "classification": "Hub-spoke MTV migration maps failure", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-              {"step": "p2p-mtv-execute-hub-spoke-migration", "failure_type": "all", "classification": "Hub-spoke MTV CCLM live migration failure", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_additional_labels": ["!default", "interop-tests"]},
-              {"step": "p2p-create-spoke-imageset", "failure_type": "all", "classification": "Spoke ClusterImageSet creation failure (nightly)", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "p2p-mtv-execute-hub-spoke-migration", "failure_type": "all", "classification": "Hub-to-spoke CCLM live migration failure (pre-upgrade pass)", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_additional_labels": ["!default", "interop-tests"]},
+              {"step": "acm-interop-p2p-spoke-upgrade-prehealthcheck", "failure_type": "all", "classification": "Spoke pre-upgrade health check failure", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
+              {"step": "acm-interop-p2p-spoke-upgrade", "failure_type": "all", "classification": "Spoke OCP upgrade failure (4.21 to 4.22)", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "acm-interop-p2p-spoke-upgrade-healthcheck", "failure_type": "all", "classification": "Spoke post-upgrade health check failure", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
+              {"step": "p2p-mtv-spoke-to-hub-migration", "failure_type": "all", "classification": "Spoke-to-hub CCLM live migration failure (post-upgrade reverse pass)", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_additional_labels": ["!default", "interop-tests"]},
               {"step": "acm-mch", "failure_type": "all", "classification": "ACM MCH install", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]}
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.23-p2p","ipi-aws-p2p","mpiit-acm-virt","mpiit_product2product","mpiit_virt","hub-spoke-cclm"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-p2p","ipi-aws-p2p","mpiit-acm-virt","mpiit_product2product","mpiit_virt","hub-spoke-cclm-upgrade"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: vshakya@redhat.com
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA","mpiit_p2p"]'
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8652
@@ -100,7 +106,7 @@ tests:
       MTV_HS_HUB_VM_PREFIX: hub-vm
       MTV_HS_SPOKE_PROVIDER: spoke-1
       MTV_HS_SPOKE_TO_HUB_NETWORK_MAP: spoke-to-hub-net-map
-      MTV_HS_SPOKE_TO_HUB_PLAN: spoke-to-hub-plan
+      MTV_HS_SPOKE_TO_HUB_PLAN: spoke-to-hub-post-upgrade-plan
       MTV_HS_SPOKE_TO_HUB_STORAGE_MAP: spoke-to-hub-storage-map
       MTV_HS_SPOKE_VM_NAMESPACE: hub-spoke-test
       MTV_HS_SPOKE_VM_PREFIX: spoke-vm
@@ -109,8 +115,8 @@ tests:
       ODF_OPERATOR_CHANNEL: stable-4.22
       OPERATORS: |
         [
-          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
-          {"name": "mtv-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-mtv", "target_namespaces": "openshift-mtv", "operator_group": "openshift-mtv-operatorgroup"}
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
+          {"name": "mtv-operator", "source": "redhat-operators", "channel": "release-v2.11", "install_namespace": "openshift-mtv", "target_namespaces": "openshift-mtv", "operator_group": "openshift-mtv-operatorgroup"}
         ]
       P2P_HS_HUB_STORAGE_CLASS: ocs-storagecluster-ceph-rbd-virtualization
       P2P_HS_HUB_VM_PREFIX: hub-vm
@@ -119,9 +125,11 @@ tests:
       P2P_HS_SPOKE_VM_PREFIX: spoke-vm
       P2P_HS_VM_COUNT: "2"
       P2P_HS_VM_NAMESPACE: hub-spoke-test
+      P2P_MIGRATION_DIRECTION: hub-to-spoke
+      SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL: candidate-4.22
       SUBMARINER_VERIFY_HUB_SPOKE: "true"
       USER_TAGS: |
-        scenario acm-cnv-p2p-hub-spoke
+        scenario acm-cnv-p2p-hub-spoke-upgrade
     leases:
     - count: 1
       env: LEASED_RESOURCE
@@ -129,10 +137,10 @@ tests:
     - count: 1
       env: MANAGED_CLUSTER_LEASED_RESOURCE
       resource_type: aws-cspi-qe-quota-slice
-    workflow: p2p-cclm-hub-spoke
-  timeout: 9h0m0s
+    workflow: p2p-cclm-hub-spoke-upgrade
+  timeout: 12h0m0s
 zz_generated_metadata:
   branch: master
   org: RedHatQE
   repo: interop-testing
-  variant: acm-virt-ocp4.23-p2p-hub-spoke
+  variant: acm-virt-ocp4.22-hub-4.21-spoke-p2p-hub-spoke
