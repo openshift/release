@@ -27,14 +27,37 @@ az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 oc version
 kubelogin --version
 
-# Check out main branch to provision the baseline environment.
-# The container image has the PR source baked in; we swap to main so that
-# Bicep templates, Helm charts, config, and pipeline definitions all come
-# from the current state of the default branch.
-echo "Fetching and checking out main for baseline provision ..."
-git fetch https://github.com/Azure/ARO-HCP.git main
-git checkout -f FETCH_HEAD
-echo "Checked out main at $(git rev-parse --short HEAD)"
+# Check out the base branch to provision the baseline environment.
+# The container has the PR merge commit baked in; we rewind to the base
+# so Bicep templates, Helm charts, config, and pipeline definitions all
+# come from what the PR is being merged into.
+#
+# Prow sets PULL_BASE_SHA to the exact base-branch commit used for the
+# merge. That commit is already in the local clone, so no fetch needed.
+# Rehearsal runs (JOB_NAME prefixed with "rehearse-") fetch main
+# explicitly, since PULL_BASE_SHA belongs to the openshift/release repo.
+IS_REHEARSAL=false
+if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
+  IS_REHEARSAL=true
+fi
+
+if [[ "${IS_REHEARSAL}" == "true" ]]; then
+  echo "Rehearsal detected (JOB_NAME=${JOB_NAME:-unset}), fetching main ..."
+  git fetch https://github.com/Azure/ARO-HCP.git main
+  git checkout -f FETCH_HEAD
+else
+  if [[ -z "${PULL_BASE_SHA:-}" ]]; then
+    echo "ERROR: PULL_BASE_SHA is not set and this is not a rehearsal. Cannot determine base commit."
+    exit 1
+  fi
+  if ! git cat-file -e "${PULL_BASE_SHA}" 2>/dev/null; then
+    echo "ERROR: PULL_BASE_SHA=${PULL_BASE_SHA} not found in git history."
+    exit 1
+  fi
+  echo "Using Prow merge base ${PULL_BASE_SHA}"
+  git checkout -f "${PULL_BASE_SHA}"
+fi
+echo "Checked out base at $(git rev-parse --short HEAD)"
 
 # The images-push-postsubmit job runs the aro-hcp-images-push step on every
 # merge to main (DEPLOY_ENV=dev), mirroring CI-built service images into the

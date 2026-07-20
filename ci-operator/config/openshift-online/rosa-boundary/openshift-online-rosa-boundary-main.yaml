@@ -1,4 +1,8 @@
 base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   ubi-python:
     name: ubi-python-311
     namespace: ocp
@@ -23,6 +27,22 @@ images:
         - destination_dir: .
           source_path: /go/src/github.com/openshift-online/rosa-boundary
     to: lambda-test-runner
+  - dockerfile_literal: |
+      FROM nested-podman
+      USER root
+      # Install Python and test dependencies; LocalStack runs as a Podman container
+      RUN dnf install -y --nodocs python3-pip && \
+          dnf clean all && \
+          pip3 install --no-cache-dir \
+          pytest boto3 requests awscli-local
+      COPY . /workspace/
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-online/rosa-boundary
+    to: localstack-test-runner
 prowgen:
   expose: true
   private: true
@@ -42,6 +62,20 @@ tests:
     uv run pytest test_handler.py -v
   container:
     from: lambda-test-runner
+- as: localstack-integration-tests
+  capabilities:
+  - nested-podman
+  commands: |
+    set -euo pipefail
+    export LOCALSTACK_AUTH_TOKEN=$(cat /etc/localstack-secret/localstack-token)
+    exec /workspace/rosa-boundary/tests/localstack/ci-run.sh
+  container:
+    from: localstack-test-runner
+  nested_podman: true
+  run_if_changed: ^(lambda/|deploy/regional/|tests/localstack/)
+  secret:
+    mount_path: /etc/localstack-secret
+    name: localstack-token
 zz_generated_metadata:
   branch: main
   org: openshift-online

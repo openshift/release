@@ -127,9 +127,9 @@ if [[ "${CSV_READY}" != "true" ]]; then
   exit 1
 fi
 
-echo "Waiting for ocs-operator deployment"
+echo "Waiting for odf-operator-controller-manager deployment"
 sleep 90
-oc wait deployment ocs-operator -n "${ODF_INSTALL_NAMESPACE}" \
+oc wait deployment odf-operator-controller-manager -n "${ODF_INSTALL_NAMESPACE}" \
   --for=condition=Available --timeout=5m
 
 echo "Labeling worker nodes for ODF"

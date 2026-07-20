@@ -1,0 +1,38 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
+images:
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.fleetshift
+    to: fleetshift
+  run_if_changed: ^Dockerfile\.fleetshift$
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: republish-latest
+  capabilities:
+  - arm64
+  cron: 30 4,10,16,22 * * *
+  retry:
+    attempts: 3
+    interval: 1h
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift
+    env:
+      IMAGE_REPO: fleetshift
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: fleetshift
+  repo: fleetshift-poc
+  variant: fleetshift

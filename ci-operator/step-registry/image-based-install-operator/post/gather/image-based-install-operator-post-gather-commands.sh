@@ -26,6 +26,8 @@ oc get baremetalhost ostest-extraworker-0 -n openshift-machine-api -o yaml > ${A
 # in case of an error in deleting the dataimage, we want to see it
 oc get dataimage ostest-extraworker-0 -n openshift-machine-api -o yaml > ${ARTIFACT_DIR}/dataimage.yaml || true
 oc get clusterdeployment ibi-cluster -n ibi-cluster -o yaml > ${ARTIFACT_DIR}/clusterdeployment.yaml
+# in case of an error in deleting the imageclusterinstall, we want to see it
+oc get imageclusterinstall ibi-cluster -n ibi-cluster -o yaml > ${ARTIFACT_DIR}/imageclusterinstall.yaml || true
 oc logs --tail=-1 -l app=image-based-install-operator -n image-based-install-operator -c manager > ${ARTIFACT_DIR}/image-based-install-operator-manager.log
 oc logs --tail=-1 -l app=image-based-install-operator -n image-based-install-operator -c server > ${ARTIFACT_DIR}/image-based-install-operator-server.log
 

@@ -26,6 +26,19 @@ export CYPRESS_BASE_URL
 CYPRESS_OC_CLUSTER_PASS=$(cat $SHARED_DIR/kubeadmin-password)
 export CYPRESS_OC_CLUSTER_PASS
 
+# Playwright equivalents (required by start.sh after Cypress→Playwright migration)
+HUB_URL=$(oc whoami --show-console)
+export HUB_URL
+HUB_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+export HUB_PASSWORD
+OC_CLUSTER_URL=$(oc whoami --show-server)
+export OC_CLUSTER_URL
+OC_CLUSTER_PASS=$(cat "${SHARED_DIR}/kubeadmin-password")
+export OC_CLUSTER_PASS
+export CONSOLE_USERNAME="${CYPRESS_OC_CLUSTER_USER:-kubeadmin}"
+export TEST_MODE="${CYPRESS_TEST_MODE:-integration}"
+export GREP="${TEST_TAGS:-@ocpInterop}"
+
 # Set the dynamic vars needed to execute application based tests (GitOps, Ansible, ObjectStore, etc.)
 ANSIBLE_TOKEN=$(cat $SECRETS_DIR/alc/ansible-token)
 export ANSIBLE_TOKEN
@@ -51,5 +64,9 @@ export COLLECTIVE_OCP_TOKEN
 # run the test execution script
 ./start.sh alc || :
 
-# Copy the test cases results to an external directory
-cp -r ../tests/cypress/results $ARTIFACT_DIR/
+# Copy test results (Playwright or legacy Cypress)
+for dir in test-results playwright-report ../tests/cypress/results; do
+  if [[ -d "$dir" ]]; then
+    cp -r "$dir" "$ARTIFACT_DIR/" || true
+  fi
+done
