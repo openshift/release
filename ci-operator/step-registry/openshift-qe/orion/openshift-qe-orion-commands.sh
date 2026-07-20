@@ -106,7 +106,7 @@ if ! curl -fsSL --fail --retry 8 --retry-all-errors https://github.com/cloud-bul
     exit 1
 fi
 chmod +x ocp-metadata
-CLUSTER_METADATA=$(./ocp-metadata)
+CLUSTER_METADATA=$(./ocp-metadata | jq -c .)
 
 # Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
@@ -192,7 +192,7 @@ if [[ "${JOB_TYPE}" == "periodic" ]]; then
 elif [[ "${JOB_TYPE}" == "presubmit" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
     pull_number="${PULL_NUMBER}"
     job_type="pull"
-    CLUSTER_METADATA=$(echo "${CLUSTER_METADATA}" | python -c "import sys,json; d=json.load(sys.stdin); d['organization']='${REPO_OWNER}'; d['repository']='${REPO_NAME}'; print(json.dumps(d))")
+    CLUSTER_METADATA=$(echo "${CLUSTER_METADATA}" | python -c "import sys,json; d=json.load(sys.stdin); d['organization']='${REPO_OWNER}'; d['repository']='${REPO_NAME}'; print(json.dumps(d,separators=(',',':')))")
     EXTRA_FLAGS+=" --pr-analysis"
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
     # Indicates a ci test triggered in PR against a pull request
