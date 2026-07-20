@@ -1,6 +1,14 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+DumpStorageCluster() {
+    : "--- StorageCluster dump (failure diagnostics) ---"
+    oc get storagecluster ocs-storagecluster -n "${ODF_INSTALL_NAMESPACE}" -o yaml || true
+    oc describe storagecluster ocs-storagecluster -n "${ODF_INSTALL_NAMESPACE}" || true
+    true
+}
+trap DumpStorageCluster ERR INT TERM
+
 # Wait for StorageCluster CRD to be registered before applying the manifest.
 oc wait crd storageclusters.ocs.openshift.io --for=condition=Established --timeout=5m
 
