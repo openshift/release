@@ -317,12 +317,6 @@ CONFIG = {
     'aro-hcp-dev-quota-slice': {
         'default': 14,
     },
-    'aro-hcp-dev-global-pipeline-quota-slice': {
-        'default': 1,
-    },
-    'aro-hcp-dev-cspr-pipeline-quota-slice': {
-        'default': 1,
-    },
     'aro-hcp-dev-image-push-quota-slice': {
         'default': 1,
     },
