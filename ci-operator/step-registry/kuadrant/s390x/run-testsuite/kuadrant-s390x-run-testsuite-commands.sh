@@ -22,6 +22,8 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 TEST_RUNNER_NAMESPACE="${TEST_RUNNER_NAMESPACE:-kuadrant-testrunner}"
 TESTSUITE_S390X_IMAGE="${TESTSUITE_S390X_IMAGE:-quay.io/vray_rh/rhcl-testsuite:stablev1}"
+# Must match the image USER/ownership so `make` can write stamp files in WORKDIR.
+TESTSUITE_RUN_AS_USER="${TESTSUITE_RUN_AS_USER:-65532}"
 JOB_NAME="kuadrant-testsuite-run"
 JOB_ACTIVE_DEADLINE="${JOB_ACTIVE_DEADLINE:-10200}"   # ~2h50m, under the step timeout
 
@@ -269,6 +271,9 @@ exit \${rc}"
 echo "=== Preparing test-runner namespace ${TEST_RUNNER_NAMESPACE} ==="
 oc create namespace "${TEST_RUNNER_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
+# Explicit runAsUser requires anyuid; restricted SCC would otherwise reject it.
+oc adm policy add-scc-to-user anyuid -z default -n "${TEST_RUNNER_NAMESPACE}"
+
 oc -n "${TEST_RUNNER_NAMESPACE}" delete job "${JOB_NAME}" --ignore-not-found=true --wait=true
 
 # Secret: dynaconf settings + admin kubeconfig (testsuite acts as cluster-admin).
@@ -300,10 +305,22 @@ spec:
       restartPolicy: Never
       nodeSelector:
         kubernetes.io/arch: s390x
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: ${TESTSUITE_RUN_AS_USER}
+        runAsGroup: ${TESTSUITE_RUN_AS_USER}
+        fsGroup: ${TESTSUITE_RUN_AS_USER}
       containers:
       - name: testsuite
         image: ${TESTSUITE_S390X_IMAGE}
         imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsNonRoot: true
+          runAsUser: ${TESTSUITE_RUN_AS_USER}
+          runAsGroup: ${TESTSUITE_RUN_AS_USER}
         command: ["bash", "-c"]
         args:
         - |
@@ -325,6 +342,10 @@ $(printf '%s\n' "${CONTAINER_SCRIPT}" | sed 's/^/          /')
           value: "yes"
         - name: resultsdir
           value: /test-run-results
+        - name: HOME
+          value: /tmp
+        - name: PYTHONPYCACHEPREFIX
+          value: /tmp/pycache
         volumeMounts:
         - name: config
           mountPath: /config
