@@ -3,10 +3,6 @@ workflow:
   steps:
     env:
       IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH: "true"
-      # New OZ LPARs keep the 2TB volume on /home; installer still creates pools under
-      # /var/lib/libvirt/openshift-images on the ~70G root FS (ENOSPC / paused VMs).
-      # Align with UPI multiarch-ci-pool parent path without changing Power/default IPI.
-      LIBVIRT_IMAGE_PATH: "/home/libvirt/openshift-images"
     allow_best_effort_post_steps: true
     pre:
     - ref: upi-libvirt-cleanup-pre
@@ -22,11 +18,6 @@ workflow:
     UPI VPN install-config naming (baseDomain phc-cicd.cis.ibm.net, cluster name = lease).
     Like openshift-e2e-libvirt-vpn and openshift-e2e-libvirt-vpn-fips, there is no workflow-level
     dnsConfig; individual step refs define DNS where needed.
-
-    Storage: openshift-install hardcodes libvirt pool path /var/lib/libvirt/openshift-images/<id>.
-    On VPN OZ hosts the large disk is /home (UPI multiarch-ci-pool -> /home/libvirt/openshift-images).
-    This workflow sets LIBVIRT_IMAGE_PATH so IPI pools are created as siblings under that path
-    (still a per-cluster pool named by infra ID; not reusing multiarch-ci-pool).
 
     s390x note: If terraform apply fails with "machine type 's390-ccw-virtio-rhel9.*' does not support
     ACPI", that is from openshift-install's bundled terraform-provider-libvirt (it always requests
