@@ -1,6 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
+if [[ -z "${BOOTC_IMAGE_BASE:-}" || -z "${BOOTC_IMAGE_TAG:-}" ]]; then
+  echo "ERROR: BOOTC_IMAGE_BASE and BOOTC_IMAGE_TAG must be set in the ci-operator config."
+  echo "  Example:"
+  echo "    steps:"
+  echo "      env:"
+  echo "        BOOTC_IMAGE_BASE: quay.io/redhat-user-workloads/jetpack-for-rhel-tenant/rhel-102-bootc"
+  echo "        BOOTC_IMAGE_TAG: \"7.2_6.12.0-211.20.1_062526071550\""
+  exit 1
+fi
+
 pip install --quiet ansible
 
 # Set up SSH key (add trailing newline if missing - Vault sync strips it)
