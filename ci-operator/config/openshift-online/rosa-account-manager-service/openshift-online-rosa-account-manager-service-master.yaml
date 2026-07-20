@@ -203,6 +203,49 @@ tests:
   secrets:
   - mount_path: /opt/app-root/ams-secrets
     name: openshift-online-ams-secrets
+- as: coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
+    cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
+    cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
+    cp /opt/app-root/ams-secrets/rbac.key secrets/rbac.key
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: src
+  nested_podman: true
+  secrets:
+  - mount_path: /opt/app-root/ams-secrets
+    name: openshift-online-ams-secrets
+  - mount_path: /var/run/codecov-secret
+    name: rosa-account-manager-service-codecov
+- as: publish-coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
+    cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
+    cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
+    cp /opt/app-root/ams-secrets/rbac.key secrets/rbac.key
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: src
+  nested_podman: true
+  postsubmit: true
+  secrets:
+  - mount_path: /opt/app-root/ams-secrets
+    name: openshift-online-ams-secrets
+  - mount_path: /var/run/codecov-secret
+    name: rosa-account-manager-service-codecov
 zz_generated_metadata:
   branch: master
   org: openshift-online
