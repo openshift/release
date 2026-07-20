@@ -1,0 +1,121 @@
+base_images:
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: nfv-e2e-sriov
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#forum-rhos-scale'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-osp-nfv
+    env:
+      EDPM_HOST: nfv-intel-11
+      SCENARIO: sriov
+    test:
+    - ref: openshift-qe-rhoso-nfv-e2e-cleanup
+    - ref: openshift-qe-rhoso-nfv-e2e-deploy
+    - ref: openshift-qe-rhoso-nfv-e2e-tune
+    - ref: openshift-qe-rhoso-nfv-e2e-crucible
+- always_run: false
+  as: nfv-e2e-ovs-dpdk
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#forum-rhos-scale'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-osp-nfv
+    env:
+      EDPM_HOST: nfv-intel-11
+      SCENARIO: ovs-dpdk
+    test:
+    - ref: openshift-qe-rhoso-nfv-e2e-cleanup
+    - ref: openshift-qe-rhoso-nfv-e2e-deploy
+    - ref: openshift-qe-rhoso-nfv-e2e-tune
+    - ref: openshift-qe-rhoso-nfv-e2e-crucible
+- always_run: false
+  as: nfv-e2e-sriov-cleanup
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-osp-nfv
+    env:
+      SCENARIO: sriov
+    test:
+    - ref: openshift-qe-rhoso-nfv-e2e-cleanup
+- always_run: false
+  as: nfv-e2e-sriov-deploy
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-osp-nfv
+    env:
+      EDPM_HOST: nfv-intel-11
+      SCENARIO: sriov
+    test:
+    - ref: openshift-qe-rhoso-nfv-e2e-deploy
+- always_run: false
+  as: nfv-e2e-sriov-tune
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-osp-nfv
+    env:
+      SCENARIO: sriov
+    test:
+    - ref: openshift-qe-rhoso-nfv-e2e-tune
+- always_run: false
+  as: nfv-e2e-sriov-crucible
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-osp-nfv
+    env:
+      SCENARIO: sriov
+    test:
+    - ref: openshift-qe-rhoso-nfv-e2e-crucible
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: metal-nfv-e2e-x86

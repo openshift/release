@@ -1,0 +1,29 @@
+ref:
+  as: openshift-qe-rhoso-nfv-e2e-deploy
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  env:
+  - name: SCENARIO
+    default: "sriov"
+    documentation: |-
+      NFV scenario: sriov or ovs-dpdk.
+  - name: EDPM_HOST
+    default: "nfv-intel-11"
+    documentation: |-
+      EDPM compute node: nfv-intel-11 or nfv-intel-12. Either can be
+      selected for any scenario based on hardware availability.
+  commands: openshift-qe-rhoso-nfv-e2e-deploy-commands.sh
+  timeout: 6h0m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Deploys RHOSO 18 via ci-framework and creates NFV tenant VM on the
+    automation host. Uses 2-hop SSH: Prow pod -> jumphost ->
+    zuul@automation-host. Runs: make e2e SCENARIO=$SCENARIO with
+    --skip-tune --skip-crucible flags (tune and crucible are separate
+    steps). Deploys OCP + RHOSO operators + EDPM compute provisioning +
+    tenant VM creation.
