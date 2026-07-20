@@ -295,21 +295,41 @@ function embed_topology_data() {
         continue
     fi
 
-    POOL=$(jq --compact-output -r .status.name < "${LEASE}")
-    SERVER=$(jq --compact-output -r .status.server < "${LEASE}")
-    CLUSTER=$(jq --compact-output -r .status.topology.computeCluster < "${LEASE}")
-    DATACENTER=$(jq --compact-output -r .status.topology.datacenter < "${LEASE}")
-    DATASTORE=$(jq --compact-output -r .status.topology.datastore < "${LEASE}")
-    NETWORKS=$(jq --compact-output -r .status.topology.networks[] < "${LEASE}")
     NAME=$(jq --compact-output -r .metadata.name < "${LEASE}")
-
     echo "Lease: ${NAME}<br>" >> "${RESULT_HTML}"
-    echo "- Pool: ${POOL}<br>" >> "${RESULT_HTML}"
-    echo "- Server: ${SERVER}<br>" >> "${RESULT_HTML}"
-    echo "- Cluster: ${CLUSTER}<br>" >> "${RESULT_HTML}"
-    echo "- Datacenter: ${DATACENTER}<br>" >> "${RESULT_HTML}"
-    echo "- Datastore: ${DATASTORE}<br>" >> "${RESULT_HTML}"
-    echo "- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
+
+    pool_info_count=$(jq '.status.poolInfo | length' < "${LEASE}")
+    if [[ "${pool_info_count}" != "null" && "${pool_info_count}" -gt 0 ]]; then
+      for ((pi = 0; pi < pool_info_count; pi++)); do
+        POOL=$(jq --compact-output -r ".status.poolInfo[${pi}].name" < "${LEASE}")
+        SERVER=$(jq --compact-output -r ".status.poolInfo[${pi}].server" < "${LEASE}")
+        CLUSTER=$(jq --compact-output -r ".status.poolInfo[${pi}].topology.computeCluster" < "${LEASE}")
+        DATACENTER=$(jq --compact-output -r ".status.poolInfo[${pi}].topology.datacenter" < "${LEASE}")
+        DATASTORE=$(jq --compact-output -r ".status.poolInfo[${pi}].topology.datastore" < "${LEASE}")
+        NETWORKS=$(jq --compact-output -r ".status.poolInfo[${pi}].topology.networks[]" < "${LEASE}")
+
+        echo "- Pool: ${POOL}<br>" >> "${RESULT_HTML}"
+        echo "&nbsp;&nbsp;- Server: ${SERVER}<br>" >> "${RESULT_HTML}"
+        echo "&nbsp;&nbsp;- Cluster: ${CLUSTER}<br>" >> "${RESULT_HTML}"
+        echo "&nbsp;&nbsp;- Datacenter: ${DATACENTER}<br>" >> "${RESULT_HTML}"
+        echo "&nbsp;&nbsp;- Datastore: ${DATASTORE}<br>" >> "${RESULT_HTML}"
+        echo "&nbsp;&nbsp;- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
+      done
+    else
+      POOL=$(jq --compact-output -r .status.name < "${LEASE}")
+      SERVER=$(jq --compact-output -r .status.server < "${LEASE}")
+      CLUSTER=$(jq --compact-output -r .status.topology.computeCluster < "${LEASE}")
+      DATACENTER=$(jq --compact-output -r .status.topology.datacenter < "${LEASE}")
+      DATASTORE=$(jq --compact-output -r .status.topology.datastore < "${LEASE}")
+      NETWORKS=$(jq --compact-output -r '.status.topology.networks[]' < "${LEASE}")
+
+      echo "- Pool: ${POOL}<br>" >> "${RESULT_HTML}"
+      echo "- Server: ${SERVER}<br>" >> "${RESULT_HTML}"
+      echo "- Cluster: ${CLUSTER}<br>" >> "${RESULT_HTML}"
+      echo "- Datacenter: ${DATACENTER}<br>" >> "${RESULT_HTML}"
+      echo "- Datastore: ${DATASTORE}<br>" >> "${RESULT_HTML}"
+      echo "- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
+    fi
     echo "<br>" >> "${RESULT_HTML}"
   done
 

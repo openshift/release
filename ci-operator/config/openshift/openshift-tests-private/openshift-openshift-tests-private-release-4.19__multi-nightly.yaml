@@ -71,47 +71,6 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- always_run: false
-  as: aws-ipi-amd-f14-netobserv
-  reporter_config:
-    channel: '#team-qe-netobserv'
-    job_states_to_report:
-    - aborted
-    - error
-    - failure
-    - success
-    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
-      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6i.2xlarge
-    test:
-    - chain: openshift-e2e-test-netobserv-qe-pf5
-    workflow: cucushift-installer-rehearse-aws-ipi
-- always_run: false
-  as: aws-ipi-arm-f28-netobserv
-  reporter_config:
-    channel: '#team-qe-netobserv'
-    job_states_to_report:
-    - aborted
-    - error
-    - failure
-    - success
-    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
-      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6gd.2xlarge
-      OCP_ARCH: arm64
-    test:
-    - chain: openshift-e2e-test-netobserv-qe-pf5
-    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-arm-mixarch-f14-day2-64k-pagesize
   cron: 15 15 11,27 * *
   steps:
@@ -1027,26 +986,6 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-heterogeneous-guest
-- always_run: false
-  as: azure-ipi-amd-f14-netobserv
-  reporter_config:
-    channel: '#team-qe-netobserv'
-    job_states_to_report:
-    - aborted
-    - error
-    - failure
-    - success
-    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
-      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_B8ms
-    test:
-    - chain: openshift-e2e-test-netobserv-qe-pf5
-    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-arm-mixarch-disc-fullypriv-f14-day2-64k-pagesize
   cron: 6 4 2,16 * *
   steps:
@@ -1769,7 +1708,7 @@ tests:
 - as: metal-ipi-ovn-ipv4-amd-f28
   capabilities:
   - intranet
-  cron: 23 13 13 * *
+  cron: 39 6 13 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1785,13 +1724,14 @@ tests:
 - as: metal-ipi-ovn-ipv4-arm-f28
   capabilities:
   - intranet
-  cron: 14 18 26 * *
+  cron: 49 0 26 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       DISCONNECTED: "false"
       RESERVE_BOOTSTRAP: "false"
+      VENDOR: ampere
       architecture: arm64
       masters: "3"
       workers: "2"
@@ -1801,7 +1741,7 @@ tests:
 - as: metal-ipi-ovn-ipv4-vmedia-amd-f28
   capabilities:
   - intranet
-  cron: 31 20 6 * *
+  cron: 9 22 6 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1816,13 +1756,14 @@ tests:
 - as: metal-ipi-ovn-dualstack-arm-vmedia-f28
   capabilities:
   - intranet
-  cron: 44 13 25 * *
+  cron: 29 0 25 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       PRIMARY_NET: ipv4
       RESERVE_BOOTSTRAP: "false"
+      VENDOR: hpe
       architecture: arm64
       ipv6_enabled: "true"
       masters: "3"
@@ -1833,7 +1774,7 @@ tests:
 - as: metal-ipi-ovn-ipv4-vmedia-disruptive-arm-f28
   capabilities:
   - intranet
-  cron: 21 18 16 * *
+  cron: 9 6 16 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1843,6 +1784,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       TEST_SCENARIOS: INSTALLER_DEDICATED
       TEST_TIMEOUT: "120"
+      VENDOR: hpe
       architecture: arm64
       masters: "3"
       workers: "2"
@@ -1852,7 +1794,7 @@ tests:
 - as: metal-ipi-ovn-ipv4-basecap-none-arm-f28
   capabilities:
   - intranet
-  cron: 8 13 16 * *
+  cron: 29 11 16 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1861,6 +1803,7 @@ tests:
       BASELINE_CAPABILITY_SET: None
       DISCONNECTED: "false"
       RESERVE_BOOTSTRAP: "false"
+      VENDOR: ampere
       architecture: arm64
       masters: "3"
       workers: "2"
@@ -1870,13 +1813,14 @@ tests:
 - as: metal-ipi-ovn-ipv4-external-lb-arm-f28
   capabilities:
   - intranet
-  cron: 8 14 24 * *
+  cron: 29 12 24 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       DISCONNECTED: "false"
       RESERVE_BOOTSTRAP: "false"
+      VENDOR: ampere
       architecture: arm64
       masters: "3"
       workers: "2"
@@ -1886,7 +1830,7 @@ tests:
 - as: metal-ipi-ovn-ipv4-vmedia-capi-tp-amd-f28
   capabilities:
   - intranet
-  cron: 31 19 11 * *
+  cron: 49 18 11 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1907,7 +1851,7 @@ tests:
 - as: metal-upi-ovn-ipv4-arm-mixarch-f28-day2-64k-pagesize
   capabilities:
   - intranet
-  cron: 37 14 10 * *
+  cron: 19 5 10 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1930,7 +1874,7 @@ tests:
 - as: metal-upi-ovn-ipv4-disconnected-arm-f28
   capabilities:
   - intranet
-  cron: 16 13 3 * *
+  cron: 59 12 3 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -1943,25 +1887,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-install-disconnected
-- always_run: false
-  as: gcp-ipi-amd-f14-netobserv
-  reporter_config:
-    channel: '#team-qe-netobserv'
-    job_states_to_report:
-    - aborted
-    - error
-    - failure
-    - success
-    report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle: {{
-      else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      COMPUTE_NODE_TYPE: c2-standard-8
-    test:
-    - chain: openshift-e2e-test-netobserv-qe-pf5
-    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-basecap-none-additionalcaps-amd-f28-destructive
   cron: 41 18 5 * *
   steps:
@@ -2552,7 +2477,7 @@ tests:
 - as: metal-short-cert-rotation-arm-f28
   capabilities:
   - intranet
-  cron: 33 15 6 * *
+  cron: 29 4 6 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -2561,6 +2486,7 @@ tests:
       FEATURE_GATES: '["ShortCertRotation=true"]'
       FEATURE_SET: CustomNoUpgrade
       RESERVE_BOOTSTRAP: "false"
+      VENDOR: ampere
       architecture: arm64
       masters: "3"
       workers: "2"
@@ -2568,7 +2494,7 @@ tests:
     - chain: openshift-e2e-test-qe-cert-rotation
     workflow: baremetal-lab-ipi
 - as: metal-ipi-ovn-tna-disasterrecovery-destructive-f14
-  cron: 0 9 14,28 * *
+  cron: 49 23 14,28 * *
   steps:
     cluster_profile: equinix-edge-enablement
     env:
@@ -2578,7 +2504,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: baremetalds-two-node-arbiter
 - as: metal-ipi-ovn-tna-disasterrecovery-sanity-f14
-  cron: 0 9 1,15 * *
+  cron: 59 18 1,15 * *
   steps:
     cluster_profile: equinix-edge-enablement
     env:
@@ -2590,7 +2516,7 @@ tests:
 - as: metal-upi-ovn-ipv4-day2-scale-amd-f28
   capabilities:
   - intranet
-  cron: 12 17 11 * *
+  cron: 19 22 11 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:

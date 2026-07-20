@@ -1,0 +1,51 @@
+base_images:
+  rebasebot:
+    name: rebasebot
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rebasebot
+  cron: 0 10,14 * * Mon-Fri
+  steps:
+    test:
+    - as: rebasebot
+      commands: |
+        rebasebot --source https://github.com/kubernetes-sigs/mcp-lifecycle-operator:main \
+                  --dest opendatahub-io/mcp-lifecycle-operator:main \
+                  --rebase opendatahub-io/mcp-lifecycle-operator:rebase-bot-main \
+                  --update-go-modules \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
+                  --github-app-id 3938801 \
+                  --github-app-key /secrets/rebasebot/openshift-rebasebot-key \
+                  --github-cloner-id 3938801 \
+                  --github-cloner-key /secrets/rebasebot/openshift-rebasebot-key \
+                  --git-username "openshift-rebasebot[bot]" \
+                  --git-email 289950310+openshift-rebasebot[bot]@users.noreply.github.com \
+                  --tag-policy=soft \
+                  --conflict-policy=warn
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
+        namespace: test-credentials
+      from_image:
+        name: rebasebot
+        namespace: ci
+        tag: latest
+      resources:
+        limits:
+          memory: 12Gi
+        requests:
+          cpu: 800m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: mcp-lifecycle-operator
+  variant: periodics

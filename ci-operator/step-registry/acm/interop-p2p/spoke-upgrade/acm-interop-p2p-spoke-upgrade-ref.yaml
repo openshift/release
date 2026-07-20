@@ -1,0 +1,30 @@
+ref:
+  as: acm-interop-p2p-spoke-upgrade
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: acm-interop-p2p-spoke-upgrade-commands.sh
+  timeout: 6h0m0s
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  dependencies:
+  - name: "release:target"
+    env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  env:
+  - name: SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL
+    default: ""
+    documentation: OCP update channel for the spoke cluster (e.g. candidate-4.21). Leave empty to skip channel patching.
+  - name: ACM_MANIFESTWORK_NAME
+    default: "spoke-ocp-upgrade"
+    documentation: ManifestWork metadata.name applied on the hub for spoke ClusterVersion desiredUpdate.
+  - name: ACM_SPOKE_UPGRADE_TIMEOUT
+    default: "3h"
+    documentation: Max time to wait for spoke ClusterVersion upgrade to complete. Accepts any oc wait duration.
+  documentation: |-
+    Upgrades the ACM managed spoke cluster (from acm-interop-p2p-cluster-install SHARED_DIR files)
+    to OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE (release:target) using ManifestWork on the hub
+    and klusterlet-work RBAC on the spoke. Post-upgrade MCP/CO/node health checks run in
+    acm-interop-p2p-spoke-upgrade-healthcheck (cucushift upgrade-healthcheck logic on the spoke).

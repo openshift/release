@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.23
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 images:
   items:
   - dockerfile_literal: |
@@ -125,6 +125,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      EC2_INSTANCE_TYPE: c7i.8xlarge
       MICROSHIFT_OS: rhel-9.8
     workflow: openshift-microshift-e2e-metal-cache
   timeout: 4h0m0s
@@ -143,7 +144,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      EC2_INSTANCE_TYPE: c7g.2xlarge
+      EC2_INSTANCE_TYPE: c7g.8xlarge
       MICROSHIFT_OS: rhel-9.8
     workflow: openshift-microshift-e2e-metal-cache
   timeout: 4h0m0s
@@ -173,6 +174,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      EC2_INSTANCE_TYPE: c7i.8xlarge
       MICROSHIFT_OS: rhel-9.8
     workflow: openshift-microshift-e2e-metal-cache
 - as: e2e-aws-tests-cache-arm
@@ -183,7 +185,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      EC2_INSTANCE_TYPE: c7g.2xlarge
+      EC2_INSTANCE_TYPE: c7g.8xlarge
       MICROSHIFT_OS: rhel-9.8
     workflow: openshift-microshift-e2e-metal-cache
 - as: e2e-aws-tests-periodic
@@ -391,6 +393,24 @@ tests:
       EC2_INSTANCE_TYPE: m7g.metal
       MICROSHIFT_OS: rhel-9.8
       SCENARIO_TYPE: bootc-upstream
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-c2cc
+  run_if_changed: ^(test/scenarios-bootc/c2cc/.*|test/suites/c2cc/.*|test/resources/c2cc.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-c2cc
+    workflow: openshift-microshift-e2e-metal-tests
+- as: e2e-aws-tests-bootc-c2cc-arm
+  run_if_changed: ^(test/scenarios-bootc/c2cc/.*|test/suites/c2cc/.*|test/resources/c2cc.*)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.metal
+      MICROSHIFT_OS: rhel-9.6
+      SCENARIO_TYPE: bootc-c2cc
     workflow: openshift-microshift-e2e-metal-tests
 zz_generated_metadata:
   branch: main

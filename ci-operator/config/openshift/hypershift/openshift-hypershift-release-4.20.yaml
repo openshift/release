@@ -11,10 +11,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  hypershift-operator-init:
+  hypershift-operator-420-latest:
     name: hypershift-operator
     namespace: hypershift
-    tag: latest
+    tag: "4.20"
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -24,6 +24,7 @@ build_root:
   use_build_cache: true
 images:
   items:
+  - to: hypershift-operator-pr
   - dockerfile_path: Dockerfile.control-plane
     to: hypershift
   - dockerfile_literal: |
@@ -33,8 +34,16 @@ images:
     to: custom-verify-src
 promotion:
   to:
-  - name: "4.20"
+  - excluded_images:
+    - hypershift-operator-pr
+    name: "4.20"
     namespace: ocp
+  - additional_images:
+      hypershift-operator: hypershift-operator-pr
+    excluded_images:
+    - '*'
+    namespace: hypershift
+    tag: "4.20"
 releases:
   initial:
     candidate:
@@ -184,7 +193,8 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+      CI_HYPERSHIFT_OPERATOR: hypershift-operator-pr
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-420-latest
     env:
       CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
       INSTALL_FROM_LATEST: "true"

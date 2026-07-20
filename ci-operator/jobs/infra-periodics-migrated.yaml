@@ -381,6 +381,82 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: core-ci
+  cron: 30 12 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build12-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build12` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      - --kubeconfig=/etc/build-farm-credentials/sa.config-updater.build12.config
+      command:
+      - /usr/bin/oc
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        secretName: config-updater
+- agent: kubernetes
+  cluster: core-ci
+  cron: 30 13 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build13-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build13` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      - --kubeconfig=/etc/build-farm-credentials/sa.config-updater.build13.config
+      command:
+      - /usr/bin/oc
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        secretName: config-updater
+- agent: kubernetes
+  cluster: core-ci
   cron: 30 0 * * 1-5
   decorate: true
   labels:

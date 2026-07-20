@@ -751,6 +751,7 @@ function get_source_dir() {
     [bootc-presubmits-el10]="scenarios-bootc/el10/presubmits:scenarios-bootc"
     [bootc-periodics-el9]="scenarios-bootc/el9/periodics:scenarios-bootc"
     [bootc-periodics-el10]="scenarios-bootc/el10/periodics:scenarios-bootc"
+    [bootc-c2cc]="scenarios-bootc/c2cc:scenarios-bootc"
     [releases]="scenarios/releases:scenarios"
     [presubmits]="scenarios/presubmits:scenarios"
     [periodics]="scenarios/periodics:scenarios-periodics"

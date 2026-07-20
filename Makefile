@@ -3,7 +3,7 @@ SHELL=/usr/bin/env bash -o errexit
 .PHONY: help check check-boskos check-core check-services check-validate-main-promotion dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
 
 export CONTAINER_ENGINE ?= podman
-export CONTAINER_ENGINE_OPTS ?= --platform linux/amd64
+export CONTAINER_ENGINE_OPTS ?= --platform linux
 export SKIP_PULL ?= false
 
 VOLUME_MOUNT_FLAGS = :z
@@ -94,19 +94,16 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig: 
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260617-37d12bec7 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260714-0633879af --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs:  ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
 	$(MAKE) sanitize-prow-jobs
 	#$(MAKE) tide-config-manager-verified
 
-cluster-profile-set-details:
-	core-services/prow/02_config/generate-boskos.py --print-cluster-profile-sets >cluster-profile-set-details.json
-
-ci-operator-checkconfig: cluster-profile-set-details
+ci-operator-checkconfig: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry/cluster-profiles:/ci-operator/step-registry/cluster-profiles$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/cluster-pools:/core-services/cluster-pools$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/cluster-profile-set-details.json:/cluster-profile-set-details.json$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest --config-dir /ci-operator/config --registry /ci-operator/step-registry --cluster-profiles-config /ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml --cluster-claim-owners-config /core-services/cluster-pools/_config.yaml --cluster-profile-set-details /cluster-profile-set-details.json
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry/cluster-profiles:/ci-operator/step-registry/cluster-profiles$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/cluster-pools:/core-services/cluster-pools$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest --config-dir /ci-operator/config --registry /ci-operator/step-registry --cluster-profiles-config /ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml --cluster-claim-owners-config /core-services/cluster-pools/_config.yaml
 .PHONY: ci-operator-checkconfig
 
 ci-operator-config: 
@@ -115,7 +112,7 @@ ci-operator-config:
 
 ci-operator-prowgen: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_auto-config-brancher_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/go/src/github.com/openshift/release$(VOLUME_MOUNT_FLAGS)" -e GOPATH=/go --entrypoint=/usr/bin/ci-operator-prowgen quay.io/openshift/ci-public:ci_auto-config-brancher_latest --from-release-repo --to-release-repo --known-infra-file infra-build-farm-periodics.yaml --known-infra-file infra-periodics.yaml --known-infra-file infra-image-mirroring.yaml --known-infra-file infra-periodics-origin-release-images.yaml $(WHAT)
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/go/src/github.com/openshift/release$(VOLUME_MOUNT_FLAGS)" -e GOPATH=/go --entrypoint=/usr/bin/ci-operator-prowgen quay.io/openshift/ci-public:ci_auto-config-brancher_latest --from-release-repo --to-release-repo --registry /go/src/github.com/openshift/release/ci-operator/step-registry --known-infra-file infra-build-farm-periodics.yaml --known-infra-file infra-periodics.yaml --known-infra-file infra-periodics-migrated.yaml --known-infra-file infra-image-mirroring.yaml --known-infra-file infra-periodics-origin-release-images.yaml $(WHAT)
 
 sanitize-prow-jobs: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_auto-config-brancher_latest

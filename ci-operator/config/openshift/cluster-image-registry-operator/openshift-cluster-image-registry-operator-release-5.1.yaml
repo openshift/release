@@ -9,8 +9,8 @@ base_images:
     tag: latest
   minio:
     name: minio
-    namespace: openshifttest
-    tag: latest
+    namespace: ci
+    tag: RELEASE.2025-09-07T16-13-09Z
 build_root:
   from_repository: true
 images:
@@ -42,13 +42,15 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -60,27 +62,29 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-ovn-image-registry
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn-image-registry
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-image-registry
-- as: e2e-aws-ovn-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-gcp-ovn
   optional: true
-  run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
+  pipeline_run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-gcp-operator
   optional: true
-  run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
+  pipeline_run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -101,14 +105,14 @@ tests:
 - always_run: false
   as: e2e-azure-ovn
   optional: true
-  run_if_changed: ^(.*azure.*|vendor/github\.com/Azure/.*)\.go$
+  pipeline_run_if_changed: ^(.*azure.*|vendor/github\.com/Azure/.*)\.go$
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-azure-operator
   optional: true
-  run_if_changed: ^(.*azure.*|vendor/github\.com/Azure/.*)\.go$
+  pipeline_run_if_changed: ^(.*azure.*|vendor/github\.com/Azure/.*)\.go$
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -123,12 +127,13 @@ tests:
 - always_run: false
   as: e2e-vsphere
   optional: true
-  run_if_changed: ^(.*(vsphere|baremetal).*)\.go$
+  pipeline_run_if_changed: ^(.*(vsphere|baremetal).*)\.go$
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-operator
-  run_if_changed: ^(.*(vsphere|baremetal).*)\.go$
+- always_run: false
+  as: e2e-vsphere-operator
+  pipeline_run_if_changed: ^(.*(vsphere|baremetal).*)\.go$
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -148,18 +153,20 @@ tests:
 - always_run: false
   as: e2e-openstack
   optional: true
-  run_if_changed: (^(.*swift.*|vendor/github\.com/gophercloud/.*)\.go$|.*openstack.*)
+  pipeline_run_if_changed: (^(.*swift.*|vendor/github\.com/gophercloud/.*)\.go$|.*openstack.*)
   steps:
     cluster_profile: openstack-vexxhost
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-hypershift
+- always_run: false
+  as: e2e-hypershift
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
-- as: e2e-hypershift-conformance
+- always_run: false
+  as: e2e-hypershift-conformance
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
@@ -177,7 +184,7 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-serial-ote
   steps:
     cluster_profile: openshift-org-aws
@@ -187,7 +194,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
   timeout: 8h0m0s
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-parallel-ote
   steps:
     cluster_profile: openshift-org-aws

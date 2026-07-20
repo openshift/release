@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.21"
+    name: "5.0"
     namespace: ocp
     tag: cli
   cli-operator-sdk:
@@ -10,7 +10,7 @@ base_images:
   hco-bundle-reg:
     name: hyperconverged-cluster-bundle
     namespace: ci
-    tag: 1.17.0-unstable
+    tag: 1.19.0-unstable
 binary_build_commands: make install
 build_root:
   from_repository: true
@@ -20,14 +20,16 @@ images:
     to: kubevirt-must-gather
 releases:
   initial:
-    integration:
-      name: "4.21"
-      namespace: ocp
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "5.0"
   latest:
-    integration:
-      include_built_images: true
-      name: "4.21"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -114,6 +116,20 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - as: test-incident
+      cli: latest
+      commands: |
+        INCIDENT_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-incident-output -- NS=ns001 VM=testvm-ns001-vm001 /usr/bin/gather --vm-incident --incident-time=${INCIDENT_TIME}
+        mkdir -p ${ARTIFACT_DIR}/junit
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} INCIDENT_NS=ns001 MG_INCIDENT_OUTPUT_DIR=must-gather-incident-output /go/bin/must-gather.test --ginkgo.label-filter=level:incident --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
     - as: test-all-images
       cli: latest
       commands: |
@@ -140,8 +156,8 @@ tests:
             break
           fi
           if [[ $i == ${TIMEOUT_SEC} ]]; then
-            echo "timeout waiting for the CSVs to get the new must-gather image"
-            break
+            echo "ERROR: timeout waiting for the CSVs to get the new must-gather image"
+            exit 1
           else
             echo "Not all the CSVs were updated with the new image; trying again ($i/${TIMEOUT_SEC})"
             sleep 1
@@ -233,6 +249,20 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - as: test-incident
+      cli: latest
+      commands: |
+        INCIDENT_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-incident-output -- NS=ns001 VM=testvm-ns001-vm001 /usr/bin/gather --vm-incident --incident-time=${INCIDENT_TIME}
+        mkdir -p ${ARTIFACT_DIR}/junit
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} INCIDENT_NS=ns001 MG_INCIDENT_OUTPUT_DIR=must-gather-incident-output /go/bin/must-gather.test --ginkgo.label-filter=level:incident --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
     - as: test-all-images
       cli: latest
       commands: |
@@ -259,8 +289,8 @@ tests:
             break
           fi
           if [[ $i == ${TIMEOUT_SEC} ]]; then
-            echo "timeout waiting for the CSVs to get the new must-gather image"
-            break
+            echo "ERROR: timeout waiting for the CSVs to get the new must-gather image"
+            exit 1
           else
             echo "Not all the CSVs were updated with the new image; trying again ($i/${TIMEOUT_SEC})"
             sleep 1

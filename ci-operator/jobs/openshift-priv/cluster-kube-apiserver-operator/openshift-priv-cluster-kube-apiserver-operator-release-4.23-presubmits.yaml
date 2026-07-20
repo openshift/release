@@ -96,6 +96,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-aws-operator-disruptive-single-node,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -119,7 +121,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-kube-apiserver-operator
     rerun_command: /test e2e-aws-operator-encryption-kms
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
     spec:
       containers:
       - args:
@@ -190,7 +191,103 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-operator-encryption-kms,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+    branches:
+    - ^release-4\.23$
+    - ^release-4\.23-
+    cluster: build06
+    context: ci/prow/e2e-aws-operator-encryption-kms-2
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel7
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-kube-apiserver-operator-release-4.23-e2e-aws-operator-encryption-kms-2
+    optional: true
+    path_alias: github.com/openshift/cluster-kube-apiserver-operator
+    rerun_command: /test e2e-aws-operator-encryption-kms-2
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-operator-encryption-kms-2
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-operator-encryption-kms-2,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -281,9 +378,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-aws-ovn|remaining-required),?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -375,9 +472,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-1of2,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-aws-ovn-serial-1of2|remaining-required),?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -469,7 +566,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-2of2,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-aws-ovn-serial-2of2|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -565,7 +662,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-single-node,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -656,13 +753,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-aws-ovn-upgrade|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -752,7 +849,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -843,9 +940,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-gcp-operator|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -869,7 +968,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-kube-apiserver-operator
     rerun_command: /test e2e-gcp-operator-encryption-aescbc
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
     spec:
       containers:
       - args:
@@ -941,6 +1039,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-aescbc,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -964,7 +1064,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-kube-apiserver-operator
     rerun_command: /test e2e-gcp-operator-encryption-aesgcm
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
     spec:
       containers:
       - args:
@@ -1059,7 +1158,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-kube-apiserver-operator
     rerun_command: /test e2e-gcp-operator-encryption-kms-rotation
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
     spec:
       containers:
       - args:
@@ -1131,6 +1229,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-kms-rotation,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -1154,7 +1254,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-kube-apiserver-operator
     rerun_command: /test e2e-gcp-operator-encryption-perf-aescbc
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
     spec:
       containers:
       - args:
@@ -1226,6 +1325,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-perf-aescbc,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -1249,7 +1350,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-kube-apiserver-operator
     rerun_command: /test e2e-gcp-operator-encryption-perf-aesgcm
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
     spec:
       containers:
       - args:
@@ -1321,6 +1421,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-perf-aesgcm,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -1344,7 +1446,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-kube-apiserver-operator
     rerun_command: /test e2e-gcp-operator-encryption-perf-single-node
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
     spec:
       containers:
       - args:
@@ -1416,6 +1517,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-perf-single-node,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -1439,7 +1542,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-kube-apiserver-operator
     rerun_command: /test e2e-gcp-operator-encryption-rotation-aescbc
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
     spec:
       containers:
       - args:
@@ -1511,6 +1613,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-rotation-aescbc,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -1534,7 +1638,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-kube-apiserver-operator
     rerun_command: /test e2e-gcp-operator-encryption-rotation-aesgcm
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
     spec:
       containers:
       - args:
@@ -1606,6 +1709,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-rotation-aesgcm,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -1629,7 +1734,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-kube-apiserver-operator
     rerun_command: /test e2e-gcp-operator-encryption-rotation-single-node
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
     spec:
       containers:
       - args:
@@ -1701,6 +1805,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-rotation-single-node,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -1724,7 +1830,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-kube-apiserver-operator
     rerun_command: /test e2e-gcp-operator-encryption-single-node
-    run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
     spec:
       containers:
       - args:
@@ -1795,7 +1900,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-single-node,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -1886,7 +1991,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-operator-serial-ote,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-gcp-operator-serial-ote|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -3302,7 +3407,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     decoration_config:
@@ -3490,7 +3595,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-short-cert-rotation-azure
     decorate: true
     decoration_config:
@@ -3584,7 +3689,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -3646,7 +3751,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -3737,7 +3842,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )k8s-e2e-gcp,?($|\s.*)
+    trigger: (?m)^/test( | .* )(k8s-e2e-gcp|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -3837,7 +3942,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -3911,7 +4016,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -3985,7 +4090,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build02
+    cluster: build04
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:

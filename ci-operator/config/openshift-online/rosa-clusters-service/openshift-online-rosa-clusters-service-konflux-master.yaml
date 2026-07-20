@@ -1,0 +1,96 @@
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+prowgen:
+  expose: true
+  private: true
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: check-migrations
+  commands: |
+    git remote add origin .
+    git update-ref refs/remotes/origin/master HEAD
+    ./check_migrations.sh
+  container:
+    from: src
+- as: lint
+  commands: unset GOFLAGS && make lint
+  container:
+    from: src
+- as: unit
+  commands: unset GOFLAGS && make test
+  container:
+    from: src
+- always_run: false
+  as: pr-check-rosa-hcp
+  commands: |
+    source prow/load_prow_secrets.sh
+    set -x
+    ./pr_check.sh --rosa-hcp
+  container:
+    from: src
+  optional: true
+  secrets:
+  - mount_path: /usr/local/rosa-clusters-service-sandbox
+    name: rosa-clusters-service-sandbox
+- always_run: false
+  as: pr-check-aws
+  commands: |
+    source prow/load_prow_secrets.sh
+    set -x
+    ./pr_check.sh --aws
+  container:
+    from: src
+  optional: true
+  secrets:
+  - mount_path: /usr/local/rosa-clusters-service-sandbox
+    name: rosa-clusters-service-sandbox
+- always_run: false
+  as: pr-check-gcp
+  commands: |
+    source prow/load_prow_secrets.sh
+    set -x
+    ./pr_check.sh --gcp
+  container:
+    from: src
+  optional: true
+  secrets:
+  - mount_path: /usr/local/rosa-clusters-service-sandbox
+    name: rosa-clusters-service-sandbox
+- always_run: false
+  as: pr-check-rosa-classic
+  commands: |
+    source prow/load_prow_secrets.sh
+    set -x
+    ./pr_check.sh --rosa-classic
+  container:
+    from: src
+  optional: true
+  secrets:
+  - mount_path: /usr/local/rosa-clusters-service-sandbox
+    name: rosa-clusters-service-sandbox
+- always_run: false
+  as: pr-check-core
+  commands: |
+    source prow/load_prow_secrets.sh
+    set -x
+    ./pr_check.sh --core
+  container:
+    from: src
+  optional: true
+  secrets:
+  - mount_path: /usr/local/rosa-clusters-service-sandbox
+    name: rosa-clusters-service-sandbox
+zz_generated_metadata:
+  branch: konflux-master
+  org: openshift-online
+  repo: rosa-clusters-service

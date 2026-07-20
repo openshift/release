@@ -1213,7 +1213,7 @@ tests:
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
       ENABLE_VSPHERE_FILESHARE_TESTS: "true"
-      POOL_SELECTOR: vsphere-type=vcf9
+      POOL_SELECTOR: vsphere-type=vcf9,vsanfs=true
       TEST_SKIPS: 'Testpattern: Dynamic PV (xfs).*multiVolume.*should concurrently
         access the single volume from pods on different node\|Testpattern: Dynamic
         PV (block volmode).*multiVolume.*should concurrently access the single volume
@@ -1614,35 +1614,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-sno-cnf
-- as: e2e-telco5g-ptp
-  capabilities:
-  - intranet
-  cron: 0 0 * * 0
-  restrict_network_access: false
-  steps:
-    env:
-      SKIP_OCP_INSTALL: "false"
-      T5CI_JOB_TYPE: ptp
-      T5CI_VERSION: "4.23"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-ptp
-- as: e2e-telco5g-ptp-upstream
-  capabilities:
-  - intranet
-  cron: 0 5 * * 0
-  restrict_network_access: false
-  steps:
-    env:
-      SKIP_OCP_INSTALL: "true"
-      T5CI_DEPLOY_UPSTREAM: "true"
-      T5CI_JOB_TYPE: ptp
-      T5CI_VERSION: "4.23"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-ptp
 - as: e2e-telco5g-hcp-cnftests
   capabilities:
   - intranet
@@ -1957,6 +1928,9 @@ tests:
   interval: 168h
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      TEST_SKIPS: \[sig-node\] Node Lifecycle should run through the lifecycle of
+        a node
     workflow: openshift-e2e-aws-cpu-partitioning
 - as: e2e-aws-ovn-single-node-one-core-serial
   interval: 168h
@@ -1988,6 +1962,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
         FIPS_MODE=true
+        MASTER_VCPU=8
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
 - as: e2e-agent-single-node-ipv6-conformance
@@ -2010,6 +1985,7 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6
+        WORKER_MEMORY=24576
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-30d

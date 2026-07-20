@@ -9,8 +9,8 @@ base_images:
     tag: 2.0.0-ent
   vault_kube_kms:
     name: vault-kube-kms
-    namespace: control-plane_vault
-    tag: 0.0.1
+    namespace: ci
+    tag: 0.1.0-beta-ubi
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -62,7 +62,8 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: src
-- as: e2e-agnostic
+- always_run: false
+  as: e2e-agnostic
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
@@ -78,7 +79,8 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-operator
+- always_run: false
+  as: e2e-operator
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -91,11 +93,13 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-agnostic-upgrade
+- always_run: false
+  as: e2e-agnostic-upgrade
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
-- as: e2e-console-login
+- always_run: false
+  as: e2e-console-login
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -107,8 +111,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-operator-encryption
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+- always_run: false
+  as: e2e-operator-encryption
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -122,7 +127,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- always_run: true
+- always_run: false
   as: e2e-gcp-operator-disruptive
   steps:
     cluster_profile: openshift-org-gcp
@@ -131,8 +136,9 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-rotation
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
+- always_run: false
+  as: e2e-gcp-operator-encryption-rotation
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -146,8 +152,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-perf
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
+- always_run: false
+  as: e2e-gcp-operator-encryption-perf
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -160,8 +167,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-oidc-techpreview
-  run_if_changed: ^(pkg/controllers/externaloidc)|^(test/e2e-oidc)
+- always_run: false
+  as: e2e-oidc-techpreview
+  pipeline_run_if_changed: ^(pkg/controllers/externaloidc)|^(test/e2e-oidc)
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -177,7 +185,8 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-oidc
+- always_run: false
+  as: e2e-oidc
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -297,12 +306,30 @@ tests:
 - always_run: false
   as: e2e-aws-operator-encryption-kms
   optional: true
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
   steps:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-authentication-operator/encryption-kms
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:4206f83742528de5a1cc0ff2b2e93476a1e44dc18caf595b6658d03603dcafa2
+    test:
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+  timeout: 4h0m0s
+- always_run: false
+  as: e2e-aws-operator-encryption-kms-2
+  optional: true
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-authentication-operator/encryption-kms-2
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:4206f83742528de5a1cc0ff2b2e93476a1e44dc18caf595b6658d03603dcafa2
     test:
     - chain: etcd-encryption-vault-setup
     - ref: openshift-e2e-test

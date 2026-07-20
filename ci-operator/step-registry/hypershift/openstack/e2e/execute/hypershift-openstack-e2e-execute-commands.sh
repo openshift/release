@@ -34,7 +34,7 @@ fi
 # run the test
 hack/ci-test-e2e.sh ${E2E_EXTRA_ARGS} \
         --test.v \
-        --test.timeout=2h30m \
+        --test.timeout=3h30m \
         --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
         --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
         --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \

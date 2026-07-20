@@ -411,6 +411,9 @@ tests:
       :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      MAX_VCENTERS: "1"
+      POOL_COUNT: "3"
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-upi-zones
   cron: 21 15 24 6 *
@@ -423,6 +426,9 @@ tests:
       :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      MAX_VCENTERS: "1"
+      POOL_COUNT: "3"
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-ipi-ovn-cgroupsv1
   cron: 34 8 15 2 *
@@ -789,20 +795,6 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-telco5g-ptp
-  capabilities:
-  - intranet
-  cron: 0 19 * * 3,6
-  restrict_network_access: false
-  steps:
-    env:
-      SKIP_OCP_INSTALL: "false"
-      T5CI_JOB_TYPE: ptp
-      T5CI_VERSION: "4.14"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-ptp
 - as: e2e-alibaba-ovn
   cron: 51 0 23 10 *
   steps:

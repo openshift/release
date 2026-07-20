@@ -11,6 +11,10 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -23,6 +27,20 @@ images:
   items:
   - dockerfile_path: openshift/Dockerfile.openshift
     to: aws-cluster-api-controllers
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src/
+      WORKDIR /opt/app-root/src/cluster-api-provider-aws
+      USER root
+      RUN dnf install -y git go make && dnf clean all
+      RUN ln -s /usr/bin/podman /usr/local/bin/docker
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/sigs.k8s.io/cluster-api-provider-aws
+    to: src-podman
 promotion:
   to:
   - disabled: true
@@ -121,9 +139,12 @@ tests:
     test:
     - ref: go-verify-deps
 - as: verify
+  capabilities:
+  - nested-podman
   commands: make -C openshift verify
   container:
-    from: src
+    from: src-podman
+  nested_podman: true
 zz_generated_metadata:
   branch: release-5.0
   org: openshift-priv

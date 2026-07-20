@@ -306,6 +306,8 @@ cp tests/cypress/e2e/tracing.cy.js "${dest}/"
 Write a `${ARTIFACT_DIR}/test-fixes/CHANGES.md` using this structure:
 
 ```markdown
+> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
+
 # Test Fix Summary
 
 ## Failing test
@@ -331,6 +333,8 @@ Rerun result after fix: [PASS / FAIL / not re-verified]
 Do not attempt to fix the plugin or operator code. Instead, write `${ARTIFACT_DIR}/bug-report.md`:
 
 ````markdown
+> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
+
 # Product Bug Report
 
 ## Summary
@@ -395,7 +399,7 @@ After editing, copy changed files to `${ARTIFACT_DIR}/test-fixes/` (same structu
 
 ## Step 5d — If CLUSTER_INSTABILITY: Write Incident Note
 
-Write `${ARTIFACT_DIR}/cluster-instability-report.md` with: a one-sentence summary; a table of affected tests (suite / test case / original duration / rerun duration); root cause (MCP updates, node evictions, COO pod restarts — include the MCP status snapshot from Step 0a); evidence (MCP output, relevant pod events); and a recommendation to rerun the CI job.
+Write `${ARTIFACT_DIR}/cluster-instability-report.md` with: a one-sentence summary; a table of affected tests (suite / test case / original duration / rerun duration); root cause (MCP updates, node evictions, COO pod restarts — include the MCP status snapshot from Step 0a); evidence (MCP output, relevant pod events); and a recommendation to rerun the CI job. Begin the report with the following banner: `> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.`
 
 ---
 
@@ -404,6 +408,8 @@ Write `${ARTIFACT_DIR}/cluster-instability-report.md` with: a one-sentence summa
 Write `${ARTIFACT_DIR}/qe-agent-analysis.md` immediately after each test is diagnosed — do not wait until the end. Overwrite it after each subsequent test. Write partial entries for in-progress flakiness runs ("Rerun 1: PASS — confirmation in progress") and overwrite when complete. Record any deviations from the skill steps in the **Skill Improvement Recommendations** section.
 
 ````markdown
+> **AI-Generated Content** — This analysis was produced by the OpenShift Observability QE Agent (Claude Code CLI). Always review AI-generated output prior to use.
+
 # QE Agent Analysis
 
 ## Failed Tests
@@ -433,6 +439,12 @@ Write `${ARTIFACT_DIR}/qe-agent-analysis.md` immediately after each test is diag
 <If PRODUCT_BUG>: Bug report written to `${ARTIFACT_DIR}/bug-report.md`.
 <If FLAKY>: Flaky test confirmed (pattern: <e.g. PFPP>). Fix applied to `${ARTIFACT_DIR}/test-fixes/`. See `CHANGES.md` for root cause and fix details.
 <If CLUSTER_INSTABILITY>: Incident note written to `${ARTIFACT_DIR}/cluster-instability-report.md`. Recommendation: rerun the CI job.
+
+## Evidence Sources
+- JUnit XML: `<filename>` — failure message at line <N>
+- Operator logs: `<namespace>/<deployment>` — <relevant log excerpt>
+- Cluster state: <MCP status / CRD availability / pod status>
+- Test source: `<file-path>` — <what was found>
 
 ## Skill Improvement Recommendations
 <!-- Record any deviation from the skill steps here — wrong commands, missing steps, steps that needed adaptation, or better approaches discovered during this run.

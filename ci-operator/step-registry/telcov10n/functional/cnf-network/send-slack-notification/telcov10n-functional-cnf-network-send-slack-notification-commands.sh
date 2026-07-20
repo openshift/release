@@ -32,7 +32,11 @@ echo "Set bastion ssh configuration"
 grep ansible_ssh_private_key -A 100 "${SHARED_DIR}/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "/tmp/temp_ssh_key"
 
 chmod 600 "/tmp/temp_ssh_key"
-scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/.polarion_url "${SHARED_DIR}/polarion_url"
+
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+scp -r ${SSH_OPTS} -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/.polarion_url "${SHARED_DIR}/polarion_url"
+scp ${SSH_OPTS} -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}:/tmp/${REPORTPORTAL_FILES:-}" "${SHARED_DIR}/reportportal_url" 2>/dev/null || true
 
 
 if [[ ! -f "$CLUSTER_VERSION_FILE" ]]; then
@@ -69,6 +73,15 @@ else
   echo "No polarion URL file found or file is empty"
 fi
 
+# Read ReportPortal URL if available
+REPORTPORTAL_URL=""
+if [[ -f "${SHARED_DIR}/reportportal_url" ]] && [[ -s "${SHARED_DIR}/reportportal_url" ]]; then
+  REPORTPORTAL_URL="$(cat "${SHARED_DIR}/reportportal_url")"
+  echo "ReportPortal URL: ${REPORTPORTAL_URL}"
+else
+  echo "No ReportPortal URL file found or file is empty"
+fi
+
 # Read phase1_build_id if available
 PHASE1_BUILD_ID="" 
 if [[ -f "$PHASE1_BUILD_ID_FILE" ]] && [[ -s "$PHASE1_BUILD_ID_FILE" ]]; then
@@ -96,6 +109,7 @@ fi
 
 extra_args=()
 [[ -n "$CONTAINERS_VERSION" ]] && extra_args+=(--containers-version "$CONTAINERS_VERSION")
+[[ -n "$REPORTPORTAL_URL" ]] && extra_args+=(--reportportal-url "$REPORTPORTAL_URL")
 
 echo "Sending Slack notification to cnf-qe-core channel..."
 cd $SCRIPTS_FOLDER

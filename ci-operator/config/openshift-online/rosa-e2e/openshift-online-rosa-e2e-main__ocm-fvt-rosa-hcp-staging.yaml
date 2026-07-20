@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
+    tag: rhel-9-golang-1.26-openshift-4.23
 releases:
   latest:
     candidate:
@@ -233,12 +233,44 @@ tests:
 - as: ocm-fvt-periodic-cs-sanity-staging-main
   capabilities:
   - nested-podman
-  interval: 168h
+  cron: 0 0 31 2 *
   nested_podman: true
   steps:
     allow_best_effort_post_steps: true
     env:
       OCM_FVT_JOB_NAME: cs-sanity-staging
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-sanity-jira-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 0 31 2 *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-sanity-jira-staging
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-access-request-staging-main
+  capabilities:
+  - nested-podman
+  cron: 20 6 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-access-request-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
     pre:

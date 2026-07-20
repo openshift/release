@@ -1,5 +1,6 @@
 build_root:
   from_repository: true
+  use_build_cache: true
 images:
   items:
   - dockerfile_path: Dockerfile
@@ -25,14 +26,37 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  karpenter-operator:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 200m
+      memory: 400Mi
 tests:
 - as: e2e-aws
   skip_if_only_changed: ^docs/|^\.github|\.md$|\.mdc$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: DevPreviewNoUpgrade
+      FEATURE_GATES: '["KarpenterOperator=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws
+- as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|^\.github|\.md$|\.mdc$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_GATES: '["KarpenterOperator=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: verify
   commands: |
     export GOCACHE=/tmp/

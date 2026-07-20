@@ -4,10 +4,6 @@ import argparse
 import json
 import yaml
 
-parser = argparse.ArgumentParser(description="Boskos config generator")
-parser.add_argument("--print-cluster-profile-sets", dest="print_cps", default=False, help="Write cluster profile set details on stdout", action="store_true")
-args = parser.parse_args()
-
 CONFIG = {
     'aws-us-east-1-quota-slice': {
         'us-east-1': 15,
@@ -108,6 +104,9 @@ CONFIG = {
         'us-west-2': 5,
         'us-east-2': 5
     },
+    'metal-dpf-doca8-quota-slice': {
+        'metal-dpf-doca8-rdu2': 1,
+    },
     'metal-perfscale-cpt-quota-slice': {
         'metal-perfscale-cpt-rdu3': 1,
     },
@@ -152,6 +151,18 @@ CONFIG = {
     },
     'aws-konflux-qe-quota-slice': {
         'us-west-2': 10
+    },
+    'aws-konflux-stg-quota-slice': {
+        'us-east-1': 25,
+        'us-east-2': 25,
+        'us-west-1': 25,
+        'us-west-2': 25
+    },
+    'aws-konflux-prod-quota-slice': {
+        'us-east-1': 100,
+        'us-east-2': 100,
+        'us-west-1': 100,
+        'us-west-2': 100
     },
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
@@ -326,6 +337,8 @@ CONFIG = {
     'aro-hcp-dev-shard3-slot': {},
     'aro-hcp-dev-hypershift-westus3-slot': {},
     'aro-hcp-int-shard0-slot': {},
+    'aro-hcp-prod-shard0-slot': {},
+    'aro-hcp-prod-shard1-slot': {},
     'aro-hcp-stg-shard0-slot': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
@@ -352,6 +365,9 @@ CONFIG = {
     },
     'fleet-manager-qe-quota-slice': {
         'ap-northeast-1': 3,
+    },
+    'gcd-quota-slice': {
+        'u-germany-northeast1': 2,
     },
     'gcp-qe-quota-slice': {
         'us-central1': 45,
@@ -454,7 +470,6 @@ CONFIG = {
     },
     'vsphere-dis-2-quota-slice':{},
     'vsphere-connected-2-quota-slice':{},
-    'vsphere-multizone-2-quota-slice':{},
     'vsphere-elastic-quota-slice':{},
     'vsphere-elastic-poc-quota-slice':{},
     'osd-ephemeral-quota-slice': {
@@ -502,6 +517,9 @@ CONFIG = {
     'powervs-7-quota-slice': {},
     'powervs-8-quota-slice': {},
     'powervs-9-quota-slice': {},
+    'powervs-sno-quota-slice': {
+        'dal14': 2,
+    },
     'powervs-multi-1-quota-slice': {
         'lon04': 2,
     },
@@ -753,9 +771,6 @@ for i in [990,1169,1166,1164,1146]:
 for i in [871,991,1165,1154,1148,1140]:
     CONFIG['vsphere-connected-2-quota-slice']['bcr01a.dal12.{}'.format(i)] = 1
 
-for i in [1287,1289,1296,1298,1300,1302]:
-    CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
-
 for i in range(0,2):
     CONFIG['vsphere-elastic-poc-quota-slice']['vsphere-elastic-poc-{}'.format(i)] = 1
 
@@ -792,14 +807,18 @@ for i in range(6):
     CONFIG['aro-hcp-dev-shard0-slot']['aro-hcp-dev-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(6):
     CONFIG['aro-hcp-dev-shard1-slot']['aro-hcp-dev-shard1-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(3):
+for i in range(6):
     CONFIG['aro-hcp-dev-shard2-slot']['aro-hcp-dev-shard2-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(3):
+for i in range(6):
     CONFIG['aro-hcp-dev-shard3-slot']['aro-hcp-dev-shard3-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-dev-hypershift-westus3-slot']['aro-hcp-dev-hypershift-westus3-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-int-shard0-slot']['aro-hcp-int-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(3):
+    CONFIG['aro-hcp-prod-shard0-slot']['aro-hcp-prod-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(3):
+    CONFIG['aro-hcp-prod-shard1-slot']['aro-hcp-prod-shard1-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
@@ -852,48 +871,6 @@ CLUSTER_PROFILE_SETS_CONFIG = {
             'install': 50,
             'quota': CONFIG['gcp-3-quota-slice'],
         },
-    },
-}
-
-CLUSTER_PROFILE_SETS_IGNORE = {
-    # Do not dump the following cps. Useful when a new profile is about to be introduced
-    # and it is not fully defined yet.
-    'profiles': [],
-
-    # Do not enforce any Cluster Profile Set usage policy on these tests. The schema of
-    # this stanza is defined as follow:
-    #
-    #  'tests_allowlist': {
-    #    '${ORGANIZATION_REGEXP}/${REPOSITORY_REGEXP}' : {
-    #      '${BRANCH_REGEXP}': {
-    #        '${VARIANT_REGEXP}': [
-    #           '${TEST_REGEXP}'
-    #         ]
-    #      }
-    #    }
-    #  }
-    'tests_allowlist': {
-        'openshift(-priv)?/openshift-tests-private': {
-            '.+': {
-                '.*': [
-                    '.+-public-ipv4-pool.*'
-                ]
-            }
-        },
-        'openshift(-priv)?/installer': {
-            '.+': {
-                '.*': [
-                    '.+-public-ipv4-pool.*'
-                ]
-            }
-        },
-        'openshift/release': {
-            '.+': {
-                '.*': [
-                    '.+-public-ipv4-pool.*'
-                ]
-            }
-        }
     },
 }
 
@@ -968,22 +945,4 @@ def generate_config():
         f.write('# generated with generate-boskos.py; do not edit directly\n')
         yaml.dump(config, f, default_flow_style=False)
 
-def print_cluster_profile_set_details():
-    ignored_cps = CLUSTER_PROFILE_SETS_IGNORE['profiles']
-    cps = {
-        'cluster_profile_sets': {},
-        'tests_allowlist': {},
-    }
-
-    for cps_name, cps_data in CLUSTER_PROFILE_SETS_CONFIG.items():
-        if not cps_name in ignored_cps:
-            cps['cluster_profile_sets'][cps_name] = list(cps_data.keys())
-
-    cps['tests_allowlist'] = CLUSTER_PROFILE_SETS_IGNORE['tests_allowlist']
-
-    print(json.dumps(cps, indent=2))
-
-if args.print_cps:
-    print_cluster_profile_set_details()
-else:
-    generate_config()
+generate_config()

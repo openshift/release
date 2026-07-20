@@ -209,6 +209,15 @@
     - component-monitor
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ship-status mcp-server --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1
+    name: sa.mcp-server.$(cluster).token.txt
+  item_name: ship-status-dash-mcp-server
+  params:
+    cluster:
+    - app.ci
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
       --bound-object-name=token-bound-object-1
     name: sa.$(service_account).$(cluster).token.txt
@@ -277,15 +286,7 @@
   item_name: build_farm
   params:
     cluster:
-    - build01
-    - build03
-    - build05
-    - build06
-    - build07
-    - build09
     - build10
-    - build11
-    - build12
 - fields:
   - cmd: /usr/bin/generate_thanos_tls.sh /tmp/thanos-tls /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       thanos-receive.core.ci.devcluster.openshift.com && cat /tmp/thanos-tls/server.crt
@@ -319,3 +320,15 @@
     - build12
     - build13
     - core-ci
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n rosa-cluster-lease rosa-cluster-lease-manager --duration=2419200s
+      --bound-object-kind=Secret --bound-object-name=rosa-cluster-lease-manager-token
+    name: sa.rosa-cluster-lease-manager.$(cluster).token.txt
+  - cmd: /usr/bin/oc_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      rosa-cluster-lease-manager rosa-cluster-lease
+    name: sa.rosa-cluster-lease-manager.$(cluster).config
+  item_name: rosa-cluster-lease-credentials
+  params:
+    cluster:
+    - hosted-mgmt

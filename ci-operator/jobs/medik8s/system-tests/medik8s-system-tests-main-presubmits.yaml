@@ -17,7 +17,6 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: medik8s-aws
       ci-operator.openshift.io/variant: 4.22-konflux
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-medik8s-system-tests-main-4.22-konflux-e2e-far-aws
     optional: true
@@ -105,7 +104,6 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: medik8s-aws
       ci-operator.openshift.io/variant: 4.22-konflux
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-medik8s-system-tests-main-4.22-konflux-e2e-mdr-aws
     optional: true
@@ -193,7 +191,6 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: medik8s-aws
       ci-operator.openshift.io/variant: 4.22-konflux
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-medik8s-system-tests-main-4.22-konflux-e2e-nhc-aws
     optional: true
@@ -281,7 +278,6 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: medik8s-aws
       ci-operator.openshift.io/variant: 4.22-konflux
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-medik8s-system-tests-main-4.22-konflux-e2e-nmo-aws
     optional: true
@@ -358,6 +354,93 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build05
+    context: ci/prow/4.22-konflux-e2e-sbr-aws-efs
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: medik8s-aws
+      ci-operator.openshift.io/variant: 4.22-konflux
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-medik8s-system-tests-main-4.22-konflux-e2e-sbr-aws-efs
+    optional: true
+    rerun_command: /test 4.22-konflux-e2e-sbr-aws-efs
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-sbr-aws-efs
+        - --variant=4.22-konflux
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.22-konflux-e2e-sbr-aws-efs,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/4.22-konflux-e2e-sbr-aws-odf
     decorate: true
     decoration_config:
@@ -369,7 +452,6 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: medik8s-aws
       ci-operator.openshift.io/variant: 4.22-konflux
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-medik8s-system-tests-main-4.22-konflux-e2e-sbr-aws-odf
     optional: true
@@ -457,7 +539,6 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: medik8s-aws
       ci-operator.openshift.io/variant: 4.22-konflux
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-medik8s-system-tests-main-4.22-konflux-e2e-snr-aws
     optional: true
@@ -534,24 +615,32 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build05
-    context: ci/prow/lint
+    context: ci/prow/4.22-upgrade-e2e-far-upgrade-presubmit-aws
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
     labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: medik8s-aws
+      ci-operator.openshift.io/variant: 4.22-upgrade
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-medik8s-system-tests-main-lint
-    rerun_command: /test lint
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    name: pull-ci-medik8s-system-tests-main-4.22-upgrade-e2e-far-upgrade-presubmit-aws
+    optional: true
+    rerun_command: /test 4.22-upgrade-e2e-far-upgrade-presubmit-aws
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=lint
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-far-upgrade-presubmit-aws
+        - --variant=4.22-upgrade
         command:
         - ci-operator
         env:
@@ -569,6 +658,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -583,6 +678,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -592,69 +696,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )lint,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/unit
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-medik8s-system-tests-main-unit
-    rerun_command: /test unit
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=unit
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.22-upgrade-e2e-far-upgrade-presubmit-aws,?($|\s.*)

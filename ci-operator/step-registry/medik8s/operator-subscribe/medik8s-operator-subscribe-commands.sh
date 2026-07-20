@@ -1,17 +1,16 @@
 #!/bin/bash
 set -eu -o pipefail
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/medik8s-lib.sh" || {
+    echo "ERROR: medik8s-lib.sh not found in SHARED_DIR." >&2
+    echo "Include the medik8s-setup chain (or medik8s-lib ref) before this step." >&2
+    exit 1
+}
 
 declare CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-medik8s-catalog}"
 declare OO_CHANNEL="${OO_CHANNEL:-candidate}"
 declare INSTALL_NAMESPACE="${INSTALL_NAMESPACE:-openshift-workload-availability}"
 declare OPERATORS="${OPERATORS:-}"
-
-# SHARED_DIR is a ci-operator shared workspace for passing artifacts between
-# workflow steps. This step reads the following files from it:
-#   - proxy-conf.sh : proxy environment settings (written by cluster provisioner)
-#   - catsrc_name   : CatalogSource name (written by the medik8s-catalogsource step)
-
-log() { echo "[$(date --utc +%FT%T.%3NZ)] $*"; }
 
 collect_artifacts() {
     log "Collecting debug artifacts..."
@@ -26,16 +25,19 @@ collect_artifacts() {
             > "${ARTIFACT_DIR}/operatorgroup.yaml"
         oc get events -n "$INSTALL_NAMESPACE" --sort-by='.lastTimestamp' 2>/dev/null \
             > "${ARTIFACT_DIR}/namespace-events.txt"
+        # Bundle unpack jobs run in openshift-marketplace — capture for debugging
+        oc get jobs -n openshift-marketplace -o yaml 2>/dev/null \
+            > "${ARTIFACT_DIR}/marketplace-jobs.yaml"
+        oc get pods -n openshift-marketplace -o wide 2>/dev/null \
+            > "${ARTIFACT_DIR}/marketplace-pods.txt"
+        oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>/dev/null \
+            > "${ARTIFACT_DIR}/marketplace-events.txt"
+        # Pod logs for bundle unpack jobs
+        for pod in $(oc get pods -n openshift-marketplace -o name 2>/dev/null | grep -v "catalog\|registry"); do
+            oc logs -n openshift-marketplace "$pod" --all-containers 2>/dev/null \
+                > "${ARTIFACT_DIR}/$(echo "$pod" | tr '/' '-').log" || true
+        done
     } || true
-}
-
-set_proxy() {
-    # shellcheck disable=SC1090
-    [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
-        log "setting proxy"
-        source "${SHARED_DIR}/proxy-conf.sh"
-    }
-    return 0
 }
 
 ensure_namespace() {

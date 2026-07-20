@@ -653,6 +653,19 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-cgroupsv2
+- always_run: false
+  as: e2e-agent-compact-ipv4-iso-no-registry
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
+        AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
+    workflow: agent-e2e-generic-conformance-iso-no-registry
 - as: lint
   commands: |
     export GOCACHE=/tmp/
@@ -893,6 +906,18 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
+- always_run: false
+  as: e2e-gcp-ovn-techpreview-pkiconfig
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/pkiconfig
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

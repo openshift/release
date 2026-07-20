@@ -61,17 +61,18 @@ operator:
 prowgen:
   disable_sparse_checkout: true
 releases:
-  arm64-4-21-latest:
+  arm64-4-22-latest:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "4.22"
   latest:
-    release:
+    candidate:
       architecture: multi
-      channel: stable
-      version: "4.21"
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -111,7 +112,7 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
-- as: test-e2e-ci-build-downstream-4-21
+- as: test-e2e-ci-build-downstream-4-22
   steps:
     cluster_profile: openshift-org-aws
     post:
@@ -142,9 +143,45 @@ tests:
           cpu: "4"
           memory: 4Gi
     workflow: ipi-aws
-- as: test-e2e-ci-build-upstream-4-21
+- as: test-e2e-ci-build-upstream-4-22
   steps:
     cluster_profile: openshift-org-aws
+    post:
+    - chain: kueue-operator-post
+    test:
+    - ref: cert-manager-install-operator
+    - as: run-sdk
+      cli: latest
+      commands: |
+        oc create namespace openshift-kueue-operator || true
+        oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true --overwrite
+        operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$OO_BUNDLE" --security-context-config=restricted
+      dependencies:
+      - env: OO_BUNDLE
+        name: kueue-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: jobset-install-operator
+    - ref: leader-worker-set-install-operator
+    - as: e2e-kueue-upstream
+      cli: latest
+      commands: make e2e-upstream-test
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: ipi-aws
+- always_run: false
+  as: test-e2e-ci-build-upstream-dra-4-22
+  cron: '@daily'
+  presubmit: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      DRA_GPU_PARTITIONS: "4"
     post:
     - chain: kueue-operator-post
     test:
@@ -170,7 +207,7 @@ tests:
       cli: latest
       commands: make e2e-upstream-test
       env:
-      - default: singlecluster certmanager dra
+      - default: dra/whole-device dra/counter
         name: E2E_TARGET_FOLDERS
       from: kueue-operator-src
       resources:
@@ -205,7 +242,7 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
-- as: test-e2e-4-21-arm64
+- as: test-e2e-4-22-arm64
   capabilities:
   - arm64
   cron: '@daily'
@@ -219,7 +256,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-4-21-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-4-22-latest
     env:
       BUNDLE_COMPONENT: kueue-bundle-1-4
       CONTAINER_IMAGE: quay.io/curl/curl:latest
@@ -258,7 +295,7 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
-- as: test-e2e-4-21-fips
+- as: test-e2e-4-22-fips
   cron: '@daily'
   reporter_config:
     channel: '#forum-node-jira'
@@ -280,7 +317,7 @@ tests:
     - ref: fips-check
     - chain: kueue-operator-test-e2e
     workflow: ipi-aws
-- as: test-e2e-4-21-hypershift
+- as: test-e2e-4-22-hypershift
   cron: '@daily'
   reporter_config:
     channel: '#forum-node-jira'
@@ -460,6 +497,60 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e-upstream
+- as: test-e2e-downstream-5-0
+  capabilities:
+  - arm64
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "5.0"
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-1-4
+      OPERAND_COMPONENT: kueue-operand-1-4
+      OPERATOR_COMPONENT: kueue-operator-1-4
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-downstream
+- as: test-e2e-upstream-5-0
+  capabilities:
+  - arm64
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "5.0"
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-1-4
+      OPERAND_COMPONENT: kueue-operand-1-4
+      OPERATOR_COMPONENT: kueue-operator-1-4
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-upstream
 - always_run: false
   as: test-e2e-downstream-4-20-disruptive
   capabilities:
@@ -614,7 +705,7 @@ tests:
           memory: 500Mi
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
 - always_run: false
-  as: test-e2e-dra-gpu-4-21
+  as: test-e2e-dra-gpu-4-22
   cron: '@daily'
   optional: true
   presubmit: true

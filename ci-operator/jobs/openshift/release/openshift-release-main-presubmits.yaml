@@ -257,6 +257,38 @@ presubmits:
     branches:
     - ^main$
     - ^main-
+    cluster: core-ci
+    context: ci/prow/cluster-manifest-verifier
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-cluster-manifest-verifier
+    rerun_command: /test cluster-manifest-verifier
+    run_if_changed: ^clusters/
+    spec:
+      containers:
+      - args:
+        - --release-repo-dir=.
+        command:
+        - cluster-manifest-verifier
+        env:
+        - name: ARGOCD_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: clientSecret
+              name: cluster-manifest-verifier-argocd
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_cluster-manifest-verifier_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )cluster-manifest-verifier,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
     cluster: build07
     context: ci/prow/clusterimageset-validate
     decorate: true
@@ -348,17 +380,16 @@ presubmits:
     spec:
       containers:
       - args:
-        - -c
-        - |
-          core-services/prow/02_config/generate-boskos.py --print-cluster-profile-sets >/tmp/cps.json
-          ci-operator-checkconfig \
-            --config-dir=./ci-operator/config/ \
-            --registry=./ci-operator/step-registry/ \
-            --cluster-profiles-config=./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml \
-            --cluster-claim-owners-config=./core-services/cluster-pools/_config.yaml \
-            --cluster-profile-set-details=/tmp/cps.json
+        - --config-dir
+        - ./ci-operator/config/
+        - --registry
+        - ./ci-operator/step-registry/
+        - --cluster-profiles-config
+        - ./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+        - --cluster-claim-owners-config
+        - ./core-services/cluster-pools/_config.yaml
         command:
-        - /bin/sh
+        - ci-operator-checkconfig
         image: quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest
         imagePullPolicy: Always
         name: ""
@@ -497,7 +528,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260617-37d12bec7
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260714-0633879af
         imagePullPolicy: IfNotPresent
         name: ""
         resources:

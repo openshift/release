@@ -11,10 +11,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator-init:
+  hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  hypershift-operator-422-latest:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: "4.22"
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -24,15 +28,21 @@ build_root:
   use_build_cache: true
 images:
   items:
-  - to: hypershift-operator
+  - to: hypershift-operator-pr
   - dockerfile_path: Dockerfile.control-plane
     to: hypershift
 promotion:
   to:
   - excluded_images:
-    - hypershift-operator
+    - hypershift-operator-pr
     name: "4.22"
     namespace: ocp
+  - additional_images:
+      hypershift-operator: hypershift-operator-pr
+    excluded_images:
+    - '*'
+    namespace: hypershift
+    tag: "4.22"
 releases:
   initial:
     candidate:
@@ -293,7 +303,8 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+      CI_HYPERSHIFT_OPERATOR: hypershift-operator-pr
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-422-latest
     env:
       CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
       INSTALL_FROM_LATEST: "true"
@@ -445,19 +456,12 @@ tests:
   cron: 0 12 * * 5
   steps:
     workflow: hypershift-dependabot-triage
-- as: periodic-review-agent
-  cron: 0 8-23/3 * * 1-5
-  steps:
-    env:
-      REVIEW_AGENT_BATCH_ONLY: "true"
-      REVIEW_AGENT_MAX_PRS: "10"
-    workflow: hypershift-review-agent
 - always_run: false
   as: address-review-comments
   optional: true
   skip_if_only_changed: .*
   steps:
-    workflow: hypershift-review-agent
+    workflow: hypershift-review-agent-trigger
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

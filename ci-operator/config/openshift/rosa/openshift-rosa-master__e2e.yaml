@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.25-openshift-4.22
+    tag: rhel-8-golang-1.26-openshift-4.23
 prowgen:
   expose: true
   private: true
@@ -22,199 +22,89 @@ resources:
       cpu: 150m
       memory: 300Mi
 tests:
-- as: rosa-sts-advanced-critical-high-f3
+- as: rosa-sts-advanced-f3
   cron: 34 13 3,6,9,12,15,18,21,24,27,30 * *
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
     cluster_profile: oex-aws-qe
     env:
       CLUSTER_TIMEOUT: "120"
-      IMPORTANCE: (Critical,High)
       NAME_PREFIX: rosa-sts-f3
       TEST_PROFILE: rosa-advanced
     test:
     - chain: rosa-tests-e2e-fullcycle
     workflow: rosa-lifecycle
-- as: rosa-sts-shared-vpc-critical-high-f3
+- as: rosa-sts-shared-vpc-f3
   cron: 59 0 1,4,7,10,13,16,19,22,25,28 * *
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
     cluster_profile: oex-aws-qe
     env:
       CLUSTER_TIMEOUT: "120"
-      IMPORTANCE: (Critical,High)
       NAME_PREFIX: rosa-sv-f3
       TEST_PROFILE: rosa-shared-vpc
     test:
     - chain: rosa-tests-e2e-fullcycle
     workflow: rosa-lifecycle
-- as: rosa-sts-shared-vpc-medium-low-f7
-  cron: 25 6 1,8,17,24 * *
-  reporter_config:
-    channel: '#ocm-qe-prow-ci-jobs'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: oex-aws-qe
-    env:
-      CLUSTER_TIMEOUT: "120"
-      IMPORTANCE: (Medium,Low)
-      NAME_PREFIX: rosa-sv-f7
-      TEST_PROFILE: rosa-shared-vpc
-    test:
-    - chain: rosa-tests-e2e-fullcycle
-    workflow: rosa-lifecycle
-- as: rosa-sts-advanced-prod-critical-high-f3
-  cron: 37 0 2,5,8,11,14,17,20,23,26,29 * *
-  reporter_config:
-    channel: '#ocm-qe-prow-ci-jobs'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: oex-aws-qe
-    env:
-      CLUSTER_TIMEOUT: "120"
-      IMPORTANCE: (Critical,High)
-      NAME_PREFIX: rosa-sts-f3
-      OCM_LOGIN_ENV: production
-      TEST_PROFILE: rosa-advanced
-    test:
-    - chain: rosa-tests-e2e-fullcycle
-    workflow: rosa-lifecycle
-- as: rosa-sts-advanced-medium-low-f7
-  cron: 46 2 3,10,17,26 * *
-  reporter_config:
-    channel: '#ocm-qe-prow-ci-jobs'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: oex-aws-qe
-    env:
-      CLUSTER_TIMEOUT: "120"
-      IMPORTANCE: (Medium,Low)
-      NAME_PREFIX: rosa-sts-f7
-      TEST_PROFILE: rosa-advanced
-    test:
-    - chain: rosa-tests-e2e-fullcycle
-    workflow: rosa-lifecycle
-- as: rosa-hcp-shared-vpc-critical-high-f3
+- as: rosa-hcp-shared-vpc-f3
   cron: 0 0 1,4,7,10,13,16,19,22,25,28 * *
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
     cluster_profile: oex-aws-qe
     env:
-      IMPORTANCE: (Critical,High)
       NAME_PREFIX: hcp-sv-f3
       TEST_PROFILE: rosa-hcp-shared-vpc-advanced
     test:
     - chain: rosa-tests-e2e-fullcycle
     workflow: rosa-lifecycle
-- as: rosa-hcp-shared-vpc-medium-low-f7
-  cron: 0 0 1,8,15,22 * *
-  reporter_config:
-    channel: '#ocm-qe-prow-ci-jobs'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: oex-aws-qe
-    env:
-      IMPORTANCE: (Medium,Low)
-      NAME_PREFIX: hcp-sv-f7
-      TEST_PROFILE: rosa-hcp-shared-vpc-advanced
-    test:
-    - chain: rosa-tests-e2e-fullcycle
-    workflow: rosa-lifecycle
-- as: rosa-sts-private-link-critical-high-f3
+- as: rosa-sts-private-link-f3
   cron: 27 23 3,6,9,12,15,18,21,24,27,30 * *
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
     cluster_profile: oex-aws-qe
     env:
       CLUSTER_TIMEOUT: "120"
-      IMPORTANCE: (Critical,High)
       NAME_PREFIX: rosa-pl-f3
-      TEST_PROFILE: rosa-private-link
-    test:
-    - chain: rosa-tests-e2e-fullcycle
-    workflow: rosa-lifecycle
-- as: rosa-sts-private-link-medium-low-f7
-  cron: 16 16 5,14,21,28 * *
-  reporter_config:
-    channel: '#ocm-qe-prow-ci-jobs'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: oex-aws-qe
-    env:
-      CLUSTER_TIMEOUT: "120"
-      IMPORTANCE: (Medium,Low)
-      NAME_PREFIX: rosa-pl-f7
       TEST_PROFILE: rosa-private-link
     test:
     - chain: rosa-tests-e2e-fullcycle
@@ -224,11 +114,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
@@ -241,108 +132,44 @@ tests:
     test:
     - chain: rosa-tests-e2e-fullcycle
     workflow: rosa-lifecycle
-- as: rosa-hcp-external-auth-medium-low-f7
-  cron: 37 23 1,8,15,24 * *
-  reporter_config:
-    channel: '#ocm-qe-prow-ci-jobs'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: oex-aws-qe
-    env:
-      IMPORTANCE: (Medium,Low)
-      NAME_PREFIX: rosa-auth-f7
-      TEST_PROFILE: rosa-hcp-external-auth
-    test:
-    - chain: rosa-tests-e2e-fullcycle
-    workflow: rosa-lifecycle
-- as: rosa-hcp-external-auth-critical-high-f3
+- as: rosa-hcp-external-auth-f3
   cron: 31 15 1,4,7,10,13,16,19,22,25,28 * *
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
     cluster_profile: oex-aws-qe
     env:
-      IMPORTANCE: (Critical,High)
       NAME_PREFIX: rosa-auth-f3
       TEST_PROFILE: rosa-hcp-external-auth
     test:
     - chain: rosa-tests-e2e-fullcycle
     workflow: rosa-lifecycle
-- as: rosa-hcp-advanced-critical-high-f3
+- as: rosa-hcp-advanced-f3
   cron: 29 17 1,4,7,10,13,16,19,22,25,28 * *
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
     cluster_profile: oex-aws-qe
     env:
-      IMPORTANCE: (Critical,High)
       NAME_PREFIX: rosa-hcp-f3
-      TEST_PROFILE: rosa-hcp-advanced
-    test:
-    - chain: rosa-tests-e2e-fullcycle
-    workflow: rosa-lifecycle
-- as: rosa-hcp-advanced-prod-critical-high-f3
-  cron: 0 7 1,4,7,10,13,16,19,22,25,28 * *
-  reporter_config:
-    channel: '#ocm-qe-prow-ci-jobs'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: oex-aws-qe
-    env:
-      IMPORTANCE: (Critical,High)
-      NAME_PREFIX: rosa-hcp-f3
-      OCM_LOGIN_ENV: production
-      TEST_PROFILE: rosa-hcp-advanced
-    test:
-    - chain: rosa-tests-e2e-fullcycle
-    workflow: rosa-lifecycle
-- as: rosa-hcp-advanced-medium-low-f7
-  cron: 12 0 9,16,23,30 * *
-  reporter_config:
-    channel: '#ocm-qe-prow-ci-jobs'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: oex-aws-qe
-    env:
-      IMPORTANCE: (Medium,Low)
-      NAME_PREFIX: rosa-hcp-f7
       TEST_PROFILE: rosa-hcp-advanced
     test:
     - chain: rosa-tests-e2e-fullcycle
@@ -352,41 +179,41 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
     cluster_profile: oex-aws-qe
     env:
-      IMPORTANCE: (Critical,High)
+      CLUSTER_TIMEOUT: "120"
       NAME_PREFIX: rosa-reghcp-f3
       OCM_LOGIN_ENV: https://api.aws.ap-southeast-1.stage.openshift.com
       REGION: ap-southeast-1
       TEST_PROFILE: rosa-hcp-advanced
-      VERSION: "4.14"
     test:
     - chain: rosa-tests-e2e-fullcycle
     workflow: rosa-lifecycle
-- as: rosa-hcp-private-link-critical-high-f3
+- as: rosa-hcp-private-link-f3
   cron: 27 19 2,5,8,11,14,17,20,23,26,29 * *
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
     cluster_profile: oex-aws-qe
     env:
-      IMPORTANCE: (Critical,High)
       NAME_PREFIX: rosa-hcppl-f3
       TEST_PROFILE: rosa-hcp-pl
     test:
@@ -397,11 +224,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
@@ -418,11 +246,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
@@ -438,11 +267,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
@@ -458,11 +288,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
@@ -478,11 +309,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
@@ -501,11 +333,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
@@ -524,11 +357,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
@@ -548,11 +382,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
@@ -560,30 +395,6 @@ tests:
     env:
       CLUSTER_TIMEOUT: "120"
       NAME_PREFIX: rosa-upgy-f3
-      TEST_LABEL_FILTERS: (upgrade)&&!Exclude
-      TEST_PROFILE: rosa-upgrade-y-stream
-    test:
-    - ref: rosa-tests
-    - ref: rosa-tests-report
-    workflow: rosa-lifecycle
-- as: rosa-sts-upgrade-y-stream-prod-f3
-  cron: 16 8 1,4,7,10,13,16,19,22,25,28 * *
-  reporter_config:
-    channel: '#ocm-qe-prow-ci-jobs'
-    job_states_to_report:
-    - error
-    - failure
-    - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs> :volcano: {{end}}'
-  steps:
-    cluster_profile: oex-aws-qe
-    env:
-      CLUSTER_TIMEOUT: "120"
-      NAME_PREFIX: rosa-upgy-f3
-      OCM_LOGIN_ENV: production
       TEST_LABEL_FILTERS: (upgrade)&&!Exclude
       TEST_PROFILE: rosa-upgrade-y-stream
     test:
@@ -595,11 +406,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
@@ -617,11 +429,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06F39XKT6K> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
@@ -639,11 +452,12 @@ tests:
   reporter_config:
     channel: '#ocm-qe-prow-ci-jobs'
     job_states_to_report:
-    - error
-    - failure
     - success
-    report_template: '<!subteam^S06FB6PCFHU> {{if eq .Status.State "success"}} :green_jenkins_circle:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+    - failure
+    - aborted
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       :rainbow: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:

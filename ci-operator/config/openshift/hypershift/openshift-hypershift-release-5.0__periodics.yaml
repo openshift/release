@@ -160,6 +160,11 @@ tests:
     env:
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-metrics
+- as: e2e-v2-aws
+  cron: 30 1,7,13,19 * * *
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-e2e-v2
 - as: e2e-aws-ovn-conformance-serial
   cron: 0 1 * * *
   steps:
@@ -174,8 +179,20 @@ tests:
     env:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-conformance-fips
+  cron: 0 3 * * 0
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      EXTRA_ARGS: --fips
+      PUBLIC_ONLY: "true"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
+    workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance-techpreview
-  cron: '@daily'
+  cron: '@weekly'
   reporter_config:
     channel: '#forum-ocp-splat-alerts-aws'
     job_states_to_report:
@@ -210,6 +227,8 @@ tests:
   cron: 0 3 * * *
   steps:
     cluster_profile: hypershift-aws
+    env:
+      AWS_REGION_OVERWRITE: us-east-1
     workflow: hypershift-aws-conformance-proxy
 - as: e2e-aws-upgrade
   cron: 0 */12 * * *
@@ -220,7 +239,7 @@ tests:
     env:
       CI_TESTS_RUN: ^TestUpgradeControlPlane.*
       REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-conformance-cilium
   minimum_interval: 168h
   steps:
@@ -282,6 +301,23 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    workflow: hypershift-azure-aks-conformance
+- as: e2e-azure-aks-ovn-conformance-fips
+  cron: 0 4 * * 0
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      HYPERSHIFT_AZURE_FIPS: "true"
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+      TEST_SKIPS: 'etcd leader changes are not excessive\| In-tree Volumes \[Driver:
+        azure-disk\]\| In-tree Volumes \[Driver: azure-file\]\| FIPS TestFIPS'
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    test:
+    - ref: hypershift-hostedcluster-fips-check
+    - chain: hypershift-conformance
     workflow: hypershift-azure-aks-conformance
 - as: e2e-azure-v2-self-managed
   cron: 30 1,7,13,19 * * *

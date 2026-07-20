@@ -509,8 +509,8 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     - ref: openshift-qe-workers-scale
     workflow: openshift-qe-udn-density-pods
-- as: cudn-density-multi-ns-500-24nodes
-  cron: 0 2 * * 3
+- as: cudn-density-single-ns-500-24nodes
+  cron: 0 2 1,15 * 3
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -526,9 +526,9 @@ tests:
     env:
       ADDITIONAL_WORKER_NODES: "21"
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6a.2xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
-      NAMESPACES_PER_CUDN: "5"
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      NAMESPACES_PER_CUDN: "1"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.2xlarge
       OVERRIDE_ITERATIONS: "500"
       SET_ENV_BY_PLATFORM: custom
@@ -541,7 +541,7 @@ tests:
     test:
     - chain: openshift-qe-cudn-density
 - as: cudn-density-single-ns-250-24nodes
-  cron: 0 4 * * 3
+  cron: 0 4 1,15 * 3
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -562,6 +562,73 @@ tests:
       NAMESPACES_PER_CUDN: "1"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.2xlarge
       OVERRIDE_ITERATIONS: "250"
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    test:
+    - chain: openshift-qe-cudn-density
+- always_run: false
+  as: cudn-pod-churn-250-24nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      EXTRA_FLAGS: --churn-duration=30m --churn-percent=50 --churn-delay=1m
+      NAMESPACES_PER_CUDN: "1"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.2xlarge
+      OVERRIDE_ITERATIONS: "250"
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    test:
+    - chain: openshift-qe-cudn-density
+- always_run: false
+  as: cudn-churn-250-24nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      EXTRA_FLAGS: --churn-mode=namespaces --churn-percent=10 --churn-cycles=3 --churn-duration=10m
+      NAMESPACES_PER_CUDN: "1"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.2xlarge
+      OVERRIDE_ITERATIONS: "250"
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    test:
+    - chain: openshift-qe-cudn-density
+- always_run: false
+  as: cudn-incremental-700-24nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      EXTRA_FLAGS: --incremental-step-size=50 --incremental-step-delay=5m --incremental-pattern=linear
+        --timeout=8h
+      NAMESPACES_PER_CUDN: "1"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      OVERRIDE_ITERATIONS: "700"
       SET_ENV_BY_PLATFORM: custom
     post:
     - chain: ipi-aws-post

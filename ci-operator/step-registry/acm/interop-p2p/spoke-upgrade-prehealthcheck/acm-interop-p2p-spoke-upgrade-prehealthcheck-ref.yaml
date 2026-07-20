@@ -1,0 +1,25 @@
+ref:
+  as: acm-interop-p2p-spoke-upgrade-prehealthcheck
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  grace_period: 10m
+  commands: acm-interop-p2p-spoke-upgrade-prehealthcheck-commands.sh
+  timeout: 30m0s
+  cli: latest
+  resources:
+    limits:
+      cpu: "1"
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: ACM_SPOKE_PRE_CO_READY_TIMEOUT_MINUTES
+    default: "30"
+    documentation: Cluster operator stability wait budget in minutes for the pre-upgrade health check. Must fit within the step timeout (30m).
+  documentation: |-
+    Pre-upgrade health check on the ACM managed spoke cluster. Uses the same logic as
+    cucushift-upgrade-prehealthcheck against ${SHARED_DIR}/managed-cluster-kubeconfig (MCP not
+    updating/degraded, cluster operators stable, all nodes Ready). Requires acm-interop-p2p-cluster-install.
+    On failure, writes spoke-<name>-upgrade-prehealthcheck-failure.txt to ${ARTIFACT_DIR} via EXIT trap.

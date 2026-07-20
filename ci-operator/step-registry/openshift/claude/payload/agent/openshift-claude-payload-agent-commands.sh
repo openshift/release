@@ -4,6 +4,43 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# fetch_with_backoff: curl wrapper with exponential backoff for release controller API.
+# Retries up to 6 times with delays of 1, 2, 4, 8, 16, 32 minutes.
+# Usage: fetch_with_backoff <url> [extra_curl_args...]
+# Output is written to stdout on success; returns non-zero after all retries exhausted.
+fetch_with_backoff() {
+    local url="$1"; shift
+    local max_retries=6
+    local base_delay=60  # 1 minute in seconds
+    local attempt=0
+    local http_code
+    local tmpfile
+    tmpfile=$(mktemp)
+
+    while true; do
+        attempt=$((attempt + 1))
+        # Use --write-out to capture HTTP status code separately
+        http_code=$(curl --connect-timeout 30 --max-time 120 -sf -w '%{http_code}' -o "${tmpfile}" "$@" "${url}" 2>/dev/null) || http_code="${http_code:-000}"
+
+        if [[ "${http_code}" =~ ^2[0-9][0-9]$ ]]; then
+            cat "${tmpfile}"
+            rm -f "${tmpfile}"
+            return 0
+        fi
+
+        if [[ "${attempt}" -gt "${max_retries}" ]]; then
+            echo "ERROR: fetch_with_backoff: All ${max_retries} retries exhausted for ${url} (last HTTP ${http_code})" >&2
+            rm -f "${tmpfile}"
+            return 1
+        fi
+
+        local delay=$(( base_delay * (1 << (attempt - 1)) ))
+        local delay_min=$(( delay / 60 ))
+        echo "  fetch_with_backoff: Attempt ${attempt}/${max_retries} failed (HTTP ${http_code}). Retrying in ${delay_min} minute(s)..." >&2
+        sleep "${delay}"
+    done
+}
+
 CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 export CLAUDE_CONFIG_DIR
 
@@ -21,7 +58,7 @@ if [[ -z "${PAYLOAD_TAG:-}" ]]; then
         exit 1
     fi
     LATEST_STREAM="${LATEST_VERSION}.0-0.nightly"
-    PAYLOAD_TAG=$(curl -sf "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${LATEST_STREAM}/tags" \
+    PAYLOAD_TAG=$(fetch_with_backoff "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${LATEST_STREAM}/tags" \
         | jq -r '[.tags[] | select(.phase == "Rejected")] | .[0].name // empty')
     if [[ -z "${PAYLOAD_TAG}" ]]; then
         echo "ERROR: No rejected nightly found for ${LATEST_STREAM}."
@@ -62,12 +99,14 @@ export PATH="/tmp/google-cloud-sdk/bin:${PATH}"
 echo "gcloud CLI installed."
 
 # Parse version and stream from payload tag
-# Format: 4.22.0-0.nightly-2026-02-25-152806
+# OCP format:  4.22.0-0.nightly-2026-02-25-152806
+# OKD format:  4.22.0-0.okd-scos-nightly-2026-06-10-015300
+# OKD CI fmt:  4.22.0-0.okd-scos-2026-06-10-003203
 VERSION=$(echo "${PAYLOAD_TAG}" | grep -oP '^\d+\.\d+')
-STREAM=$(echo "${PAYLOAD_TAG}" | grep -oP '\d+\.\d+\.\d+-\d+\.\K[a-z]+')
+STREAM_NAME=$(echo "${PAYLOAD_TAG}" | sed 's/-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[0-9]\{6\}$//')
+STREAM=$(echo "${STREAM_NAME}" | sed 's/^[0-9]*\.[0-9]*\.[0-9]*-[0-9]*\.//')
 
-RELEASE_CONTROLLER_URL="https://amd64.ocp.releases.ci.openshift.org"
-STREAM_NAME="${VERSION}.0-0.${STREAM}"
+RELEASE_CONTROLLER_URL="${RELEASE_CONTROLLER_URL:-https://amd64.ocp.releases.ci.openshift.org}"
 API_URL="${RELEASE_CONTROLLER_URL}/api/v1/releasestream/${STREAM_NAME}/release/${PAYLOAD_TAG}"
 PAYLOAD_URL="${RELEASE_CONTROLLER_URL}/releasestream/${STREAM_NAME}/release/${PAYLOAD_TAG}"
 
@@ -312,11 +351,6 @@ done
 
 PHASE_WAIT_DURATION=$(( $(date +%s) - PHASE_WAIT_START ))
 
-# Workaround: --continue + -p is broken (anthropics/claude-code#42376).
-# Sessions created by -p get sessionKind tagged and are filtered from --continue lookup.
-# Setting CLAUDE_CODE_ENTRYPOINT=-sdk-cli prevents the sessionKind tag from being set.
-export CLAUDE_CODE_ENTRYPOINT=sdk-cli
-
 # Run Claude to analyze the payload
 echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 
@@ -364,43 +398,49 @@ claude plugin install must-gather@ai-helpers
 claude plugin install prow-agent@ai-helpers
 echo "Plugins installed."
 
-OTEL_COLLECTOR="/opt/ai-helpers/plugins/prow-agent/scripts/otel_collector.py"
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 
-# Start OTEL collector for Claude Code telemetry
-OTEL_PORT_FILE=$(mktemp)
+# agentic-ci manages OTEL collector lifecycle per invocation; collect JSONL after each run
 OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
-python3 "${OTEL_COLLECTOR}" \
-    --port-file "${OTEL_PORT_FILE}" \
-    --log-file "${OTEL_LOG}" &
-COLLECTOR_PID=$!
-OTEL_WAIT=0
-while [[ ! -s "${OTEL_PORT_FILE}" ]]; do
-    if ! kill -0 "${COLLECTOR_PID}" 2>/dev/null; then
-        echo "ERROR: OTEL collector exited before writing port file."
-        exit 1
-    fi
-    if [[ "${OTEL_WAIT}" -ge 300 ]]; then
-        echo "ERROR: Timed out waiting for OTEL collector port file."
-        kill "${COLLECTOR_PID}" 2>/dev/null || true
-        exit 1
-    fi
-    sleep 0.1
-    OTEL_WAIT=$((OTEL_WAIT + 1))
-done
-OTEL_PORT=$(cat "${OTEL_PORT_FILE}")
-echo "OTEL collector started on port ${OTEL_PORT} (PID ${COLLECTOR_PID})"
-
-export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
-export OTEL_METRICS_EXPORTER=otlp
-export OTEL_LOGS_EXPORTER=otlp
-export OTEL_TRACES_EXPORTER=otlp
-export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
-export OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:${OTEL_PORT}"
-export OTEL_METRIC_EXPORT_INTERVAL=10000
-
 ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
+
+agentic_ci() {
+    local agentic_args=()
+    local timeout_seconds=""
+    while true; do
+        case "${1:-}" in
+            --no-streaming) agentic_args+=("$1"); shift ;;
+            --timeout) timeout_seconds="$2"; shift 2 ;;
+            *) break ;;
+        esac
+    done
+    local prompt="$1"; shift
+    local cmd=(
+        agentic-ci run
+        --backend local
+        --harness claude-code
+        --model "${CLAUDE_MODEL}"
+        --workdir "${WORKDIR}"
+        "${agentic_args[@]+"${agentic_args[@]}"}"
+        "${prompt}"
+        --
+        --permission-mode default
+        --allowedTools "${ALLOWED_TOOLS}"
+        --verbose
+        "$@"
+    )
+    if [[ -n "${timeout_seconds}" ]]; then
+        timeout "${timeout_seconds}" "${cmd[@]}"
+    else
+        "${cmd[@]}"
+    fi
+    local rc=$?
+    for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
+        [ -f "$f" ] && cat "$f" >> "${OTEL_LOG}"
+    done
+    rm -rf /tmp/agentic-ci-run.*
+    return $rc
+}
 
 SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer triaging failures.
 
@@ -410,15 +450,11 @@ After completing your analysis, you MUST use the Skill tool to invoke ci:payload
 
 PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0
-export CLAUDE_OUTPUT_LOG="${ARTIFACT_DIR}/claude-output.log"
-timeout 3600 claude \
-    --model "${CLAUDE_MODEL}" \
-    --allowedTools "${ALLOWED_TOOLS}" \
-    --output-format stream-json \
+agentic_ci --timeout 3600 \
+    "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DATA_DIR}" \
     --max-turns 100 \
     --append-system-prompt "${SYSTEM_PROMPT}" \
-    -p "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DATA_DIR}" \
-    --verbose 2>&1 | tee "${CLAUDE_OUTPUT_LOG}" || CLAUDE_EXIT=$?
+    || CLAUDE_EXIT=$?
 
 # If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
 PHASE_NUDGE_START=$(date +%s)
@@ -426,14 +462,11 @@ NUDGE_EXIT=0
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo ""
     echo "Claude timed out. Nudging to wrap up..."
-    timeout 600 claude \
-        --model "${CLAUDE_MODEL}" \
+    agentic_ci --timeout 600 \
+        "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
         --continue \
-        --allowedTools "${ALLOWED_TOOLS}" \
-        --output-format stream-json \
         --max-turns 20 \
-        -p "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
-        --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-output.log" || NUDGE_EXIT=$?
+        || NUDGE_EXIT=$?
 fi
 PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
@@ -473,14 +506,11 @@ for attempt in 1 2 3; do
     if ! $JSON_OK; then MISSING="${MISSING:+${MISSING} and }ci:payload-autodl-json"; fi
     echo "Attempt ${attempt}: Missing/invalid outputs (${MISSING}). Re-invoking Claude..."
 
-    timeout 600 claude \
-        --model "${CLAUDE_MODEL}" \
+    agentic_ci --timeout 600 \
+        "Your structured output files are missing or invalid. Use the Skill tool to invoke ${MISSING} to regenerate them now." \
         --continue \
-        --allowedTools "${ALLOWED_TOOLS}" \
-        --output-format stream-json \
         --max-turns 10 \
-        -p "Your structured output files are missing or invalid. Use the Skill tool to invoke ${MISSING} to regenerate them now." \
-        --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-output.log" || true
+        || true
 done
 
 PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
@@ -531,19 +561,12 @@ else
     TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 fi
 
-# Stop OTEL collector
-kill ${COLLECTOR_PID} 2>/dev/null; wait ${COLLECTOR_PID} 2>/dev/null || true
-echo "OTEL collector stopped."
-
 # Extract session metrics (cost, tokens, duration) for BigQuery
 METRICS_CASE=""
 METRICS_TEST_COUNT=0
 if [[ -n "${EXTRACT_METRICS}" ]] && [[ -f "${OTEL_LOG}" ]]; then
     METRICS_TEST_COUNT=1
     METRICS_ARGS=("${OTEL_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json")
-    if [[ -f "${CLAUDE_OUTPUT_LOG:-}" ]]; then
-        METRICS_ARGS+=("--stream-log" "${CLAUDE_OUTPUT_LOG}")
-    fi
     if python3 "${EXTRACT_METRICS}" "${METRICS_ARGS[@]}"; then
         METRICS_CASE="  <testcase name=\"${PHASE_PREFIX} Session metrics extraction\" time=\"0\"/>"
     else
@@ -587,14 +610,12 @@ fi
 
 echo "Asking Claude to summarize findings for Slack..."
 SLACK_LOG=$(mktemp)
-claude \
-    --model "${CLAUDE_MODEL}" \
+agentic_ci --no-streaming \
+    "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If you identified revert candidates, mention them. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
     --continue \
-    --output-format stream-json \
     --max-turns 5 \
-    -p "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If you identified revert candidates, mention them. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
-    --verbose 2>&1 | tee -a "${CLAUDE_OUTPUT_LOG}" > "${SLACK_LOG}" || true
-SUMMARY=$(jq -r 'select(.type == "result") | .result // empty' "${SLACK_LOG}" 2>/dev/null | head -1) || SUMMARY=""
+    > "${SLACK_LOG}" 2>&1 || true
+SUMMARY=$(grep -E '^\{' "${SLACK_LOG}" | jq -r 'select(.type == "result") | .result // empty' 2>/dev/null | head -1) || SUMMARY=""
 rm -f "${SLACK_LOG}"
 
 if [[ -n "${SLACK_WEBHOOK}" ]]; then

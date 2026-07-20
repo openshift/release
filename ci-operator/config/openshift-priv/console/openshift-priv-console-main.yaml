@@ -14,6 +14,8 @@ images:
   items:
   - dockerfile_path: Dockerfile
     to: console
+  - dockerfile_path: Dockerfile.downloads
+    to: console-downloads
   - dockerfile_path: Dockerfile.plugins.demo
     from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
     to: console-plugin-demo
@@ -108,8 +110,9 @@ tests:
   container:
     from: test-bin
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
-- as: e2e-gcp-console
-  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+- always_run: false
+  as: e2e-gcp-console
+  pipeline_skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -135,7 +138,7 @@ tests:
 - always_run: false
   as: e2e-playwright
   optional: true
-  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+  pipeline_skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -143,6 +146,9 @@ tests:
       cli: latest
       commands: |
         ./test-prow-playwright-e2e.sh
+      dependencies:
+      - env: PLUGIN_PULL_SPEC
+        name: console-plugin-demo
       from: console-playwright-runner
       resources:
         requests:

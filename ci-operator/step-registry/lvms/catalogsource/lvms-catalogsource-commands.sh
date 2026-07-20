@@ -12,6 +12,11 @@ declare -r IDMS_NAME=${IDMS_NAME:-"lvm-operator-idms"}
 declare -r CATALOG_SOURCE=${LVM_CATALOG_SOURCE:-"lvm-catalogsource"}
 declare LVM_INDEX_IMAGE
 
+# Source proxy config early so oc commands work in disconnected environments
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
 
 echo "Detected OpenShift version: ${CLUSTER_VERSION}"
@@ -91,8 +96,96 @@ fi
 # lvms-operator exists in Konflux catalogsource index image by default in all versions
 LVM_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
 
+declare -r QUAY_API="https://quay.io/api/v1"
+declare -r QUAY_REPO="redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog"
+
+resolve_snapshot_to_digest() {
+	local snapshot="$1"
+
+	local version_prefix date_str time_str
+	version_prefix=$(echo "${snapshot}" | grep -oP 'lvm-operator-catalog-\d+-\d+')
+	date_str=$(echo "${snapshot}" | grep -oP '\d{8}(?=-\d{6}-)')
+	time_str=$(echo "${snapshot}" | grep -oP '(?<=\d{8}-)\d{6}')
+
+	if [[ -z "${version_prefix}" || -z "${date_str}" || -z "${time_str}" ]]; then
+		echo "Cannot parse snapshot name: ${snapshot}" >&2
+		return 1
+	fi
+
+	local snap_year snap_month snap_day snap_hour snap_min snap_sec snap_epoch
+	snap_year=${date_str:0:4}
+	snap_month=${date_str:4:2}
+	snap_day=${date_str:6:2}
+	snap_hour=${time_str:0:2}
+	snap_min=${time_str:2:2}
+	snap_sec=${time_str:4:2}
+	snap_epoch=$(date -d "${snap_year}-${snap_month}-${snap_day}T${snap_hour}:${snap_min}:${snap_sec}Z" +%s 2>/dev/null || echo 0)
+
+	local version_dot
+	version_dot=$(echo "${version_prefix}" | sed 's/lvm-operator-catalog-//; s/-/./')
+
+	local tags_json
+	tags_json=$(curl -sSL --connect-timeout 10 --max-time 30 \
+		"${QUAY_API}/repository/${QUAY_REPO}/tag/?limit=50&filter_tag_name=like:v${version_dot}-")
+
+	local result
+	result=$(echo "${tags_json}" | jq -r --arg snap_epoch "${snap_epoch}" --arg vpfx "v${version_dot}-" '
+		[.tags[]
+		 | select(.name | startswith($vpfx))
+		 | select(.name | test("^v[0-9]+\\.[0-9]+-[a-f0-9]{40}$"))
+		 | select(.last_modified != null and .last_modified != "")
+		 | .tag_epoch = (.last_modified | strptime("%a, %d %b %Y %H:%M:%S %z") | mktime)
+		 | .abs_delta = ((.tag_epoch - ($snap_epoch | tonumber)) | fabs)
+		] | sort_by(.abs_delta) | .[0] // empty |
+		[.name, .manifest_digest] | @tsv
+	')
+
+	if [[ -z "${result}" ]]; then
+		echo "No matching quay tag found for snapshot ${snapshot}" >&2
+		return 1
+	fi
+
+	local tag_name digest
+	tag_name=$(echo "${result}" | cut -f1)
+	digest=$(echo "${result}" | cut -f2)
+
+	echo "Resolved: ${snapshot} → ${tag_name} (${digest})" >&2
+	echo "${digest}"
+}
+
+# Z-stream presubmit: resolve catalog image from PR content
+if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
+	if [[ -z "${PULL_NUMBER:-}" ]]; then
+		echo "ERROR: ZSTREAM_VERSION is set but PULL_NUMBER is not available"
+		exit 1
+	fi
+	echo "Resolving z-stream catalog image for version ${ZSTREAM_VERSION} from PR #${PULL_NUMBER}"
+
+	catalog_prefix="lvm-operator-catalog-$(echo "${ZSTREAM_VERSION}" | tr '.' '-')"
+
+	pr_files=$(curl -sSL --connect-timeout 10 --max-time 30 \
+		"https://api.github.com/repos/openshift/lvm-operator/pulls/${PULL_NUMBER}/files")
+	snapshot=$(echo "${pr_files}" | jq -r \
+		'[.[] | select(.filename | contains("catalog")) | .patch // ""] | join("\n")' \
+		| grep -oP "(?<=snapshot: )${catalog_prefix}\S*" | head -1)
+
+	if [[ -z "${snapshot}" ]]; then
+		echo "ERROR: No catalog snapshot found for ${ZSTREAM_VERSION} in PR #${PULL_NUMBER}"
+		exit 1
+	fi
+	echo "Found snapshot: ${snapshot}"
+
+	digest=$(resolve_snapshot_to_digest "${snapshot}")
+	if [[ -z "${digest}" ]]; then
+		echo "ERROR: Failed to resolve snapshot ${snapshot} to a quay.io digest"
+		exit 1
+	fi
+
+	LVM_INDEX_IMAGE="quay.io/${QUAY_REPO}@${digest}"
+	echo "Resolved z-stream catalog image: ${LVM_INDEX_IMAGE}"
+
 # Allow overriding the LVM_INDEX_IMAGE with the Gangway API
-if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE:-}" ]]; then
+elif [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE:-}" ]]; then
   LVM_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE}
 fi
 
@@ -208,6 +301,55 @@ EOF
 	fi
 
 	echo "ImageDigestMirrorSet $IDMS_NAME created successfully for disconnected environment"
+
+	cat <<EOF | oc apply -f -
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: ${IDMS_NAME}-tag
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}/rhel8/support-tools
+    source: registry.redhat.io/rhel8/support-tools
+EOF
+
+	if [ $? -ne 0 ]; then
+		echo "!!! failed to create the ITMS for disconnected environment"
+		return 1
+	fi
+
+	echo "ITMS ${IDMS_NAME}-tag created successfully for disconnected environment"
+	return 0
+}
+
+function mirror_test_images {
+	echo "Pre-mirroring test dependency images to mirror registry (port 5000)"
+
+	local new_pull_secret="/tmp/mirror-pull-secret.json"
+	local registry_cred
+	registry_cred=$(head -n 1 "$MIRROR_REGISTRY_CREDS" | base64 -w 0)
+
+	jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" \
+		'.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+
+	local image="registry.redhat.io/rhel8/support-tools:latest=${MIRROR_REGISTRY_HOST}/rhel8/support-tools:latest"
+	local retries=0
+	echo "Mirroring $image"
+	until oc image mirror "$image" --insecure=true -a "${new_pull_secret}" \
+		--skip-verification=true --keep-manifest-list=true --filter-by-os='.*'; do
+		if [[ $retries -eq 5 ]]; then
+			echo "Failed to mirror support-tools image after 5 attempts"
+			rm -f "${new_pull_secret}"
+			return 1
+		fi
+		echo "Failed to mirror image, retrying in 10s..."
+		sleep 10
+		((retries+=1))
+	done
+
+	echo "Successfully mirrored support-tools image to ${MIRROR_REGISTRY_HOST}"
+	rm -f "${new_pull_secret}"
 	return 0
 }
 
@@ -303,7 +445,7 @@ function set_cluster_auth_disconnected {
 	registry_cred=$(head -n 1 "$MIRROR_REGISTRY_CREDS" | base64 -w 0)
 
 	# Add mirror registry auth to cluster pull secret
-	jq --argjson a "{\"${MIRROR_PROXY_REGISTRY_QUAY}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+	jq --argjson a "{\"${MIRROR_PROXY_REGISTRY_QUAY}\": {\"auth\": \"$registry_cred\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
 
 	run "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson"
 	ret=$?
@@ -392,11 +534,22 @@ function main {
 			return 1
 		}
 
-		# Create IDMS for disconnected environment
+		# Create IDMS/ITMS for disconnected environment
 		create_idms_disconnected || {
 			echo "failed to create ImageDigestMirrorSet for disconnected. resolve the above errors"
 			return 1
 		}
+
+		# Pre-mirror test dependency images to port 5000 while MCP rollout is in progress
+		mirror_test_images || {
+			echo "failed to mirror test images. resolve the above errors"
+			return 1
+		}
+
+		echo "Waiting for MachineConfigPool to finish rollout after IDMS changes..."
+		oc wait mcp --all --for=condition=Updating --timeout=5m || true
+		oc wait mcp --all --for=condition=Updated --timeout=20m || true
+		echo "MCP rollout completed"
 
 		# Update LVM_INDEX_IMAGE to point to mirrored location
 		LVM_INDEX_IMAGE="${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"

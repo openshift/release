@@ -1,0 +1,26 @@
+workflow:
+  as: osac-project-netris-caas
+  steps:
+    cluster_profile: packet-osac
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    pre:
+      - ref: ofcir-acquire
+      - chain: osac-project-netris-lab
+      - ref: osac-project-netris-caas-setup
+    test:
+      - ref: osac-project-netris-caas-deploy
+    post:
+      - ref: osac-project-netris-caas-gather
+      - ref: osac-project-netris-lab-gather
+      - ref: osac-project-netris-lab-cleanup-dns
+      - ref: ofcir-release
+    env:
+      CLUSTERTYPE: "osac-aws"
+  documentation: |-
+    CaaS end-to-end tests on OCP SNO deployed inside a Netris-lab
+    simulated Spectrum-X network on an OFCIR bare-metal host.
+    Deploys the netris-lab, configures networking, deploys OCP SNO
+    with OSAC and its prerequisites, boots discovery agents on
+    hgx1-3, registers host types, creates a cluster via the
+    fulfillment API, and runs the OSAC CaaS test suite.

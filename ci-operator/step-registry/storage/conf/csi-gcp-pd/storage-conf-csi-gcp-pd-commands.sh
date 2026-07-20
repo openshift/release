@@ -3,7 +3,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-cd /go/src/github.com/openshift/gcp-pd-csi-driver-operator
+if [ -d /go/src/github.com/openshift/csi-operator/legacy/gcp-pd-csi-driver-operator/ ]; then
+    echo "Using legacy csi directory"
+    cd /go/src/github.com/openshift/csi-operator/legacy/gcp-pd-csi-driver-operator
+else
+    echo "Using regular csi directory"
+    cd /go/src/github.com/openshift/gcp-pd-csi-driver-operator
+fi
+
 if [ "${IMAGE_VOLUME_SNAPSHOT_MANIFEST:-}" = "image-snapshot" ]; then
     echo "Copying image-snapshot-manifest.yaml to ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}"
     cp "test/e2e/image-snapshot-manifest.yaml" "${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}"

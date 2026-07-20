@@ -1,0 +1,40 @@
+ref:
+  as: acm-interop-p2p-submariner-cloud-prepare
+  from: cli
+  commands: acm-interop-p2p-submariner-cloud-prepare-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  timeout: 45m0s
+  grace_period: 10m0s
+  env:
+    - name: ACM_SPOKE_CLUSTER_COUNT
+      default: "2"
+      documentation: |-
+        Number of ACM spoke clusters to prepare for Submariner.
+    - name: SUBMARINER_GATEWAY_WAIT_TIMEOUT
+      default: "600"
+      documentation: |-
+        Seconds to wait for submariner gateway MachineSet and gateway node label after cloud prepare.
+    - name: SUBMARINER_CLOUD_PREPARE_DEBUG_MODE
+      default: "false"
+      documentation: |-
+        When "true", cloud-prepare failures are logged but do not fail the job.
+        Used for iterative debugging of gateway node provisioning.
+  documentation: |-
+    Step 1 of 3 in the Submariner installation chain.
+
+    Installs subctl locally (not SHARED_DIR), prepares AWS security groups on
+    each spoke cluster using 'subctl cloud prepare aws' with dedicated gateway
+    nodes (default --gateways 1), and opens required IPsec/NAT-T firewall ports.
+
+    AWS credentials are loaded from CLUSTER_PROFILE_DIR into ~/.aws/
+    and removed from disk via a trap on EXIT. They are never written
+    to SHARED_DIR.
+
+    Env vars consumed:
+      ACM_SPOKE_CLUSTER_COUNT          - number of spoke clusters (default: 2)
+      SUBMARINER_GATEWAY_WAIT_TIMEOUT  - gateway node wait timeout in seconds (default: 600)
+      SHARED_DIR                       - shared artifact directory
+      CLUSTER_PROFILE_DIR              - directory containing .awscred

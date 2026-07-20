@@ -11,6 +11,8 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
       - packages/agent-ops/Dockerfile.workspace
       - packages/automl/Dockerfile.workspace
       - packages/autorag/Dockerfile.workspace
@@ -65,6 +67,189 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
+    context: ci/prow/odh-core-bff-pr-image-mirror
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
+      - packages/agent-ops/Dockerfile.workspace
+      - packages/automl/Dockerfile.workspace
+      - packages/autorag/Dockerfile.workspace
+      - packages/eval-hub/Dockerfile.workspace
+      - packages/gen-ai/Dockerfile.workspace
+      - packages/maas/Dockerfile.workspace
+      - packages/mlflow/Dockerfile.workspace
+      - packages/model-registry/Dockerfile.workspace
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-opendatahub-io-odh-dashboard-main-odh-core-bff-pr-image-mirror
+    rerun_command: /test odh-core-bff-pr-image-mirror
+    run_if_changed: ^distributions/core-bff/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=odh-core-bff-pr-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )odh-core-bff-pr-image-mirror,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
+    context: ci/prow/odh-dashboard-operator-pr-image-mirror
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
+      - packages/agent-ops/Dockerfile.workspace
+      - packages/automl/Dockerfile.workspace
+      - packages/autorag/Dockerfile.workspace
+      - packages/eval-hub/Dockerfile.workspace
+      - packages/gen-ai/Dockerfile.workspace
+      - packages/maas/Dockerfile.workspace
+      - packages/mlflow/Dockerfile.workspace
+      - packages/model-registry/Dockerfile.workspace
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-opendatahub-io-odh-dashboard-main-odh-dashboard-operator-pr-image-mirror
+    rerun_command: /test odh-dashboard-operator-pr-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=odh-dashboard-operator-pr-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )odh-dashboard-operator-pr-image-mirror,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -75,6 +260,8 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
       - packages/agent-ops/Dockerfile.workspace
       - packages/automl/Dockerfile.workspace
       - packages/autorag/Dockerfile.workspace
@@ -154,7 +341,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )odh-dashboard-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -164,6 +351,8 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
       - packages/agent-ops/Dockerfile.workspace
       - packages/automl/Dockerfile.workspace
       - packages/autorag/Dockerfile.workspace
@@ -177,6 +366,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-odh-dashboard-main-odh-mod-arch-agent-ops-pr-image-mirror
     rerun_command: /test odh-mod-arch-agent-ops-pr-image-mirror
+    run_if_changed: ^packages/agent-ops/
     spec:
       containers:
       - args:
@@ -243,7 +433,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )odh-mod-arch-agent-ops-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -253,6 +443,8 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
       - packages/agent-ops/Dockerfile.workspace
       - packages/automl/Dockerfile.workspace
       - packages/autorag/Dockerfile.workspace
@@ -266,6 +458,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-odh-dashboard-main-odh-mod-arch-automl-pr-image-mirror
     rerun_command: /test odh-mod-arch-automl-pr-image-mirror
+    run_if_changed: ^packages/automl/
     spec:
       containers:
       - args:
@@ -332,7 +525,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )odh-mod-arch-automl-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -342,6 +535,8 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
       - packages/agent-ops/Dockerfile.workspace
       - packages/automl/Dockerfile.workspace
       - packages/autorag/Dockerfile.workspace
@@ -355,6 +550,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-odh-dashboard-main-odh-mod-arch-autorag-pr-image-mirror
     rerun_command: /test odh-mod-arch-autorag-pr-image-mirror
+    run_if_changed: ^packages/autorag/
     spec:
       containers:
       - args:
@@ -421,7 +617,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )odh-mod-arch-autorag-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -431,6 +627,8 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
       - packages/agent-ops/Dockerfile.workspace
       - packages/automl/Dockerfile.workspace
       - packages/autorag/Dockerfile.workspace
@@ -444,6 +642,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-odh-dashboard-main-odh-mod-arch-eval-hub-pr-image-mirror
     rerun_command: /test odh-mod-arch-eval-hub-pr-image-mirror
+    run_if_changed: ^packages/eval-hub/
     spec:
       containers:
       - args:
@@ -510,7 +709,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )odh-mod-arch-eval-hub-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -520,6 +719,8 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
       - packages/agent-ops/Dockerfile.workspace
       - packages/automl/Dockerfile.workspace
       - packages/autorag/Dockerfile.workspace
@@ -533,6 +734,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-odh-dashboard-main-odh-mod-arch-gen-ai-pr-image-mirror
     rerun_command: /test odh-mod-arch-gen-ai-pr-image-mirror
+    run_if_changed: ^packages/gen-ai/
     spec:
       containers:
       - args:
@@ -599,7 +801,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )odh-mod-arch-gen-ai-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -609,6 +811,8 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
       - packages/agent-ops/Dockerfile.workspace
       - packages/automl/Dockerfile.workspace
       - packages/autorag/Dockerfile.workspace
@@ -622,6 +826,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-odh-dashboard-main-odh-mod-arch-maas-pr-image-mirror
     rerun_command: /test odh-mod-arch-maas-pr-image-mirror
+    run_if_changed: ^packages/maas/
     spec:
       containers:
       - args:
@@ -688,7 +893,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )odh-mod-arch-maas-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -698,6 +903,8 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
       - packages/agent-ops/Dockerfile.workspace
       - packages/automl/Dockerfile.workspace
       - packages/autorag/Dockerfile.workspace
@@ -711,6 +918,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-odh-dashboard-main-odh-mod-arch-mlflow-pr-image-mirror
     rerun_command: /test odh-mod-arch-mlflow-pr-image-mirror
+    run_if_changed: ^packages/mlflow/
     spec:
       containers:
       - args:
@@ -777,7 +985,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )odh-mod-arch-mlflow-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -787,6 +995,8 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
       - packages/agent-ops/Dockerfile.workspace
       - packages/automl/Dockerfile.workspace
       - packages/autorag/Dockerfile.workspace
@@ -800,6 +1010,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-odh-dashboard-main-odh-mod-arch-model-registry-pr-image-mirror
     rerun_command: /test odh-mod-arch-model-registry-pr-image-mirror
+    run_if_changed: ^packages/model-registry/
     spec:
       containers:
       - args:

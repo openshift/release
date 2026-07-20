@@ -53,7 +53,8 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: src
-- as: e2e-agnostic
+- always_run: false
+  as: e2e-agnostic
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
@@ -69,7 +70,8 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-operator
+- always_run: false
+  as: e2e-operator
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -82,11 +84,13 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-agnostic-upgrade
+- always_run: false
+  as: e2e-agnostic-upgrade
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
-- as: e2e-console-login
+- always_run: false
+  as: e2e-console-login
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -98,8 +102,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-operator-encryption
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+- always_run: false
+  as: e2e-operator-encryption
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -113,8 +118,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-rotation
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
+- always_run: false
+  as: e2e-gcp-operator-encryption-rotation
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -128,8 +134,9 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-perf
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
+- always_run: false
+  as: e2e-gcp-operator-encryption-perf
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -142,8 +149,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-oidc-techpreview
-  run_if_changed: ^(pkg/controllers/externaloidc)|^(test/e2e-oidc)
+- always_run: false
+  as: e2e-oidc-techpreview
+  pipeline_run_if_changed: ^(pkg/controllers/externaloidc)|^(test/e2e-oidc)
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -159,7 +167,8 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-oidc
+- always_run: false
+  as: e2e-oidc
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -187,7 +196,7 @@ tests:
 - always_run: false
   as: e2e-gcp-operator-encryption-kms
   optional: true
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
   steps:
     cluster_profile: openshift-org-gcp
     env:

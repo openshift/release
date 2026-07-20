@@ -13,21 +13,18 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
-    ci-operator.openshift.io/variant: ocp-4.21
+    ci-operator.openshift.io/variant: ocp-4.22
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-service-mesh-sail-operator-main-ocp-4.21-istio-periodic-perfscale
+  name: periodic-ci-openshift-service-mesh-sail-operator-main-ocp-4.22-istio-periodic-perfscale
   reporter_config:
     slack:
-      channel: '#ossm-qe-ci'
+      channel: '#team-ossm-quality'
       job_states_to_report:
-      - success
       - failure
       - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -37,7 +34,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=istio-periodic-perfscale
-      - --variant=ocp-4.21
+      - --variant=ocp-4.22
       command:
       - ci-operator
       env:
@@ -94,7 +91,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 00 6 * * 1-5
   decorate: true
   decoration_config:
@@ -104,10 +101,10 @@ periodics:
     org: openshift-service-mesh
     repo: sail-operator
   labels:
-    ci-operator.openshift.io/variant: ocp-4.21
+    ci-operator.openshift.io/variant: ocp-4.22
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-service-mesh-sail-operator-main-ocp-4.21-sync-upstream
+  name: periodic-ci-openshift-service-mesh-sail-operator-main-ocp-4.22-sync-upstream
   reporter_config:
     slack:
       channel: '#team-ossm-release-maintenance'
@@ -125,7 +122,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=sync-upstream
-      - --variant=ocp-4.21
+      - --variant=ocp-4.22
       command:
       - ci-operator
       env:

@@ -54,8 +54,11 @@ remote:
 
 pci_devices: []
 wait_timeout: ${WAIT_TIMEOUT:-3600}
-no_wait: false
 version_channel: ${VERSION_CHANNEL:-stable}
+
+snapshot:
+  enabled: ${SNAPSHOT_ENABLED:-true}
+  max_cached: ${SNAPSHOT_MAX_CACHED:-3}
 
 operators:
   install: false
@@ -68,11 +71,13 @@ EOF
 echo "Generated cluster config:"
 cat ${CONFIG_FILE}
 
-# Delete cluster using config file
-if [[ "${SKIP_CLUSTER_DELETE:-false}" != "true" ]]; then
+if [[ "${SKIP_CLUSTER_DELETE:-false}" == "true" ]]; then
+  echo "SKIP_CLUSTER_DELETE is set to true, skipping cluster deletion"
+elif [[ "${SNAPSHOT_ENABLED:-true}" == "true" ]]; then
+  echo "Snapshot caching enabled — stopping VMs (preserving disk and snapshots for reuse)..."
+  make cluster-stop CONFIG_FILE_PATH=${CONFIG_FILE}
+else
   echo "Deleting cluster..."
   make cluster-delete CONFIG_FILE_PATH=${CONFIG_FILE}
-else
-  echo "SKIP_CLUSTER_DELETE is set to true, skipping cluster deletion"
 fi
 
