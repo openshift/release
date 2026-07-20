@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
+# separate SHARED_DIR subdirectory so mgmt and infra files never collide.
+# The kubeconfig is saved as kubeconfig (mgmt) or infra/kubeconfig (infra).
+if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
+  LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
+  SHARED_DIR="${SHARED_DIR}/infra"
+  mkdir -p "${SHARED_DIR}"
+fi
+
 INSTALL_DIR=/tmp
 
 trap 'prepare_next_steps' EXIT TERM
