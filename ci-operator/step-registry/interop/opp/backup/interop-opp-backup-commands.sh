@@ -61,10 +61,10 @@ if [[ -n "${controlPlaneNode}" ]]; then
         # Copy snapshot and static-pod resources from the node
         typeset snapshotFile=""
         snapshotFile=$(oc debug "node/${controlPlaneNode}" -- chroot /host \
-            bash -c "ls -1 ${etcdBackupRemote}/snapshot_*.db 2>/dev/null | head -1") || true
+            bash -c "ls -1 ${etcdBackupRemote}/snapshot_*.db | head -1") || true
         typeset resourcesFile=""
         resourcesFile=$(oc debug "node/${controlPlaneNode}" -- chroot /host \
-            bash -c "ls -1 ${etcdBackupRemote}/static_kuberesources_*.tar.gz 2>/dev/null | head -1") || true
+            bash -c "ls -1 ${etcdBackupRemote}/static_kuberesources_*.tar.gz | head -1") || true
 
         typeset isCopyOk=true
         if [[ -z "${snapshotFile}" || -z "${resourcesFile}" ]]; then
@@ -142,7 +142,7 @@ typeset opJson="["
 typeset csvPhase=""
 for op in "${opListArr[@]}"; do
     csvPhase=""
-    csvPhase=$(oc get csv -A --no-headers | grep "${op}" | head -1 | awk '{print $NF}') || true
+    csvPhase=$(oc get csv -A -o json | jq -r --arg op "${op}" '[.items[] | select(.metadata.name | contains($op))][0].status.phase // "unknown"') || true
     opJson="${opJson}{\"name\":\"${op}\",\"phase\":\"${csvPhase:-unknown}\"},"
 done
 opJson="${opJson%,}]"

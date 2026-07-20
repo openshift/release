@@ -59,3 +59,5 @@ for try in $(seq "${retries}"); do
     sleep 30
   fi
 done
+
+true

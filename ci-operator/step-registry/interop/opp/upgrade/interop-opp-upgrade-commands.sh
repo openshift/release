@@ -35,19 +35,27 @@ DebugOnExit() {
         oc get machineconfig || : "unavailable"
 
         : "# Abnormal nodes"
-        oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read -r node; do
+        oc get node -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status!="True")) | .metadata.name' | while read -r node; do
             : "### oc describe node ${node} ###"
             oc describe node "${node}" || true
         done || true
 
         : "# Abnormal ClusterOperators"
-        oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read -r co; do
+        oc get co -o json | jq -r '.items[] | select(
+            (.status.conditions[] | select(.type=="Available")).status != "True" or
+            (.status.conditions[] | select(.type=="Progressing")).status != "False" or
+            (.status.conditions[] | select(.type=="Degraded")).status != "False"
+        ) | .metadata.name' | while read -r co; do
             : "### oc describe co ${co} ###"
             oc describe co "${co}" || true
         done || true
 
         : "# Abnormal MachineConfigPools"
-        oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read -r mcp; do
+        oc get machineconfigpools -o json | jq -r '.items[] | select(
+            (.status.conditions[] | select(.type=="Updated")).status != "True" or
+            (.status.conditions[] | select(.type=="Updating")).status != "False" or
+            (.status.conditions[] | select(.type=="Degraded")).status != "False"
+        ) | .metadata.name' | while read -r mcp; do
             : "### oc describe mcp ${mcp} ###"
             oc describe mcp "${mcp}" || true
         done || true
@@ -252,12 +260,12 @@ MonitorUpgrade() {
             oc get clusterversion version -o json > "${snapshotDir}/cv-$(date +%s).json" || true
         fi
 
-        typeset cvOut="" avail="" progressing=""
-        cvOut="$(oc get clusterversion --no-headers)" || continue
-        avail="$(echo "${cvOut}" | awk '{print $3}')"
-        progressing="$(echo "${cvOut}" | awk '{print $4}')"
+        typeset avail="" progressing="" cvVersion=""
+        avail="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" || continue
+        progressing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')" || continue
+        cvVersion="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')" || continue
 
-        if [[ "${avail}" == "True" && "${progressing}" == "False" && "${cvOut}" == *"${targetVersion}"* ]]; then
+        if [[ "${avail}" == "True" && "${progressing}" == "False" && "${cvVersion}" == "${targetVersion}" ]]; then
             typeset -i endTime=0
             endTime=$(date +%s)
             : "Upgrade completed successfully at $(date '+%F %T')"
@@ -301,7 +309,11 @@ ValidatePlatformHealth() {
     : "CVO: Available=True, Progressing=False, Degraded=False"
 
     typeset unhealthyCo=""
-    unhealthyCo="$(oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}')"
+    unhealthyCo="$(oc get co -o json | jq -r '.items[] | select(
+        (.status.conditions[] | select(.type=="Available")).status != "True" or
+        (.status.conditions[] | select(.type=="Progressing")).status != "False" or
+        (.status.conditions[] | select(.type=="Degraded")).status != "False"
+    ) | .metadata.name')"
     if [[ -n "${unhealthyCo}" ]]; then
         : "Unhealthy ClusterOperators: ${unhealthyCo}"
         return 1
@@ -309,7 +321,7 @@ ValidatePlatformHealth() {
     : "All ClusterOperators healthy"
 
     typeset unreadyNodes=""
-    unreadyNodes="$(oc get node --no-headers | awk '$2 != "Ready" {print $1}')"
+    unreadyNodes="$(oc get node -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status!="True")) | .metadata.name')"
     if [[ -n "${unreadyNodes}" ]]; then
         : "Not-Ready nodes: ${unreadyNodes}"
         return 1
@@ -317,7 +329,11 @@ ValidatePlatformHealth() {
     : "All nodes Ready"
 
     typeset mcpIssues=""
-    mcpIssues="$(oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}')"
+    mcpIssues="$(oc get machineconfigpools -o json | jq -r '.items[] | select(
+        (.status.conditions[] | select(.type=="Updated")).status != "True" or
+        (.status.conditions[] | select(.type=="Updating")).status != "False" or
+        (.status.conditions[] | select(.type=="Degraded")).status != "False"
+    ) | .metadata.name')"
     if [[ -n "${mcpIssues}" ]]; then
         : "Unhealthy MachineConfigPools: ${mcpIssues}"
         return 1
@@ -334,22 +350,21 @@ ValidateOppOperators() {
     : "Waiting 5 minutes for operator settling"
     sleep 300
 
-    typeset allCsvs=""
+    typeset allCsvsJson=""
     typeset -i failCount=0
-    allCsvs="$(oc get csv -A --no-headers)" || {
+    allCsvsJson="$(oc get csv -A -o json)" || {
         : "Failed to retrieve CSVs"
         return 1
     }
 
-    typeset csvLine="" phase=""
+    typeset phase=""
     for op in "${operatorsArr[@]}"; do
-        csvLine="$(echo "${allCsvs}" | grep "${op}" | head -1)" || true
-        if [[ -z "${csvLine}" ]]; then
+        phase="$(echo "${allCsvsJson}" | jq -r --arg op "${op}" '[.items[] | select(.metadata.name | contains($op))][0].status.phase // empty')" || true
+        if [[ -z "${phase}" ]]; then
             : "CSV not found for operator: ${op}"
             (( failCount += 1 ))
             continue
         fi
-        phase="$(echo "${csvLine}" | awk '{print $NF}')"
         if [[ "${phase}" != "Succeeded" ]]; then
             : "Operator ${op} CSV phase: ${phase} (expected: Succeeded)"
             (( failCount += 1 ))
@@ -361,13 +376,13 @@ ValidateOppOperators() {
     if (( failCount > 0 )); then
         : "${failCount} OPP operator(s) not healthy after upgrade"
         : "Full CSV listing:"
-        echo "${allCsvs}"
+        echo "${allCsvsJson}" | jq -r '.items[] | "\(.metadata.namespace)\t\(.metadata.name)\t\(.status.phase)"'
         return 1
     fi
 
     : "Checking pod readiness for OPP operator namespaces"
     typeset oppNamespaces=""
-    oppNamespaces="$(echo "${allCsvs}" | grep -E "$(echo "${OPP_OPERATORS}" | tr ',' '|')" | awk '{print $1}' | sort -u)"
+    oppNamespaces="$(echo "${allCsvsJson}" | jq -r --arg ops "${OPP_OPERATORS}" '($ops | split(",")) as $opArr | [.items[] | select(.metadata.name as $n | $opArr | any(. as $op | $n | contains($op))) | .metadata.namespace] | unique | .[]')"
     typeset notReady="" ns=""
     for ns in ${oppNamespaces}; do
         notReady="$(oc get pods -n "${ns}" --no-headers | grep -v 'Completed' | grep -v 'Running' | grep -v 'Succeeded')" || true
@@ -401,7 +416,7 @@ Main() {
     export targetVersion targetMinorVersion
     : "Target release: ${targetVersion} (minor: ${targetMinorVersion})"
 
-    sourceVersion="$(oc get clusterversion --no-headers | awk '{print $2}')"
+    sourceVersion="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')"
     sourceMinorVersion="$(echo "${sourceVersion}" | cut -f2 -d.)"
     export sourceVersion sourceMinorVersion
     : "Source release: ${sourceVersion} (minor: ${sourceMinorVersion})"
