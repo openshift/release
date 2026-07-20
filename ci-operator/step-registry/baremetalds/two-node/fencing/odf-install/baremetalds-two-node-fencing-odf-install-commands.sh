@@ -230,6 +230,9 @@ fi
 
 # ---------------------------------------------------------------------------
 # Step 5: DRBD floating monitor setup
+#   The drbd-setup script SSHes into each cluster node to configure DRBD.
+#   It must run on the hypervisor which has direct SSH access to the nodes;
+#   the CI pod can only reach the hypervisor, not the node IPs.
 # ---------------------------------------------------------------------------
 echo "--- Step 5: DRBD floating monitor setup ---"
 echo "Retrieving drbd-setup script from ConfigMap..."
@@ -260,8 +263,13 @@ if grep -q 'non-rotational' /tmp/drbd-setup; then
   echo "Patched ROTA check in drbd-setup"
 fi
 
-echo "Running drbd-setup with mon disk ${MON_DISK_PATH}..."
-/tmp/drbd-setup -d "${MON_DISK_PATH}"
+echo "Copying drbd-setup script and kubeconfig to hypervisor..."
+scp "${SSHOPTS[@]}" /tmp/drbd-setup "root@${IP}:/tmp/drbd-setup"
+scp "${SSHOPTS[@]}" "${KUBECONFIG}" "root@${IP}:/tmp/kubeconfig"
+
+echo "Running drbd-setup on hypervisor with mon disk ${MON_DISK_PATH}..."
+ssh "${SSHOPTS[@]}" "root@${IP}" \
+    "KUBECONFIG=/tmp/kubeconfig /tmp/drbd-setup -d '${MON_DISK_PATH}'"
 
 # ---------------------------------------------------------------------------
 # Step 6: Label nodes for ODF storage
