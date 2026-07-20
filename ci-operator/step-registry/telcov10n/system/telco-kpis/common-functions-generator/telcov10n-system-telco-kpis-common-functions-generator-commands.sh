@@ -413,8 +413,9 @@ setup_continue_on_fail() {
 # The step's full context (inventory, vaults, env) remains available
 # for interactive debugging via the pod terminal.
 #
-# Uses TIMEOUT env var (default: "+10 min") to control how long to wait.
-# Sentinel files /tmp/debug.done and /tmp/keep.debugging control the loop.
+# Uses DEBUG_TIMEOUT from JSON settings (default: "+10 min") to control
+# how long to wait. Sentinel files /tmp/debug.done and /tmp/keep.debugging
+# control the loop.
 # ----------------------------------------------------------------------
 
 setup_debug_on_fail() {
@@ -442,7 +443,7 @@ __debug_on_fail_exit_handler() {
 
     TZ=UTC
     local end_time
-    end_time=$(date -d "${TIMEOUT:-+10 min}" +%s)
+    end_time=$(date -d "${DEBUG_TIMEOUT:-+10 min}" +%s)
     local debug_done=/tmp/debug.done
     local keep_debugging=/tmp/keep.debugging
 
