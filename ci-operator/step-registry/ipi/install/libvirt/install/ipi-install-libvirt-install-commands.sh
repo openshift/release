@@ -474,6 +474,17 @@ yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0
 # Bump the libvirt workers disk to to 30GB
 yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] ${WORKER_DISK}
 
+# Opt-in: point machine-api volumes at an existing libvirt pool (e.g. UPI multiarch-ci-pool on /home)
+# instead of the per-cluster pool openshift-install would create under /var/lib/libvirt/openshift-images.
+if [[ -n "${LIBVIRT_POOL_NAME:-}" ]]; then
+	echo "Setting machine volume poolName to ${LIBVIRT_POOL_NAME}"
+	for ((i=0; i<${MASTER_REPLICAS}; i++))
+	do
+		yq write --inplace "${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml" spec.providerSpec.value.volume[poolName] "${LIBVIRT_POOL_NAME}"
+	done
+	yq write --inplace "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" spec.template.spec.providerSpec.value.volume[poolName] "${LIBVIRT_POOL_NAME}"
+fi
+
 while IFS= read -r -d '' item
 do
   manifest="$( basename "${item}" )"
@@ -531,10 +542,55 @@ if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "tru
 	fi
 fi
 
-# CI workaround: inject xml.xslt before terraform init (see comment above).
+# Ensure an existing shared pool is present when LIBVIRT_POOL_NAME is set (VPN OZ / UPI multiarch-ci-pool).
+# openshift-install otherwise creates a new dir pool under /var/lib/libvirt/openshift-images/<id> on root.
+if [[ -n "${LIBVIRT_POOL_NAME:-}" ]]; then
+	LIBVIRT_IMAGE_PATH="${LIBVIRT_IMAGE_PATH:-/home/libvirt/openshift-images}"
+	if [[ -z "${LEASED_RESOURCE:-}" || ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
+		echo "ERROR: LIBVIRT_POOL_NAME=${LIBVIRT_POOL_NAME} requires LEASED_RESOURCE and ${CLUSTER_PROFILE_DIR}/leases" >&2
+		exit 1
+	fi
+	if command -v yq-v4 >/dev/null 2>&1; then
+		POOL_HOST="$(yq-v4 -oy ".[\"${LEASED_RESOURCE}\"].hostname" "${CLUSTER_PROFILE_DIR}/leases")"
+	else
+		POOL_HOST="$(yq eval -o=y ".[\"${LEASED_RESOURCE}\"].hostname" "${CLUSTER_PROFILE_DIR}/leases")"
+	fi
+	if [[ -z "${POOL_HOST}" ]]; then
+		echo "ERROR: could not resolve hypervisor hostname for pool ${LIBVIRT_POOL_NAME}" >&2
+		exit 1
+	fi
+	POOL_VIRSH="mock-nss.sh virsh --connect qemu+tcp://${POOL_HOST}/system"
+	echo "Ensuring libvirt pool ${LIBVIRT_POOL_NAME} exists on ${POOL_HOST} (target ${LIBVIRT_IMAGE_PATH})"
+	if ${POOL_VIRSH} pool-list --all --name | grep -qx "${LIBVIRT_POOL_NAME}"; then
+		echo "Storage pool ${LIBVIRT_POOL_NAME} already exists. Skipping create."
+		# Start if inactive
+		if ! ${POOL_VIRSH} pool-list --name | grep -qx "${LIBVIRT_POOL_NAME}"; then
+			${POOL_VIRSH} pool-start "${LIBVIRT_POOL_NAME}" || true
+		fi
+	else
+		echo "Creating storage pool ${LIBVIRT_POOL_NAME}..."
+		${POOL_VIRSH} pool-define-as --name "${LIBVIRT_POOL_NAME}" --type dir --target "${LIBVIRT_IMAGE_PATH}"
+		${POOL_VIRSH} pool-autostart "${LIBVIRT_POOL_NAME}"
+		${POOL_VIRSH} pool-start "${LIBVIRT_POOL_NAME}"
+	fi
+fi
+
+NEED_ACPI_PATCH="false"
 if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
+	NEED_ACPI_PATCH="true"
+fi
+NEED_POOL_PATCH="false"
+if [[ -n "${LIBVIRT_POOL_NAME:-}" ]]; then
+	NEED_POOL_PATCH="true"
+fi
+
+# CI workarounds: wrap terraform before first init (unpackAndInit has no poller gap).
+# - s390x ACPI: inject xml.xslt on libvirt_domain.
+# - LIBVIRT_POOL_NAME: drop installer-created libvirt_pool and use the existing shared pool.
+if [[ "${NEED_ACPI_PATCH}" == "true" || "${NEED_POOL_PATCH}" == "true" ]]; then
 	xsl="${dir}/s390x-strip-acpi.xsl"
-	cat > "${xsl}" <<'XSL_EOF'
+	if [[ "${NEED_ACPI_PATCH}" == "true" ]]; then
+		cat > "${xsl}" <<'XSL_EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
   <xsl:output method="xml" encoding="UTF-8" indent="yes"/>
@@ -546,31 +602,62 @@ if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "tru
   <xsl:template match="acpi"/>
 </xsl:stylesheet>
 XSL_EOF
-	patch_tf="${dir}/ipi-libvirt-s390x-patch-libvirt-domain-tf.sh"
+	fi
+	patch_tf="${dir}/ipi-libvirt-patch-terraform-tf.sh"
 	cat > "${patch_tf}" <<'PATCH_EOF'
 #!/bin/bash
 set -euo pipefail
 work="${1:?}"
-xsl="${2:?}"
+xsl="${2:-}"
+pool_name="${3:-}"
 [[ -d "${work}" ]] || exit 0
 while IFS= read -r -d '' tf; do
-	if grep -q 'ipi-ci-s390x-strip-acpi' "${tf}" 2>/dev/null; then
-		continue
+	if [[ -n "${pool_name}" ]]; then
+		# Remove resource "libvirt_pool" "storage_pool" { ... } (installer hardcoded path on root FS).
+		if grep -q 'resource "libvirt_pool" "storage_pool"' "${tf}" 2>/dev/null; then
+			awk '
+				BEGIN { skip=0; depth=0 }
+				/resource "libvirt_pool" "storage_pool"/ { skip=1; depth=0 }
+				{
+					if (skip) {
+						for (i=1; i<=length($0); i++) {
+							c=substr($0,i,1)
+							if (c=="{") depth++
+							if (c=="}") {
+								depth--
+								if (depth<=0) { skip=0; next }
+							}
+						}
+						next
+					}
+					print
+				}
+			' "${tf}" > "${tf}.ipi_drop_pool.$$" && mv "${tf}.ipi_drop_pool.$$" "${tf}"
+		fi
+		# Point volumes/ignition/outputs at the shared pool name.
+		if grep -qE 'libvirt_pool\.storage_pool\.name|pool[[:space:]]*=' "${tf}" 2>/dev/null; then
+			sed "s|libvirt_pool\.storage_pool\.name|\"${pool_name}\"|g" "${tf}" > "${tf}.ipi_pool_ref.$$" && mv "${tf}.ipi_pool_ref.$$" "${tf}"
+		fi
 	fi
-	if ! grep -q 'resource "libvirt_domain"' "${tf}" 2>/dev/null; then
-		continue
+	if [[ -n "${xsl}" && -f "${xsl}" ]]; then
+		if grep -q 'ipi-ci-s390x-strip-acpi' "${tf}" 2>/dev/null; then
+			continue
+		fi
+		if ! grep -q 'resource "libvirt_domain"' "${tf}" 2>/dev/null; then
+			continue
+		fi
+		awk -v xsl="${xsl}" '
+			/resource "libvirt_domain"/ {
+				print
+				print "  # ipi-ci-s390x-strip-acpi: XSLT strips ACPI for RHEL 9 QEMU s390-ccw-virtio-rhel9.*"
+				print "  xml {"
+				print "    xslt = file(\"" xsl "\")"
+				print "  }"
+				next
+			}
+			{ print }
+		' "${tf}" > "${tf}.ipi_acpi_xslt.$$" && mv "${tf}.ipi_acpi_xslt.$$" "${tf}"
 	fi
-	awk -v xsl="${xsl}" '
-		/resource "libvirt_domain"/ {
-			print
-			print "  # ipi-ci-s390x-strip-acpi: XSLT strips ACPI for RHEL 9 QEMU s390-ccw-virtio-rhel9.*"
-			print "  xml {"
-			print "    xslt = file(\"" xsl "\")"
-			print "  }"
-			next
-		}
-		{ print }
-	' "${tf}" > "${tf}.ipi_acpi_xslt.$$" && mv "${tf}.ipi_acpi_xslt.$$" "${tf}"
 done < <(find "${work}" -name '*.tf' -print0 2>/dev/null)
 PATCH_EOF
 	chmod +x "${patch_tf}"
@@ -593,16 +680,20 @@ PATCH_EOF
 		if ! mv "${tfbin}" "${tfbin}.real" 2>/dev/null; then
 			exit 0
 		fi
+		xsl_arg=""
+		if [[ "${NEED_ACPI_PATCH}" == "true" ]]; then
+			xsl_arg="${xsl}"
+		fi
+		pool_arg="${LIBVIRT_POOL_NAME:-}"
 		cat >"${tfbin}" <<EOF
 #!/bin/bash
 set -euo pipefail
 REAL="${tfbin}.real"
 PATCH="${patch_tf}"
-XSL="${xsl}"
-if [[ "\${ARCH:-}" == "s390x" && "\${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
-	if [[ "\$1" == "init" || "\$1" == "plan" || "\$1" == "apply" ]]; then
-		bash "\${PATCH}" "\$(pwd)" "\${XSL}"
-	fi
+XSL="${xsl_arg}"
+POOL="${pool_arg}"
+if [[ "\$1" == "init" || "\$1" == "plan" || "\$1" == "apply" ]]; then
+	bash "\${PATCH}" "\$(pwd)" "\${XSL}" "\${POOL}"
 fi
 exec "\${REAL}" "\$@"
 EOF
