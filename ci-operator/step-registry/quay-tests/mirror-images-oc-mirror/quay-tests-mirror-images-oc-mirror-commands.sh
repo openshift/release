@@ -38,7 +38,7 @@ function check_signed() {
         digest="$(echo "${payload}" | cut -f2 -d@)"
         echo "The target image is using digest pullspec, its digest is ${digest}"
     else
-        digest="$(oc image info "${payload}" -o json | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["digest"])')"
+        digest="$(oc image info --registry-config /tmp/pull-secret.json "${payload}" -o json | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["digest"])')"
         echo "The target image is using tagname pullspec, its digest is ${digest}"
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
@@ -78,7 +78,7 @@ echo "target_release_image_repo: ${target_release_image_repo}"
 
 # since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
 # unset KUBECONFIG to ensure this step always interact with the build farm.
-KUBECONFIG="" oc registry login
+KUBECONFIG="" oc registry login --to /tmp/pull-secret.json
 mkdir -p "${HOME}/.docker"
 cp /tmp/pull-secret.json "${HOME}/.docker/config.json"
 
