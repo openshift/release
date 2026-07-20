@@ -84,22 +84,31 @@ RUN_EXIT_CODE=$?
 set -o errexit
 
 METRICS_FOLDER="collected-metrics-${UUID}"
-if [[ -f ${METRICS_FOLDER}/jobSummary.json ]]; then
-  cp -r ${METRICS_FOLDER} "${ARTIFACT_DIR}/"
-  if [[ ${JOB_NAME} == *openshift-eng-ocp-qe-perfscale-ci* ]] && [[ ${JOB_TYPE} == "periodic" ]]; then
-    set +e
-    OCP_PERF_DASH_HOST=$(cat ${ES_SECRETS_PATH}/ocp-perf-dash-address)
-    OCP_PERF_DASH_DIR="/usr/share/ocp-perf-dash/${JOB_NAME}/${WORKLOAD}/${UUID}"
-    METRICS="${METRICS_FOLDER}/*QuantilesMeasurement*.json ${METRICS_FOLDER}/jobSummary.json"
-    SSH_ARGS="-i ${ES_SECRETS_PATH}/ocp-perf-dash-id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-    ssh ${SSH_ARGS} ${OCP_PERF_DASH_HOST} "mkdir -p ${OCP_PERF_DASH_DIR}"
-    scp ${SSH_ARGS} ${METRICS} ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}
-    set -e
-  fi
+cp -r ${METRICS_FOLDER} "${ARTIFACT_DIR}/"
+if [[ ${JOB_NAME} == *openshift-eng-ocp-qe-perfscale-ci* ]] && [[ ${JOB_TYPE} == "periodic" ]]; then
+  set +e
+  OCP_PERF_DASH_HOST=$(cat ${ES_SECRETS_PATH}/ocp-perf-dash-address)
+  OCP_PERF_DASH_DIR="/usr/share/ocp-perf-dash/${JOB_NAME}/${WORKLOAD}/${UUID}"
+  METRICS="${METRICS_FOLDER}/*QuantilesMeasurement*.json ${METRICS_FOLDER}/jobSummary.json"
+  SSH_ARGS="-i ${ES_SECRETS_PATH}/ocp-perf-dash-id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  ssh ${SSH_ARGS} ${OCP_PERF_DASH_HOST} "mkdir -p ${OCP_PERF_DASH_DIR}"
+  scp ${SSH_ARGS} ${METRICS} ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}
+  set -e
 fi
 
 if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
+fi
+
+if [[ "${RUN_EXIT_CODE}" -eq 2 ]]; then
+  echo "kube-burner returned exit code 2, which means the workload reached a timeout"
+  echo "Checking cluster health before exiting"
+  if /tmp/kube-burner-ocp cluster-health; then
+    echo "Cluster is still healthy. Ignoring workload timeout to run remaining workloads"
+    echo "Deleting any left-over test resources"
+    oc delete ns -l kube-burner.io/uuid
+    exit 0
+  fi
 fi
 
 exit ${RUN_EXIT_CODE}
