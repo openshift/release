@@ -8,8 +8,7 @@ export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 cp /var/run/ci-credentials/registry/.dockerconfigjson /tmp/pull-secret.json
-export REGISTRY_AUTH_FILE=/tmp/pull-secret.json
-mkdir -p "${XDG_RUNTIME_DIR}"
+mkdir -p "${XDG_RUNTIME_DIR}/containers"
 
 function run_command() {
     local CMD="$1"
@@ -38,7 +37,7 @@ function check_signed() {
         digest="$(echo "${payload}" | cut -f2 -d@)"
         echo "The target image is using digest pullspec, its digest is ${digest}"
     else
-        digest="$(oc image info --registry-config /tmp/pull-secret.json "${payload}" -o json | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["digest"])')"
+        digest="$(oc image info -a /tmp/pull-secret.json "${payload}" -o json | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["digest"])')"
         echo "The target image is using tagname pullspec, its digest is ${digest}"
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
@@ -64,11 +63,12 @@ OMR_HOST_NAME=$(cat "${SHARED_DIR}/OMR_HOST_NAME")
 MIRROR_REGISTRY_HOST="${OMR_HOST_NAME}:8443"
 echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
 
-# Trust OMR self-signed CA alongside system CAs (no root needed)
+# Trust OMR self-signed CA via containers/certs.d (no root needed, no system trust)
 if [[ -f "${SHARED_DIR}/rootCA.pem" ]]; then
-  cat /etc/pki/tls/certs/ca-bundle.crt "${SHARED_DIR}/rootCA.pem" > /tmp/combined-ca-bundle.crt
-  export SSL_CERT_FILE=/tmp/combined-ca-bundle.crt
-  echo "Combined CA bundle created at /tmp/combined-ca-bundle.crt (system CAs + OMR CA)"
+  mkdir -p "${HOME}/.config/containers/certs.d/${MIRROR_REGISTRY_HOST}"
+  cp "${SHARED_DIR}/rootCA.pem" \
+     "${HOME}/.config/containers/certs.d/${MIRROR_REGISTRY_HOST}/ca.crt"
+  echo "OMR CA installed to containers/certs.d/${MIRROR_REGISTRY_HOST}/ca.crt"
 fi
 
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -86,33 +86,26 @@ echo "target_release_image_repo: ${target_release_image_repo}"
 # since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
 # unset KUBECONFIG to ensure this step always interact with the build farm.
 KUBECONFIG="" oc registry login --to /tmp/pull-secret.json
-mkdir -p "${HOME}/.docker"
-cp /tmp/pull-secret.json "${HOME}/.docker/config.json"
 
 run_command "which oc"
 run_command "oc version --client"
 
 # Create combined pull secret (CI registry creds + cluster profile + OMR hardcoded credential)
-combined_pull_secret_tmp=$(mktemp)
+# Use jq for credential merging (v3 pattern)
 registry_cred="cXVheTpwYXNzd29yZA=="
-python3 -c '
-import json, sys
-# Start with CI registry creds (includes registry.build01 from oc registry login)
-with open("/tmp/pull-secret.json") as f:
-    merged = json.load(f)
-# Merge cluster profile creds on top
-with open(sys.argv[1]) as f:
-    cp = json.load(f)
-auths = merged.get("auths", {})
-auths.update(cp.get("auths", {}))
-# Add OMR credentials
-auths[sys.argv[2]] = {"auth": sys.argv[3]}
-merged["auths"] = auths
-print(json.dumps(merged))
-' "${CLUSTER_PROFILE_DIR}/pull-secret" "${MIRROR_REGISTRY_HOST}" "${registry_cred}" > "${combined_pull_secret_tmp}"
+jq -s '
+  .[0] * {auths: (.[0].auths + .[1].auths + {($mirror_host): {auth: $registry_cred}})}
+' --arg mirror_host "${MIRROR_REGISTRY_HOST}" \
+  --arg registry_cred "${registry_cred}" \
+  /tmp/pull-secret.json "${CLUSTER_PROFILE_DIR}/pull-secret" \
+  > /tmp/combined-pull-secret.json
+
+# Copy combined pull secret to XDG_RUNTIME_DIR/containers/auth.json (v3 auth pattern)
+cp /tmp/combined-pull-secret.json "${XDG_RUNTIME_DIR}/containers/auth.json"
+chmod 0600 "${XDG_RUNTIME_DIR}/containers/auth.json"
 
 # Extract the full OCP version from the target release
-ocp_full_version=$(oc adm release info --registry-config "${combined_pull_secret_tmp}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
+ocp_full_version=$(oc adm release info -a /tmp/pull-secret.json "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
 echo "Target OCP version: ${ocp_full_version}"
 
 # Detect architecture for oc-mirror download
@@ -188,12 +181,6 @@ run_command "'${oc_mirror_bin}' version --output=yaml"
 
 oc_mirror_dir=$(mktemp -d)
 pushd "${oc_mirror_dir}"
-new_pull_secret="${oc_mirror_dir}/new_pull_secret"
-
-# Reuse the combined pull secret created earlier
-cp "${combined_pull_secret_tmp}" "${new_pull_secret}"
-rm -f "${combined_pull_secret_tmp}"
-oc registry login --to "${new_pull_secret}"
 
 # Set up ImageSetConfiguration
 image_set_config="image_set_config.yaml"
@@ -212,16 +199,10 @@ if ! isPreVersion "4.19" && ! check_signed "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OV
     echo "Will use --ignore-release-signature for unsigned release"
 fi
 
-# Set up auth for oc-mirror
-# oc-mirror only respects ~/.docker/config.json -> ${XDG_RUNTIME_DIR}/containers/auth.json
-mkdir -p "${XDG_RUNTIME_DIR}/containers/"
-cp -rf "${new_pull_secret}" "${XDG_RUNTIME_DIR}/containers/auth.json"
-
 unset REGISTRY_AUTH_PREFERENCE
 
-
-# Build oc-mirror command
-mirrorCmd="${oc_mirror_bin} -c ${image_set_config} docker://${target_release_image_repo} --dest-tls-verify=false --v2 --workspace file://${oc_mirror_dir}"
+# Build oc-mirror command (v3 pattern: --authfile, no --dest-tls-verify)
+mirrorCmd="${oc_mirror_bin} -c ${image_set_config} docker://${target_release_image_repo} --authfile \"${XDG_RUNTIME_DIR}/containers/auth.json\" --v2 --workspace file://${oc_mirror_dir}"
 
 # ref OCPBUGS-56009: add --ignore-release-signature for unsigned releases >= 4.19
 if [[ -n "${extra_flags}" ]]; then
@@ -291,6 +272,4 @@ print(yaml.dump(output, default_flow_style=False))
 echo "install-config-icsp.yaml.patch:"
 cat "${install_config_icsp_patch}"
 
-# Clean up
-rm -f "${new_pull_secret}"
 popd
