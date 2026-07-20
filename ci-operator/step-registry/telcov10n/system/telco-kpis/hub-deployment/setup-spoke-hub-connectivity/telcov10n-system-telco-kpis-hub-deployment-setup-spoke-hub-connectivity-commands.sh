@@ -5,6 +5,7 @@ set -euo pipefail
 source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'setup_spoke_hub_connectivity' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
+setup_debug_on_fail
 
 main() {
     echo "Setting up spoke-hub connectivity: ${SPOKE_CLUSTER} -> ${HUB_CLUSTER}"

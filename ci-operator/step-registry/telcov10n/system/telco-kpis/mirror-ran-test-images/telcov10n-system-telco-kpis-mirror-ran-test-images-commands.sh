@@ -5,6 +5,7 @@ set -euo pipefail
 source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'mirror_ran_test_images' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
+setup_debug_on_fail
 
 # TODO: Implement RAN test image mirroring using Ansible playbook
 # Expected playbook: repos/eco-ci-cd/playbooks/telco-kpis/mirror-ran-test-images.yml

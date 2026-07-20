@@ -10,6 +10,7 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'ztp_ai_deployment_time' "${TEST_SETTINGS:-}" "${TEST_SETTINGS_DEFAULTS:-}"
 setup_continue_on_fail
+setup_debug_on_fail
 
 main() {
     echo "Running ZTP AI deployment time test for spoke: ${SPOKE_CLUSTER}"

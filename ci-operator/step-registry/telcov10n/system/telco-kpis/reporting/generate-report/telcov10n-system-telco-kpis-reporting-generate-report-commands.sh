@@ -10,6 +10,7 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'generate_report' "${REPORTING_SETTINGS:-}" "${REPORTING_SETTINGS_DEFAULTS:-}"
 setup_continue_on_fail
+setup_debug_on_fail
 
 main() {
     echo "Generating report for spoke: ${SPOKE_CLUSTER}"

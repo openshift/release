@@ -5,6 +5,7 @@ set -euo pipefail
 source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'deploy_sno_hub' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
+setup_debug_on_fail
 
 main() {
     echo "Deploying SNO hub cluster: ${HUB_CLUSTER}"
