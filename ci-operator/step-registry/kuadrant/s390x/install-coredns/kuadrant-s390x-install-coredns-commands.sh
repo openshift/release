@@ -74,6 +74,43 @@ metadata:
     openshift.io/cluster-monitoring: "true"
 ---
 apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kuadrant-coredns
+  namespace: ${COREDNS_NAMESPACE}
+  labels:
+    app.kubernetes.io/instance: kuadrant
+    app.kubernetes.io/name: coredns
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kuadrant-coredns-plugin
+  labels:
+    app.kubernetes.io/instance: kuadrant
+    app.kubernetes.io/name: coredns
+rules:
+- apiGroups: ["kuadrant.io"]
+  resources: ["dnsrecords"]
+  verbs: ["list", "watch", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kuadrant-coredns-plugin
+  labels:
+    app.kubernetes.io/instance: kuadrant
+    app.kubernetes.io/name: coredns
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kuadrant-coredns-plugin
+subjects:
+- kind: ServiceAccount
+  name: kuadrant-coredns
+  namespace: ${COREDNS_NAMESPACE}
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: kuadrant-coredns
@@ -128,6 +165,7 @@ spec:
         app.kubernetes.io/instance: kuadrant
         app.kubernetes.io/name: coredns
     spec:
+      serviceAccountName: kuadrant-coredns
       containers:
       - name: coredns
         image: ${COREDNS_IMAGE}
