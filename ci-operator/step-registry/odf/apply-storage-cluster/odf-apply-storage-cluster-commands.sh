@@ -3,8 +3,8 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 DumpStorageCluster() {
     : "--- StorageCluster dump (failure diagnostics) ---"
-    oc get storagecluster ocs-storagecluster -n "${ODF_INSTALL_NAMESPACE}" -o yaml || true
-    oc describe storagecluster ocs-storagecluster -n "${ODF_INSTALL_NAMESPACE}" || true
+    oc get storagecluster ocs-storagecluster -n "${ODF__INSTALL_NAMESPACE}" -o yaml || true
+    oc describe storagecluster ocs-storagecluster -n "${ODF__INSTALL_NAMESPACE}" || true
     true
 }
 trap DumpStorageCluster ERR INT TERM
@@ -20,7 +20,7 @@ apiVersion: ocs.openshift.io/v1
 kind: StorageCluster
 metadata:
   name: ocs-storagecluster
-  namespace: "${ODF_INSTALL_NAMESPACE}"
+  namespace: "${ODF__INSTALL_NAMESPACE}"
 spec:
   resources: {}
   storageDeviceSets:
@@ -31,8 +31,8 @@ spec:
         - ReadWriteOnce
         resources:
           requests:
-            storage: "${ODF_STORAGE_CLAIM}"
-        storageClassName: "${ODF_STORAGE_CLASS}"
+            storage: "${ODF__STORAGE_CLAIM}"
+        storageClassName: "${ODF__STORAGE_CLASS}"
         volumeMode: Block
     name: ocs-deviceset
     placement: {}
@@ -44,10 +44,10 @@ ocEOF
 # Block until the OCS operator has started reconciling (Progressing=True), which
 # guarantees status conditions are present before we poll for Available.
 oc wait 'storagecluster.ocs.openshift.io/ocs-storagecluster' \
-    -n "${ODF_INSTALL_NAMESPACE}" --for=condition=Progressing --timeout=5m 1>/dev/null
+    -n "${ODF__INSTALL_NAMESPACE}" --for=condition=Progressing --timeout=5m 1>/dev/null
 
 oc wait 'storagecluster.ocs.openshift.io/ocs-storagecluster' \
-    -n "${ODF_INSTALL_NAMESPACE}" --for=condition='Available' --timeout="${ODF_STORAGE_CLUSTER_WAIT_TIMEOUT}" 1>/dev/null
+    -n "${ODF__INSTALL_NAMESPACE}" --for=condition='Available' --timeout="${ODF__STORAGE_CLUSTER_WAIT_TIMEOUT}" 1>/dev/null
 
 # Remove is-default-class annotation from all storage classes, then promote
 # ocs-storagecluster-ceph-rbd as the default storage class.
