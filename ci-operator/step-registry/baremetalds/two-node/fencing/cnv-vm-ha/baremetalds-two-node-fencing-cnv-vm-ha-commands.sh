@@ -46,8 +46,10 @@ echo "StorageClass ${CNV_STORAGE_CLASS} available"
 # Wait for golden images and find the Fedora snapshot
 # -------------------------------------------------------------------------
 echo "--- Waiting for golden images ---"
-oc wait DataImportCron -n openshift-virtualization-os-images \
-  --all --for=condition=UpToDate --timeout=20m
+if ! oc wait DataImportCron -n openshift-virtualization-os-images \
+    --all --for=condition=UpToDate --timeout=40m; then
+  echo "WARNING: Not all golden images are ready, checking if Fedora is available..."
+fi
 
 FEDORA_SNAP=$(oc get volumesnapshot -n openshift-virtualization-os-images \
   -o jsonpath='{.items[?(@.status.readyToUse==true)].metadata.name}' | tr ' ' '\n' | grep fedora | head -1)
