@@ -15,6 +15,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: cluster-resource-override-admission-operator
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -99,6 +103,11 @@ tests:
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-cluster-resource-override,clusterresourceoverride-operator
+      SCANNER_CPU: 500m
+      SCANNER_MEMORY: 1Gi
     test:
     - as: test
       cli: latest
@@ -114,6 +123,28 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - as: deploy-operand
+      cli: latest
+      commands: |-
+        oc apply -f - <<EOF
+        apiVersion: operator.autoscaling.openshift.io/v1
+        kind: ClusterResourceOverride
+        metadata:
+          name: cluster
+        spec:
+          podResourceOverride:
+            spec:
+              memoryRequestToLimitPercent: 50
+              cpuRequestToLimitPercent: 25
+              limitCPUToMemoryPercent: 200
+        EOF
+        echo "Waiting for ClusterResourceOverride operand to become available..."
+        oc wait --for=condition=Available clusterresourceoverride/cluster --timeout=5m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-scanner-run
     workflow: ipi-aws
 - as: e2e-aws-upgrade
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
