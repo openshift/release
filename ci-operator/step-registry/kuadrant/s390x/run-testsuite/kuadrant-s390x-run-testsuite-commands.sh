@@ -577,8 +577,52 @@ PY
 FAILED=0
 JOB_LOG="${ARTIFACT_DIR}/kuadrant-testrunner-job.log"
 
+start_live_resource_monitor() {
+  local monitor_dir="${ARTIFACT_DIR}/live-resource-snapshots"
+  mkdir -p "${monitor_dir}"
+  echo "=== Starting live resource monitor → ${monitor_dir} ==="
+  (
+    # Monitor resources in kuadrant namespace every 30 seconds while tests run
+    iteration=0
+    while true; do
+      sleep 30
+      iteration=$((iteration + 1))
+      snapshot="${monitor_dir}/snapshot-${iteration}.log"
+      {
+        echo "=== Snapshot ${iteration} at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
+        echo "--- Pods in kuadrant namespace ---"
+        oc get pods -n kuadrant -o wide 2>&1 || true
+        echo "--- Services in kuadrant namespace ---"
+        oc get svc -n kuadrant -o wide 2>&1 || true
+        echo "--- Routes in kuadrant namespace ---"
+        oc get routes -n kuadrant -o wide 2>&1 || true
+        echo "--- DNSRecords in all namespaces ---"
+        oc get dnsrecords -A 2>&1 || true
+        echo "--- Backend pod status (if exists) ---"
+        for pod in $(oc get pods -n kuadrant -l app=backend -o name 2>/dev/null); do
+          pod_name=$(basename "${pod}")
+          echo "Pod: ${pod_name}"
+          oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.phase}' 2>&1 || true
+          echo ""
+        done
+      } >"${snapshot}" 2>&1
+    done
+  ) &
+  LIVE_MONITOR_PID=$!
+  echo "Live monitor started (PID ${LIVE_MONITOR_PID})"
+}
+
+stop_live_resource_monitor() {
+  if [[ -n "${LIVE_MONITOR_PID:-}" ]]; then
+    echo "=== Stopping live resource monitor (PID ${LIVE_MONITOR_PID}) ==="
+    kill_pid_tree "${LIVE_MONITOR_PID}"
+    LIVE_MONITOR_PID=""
+  fi
+}
+
 start_istio_proxy_log_collector
 start_dns_log_collector
+start_live_resource_monitor
 
 echo "=== Launching test-runner Job ==="
 oc apply -f "${JOB_FILE}"
@@ -625,6 +669,7 @@ fi
 
 stop_dns_log_collector
 stop_istio_proxy_log_collector
+stop_live_resource_monitor
 
 echo "=== Test-runner diagnostics ==="
 oc -n "${TEST_RUNNER_NAMESPACE}" get pods -o wide 2>&1 || true
@@ -634,6 +679,46 @@ oc -n "${TEST_RUNNER_NAMESPACE}" describe job "${JOB_NAME}" 2>&1 \
 # Enhanced diagnostics on failure - capture state before cleanup
 if [[ "${FAILED}" -ne 0 ]]; then
   echo "=== Capturing diagnostic state before cleanup ===" >&2
+
+  # CoreDNS and DNSRecords diagnostics
+  echo "=== CoreDNS Diagnostics ===" | tee "${ARTIFACT_DIR}/coredns-diagnostics.log"
+  echo "--- CoreDNS Pod Status ---" | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log"
+  oc get pods -n "${COREDNS_NAMESPACE}" -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log" || true
+  echo "--- CoreDNS Service ---" | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log"
+  oc get svc -n "${COREDNS_NAMESPACE}" -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/coredns-service.yaml" || true
+  echo "--- CoreDNS Logs (last 200 lines) ---" | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log"
+  for pod in $(oc get pods -n "${COREDNS_NAMESPACE}" -l app.kubernetes.io/name=coredns -o name 2>/dev/null); do
+    pod_name=$(basename "${pod}")
+    echo "=== CoreDNS logs from ${pod_name} ===" | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log"
+    oc logs -n "${COREDNS_NAMESPACE}" "${pod_name}" --tail=200 2>&1 | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log" || true
+  done
+
+  # Test CoreDNS connectivity from cluster
+  echo "=== Testing CoreDNS from cluster ===" | tee "${ARTIFACT_DIR}/coredns-connectivity-test.log"
+  coredns_ip="$(oc get svc kuadrant-coredns -n "${COREDNS_NAMESPACE}" -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)"
+  if [[ -n "${coredns_ip}" ]]; then
+    echo "Testing DNS query to ${coredns_ip}:53 for test.${COREDNS_ZONE}" | tee -a "${ARTIFACT_DIR}/coredns-connectivity-test.log"
+    oc run dns-test --image=registry.access.redhat.com/ubi9/ubi-minimal:latest --rm -i --restart=Never -- \
+      sh -c "microdnf install -y bind-utils && dig @${coredns_ip} test.${COREDNS_ZONE} +short" 2>&1 \
+      | tee -a "${ARTIFACT_DIR}/coredns-connectivity-test.log" || true
+  fi
+
+  # DNSRecords in all namespaces
+  echo "=== DNSRecords across all namespaces ===" | tee "${ARTIFACT_DIR}/dnsrecords-diagnostics.log"
+  oc get dnsrecords -A -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/dnsrecords-diagnostics.log" || true
+  oc get dnsrecords -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/dnsrecords.yaml" || true
+
+  # DNSPolicies
+  echo "=== DNSPolicies ===" | tee -a "${ARTIFACT_DIR}/dnsrecords-diagnostics.log"
+  oc get dnspolicies -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/dnspolicies.yaml" || true
+
+  # Kuadrant DNS operator logs
+  echo "=== Kuadrant DNS Operator Logs ===" | tee "${ARTIFACT_DIR}/dns-operator-logs.log"
+  for pod in $(oc get pods -n kuadrant-system -l control-plane=dns-operator-controller-manager -o name 2>/dev/null); do
+    pod_name=$(basename "${pod}")
+    echo "=== DNS operator logs from ${pod_name} ===" | tee -a "${ARTIFACT_DIR}/dns-operator-logs.log"
+    oc logs -n kuadrant-system "${pod_name}" --tail=300 2>&1 | tee -a "${ARTIFACT_DIR}/dns-operator-logs.log" || true
+  done
 
   # Backend pod logs (MockServer or httpbin)
   echo "=== Backend pods in kuadrant namespace ===" | tee "${ARTIFACT_DIR}/backend-diagnostics.log"
