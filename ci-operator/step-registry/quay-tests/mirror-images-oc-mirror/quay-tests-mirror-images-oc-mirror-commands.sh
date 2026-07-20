@@ -64,12 +64,11 @@ OMR_HOST_NAME=$(cat "${SHARED_DIR}/OMR_HOST_NAME")
 MIRROR_REGISTRY_HOST="${OMR_HOST_NAME}:8443"
 echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
 
-# Install OMR CA cert into system trust store so oc-mirror trusts it
+# Trust OMR self-signed CA alongside system CAs (no root needed)
 if [[ -f "${SHARED_DIR}/rootCA.pem" ]]; then
-  echo "Installing OMR CA cert into system trust store..."
-  cp "${SHARED_DIR}/rootCA.pem" /etc/pki/ca-trust/source/anchors/omr-ca.pem
-  update-ca-trust
-  echo "CA trust store updated."
+  cat /etc/pki/tls/certs/ca-bundle.crt "${SHARED_DIR}/rootCA.pem" > /tmp/combined-ca-bundle.crt
+  export SSL_CERT_FILE=/tmp/combined-ca-bundle.crt
+  echo "Combined CA bundle created at /tmp/combined-ca-bundle.crt (system CAs + OMR CA)"
 fi
 
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
