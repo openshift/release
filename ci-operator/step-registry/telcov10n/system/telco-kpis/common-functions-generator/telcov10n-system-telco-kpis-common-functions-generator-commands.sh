@@ -64,10 +64,8 @@ proxy = (
 print(yaml.dump({key: proxy}, default_flow_style=False, allow_unicode=True).rstrip())
 " "${ssh_key_file}" "${ssh_user}" "${hypervisor_ip}" >> "${host_vars_file}"
 
-    # Override ANSIBLE_REMOTE_TMP for remote hosts. The global env var sets
-    # /tmp/.ansible/tmp (needed for the Prow container where HOME=/ is not
-    # writable), but remote hosts deny mkdir in /tmp via sshpass+ProxyCommand.
-    # Remote hosts have writable home directories, so the default path works.
+    echo "ansible_ssh_private_key_file: ${ssh_key_file}" >> "${host_vars_file}"
+
     echo "ansible_remote_tmp: ~/.ansible/tmp" >> "${host_vars_file}"
 
     echo "SSH jump configured: container -> ${ssh_user}@${hypervisor_ip} -> $(basename "${host_vars_file}")"
