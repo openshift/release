@@ -1,0 +1,50 @@
+workflow:
+  as: aro-hcp-hypershift-e2e
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+      - ref: aro-hcp-lease-acquire
+      - ref: aro-hcp-write-config
+      - ref: aro-hcp-hypershift-images-push
+      - ref: aro-hcp-hypershift-deploy
+    test:
+      - ref: aro-hcp-test-local
+    post:
+      - ref: aro-hcp-gather-provision-failure
+      - ref: aro-hcp-gather-visualization
+      - ref: aro-hcp-gather-test-visualization
+      - ref: aro-hcp-gather-custom-link-tools
+      - ref: aro-hcp-gather-observability
+      - ref: aro-hcp-deprovision-environment
+      - ref: aro-hcp-lease-release
+  documentation: |-
+    Runs ARO HCP e2e tests with PR-built hypershift images in an isolated
+    per-PR environment.
+
+    This workflow is triggered from hypershift PRs and provisions a fresh,
+    isolated ARO HCP environment to test the PR-built HyperShift Operator
+    (HO) and Control Plane Operator (CPO) images.
+
+    Flow:
+    1. Acquire runtime Boskos leases via slot-manager
+       (aro-hcp-lease-acquire)
+    2. Render config (aro-hcp-write-config)
+    3. Push PR-built HO and CPO images to ACR
+       (aro-hcp-hypershift-images-push). Writes:
+       - HO config overlay (hypershift.image.repository + digest) to
+         SHARED_DIR/hypershift-image-overrides.yaml
+       - CPO image ref to SHARED_DIR/hypershift-cpo-override.env
+    4. Provision a full ARO HCP environment from scratch — the provision
+       step merges hypershift-image-overrides.yaml into the config
+       overlay, so the HO is deployed with the PR image. ARO-HCP service
+       images are resolved from the dev ACR at runtime.
+       (aro-hcp-hypershift-deploy)
+    5. Run ARO HCP e2e tests (aro-hcp-test-local). The CPO override is
+       passed as an ARM resource tag on cluster creation, gated by the
+       FeatureExperimentalReleaseFeatures subscription AFEC.
+    6. Gather test results, tear down the environment, and release
+       Boskos leases (aro-hcp-deprovision-environment,
+       aro-hcp-lease-release)
+
+    Each PR gets its own isolated environment, so concurrent runs do not
+    interfere with each other.
