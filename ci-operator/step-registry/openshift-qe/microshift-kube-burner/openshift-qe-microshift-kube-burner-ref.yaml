@@ -1,0 +1,67 @@
+ref:
+  as: openshift-qe-microshift-kube-burner
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-microshift-kube-burner-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: WORKLOAD
+    default: "node-density"
+    documentation: |-
+      kube-burner-ocp workload to run: node-density, node-density-cni or
+      network-policy.
+  - name: ITERATIONS
+    default: "75"
+    documentation: |-
+      Iterations; only consumed by the network-policy workload.
+  - name: PODS_PER_NODE
+    default: "245"
+    documentation: |-
+      Max pods per worker node (node-density / node-density-cni).
+  - name: POD_READY_THRESHOLD
+    default: "180000ms"
+    documentation: |-
+      Pod ready latency threshold (node-density).
+  - name: QPS
+    default: "20"
+    documentation: |-
+      kube-burner client QPS (BURST is set equal to QPS).
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      e2e-benchmarking tag; default resolves the latest release (>= v2.9.18
+      required for the MicroShift-aware indexer).
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      kube-burner-ocp version; default uses the wrapper default (>= 1.11.17
+      required for MicroShift).
+  - name: MICROSHIFT_PROMETHEUS_URL
+    default: ""
+    documentation: |-
+      Override the Prometheus endpoint. Defaults to
+      ${SHARED_DIR}/prometheus_url written by openshift-qe-microshift-deploy.
+  - name: EXTRA_FLAGS_APPEND
+    default: ""
+    documentation: |-
+      Extra kube-burner-ocp flags appended after the MicroShift defaults.
+  - name: ES_SECRETS_PATH
+    default: "/secret"
+    documentation: |-
+      Elasticsearch credentials mount path.
+  documentation: >-
+    Runs MicroShift-native kube-burner-ocp workloads (node-density,
+    node-density-cni, network-policy) against a MicroShift cluster deployed by
+    openshift-qe-microshift-deploy, using the embedded microshift-metrics.yml
+    profile and an external Prometheus published via SHARED_DIR.
+  timeout: 4h0m0s
