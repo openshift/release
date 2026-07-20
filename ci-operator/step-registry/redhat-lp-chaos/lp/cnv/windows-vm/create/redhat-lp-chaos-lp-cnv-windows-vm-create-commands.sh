@@ -21,7 +21,7 @@ function BenchmarkRunnerDebug () {
 _TERM_RECEIVED=false
 function _term_handler () { _TERM_RECEIVED=true; BenchmarkRunnerDebug; }
 function _on_exit () {
-    local _rc=$?
+    typeset _rc=$?
     # Skip if TERM handler already ran BenchmarkRunnerDebug
     ${_TERM_RECEIVED} && return
     [[ ${_rc} -eq 0 ]] || BenchmarkRunnerDebug
@@ -30,9 +30,19 @@ function _on_exit () {
 trap _term_handler TERM
 trap _on_exit EXIT
 
+typeset clusterRegion
+clusterRegion=$(jq -r '.aws.region // "us-east-1"' "${SHARED_DIR}/metadata.json" 2>/dev/null || echo 'us-east-1')
+
 set +x
+case "${clusterRegion}" in
+    us-west-*)
+        WINDOWS_URL='https://ieng--vm-image--windows--us-west-2.s3.us-west-2.amazonaws.com/win10/windows10.qcow2'
+        ;;
+    *)
+        WINDOWS_URL='https://ieng--vm-image--windows--us-east-1.s3.us-east-1.amazonaws.com/win10/windows10.qcow2'
+        ;;
+esac
 KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
-WINDOWS_URL=$(cat /var/run/secrets/windows-vm/S3-bucket-url)
 SCALE_NODES=$(oc get nodes -l kubevirt.io/schedulable=true -o jsonpath-as-json='{.items[*].metadata.name}' | jq -r '[ .[] | "'"'"'" + . + "'"'"'" ] | "[" + join(", ") + "]"')
 set -x
 export KUBEADMIN_PASSWORD WINDOWS_URL SCALE_NODES
@@ -42,6 +52,22 @@ export DELETE_ALL=False
 export RUN_STRATEGY=True
 
 oc create namespace benchmark-runner --dry-run=client -o json --save-config | oc apply -f -
+
+oc -n benchmark-runner create \
+    secret generic lp-chaos--vm-img--windows \
+    --type Opaque \
+    --from-file accessKeyId=<(
+        set +x
+        printf '%s' "$(cat /var/run/secrets/windows-vm/AWS__S3__u-ieng--s3--vm-img--windows--ro__AccKeyId)"
+    ) \
+    --from-file secretKey=<(
+        set +x
+        printf '%s' "$(cat /var/run/secrets/windows-vm/AWS__S3__u-ieng--s3--vm-img--windows--ro__AccKeySecret)"
+    ) \
+    --dry-run=client -o yaml --save-config | oc apply -f -
+
+export CDI_SOURCE_TYPE=s3
+export CDI_SOURCE_S3_CRED=lp-chaos--vm-img--windows
 
 if oc get daemonset virt-handler -n openshift-cnv --ignore-not-found -o name | grep -q .; then
     oc rollout status daemonset/virt-handler -n openshift-cnv --timeout=5m
@@ -76,3 +102,5 @@ export RUN_TYPE="${RUN_TYPE:-test_ci}"
 
 : "Creating Windows VM: workload=${WORKLOAD} scale=${SCALE} image=${WINDOWS_IMAGE}"
 python3.14 /benchmark_runner/main/main.py
+
+true
