@@ -3,6 +3,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.31.0
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   ubi-min9:
     name: ubi-minimal
     namespace: ocp
@@ -95,6 +99,21 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: install-bundle-tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      OO_INSTALL_NAMESPACE: oran-o2ims
+      SCAN_NAMESPACE: oran-o2ims
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 - always_run: false
   as: markdownlint
   commands: |
