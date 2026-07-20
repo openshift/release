@@ -64,6 +64,14 @@ OMR_HOST_NAME=$(cat "${SHARED_DIR}/OMR_HOST_NAME")
 MIRROR_REGISTRY_HOST="${OMR_HOST_NAME}:8443"
 echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
 
+# Install OMR CA cert into system trust store so oc-mirror trusts it
+if [[ -f "${SHARED_DIR}/rootCA.pem" ]]; then
+  echo "Installing OMR CA cert into system trust store..."
+  sudo cp "${SHARED_DIR}/rootCA.pem" /etc/pki/ca-trust/source/anchors/omr-ca.pem
+  sudo update-ca-trust
+  echo "CA trust store updated."
+fi
+
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 if [[ -z "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
