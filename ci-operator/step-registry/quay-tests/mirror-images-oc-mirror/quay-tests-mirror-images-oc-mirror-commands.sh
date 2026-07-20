@@ -85,10 +85,24 @@ cp /tmp/pull-secret.json "${HOME}/.docker/config.json"
 run_command "which oc"
 run_command "oc version --client"
 
-# Create combined pull secret (cluster profile + OMR hardcoded credential)
+# Create combined pull secret (CI registry creds + cluster profile + OMR hardcoded credential)
 combined_pull_secret_tmp=$(mktemp)
 registry_cred="cXVheTpwYXNzd29yZA=="
-python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'"${MIRROR_REGISTRY_HOST}"'"]={"auth":"'"${registry_cred}"'"};j["auths"]=a;print(json.dumps(j))' < "${CLUSTER_PROFILE_DIR}/pull-secret" > "${combined_pull_secret_tmp}"
+python3 -c '
+import json, sys
+# Start with CI registry creds (includes registry.build01 from oc registry login)
+with open("/tmp/pull-secret.json") as f:
+    merged = json.load(f)
+# Merge cluster profile creds on top
+with open(sys.argv[1]) as f:
+    cp = json.load(f)
+auths = merged.get("auths", {})
+auths.update(cp.get("auths", {}))
+# Add OMR credentials
+auths[sys.argv[2]] = {"auth": sys.argv[3]}
+merged["auths"] = auths
+print(json.dumps(merged))
+' "${CLUSTER_PROFILE_DIR}/pull-secret" "${MIRROR_REGISTRY_HOST}" "${registry_cred}" > "${combined_pull_secret_tmp}"
 
 # Extract the full OCP version from the target release
 ocp_full_version=$(oc adm release info --registry-config "${combined_pull_secret_tmp}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
