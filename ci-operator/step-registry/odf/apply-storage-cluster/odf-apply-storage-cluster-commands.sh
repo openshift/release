@@ -33,9 +33,10 @@ spec:
     resources: {}
 ocEOF
 
-# OCS operator reconciliation is asynchronous; without this pause the oc wait
-# below can race against the controller before it has registered the status conditions.
-sleep 60
+# Block until the OCS operator has started reconciling (Progressing=True), which
+# guarantees status conditions are present before we poll for Available.
+oc wait 'storagecluster.ocs.openshift.io/ocs-storagecluster' \
+    -n "${ODF_INSTALL_NAMESPACE}" --for=condition=Progressing --timeout=5m
 
 oc wait 'storagecluster.ocs.openshift.io/ocs-storagecluster' \
     -n "${ODF_INSTALL_NAMESPACE}" --for=condition='Available' --timeout="${ODF_STORAGE_CLUSTER_WAIT_TIMEOUT}"
