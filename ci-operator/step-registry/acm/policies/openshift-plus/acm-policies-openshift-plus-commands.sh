@@ -12,6 +12,17 @@ git clone https://github.com/stolostron/policy-collection.git
 sleep 60
 
 cd policy-collection/deploy/
+
+# If QUAY_OPERATOR_CHANNEL is set, patch the Quay operator subscription to pin the channel
+if [[ -n "${QUAY_OPERATOR_CHANNEL}" ]]; then
+  if [[ ! "${QUAY_OPERATOR_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "Invalid QUAY_OPERATOR_CHANNEL: ${QUAY_OPERATOR_CHANNEL}" >&2
+    exit 1
+  fi
+  typeset quayPolicyFile="../policygenerator/policy-sets/stable/openshift-plus/input-quay/policy-install-quay.yaml"
+  sed -i "/^    name: quay-operator$/a\\    channel: ${QUAY_OPERATOR_CHANNEL}" "${quayPolicyFile}"
+  grep -A5 'name: quay-operator' "${quayPolicyFile}"
+fi
 echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
 
 sleep 120
