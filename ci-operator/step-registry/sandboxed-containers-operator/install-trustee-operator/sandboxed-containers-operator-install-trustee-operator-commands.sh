@@ -6,9 +6,8 @@
 # helm charts from https://github.com/confidential-devhub/charts
 #
 # NETWORK ACCESS:
-#   Preferred: Use TRUSTEE_CHARTS_IMAGE (pre-built image dependency)
-#              Works with restrict_network_access: true for rehearsals
-#   Fallback:  Fetches from GitHub (requires restrict_network_access: false)
+#   Uses HELM_CHART_IMAGE (pre-built image with helm and charts)
+#   Works with restrict_network_access: true for rehearsals
 #
 # Environment Variables:
 #   TRUSTEE_INSTALL               - "true" to install, "false" to skip (default: false)
@@ -16,9 +15,7 @@
 #   TRUSTEE_CATALOG_SOURCE_IMAGE  - Custom catalog image (optional)
 #                                   NOTE: CatalogSource name is hardcoded to "trustee-operator-dev-catalog"
 #                                   in the helm chart and cannot be overridden
-#   IMAGE_TRUSTEE_CHARTS          - Pre-built charts image (set by ci-operator, recommended)
-#   TRUSTEE_CHARTS_REPO           - Charts repo URL (default: https://github.com/confidential-devhub/charts)
-#   TRUSTEE_CHARTS_REF            - Charts git ref (default: main)
+#   HELM_CHART_IMAGE              - Pre-built image with helm and charts at /charts/ (required)
 #   KBS_CLIENT_TAG                - kbs-client version override (optional)
 #
 # Outputs to SHARED_DIR:
@@ -41,8 +38,6 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 TRUSTEE_INSTALL=${TRUSTEE_INSTALL:-false}
 TRUSTEE_NAMESPACE=${TRUSTEE_NAMESPACE:-trustee-operator-system}
 TRUSTEE_CATALOG_SOURCE_IMAGE=${TRUSTEE_CATALOG_SOURCE_IMAGE:-}
-TRUSTEE_CHARTS_REPO=${TRUSTEE_CHARTS_REPO:-https://github.com/confidential-devhub/charts}
-TRUSTEE_CHARTS_REF=${TRUSTEE_CHARTS_REF:-main}
 
 # Early exit if installation disabled
 if [[ "${TRUSTEE_INSTALL}" != "true" ]]; then
@@ -50,15 +45,13 @@ if [[ "${TRUSTEE_INSTALL}" != "true" ]]; then
   exit 0
 fi
 
-# Check helm is available
-if ! command -v helm &> /dev/null; then
-  echo ">>> ERROR: helm is not available in the step image." >&2
-  echo ">>> Install helm in the image used by this step to keep restrict_network_access support." >&2
+if [[ -z "${HELM_CHART_IMAGE:-}" ]]; then
+  echo ">>> ERROR: HELM_CHART_IMAGE is required but not set" >&2
   exit 1
 fi
 
 # Show configuration
-echo ">>> Trustee charts: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})"
+echo ">>> Trustee charts image: ${HELM_CHART_IMAGE}"
 if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
   echo ">>> Trustee catalog source: trustee-operator-dev-catalog (image: ${TRUSTEE_CATALOG_SOURCE_IMAGE})"
 else
@@ -135,54 +128,50 @@ function wait_until() {
   return 1
 }
 
-# Fetch trustee helm charts (from pre-built image or GitHub)
+# Extract trustee helm charts and helm binary from pre-built container image.
+# The returned directory contains trustee-operator/ and trustee-operands/ subdirectories.
+# Also extracts helm to ${SCRATCH}/bin/ and adds it to PATH.
 function fetch_trustee_charts() {
   local charts_dir="${SCRATCH}/charts"
+  local bin_dir="${SCRATCH}/bin"
 
-  # Option 1: Extract from pre-built container image (preferred, works with restrict_network_access: true)
-  # ci-operator provides built images via IMAGE_FORMAT and IMAGE_TRUSTEE_CHARTS env vars
-  if [[ -n "${IMAGE_TRUSTEE_CHARTS:-}" ]]; then
-    local charts_image="${IMAGE_TRUSTEE_CHARTS}"
-    echo ">>> Extracting trustee charts from pre-built image" >&2
-    echo ">>> Image: ${charts_image}" >&2
 
-    # Extract charts from the image
-    mkdir -p "${charts_dir}"
-    local extract_output
-    if extract_output=$(oc image extract "${charts_image}" --path /charts/:${charts_dir}/ 2>&1); then
-      echo ">>> Charts extracted from image (no network access needed)" >&2
-      echo ">>> Extracted files:" >&2
-      ls -lR "${charts_dir}" | head -50 >&2
-      # The git repo structure is: charts/trustee-operator/, so image has /charts/charts/
-      # Return the nested charts directory
-      echo "${charts_dir}/charts"
-      return 0
+
+  echo ">>> Extracting charts and helm from image: ${HELM_CHART_IMAGE}" >&2
+
+  mkdir -p "${charts_dir}" "${bin_dir}"
+  local extract_output
+  local lib_dir="${SCRATCH}/lib"
+  mkdir -p "${lib_dir}"
+  if extract_output=$(oc image extract "${HELM_CHART_IMAGE}" \
+    --path /charts/:${charts_dir}/ \
+    --path /usr/local/bin/helm:${bin_dir}/ \
+    --path /usr/bin/jq:${bin_dir}/ \
+    --path /usr/local/lib/libjq.so.1:${lib_dir}/ \
+    --path /usr/local/lib/libonig.so.5:${lib_dir}/ 2>&1); then
+    echo ">>> Extracted from image" >&2
+    echo ">>> Chart files:" >&2
+    ls -lR "${charts_dir}" | head -50 >&2
+
+    if [[ -f "${bin_dir}/helm" ]]; then
+      chmod +x "${bin_dir}/helm"
+      [[ -f "${bin_dir}/jq" ]] && chmod +x "${bin_dir}/jq"
+      export PATH="${bin_dir}:${PATH}"
+      export LD_LIBRARY_PATH="${lib_dir}:${LD_LIBRARY_PATH:-}"
+      echo ">>> helm version: $(helm version --short 2>/dev/null)" >&2
+      echo ">>> jq version: $(jq --version 2>/dev/null || echo 'not found')" >&2
     else
-      echo ">>> ERROR: Failed to extract charts from image" >&2
-      echo "$extract_output" >&2
-      echo ">>> Falling back to git clone" >&2
+      echo ">>> ERROR: helm binary not found in image at /usr/local/bin/helm" >&2
+      return 1
     fi
-  else
-    echo ">>> IMAGE_TRUSTEE_CHARTS not set, using git clone fallback" >&2
+
+    echo "${charts_dir}"
+    return 0
   fi
 
-  # Option 2: Fallback to git clone (requires restrict_network_access: false)
-  echo ">>> Fetching trustee charts from GitHub: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})" >&2
-
-  if ! command -v git &> /dev/null; then
-    echo ">>> ERROR: git command not found" >&2
-    return 1
-  fi
-
-  git clone --depth 1 --branch "${TRUSTEE_CHARTS_REF}" "${TRUSTEE_CHARTS_REPO}" "${charts_dir}"
-
-  if [[ ! -d "${charts_dir}" ]]; then
-    echo ">>> ERROR: Failed to clone charts repository" >&2
-    return 1
-  fi
-
-  echo ">>> Charts cloned from GitHub" >&2
-  echo "${charts_dir}"
+  echo ">>> ERROR: Failed to extract from image" >&2
+  echo "$extract_output" >&2
+  return 1
 }
 
 # Get cluster domain from ingress config, console route, or console URL
@@ -495,6 +484,45 @@ function install_trustee_operands() {
 
   echo ">>> Apply output:"
   echo "$apply_output"
+}
+
+# Create the kbsres1 secret required by the KbsConfig controller.
+# The trustee-operands chart references kbsres1 in kbsSecretResources;
+# without it the controller refuses to create the trustee-deployment.
+function register_kbs_secret() {
+  local secret_name="kbsres1"
+
+  cat > "${SCRATCH}/cosign.pub" <<'PUBKEY'
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWT07eR1HNK3D2iqHotE0c389aSTh
+Lj0B39PXTBcJzJpkXPO82lLGQdc47V5HPWaPZ2Fc3DWyRoz1oWbnLlvQ5Q==
+-----END PUBLIC KEY-----
+PUBKEY
+
+  echo ">>> Creating secret ${secret_name} in ${TRUSTEE_NAMESPACE}"
+  oc create secret generic "${secret_name}" \
+    -n "${TRUSTEE_NAMESPACE}" \
+    --from-file=key1="${SCRATCH}/cosign.pub"
+
+  local cr_name
+  cr_name=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [[ -z "${cr_name}" ]]; then
+    echo ">>> WARN: No KbsConfig found — secret created but not patched into CR"
+    return 0
+  fi
+
+  # Check whether kbsres1 is already listed in kbsSecretResources
+  local existing
+  existing=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" "${cr_name}" \
+    -o jsonpath='{.spec.kbsSecretResources}' 2>/dev/null || echo "")
+
+  if echo "${existing}" | grep -q "${secret_name}"; then
+    echo ">>> ${secret_name} already in kbsSecretResources — skipping patch"
+  else
+    echo ">>> Patching KbsConfig ${cr_name} to register ${secret_name}"
+    oc patch kbsconfig -n "${TRUSTEE_NAMESPACE}" "${cr_name}" --type=json \
+      -p="[{\"op\":\"add\",\"path\":\"/spec/kbsSecretResources/-\",\"value\":\"${secret_name}\"}]"
+  fi
 }
 
 # Wait for operand deployments to become available
@@ -1002,9 +1030,12 @@ function verify_trustee_connectivity() {
 
 echo ">>> Starting Trustee operator installation"
 
-# Fetch helm charts from GitHub
+# Fetch helm and charts from image (function runs in subshell via $(), so
+# the PATH export inside it doesn't propagate — set it here)
 CHARTS_DIR=$(fetch_trustee_charts)
 export CHARTS_DIR
+export PATH="${SCRATCH}/bin:${PATH}"
+export LD_LIBRARY_PATH="${SCRATCH}/lib:${LD_LIBRARY_PATH:-}"
 
 # Get cluster domain
 CLUSTER_DOMAIN=$(get_cluster_domain)
@@ -1014,6 +1045,7 @@ export CLUSTER_DOMAIN
 install_trustee_operator "${CHARTS_DIR}"
 wait_for_operator
 install_trustee_operands "${CHARTS_DIR}"
+register_kbs_secret
 wait_for_operands
 
 # Configure and verify

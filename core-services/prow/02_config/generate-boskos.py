@@ -158,6 +158,12 @@ CONFIG = {
         'us-west-1': 25,
         'us-west-2': 25
     },
+    'aws-konflux-prod-quota-slice': {
+        'us-east-1': 100,
+        'us-east-2': 100,
+        'us-west-1': 100,
+        'us-west-2': 100
+    },
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
     },
@@ -809,9 +815,9 @@ for i in range(1):
     CONFIG['aro-hcp-dev-hypershift-westus3-slot']['aro-hcp-dev-hypershift-westus3-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-int-shard0-slot']['aro-hcp-int-shard0-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(12):
+for i in range(3):
     CONFIG['aro-hcp-prod-shard0-slot']['aro-hcp-prod-shard0-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(12):
+for i in range(3):
     CONFIG['aro-hcp-prod-shard1-slot']['aro-hcp-prod-shard1-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1

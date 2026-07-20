@@ -815,6 +815,7 @@ periodics:
       - --github-app-private-key-path=/etc/github/cert
       - --github-endpoint=http://ghproxy
       - --github-graphql-endpoint=http://ghproxy/graphql
+      - --github-org=openshift-online
       - |-
         --comment=Inactive PRs go stale after 28d of inactivity.
 
@@ -874,6 +875,7 @@ periodics:
       - --github-app-private-key-path=/etc/github/cert
       - --github-endpoint=http://ghproxy
       - --github-graphql-endpoint=http://ghproxy/graphql
+      - --github-org=openshift-online
       - |-
         --comment=Stale PRs close after 7d of inactivity.
 
@@ -984,7 +986,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260702-ef12e757d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260714-0633879af
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1019,7 +1021,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260702-ef12e757d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260714-0633879af
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1329,7 +1331,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260702-ef12e757d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260714-0633879af
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1387,7 +1389,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260702-ef12e757d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260714-0633879af
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1479,7 +1481,7 @@ periodics:
           --github-allowed-burst=600 \
           --allow-repo-archival \
           --ignore-enterprise-teams
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260702-ef12e757d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260714-0633879af
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1511,7 +1513,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260702-ef12e757d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260714-0633879af
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2080,7 +2082,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260702-ef12e757d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260714-0633879af
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2112,7 +2114,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260702-ef12e757d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260714-0633879af
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2144,7 +2146,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260702-ef12e757d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260714-0633879af
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2883,7 +2885,7 @@ periodics:
       kubernetes.io/arch: amd64
     serviceAccountName: mabc-updater
 - agent: kubernetes
-  cluster: build13
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -3002,3 +3004,63 @@ periodics:
         requests:
           cpu: 100m
     serviceAccountName: etcd-defragger
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 8 * * 1-5
+  decorate: true
+  extra_refs:
+  - base_ref: release-5.0
+    org: openshift
+    repo: openshift-mcp-server
+    workdir: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-openshift-mcp-server-upstream-pr-sync
+  reporter_config:
+    slack:
+      channel: '#pixaa-rebasebot-alerts'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed. https://prow.ci.openshift.org/?job={{.Spec.Job}}
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -euo pipefail
+
+        # Install gh CLI
+        GH_VERSION="2.62.0"
+        GH_TARBALL="gh_${GH_VERSION}_linux_amd64.tar.gz"
+        curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/${GH_TARBALL}" -o "/tmp/${GH_TARBALL}"
+        tar -xzf "/tmp/${GH_TARBALL}" -C /tmp
+        export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
+        gh --version
+
+        # Authenticate gh CLI and git push via token
+        GH_TOKEN="$(cat /etc/github/oauth)"
+        export GH_TOKEN
+        export OWNER_REPO="openshift/openshift-mcp-server"
+        git config user.name "OpenShift CI Robot"
+        git config user.email "noreply@openshift.io"
+        git remote add origin "https://openshift-ci-robot:${GH_TOKEN}@github.com/openshift/openshift-mcp-server.git" 2>/dev/null \
+            || git remote set-url origin "https://openshift-ci-robot:${GH_TOKEN}@github.com/openshift/openshift-mcp-server.git"
+
+        make sync-upstream-pr
+      command:
+      - /bin/bash
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.26-openshift-5.0
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-ci-robot

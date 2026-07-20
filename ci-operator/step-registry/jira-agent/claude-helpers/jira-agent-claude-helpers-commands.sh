@@ -35,14 +35,18 @@ OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
 # Filters to JSON lines only (agentic-ci log lines are stripped).
 # Captures OTEL JSONL per invocation and appends to the consolidated log.
 #
-# Usage: run_claude <phase> <issue_key> <prompt> [extra agentic-ci/claude args...]
+# Usage: run_claude <phase> <issue_key> <prompt> <output_file> [extra agentic-ci/claude args...]
 run_claude() {
   local phase=$1; shift
   local issue_key=$1; shift
   local prompt="$1"; shift
+  local output_file="$1"; shift
 
   local phase_otel="/tmp/claude-${issue_key}-${phase}-otel.jsonl"
+  local raw_output="/tmp/claude-${issue_key}-${phase}-raw.jsonl"
+  local log_file="/tmp/claude-${issue_key}-${phase}.log"
 
+  local rc=0
   agentic-ci run \
     --backend local \
     --harness claude-code \
@@ -55,8 +59,10 @@ run_claude() {
     --verbose \
     --output-format stream-json \
     "$@" \
-    | grep '^{'
-  local rc=${PIPESTATUS[0]}
+    > "$raw_output" 2>"$log_file" \
+    || rc=$?
+
+  grep '^{' "$raw_output" > "$output_file" || true
 
   for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
     if [ -f "$f" ]; then
@@ -215,26 +221,22 @@ run_claude_phase() {
   local issue_key=$1 phase=$2 artifact_prefix=$3 prompt=$4 tools=$5 max_turns=$6
   shift 6
 
-  local phase_start json_file log_file
+  local phase_start json_file
   phase_start=$(date +%s)
   json_file="/tmp/claude-${issue_key}-${artifact_prefix}.json"
-  log_file="/tmp/claude-${issue_key}-${artifact_prefix}.log"
 
   echo ""
   echo "=========================================="
   echo "Phase: ${phase} for ${issue_key}"
   echo "=========================================="
 
-  set +e
-  run_claude "$phase" "$issue_key" "$prompt" \
+  PHASE_EXIT_CODE=0
+  run_claude "$phase" "$issue_key" "$prompt" "$json_file" \
     --allowedTools "$tools" \
     --max-turns "$max_turns" \
     --effort max \
     "$@" \
-    2> "$log_file" \
-    | tee "$json_file"
-  PHASE_EXIT_CODE=$?
-  set -e
+    || PHASE_EXIT_CODE=$?
 
   extract_claude_outputs "$json_file" "$issue_key" "$artifact_prefix"
   extract_claude_tokens "$json_file" "$issue_key" "$phase"
@@ -339,13 +341,13 @@ process_single_issue() {
   # Phase 1: Solve the issue
   run_claude_phase "$issue_key" "solve" "output" \
     "$(build_solve_prompt "$issue_key")" \
-    "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task" 300 \
+    "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task LSP mcp__plugin_golang_gopls__*" 300 \
     --append-system-prompt "$fork_context"
 
   if [ $PHASE_EXIT_CODE -ne 0 ]; then
-    echo "Failed to process $issue_key"
+    echo "Failed to process $issue_key (solve exit code: $PHASE_EXIT_CODE)"
     echo "Error output (last 20 lines):"
-    tail -20 "/tmp/claude-${issue_key}-output.log"
+    tail -20 "/tmp/claude-${issue_key}-solve.log" 2>/dev/null || echo "(no log file)"
     record_issue_result "$issue_key" "$timestamp" "" "FAILED"
     return 1
   fi
@@ -362,7 +364,7 @@ process_single_issue() {
   # Phase 2: Code review
   run_claude_phase "$issue_key" "review" "review" \
     "$(build_review_prompt)" \
-    "Bash Read Grep Glob Task Agent Skill" 225 \
+    "Bash Read Grep Glob Task Agent Skill LSP mcp__plugin_golang_gopls__*" 225 \
     --append-system-prompt "${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
 
   # Phase 3: Fix review findings
@@ -377,7 +379,7 @@ process_single_issue() {
   if [ -n "$review_findings" ]; then
     run_claude_phase "$issue_key" "fix" "fix" \
       "$(build_fix_prompt)" \
-      "Bash Read Write Edit Grep Glob Agent Skill Task" 225 \
+      "Bash Read Write Edit Grep Glob Agent Skill Task LSP mcp__plugin_golang_gopls__*" 225 \
       --append-system-prompt "REVIEW FINDINGS:
 ${review_findings}
 

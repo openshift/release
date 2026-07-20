@@ -1028,6 +1028,16 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-private-shared-vpc-phz-sts
+- as: aws-ipi-proxy-fips-f999-fips-check
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    test:
+    - ref: fips-check-optional-operator-images-scan
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: aws-ipi-shared-vpc-phz-freeipa-f14
   cron: 7 17 14,30 * *
   steps:
@@ -2833,6 +2843,23 @@ tests:
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
+- as: gcp-ipi-ovn-winc-f999-file-integrity
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@fio'
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: File_Integrity_Operator
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
 - as: gcp-ipi-ovn-ipsec-f28-security-profiles
   cron: 45 14 3,17 * *
   steps:
@@ -2968,6 +2995,13 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
+- as: ibmcloud-ipi-ovn-mtu-migrate-f999
+  cron: 8 18 29 2 *
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-mtu-migrate
 - as: ibmcloud-ipi-private-byo-kms-f28
   cron: 6 0 18 * *
   steps:

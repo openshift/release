@@ -156,9 +156,13 @@ run_claude() {
   local phase=$1; shift
   local pr_number=$1; shift
   local prompt="$1"; shift
+  local output_file="$1"; shift
 
   local phase_otel="/tmp/claude-${pr_number}-${phase}-otel.jsonl"
+  local raw_output="/tmp/claude-${pr_number}-${phase}-raw.jsonl"
+  local log_file="/tmp/claude-${pr_number}-${phase}.log"
 
+  local rc=0
   agentic-ci run \
     --backend local \
     --harness claude-code \
@@ -171,8 +175,10 @@ run_claude() {
     --verbose \
     --output-format stream-json \
     "$@" \
-    | grep '^{'
-  local rc=${PIPESTATUS[0]}
+    > "$raw_output" 2>"$log_file" \
+    || rc=$?
+
+  grep '^{' "$raw_output" > "$output_file" || true
 
   for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
     if [ -f "$f" ]; then
@@ -316,17 +322,14 @@ echo "=========================================="
 
 PHASE1_START=$(date +%s)
 
-set +e
-run_claude "address-review" "$PR_NUMBER" "/openshift-developer:address-review-pr $PR_NUMBER --ci" \
+EXIT_CODE=0
+run_claude "address-review" "$PR_NUMBER" "/openshift-developer:address-review-pr $PR_NUMBER --ci" "/tmp/claude-pr-${PR_NUMBER}-output.json" \
   --append-system-prompt "You are addressing review comments on PR #$PR_NUMBER in openshift/hypershift. The PR was created from the hypershift-community fork." \
-  --allowedTools "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task" \
+  --allowedTools "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task LSP mcp__plugin_golang_gopls__*" \
   --disallowedTools "${DISALLOWED_TOOLS[@]}" \
   --max-turns 200 \
   --effort max \
-  2> "/tmp/claude-pr-${PR_NUMBER}-output.log" \
-  | tee "/tmp/claude-pr-${PR_NUMBER}-output.json"
-EXIT_CODE=$?
-set -e
+  || EXIT_CODE=$?
 
 # Save raw output to ARTIFACT_DIR for debugging
 if [ -f "/tmp/claude-pr-${PR_NUMBER}-output.json" ]; then

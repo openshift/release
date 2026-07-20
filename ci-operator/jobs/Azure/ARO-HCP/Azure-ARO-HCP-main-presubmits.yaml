@@ -322,8 +322,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-Azure-ARO-HCP-main-capz-e2e-dev
+    optional: true
     rerun_command: /test capz-e2e-dev
-    run_if_changed: ^$
     spec:
       containers:
       - args:
@@ -745,7 +745,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build13
+    cluster: build08
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -762,6 +762,7 @@ presubmits:
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
     labels:
+      capability/gcp: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-Azure-ARO-HCP-main-images
@@ -813,7 +814,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build09
     context: ci/prow/integration
     decorate: true
     decoration_config:
@@ -1330,7 +1331,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build09
     context: ci/prow/mega-linter
     decorate: true
     decoration_config:
@@ -2527,6 +2528,92 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )test-unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build13
+    context: ci/prow/upgrade-e2e-parallel
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - fleet/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
+      timeout: 10h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-upgrade-e2e-parallel
+    optional: true
+    rerun_command: /test upgrade-e2e-parallel
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=upgrade-e2e-parallel
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )upgrade-e2e-parallel,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

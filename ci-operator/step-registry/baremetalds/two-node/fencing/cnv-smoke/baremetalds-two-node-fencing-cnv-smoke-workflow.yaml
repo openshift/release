@@ -1,0 +1,38 @@
+workflow:
+  as: baremetalds-two-node-fencing-cnv-smoke
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: equinix-edge-enablement
+    pre:
+      - chain: baremetalds-ofcir-pre
+      - chain: baremetalds-two-node-fencing-post-install
+      - ref: openshift-cluster-bot-rbac
+      - chain: storage-conf-csi-optional-topolvm
+      - ref: interop-tests-deploy-cnv
+    test:
+    - ref: cnv-smoke-lvms
+    post:
+      - chain: baremetalds-ofcir-post
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        MASTER_DISK=100
+        NUM_WORKERS=0
+        BMC_DRIVER=redfish
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=100G
+      LVM_OPERATOR_SUB_SOURCE: "lvm-catalogsource"
+      LVM_OPERATOR_SUB_CHANNEL: "stable-4.22"
+      LVM_CATALOG_SOURCE: "lvm-catalogsource"
+      MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE: "quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v4.22"
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: "openshift-lvm-storage"
+      LVM_CLUSTER_TOLERATE_MASTER: "true"
+      CNV_VERSION: "4.22"
+  documentation: |-
+    This workflow provisions a Two Node OpenShift with Fencing (TNF) cluster,
+    deploys LVMS for local storage, deploys CNV, and runs CNV smoke tests.
+    LVMS is used because TNF clusters lack shared storage; LiveMigration
+    is not tested since LVMS does not support RWX volumes.

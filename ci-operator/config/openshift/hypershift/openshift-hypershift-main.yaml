@@ -28,12 +28,20 @@ build_root:
   use_build_cache: true
 images:
   items:
-  - to: hypershift-operator
-  - dockerfile_path: Dockerfile.control-plane
+  - additional_architectures:
+    - arm64
+    to: hypershift-operator
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.control-plane
     to: hypershift
-  - dockerfile_path: Dockerfile.e2e
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.e2e
     to: hypershift-tests
-  - dockerfile_literal: |
+  - additional_architectures:
+    - arm64
+    dockerfile_literal: |
       FROM hypershift-operator
       RUN yum install -y jq && yum clean all
     from: hypershift-operator
@@ -566,7 +574,7 @@ tests:
   steps:
     workflow: hypershift-dependabot-triage
 - as: periodic-jira-agent
-  cron: 30 8 * * 1
+  cron: 0 9 * * *
   steps:
     env:
       JIRA_AGENT_MAX_ISSUES: "1"
