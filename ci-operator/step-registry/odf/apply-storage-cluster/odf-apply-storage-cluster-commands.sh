@@ -14,13 +14,22 @@ oc wait crd storageclusters.ocs.openshift.io --for=condition=Established --timeo
 
 # Deploy StorageCluster (idempotent via oc apply).
 {
-    oc create -f - --dry-run=client -o yaml --save-config
-} 0<<ocEOF | oc apply -f -
+    oc create -f - --dry-run=client -o json --save-config |
+    jq -c \
+        --arg installNamespace "${ODF__INSTALL_NAMESPACE}" \
+        --arg storageClass "${ODF__STORAGE_CLASS}" \
+        --arg storageClaim "${ODF__STORAGE_CLAIM}" \
+        '
+            .metadata.namespace = $installNamespace |
+            .spec.storageDeviceSets[0].dataPVCTemplate.spec.resources.requests.storage = $storageClaim |
+            .spec.storageDeviceSets[0].dataPVCTemplate.spec.storageClassName = $storageClass
+        '
+} 0<<'ocEOF' | oc apply -f -
 apiVersion: ocs.openshift.io/v1
 kind: StorageCluster
 metadata:
   name: ocs-storagecluster
-  namespace: "${ODF__INSTALL_NAMESPACE}"
+  namespace: placeholder
 spec:
   resources: {}
   storageDeviceSets:
@@ -31,8 +40,8 @@ spec:
         - ReadWriteOnce
         resources:
           requests:
-            storage: "${ODF__STORAGE_CLAIM}"
-        storageClassName: "${ODF__STORAGE_CLASS}"
+            storage: placeholder
+        storageClassName: placeholder
         volumeMode: Block
     name: ocs-deviceset
     placement: {}
