@@ -25,12 +25,24 @@ typeset candidates=""
 typeset try=""
 typeset -i policyCount=0
 for try in $(seq "${retries}"); do
-  results=$(oc get policies -n policies) || { : "Try ${try}/${retries}: API request failed, retrying in 30 seconds"; sleep 30; continue; }
+  if ! results=$(oc get policies -n policies); then
+    if [ "${try}" -eq "${retries}" ]; then
+      : "Error: API request failed on final attempt (${retries} retries exhausted)"
+      exit 1
+    fi
+    : "Try ${try}/${retries}: API request failed, retrying in 30 seconds"
+    sleep 30
+    continue
+  fi
   policyCount=0
   if [[ -n "${results}" ]]; then
     policyCount=$(echo "${results}" | grep -c -v '^NAME' || true)
   fi
   if (( policyCount == 0 )); then
+    if [ "${try}" -eq "${retries}" ]; then
+      : "Error: no policies found after ${retries} attempts"
+      exit 1
+    fi
     : "Try ${try}/${retries}: No policies found yet. Checking again in 30 seconds"
     sleep 30
     continue
@@ -59,5 +71,3 @@ for try in $(seq "${retries}"); do
     sleep 30
   fi
 done
-
-true
