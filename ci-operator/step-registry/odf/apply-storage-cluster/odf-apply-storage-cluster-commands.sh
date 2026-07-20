@@ -10,7 +10,7 @@ DumpStorageCluster() {
 trap DumpStorageCluster ERR INT TERM
 
 # Wait for StorageCluster CRD to be registered before applying the manifest.
-oc wait crd storageclusters.ocs.openshift.io --for=condition=Established --timeout=5m
+oc wait crd storageclusters.ocs.openshift.io --for=condition=Established --timeout=5m 1>/dev/null
 
 # Deploy StorageCluster (idempotent via oc apply).
 {
@@ -44,10 +44,10 @@ ocEOF
 # Block until the OCS operator has started reconciling (Progressing=True), which
 # guarantees status conditions are present before we poll for Available.
 oc wait 'storagecluster.ocs.openshift.io/ocs-storagecluster' \
-    -n "${ODF_INSTALL_NAMESPACE}" --for=condition=Progressing --timeout=5m
+    -n "${ODF_INSTALL_NAMESPACE}" --for=condition=Progressing --timeout=5m 1>/dev/null
 
 oc wait 'storagecluster.ocs.openshift.io/ocs-storagecluster' \
-    -n "${ODF_INSTALL_NAMESPACE}" --for=condition='Available' --timeout="${ODF_STORAGE_CLUSTER_WAIT_TIMEOUT}"
+    -n "${ODF_INSTALL_NAMESPACE}" --for=condition='Available' --timeout="${ODF_STORAGE_CLUSTER_WAIT_TIMEOUT}" 1>/dev/null
 
 # Remove is-default-class annotation from all storage classes, then promote
 # ocs-storagecluster-ceph-rbd as the default storage class.
