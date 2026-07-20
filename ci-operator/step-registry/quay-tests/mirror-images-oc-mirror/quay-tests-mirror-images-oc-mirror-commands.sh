@@ -67,8 +67,8 @@ echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
 # Install OMR CA cert into system trust store so oc-mirror trusts it
 if [[ -f "${SHARED_DIR}/rootCA.pem" ]]; then
   echo "Installing OMR CA cert into system trust store..."
-  sudo cp "${SHARED_DIR}/rootCA.pem" /etc/pki/ca-trust/source/anchors/omr-ca.pem
-  sudo update-ca-trust
+  cp "${SHARED_DIR}/rootCA.pem" /etc/pki/ca-trust/source/anchors/omr-ca.pem
+  update-ca-trust
   echo "CA trust store updated."
 fi
 
