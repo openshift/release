@@ -1,0 +1,108 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.22_base-rhel9:
+    name: "4.22"
+    namespace: ocp
+    tag: base-rhel9
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-sno-z-stream-upgrade
+  cron: 0 8 * * 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_PACKAGE: lvms-operator
+      LVM_OPERATOR_SUB_SOURCE: redhat-operators
+      LVMS_NAMESPACE: openshift-lvm-storage
+      REDHAT_OPERATORS_INDEX_TAG: v4.22
+      STORAGE_WORKLOAD_COUNT: "3"
+      TARGET_LVMS_CHANNEL: stable-4.22
+      TARGET_LVMS_SOURCE: lvm-catalogsource
+    test:
+    - ref: storage-data-create
+    - ref: lvms-upgrade
+    - as: verify-z-stream-upgrade
+      cli: latest
+      commands: |
+        LVMS_NAMESPACE="${LVMS_NAMESPACE:-openshift-lvm-storage}"
+        csv_version=$(oc get csv -n "${LVMS_NAMESPACE}" -o jsonpath='{.items[?(@.metadata.name contains "lvms")].spec.version}' 2>/dev/null | awk '{print $NF}')
+        echo "LVMS CSV version after upgrade: ${csv_version}"
+        # Verify it's a z-stream version (4.22.x where x > 0)
+        if [[ "${csv_version}" =~ ^4\.22\.[1-9][0-9]*$ ]]; then
+          echo "Z-stream upgrade verified: ${csv_version}"
+        else
+          echo "ERROR: Expected z-stream version (4.22.x where x > 0), got: ${csv_version}"
+          exit 1
+        fi
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: storage-data-check
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
+- as: e2e-aws-mno-z-stream-upgrade
+  cron: 0 8 * * 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_PACKAGE: lvms-operator
+      LVM_OPERATOR_SUB_SOURCE: redhat-operators
+      LVMS_NAMESPACE: openshift-lvm-storage
+      REDHAT_OPERATORS_INDEX_TAG: v4.22
+      STORAGE_WORKLOAD_COUNT: "3"
+      TARGET_LVMS_CHANNEL: stable-4.22
+      TARGET_LVMS_SOURCE: lvm-catalogsource
+    test:
+    - ref: storage-data-create
+    - ref: lvms-upgrade
+    - as: verify-z-stream-upgrade
+      cli: latest
+      commands: |
+        LVMS_NAMESPACE="${LVMS_NAMESPACE:-openshift-lvm-storage}"
+        csv_version=$(oc get csv -n "${LVMS_NAMESPACE}" -o jsonpath='{.items[?(@.metadata.name contains "lvms")].spec.version}' 2>/dev/null | awk '{print $NF}')
+        echo "LVMS CSV version after upgrade: ${csv_version}"
+        # Verify it's a z-stream version (4.22.x where x > 0)
+        if [[ "${csv_version}" =~ ^4\.22\.[1-9][0-9]*$ ]]; then
+          echo "Z-stream upgrade verified: ${csv_version}"
+        else
+          echo "ERROR: Expected z-stream version (4.22.x where x > 0), got: ${csv_version}"
+          exit 1
+        fi
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: storage-data-check
+    workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: lvm-operator
+  variant: nightly-z-upgrade
