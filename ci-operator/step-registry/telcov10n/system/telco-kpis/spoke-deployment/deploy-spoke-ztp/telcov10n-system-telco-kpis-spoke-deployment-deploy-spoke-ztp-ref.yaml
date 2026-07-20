@@ -17,30 +17,40 @@ ref:
     - name: HUB_CLUSTER
       default: "kni-qe-71"
       documentation: Hub cluster managing ZTP deployment
-    - name: VERSION
-      default: "4.18"
-      documentation: OpenShift version to deploy on spoke
-    - name: ZTP_GIT_REPO
-      default: "https://gitlab.cee.redhat.com/ocp-edge-qe/ztp-site-configs.git"
-      documentation: ZTP site configurations repository URL
-    - name: ZTP_GIT_BRANCH
-      default: ""
-      documentation: ZTP site configurations branch (empty to auto-generate as ${SPOKE_CLUSTER}-kpi-${VERSION})
-    - name: ZTP_CLUSTERS_PATH
-      default: "siteconfig"
-      documentation: Path to cluster configurations in ZTP repository
-    - name: ZTP_POLICIES_PATH
-      default: "policygentemplates"
-      documentation: Path to policy templates in ZTP repository
-    - name: DEBUG
-      default: "false"
-      documentation: Enable Ansible debug output
-    - name: SKIP_REBUILD_IMAGE
-      default: "false"
-      documentation: Skip test-runner image rebuild
-    - name: ECO_CI_CD_IMAGE
-      default: "quay.io/telcov10n-ci/eco-ci-cd:latest"
-      documentation: Container image for Ansible execution
+    - name: INFRA_SETTINGS
+      default: '{}'
+      documentation: >-
+        JSON object for per-step infrastructure configuration overrides from CI config.
+        Values here take precedence over INFRA_SETTINGS_DEFAULTS.
+    - name: INFRA_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "deploy_spoke_ztp": {
+            "skip": false,
+            "debug_on_fail": false,
+            "debug_timeout": "+10 min",
+            "version": "4.22",
+            "ocp_release_image": "",
+            "ztp_git_repo": "https://gitlab.cee.redhat.com/ocp-edge-qe/ztp-site-configs.git",
+            "ztp_git_branch": "",
+            "ztp_clusters_path": "siteconfig",
+            "ztp_policies_path": "policygentemplates",
+            "force_cleanup": false,
+            "debug": false
+          }
+        }
+      documentation: >-
+        JSON object for per-step infrastructure configuration. The "deploy_spoke_ztp" key supports:
+        skip (bool) - when true, skip this step entirely and exit 0;
+        version (str) - OpenShift version to deploy on spoke;
+        ocp_release_image (str) - optional explicit release pull spec (overrides version);
+        ztp_git_repo (str) - ZTP site configurations repository URL;
+        ztp_git_branch (str) - ZTP branch (empty to auto-generate as ${SPOKE_CLUSTER}-kpi-${VERSION});
+        ztp_clusters_path (str) - path to cluster configurations in ZTP repository;
+        ztp_policies_path (str) - path to policy templates in ZTP repository;
+        force_cleanup (bool) - force cleanup of spoke resources on hub before deployment;
+        debug (bool) - when true, enables Ansible -vvv verbose output.
+        Values are exported as uppercase env vars.
   credentials:
     # Common hypervisor (shared across all spokes)
     - namespace: test-credentials
