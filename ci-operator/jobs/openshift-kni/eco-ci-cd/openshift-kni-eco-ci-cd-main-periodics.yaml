@@ -3010,11 +3010,11 @@ periodics:
     repo: eco-ci-cd
   labels:
     capability/intranet: intranet
-    ci-operator.openshift.io/variant: cnf-compute-nrop-stage
+    ci-operator.openshift.io/variant: cnf-compute-nrop-stage-5-0
     ci.openshift.io/generator: prowgen
     job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-compute-nrop-stage-e2e-telcov10n-nrop-tests-5-0-nightly
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-compute-nrop-stage-5-0-e2e-telcov10n-nrop-tests-5-0-nightly
   spec:
     containers:
     - args:
@@ -3024,7 +3024,89 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-telcov10n-nrop-tests-5-0-nightly
-      - --variant=cnf-compute-nrop-stage
+      - --variant=cnf-compute-nrop-stage-5-0
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build07
+  cron: 0 8 * * 0
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: cnf-compute-nrop-stage-5-0
+    ci.openshift.io/generator: prowgen
+    job-release: "5.0"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-compute-nrop-stage-5-0-e2e-telcov10n-nrop-tls-scanner-5-0-nightly
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-telcov10n-nrop-tls-scanner-5-0-nightly
+      - --variant=cnf-compute-nrop-stage-5-0
       command:
       - ci-operator
       env:
@@ -3094,7 +3176,6 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/variant: cnf-compute-nrop-stage
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-compute-nrop-stage-e2e-telcov10n-nrop-tests-stage-4-14
   spec:
@@ -3104,7 +3185,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-telcov10n-nrop-tests-stage-4-14
       - --variant=cnf-compute-nrop-stage
       command:
@@ -3127,9 +3207,6 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -3150,9 +3227,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -3176,7 +3250,6 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/variant: cnf-compute-nrop-stage
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-compute-nrop-stage-e2e-telcov10n-nrop-tests-stage-4-16
   spec:
@@ -3186,7 +3259,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-telcov10n-nrop-tests-stage-4-16
       - --variant=cnf-compute-nrop-stage
       command:
@@ -3209,9 +3281,6 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -3232,9 +3301,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -3258,7 +3324,6 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/variant: cnf-compute-nrop-stage
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-compute-nrop-stage-e2e-telcov10n-nrop-tests-stage-4-18
   spec:
@@ -3268,7 +3333,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-telcov10n-nrop-tests-stage-4-18
       - --variant=cnf-compute-nrop-stage
       command:
@@ -3291,9 +3355,6 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -3314,9 +3375,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -3340,7 +3398,6 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/variant: cnf-compute-nrop-stage
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-compute-nrop-stage-e2e-telcov10n-nrop-tests-stage-4-19
   spec:
@@ -3350,7 +3407,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-telcov10n-nrop-tests-stage-4-19
       - --variant=cnf-compute-nrop-stage
       command:
@@ -3373,9 +3429,6 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -3396,9 +3449,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -3422,7 +3472,6 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/variant: cnf-compute-nrop-stage
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-compute-nrop-stage-e2e-telcov10n-nrop-tests-stage-4-20
   spec:
@@ -3432,7 +3481,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-telcov10n-nrop-tests-stage-4-20
       - --variant=cnf-compute-nrop-stage
       command:
@@ -3455,9 +3503,6 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -3478,9 +3523,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -3504,7 +3546,6 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/variant: cnf-compute-nrop-stage
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-compute-nrop-stage-e2e-telcov10n-nrop-tests-stage-4-21
   spec:
@@ -3514,7 +3555,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-telcov10n-nrop-tests-stage-4-21
       - --variant=cnf-compute-nrop-stage
       command:
@@ -3537,9 +3577,6 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -3560,9 +3597,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -3586,7 +3620,6 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/variant: cnf-compute-nrop-stage
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-compute-nrop-stage-e2e-telcov10n-nrop-tests-stage-4-22
   spec:
@@ -3596,7 +3629,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-telcov10n-nrop-tests-stage-4-22
       - --variant=cnf-compute-nrop-stage
       command:
@@ -3619,9 +3651,6 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -3642,91 +3671,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build07
-  cron: 0 8 * * 0
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift-kni
-    repo: eco-ci-cd
-  labels:
-    capability/intranet: intranet
-    ci-operator.openshift.io/variant: cnf-compute-nrop-stage
-    ci.openshift.io/generator: prowgen
-    job-release: "5.0"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-compute-nrop-stage-e2e-telcov10n-nrop-tls-scanner-5-0-nightly
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-telcov10n-nrop-tls-scanner-5-0-nightly
-      - --variant=cnf-compute-nrop-stage
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
