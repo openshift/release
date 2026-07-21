@@ -3348,6 +3348,49 @@ tests:
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
+- as: aws-ipi-etcd-rhcos10-tp-amd-f28-file-integrity
+  cron: 12 17 7 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      FEATURE_SET: TechPreviewNoUpgrade
+      FILTERS_ADDITIONAL: ""
+      OS_IMAGE_STREAM: rhel-10
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: File_Integrity_Operator
+      TEST_TIMEOUT: "30"
+      TEST_TYPE: dev
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-etcd-rhcos10-tp-amd-f28-security-profiles
+  cron: 46 13 16 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CATALOG_SOURCE_NAME: security-profiles-operator
+      COMPUTE_NODE_REPLICAS: "2"
+      FEATURE_SET: TechPreviewNoUpgrade
+      FILTERS_ADDITIONAL: ""
+      OS_IMAGE_STREAM: rhel-10
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Security_Profiles_Operator|Node_Audit_Logging
+      TEST_TIMEOUT: "30"
+      TEST_TYPE: dev
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: etcd-encryption
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: metal-upi-ovn-ipv4-f7
   capabilities:
   - intranet
