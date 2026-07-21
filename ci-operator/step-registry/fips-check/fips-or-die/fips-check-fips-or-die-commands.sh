@@ -142,7 +142,8 @@ fi
 
 # check if FIPS enabled
 fips_enabled=false
-node_name=$(oc get node -l node-role.kubernetes.io/master= --no-headers | awk '$2=="Ready" {print $1; exit}')
+node_name=$(oc get node -l node-role.kubernetes.io/master= --no-headers | awk '$2=="Ready" {print $1}')
+node_name=$(echo "$node_name" | head -1)
 if [[ -z "$node_name" ]]; then
   echo "ERROR: No Ready master node found"
   exit 1
