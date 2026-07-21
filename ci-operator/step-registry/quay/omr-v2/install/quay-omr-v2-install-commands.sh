@@ -141,6 +141,7 @@ openssl rand -hex 24 > "/home/$(id -un)/.omr-v2-admin-password"
 chmod 0600 "/home/$(id -un)/.omr-v2-admin-password"
 admin_password=$(<"/home/$(id -un)/.omr-v2-admin-password")
 install_status=0
+set +o errexit
 "${work_dir}/mirror-registry" install \
     --initUser admin \
     --initPassword "${admin_password}" \
@@ -149,9 +150,19 @@ install_status=0
     --quayRoot "${quay_root}" \
     --quayStorage "${quay_storage}" \
     --sqliteStorage "${sqlite_storage}" \
-    -v > "${work_dir}/install.log" 2>&1 || install_status=$?
-sed "s/${admin_password}/<redacted>/g" "${work_dir}/install.log" \
-    > "${work_dir}/install-sanitized.log"
+    -v 2>&1 | \
+    tee "${work_dir}/install.log" | \
+    sed "s/${admin_password}/<redacted>/g" | \
+    tee "${work_dir}/install-sanitized.log"
+pipeline_status=("${PIPESTATUS[@]}")
+set -o errexit
+install_status="${pipeline_status[0]}"
+if [[ "${pipeline_status[1]}" -ne 0 ||
+      "${pipeline_status[2]}" -ne 0 ||
+      "${pipeline_status[3]}" -ne 0 ]]; then
+    echo "Failed to capture the OMR v2 installer diagnostics." >&2
+    install_status=1
+fi
 chmod 0600 "${work_dir}/install-sanitized.log"
 unset admin_password
 if [[ "${install_status}" -ne 0 ]]; then

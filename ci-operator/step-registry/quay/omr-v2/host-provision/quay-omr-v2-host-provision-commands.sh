@@ -191,7 +191,10 @@ Resources:
           set -o errexit
           set -o pipefail
           install -d -m 0700 -o ec2-user -g ec2-user /home/ec2-user/.ssh
-          printf '%s' '${PublicKeyBase64}' | base64 --decode > /home/ec2-user/.ssh/authorized_keys
+          # OMR appends a generated local-install key, so preserve the line boundary.
+          authorized_key=$(printf '%s' '${PublicKeyBase64}' | base64 --decode)
+          printf '%s\n' "$authorized_key" > /home/ec2-user/.ssh/authorized_keys
+          unset authorized_key
           chown ec2-user:ec2-user /home/ec2-user/.ssh/authorized_keys
           chmod 0600 /home/ec2-user/.ssh/authorized_keys
           restorecon -RF /home/ec2-user/.ssh || true
