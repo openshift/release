@@ -26,12 +26,6 @@ jq -n \
   '{quay:$quay, playwright_runner:$playwright, operator_bundle:$bundle}' \
   >"${ARTIFACT_DIR}/resolved-inputs.json"
 
-echo "Installing promoted Quay Operator bundle ${QUAY_OPERATOR_BUNDLE}"
-operator-sdk run bundle --timeout=10m --security-context-config restricted \
-  -n "${operator_namespace}" "${QUAY_OPERATOR_BUNDLE}"
-oc wait --timeout=10m --for=condition=Available \
-  -n "${operator_namespace}" deployment/quay-operator-tng
-
 echo "Configuring the operator to reconcile the pull-request Quay image"
 operator_csv="$(oc -n "${operator_namespace}" get deployment quay-operator-tng \
   -o jsonpath='{.metadata.ownerReferences[?(@.kind=="ClusterServiceVersion")].name}')"
