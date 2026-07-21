@@ -8,7 +8,7 @@ ODF_INSTALL_NAMESPACE=openshift-storage
 ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-stable-4.22}"
 OSD_DISK_SERIAL="${OSD_DISK_SERIAL:-osd-disk}"
 MON_DISK_SERIAL="${MON_DISK_SERIAL:-mon-disk}"
-MON_DISK_SIZE="${MON_DISK_SIZE:-50G}"
+MON_DISK_SIZE="${MON_DISK_SIZE:-30G}"
 
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   source "${SHARED_DIR}/proxy-conf.sh"
