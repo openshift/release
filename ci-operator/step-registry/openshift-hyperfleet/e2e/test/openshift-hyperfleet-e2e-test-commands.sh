@@ -17,7 +17,8 @@ cp -r /e2e/ /tmp/
 
 # Clone and build from a specific ref if requested (RC/release testing)
 E2E_REF="${MULTISTAGE_PARAM_OVERRIDE_E2E_REF:-}"
-E2E_BIN="hyperfleet-e2e"
+GINKGO_BIN="ginkgo"
+E2E_TEST_BIN="/usr/local/bin/e2e.test"
 TESTDATA="/e2e/testdata"
 if [ -n "$E2E_REF" ]; then
   log "=== Building E2E from ref: ${E2E_REF} ==="
@@ -25,8 +26,13 @@ if [ -n "$E2E_REF" ]; then
     https://github.com/openshift-hyperfleet/hyperfleet-e2e.git /tmp/e2e-src
   cd /tmp/e2e-src
   make build
-  E2E_BIN="/tmp/e2e-src/bin/hyperfleet-e2e"
-  chmod +x "$E2E_BIN"
+  # Build ginkgo CLI and test binary for parallel execution
+  cd .bingo && GOWORK=off go build -mod=mod -modfile=ginkgo.mod \
+    -o /tmp/e2e-src/bin/ginkgo "github.com/onsi/ginkgo/v2/ginkgo"
+  cd ..
+  CGO_ENABLED=0 go test -c -o /tmp/e2e-src/bin/e2e.test ./e2e
+  GINKGO_BIN="/tmp/e2e-src/bin/ginkgo"
+  E2E_TEST_BIN="/tmp/e2e-src/bin/e2e.test"
   TESTDATA="/tmp/e2e-src/testdata"
   rm -rf /tmp/e2e/env /tmp/e2e/configs
   cp -r /tmp/e2e-src/env /tmp/e2e/env
@@ -78,5 +84,12 @@ export HYPERFLEET_IDENTITY_TOKENREQUEST_NAMESPACE="${NAMESPACE}"
 export HYPERFLEET_IDENTITY_EXPECTEDIDENTITY="system:serviceaccount:${NAMESPACE}:${HYPERFLEET_IDENTITY_TOKENREQUEST_SERVICEACCOUNTNAME}"
 
 export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_CREDENTIALS_PATH}/hcm-hyperfleet-e2e.json"
-# Run e2e tests via --label-filter
-"${E2E_BIN}" test --label-filter="${LABEL_FILTER}" --flake-attempts="${FLAKE_ATTEMPTS:-2}" --junit-report "${ARTIFACT_DIR}/junit.xml"
+
+# Run e2e tests via ginkgo CLI with parallel execution
+"${GINKGO_BIN}" \
+  --procs="${PROCS:-4}" \
+  --label-filter="${LABEL_FILTER}" \
+  --flake-attempts="${FLAKE_ATTEMPTS:-2}" \
+  --junit-report=junit.xml \
+  --output-dir="${ARTIFACT_DIR}" \
+  "${E2E_TEST_BIN}"
