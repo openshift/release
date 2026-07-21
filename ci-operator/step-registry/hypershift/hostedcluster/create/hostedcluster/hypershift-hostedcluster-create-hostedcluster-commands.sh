@@ -144,6 +144,10 @@ case "${PLATFORM}" in
       ARGS+=( --feature-set "${GUEST_FEATURE_SET}")
     fi
 
+    if [[ -n "${EXTRA_ARGS}" ]]; then
+      ARGS+=( ${EXTRA_ARGS} )
+    fi
+
     echo "Creating cluster with the following arguments:"
     echo "${ARGS[@]}"
     /usr/bin/hypershift create cluster aws "${ARGS[@]}"
