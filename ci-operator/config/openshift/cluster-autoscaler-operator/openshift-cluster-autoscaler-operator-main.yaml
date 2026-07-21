@@ -3,6 +3,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.22"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -54,6 +58,13 @@ tests:
   skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-machine-api
+      SCANNER_CPU: 500m
+      SCANNER_MEMORY: 1Gi
+    test:
+    - ref: tls-scanner-run
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
