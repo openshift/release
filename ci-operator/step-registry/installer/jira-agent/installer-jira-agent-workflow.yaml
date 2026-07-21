@@ -1,0 +1,30 @@
+workflow:
+  as: installer-jira-agent
+  steps:
+    pre:
+      - ref: jira-agent-setup
+      - ref: jira-agent-github-app-auth
+      - ref: jira-agent-slack-pr-notify
+      - ref: jira-agent-claude-helpers
+      - ref: jira-agent-jira-helpers
+      - ref: jira-agent-git-helpers
+    test:
+      - ref: jira-agent-process
+    post:
+      - ref: jira-agent-report
+    env:
+      JIRA_AGENT_AUTH_MODE: "pat"
+      JIRA_AGENT_FORK_ORG: "jira-solve-bot"
+      JIRA_AGENT_UPSTREAM_REPO: "openshift/installer"
+      # TODO: remove before merge — hardcoded for rehearsal
+      JIRA_AGENT_ISSUE_KEY: "OCPBUGS-99229"
+      JIRA_AGENT_TARGET_STATUS: '{"OCPBUGS":"ASSIGNED"}'
+      JIRA_AGENT_TOOL_SETUP_SCRIPT: "GOFLAGS='' go install golang.org/x/tools/gopls@v0.21.0"
+      JIRA_AGENT_REVIEW_LANGUAGE: "go"
+      JIRA_AGENT_SLACK_EMOJI: ":robot:"
+  documentation: |-
+    Installer-specific wrapper for the generic Jira Agent workflow.
+    Uses PAT auth mode — auto-forks openshift/installer into jira-solve-bot
+    and creates PRs against the upstream repo.
+
+    Credentials: Uses hypershift-team-claude-prow (shared secret with gh-pat).
