@@ -7,6 +7,11 @@
 # The script exit 0 if fail to create catalogsource. this allows  the other test can be executed continuously
 set -u
 
+if [[ "${SKIP_QE_APP_REGISTRY:-false}" == "true" ]]; then
+  echo "====> SKIP_QE_APP_REGISTRY=true, skipping deploy qe catalogsource"
+  exit 0
+fi
+
 # Version comparison functions using sort -V
 function version_gt() {
   # Returns 0 (true) if $1 > $2
