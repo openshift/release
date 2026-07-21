@@ -12,6 +12,9 @@ configuration:
 | `REVIEW_AGENT_FORK_REPO` | `https://github.com/hypershift-community/hypershift` |
 | `REVIEW_AGENT_UPSTREAM_REPO` | `openshift/hypershift` |
 
+This uses App mode (the default). For PAT mode, set `REVIEW_AGENT_AUTH_MODE="pat"` and
+`REVIEW_AGENT_FORK_ORG` instead of `REVIEW_AGENT_FORK_REPO` — the fork URL is auto-derived.
+
 Credentials use the `hypershift-team-claude-prow` secret (configured in the generic step refs).
 
 ## Jobs
