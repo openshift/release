@@ -71,14 +71,14 @@ RUN ls /charts/trustee-operator /charts/trustee-operands
 |-----------|---------|-------------|
 | `HELM_VERSION` | `v3.17.3` | Helm binary version to install. |
 | `CHARTS_REPO` | `https://github.com/confidential-devhub/charts` | Git URL of the charts repository. Use a fork URL to test chart changes before merging upstream. |
-| `CHARTS_BRANCH` | `main` | Branch, tag, or commit to check out from `CHARTS_REPO`. |
+| `CHARTS_BRANCH` | `main` | Branch or tag to check out from `CHARTS_REPO`. |
 
 Build and push to the Quay registry and tag of your choice:
 
 ```bash
 # Set these to your own values
 #HELM_VERSION=v3.16.4
-#CHARTS_REPO=https://github.com/confidential-devhub/charts`
+#CHARTS_REPO=https://github.com/confidential-devhub/charts
 #CHARTS_BRANCH=main
 USER=tbuskey
 REGISTRY=quay.io/$USER         # your registry and namespace
@@ -92,7 +92,7 @@ podman build -t ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
 # Build from a fork and branch and override default helm repo
 podman build \
   --build-arg HELM_VERSION=$HELM_VERSION \
-  --build-arg CHARTS_REPO=$CHARTS_REPO
+  --build-arg CHARTS_REPO=$CHARTS_REPO \
   --build-arg CHARTS_BRANCH=$CHARTS_BRANCH \
   -t ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
 
