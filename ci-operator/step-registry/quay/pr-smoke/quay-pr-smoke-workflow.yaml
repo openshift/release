@@ -1,0 +1,21 @@
+workflow:
+  as: quay-pr-smoke
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-aws-pre
+    - ref: quay-pr-smoke-s3-provision
+    - ref: quay-pr-smoke-deploy
+    test:
+    - ref: quay-pr-smoke-test
+    post:
+    - ref: quay-gather
+    - ref: quay-pr-smoke-s3-deprovision
+    - chain: ipi-aws-post
+    - ref: quay-pr-smoke-result
+  documentation: |-
+    Provisions a conventional AWS IPI cluster and an ephemeral S3 bucket,
+    installs a promoted Quay Operator bundle, deploys the pull-request Quay
+    image with operator-managed PostgreSQL, and runs the pull-request
+    Playwright runner. Quay diagnostics, the standard IPI gather, and S3 and
+    cluster cleanup run unconditionally.
