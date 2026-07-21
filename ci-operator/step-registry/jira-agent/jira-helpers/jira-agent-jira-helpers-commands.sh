@@ -47,6 +47,12 @@ load_jira_credentials() {
 # Sets: SLACK_WEBHOOK_URL (exported)
 load_slack_credentials() {
   local webhook_key="${JIRA_AGENT_SLACK_WEBHOOK_KEY:-slack-webhook-url}"
+  if [[ ! "$webhook_key" =~ ^[A-Za-z0-9._-]+$ ||
+        "$webhook_key" == "." || "$webhook_key" == ".." ]]; then
+    echo "Error: invalid Slack webhook credential key: ${webhook_key}"
+    export SLACK_WEBHOOK_URL=""
+    return 0
+  fi
   local webhook_file="${JIRA_CREDS_DIR}/${webhook_key}"
   [[ $- == *x* ]] && local _was_tracing=true || local _was_tracing=false
   set +x
