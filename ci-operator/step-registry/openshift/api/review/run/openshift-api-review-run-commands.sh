@@ -108,7 +108,19 @@ if [ ! -s /tmp/api-review-output.txt ]; then
   exit 1
 fi
 
-if grep -q '^RESULT:PASS$' /tmp/api-review-output.txt; then
+echo "Classifying review result (model: ${INLINE_MODEL})..."
+CLASSIFICATION=$(claude --print -p "Read the following API review output. Reply with exactly one word: PASS or FAIL. PASS means the review found no issues requiring changes. FAIL means the review found issues that need to be addressed. If uncertain, reply FAIL.
+
+$(cat /tmp/api-review-output.txt)" \
+  --dangerously-skip-permissions \
+  --model "${INLINE_MODEL}" \
+  --max-turns 1 \
+  --allowedTools "" \
+  < /dev/null 2>/tmp/classify-stderr.txt | tr -d '[:space:]')
+
+echo "Classification: ${CLASSIFICATION}"
+
+if [ "$CLASSIFICATION" = "PASS" ]; then
   REVIEW_PASSED=true
   echo "Review result: PASS"
 else
