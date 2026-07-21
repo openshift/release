@@ -312,3 +312,17 @@ echo "=== Kuadrant operator install diagnostic dump ==="
 echo "=== Kuadrant operator install complete ==="
 oc get csv -n "${KUADRANT_NAMESPACE}"
 oc get kuadrant -n "${KUADRANT_NAMESPACE}"
+
+# Restart CoreDNS so it can discover DNSRecord CRDs now that the DNS operator installed them
+COREDNS_NS="kuadrant-coredns"
+if [[ -f "${SHARED_DIR}/kuadrant-coredns-namespace" ]]; then
+  COREDNS_NS="$(cat "${SHARED_DIR}/kuadrant-coredns-namespace")"
+fi
+if oc get deployment kuadrant-coredns -n "${COREDNS_NS}" >/dev/null 2>&1; then
+  echo "=== Restarting CoreDNS (${COREDNS_NS}) to discover DNSRecord CRDs ==="
+  oc rollout restart deployment/kuadrant-coredns -n "${COREDNS_NS}"
+  oc rollout status deployment/kuadrant-coredns -n "${COREDNS_NS}" --timeout=120s
+  echo "CoreDNS restarted - plugin can now see DNSRecord CRDs"
+else
+  echo "CoreDNS deployment not found in ${COREDNS_NS}, skipping restart"
+fi
