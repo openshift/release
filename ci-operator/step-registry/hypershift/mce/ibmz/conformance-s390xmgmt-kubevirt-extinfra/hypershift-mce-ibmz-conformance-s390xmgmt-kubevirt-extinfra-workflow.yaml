@@ -12,12 +12,18 @@ workflow:
     - resource_type: libvirt-s390x-quota-slice
       env: LEASED_RESOURCE_INFRA    # infra cluster host
     pre:
-    # ── Management cluster (CLUSTER_ROLE=mgmt, uses $LEASED_RESOURCE) ────
+    # ── Management cluster (SNO: 1 control, 0 compute) ───────────────────
     - ref: upi-libvirt-cleanup-pre
     - chain: upi-conf-libvirt
+      env:
+        CONTROL_COUNT: "1"
+        COMPUTE_COUNT: "0"
     - ref: ipi-debug-missing-static-pod-controller-degraded
     - ref: ipi-conf-etcd-on-ramfs
     - chain: upi-install-libvirt
+      env:
+        CONTROL_COUNT: "1"
+        COMPUTE_COUNT: "0"
 
     # ── Infra cluster (CLUSTER_ROLE=infra, uses $LEASED_RESOURCE_INFRA) ──
     - ref: upi-libvirt-infra-cleanup-pre
