@@ -118,6 +118,10 @@ EOF
 $WAS_TRACING && set -x
 echo "Generated dynaconf settings (credentials redacted in logs)."
 
+# Log config for debugging (mask only passwords)
+echo "=== Testsuite Configuration (for debugging backend deployment) ==="
+cat "${SECRETS_FILE}" | sed -e "s/${KEYCLOAK_ADMIN_PASSWORD}/REDACTED/g" | tee "${ARTIFACT_DIR}/testsuite-config.yaml"
+
 # ---------------------------------------------------------------------------
 # 2. getaddrinfo plugin → mounted into the Job as a ConfigMap
 #    Redirects only *.COREDNS_ZONE lookups to CoreDNS ClusterIP:53.
