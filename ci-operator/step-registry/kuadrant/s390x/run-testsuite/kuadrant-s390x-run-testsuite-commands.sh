@@ -108,7 +108,6 @@ ${DNS_BLOCK}
     collector_url: "${JAEGER_COLLECTOR_URL}"
     query_url: "${JAEGER_QUERY_URL}"
   mockserver:
-    url: "${MOCKSERVER_URL}"
     image: "${MOCKSERVER_IMAGE}"
   llm_sim:
     image: "${LLM_SIM_IMAGE}"
