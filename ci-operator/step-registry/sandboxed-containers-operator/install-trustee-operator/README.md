@@ -41,7 +41,10 @@ The image must provide:
 ## Building the Helm Chart Image
 
 Create a `Containerfile` (or `Dockerfile`) with the content below.
-Build arguments let you pin the helm version and chart ref at build time.
+Build arguments let you pin the helm version, charts repository, and branch
+at build time. You can use the upstream
+[confidential-devhub/charts](https://github.com/confidential-devhub/charts)
+repo or your own fork.
 
 ```dockerfile
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -54,41 +57,50 @@ RUN curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" | \
     tar xz -C /usr/local/bin --strip-components=1 linux-amd64/helm && \
     helm version
 
-ARG CHARTS_TAG=main
-RUN git clone --depth 1 --branch "${CHARTS_TAG}" \
-      https://github.com/confidential-devhub/charts /tmp/charts-repo && \
+ARG CHARTS_REPO=https://github.com/confidential-devhub/charts
+ARG CHARTS_BRANCH=main
+RUN git clone --depth 1 --branch "${CHARTS_BRANCH}" \
+      "${CHARTS_REPO}" /tmp/charts-repo && \
     cp -a /tmp/charts-repo/charts /charts && \
     rm -rf /tmp/charts-repo
 
 RUN ls /charts/trustee-operator /charts/trustee-operands
 ```
 
-Build and push to the registry and tag of your choice:
+| Build Arg | Default | Description |
+|-----------|---------|-------------|
+| `HELM_VERSION` | `v3.17.3` | Helm binary version to install. |
+| `CHARTS_REPO` | `https://github.com/confidential-devhub/charts` | Git URL of the charts repository. Use a fork URL to test chart changes before merging upstream. |
+| `CHARTS_BRANCH` | `main` | Branch, tag, or commit to check out from `CHARTS_REPO`. |
+
+Build and push to the Quay registry and tag of your choice:
 
 ```bash
-# Defaults (helm v3.17.3, charts from main)
-podman build -t quay.io/$ORG/trustee-helm-charts:latest .
+# Set these to your own values
+#HELM_VERSION=v3.16.4
+#CHARTS_REPO=https://github.com/confidential-devhub/charts`
+#CHARTS_BRANCH=main
+USER=tbuskey
+REGISTRY=quay.io/$USER         # your registry and namespace
+IMAGE_NAME=trustee-helm-charts # image name
+IMAGE_TAG=latest               # image tag
 
-CHARTS_TAGS=main
-IMAGE_VERSION=v1.13
-ORG=tbuskey
+# Build from upstream charts (defaults)
+podman build -t ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
 
-# Pin a specific chart ref
+
+# Build from a fork and branch and override default helm repo
 podman build \
-  --build-arg CHARTS_TAG=$CHARTS_TAG \
-  -t quay.io/$ORG/trustee-helm-charts:$IMAGE_VERSION .
+  --build-arg HELM_VERSION=$HELM_VERSION \
+  --build-arg CHARTS_REPO=$CHARTS_REPO
+  --build-arg CHARTS_BRANCH=$CHARTS_BRANCH \
+  -t ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} .
 
-# Override helm version too
-podman build \
-  --build-arg HELM_VERSION=v3.16.4 \
-  --build-arg CHARTS_TAG=$CHARTS_TAG \
-  -t quay.io/$ORG/trustee-helm-charts:$IMAGE_VERSION .
-
-podman push quay.io/$ORG/trustee-helm-charts:$IMAGE_VERSION
+# Push the image
+podman push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+HELM_CHART_IMAGE=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+echo $HELM_CHART_IMAGE
 ```
-
-Replace `$ORG` with your Quay.io organization or any other registry you
-control.
 
 ## Environment Variables
 
@@ -111,7 +123,11 @@ control.
 5. Waits for operand deployments to become available.
 6. Discovers the KBS service URL (route, LoadBalancer, or ClusterIP).
 7. Creates INITDATA (aa.toml, cdh.toml, policy.rego) with TLS certificate
-   and image security policy.
+   and image security policy. The `image_security_policy` defaults to
+   rejecting all images except `ghcr.io/confidential-containers/test-container-image-rs`,
+   which is allowed via `sigstoreSigned` verification (with `matchRepository`
+   identity) or `insecureAcceptAnything` as a fallback. KBS URLs in
+   `aa.toml` and `cdh.toml` use `https` for TLS-secured communication.
 8. Updates the `osc-config` ConfigMap in the `default` namespace.
 9. Verifies KBS connectivity with a kbs-client test pod (RCA protocol).
 10. Saves KBS attestation logs to `${ARTIFACT_DIR}/kbs-attestation-logs.txt`.
@@ -122,7 +138,7 @@ Written to `${SHARED_DIR}` for use by subsequent steps:
 
 | File | Content |
 |------|---------|
-| `TRUSTEE_URL` | KBS service URL (e.g. `http://kbs-service-trustee-operator-system.apps.example.com`) |
+| `TRUSTEE_URL` | KBS service URL (e.g. `https://kbs-service-trustee-operator-system.apps.example.com`) |
 | `TRUSTEE_HOST` | KBS hostname |
 | `TRUSTEE_PORT` | KBS port |
 | `INITDATA` | Base64-encoded gzipped `initdata.toml` |

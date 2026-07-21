@@ -599,8 +599,8 @@ function get_trustee_url() {
   if oc get route -n "${TRUSTEE_NAMESPACE}" &>/dev/null; then
     trustee_host=$(oc get route "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
     if [[ -n "${trustee_host}" ]]; then
-      trustee_url="http://${trustee_host}"
-      echo ">>> Trustee URL: ${trustee_url} (HTTP for test environment)"
+      trustee_url="https://${trustee_host}"
+      echo ">>> Trustee URL: ${trustee_url"
     fi
   fi
 
@@ -609,7 +609,7 @@ function get_trustee_url() {
     trustee_ip=$(oc get svc "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
     [[ -z "${trustee_ip}" ]] && trustee_ip=$(oc get svc "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
     if [[ -n "${trustee_ip}" ]]; then
-      trustee_url="http://${trustee_ip}:${trustee_port}"
+      trustee_url="https://${trustee_ip}:${trustee_port}"
       trustee_host="${trustee_ip}"
     fi
   fi
@@ -619,7 +619,7 @@ function get_trustee_url() {
     trustee_ip=$(oc get svc "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
     if [[ -n "${trustee_ip}" ]]; then
       echo ">>> WARN: Trustee using ClusterIP only (not externally accessible)"
-      trustee_url="http://${trustee_ip}:${trustee_port}"
+      trustee_url="https://${trustee_ip}:${trustee_port}"
       trustee_host="${trustee_ip}"
     else
       echo ">>> ERROR: Cannot find Trustee KBS service in namespace ${TRUSTEE_NAMESPACE}"
@@ -657,7 +657,13 @@ function create_initdata() {
       "ghcr.io/confidential-containers/test-container-image-rs": [
         {
           "type": "sigstoreSigned",
-          "keyPath": "kbs:///default/cosign-keys/key-0"
+          "keyPath": "kbs:///default/cosign-keys/key-0",
+          "signedIdentity": {
+            "type": "matchRepository"
+          }
+        },
+        {
+          "type": "insecureAcceptAnything"
         }
       ]
     }
@@ -742,7 +748,7 @@ default UpdateEphemeralMountsRequest := true
 default UpdateInterfaceRequest := true
 default UpdateRoutesRequest := true
 default WaitProcessRequest := true
-default ExecProcessRequest := false
+default ExecProcessRequest := true
 default SetPolicyRequest := true
 default WriteStreamRequest := false
 
@@ -975,7 +981,7 @@ function verify_trustee_connectivity() {
       echo ">>> ERROR: Cannot connect to KBS service"
     fi
     if echo "${all_output}" | grep -q "certificate verify failed\|SSL\|TLS"; then
-      echo ">>> ERROR: SSL/TLS error - URL should be HTTP, not HTTPS (current: ${TRUSTEE_URL})"
+      echo ">>> ERROR: SSL/TLS error for: ${TRUSTEE_URL})"
     fi
 
     kbs_test_failed=true
