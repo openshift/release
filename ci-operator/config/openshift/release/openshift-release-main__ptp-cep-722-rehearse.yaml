@@ -1,0 +1,63 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+images:
+  items:
+  - dockerfile_literal: |-
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.0 AS builder
+      ENV GO111MODULE=off
+      ENV CGO_ENABLED=1
+      ENV COMMON_GO_ARGS=-race
+      ENV GOOS=linux
+      ENV GOPATH=/go
+      WORKDIR /go/src/github.com/redhat-cne/cloud-event-proxy
+      RUN git clone --depth 1 --branch ntpThresholds https://github.com/sebsoto/cloud-event-proxy.git .
+      RUN hack/build-go.sh
+
+      FROM registry.ci.openshift.org/ocp/5.0:base-rhel9 AS bin
+      COPY --from=builder /go/src/github.com/redhat-cne/cloud-event-proxy/build/cloud-event-proxy /
+      COPY --from=builder /go/src/github.com/redhat-cne/cloud-event-proxy/plugins/*.so /plugins/
+
+      LABEL io.k8s.display-name="Cloud Event Proxy" \
+            io.k8s.description="This is a component of OpenShift Container Platform and provides a side car to handle cloud events." \
+            io.openshift.tags="openshift" \
+            maintainer="Aneesh Puttur <aputtur@redhat.com>"
+
+      ENTRYPOINT ["./cloud-event-proxy"]
+    to: cloud-event-proxy
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-telco5g-ptp-cep-722
+  capabilities:
+  - intranet
+  cron: 0 0 1 1 *
+  restrict_network_access: false
+  steps:
+    dependencies:
+      CLOUD_EVENT_PROXY_IMAGE: pipeline:cloud-event-proxy
+    env:
+      SKIP_OCP_INSTALL: "true"
+      T5CI_JOB_TYPE: ptp
+      T5CI_SIDECAR_FROM_CI: "true"
+      T5CI_VERSION: "5.0"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: telco5g-ptp
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: ptp-cep-722-rehearse
