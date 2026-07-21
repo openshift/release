@@ -5,14 +5,14 @@ set -o errexit
 set -o pipefail
 
 mkdir -p "${ARTIFACT_DIR}"
-exec > >(tee "${ARTIFACT_DIR}/omr-v3-validation.log") 2>&1
+exec > >(tee "${ARTIFACT_DIR}/omr-v2-validation.log") 2>&1
 
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     # shellcheck disable=SC1091
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-function validate_idms_mappings() {
+validate_idms_mappings() {
     local idms_json="$1"
     local mirror_host="$2"
     local release_image="$3"
@@ -32,7 +32,7 @@ function validate_idms_mappings() {
         if ! jq -e --arg source "${source}" --arg mirror "${mirror_host}/" '
           any(.items[].spec.imageDigestMirrors[]?;
             .source == $source and any(.mirrors[]?; startswith($mirror)))
-        ' "${idms_json}" > /dev/null; then
+        ' "${idms_json}" >/dev/null; then
             echo "IDMS does not map ${source} to ${mirror_host}."
             return 1
         fi
@@ -42,9 +42,12 @@ function validate_idms_mappings() {
 required_files=(
     mirror_registry_url
     oc-mirror-signature-configmap.json
+    omr_host_public_address
+    omr_host_ssh_user
     omr_mirror_completed_at
     omr_mirror_repository
     omr_mirrored_cli_image
+    omr_v2_version
 )
 for name in "${required_files[@]}"; do
     if [[ ! -s "${SHARED_DIR}/${name}" ]]; then
@@ -53,19 +56,11 @@ for name in "${required_files[@]}"; do
     fi
 done
 
-host_address_file="${SHARED_DIR}/bastion_public_address"
-host_user_file="${SHARED_DIR}/bastion_ssh_user"
-if [[ -s "${SHARED_DIR}/omr_host_public_address" ||
-      -s "${SHARED_DIR}/omr_host_ssh_user" ]]; then
-    host_address_file="${SHARED_DIR}/omr_host_public_address"
-    host_user_file="${SHARED_DIR}/omr_host_ssh_user"
+omr_v2_version=$(<"${SHARED_DIR}/omr_v2_version")
+if [[ ! "${omr_v2_version}" =~ ^2\.[0-9]+\.[0-9]+$ ]]; then
+    echo "The installed mirror-registry artifact is not a v2 release: ${omr_v2_version}"
+    exit 1
 fi
-for required_file in "${host_address_file}" "${host_user_file}"; do
-    if [[ ! -s "${required_file}" ]]; then
-        echo "Required OMR host connection file is missing or empty: ${required_file}"
-        exit 1
-    fi
-done
 
 signature_configmap="${SHARED_DIR}/oc-mirror-signature-configmap.json"
 if ! jq -e '
@@ -74,7 +69,7 @@ if ! jq -e '
   and .metadata.name == "mirrored-release-signatures"
   and .metadata.namespace == "openshift-config-managed"
   and (.binaryData | type == "object" and length > 0)
-' "${signature_configmap}" > /dev/null; then
+' "${signature_configmap}" >/dev/null; then
     echo "The generated oc-mirror release signature ConfigMap is invalid."
     exit 1
 fi
@@ -83,7 +78,6 @@ oc apply -f "${signature_configmap}"
 oc wait clusterversion/version --for=condition=Available --timeout=10m
 oc get clusterversion version -o wide
 oc get clusteroperators
-
 degraded=$(oc get clusteroperators -o json | jq -r '
   [.items[] | select(any(.status.conditions[]?; .type == "Degraded" and .status == "True")) | .metadata.name]
   | join(" ")
@@ -92,11 +86,10 @@ if [[ -n "${degraded}" ]]; then
     echo "Degraded ClusterOperators: ${degraded}"
     exit 1
 fi
-
 oc wait nodes --all --for=condition=Ready --timeout=10m
 oc get nodes -o wide
 
-idms_json="${ARTIFACT_DIR}/image-digest-mirror-sets.json"
+idms_json="${ARTIFACT_DIR}/image-digest-mirror-sets-v2.json"
 oc get imagedigestmirrorsets -o json > "${idms_json}"
 mirror_host=$(<"${SHARED_DIR}/mirror_registry_url")
 validate_idms_mappings \
@@ -104,25 +97,28 @@ validate_idms_mappings \
     "${mirror_host}" \
     "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
-if ! whoami &> /dev/null; then
+if ! whoami >/dev/null 2>&1; then
     if [[ -w /etc/passwd ]]; then
         echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
     else
-        echo "/etc/passwd is not writable and the current uid has no passwd entry."
+        echo "/etc/passwd is not writable and the current UID has no passwd entry."
         exit 1
     fi
 fi
 
-host_address=$(<"${host_address_file}")
-host_user=$(<"${host_user_file}")
+host_address=$(<"${SHARED_DIR}/omr_host_public_address")
+host_user=$(<"${SHARED_DIR}/omr_host_ssh_user")
 ssh_options=(
     -o UserKnownHostsFile=/dev/null
     -o StrictHostKeyChecking=no
     -o "IdentityFile=${CLUSTER_PROFILE_DIR}/ssh-privatekey"
 )
+remote="${host_user}@${host_address}"
+ssh "${ssh_options[@]}" "${remote}" \
+    'export XDG_RUNTIME_DIR="/run/user/$(id -u)"; systemctl --user is-active --quiet quay-app.service quay-redis.service quay-pod.service'
 
-smoke_namespace=quay-omr-v3-smoke
-smoke_pod=omr-v3-mirrored-cli-smoke
+smoke_namespace=quay-omr-v2-smoke
+smoke_pod=omr-v2-mirrored-cli-smoke
 smoke_image=$(<"${SHARED_DIR}/omr_mirrored_cli_image")
 oc create namespace "${smoke_namespace}" \
     --dry-run=client -o yaml | oc apply -f -
@@ -130,32 +126,25 @@ trap 'oc delete namespace "${smoke_namespace}" --ignore-not-found --wait=false >
 oc -n "${smoke_namespace}" delete pod "${smoke_pod}" --ignore-not-found --wait=true
 oc -n "${smoke_namespace}" run "${smoke_pod}" --image="${smoke_image}" \
     --image-pull-policy=Always --restart=Never --command -- oc version --client=true
-if ! oc -n "${smoke_namespace}" wait pod/"${smoke_pod}" --for=jsonpath='{.status.phase}'=Succeeded --timeout=5m; then
+if ! oc -n "${smoke_namespace}" wait pod/"${smoke_pod}" \
+    --for=jsonpath='{.status.phase}'=Succeeded --timeout=5m; then
     oc -n "${smoke_namespace}" describe pod "${smoke_pod}"
     oc -n "${smoke_namespace}" logs "${smoke_pod}" || true
     exit 1
 fi
 oc -n "${smoke_namespace}" get pod "${smoke_pod}" -o wide
-oc -n "${smoke_namespace}" logs "${smoke_pod}" | tee "${ARTIFACT_DIR}/mirrored-cli-smoke.log"
+oc -n "${smoke_namespace}" logs "${smoke_pod}" | tee "${ARTIFACT_DIR}/mirrored-cli-smoke-v2.log"
 
-# Run the smoke pull before reading the journal so a newly migrated v3 service
-# always has a post-migration registry request to validate.
 mirror_completed_at=$(<"${SHARED_DIR}/omr_mirror_completed_at")
 mirror_repository=$(<"${SHARED_DIR}/omr_mirror_repository")
 repository_path="${mirror_repository#*/}"
-journal_file="${ARTIFACT_DIR}/quay-journal-after-mirror.log"
-if [[ "${host_user_file}" == "${SHARED_DIR}/omr_host_ssh_user" ]]; then
-    ssh "${ssh_options[@]}" "${host_user}@${host_address}" \
-        "export XDG_RUNTIME_DIR=/run/user/\$(id -u); journalctl --user -u quay.service --since '${mirror_completed_at}' --no-pager --output=short-iso" \
-        > "${journal_file}"
-else
-    ssh "${ssh_options[@]}" "${host_user}@${host_address}" \
-        "sudo journalctl -u quay.service --since '${mirror_completed_at}' --no-pager --output=short-iso" \
-        > "${journal_file}"
-fi
+journal_file="${ARTIFACT_DIR}/quay-v2-journal-after-mirror.log"
+ssh "${ssh_options[@]}" "${remote}" \
+    "export XDG_RUNTIME_DIR=/run/user/\$(id -u); journalctl --user -u quay-app.service --since '${mirror_completed_at}' --no-pager --output=short-iso" \
+    > "${journal_file}"
 if ! grep -F "/v2/${repository_path}/" "${journal_file}" >/dev/null; then
-    echo "No OMR request for /v2/${repository_path}/ was recorded after mirror completion."
+    echo "No OMR v2 request for /v2/${repository_path}/ was recorded after mirror completion."
     exit 1
 fi
 
-echo "OMR v3 disconnected validation passed."
+echo "OMR v${omr_v2_version} disconnected installation validation passed."
