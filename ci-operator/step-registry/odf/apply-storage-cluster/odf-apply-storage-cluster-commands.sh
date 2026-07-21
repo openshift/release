@@ -9,8 +9,11 @@ DumpStorageCluster() {
 }
 trap DumpStorageCluster ERR INT TERM
 
-# Wait for StorageCluster CRD to be registered before applying the manifest.
-oc wait crd storageclusters.ocs.openshift.io --for=condition=Established --timeout=5m 1>/dev/null
+# Wait for StorageCluster CRD to appear before applying the manifest (ocs-operator installs it after odf-operator),
+# then for Established. --for=condition=Established alone fails immediately with
+# NotFound if the CRD does not exist yet.
+oc wait --for=create crd/storageclusters.ocs.openshift.io --timeout=5m 1>/dev/null
+oc wait crd/storageclusters.ocs.openshift.io --for=condition=Established --timeout=5m 1>/dev/null
 
 # Deploy StorageCluster (idempotent via oc apply).
 {
