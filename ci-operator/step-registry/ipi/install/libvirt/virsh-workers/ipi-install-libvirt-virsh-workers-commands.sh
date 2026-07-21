@@ -26,12 +26,21 @@ fi
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
+# mikefarah/yq v4: "yq-v4" uses legacy CLI ("yq-v4 -o=y ..."). Images that only ship "yq"
+# require the v4 syntax: "yq eval -o=y ..." (plain "yq -o=y" treats the expression as a subcommand).
+# ocp/4.15:libvirt-installer has yq-v4 but not jq — never fall back to bare "yq eval" when yq-v4 exists.
+if ! command -v yq-v4 >/dev/null 2>&1 && ! command -v yq >/dev/null 2>&1 && ! command -v jq >/dev/null 2>&1; then
+  echo "Neither yq-v4, yq, nor jq found in PATH"
+  exit 1
+fi
+
 leaseLookup() {
   local lookup
+  local leases="${CLUSTER_PROFILE_DIR}/leases"
   if command -v yq-v4 >/dev/null 2>&1; then
-    lookup=$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".${1}" "${CLUSTER_PROFILE_DIR}/leases")
+    lookup=$(yq-v4 -oy ".[\"${LEASED_RESOURCE}\"].${1}" "${leases}")
   else
-    lookup=$(yq eval -o=y ".\"${LEASED_RESOURCE}\".${1}" "${CLUSTER_PROFILE_DIR}/leases")
+    lookup=$(yq eval -o=y ".[\"${LEASED_RESOURCE}\"].${1}" "${leases}")
   fi
   if [[ -z "${lookup}" || "${lookup}" == "null" ]]; then
     echo "Couldn't find ${1} in lease config"
@@ -50,10 +59,12 @@ VIRT_INSTALL_OSINFO="${VIRT_INSTALL_OSINFO:-rhel9-unknown}"
 
 if command -v jq >/dev/null 2>&1; then
   INFRA_ID=$(jq -r '.infraID // empty' "${SHARED_DIR}/metadata.json")
+elif command -v yq-v4 >/dev/null 2>&1; then
+  INFRA_ID=$(yq-v4 -oy '.infraID // ""' "${SHARED_DIR}/metadata.json")
 else
-  INFRA_ID=$(yq eval -r '.infraID // ""' "${SHARED_DIR}/metadata.json")
+  INFRA_ID=$(yq eval -o=y '.infraID // ""' "${SHARED_DIR}/metadata.json")
 fi
-if [[ -z "${INFRA_ID}" ]]; then
+if [[ -z "${INFRA_ID}" || "${INFRA_ID}" == "null" ]]; then
   echo "Could not determine infraID from metadata.json"
   exit 1
 fi
