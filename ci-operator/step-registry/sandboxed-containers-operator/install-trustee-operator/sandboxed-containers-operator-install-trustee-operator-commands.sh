@@ -981,7 +981,7 @@ function verify_trustee_connectivity() {
       echo ">>> ERROR: Cannot connect to KBS service"
     fi
     if echo "${all_output}" | grep -q "certificate verify failed\|SSL\|TLS"; then
-      echo ">>> ERROR: SSL/TLS error for: ${TRUSTEE_URL})"
+      echo ">>> ERROR: SSL/TLS error for: ${TRUSTEE_URL}"
     fi
 
     kbs_test_failed=true
