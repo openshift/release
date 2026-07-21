@@ -174,10 +174,11 @@ export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 for service in quay-app.service quay-redis.service quay-pod.service; do
     systemctl --user is-active --quiet "${service}"
 done
+echo "Checking OMR v2 health at https://${registry_hostname}:8443/health/instance."
 curl --retry 20 --retry-delay 3 --retry-all-errors \
     --silent --show-error --fail \
     --cacert "${quay_root}/quay-rootCA/rootCA.pem" \
-    "https://${registry_hostname}:8443/healthz" >/dev/null
+    "https://${registry_hostname}:8443/health/instance" >/dev/null
 rm -f -- "${archive}"
 EOF
 chmod 0755 "${work_dir}/install-omr-v2"
