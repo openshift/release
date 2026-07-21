@@ -39,6 +39,11 @@ images:
     - arm64
     dockerfile_path: Dockerfile.e2e
     to: hypershift-tests
+  - dockerfile_literal: |
+      FROM base
+      RUN dnf install -y python3-pip
+    from: src
+    to: custom-verify-src
   - additional_architectures:
     - arm64
     dockerfile_literal: |
@@ -49,6 +54,7 @@ images:
 promotion:
   to:
   - excluded_images:
+    - custom-verify-src
     - hypershift-cli
     - hypershift-operator
     - hypershift-tests
@@ -115,7 +121,34 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  unit:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 4000m
+      memory: 8Gi
+  verify:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 4000m
+      memory: 8Gi
 tests:
+- always_run: false
+  as: verify
+  commands: make verify-ci
+  container:
+    from: custom-verify-src
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
+  timeout: 1h0m0s
+- always_run: false
+  as: unit
+  commands: make test
+  container:
+    from: src
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)
 - always_run: false
   as: agentic-qe-aws
   optional: true
