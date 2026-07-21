@@ -22,21 +22,21 @@ E2E_TEST_BIN="/usr/local/bin/e2e.test"
 TESTDATA="/e2e/testdata"
 if [ -n "$E2E_REF" ]; then
   log "=== Building E2E from ref: ${E2E_REF} ==="
+  SRC_DIR="$(mktemp -d)"
   git clone --branch "$E2E_REF" --depth 1 \
-    https://github.com/openshift-hyperfleet/hyperfleet-e2e.git /tmp/e2e-src
-  cd /tmp/e2e-src
+    https://github.com/openshift-hyperfleet/hyperfleet-e2e.git "${SRC_DIR}"
+  cd "${SRC_DIR}"
   make build
   # Build ginkgo CLI and test binary for parallel execution
-  cd .bingo && GOWORK=off go build -mod=mod -modfile=ginkgo.mod \
-    -o /tmp/e2e-src/bin/ginkgo "github.com/onsi/ginkgo/v2/ginkgo"
-  cd ..
-  CGO_ENABLED=0 go test -c -o /tmp/e2e-src/bin/e2e.test ./e2e
-  GINKGO_BIN="/tmp/e2e-src/bin/ginkgo"
-  E2E_TEST_BIN="/tmp/e2e-src/bin/e2e.test"
-  TESTDATA="/tmp/e2e-src/testdata"
+  (cd .bingo && GOWORK=off go build -mod=mod -modfile=ginkgo.mod \
+    -o "${SRC_DIR}/bin/ginkgo" "github.com/onsi/ginkgo/v2/ginkgo")
+  CGO_ENABLED=0 go test -c -o "${SRC_DIR}/bin/e2e.test" ./e2e
+  GINKGO_BIN="${SRC_DIR}/bin/ginkgo"
+  E2E_TEST_BIN="${SRC_DIR}/bin/e2e.test"
+  TESTDATA="${SRC_DIR}/testdata"
   rm -rf /tmp/e2e/env /tmp/e2e/configs
-  cp -r /tmp/e2e-src/env /tmp/e2e/env
-  cp -r /tmp/e2e-src/configs /tmp/e2e/configs
+  cp -r "${SRC_DIR}/env" /tmp/e2e/env
+  cp -r "${SRC_DIR}/configs" /tmp/e2e/configs
   cd -
   log "=== E2E build complete ==="
 fi
@@ -88,6 +88,7 @@ export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_CREDENTIALS_PATH}/hcm-hy
 # Run e2e tests via ginkgo CLI with parallel execution
 "${GINKGO_BIN}" \
   --procs="${PROCS:-4}" \
+  --timeout="${SUITE_TIMEOUT:-2h}" \
   --label-filter="${LABEL_FILTER}" \
   --flake-attempts="${FLAKE_ATTEMPTS:-2}" \
   --junit-report=junit.xml \
