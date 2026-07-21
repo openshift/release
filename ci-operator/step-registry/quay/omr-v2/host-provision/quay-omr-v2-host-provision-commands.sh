@@ -196,7 +196,9 @@ Resources:
           chmod 0600 /home/ec2-user/.ssh/authorized_keys
           restorecon -RF /home/ec2-user/.ssh || true
           dnf install -y curl gzip openssl podman slirp4netns tar
-          install -d -m 0700 -o ec2-user -g ec2-user /home/ec2-user/.config/containers
+          install -d -m 0700 -o ec2-user -g ec2-user \
+            /home/ec2-user/.config \
+            /home/ec2-user/.config/containers
           printf '[network]\ndefault_rootless_network_cmd = "slirp4netns"\n' > /home/ec2-user/.config/containers/containers.conf
           chown ec2-user:ec2-user /home/ec2-user/.config/containers/containers.conf
 Outputs:
