@@ -300,36 +300,6 @@ process_change_point
 
 cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 
-# Experimental: run orion with original e-divisive binary (safe block, never breaks main execution)
-(
-    EXP_DIR="/tmp/orion-original-edivisive"
-    rm -rf "$EXP_DIR"
-    mkdir -p "$EXP_DIR"
-    pushd "$EXP_DIR"
-    python -m virtualenv ./venv_exp
-    source ./venv_exp/bin/activate
-
-    cp -a /tmp/orion ./orion
-    pushd orion
-    git fetch origin orig-edivisive-exp
-    git checkout FETCH_HEAD
-
-    pip install -q --retries "$MAX_RETRIES" -r requirements.txt
-    pip install -q --retries "$MAX_RETRIES" .
-
-    echo "Running experimental orion (original e-divisive)..."
-    # Strip JIRA flags for experimental run
-    EXTRA_FLAGS_NO_JIRA="${EXTRA_FLAGS//" --jira-ack --jira-auto-create"/}"
-    orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS_NO_JIRA} --viz | tee orion-exp-output.txt || true
-
-    # Copy all results except .xml files into the experimental artifacts subdirectory
-    mkdir -p "$ARTIFACT_DIR/orion-original-edivisive"
-    cp *.csv *.json *.txt *.html "$ARTIFACT_DIR/orion-original-edivisive/" 2>/dev/null || true
-    deactivate
-    popd
-    popd
-    echo "Experimental orion run complete."
-) || echo "Experimental orion block failed, continuing."
 
 if [ $orion_exit_status -eq 3 ]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."
