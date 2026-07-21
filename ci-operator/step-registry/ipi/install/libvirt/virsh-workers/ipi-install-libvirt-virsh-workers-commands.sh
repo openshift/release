@@ -7,6 +7,9 @@ set -o pipefail
 # After IPI terraform brings up masters (WORKER_REPLICAS=0), create workers the UPI way
 # (virt-install + ignition disk) so s390x avoids machine-api/libvirt ACPI domain XML.
 
+# libvirt-installer image sets PATH=/bin; oc/virsh helpers live under /usr/bin.
+export PATH="/usr/bin:/bin:${PATH:-}"
+
 if [[ -z "${LEASED_RESOURCE:-}" ]]; then
   echo "Failed to acquire lease"
   exit 1
@@ -25,6 +28,11 @@ if [[ ! -f "${SHARED_DIR}/metadata.json" ]]; then
 fi
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+if ! command -v oc >/dev/null 2>&1; then
+  echo "ERROR: oc not found in PATH=${PATH}"
+  exit 1
+fi
 
 # mikefarah/yq v4: "yq-v4" uses legacy CLI ("yq-v4 -o=y ..."). Images that only ship "yq"
 # require the v4 syntax: "yq eval -o=y ..." (plain "yq -o=y" treats the expression as a subcommand).
@@ -50,7 +58,8 @@ leaseLookup() {
 }
 
 HOSTNAME="$(leaseLookup 'hostname')"
-POOL_NAME="${POOL_NAME:-multiarch-ci-pool}"
+# Prefer workflow LIBVIRT_POOL_NAME (same pool as IPI install) over step POOL_NAME default.
+POOL_NAME="${LIBVIRT_POOL_NAME:-${POOL_NAME:-multiarch-ci-pool}}"
 COMPUTE_COUNT="${COMPUTE_COUNT:-2}"
 # IPI jobs already set WORKER_MEMORY; prefer that over DOMAIN_MEMORY default.
 DOMAIN_MEMORY="${WORKER_MEMORY:-${DOMAIN_MEMORY:-16384}}"
@@ -100,17 +109,29 @@ fi
 WORKDIR=$(mktemp -d)
 trap 'rm -rf "${WORKDIR}"' EXIT
 
-# Prefer live worker userdata from the cluster (matches current cluster CA/join data).
-echo "Extracting worker ignition from cluster..."
+# Prefer ignition saved by the install step; otherwise pull live worker userdata from the cluster.
+echo "Extracting worker ignition..."
 WORKER_IGN="${WORKDIR}/worker.ign"
-set +e
-oc -n openshift-machine-api get secret worker-user-data -o jsonpath='{.data.userData}' 2>/dev/null | base64 -d > "${WORKER_IGN}"
-if [[ ! -s "${WORKER_IGN}" ]]; then
-  oc -n openshift-machine-api get secret worker-user-data-managed -o jsonpath='{.data.userData}' 2>/dev/null | base64 -d > "${WORKER_IGN}"
+if [[ -s "${SHARED_DIR}/worker.ign" ]]; then
+  echo "Using ${SHARED_DIR}/worker.ign from install step"
+  cp "${SHARED_DIR}/worker.ign" "${WORKER_IGN}"
+else
+  set +e
+  for secret in worker-user-data worker-user-data-managed; do
+    echo "Trying secret/${secret} in openshift-machine-api..."
+    if oc -n openshift-machine-api extract "secret/${secret}" --keys=userData --to=- > "${WORKER_IGN}" 2>"${WORKDIR}/extract.err"; then
+      if [[ -s "${WORKER_IGN}" ]]; then
+        echo "Extracted worker ignition from secret/${secret}"
+        break
+      fi
+    fi
+    cat "${WORKDIR}/extract.err" >&2 || true
+  done
+  set -e
 fi
-set -e
 if [[ ! -s "${WORKER_IGN}" ]]; then
-  echo "ERROR: could not extract worker ignition from worker-user-data(-managed)"
+  echo "ERROR: could not extract worker ignition (SHARED_DIR/worker.ign or worker-user-data(-managed))"
+  oc -n openshift-machine-api get secrets 2>&1 | head -50 || true
   exit 1
 fi
 
@@ -195,7 +216,7 @@ APPROVE_PID=$!
 
 deadline=$((SECONDS + 45 * 60))
 while true; do
-  ready=$(oc get nodes --no-headers 2>/dev/null | awk '$3 !~ /master/ && $2 ~ /Ready/ {c++} END{print c+0}')
+  ready=$(oc get nodes --no-headers 2>/dev/null | awk '$3 !~ /master/ && $2 == "Ready" {c++} END{print c+0}')
   echo "Ready worker nodes: ${ready}/${COMPUTE_COUNT}"
   if [[ "${ready}" -ge "${COMPUTE_COUNT}" ]]; then
     break

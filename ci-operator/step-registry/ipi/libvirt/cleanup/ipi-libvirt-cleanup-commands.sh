@@ -76,7 +76,7 @@ done
 SHARED_POOL="${LIBVIRT_POOL_NAME:-multiarch-ci-pool}"
 if mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" pool-list --all --name | grep -qx "${SHARED_POOL}"; then
   echo "Removing stale volumes for ${LEASED_RESOURCE} from pool ${SHARED_POOL}..."
-  for VOLUME in $(mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" vol-list --pool "${SHARED_POOL}" 2>/dev/null | awk '{print $1}' | grep "${LEASED_RESOURCE}" || true)
+  for VOLUME in $(mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" vol-list --pool "${SHARED_POOL}" 2>/dev/null | awk '{print $1}' | grep -E "^${LEASED_RESOURCE}-" || true)
   do
     mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" vol-delete --pool "${SHARED_POOL}" "${VOLUME}" || true
   done

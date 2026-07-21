@@ -17,13 +17,16 @@ function populate_artifact_dir() {
 }
 
 function prepare_next_steps() {
+  # Capture the exit code that triggered this EXIT/TERM trap before any other
+  # command overwrites $? (e.g. killing the ACPI terraform wrapper).
+  local install_exit_code=$?
   if [[ -n "${IPI_ACPI_PATCHER_PID:-}" ]]; then
     kill "${IPI_ACPI_PATCHER_PID}" 2>/dev/null || true
     wait "${IPI_ACPI_PATCHER_PID}" 2>/dev/null || true
     unset IPI_ACPI_PATCHER_PID
   fi
   #Save exit code for must-gather to generate junit
-  echo "$?" > "${SHARED_DIR}/install-status.txt"
+  echo "${install_exit_code}" > "${SHARED_DIR}/install-status.txt"
   set +e
   echo "Setup phase finished, prepare env for next steps"
   populate_artifact_dir
@@ -374,7 +377,7 @@ function collect_control_plane_logs() {
 		return 0
 	fi
 	if [[ -f "${DIR}/metadata.json" ]]; then
-		cluster_name=$(sed -n -r -e 's/.*"clusterName"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${DIR}/metadata.json" | head -n1)
+		cluster_name=$(sed -n -r -e 's/.*"clusterName"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "${DIR}/metadata.json" | head -n1)
 	fi
 	if [[ -z "${cluster_name:-}" && -f "${SHARED_DIR}/install-config.yaml" ]]; then
 		if command -v yq-v4 >/dev/null 2>&1; then
@@ -774,6 +777,21 @@ if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+  # Persist worker ignition for day-2 virsh workers (WORKER_REPLICAS=0 hybrid path).
+  # libvirt-installer PATH may be /bin-only in the next step; save here while oc works.
+  export PATH="/usr/bin:/bin:${PATH:-}"
+  if env KUBECONFIG="${dir}/auth/kubeconfig" oc -n openshift-machine-api extract secret/worker-user-data --keys=userData --to=- > "${SHARED_DIR}/worker.ign" 2>/dev/null \
+    || env KUBECONFIG="${dir}/auth/kubeconfig" oc -n openshift-machine-api extract secret/worker-user-data-managed --keys=userData --to=- > "${SHARED_DIR}/worker.ign" 2>/dev/null; then
+    if [[ -s "${SHARED_DIR}/worker.ign" ]]; then
+      echo "Saved worker ignition to ${SHARED_DIR}/worker.ign ($(wc -c < "${SHARED_DIR}/worker.ign") bytes)"
+    else
+      echo "WARNING: worker ignition extract produced an empty file"
+      rm -f "${SHARED_DIR}/worker.ign"
+    fi
+  else
+    echo "WARNING: could not extract worker-user-data(-managed) for SHARED_DIR/worker.ign"
+    rm -f "${SHARED_DIR}/worker.ign"
+  fi
 fi
 
 exit "${ret}"
