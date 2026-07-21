@@ -33,10 +33,65 @@ oc wait --timeout=10m --for=condition=Available \
   -n "${operator_namespace}" deployment/quay-operator-tng
 
 echo "Configuring the operator to reconcile the pull-request Quay image"
-oc set env -n "${operator_namespace}" deployment/quay-operator-tng \
-  "RELATED_IMAGE_COMPONENT_QUAY=${QUAY_IMAGE}"
+operator_csv="$(oc -n "${operator_namespace}" get deployment quay-operator-tng \
+  -o jsonpath='{.metadata.ownerReferences[?(@.kind=="ClusterServiceVersion")].name}')"
+if [[ -z "${operator_csv}" ]]; then
+  echo "Could not resolve the ClusterServiceVersion owning quay-operator-tng" >&2
+  exit 1
+fi
+
+csv_image_path="$(oc -n "${operator_namespace}" get csv "${operator_csv}" -o json | jq -r '
+  [
+    (.spec.install.spec.deployments // []) | to_entries[] as $deployment |
+    select($deployment.value.name == "quay-operator-tng") |
+    ($deployment.value.spec.template.spec.containers // []) | to_entries[] as $container |
+    select($container.value.name == "quay-operator") |
+    ($container.value.env // []) | to_entries[] |
+    select(.value.name == "RELATED_IMAGE_COMPONENT_QUAY") |
+    "/spec/install/spec/deployments/\($deployment.key)/spec/template/spec/containers/\($container.key)/env/\(.key)/value"
+  ] | first // ""
+')"
+if [[ -z "${csv_image_path}" ]]; then
+  echo "RELATED_IMAGE_COMPONENT_QUAY was not found in CSV ${operator_csv}" >&2
+  oc -n "${operator_namespace}" get csv "${operator_csv}" -o yaml \
+    >"${ARTIFACT_DIR}/quay-operator-csv.yaml" 2>/dev/null || true
+  exit 1
+fi
+
+csv_image_patch="$(jq -cn \
+  --arg path "${csv_image_path}" \
+  --arg value "${QUAY_IMAGE}" \
+  '[{op:"replace",path:$path,value:$value}]')"
+oc -n "${operator_namespace}" patch csv "${operator_csv}" --type=json \
+  -p "${csv_image_patch}"
+
+operator_image_applied=false
+for attempt in $(seq 1 120); do
+  deployed_quay_image="$(oc -n "${operator_namespace}" get deployment quay-operator-tng \
+    -o json | jq -r '
+      .spec.template.spec.containers[]? |
+      select(.name == "quay-operator") |
+      .env[]? |
+      select(.name == "RELATED_IMAGE_COMPONENT_QUAY") |
+      .value
+    ' 2>/dev/null || true)"
+  if [[ "${deployed_quay_image}" == "${QUAY_IMAGE}" ]]; then
+    operator_image_applied=true
+    echo "OLM reconciled RELATED_IMAGE_COMPONENT_QUAY after $((attempt * 5)) seconds"
+    break
+  fi
+  sleep 5
+done
+if [[ "${operator_image_applied}" != "true" ]]; then
+  echo "OLM did not apply RELATED_IMAGE_COMPONENT_QUAY=${QUAY_IMAGE}" >&2
+  oc -n "${operator_namespace}" get csv "${operator_csv}" -o yaml \
+    >"${ARTIFACT_DIR}/quay-operator-csv.yaml" 2>/dev/null || true
+  exit 1
+fi
 oc rollout status -n "${operator_namespace}" deployment/quay-operator-tng \
   --timeout=10m
+oc -n "${operator_namespace}" get csv "${operator_csv}" -o yaml \
+  >"${ARTIFACT_DIR}/quay-operator-csv.yaml"
 
 oc create namespace "${quay_namespace}" --dry-run=client -o yaml | oc apply -f -
 
