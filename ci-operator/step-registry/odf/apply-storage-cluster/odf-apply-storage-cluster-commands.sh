@@ -1,19 +1,39 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+# DumpStorageCluster — write OLM / StorageCluster diagnostics to ARTIFACT_DIR on failure.
 DumpStorageCluster() {
-    : "--- StorageCluster dump (failure diagnostics) ---"
-    oc get storagecluster ocs-storagecluster -n "${ODF__INSTALL_NAMESPACE}" -o yaml || true
-    oc describe storagecluster ocs-storagecluster -n "${ODF__INSTALL_NAMESPACE}" || true
+    typeset artifactDir="${ARTIFACT_DIR}/debug-info"
+    mkdir -p "${artifactDir}"
+    oc get csv,subscription.operators.coreos.com,installplan \
+        -n "${ODF__INSTALL_NAMESPACE}" -o wide \
+        > "${artifactDir}/olm-resources.txt" 2>&1 || true
+    oc get storagecluster ocs-storagecluster \
+        -n "${ODF__INSTALL_NAMESPACE}" -o yaml \
+        > "${artifactDir}/storagecluster.yaml" 2>&1 || true
+    oc describe storagecluster ocs-storagecluster \
+        -n "${ODF__INSTALL_NAMESPACE}" \
+        > "${artifactDir}/storagecluster-describe.txt" 2>&1 || true
     true
 }
 trap DumpStorageCluster ERR INT TERM
 
-# Wait for StorageCluster CRD to appear before applying the manifest (ocs-operator installs it after odf-operator),
-# then for Established. --for=condition=Established alone fails immediately with
-# NotFound if the CRD does not exist yet.
-oc wait --for=create crd/storageclusters.ocs.openshift.io --timeout=5m 1>/dev/null
-oc wait crd/storageclusters.ocs.openshift.io --for=condition=Established --timeout=5m 1>/dev/null
+# ocs-operator (a dependent of odf-operator) registers the StorageCluster CRD.
+# install-operators only guarantees the odf-operator CSV; wait for the dependent here.
+oc wait --for=create deployment/ocs-operator \
+    -n "${ODF__INSTALL_NAMESPACE}" \
+    --timeout="${ODF__OCS_OPERATOR_WAIT_TIMEOUT}" 1>/dev/null
+oc wait deployment/ocs-operator \
+    -n "${ODF__INSTALL_NAMESPACE}" \
+    --for=condition=Available \
+    --timeout="${ODF__OCS_OPERATOR_WAIT_TIMEOUT}" 1>/dev/null
+
+# --for=condition=Established alone fails immediately with NotFound if the CRD is absent.
+oc wait --for=create crd/storageclusters.ocs.openshift.io \
+    --timeout="${ODF__CRD_WAIT_TIMEOUT}" 1>/dev/null
+oc wait crd/storageclusters.ocs.openshift.io \
+    --for=condition=Established \
+    --timeout="${ODF__CRD_WAIT_TIMEOUT}" 1>/dev/null
 
 # Deploy StorageCluster (idempotent via oc apply).
 {
@@ -53,13 +73,10 @@ spec:
     resources: {}
 ocEOF
 
-# Block until the OCS operator has started reconciling (Progressing=True), which
-# guarantees status conditions are present before we poll for Available.
 oc wait 'storagecluster.ocs.openshift.io/ocs-storagecluster' \
-    -n "${ODF__INSTALL_NAMESPACE}" --for=condition=Progressing --timeout=5m 1>/dev/null
-
-oc wait 'storagecluster.ocs.openshift.io/ocs-storagecluster' \
-    -n "${ODF__INSTALL_NAMESPACE}" --for=condition='Available' --timeout="${ODF__STORAGE_CLUSTER_WAIT_TIMEOUT}" 1>/dev/null
+    -n "${ODF__INSTALL_NAMESPACE}" \
+    --for=condition=Available \
+    --timeout="${ODF__STORAGE_CLUSTER_WAIT_TIMEOUT}" 1>/dev/null
 
 # Remove is-default-class annotation from all storage classes, then promote
 # ocs-storagecluster-ceph-rbd as the default storage class.
