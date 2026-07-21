@@ -473,6 +473,29 @@ tests:
       WINDOWS_OS_ID: Windows_Server-2022-English-Core-Base
     workflow: openshift-e2e-aws-csi-smb-win
 - always_run: false
+  as: tls-scanner-smb
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    dependencies:
+      OO_INDEX: ci-index-smb-csi-driver-operator-bundle
+    env:
+      CLUSTERCSIDRIVER: smb.csi.k8s.io
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+      SCAN_NAMESPACE: openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+      TRUECONDITIONS: SambaDriverControllerServiceControllerAvailable SambaDriverNodeServiceControllerAvailable
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-azure-csi-smb
+- always_run: false
   as: e2e-gcp
   steps:
     cluster_profile: openshift-org-gcp
