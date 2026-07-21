@@ -1,4 +1,12 @@
 base_images:
+  aro-hcp-e2e-tests:
+    name: aro-hcp-e2e-tests
+    namespace: aro-hcp
+    tag: latest
+  aro-hcp-e2e-tools:
+    name: aro-hcp-e2e-tools
+    namespace: aro-hcp
+    tag: latest
   claude-ai-helpers:
     name: claude-ai-helpers
     namespace: ci
@@ -162,6 +170,17 @@ tests:
       NODEPOOL_N3_VERSION: "4.19"
       NODEPOOL_N4_VERSION: "4.18"
     workflow: hypershift-azure-aks-e2e
+- always_run: false
+  as: e2e-aro-hcp
+  optional: true
+  steps:
+    cluster_profile: aro-hcp-dev
+    env:
+      ALLOWED_SUBSCRIPTIONS: Hypershift Managed Azure
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      MULTISTAGE_PARAM_OVERRIDE_LOCATION: westus3
+    workflow: aro-hcp-hypershift-e2e
 - as: e2e-aks-override
   run_if_changed: (/overrides\.yaml$)
   steps:
