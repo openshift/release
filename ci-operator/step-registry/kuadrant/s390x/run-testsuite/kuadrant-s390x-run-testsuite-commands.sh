@@ -271,7 +271,7 @@ PY
 # newer lock entry. Re-pin pyproject+lock in the Job before make so sync stays
 # on 6.32.1.
 PROTOBUF_PIN="${PROTOBUF_PIN:-6.32.1}"
-PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve"
+PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve -vv --tb=short"
 CONTAINER_SCRIPT="set -o pipefail
 cd /opt/workdir/kuadrant-testsuite
 rc=0
