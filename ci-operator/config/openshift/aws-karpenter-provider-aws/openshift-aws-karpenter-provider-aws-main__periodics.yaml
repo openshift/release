@@ -1,8 +1,24 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   rebasebot:
     name: rebasebot
     namespace: ci
     tag: latest
+build_root:
+  from_repository: true
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -45,6 +61,45 @@ tests:
         requests:
           cpu: 400m
           memory: 1Gi
+- as: e2e-aws-karpenter-core-regression
+  cron: 0 6 * * 6
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      HYPERSHIFT_AUTONODE: "true"
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - as: e2e-aws-karpenter-core-regression
+      cli: latest
+      commands: |-
+        export CLUSTER="$(<"${SHARED_DIR}/cluster-name")"
+        export HYPERSHIFT_NAMESPACE="$(<"${SHARED_DIR}/management_cluster_namespace")"
+
+        # Clone karpenter core fork and vendor it
+        dir=$(mktemp -d)
+        git clone https://github.com/openshift/kubernetes-sigs-karpenter.git --depth=1 $dir
+        go -C $dir mod vendor
+
+        # Annotate HCP on management cluster to enable e2e override
+        export KUBECONFIG=${SHARED_DIR}/management_cluster_kubeconfig
+        oc annotate -n ${HYPERSHIFT_NAMESPACE}-${CLUSTER} hcp/${CLUSTER} hypershift.openshift.io/karpenter-core-e2e-override=true
+
+        # Switch to guest cluster
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        oc delete validatingadmissionpolicybindings.admissionregistration.k8s.io karpenter-binding.ec2nodeclass.hypershift.io
+
+        # Clone hypershift to use the upstream-e2e.sh script
+        hs_dir=$(mktemp -d)
+        git clone https://github.com/openshift/hypershift.git --depth=1 $hs_dir
+        cd $hs_dir
+        KARPENTER_CORE_DIR=$dir TEST_SUITE=regression make karpenter-upstream-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    workflow: hypershift-aws-e2e-cluster
 zz_generated_metadata:
   branch: main
   org: openshift
