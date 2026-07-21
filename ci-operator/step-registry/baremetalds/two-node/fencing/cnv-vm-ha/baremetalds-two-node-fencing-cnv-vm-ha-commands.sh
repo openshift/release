@@ -19,16 +19,26 @@ fi
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-run_on_node() {
-  local node="$1"
-  shift
-  oc debug -n default "node/${node}" -- chroot /host bash -c "$*"
-}
-
 mapfile -t NODES < <(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | sort)
 NODE_0="${NODES[0]}"
 NODE_1="${NODES[1]}"
 echo "Cluster nodes: ${NODE_0}, ${NODE_1}"
+
+NODE_0_IP=$(oc get node "${NODE_0}" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+NODE_1_IP=$(oc get node "${NODE_1}" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+echo "Node IPs: ${NODE_0}=${NODE_0_IP}, ${NODE_1}=${NODE_1_IP}"
+
+declare -A NODE_IP
+NODE_IP["${NODE_0}"]="${NODE_0_IP}"
+NODE_IP["${NODE_1}"]="${NODE_1_IP}"
+
+run_on_node() {
+  local node="$1"
+  shift
+  local ip="${NODE_IP[${node}]}"
+  ssh "${SSHOPTS[@]}" "root@${IP}" \
+    "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@${ip} 'sudo bash -c \"$*\"'"
+}
 
 # -------------------------------------------------------------------------
 # Wait for the virtualization StorageClass
@@ -194,6 +204,9 @@ trap recover_fenced_node EXIT
 # -------------------------------------------------------------------------
 echo "--- Fencing ${FENCE_NODE} ---"
 
+echo "Pre-fence pcs status:"
+run_on_node "${SURVIVE_NODE}" "sudo pcs status" || true
+
 echo "Setting STONITH action to off for ${FENCE_NODE}..."
 run_on_node "${SURVIVE_NODE}" \
   "sudo pcs stonith update ${FENCE_NODE}_redfish action=off --force"
@@ -202,6 +215,20 @@ RECOVERY_NEEDED=true
 echo "Fencing ${FENCE_NODE}..."
 run_on_node "${SURVIVE_NODE}" \
   "sudo pcs stonith fence ${FENCE_NODE}"
+
+echo "Waiting for pcs to confirm etcd running on ${SURVIVE_NODE} and stopped on ${FENCE_NODE}..."
+for ((i=1; i <= 30; i++)); do
+  PCS_OUT=$(run_on_node "${SURVIVE_NODE}" "sudo pcs status" 2>/dev/null || true)
+  ETCD_SURVIVE=$(echo "${PCS_OUT}" | grep -c "etcd.*Started.*${SURVIVE_NODE}" || true)
+  ETCD_FENCED=$(echo "${PCS_OUT}" | grep -c "etcd.*Stopped" || true)
+  if [[ "${ETCD_SURVIVE}" -ge 1 && "${ETCD_FENCED}" -ge 1 ]]; then
+    echo "pcs confirms etcd running on ${SURVIVE_NODE} and stopped on ${FENCE_NODE}"
+    echo "${PCS_OUT}"
+    break
+  fi
+  echo "Try ${i}/30: etcd on ${SURVIVE_NODE}=${ETCD_SURVIVE}, stopped=${ETCD_FENCED}, waiting..."
+  sleep 10
+done
 
 echo "Waiting for ${FENCE_NODE} to become NotReady..."
 oc wait "node/${FENCE_NODE}" --for=condition=Ready=False --timeout=5m || \
@@ -217,8 +244,9 @@ run_on_node "${SURVIVE_NODE}" "sudo pcs resource status" || true
 # Verify VM migrated to the surviving node
 # -------------------------------------------------------------------------
 echo "--- Verifying VM migration ---"
-echo "Waiting for VM to be Running on ${SURVIVE_NODE}..."
-for ((i=1; i <= 60; i++)); do
+echo "Waiting up to 120s for VM to be Running on ${SURVIVE_NODE}..."
+VM_MIGRATE_DEADLINE=$((SECONDS + 120))
+while [[ ${SECONDS} -lt ${VM_MIGRATE_DEADLINE} ]]; do
   VMI_STATUS=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.phase}' 2>/dev/null || true)
   VMI_CURRENT_NODE=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.nodeName}' 2>/dev/null || true)
 
@@ -227,7 +255,11 @@ for ((i=1; i <= 60; i++)); do
     break
   fi
 
-  echo "Try ${i}/60: VM status=${VMI_STATUS:-?}, node=${VMI_CURRENT_NODE:-?}"
+  if [[ -z "${VMI_STATUS}" && -z "${VMI_CURRENT_NODE}" ]]; then
+    echo "API not reachable yet (stabilizing after fencing), retrying..."
+  else
+    echo "VM status=${VMI_STATUS:-?}, node=${VMI_CURRENT_NODE:-?}, retrying..."
+  fi
   sleep 10
 done
 
