@@ -421,15 +421,5 @@ echo "--- Step 9: Wait for StorageCluster ---"
 oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster" \
     -n "${ODF_INSTALL_NAMESPACE}" --for=condition='Available' --timeout='30m'
 
-# ---------------------------------------------------------------------------
-# Step 10: Set default StorageClass
-#   CNV DataImportCrons create DataVolumes without a storageClass, so a
-#   default SC must exist or golden image imports fail with
-#   "PVC spec is missing accessMode and no storageClass to choose profile".
-# ---------------------------------------------------------------------------
-echo "--- Step 10: Set default StorageClass ---"
-oc annotate storageclass ocs-storagecluster-ceph-rbd-virtualization \
-    storageclass.kubernetes.io/is-default-class=true --overwrite
-
 echo "ODF 2-node installation complete"
 oc get sc

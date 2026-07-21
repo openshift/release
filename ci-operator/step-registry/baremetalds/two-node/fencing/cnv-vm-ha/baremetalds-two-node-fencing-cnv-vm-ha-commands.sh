@@ -42,6 +42,10 @@ timeout 40m bash -c "
 "
 echo "StorageClass ${CNV_STORAGE_CLASS} available"
 
+echo "Setting ${CNV_STORAGE_CLASS} as default StorageClass..."
+oc annotate storageclass "${CNV_STORAGE_CLASS}" \
+    storageclass.kubernetes.io/is-default-class=true --overwrite
+
 # -------------------------------------------------------------------------
 # Wait for golden images and find the Fedora snapshot
 # -------------------------------------------------------------------------
