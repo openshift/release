@@ -68,8 +68,10 @@ RUN_EXIT_CODE=$?
 set -o errexit
 
 METRICS_FOLDER="collected-metrics-${UUID}"
-if [[ -f ${METRICS_FOLDER}/jobSummary.json ]]; then
+if [[ -d ${METRICS_FOLDER} ]]; then
   cp -r ${METRICS_FOLDER} "${ARTIFACT_DIR}/"
+fi
+if [[ -f ${METRICS_FOLDER}/jobSummary.json ]]; then
   if [[ ${JOB_NAME} == *openshift-eng-ocp-qe-perfscale-ci* ]] && [[ ${JOB_TYPE} == "periodic" ]]; then
     set +e
     OCP_PERF_DASH_HOST=$(cat ${ES_SECRETS_PATH}/ocp-perf-dash-address)
