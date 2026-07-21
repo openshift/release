@@ -36,6 +36,16 @@ tests:
 - as: sonar
   commands: |
     export HOME="/tmp"
+    # SonarQube Cloud requires Java 21+ (Java 17 dropped 2026-07-20). ACM-38055
+    # Temporary bootstrap until stolostron/builder images ship java-21-openjdk-headless.
+    if ! java -version 2>&1 | grep -qE 'version "2[1-9]'; then
+      curl -fsSL "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse" -o /tmp/jdk21.tar.gz
+      mkdir -p /tmp/jdk-21
+      tar -xzf /tmp/jdk21.tar.gz -C /tmp/jdk-21 --strip-components=1
+      export JAVA_HOME=/tmp/jdk-21
+      export PATH="${JAVA_HOME}/bin:${PATH}"
+    fi
+    java -version
     export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
     export SELF="make -f /opt/build-harness/Makefile.prow"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
