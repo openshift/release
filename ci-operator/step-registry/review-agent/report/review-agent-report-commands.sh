@@ -3,6 +3,11 @@ set -euo pipefail
 
 echo "=== Review Agent Report Generation ==="
 
+if [[ -z "${REVIEW_AGENT_UPSTREAM_REPO:-}" ]]; then
+  echo "ERROR: REVIEW_AGENT_UPSTREAM_REPO is required (e.g. openshift/hypershift)"
+  exit 1
+fi
+
 STATE_FILE="${SHARED_DIR}/processed-prs.txt"
 REPORT_FILE="${ARTIFACT_DIR}/review-agent-report.html"
 
@@ -113,7 +118,7 @@ while IFS= read -r line; do
     STATUS_LABEL="Failed"
   fi
 
-  # Read extracted artifacts (same pattern as jira-agent)
+  # Read extracted artifacts
   PREFIX="claude-pr-${PR_NUMBER}-review"
   TOKEN_FILE="${SHARED_DIR}/${PREFIX}-tokens.json"
 
@@ -140,8 +145,8 @@ while IFS= read -r line; do
   GRAND_TOTAL_COST_USD=$(awk "BEGIN {printf \"%.6f\", $GRAND_TOTAL_COST_USD + $COST_RAW}" 2>/dev/null || echo "0")
 
   # PR link and title
-  PR_LINK="<a href=\"https://github.com/openshift/hypershift/pull/${PR_NUMBER}\">#${PR_NUMBER}</a>"
-  PR_TITLE_RAW=$(gh pr view "$PR_NUMBER" --repo openshift/hypershift --json title --jq '.title' 2>/dev/null || echo "PR #${PR_NUMBER}")
+  PR_LINK="<a href=\"https://github.com/${REVIEW_AGENT_UPSTREAM_REPO}/pull/${PR_NUMBER}\">#${PR_NUMBER}</a>"
+  PR_TITLE_RAW=$(gh pr view "$PR_NUMBER" --repo "${REVIEW_AGENT_UPSTREAM_REPO}" --json title --jq '.title' 2>/dev/null || echo "PR #${PR_NUMBER}")
   PR_TITLE=$(echo "$PR_TITLE_RAW" | html_escape)
   PR_TITLE_LINKED=$(linkify_jira "$PR_TITLE")
 
@@ -239,13 +244,13 @@ ${SUMMARY_ROWS}
 </tbody>
 </table>
 
-<p><a href="../../hypershift-review-agent-process/artifacts/review-agent-transcript.html">View full conversation transcript</a></p>
+<p><a href="../../review-agent-process/artifacts/review-agent-transcript.html">View full conversation transcript</a></p>
 
 <h2>Details</h2>
 ${DETAIL_SECTIONS}
 
 <div class="footer">
-  Review Agent Report &middot; openshift/hypershift &middot; Generated from CI artifacts
+  Review Agent Report &middot; ${REVIEW_AGENT_UPSTREAM_REPO} &middot; Generated from CI artifacts
 </div>
 
 </div>

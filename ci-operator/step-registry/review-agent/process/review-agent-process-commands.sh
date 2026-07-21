@@ -1,13 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== HyperShift Review Agent Process ==="
+echo "=== Review Agent Process ==="
 
-# This step addresses review comments on a single PR.
-# It uses the /openshift-developer:address-review-pr skill which handles:
-# - Fetching and filtering PR comments (deduplication, bot filtering, authorization)
-# - Categorizing comments by priority (blocking, change requests, questions, suggestions)
-# - Making code changes, posting replies, and pushing
+# Validate required env vars
+if [[ -z "${REVIEW_AGENT_FORK_REPO:-}" ]]; then
+  echo "ERROR: REVIEW_AGENT_FORK_REPO is required (e.g. https://github.com/hypershift-community/hypershift)"
+  exit 1
+fi
+if [[ -z "${REVIEW_AGENT_UPSTREAM_REPO:-}" ]]; then
+  echo "ERROR: REVIEW_AGENT_UPSTREAM_REPO is required (e.g. openshift/hypershift)"
+  exit 1
+fi
+
+# Derive clone directory from fork repo URL
+CLONE_DIR="/tmp/$(basename "$REVIEW_AGENT_FORK_REPO")"
 
 # Apply Gangway API overrides (MULTISTAGE_PARAM_OVERRIDE_* prefix)
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_TARGET_PR:-}" ]]; then
@@ -26,9 +33,9 @@ echo "Processing PR #$PR_NUMBER"
 # State file for sharing results with report step
 STATE_FILE="${SHARED_DIR}/processed-prs.txt"
 
-# Clone HyperShift fork (we work on branches here)
-echo "Cloning HyperShift repository..."
-git clone https://github.com/hypershift-community/hypershift /tmp/hypershift
+# Clone the fork repo
+echo "Cloning repository from ${REVIEW_AGENT_FORK_REPO}..."
+git clone "${REVIEW_AGENT_FORK_REPO}" "${CLONE_DIR}"
 
 # Install tool dependencies
 echo "Installing tool dependencies..."
@@ -50,66 +57,48 @@ claude plugin marketplace add RedHatProductSecurity/prodsec-skills
 claude plugin install openshift-developer@ai-helpers
 claude plugin install prow-agent@ai-helpers
 
-cd /tmp/hypershift
+cd "${CLONE_DIR}"
 
 # Configure git
 git config user.name "OpenShift CI Bot"
 git config user.email "ci-bot@redhat.com"
 
 # Add upstream remote for PR operations
-git remote add upstream https://github.com/openshift/hypershift.git
+git remote add upstream "https://github.com/${REVIEW_AGENT_UPSTREAM_REPO}.git"
 
-# Generate GitHub App installation token
-echo "Generating GitHub App token..."
+# Source the github-app-auth library (written by jira-agent-github-app-auth pre step)
+echo "Loading GitHub App auth library..."
+if [ ! -f "${SHARED_DIR}/github-app-auth.sh" ]; then
+  echo "ERROR: github-app-auth.sh not found in SHARED_DIR."
+  echo "Ensure jira-agent-github-app-auth runs as a pre step."
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/github-app-auth.sh"
 
 GITHUB_APP_CREDS_DIR="/var/run/claude-code-service-account"
-APP_ID_FILE="${GITHUB_APP_CREDS_DIR}/app-id"
-INSTALLATION_ID_FILE="${GITHUB_APP_CREDS_DIR}/installation-id"
-PRIVATE_KEY_FILE="${GITHUB_APP_CREDS_DIR}/private-key"
+INSTALLATION_ID_FORK_FILE="${GITHUB_APP_CREDS_DIR}/installation-id"
 INSTALLATION_ID_UPSTREAM_FILE="${GITHUB_APP_CREDS_DIR}/o-h-installation-id"
 
-if [ ! -f "$APP_ID_FILE" ] || [ ! -f "$INSTALLATION_ID_FILE" ] || [ ! -f "$PRIVATE_KEY_FILE" ] || [ ! -f "$INSTALLATION_ID_UPSTREAM_FILE" ]; then
+if [ ! -f "$INSTALLATION_ID_FORK_FILE" ] || [ ! -f "$INSTALLATION_ID_UPSTREAM_FILE" ]; then
   echo "GitHub App credentials not yet available in ${GITHUB_APP_CREDS_DIR}"
   echo "Available files:"
   ls -la "${GITHUB_APP_CREDS_DIR}/" || echo "Directory does not exist"
   echo ""
   echo "Waiting for Vault secretsync to complete. The following keys are required:"
   echo "  - app-id"
-  echo "  - installation-id (for hypershift-community fork)"
-  echo "  - o-h-installation-id (for openshift/hypershift upstream)"
+  echo "  - installation-id (for fork)"
+  echo "  - o-h-installation-id (for upstream)"
   echo "  - private-key"
   echo ""
-  echo "Exiting gracefully. Re-run once secrets are synced."
-  exit 0
+  echo "ERROR: Required credentials are missing. Re-run once secrets are synced."
+  exit 1
 fi
 
-APP_ID=$(cat "$APP_ID_FILE")
-INSTALLATION_ID_FORK=$(cat "$INSTALLATION_ID_FILE")
+INSTALLATION_ID_FORK=$(cat "$INSTALLATION_ID_FORK_FILE")
 INSTALLATION_ID_UPSTREAM=$(cat "$INSTALLATION_ID_UPSTREAM_FILE")
 
-generate_github_token() {
-  local INSTALL_ID=$1
-  local NOW
-  NOW=$(date +%s)
-  local IAT=$((NOW - 60))
-  local EXP=$((NOW + 600))
-
-  local HEADER
-  HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-  local PAYLOAD
-  PAYLOAD=$(echo -n "{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-  local SIGNATURE
-  SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$PRIVATE_KEY_FILE" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-  local JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
-
-  curl -s -X POST \
-    -H "Authorization: Bearer ${JWT}" \
-    -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/app/installations/${INSTALL_ID}/access_tokens" \
-    | jq -r '.token'
-}
-
-# Generate token for fork (hypershift-community/hypershift) - for pushing branches
+# Generate token for fork - for pushing branches
 echo "Generating GitHub App token for fork..."
 GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
 if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
@@ -118,7 +107,7 @@ if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
 fi
 echo "Fork token generated successfully"
 
-# Generate token for upstream (openshift/hypershift) - for reading PRs and comments
+# Generate token for upstream - for reading PRs and comments
 echo "Generating GitHub App token for upstream..."
 GITHUB_TOKEN_UPSTREAM=$(generate_github_token "$INSTALLATION_ID_UPSTREAM")
 if [ -z "$GITHUB_TOKEN_UPSTREAM" ] || [ "$GITHUB_TOKEN_UPSTREAM" = "null" ]; then
@@ -151,6 +140,9 @@ DISALLOWED_TOOLS=(
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
 
+# Derive repo name for telemetry
+REPO_NAME="${REVIEW_AGENT_UPSTREAM_REPO}"
+
 # Wrapper: run claude via agentic-ci for native OTEL collection
 run_claude() {
   local phase=$1; shift
@@ -167,7 +159,7 @@ run_claude() {
     --backend local \
     --harness claude-code \
     --model "${CLAUDE_MODEL}" \
-    --workdir /tmp/hypershift \
+    --workdir "${CLONE_DIR}" \
     --no-streaming \
     "${prompt}" \
     -- \
@@ -231,6 +223,7 @@ generate_autodl() {
     --arg analyzed_at "$analyzed_at" \
     --arg job_name "${JOB_NAME:-}" \
     --arg build_id "${BUILD_ID:-}" \
+    --arg repo "$REPO_NAME" \
     '{
       table_name: "address_review_agent",
       schema: {
@@ -240,7 +233,8 @@ generate_autodl() {
         result: "string",
         analyzed_at: "string",
         job_name: "string",
-        build_id: "string"
+        build_id: "string",
+        repo: "string"
       },
       schema_mapping: null,
       rows: [{
@@ -250,7 +244,8 @@ generate_autodl() {
         result: $result,
         analyzed_at: $analyzed_at,
         job_name: $job_name,
-        build_id: $build_id
+        build_id: $build_id,
+        repo: $repo
       }],
       chunk_size: 0,
       expiration_days: 0,
@@ -293,7 +288,7 @@ extract_artifacts() {
 # Checkout the PR branch
 echo "Fetching PR #$PR_NUMBER details..."
 PR_INFO=$(gh pr view "$PR_NUMBER" \
-  --repo openshift/hypershift \
+  --repo "${REVIEW_AGENT_UPSTREAM_REPO}" \
   --json number,title,headRefName \
   --jq '"\(.number) \(.headRefName) \(.title)"' 2>/dev/null || echo "")
 
@@ -324,7 +319,7 @@ PHASE1_START=$(date +%s)
 
 EXIT_CODE=0
 run_claude "address-review" "$PR_NUMBER" "/openshift-developer:address-review-pr $PR_NUMBER --ci" "/tmp/claude-pr-${PR_NUMBER}-output.json" \
-  --append-system-prompt "You are addressing review comments on PR #$PR_NUMBER in openshift/hypershift. The PR was created from the hypershift-community fork." \
+  --append-system-prompt "You are addressing review comments on PR #$PR_NUMBER in ${REVIEW_AGENT_UPSTREAM_REPO}. The PR was created from the $(basename "$REVIEW_AGENT_FORK_REPO") fork." \
   --allowedTools "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task LSP mcp__plugin_golang_gopls__*" \
   --disallowedTools "${DISALLOWED_TOOLS[@]}" \
   --max-turns 200 \
@@ -476,7 +471,7 @@ details[open] summary {{ margin-bottom: 0.5em; }}
 </style>
 </head>
 <body>
-<p><a href="../../hypershift-review-agent-report/artifacts/review-agent-report.html">Back to summary report</a></p>
+<p><a href="../../review-agent-report/artifacts/review-agent-report.html">Back to summary report</a></p>
 <h1>Review Agent Transcript</h1>
 <p style="color:#666">Total cost: ${total_cost:.4f}</p>
 {"".join(sections) if sections else "<p>No transcript data available.</p>"}

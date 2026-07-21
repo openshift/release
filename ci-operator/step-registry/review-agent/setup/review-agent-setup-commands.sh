@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== HyperShift Review Agent Setup ==="
+echo "=== Review Agent Setup ==="
 
 # Verify Claude Code is available (Vertex AI authentication is handled via GOOGLE_APPLICATION_CREDENTIALS env var)
 echo "Verifying Claude Code CLI..."
