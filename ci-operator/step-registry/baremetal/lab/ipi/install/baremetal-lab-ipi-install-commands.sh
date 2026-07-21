@@ -268,19 +268,21 @@ if [[ -n "${WORKER_COREOS_STREAM:-}" ]]; then
     esc_stream="$(printf '%s' "${WORKER_COREOS_STREAM}" | sed 's/[\/&]/\\&/g')"
     for bmh_file in "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_hosts-*.yaml; do
         ls "${bmh_file}"
-        echo "-------------------------"
+        echo -e "-------------------------\n$(cat "${bmh_file}")\n-------------------------"
         if ! grep -q 'installer.openshift.io/role: control-plane' "${bmh_file}"; then
             sed -i "s/coreos.openshift.io\/stream: .*/coreos.openshift.io\/stream: ${esc_stream}/" "${bmh_file}"
-            echo -e "${bmh_file} updated -------"
+            echo -e "-------\n${bmh_file} updated\n-------"
             grep "${esc_stream}" "${bmh_file}"
         fi
     done
     # Patch worker MachineSet hostSelector to match the new stream
     for ms_file in "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
         ls "${ms_file}"
-        echo "-------------------------"
+        echo -e "-xxx---------------------\n$(cat "${ms_file}")\n---------------------xxx-"
         sed -i "s/coreos.openshift.io\/stream: .*/coreos.openshift.io\/stream: ${esc_stream}/" "${ms_file}"
-        grep coreos.openshift.io "${ms_file}"
+        sed -i "s/machineconfiguration.openshift.io\/osstream: .*/machineconfiguration.openshift.io\/osstream: ${esc_stream}/" "${ms_file}"
+        echo -e "-xxx---------------------"
+        echo -e "-after update---------------------\n$(cat "${ms_file}")\n---------------------xxx-"
     done
     # Set the worker MachineConfigPool to use the specified stream for
     # the on-disk OS. Requires the OSStreams feature gate (TechPreviewNoUpgrade).
@@ -303,6 +305,8 @@ spec:
     name: ${esc_stream}
 EOF
 fi
+echo "[INFO] 99_worker-osimagestream.yaml:"
+cat ${INSTALL_DIR}/openshift/99_worker-osimagestream.yaml
 
 ### Inject customized manifests
 echo -e "\n[INFO] The following manifests will be included at installation time:"
