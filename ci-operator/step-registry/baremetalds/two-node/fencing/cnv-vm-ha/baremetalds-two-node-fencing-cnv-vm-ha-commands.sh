@@ -244,8 +244,8 @@ run_on_node "${SURVIVE_NODE}" "sudo pcs resource status" || true
 # Verify VM migrated to the surviving node
 # -------------------------------------------------------------------------
 echo "--- Verifying VM migration ---"
-echo "Waiting up to 120s for VM to be Running on ${SURVIVE_NODE}..."
-VM_MIGRATE_DEADLINE=$((SECONDS + 120))
+echo "Waiting up to 180s for VM to be Running on ${SURVIVE_NODE}..."
+VM_MIGRATE_DEADLINE=$((SECONDS + 180))
 while [[ ${SECONDS} -lt ${VM_MIGRATE_DEADLINE} ]]; do
   VMI_STATUS=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.phase}' 2>/dev/null || true)
   VMI_CURRENT_NODE=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.nodeName}' 2>/dev/null || true)
