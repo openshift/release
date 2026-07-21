@@ -3,6 +3,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: aws-efs-csi-operator-create-efs
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -193,6 +197,76 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 - always_run: false
+  as: e2e-sbr-hypershift-aws-odf
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      ECO_TEST_FEATURES: sbr-operator
+      HYPERSHIFT_INSTANCE_TYPE: m5.4xlarge
+      HYPERSHIFT_NODE_COUNT: "3"
+      OCP_VERSION: "422"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      OO_CHANNEL: stable
+      OPERATORS: storage-based-remediation
+      SC_WAIT_TIMEOUT: 10m
+      SKIP_IDMS: "true"
+    test:
+    - ref: medik8s-sbr-hypershift-switch-kubeconfig
+    - ref: medik8s-sbr-hypershift-wait-nodes
+    - chain: medik8s-setup
+    - ref: odf-prepare-cluster
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-apply-storage-cluster
+    - as: e2e-test
+      cli: latest
+      commands: make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: medik8s-sbr-hypershift
+- always_run: false
+  as: e2e-sbr-hypershift-persistent-aws-odf
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      ECO_TEST_FEATURES: sbr-operator
+      HYPERSHIFT_INSTANCE_TYPE: m5.4xlarge
+      HYPERSHIFT_NODE_COUNT: "3"
+      OCP_VERSION: "422"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      OO_CHANNEL: stable
+      OPERATORS: storage-based-remediation
+      SC_WAIT_TIMEOUT: 10m
+      SKIP_IDMS: "true"
+    test:
+    - ref: medik8s-sbr-hypershift-switch-kubeconfig
+    - ref: medik8s-sbr-hypershift-wait-nodes
+    - chain: medik8s-setup
+    - ref: odf-prepare-cluster
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-apply-storage-cluster
+    - as: e2e-test
+      cli: latest
+      commands: make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: medik8s-sbr-hypershift-persistent
+- always_run: false
   as: e2e-snr-aws
   capabilities:
   - intranet
@@ -365,8 +439,7 @@ tests:
     - ref: storage-destroy-csi-aws-efs-sts-operator-role
     - chain: ipi-aws-post
     test:
-    - ref: medik8s-catalogsource
-    - ref: medik8s-operator-subscribe
+    - chain: medik8s-setup
     - ref: storage-create-csi-aws-efs-sts-operator-role
     - ref: storage-subscribe-aws-efs-csi-driver
     - ref: storage-create-csi-aws-efs
