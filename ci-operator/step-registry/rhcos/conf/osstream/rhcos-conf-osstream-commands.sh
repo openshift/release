@@ -7,8 +7,8 @@ set -o pipefail
 # Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
 # separate SHARED_DIR subdirectory so mgmt and infra files never collide.
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
-  LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
-  SHARED_DIR="${SHARED_DIR}/infra"
+  export LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
+  export SHARED_DIR="${SHARED_DIR}/infra"
   mkdir -p "${SHARED_DIR}"
 fi
 
