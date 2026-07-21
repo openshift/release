@@ -5,7 +5,10 @@ set -o errexit
 set -o pipefail
 
 # After IPI terraform brings up masters (WORKER_REPLICAS=0), create workers the UPI way
-# (virt-install + ignition disk) so s390x avoids machine-api/libvirt ACPI domain XML.
+# (import RHCOS volume + ignition disk) so s390x avoids machine-api/libvirt ACPI domain XML.
+#
+# ocp/4.16+: libvirt-installer ships virt-install (MULTIARCH-4111). ocp/4.15: does not —
+# fall back to virsh define with a minimal domain XML (no <acpi/>).
 
 # libvirt-installer image sets PATH=/bin; tools and injected oc (cli: latest) live under /usr/bin.
 export PATH="/usr/bin:/bin:${PATH:-}"
@@ -156,24 +159,116 @@ clone_volume() {
     --newname "${newname}"
 }
 
+# Domain XML equivalent of virt-install --import + ignition disk (UPI default path).
+# Intentionally omits <features><acpi/> — RHEL 9 QEMU rejects ACPI on s390-ccw-virtio.
+write_worker_domain_xml() {
+  local name=$1
+  local mac=$2
+  local xml=$3
+  local arch_attr machine console_target uuid
+
+  case "${ARCH:-s390x}" in
+    s390x)
+      arch_attr="s390x"
+      machine="s390-ccw-virtio"
+      console_target="sclp"
+      ;;
+    ppc64le)
+      arch_attr="ppc64le"
+      machine="pseries"
+      console_target="serial"
+      ;;
+    *)
+      arch_attr="x86_64"
+      machine="q35"
+      console_target="serial"
+      ;;
+  esac
+
+  if [[ -r /proc/sys/kernel/random/uuid ]]; then
+    uuid=$(cat /proc/sys/kernel/random/uuid)
+  elif command -v python3 >/dev/null 2>&1; then
+    uuid=$(python3 -c 'import uuid; print(uuid.uuid4())')
+  else
+    uuid=""
+  fi
+
+  {
+    echo "<domain type='kvm'>"
+    echo "  <name>${name}</name>"
+    if [[ -n "${uuid}" ]]; then
+      echo "  <uuid>${uuid}</uuid>"
+    fi
+    echo "  <memory unit='MiB'>${DOMAIN_MEMORY}</memory>"
+    echo "  <currentMemory unit='MiB'>${DOMAIN_MEMORY}</currentMemory>"
+    echo "  <vcpu placement='static'>${DOMAIN_VCPUS}</vcpu>"
+    echo "  <os>"
+    echo "    <type arch='${arch_attr}' machine='${machine}'>hvm</type>"
+    echo "    <boot dev='hd'/>"
+    echo "  </os>"
+    echo "  <clock offset='utc'/>"
+    echo "  <on_poweroff>destroy</on_poweroff>"
+    echo "  <on_reboot>restart</on_reboot>"
+    echo "  <on_crash>destroy</on_crash>"
+    echo "  <devices>"
+    echo "    <disk type='volume' device='disk'>"
+    echo "      <driver name='qemu' type='qcow2'/>"
+    echo "      <source pool='${POOL_NAME}' volume='${name}-volume'/>"
+    echo "      <target dev='vda' bus='virtio'/>"
+    echo "    </disk>"
+    echo "    <disk type='volume' device='disk'>"
+    echo "      <driver name='qemu' type='raw'/>"
+    echo "      <source pool='${POOL_NAME}' volume='${IGNITION_VOLUME}'/>"
+    echo "      <target dev='vdb' bus='virtio'/>"
+    echo "      <readonly/>"
+    echo "      <serial>ignition</serial>"
+    echo "      <startupPolicy>optional</startupPolicy>"
+    echo "    </disk>"
+    echo "    <interface type='network'>"
+    echo "      <mac address='${mac}'/>"
+    echo "      <source network='${NETWORK_NAME}'/>"
+    echo "      <model type='virtio'/>"
+    echo "    </interface>"
+    echo "    <console type='pty'>"
+    echo "      <target type='${console_target}' port='0'/>"
+    echo "    </console>"
+    echo "  </devices>"
+    echo "</domain>"
+  } > "${xml}"
+}
+
 create_worker() {
   local name=$1
   local mac=$2
+  local xml
   echo "Creating worker ${name} (mac=${mac})..."
   clone_volume "${name}-volume"
-  # mock-nss.sh wraps virsh; virt-install needs the qemu+tcp URI via --connect.
-  mock-nss.sh virt-install \
-    --connect "${LIBVIRT_CONNECTION}" \
-    --name "${name}" \
-    --memory "${DOMAIN_MEMORY}" \
-    --vcpus "${DOMAIN_VCPUS}" \
-    --network "network=${NETWORK_NAME},mac=${mac}" \
-    --disk="vol=${POOL_NAME}/${name}-volume" \
-    --osinfo "${VIRT_INSTALL_OSINFO}" \
-    --graphics=none \
-    --import \
-    --noautoconsole \
-    --disk "vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional"
+
+  # Match UPI: call virt-install directly (not via mock-nss.sh). Available on 4.16+ images.
+  if command -v virt-install >/dev/null 2>&1; then
+    echo "Using virt-install"
+    virt-install \
+      --connect "${LIBVIRT_CONNECTION}" \
+      --name "${name}" \
+      --memory "${DOMAIN_MEMORY}" \
+      --vcpus "${DOMAIN_VCPUS}" \
+      --network "network=${NETWORK_NAME},mac=${mac}" \
+      --disk="vol=${POOL_NAME}/${name}-volume" \
+      --osinfo "${VIRT_INSTALL_OSINFO}" \
+      --graphics=none \
+      --import \
+      --noautoconsole \
+      --disk "vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional"
+    return
+  fi
+
+  echo "virt-install not in image; defining ${name} with virsh (4.15 libvirt-installer fallback)"
+  xml="${WORKDIR}/${name}.xml"
+  write_worker_domain_xml "${name}" "${mac}" "${xml}"
+  echo "Domain XML:"
+  cat "${xml}"
+  ${VIRSH} define "${xml}"
+  ${VIRSH} start "${name}"
 }
 
 for ((i = 0; i < COMPUTE_COUNT; i++)); do

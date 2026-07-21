@@ -5,8 +5,8 @@ workflow:
       IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH: "true"
       LIBVIRT_POOL_NAME: multiarch-ci-pool
       LIBVIRT_IMAGE_PATH: "/home/libvirt/openshift-images"
-      # Masters via IPI terraform; workers via virt-install (UPI-style) to avoid s390x ACPI
-      # in machine-api domain XML. Keep MachineSet replicas at 0.
+      # Masters via IPI terraform; workers via virt-install or virsh define (no ACPI)
+      # Keep MachineSet replicas at 0 so machine-api does not create guests.
       WORKER_REPLICAS: "0"
       COMPUTE_COUNT: "2"
     allow_best_effort_post_steps: true
@@ -25,7 +25,7 @@ workflow:
 
     Workers: WORKER_REPLICAS=0 so machine-api does not create guests (s390x QEMU rejects
     ACPI in provider domain XML). After install, ipi-install-libvirt-virsh-workers clones
-    the IPI RHCOS base volume and creates ${lease}-compute-* with virt-install + ignition
-    disk, same approach as UPI libvirt (no ACPI issue observed on that path).
+    the IPI RHCOS base volume and creates ${lease}-compute-* with virt-install (4.16+)
+    or virsh define + ACPI-free domain XML (4.15), attaching the worker ignition disk.
 
     Masters still use IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH for terraform domains.
