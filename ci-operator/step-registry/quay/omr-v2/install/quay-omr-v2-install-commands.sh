@@ -142,7 +142,6 @@ chmod 0600 "/home/$(id -un)/.omr-v2-admin-password"
 admin_password=$(<"/home/$(id -un)/.omr-v2-admin-password")
 install_status=0
 "${work_dir}/mirror-registry" install \
-    --autoApprove \
     --initUser admin \
     --initPassword "${admin_password}" \
     --no-color \
