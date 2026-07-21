@@ -11,6 +11,58 @@ mkdir -p "${CLAUDE_HOME}"
 
 CLAUDE_DOCTOR_LOG="${WORKDIR}/claude-doctor.log"
 
+github_app_token() {
+    local -r jwt="$1"
+    local -r repo="$2"
+
+    local install_id
+    install_id="$(curl -s \
+        -H "Authorization: Bearer ${jwt}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/${repo}/installation" \
+        | jq -r '.id')"
+    if [ -z "${install_id}" ] || [ "${install_id}" = "null" ]; then
+        echo "ERROR: Failed to get installation ID for ${repo}" >&2
+        return 1
+    fi
+
+    curl -s -X POST \
+        -H "Authorization: Bearer ${jwt}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/${install_id}/access_tokens" \
+        | jq -r '.token'
+}
+
+load_secrets() {
+    trap 'set -x' RETURN
+    set +x
+
+    echo "Loading secrets..."
+    if [ -f "${GITHUB_APP_ID_PATH}" ] && [ -f "${GITHUB_KEY_PATH}" ]; then
+        local github_app_jwt
+        github_app_jwt="$(gh-token generate \
+            --app-id "$(< "${GITHUB_APP_ID_PATH}")" \
+            --key "${GITHUB_KEY_PATH}" \
+            --jwt \
+            --token-only)"
+        if [ -z "${github_app_jwt}" ]; then
+            echo "ERROR: Failed to generate GitHub App JWT"
+            return 1
+        fi
+
+        GITHUB_TOKEN="$(github_app_token "${github_app_jwt}" openshift/lvm-operator)"
+        if [ -z "${GITHUB_TOKEN}" ] || [ "${GITHUB_TOKEN}" = "null" ]; then
+            echo "ERROR: Failed to generate installation access token for openshift/lvm-operator"
+            return 1
+        fi
+        export GITHUB_TOKEN
+
+        echo "GitHub token generated."
+    else
+        echo "WARNING: GitHub App credentials not found at ${GITHUB_APP_ID_PATH} and ${GITHUB_KEY_PATH}. GitHub operations will not be available."
+    fi
+}
+
 # The procedure to copy reports and session logs to artifacts, executed at exit
 atexit_handler() {
     if [[ -d "${WORKDIR:-}" ]]; then
@@ -95,6 +147,7 @@ echo "Starting LVMS Claude CI Doctor"
 # Ensure reports and session logs are copied to artifacts
 trap atexit_handler EXIT TERM INT
 
+load_secrets
 configure_claude
 
 # Use the edge-tooling source pre-installed in the image
