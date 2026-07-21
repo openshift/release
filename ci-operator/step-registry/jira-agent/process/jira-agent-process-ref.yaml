@@ -20,11 +20,42 @@ ref:
     default: "/var/run/claude-code-service-account/claude-prow"
     documentation: |-
       Path to the Google Cloud service account JSON key file for Vertex AI authentication.
+  - name: JIRA_AGENT_AUTH_MODE
+    default: "app"
+    documentation: |-
+      Authentication mode: "app" (GitHub App, default) or "pat" (classic PAT).
+      In "app" mode, separate fork/upstream GitHub App installation tokens are used.
+      In "pat" mode, a single classic PAT handles fork creation, push, and PR creation
+      against any public repo. PAT mode requires JIRA_AGENT_FORK_ORG and JIRA_AGENT_PAT_KEY.
+  - name: JIRA_AGENT_FORK_ORG
+    default: ""
+    documentation: |-
+      GitHub org or user account to fork repos into (PAT mode only).
+      Example: "jira-solve-bot"
+      In PAT mode, if JIRA_AGENT_FORK_REPO is not set, it is derived as
+      JIRA_AGENT_FORK_ORG/<repo-name-from-upstream>.
+      Ignored in App mode (JIRA_AGENT_FORK_REPO is used directly).
+  - name: JIRA_AGENT_PAT_KEY
+    default: "gh-pat"
+    documentation: |-
+      Key name in the credential secret for the GitHub classic PAT (PAT mode only).
+      The PAT must have the "public_repo" scope for fork creation, push, and PR
+      creation against public repositories.
+  - name: JIRA_AGENT_COMPONENT_REPO_MAP
+    default: ""
+    documentation: |-
+      Optional JSON object mapping Jira component names to upstream repos.
+      When set, JIRA_AGENT_UPSTREAM_REPO is resolved per-issue from the issue's
+      Jira component. A fresh clone/fork/sync is performed for each issue.
+      Example: '{"HyperShift":"openshift/hypershift","Installer / openshift-installer":"openshift/installer"}'
+      When empty, JIRA_AGENT_UPSTREAM_REPO is used for all issues (static mode).
   - name: JIRA_AGENT_FORK_REPO
     default: ""
     documentation: |-
-      Required. Fork repository in org/repo format (e.g., "my-team/my-repo").
+      Fork repository in org/repo format (e.g., "my-team/my-repo").
       The agent clones this repo and pushes branches to it.
+      Required in App mode. Optional in PAT mode (derived from JIRA_AGENT_FORK_ORG
+      and JIRA_AGENT_UPSTREAM_REPO if not set).
   - name: JIRA_AGENT_UPSTREAM_REPO
     default: ""
     documentation: |-
@@ -51,10 +82,12 @@ ref:
     default: "o-h-installation-id"
     documentation: |-
       Key name in the Vault secret for the upstream GitHub App installation ID.
+      Only used in App auth mode.
   - name: JIRA_AGENT_FORK_INSTALLATION_ID_KEY
     default: "installation-id"
     documentation: |-
       Key name in the Vault secret for the fork GitHub App installation ID.
+      Only used in App auth mode.
   - name: JIRA_AGENT_TOOL_SETUP_SCRIPT
     default: ""
     documentation: |-
@@ -123,5 +156,11 @@ ref:
     Phase 3 - Fix: Addresses review findings by editing code, committing, and pushing fixes
     Phase 4 - PR Creation: Creates a draft PR via gh CLI after review is complete
 
-    Required env vars: JIRA_AGENT_FORK_REPO, JIRA_AGENT_UPSTREAM_REPO, JIRA_AGENT_JQL
-    Teams onboarding this workflow should create team-specific ref YAMLs (or use a shared credential name), because the credential secret name is defined in the ref.
+    Supports two auth modes:
+    - "app" (default): GitHub App with separate fork/upstream installation tokens.
+      Required: JIRA_AGENT_FORK_REPO, JIRA_AGENT_UPSTREAM_REPO
+    - "pat": Classic PAT for fork creation, push, and PR creation against any public repo.
+      Required: JIRA_AGENT_UPSTREAM_REPO, JIRA_AGENT_FORK_ORG
+
+    Teams onboarding this workflow should create team-specific ref YAMLs (or use a shared
+    credential name), because the credential secret name is defined in the ref.

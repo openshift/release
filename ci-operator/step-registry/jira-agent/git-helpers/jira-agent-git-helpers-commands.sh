@@ -3,21 +3,204 @@ set -euo pipefail
 
 cat > "${SHARED_DIR}/git-helpers.sh" << 'HEREDOC_EOF'
 #!/bin/bash
-# Git and GitHub App token helper functions for jira-agent.
+# Git and GitHub token helper functions for jira-agent.
+#
+# Supports two auth modes (JIRA_AGENT_AUTH_MODE):
+#   "app"  — GitHub App with separate fork/upstream installation tokens (default)
+#   "pat"  — Classic PAT for fork creation, push, and PR creation
 #
 # Usage:
 #   source "${SHARED_DIR}/git-helpers.sh"
 #
 # Functions:
-#   load_github_app_credentials   - Validate and load credential files
-#   generate_and_configure_tokens - Generate initial tokens, configure git
-#   refresh_fork_token            - Refresh fork GitHub App token
-#   refresh_upstream_token        - Refresh upstream GitHub App token
-#   refresh_all_tokens            - Refresh both fork and upstream tokens
+#   load_credentials              - Load credentials (dispatches by auth mode)
+#   ensure_fork_exists            - Create fork if needed (PAT mode)
+#   refresh_fork_token            - Refresh fork token (no-op in PAT mode)
+#   refresh_upstream_token        - Refresh upstream token (no-op in PAT mode)
+#   refresh_all_tokens            - Refresh all tokens (no-op in PAT mode)
 #   sync_fork_with_upstream       - Sync fork main with upstream main
 #   check_branch_changes          - Detect code changes on current branch
 
 GITHUB_APP_CREDS_DIR="/var/run/claude-code-service-account"
+
+# ── PAT mode ──────────────────────────────────────────────────────────────────
+
+# Load a classic PAT from the credential secret.
+# Sets: GITHUB_TOKEN_PAT
+# Requires: JIRA_AGENT_PAT_KEY
+_load_pat_credentials() {
+  echo "Loading GitHub PAT credentials..."
+  local pat_file="${GITHUB_APP_CREDS_DIR}/${JIRA_AGENT_PAT_KEY:-gh-pat}"
+
+  if [ ! -f "$pat_file" ]; then
+    echo "ERROR: PAT file not found: $pat_file"
+    echo "Available files:"
+    ls -la "${GITHUB_APP_CREDS_DIR}/" || echo "Directory does not exist"
+    exit 1
+  fi
+
+  [[ $- == *x* ]] && local _was_tracing=true || local _was_tracing=false
+  set +x
+
+  GITHUB_TOKEN_PAT=$(cat "$pat_file")
+  if [ -z "$GITHUB_TOKEN_PAT" ]; then
+    echo "ERROR: PAT file is empty: $pat_file"
+    $_was_tracing && set -x || true
+    exit 1
+  fi
+
+  # PAT mode uses a single token for everything (push + PR creation)
+  git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_PAT}; }; f"
+  export GITHUB_TOKEN="$GITHUB_TOKEN_PAT"
+  echo "PAT configured for git and GitHub CLI"
+
+  $_was_tracing && set -x || true
+}
+
+# Ensure a fork of the upstream repo exists in the bot user's account.
+# Creates the fork via GitHub API if it doesn't exist, then polls until ready.
+# Sets: JIRA_AGENT_FORK_REPO, FORK_ORG
+# Requires: JIRA_AGENT_UPSTREAM_REPO, JIRA_AGENT_FORK_ORG, GITHUB_TOKEN
+ensure_fork_exists() {
+  if [ "${JIRA_AGENT_AUTH_MODE:-app}" != "pat" ]; then
+    echo "Skipping ensure_fork_exists (not in PAT mode)"
+    return 0
+  fi
+
+  local upstream_repo="${JIRA_AGENT_UPSTREAM_REPO}"
+  local fork_org="${JIRA_AGENT_FORK_ORG}"
+  local repo_name="${upstream_repo#*/}"
+
+  if [ -z "$fork_org" ]; then
+    echo "ERROR: JIRA_AGENT_FORK_ORG is required in PAT mode"
+    exit 1
+  fi
+
+  echo "Checking if fork ${fork_org}/${repo_name} exists..."
+
+  local http_code
+  http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${fork_org}/${repo_name}")
+
+  if [ "$http_code" = "200" ]; then
+    echo "Fork ${fork_org}/${repo_name} already exists"
+  else
+    echo "Fork not found (HTTP ${http_code}). Creating fork of ${upstream_repo}..."
+    local fork_response
+    fork_response=$(curl -s -X POST \
+      --connect-timeout 10 --max-time 30 \
+      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${upstream_repo}/forks" \
+      -d "{\"default_branch_only\":true}")
+
+    local fork_full_name
+    fork_full_name=$(echo "$fork_response" | jq -r '.full_name // empty' 2>/dev/null)
+    if [ -z "$fork_full_name" ]; then
+      echo "ERROR: Failed to create fork. API response:"
+      echo "$fork_response" | head -20
+      exit 1
+    fi
+    echo "Fork creation initiated: ${fork_full_name}"
+
+    # Poll until the fork is ready (GitHub forks are async)
+    local max_wait=120
+    local waited=0
+    while [ $waited -lt $max_wait ]; do
+      http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/${fork_org}/${repo_name}")
+      if [ "$http_code" = "200" ]; then
+        echo "Fork ${fork_org}/${repo_name} is ready"
+        break
+      fi
+      echo "Waiting for fork to be ready... (${waited}s/${max_wait}s)"
+      sleep 10
+      waited=$((waited + 10))
+    done
+
+    if [ "$http_code" != "200" ]; then
+      echo "ERROR: Fork not ready after ${max_wait}s"
+      exit 1
+    fi
+  fi
+
+  export JIRA_AGENT_FORK_REPO="${fork_org}/${repo_name}"
+  export FORK_ORG="${fork_org}"
+  echo "Fork repo set to: ${JIRA_AGENT_FORK_REPO}"
+}
+
+# Resolve the upstream repo for an issue from its Jira component.
+# Uses JIRA_AGENT_COMPONENT_REPO_MAP (JSON object) to map component names to repos.
+# Falls back to JIRA_AGENT_UPSTREAM_REPO if no map is configured or component not found.
+# Sets: JIRA_AGENT_UPSTREAM_REPO (exported), JIRA_AGENT_FORK_REPO (exported), FORK_ORG (exported)
+# Requires: JIRA_AUTH, JIRA_BASE_URL, JIRA_AGENT_FORK_ORG (in PAT mode)
+resolve_upstream_repo() {
+  local issue_key="$1"
+  local component_map="${JIRA_AGENT_COMPONENT_REPO_MAP:-}"
+
+  if [ -z "$component_map" ]; then
+    echo "No component-repo map configured, using JIRA_AGENT_UPSTREAM_REPO=${JIRA_AGENT_UPSTREAM_REPO}"
+    return 0
+  fi
+
+  echo "Resolving upstream repo for ${issue_key} from Jira component..."
+  local issue_response http_code component resolved_repo
+  issue_response=$(curl -s -w "\n%{http_code}" \
+    "${JIRA_BASE_URL}/rest/api/3/issue/${issue_key}?fields=components" \
+    -H "Authorization: Basic $JIRA_AUTH" \
+    -H "Content-Type: application/json")
+  http_code=$(echo "$issue_response" | tail -1)
+
+  if [ "$http_code" != "200" ]; then
+    echo "Warning: Failed to fetch issue components (HTTP ${http_code}), using default JIRA_AGENT_UPSTREAM_REPO"
+    return 0
+  fi
+
+  component=$(echo "$issue_response" | sed '$d' | jq -r '.fields.components[0].name // empty')
+  if [ -z "$component" ]; then
+    echo "Warning: Issue ${issue_key} has no components, using default JIRA_AGENT_UPSTREAM_REPO"
+    return 0
+  fi
+
+  echo "Issue component: ${component}"
+  resolved_repo=$(echo "$component_map" | jq -r --arg c "$component" '.[$c] // empty')
+
+  if [ -z "$resolved_repo" ]; then
+    echo "Warning: Component '${component}' not found in JIRA_AGENT_COMPONENT_REPO_MAP, using default JIRA_AGENT_UPSTREAM_REPO"
+    return 0
+  fi
+
+  export JIRA_AGENT_UPSTREAM_REPO="$resolved_repo"
+  echo "Resolved upstream repo: ${JIRA_AGENT_UPSTREAM_REPO}"
+
+  # In PAT mode, also update the fork repo
+  if [ "${JIRA_AGENT_AUTH_MODE:-app}" = "pat" ] && [ -n "${JIRA_AGENT_FORK_ORG:-}" ]; then
+    export JIRA_AGENT_FORK_REPO="${JIRA_AGENT_FORK_ORG}/${resolved_repo#*/}"
+    export FORK_ORG="${JIRA_AGENT_FORK_ORG}"
+    echo "Updated fork repo: ${JIRA_AGENT_FORK_REPO}"
+  fi
+}
+
+# Clone, fork (if needed), and sync a repo for processing.
+# Call once per issue when JIRA_AGENT_COMPONENT_REPO_MAP is set (repo changes per issue).
+# Requires: JIRA_AGENT_FORK_REPO, JIRA_AGENT_UPSTREAM_REPO
+setup_repo() {
+  rm -rf /tmp/project-repo
+
+  ensure_fork_exists
+
+  echo "Cloning ${JIRA_AGENT_FORK_REPO}..."
+  git clone "https://github.com/${JIRA_AGENT_FORK_REPO}" /tmp/project-repo
+  cd /tmp/project-repo
+
+  sync_fork_with_upstream
+}
+
+# ── GitHub App mode ───────────────────────────────────────────────────────────
 
 # Validate and load GitHub App credential files.
 # Sets: INSTALLATION_ID_FORK, INSTALLATION_ID_UPSTREAM
@@ -88,9 +271,26 @@ generate_and_configure_tokens() {
   $_was_tracing && set -x || true
 }
 
+# ── Auth mode dispatcher ─────────────────────────────────────────────────────
+
+# Load credentials based on JIRA_AGENT_AUTH_MODE.
+# In "pat" mode: loads PAT from secret, configures git + GITHUB_TOKEN.
+# In "app" mode: loads GitHub App credentials, generates installation tokens.
+load_credentials() {
+  if [ "${JIRA_AGENT_AUTH_MODE:-app}" = "pat" ]; then
+    _load_pat_credentials
+  else
+    load_github_app_credentials
+    generate_and_configure_tokens
+  fi
+}
+
 # Refresh the fork GitHub App token and update git credential helper.
-# Updates: GITHUB_TOKEN_FORK
+# No-op in PAT mode (PATs don't expire mid-run).
 refresh_fork_token() {
+  if [ "${JIRA_AGENT_AUTH_MODE:-app}" = "pat" ]; then
+    return 0
+  fi
   echo "Refreshing GitHub App token for fork..."
   [[ $- == *x* ]] && local _was_tracing=true || local _was_tracing=false
   set +x
@@ -107,8 +307,11 @@ refresh_fork_token() {
 }
 
 # Refresh the upstream GitHub App token and update GITHUB_TOKEN.
-# Updates: GITHUB_TOKEN_UPSTREAM, GITHUB_TOKEN (exported)
+# No-op in PAT mode.
 refresh_upstream_token() {
+  if [ "${JIRA_AGENT_AUTH_MODE:-app}" = "pat" ]; then
+    return 0
+  fi
   echo "Refreshing GitHub App token for upstream..."
   [[ $- == *x* ]] && local _was_tracing=true || local _was_tracing=false
   set +x
@@ -125,6 +328,7 @@ refresh_upstream_token() {
 }
 
 # Refresh both fork and upstream GitHub App tokens.
+# No-op in PAT mode.
 refresh_all_tokens() {
   refresh_fork_token
   refresh_upstream_token
