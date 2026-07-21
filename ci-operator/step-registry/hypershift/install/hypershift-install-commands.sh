@@ -10,8 +10,9 @@ extract_hcp_cli() {
   local image=$1
   local cli_dir
   cli_dir="$(mktemp -d "${TMPDIR:-/tmp}/hs-cli.XXXXXX")"
-  oc extract secret/pull-secret -n openshift-config --to="${cli_dir}" --confirm
-  oc image extract "${image}" --path "/usr/bin/hypershift:${cli_dir}" --registry-config="${cli_dir}/.dockerconfigjson" --filter-by-os="linux/amd64" --confirm
+  oc image extract "${image}" --path "/usr/bin/hypershift:${cli_dir}" \
+    --registry-config=/etc/ci-pull-credentials/.dockerconfigjson \
+    --filter-by-os="linux/amd64" --confirm
   chmod +x "${cli_dir}/hypershift"
   HCP_CLI="${cli_dir}/hypershift"
 }
