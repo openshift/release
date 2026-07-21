@@ -17,15 +17,89 @@ trap collect_artifacts EXIT TERM
 cat >"${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-step.sh <<"EOF"
 #!/usr/bin/env bash
 
-export PREVIOUS_CLUSTER_NAME="${PREVIOUS_CLUSTER_NAME:-ostest}"
-export PREVIOUS_BASE_DOMAIN="${PREVIOUS_BASE_DOMAIN:-redhat.com}"
+# --- Discover dev-scripts environment ---
+cd /root/dev-scripts
+source common.sh
+source ocp_install_env.sh
+export KUBECONFIG=$(ls -d /root/dev-scripts/ocp/*/auth/kubeconfig 2>/dev/null | head -1)
+if [[ -z "${KUBECONFIG}" || ! -f "${KUBECONFIG}" ]]; then
+  echo "ERROR: could not locate a unique kubeconfig under /root/dev-scripts/ocp/*/auth/kubeconfig" >&2
+  exit 1
+fi
+cd /
+
+# Discover the SNO node IP from the libvirt DHCP reservation by hostname
+MASTER_VM="${CLUSTER_NAME}_master_0"
+MASTER_HOSTNAME=$(printf "${MASTER_HOSTNAME_FORMAT}" 0)
+DISCOVERED_IP=$(virsh net-dumpxml "${BAREMETAL_NETWORK_NAME}" | \
+  xmllint --xpath "string(//host[@name='${MASTER_HOSTNAME}']/@ip)" -)
+if [[ -z "${DISCOVERED_IP}" ]]; then
+  echo "ERROR: could not discover SNO node IP from network ${BAREMETAL_NETWORK_NAME} for host ${MASTER_HOSTNAME}" >&2
+  virsh net-dumpxml "${BAREMETAL_NETWORK_NAME}" >&2
+  exit 1
+fi
+
+export PREVIOUS_CLUSTER_NAME="${PREVIOUS_CLUSTER_NAME:-${CLUSTER_NAME:-ostest}}"
+export PREVIOUS_BASE_DOMAIN="${PREVIOUS_BASE_DOMAIN:-${BASE_DOMAIN:-test.metalkube.org}}"
+export PREVIOUS_HOSTNAME="${PREVIOUS_HOSTNAME:-${MASTER_HOSTNAME}}"
 export NEW_CLUSTER_NAME="${NEW_CLUSTER_NAME:-another-name}"
 export NEW_BASE_DOMAIN="${NEW_BASE_DOMAIN:-another.domain}"
 export NEW_HOSTNAME="${NEW_HOSTNAME:-another-hostname}"
-export SINGLE_NODE_IP="${SINGLE_NODE_IP:-192.168.127.10}"
+export SINGLE_NODE_IP="${SINGLE_NODE_IP:-${DISCOVERED_IP}}"
 export ADDITIONAL_NODE_IP="${ADDITIONAL_NODE_IP:-192.168.145.10}"
+
+# Create a secondary libvirt network for the additional IP
+ADDITIONAL_NETWORK_NAME="recert-secondary"
+ADDITIONAL_MAC="52:54:00:ee:42:99"
+if ! virsh net-info "${ADDITIONAL_NETWORK_NAME}" &>/dev/null; then
+  cat > /tmp/recert-secondary-net.xml <<NETXML
+<network>
+  <name>${ADDITIONAL_NETWORK_NAME}</name>
+  <forward mode="nat"/>
+  <bridge name="virbr-recert" stp="on" delay="0"/>
+  <ip address="192.168.145.1" netmask="255.255.255.0">
+    <dhcp>
+      <host mac="${ADDITIONAL_MAC}" ip="${ADDITIONAL_NODE_IP}"/>
+    </dhcp>
+  </ip>
+</network>
+NETXML
+  virsh net-define /tmp/recert-secondary-net.xml
+  virsh net-start "${ADDITIONAL_NETWORK_NAME}"
+fi
+
+# Hot-attach the secondary interface to the SNO VM
+if ! virsh domiflist "${MASTER_VM}" | grep -q "${ADDITIONAL_NETWORK_NAME}"; then
+  virsh attach-interface "${MASTER_VM}" network "${ADDITIONAL_NETWORK_NAME}" \
+    --model virtio --mac "${ADDITIONAL_MAC}" --live --config
+fi
+
+# Wait for the VM to acquire the DHCP lease on the secondary network
+echo "Waiting for ${ADDITIONAL_NODE_IP} to become reachable..."
+for i in $(seq 1 30); do
+  if ping -c 1 -W 2 "${ADDITIONAL_NODE_IP}" > /dev/null 2>&1; then
+    echo "Secondary IP reachable after $((i * 2)) seconds"
+    break
+  fi
+  if [[ "${i}" -eq 30 ]]; then
+    echo "ERROR: ${ADDITIONAL_NODE_IP} never became reachable" >&2
+    exit 1
+  fi
+  sleep 2
+done
+
 export SINGLE_NODE_NETWORK_PREFIX="$(echo ${SINGLE_NODE_IP} | cut -d '.' -f 1,2,3).0"
 export ADDITIONAL_NODE_NETWORK_PREFIX="$(echo ${ADDITIONAL_NODE_IP} | cut -d '.' -f 1,2,3).0"
+
+echo "=== Recert rename configuration ==="
+echo "SINGLE_NODE_IP=${SINGLE_NODE_IP}"
+echo "ADDITIONAL_NODE_IP=${ADDITIONAL_NODE_IP}"
+echo "PREVIOUS_CLUSTER_NAME=${PREVIOUS_CLUSTER_NAME}"
+echo "PREVIOUS_BASE_DOMAIN=${PREVIOUS_BASE_DOMAIN}"
+echo "PREVIOUS_HOSTNAME=${PREVIOUS_HOSTNAME}"
+echo "NEW_CLUSTER_NAME=${NEW_CLUSTER_NAME}"
+echo "NEW_BASE_DOMAIN=${NEW_BASE_DOMAIN}"
+echo "NEW_HOSTNAME=${NEW_HOSTNAME}"
 
 export SSH_OPTS=(-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2)
 
@@ -34,22 +108,26 @@ function info {
 }
 
 function gather_recert_logs {
+  # After recert the node may be on either IP
+  local log_ip="${ADDITIONAL_NODE_IP}"
+  if ! ssh ${SSH_OPTS[@]} core@${log_ip} true 2>/dev/null; then
+    log_ip="${SINGLE_NODE_IP}"
+  fi
+
   info "Saving systemd recert.service log to /tmp/recert.log..."
-  ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "journalctl -u recert.service > /tmp/recert.log"
+  ssh ${SSH_OPTS[@]} core@${log_ip} "journalctl -u recert.service > /tmp/recert.log"
 
   info "Adding systemd recert.service log to CI artifacts..."
-  scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/tmp/recert.log /tmp/artifacts
+  scp ${SSH_OPTS[@]} core@${log_ip}:/tmp/recert.log /tmp/artifacts
 
   info "Adding recert_summary_clean.yaml to CI artifacts..."
-  scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/etc/kubernetes/recert_summary_clean.yaml /tmp/artifacts
+  scp ${SSH_OPTS[@]} core@${log_ip}:/etc/kubernetes/recert_summary_clean.yaml /tmp/artifacts
 }
 trap gather_recert_logs EXIT TERM
 
-# assisted-test-infra sets up 2 network interfaces that compete with each other
-# when setting the NODE_IP and KUBELET_NODEIP. Use KUBELET_NODEIP_HINT to
-# ensure the correct interface is chosen.
-#
-# https://access.redhat.com/articles/6956852
+# The secondary recert-secondary network gives the VM a second interface.
+# Set KUBELET_NODEIP_HINT to the primary network prefix so kubelet
+# uses the original IP until recert's update_node_ip changes it.
 ssh ${SSH_OPTS[@]} "core@${SINGLE_NODE_IP}" \
   "echo KUBELET_NODEIP_HINT=${SINGLE_NODE_NETWORK_PREFIX} | sudo tee /etc/default/nodeip-configuration"
 
@@ -127,14 +205,14 @@ function recert {
   local etcd_image="\${ETCD_IMAGE}"
   local recert_image="${RECERT_IMAGE:-quay.io/edge-infrastructure/recert:latest}"
   echo "recert image: \${recert_image}"
-  local previous_base_domain="${PREVIOUS_BASE_DOMAIN:-redhat.com}"
+  local previous_base_domain="${PREVIOUS_BASE_DOMAIN}"
   local previous_cluster_name="${PREVIOUS_CLUSTER_NAME:-ostest}"
   local new_base_domain="${NEW_BASE_DOMAIN:-another.domain}"
   local new_cluster_name="${NEW_CLUSTER_NAME:-another-name}"
   local previous_hostname="${PREVIOUS_HOSTNAME:-ostest-master-0}"
   local new_hostname="${NEW_HOSTNAME:-another-hostname}"
-  local old_ip="${SINGLE_NODE_IP:-192.168.127.10}"
-  local new_ip="${ADDITIONAL_NODE_IP:-192.168.145.10}"
+  local old_ip="${SINGLE_NODE_IP}"
+  local new_ip="${ADDITIONAL_NODE_IP}"
 
 
   podman run --authfile=/var/lib/kubelet/config.json \
@@ -367,17 +445,20 @@ info "Waiting for master MachineConfigPool to have condition=updating..."
 oc wait --for=condition=updating machineconfigpools master --timeout 10m
 
 info "Waiting for recert to be completed..."
+# After the MachineConfig triggers a reboot and recert runs update_node_ip,
+# the node switches from SINGLE_NODE_IP to ADDITIONAL_NODE_IP. Poll both.
 while true; do
-  if ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} test -e /var/recert.done; then
-    info "Recert completed successfully"
-    break
-  elif ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} test -e /var/recert.failed; then
-    info "Recert failed"
-    break
-  else
-    info "Waiting for recert to be completed..."
-    sleep 5
-  fi
+  for poll_ip in "${SINGLE_NODE_IP}" "${ADDITIONAL_NODE_IP}"; do
+    if ssh ${SSH_OPTS[@]} core@${poll_ip} test -e /var/recert.done 2>/dev/null; then
+      info "Recert completed successfully (reached via ${poll_ip})"
+      break 2
+    elif ssh ${SSH_OPTS[@]} core@${poll_ip} test -e /var/recert.failed 2>/dev/null; then
+      info "Recert failed (reached via ${poll_ip})"
+      break 2
+    fi
+  done
+  info "Waiting for recert to be completed..."
+  sleep 5
 done
 
 sed -i -e "s/${PREVIOUS_CLUSTER_NAME}/${NEW_CLUSTER_NAME}/g" -e "s/${PREVIOUS_BASE_DOMAIN}/${NEW_BASE_DOMAIN}/g" ${KUBECONFIG}
@@ -392,12 +473,13 @@ do
 done
 
 info "Waiting for OCP stabilization..."
-until ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt" &> /dev/null
+RECERT_NODE_IP="${ADDITIONAL_NODE_IP}"
+until ssh ${SSH_OPTS[@]} core@${RECERT_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt" &> /dev/null
 do
   info "Waiting for OCP stabilization..."
   sleep 5
 done
-info $(ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt")
+info $(ssh ${SSH_OPTS[@]} core@${RECERT_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt")
 
 info "Checking for etcd, kube-apiserver, kube-controller-manager and kube-scheduler revision triggers in the respective cluster operator logs..."
 declare -a components=(
