@@ -362,6 +362,40 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: hypershift-kubevirt-conformance
 - always_run: false
+  as: metal-ds-ipi-ovn-dualstack-kubevirt-hypershift
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      HYPERSHIFT_NODE_COUNT: "3"
+      HYPERSHIFT_NODE_MEMORY: "16"
+    test:
+    - as: wait
+      cli: latest
+      commands: |
+        echo "Cluster is ready. Waiting 12 hours for debugging..."
+        echo "Management cluster KUBECONFIG: \$KUBECONFIG"
+        echo "Hosted cluster KUBECONFIG: \${SHARED_DIR}/nested_kubeconfig"
+        echo ""
+        echo "To access the hosted cluster:"
+        echo "  export KUBECONFIG=\${SHARED_DIR}/nested_kubeconfig"
+        echo "  oc get nodes"
+        echo ""
+        oc get nodes
+        echo ""
+        echo "Sleeping for 12 hours..."
+        sleep 43200
+        echo "Wait complete."
+      from: stable:cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 12h30m0s
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-kubevirt-hypershift
+- always_run: false
   as: qe-perfscale-aws-ovn-medium-cluster-density
   optional: true
   steps:
