@@ -537,7 +537,8 @@ omr_cli_tmp=$(mktemp "${SHARED_DIR}/.omr_mirrored_cli_image.XXXXXX")
 omr_completed_tmp=$(mktemp "${SHARED_DIR}/.omr_mirror_completed_at.XXXXXX")
 printf '%s\n' "${component_mirror}" > "${omr_repository_tmp}"
 printf '%s@%s\n' "${component_mirror}" "${cli_digest}" > "${omr_cli_tmp}"
-date -u +%Y-%m-%dT%H:%M:%SZ > "${omr_completed_tmp}"
+# Older systemd versions reject RFC 3339's T/Z form in journalctl --since.
+date -u '+%Y-%m-%d %H:%M:%S UTC' > "${omr_completed_tmp}"
 chmod 0644 \
   "${install_patch_tmp}" \
   "${signature_json_tmp}" \
