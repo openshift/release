@@ -81,6 +81,8 @@ kind: CatalogSource
 metadata:
   $CS_NAMESTANZA
   namespace: $CS_NAMESPACE
+  annotations:
+    openshift.io/required-scc: anyuid
 spec:
   sourceType: grpc
   image: "$OO_INDEX"
