@@ -7,7 +7,7 @@ set -o pipefail
 # After IPI terraform brings up masters (WORKER_REPLICAS=0), create workers the UPI way
 # (virt-install + ignition disk) so s390x avoids machine-api/libvirt ACPI domain XML.
 
-# libvirt-installer image sets PATH=/bin; oc/virsh helpers live under /usr/bin.
+# libvirt-installer image sets PATH=/bin; tools and injected oc (cli: latest) live under /usr/bin.
 export PATH="/usr/bin:/bin:${PATH:-}"
 
 if [[ -z "${LEASED_RESOURCE:-}" ]]; then
