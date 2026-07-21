@@ -624,6 +624,14 @@ start_istio_proxy_log_collector
 start_dns_log_collector
 start_live_resource_monitor
 
+echo "=== Pre-test Backend Diagnostics ==="
+echo "--- Checking for existing backend pods in kuadrant namespace ---"
+oc get pods -n kuadrant -l app=backend -o wide 2>&1 || echo "No backend pods found yet (expected before tests start)"
+echo "--- Checking HTTPRoute backends ---"
+oc get httproutes -n kuadrant -o yaml 2>&1 | grep -A 10 "backendRefs:" || echo "No HTTPRoutes found yet"
+echo "--- Checking Services in kuadrant namespace ---"
+oc get svc -n kuadrant -o wide 2>&1 || echo "No services yet"
+
 echo "=== Launching test-runner Job ==="
 oc apply -f "${JOB_FILE}"
 
@@ -646,7 +654,42 @@ if [[ -n "${RUNNER_POD}" ]]; then
   # Wait until the container is running (image pull can take a while), then follow.
   oc -n "${TEST_RUNNER_NAMESPACE}" wait --for=condition=Ready \
     "pod/${RUNNER_POD}" --timeout=600s 2>/dev/null || true
+
+  # Start backend monitoring in background (logs to stdout every 30s)
+  (
+    echo "=== Starting backend monitor (logs every 30s while tests run) ==="
+    iteration=0
+    while true; do
+      sleep 30
+      iteration=$((iteration + 1))
+      echo "=== Backend Monitor Snapshot ${iteration} at $(date -u +%H:%M:%S) ==="
+      echo "--- Backend pods ---"
+      oc get pods -n kuadrant -l app=backend -o wide 2>&1 || echo "No backend pods"
+      # Show pod readiness and age
+      for pod in $(oc get pods -n kuadrant -l app=backend -o name 2>/dev/null); do
+        pod_name=$(basename "${pod}")
+        echo "  Pod ${pod_name}:"
+        echo "    Status: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.phase}' 2>&1 || echo 'N/A')"
+        echo "    Ready: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>&1 || echo 'N/A')"
+        echo "    Image: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.spec.containers[0].image}' 2>&1 || echo 'N/A')"
+        echo "    Restarts: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>&1 || echo 'N/A')"
+      done
+      echo "--- Backend services ---"
+      oc get svc -n kuadrant -l app=backend -o wide 2>&1 || echo "No backend services"
+      echo "--- HTTPRoutes ---"
+      oc get httproutes -n kuadrant -o name 2>&1 | head -5 || echo "No HTTPRoutes"
+    done
+  ) &
+  BACKEND_MONITOR_PID=$!
+  echo "Backend monitor started (PID ${BACKEND_MONITOR_PID})"
+
   oc -n "${TEST_RUNNER_NAMESPACE}" logs -f "job/${JOB_NAME}" 2>&1 | tee "${JOB_LOG}" || true
+
+  # Stop backend monitor
+  if [[ -n "${BACKEND_MONITOR_PID:-}" ]]; then
+    echo "=== Stopping backend monitor (PID ${BACKEND_MONITOR_PID}) ==="
+    kill_pid_tree "${BACKEND_MONITOR_PID}" 2>/dev/null || true
+  fi
 
   echo "=== Waiting for Job completion ==="
   deadline=$(( $(date +%s) + JOB_ACTIVE_DEADLINE ))
@@ -720,9 +763,29 @@ if [[ "${FAILED}" -ne 0 ]]; then
     oc logs -n kuadrant-system "${pod_name}" --tail=300 2>&1 | tee -a "${ARTIFACT_DIR}/dns-operator-logs.log" || true
   done
 
-  # Backend pod logs (MockServer or httpbin)
-  echo "=== Backend pods in kuadrant namespace ===" | tee "${ARTIFACT_DIR}/backend-diagnostics.log"
+  # Backend pod logs and diagnostics
+  echo "=== Backend Diagnostics ===" | tee "${ARTIFACT_DIR}/backend-diagnostics.log"
+  echo "--- Backend pods in kuadrant namespace ---" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
   oc get pods -n kuadrant -l app=backend -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log" || true
+
+  # Detailed backend pod information
+  echo "--- Backend pod details ---" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
+  for pod in $(oc get pods -n kuadrant -l app=backend -o name 2>/dev/null); do
+    pod_name=$(basename "${pod}")
+    echo "=== Pod: ${pod_name} ===" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
+    echo "Image: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.spec.containers[0].image}' 2>&1)" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
+    echo "Status: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.phase}' 2>&1)" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
+    echo "Ready: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>&1)" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
+    echo "Restarts: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>&1)" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
+
+    # Check if pod has readiness probe
+    echo "Readiness Probe:" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
+    oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.spec.containers[0].readinessProbe}' 2>&1 | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log" || echo "  No readiness probe" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
+    echo "" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
+  done
+
+  # Backend pod logs
+  echo "--- Backend pod logs ---" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
   for pod in $(oc get pods -n kuadrant -l app=backend -o name 2>/dev/null); do
     pod_name=$(basename "${pod}")
     echo "=== Logs for ${pod_name} ===" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
@@ -756,6 +819,22 @@ if [[ "${FAILED}" -ne 0 ]]; then
   echo "=== Kuadrant Policies ===" | tee "${ARTIFACT_DIR}/policies.log"
   oc get ratelimitpolicies -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/policies.yaml" || true
   oc get authpolicies -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/policies.yaml" || true
+
+  # Test backend connectivity directly
+  echo "=== Testing Backend Connectivity ===" | tee "${ARTIFACT_DIR}/backend-connectivity-test.log"
+  for svc in $(oc get svc -n kuadrant -l app=backend -o name 2>/dev/null); do
+    svc_name=$(basename "${svc}")
+    svc_ip="$(oc get svc -n kuadrant "${svc_name}" -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)"
+    svc_port="$(oc get svc -n kuadrant "${svc_name}" -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || true)"
+    if [[ -n "${svc_ip}" && -n "${svc_port}" ]]; then
+      echo "Testing backend ${svc_name} at ${svc_ip}:${svc_port}" | tee -a "${ARTIFACT_DIR}/backend-connectivity-test.log"
+      # Try to curl /get endpoint
+      oc run backend-test-${RANDOM} --image=registry.access.redhat.com/ubi9/ubi-minimal:latest --rm -i --restart=Never -- \
+        sh -c "microdnf install -y curl && curl -v http://${svc_ip}:${svc_port}/get" 2>&1 \
+        | tee -a "${ARTIFACT_DIR}/backend-connectivity-test.log" || true
+      echo "---" | tee -a "${ARTIFACT_DIR}/backend-connectivity-test.log"
+    fi
+  done
 
   # Test a sample Route from inside cluster
   echo "=== Testing Route connectivity from cluster ===" | tee "${ARTIFACT_DIR}/route-connectivity-test.log"
