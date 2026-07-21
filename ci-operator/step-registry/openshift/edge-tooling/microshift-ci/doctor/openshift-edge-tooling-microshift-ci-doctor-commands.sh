@@ -256,6 +256,7 @@ cd "${SRC_DIR}"
 # from being included in the analysis and bug creation.
 echo "Running automatic closing of duplicate rebase PRs..."
 "${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
+    --component microshift \
     --mode close-duplicates \
     --execute \
     --author 'microshift-rebase-script[bot]' \
@@ -336,6 +337,7 @@ check_claude_rc "${CLAUDE_RC}" "doctor-refresh" 10
 # complete successfully, the PR will be automatically merged.
 echo "Running automatic restart of failed rebase PRs tests..."
 "${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
+    --component microshift \
     --mode restart \
     --execute \
     --author 'microshift-rebase-script[bot]'
