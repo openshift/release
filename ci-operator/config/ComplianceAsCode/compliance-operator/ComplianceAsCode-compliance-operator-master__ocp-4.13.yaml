@@ -1,0 +1,179 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.13"
+  initial:
+    integration:
+      name: "4.13"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: e2e-aws-prerelease-f14
+  cron: 12 15 1,15 * *
+  steps:
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      CATALOG_SOURCE_NAME: compliance-operator
+      OO_BUNDLE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-bundle-release:release-1.9
+      OO_INSTALL_NAMESPACE: openshift-compliance
+      TEST_TYPE: release
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: optional-operators-operator-sdk-non-ci-bundle-image
+    - as: test
+      cli: latest
+      commands: make e2e-prerelease
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-parallel-f14
+  cron: 12 15 1,15 * *
+  steps:
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      CATALOG_SOURCE_NAME: compliance-operator
+      OO_BUNDLE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-bundle-release:release-1.9
+      OO_INSTALL_NAMESPACE: openshift-compliance
+      TEST_TYPE: release
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: optional-operators-operator-sdk-non-ci-bundle-image
+    - as: test
+      cli: latest
+      commands: make e2e-parallel
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-serial-f14
+  cron: 12 15 1,15 * *
+  steps:
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      CATALOG_SOURCE_NAME: compliance-operator
+      OO_BUNDLE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-bundle-release:release-1.9
+      OO_INSTALL_NAMESPACE: openshift-compliance
+      TEST_TYPE: release
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: optional-operators-operator-sdk-non-ci-bundle-image
+    - as: test
+      cli: latest
+      commands: make e2e-serial
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-deployment-f14
+  cron: 12 15 1,15 * *
+  steps:
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      CATALOG_SOURCE_NAME: compliance-operator
+      OO_BUNDLE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-bundle-release:release-1.9
+      OO_INSTALL_NAMESPACE: openshift-compliance
+      TEST_TYPE: release
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: optional-operators-operator-sdk-non-ci-bundle-image
+    - as: test
+      cli: latest
+      commands: make e2e-deployment
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-config-f14
+  cron: 12 15 1,15 * *
+  steps:
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      CATALOG_SOURCE_NAME: compliance-operator
+      OO_BUNDLE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-bundle-release:release-1.9
+      OO_INSTALL_NAMESPACE: openshift-compliance
+      TEST_TYPE: release
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: optional-operators-operator-sdk-non-ci-bundle-image
+    - as: test
+      cli: latest
+      commands: make e2e-config
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-tailoring-f14
+  cron: 12 15 1,15 * *
+  steps:
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      CATALOG_SOURCE_NAME: compliance-operator
+      OO_BUNDLE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-bundle-release:release-1.9
+      OO_INSTALL_NAMESPACE: openshift-compliance
+      TEST_TYPE: release
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: optional-operators-operator-sdk-non-ci-bundle-image
+    - as: test
+      cli: latest
+      commands: make e2e-tailoring
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-cel-f14
+  cron: 12 15 1,15 * *
+  steps:
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      CATALOG_SOURCE_NAME: compliance-operator
+      OO_BUNDLE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-bundle-release:release-1.9
+      OO_INSTALL_NAMESPACE: openshift-compliance
+      TEST_TYPE: release
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: optional-operators-operator-sdk-non-ci-bundle-image
+    - as: test
+      cli: latest
+      commands: make e2e-cel
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: ComplianceAsCode
+  repo: compliance-operator
+  variant: ocp-4.13
