@@ -17,7 +17,7 @@ trap collect_artifacts EXIT TERM
 cat >"${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-step.sh <<"EOF"
 #!/usr/bin/env bash
 
-export PREVIOUS_CLUSTER_NAME="${PREVIOUS_CLUSTER_NAME:-test-infra-cluster}"
+export PREVIOUS_CLUSTER_NAME="${PREVIOUS_CLUSTER_NAME:-ostest}"
 export PREVIOUS_BASE_DOMAIN="${PREVIOUS_BASE_DOMAIN:-redhat.com}"
 export NEW_CLUSTER_NAME="${NEW_CLUSTER_NAME:-another-name}"
 export NEW_BASE_DOMAIN="${NEW_BASE_DOMAIN:-another.domain}"
@@ -128,10 +128,10 @@ function recert {
   local recert_image="${RECERT_IMAGE:-quay.io/edge-infrastructure/recert:latest}"
   echo "recert image: \${recert_image}"
   local previous_base_domain="${PREVIOUS_BASE_DOMAIN:-redhat.com}"
-  local previous_cluster_name="${PREVIOUS_CLUSTER_NAME:-test-infra-cluster}"
+  local previous_cluster_name="${PREVIOUS_CLUSTER_NAME:-ostest}"
   local new_base_domain="${NEW_BASE_DOMAIN:-another.domain}"
   local new_cluster_name="${NEW_CLUSTER_NAME:-another-name}"
-  local previous_hostname="${PREVIOUS_HOSTNAME:-test-infra-cluster-master-0}"
+  local previous_hostname="${PREVIOUS_HOSTNAME:-ostest-master-0}"
   local new_hostname="${NEW_HOSTNAME:-another-hostname}"
   local old_ip="${SINGLE_NODE_IP:-192.168.127.10}"
   local new_ip="${ADDITIONAL_NODE_IP:-192.168.145.10}"

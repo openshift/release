@@ -1,0 +1,25 @@
+workflow:
+  as: review-agent
+  steps:
+    pre:
+      - ref: jira-agent-github-app-auth
+      - ref: review-agent-setup
+    test:
+      - ref: review-agent-process
+    post:
+      - ref: review-agent-report
+  documentation: |-
+    Generic review agent workflow for automated PR review comment handling.
+
+    This workflow processes a single PR per invocation:
+    1. Pre: Generates GitHub App tokens (jira-agent-github-app-auth) and
+       verifies Claude Code CLI availability (review-agent-setup)
+    2. Test: Addresses review comments using /openshift-developer:address-review-pr
+    3. Post: Generates HTML report with token usage, cost estimates, and action badges
+
+    Teams onboard by creating a thin wrapper workflow that sets two env vars:
+    - REVIEW_AGENT_FORK_REPO: Fork repo URL to clone and push to
+    - REVIEW_AGENT_UPSTREAM_REPO: Upstream owner/repo for gh CLI operations
+
+    Teams with a different credential secret create thin ref YAML wrappers
+    pointing to the generic commands scripts. See ONBOARDING.md.

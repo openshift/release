@@ -317,12 +317,6 @@ CONFIG = {
     'aro-hcp-dev-quota-slice': {
         'default': 14,
     },
-    'aro-hcp-dev-global-pipeline-quota-slice': {
-        'default': 1,
-    },
-    'aro-hcp-dev-cspr-pipeline-quota-slice': {
-        'default': 1,
-    },
     'aro-hcp-dev-image-push-quota-slice': {
         'default': 1,
     },
@@ -340,6 +334,7 @@ CONFIG = {
     'aro-hcp-prod-shard0-slot': {},
     'aro-hcp-prod-shard1-slot': {},
     'aro-hcp-stg-shard0-slot': {},
+    'aro-hcp-dev-hypershift-westus3-slot': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
@@ -821,6 +816,8 @@ for i in range(3):
     CONFIG['aro-hcp-prod-shard1-slot']['aro-hcp-prod-shard1-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-dev-hypershift-westus3-slot']['aro-hcp-dev-hypershift-westus3-slot-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
 for i in range(20):
     CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1

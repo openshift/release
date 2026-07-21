@@ -1,9 +1,9 @@
 #!/bin/bash
+set -euxo pipefail
+shopt -s inherit_errexit
 
-set -o nounset
-set -o errexit
-set -o pipefail
-
+# NOTE: UPGRADE_TIMEOUT, POLL_INTERVAL, STALL_WINDOW, OPP_OPERATORS are set via step config YAML
+# (naming deviates from OPP__ convention)
 UPGRADE_TIMEOUT="${UPGRADE_TIMEOUT:-130}"
 POLL_INTERVAL="${POLL_INTERVAL:-60}"
 STALL_WINDOW="${STALL_WINDOW:-10}"
@@ -14,373 +14,431 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
-debug_on_exit() {
-    if (( EXIT_CODE != 0 )); then
-        echo -e "\n### DEBUG: Upgrade failure diagnostics ###\n"
-        if [[ -n "${TARGET_MINOR_VERSION:-}" ]] && (( TARGET_MINOR_VERSION >= 16 )); then
-            echo -e "\n# oc adm upgrade status\n"
+typeset -i exitCode=0
+typeset upgradeTarget=""
+typeset targetVersion=""
+typeset -i targetMinorVersion=0
+typeset sourceVersion=""
+typeset -i sourceMinorVersion=0
+typeset isForceUpdate="false"
+
+DebugOnExit() {
+    if (( exitCode != 0 )); then
+        : "### DEBUG: Upgrade failure diagnostics ###"
+        if [[ -n "${targetMinorVersion:-}" ]] && (( targetMinorVersion >= 16 )); then
+            : "# oc adm upgrade status"
             env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status --details=all || true
         fi
-        echo -e "\n# ClusterVersion YAML\n$(oc get clusterversion/version -oyaml 2>/dev/null || echo 'unavailable')"
-        echo -e "\n# MachineConfigs\n$(oc get machineconfig 2>/dev/null || echo 'unavailable')"
+        : "# ClusterVersion YAML"
+        oc get clusterversion/version -oyaml || : "unavailable"
+        : "# MachineConfigs"
+        oc get machineconfig || : "unavailable"
 
-        echo -e "\n# Abnormal nodes\n"
-        oc get node --no-headers 2>/dev/null | awk '$2 != "Ready" {print $1}' | while read -r node; do
-            echo -e "\n### oc describe node ${node} ###\n$(oc describe node "${node}" 2>/dev/null)"
-        done
+        : "# Abnormal nodes"
+        oc get node -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status!="True")) | .metadata.name' | while read -r node; do
+            : "### oc describe node ${node} ###"
+            oc describe node "${node}" || true
+        done || true
 
-        echo -e "\n# Abnormal ClusterOperators\n"
-        oc get co --no-headers 2>/dev/null | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read -r co; do
-            echo -e "\n### oc describe co ${co} ###\n$(oc describe co "${co}" 2>/dev/null)"
-        done
+        : "# Abnormal ClusterOperators"
+        oc get co -o json | jq -r '.items[] | select(
+            (.status.conditions[] | select(.type=="Available")).status != "True" or
+            (.status.conditions[] | select(.type=="Progressing")).status != "False" or
+            (.status.conditions[] | select(.type=="Degraded")).status != "False"
+        ) | .metadata.name' | while read -r co; do
+            : "### oc describe co ${co} ###"
+            oc describe co "${co}" || true
+        done || true
 
-        echo -e "\n# Abnormal MachineConfigPools\n"
-        oc get machineconfigpools --no-headers 2>/dev/null | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read -r mcp; do
-            echo -e "\n### oc describe mcp ${mcp} ###\n$(oc describe mcp "${mcp}" 2>/dev/null)"
-        done
+        : "# Abnormal MachineConfigPools"
+        oc get machineconfigpools -o json | jq -r '.items[] | select(
+            (.status.conditions[] | select(.type=="Updated")).status != "True" or
+            (.status.conditions[] | select(.type=="Updating")).status != "False" or
+            (.status.conditions[] | select(.type=="Degraded")).status != "False"
+        ) | .metadata.name' | while read -r mcp; do
+            : "### oc describe mcp ${mcp} ###"
+            oc describe mcp "${mcp}" || true
+        done || true
 
-        echo -e "\n# OPP Operator CSVs\n$(oc get csv -A 2>/dev/null || echo 'unavailable')"
+        : "# OPP Operator CSVs"
+        oc get csv -A || : "unavailable"
     fi
 }
 
-trap 'EXIT_CODE=$?; debug_on_exit' EXIT TERM
+trap 'exitCode=$?; DebugOnExit' EXIT TERM
 
-KUBECONFIG="" oc --loglevel=8 registry login
+set +x
+KUBECONFIG="" oc registry login
+set -x
 
-resolve_target_image() {
-    local target="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
-    if [[ -z "${target}" ]]; then
-        echo >&2 "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is not set; cannot resolve upgrade target"
+ResolveTargetImage() {
+    typeset image="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
+    if [[ -z "${image}" ]]; then
+        : "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is not set; cannot resolve upgrade target"
         exit 3
     fi
-    echo "Target image: ${target}"
-    TARGET="${target}"
+    : "Target image: ${image}"
+    upgradeTarget="${image}"
 }
 
-check_signed() {
-    local digest algorithm hash_value response try max_retries=3 payload="${1}"
+CheckSigned() {
+    typeset payload="${1:-}"; (($#)) && shift
+    typeset digest="" algorithm="" hashValue=""
+    typeset -i response=0 try=0 maxRetries=3
     if [[ "${payload}" =~ "@sha256:" ]]; then
         digest="$(echo "${payload}" | cut -f2 -d@)"
     else
         digest="$(oc image info "${payload}" -o json | jq -r '.digest')"
     fi
-    echo "Image digest: ${digest}"
+    : "Image digest: ${digest}"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
-    hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    try=0
-    response=0
-    while (( try < max_retries && response != 200 )); do
-        echo "Signature check attempt #${try}"
+    hashValue="$(echo "${digest}" | cut -f2 -d:)"
+    while (( try < maxRetries && response != 200 )); do
+        : "Signature check attempt #${try}"
         response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null \
+            --connect-timeout 10 --max-time 30 \
             --write-out "%{http_code}" \
-            "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+            "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hashValue}/signature-1")
         (( try += 1 ))
-        if (( response != 200 && try < max_retries )); then
+        if (( response != 200 && try < maxRetries )); then
             sleep 60
         fi
     done
     if (( response == 200 )); then
-        echo "Image is signed" && return 0
+        : "Image is signed"
+        return 0
     else
-        echo "Image is not signed" && return 1
+        : "Image is not signed"
+        return 1
     fi
 }
 
-admin_ack() {
-    local source_minor="${1}" target_minor="${2}"
-    if (( source_minor == target_minor )) || (( source_minor < 8 )); then
-        echo "Admin ack not required (z-stream or pre-4.8)" && return 0
+AdminAck() {
+    typeset -i srcMinor="${1:-0}"; (($#)) && shift
+    typeset -i tgtMinor="${1:-0}"; (($#)) && shift
+    if (( srcMinor == tgtMinor )) || (( srcMinor < 8 )); then
+        : "Admin ack not required (z-stream or pre-4.8)"
+        return 0
     fi
 
-    local gates
-    gates="$(oc -n openshift-config-managed get configmap admin-gates -o json 2>/dev/null | jq -r '.data' 2>/dev/null)" || true
+    typeset gates=""
+    gates="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r '.data')" || true
     if [[ -z "${gates}" || "${gates}" == "null" ]]; then
-        echo "No admin gates found" && return 0
+        : "No admin gates found"
+        return 0
     fi
-    echo -e "Admin gates:\n${gates}"
+    : "Admin gates: ${gates}"
 
-    if [[ ${gates} != *"ack-4.${source_minor}"* ]]; then
-        echo "No acks required for source minor version ${source_minor}" && return 0
+    if [[ ${gates} != *"ack-4.${srcMinor}"* ]]; then
+        : "No acks required for source minor version ${srcMinor}"
+        return 0
     fi
 
-    echo "Patching admin acks for 4.${source_minor} -> 4.${target_minor}"
-    local ack_keys
-    ack_keys="$(echo "${gates}" | jq -r 'keys[]')"
-    for ack in ${ack_keys}; do
-        if [[ "${ack}" == *"ack-4.${source_minor}"* ]]; then
-            echo "Applying ack: ${ack}"
+    : "Patching admin acks for 4.${srcMinor} -> 4.${tgtMinor}"
+    typeset ackKeys=""
+    ackKeys="$(echo "${gates}" | jq -r 'keys[]')"
+    typeset ack=""
+    for ack in ${ackKeys}; do
+        if [[ "${ack}" == *"ack-4.${srcMinor}"* ]]; then
+            : "Applying ack: ${ack}"
             oc -n openshift-config patch configmap admin-acks \
                 --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
         fi
     done
 
-    echo "Waiting for admin acks to take effect (up to 5 minutes)"
-    local elapsed=0
+    : "Waiting for admin acks to take effect (up to 5 minutes)"
+    typeset -i elapsed=0
     while (( elapsed < 5 )); do
         sleep 1m
         (( elapsed += 1 ))
-        if ! oc adm upgrade 2>&1 | grep -q "AdminAckRequired"; then
-            echo "Admin acks applied successfully"
+        typeset upgradeOutput=""
+        upgradeOutput="$(oc adm upgrade 2>&1)" || true
+        if [[ "${upgradeOutput}" != *"AdminAckRequired"* ]]; then
+            : "Admin acks applied successfully"
             return 0
         fi
-        echo "Still waiting... (${elapsed}/5 min)"
+        : "Still waiting... (${elapsed}/5 min)"
     done
-    echo >&2 "Timed out waiting for admin acks"
+    : "Timed out waiting for admin acks"
     return 1
 }
 
-update_cco_annotation() {
-    local source_version="${1}" target_version="${2}"
-    local source_minor target_minor
-    source_minor="$(echo "${source_version}" | cut -f2 -d.)"
-    target_minor="$(echo "${target_version}" | cut -f2 -d.)"
+UpdateCcoAnnotation() {
+    typeset srcVersion="${1:-}"; (($#)) && shift
+    typeset tgtVersion="${1:-}"; (($#)) && shift
+    typeset -i srcMinor=0 tgtMinor=0
+    srcMinor="$(echo "${srcVersion}" | cut -f2 -d.)"
+    tgtMinor="$(echo "${tgtVersion}" | cut -f2 -d.)"
 
-    if (( source_minor == target_minor )) || (( source_minor < 8 )); then
-        echo "CCO annotation not required (z-stream or pre-4.8)" && return 0
+    if (( srcMinor == tgtMinor )) || (( srcMinor < 8 )); then
+        : "CCO annotation not required (z-stream or pre-4.8)"
+        return 0
     fi
 
-    local cco_mode
-    cco_mode="$(oc get cloudcredential cluster -o jsonpath='{.spec.credentialsMode}' 2>/dev/null)" || true
-    if [[ "${cco_mode}" != "Manual" ]]; then
-        echo "CCO annotation not required (mode: ${cco_mode:-default})" && return 0
+    typeset ccoMode=""
+    ccoMode="$(oc get cloudcredential cluster -o jsonpath='{.spec.credentialsMode}')" || true
+    if [[ "${ccoMode}" != "Manual" ]]; then
+        : "CCO annotation not required (mode: ${ccoMode:-default})"
+        return 0
     fi
 
-    local to_version
-    to_version="$(echo "${target_version}" | cut -f1 -d-)"
-    echo "Patching CCO upgradeable-to annotation: ${to_version}"
+    typeset toVersion=""
+    toVersion="$(echo "${tgtVersion}" | cut -f1 -d-)"
+    : "Patching CCO upgradeable-to annotation: ${toVersion}"
     oc patch cloudcredential.operator.openshift.io/cluster \
-        --patch '{"metadata":{"annotations": {"cloudcredential.openshift.io/upgradeable-to": "'"${to_version}"'"}}}' \
+        --patch '{"metadata":{"annotations": {"cloudcredential.openshift.io/upgradeable-to": "'"${toVersion}"'"}}}' \
         --type=merge
 
-    echo "Waiting for CCO annotation to take effect (up to 5 minutes)"
-    local elapsed=0
+    : "Waiting for CCO annotation to take effect (up to 5 minutes)"
+    typeset -i elapsed=0
     while (( elapsed < 5 )); do
         sleep 1m
         (( elapsed += 1 ))
-        if ! oc adm upgrade 2>&1 | grep -q "MissingUpgradeableAnnotation"; then
-            echo "CCO annotation applied successfully"
+        typeset upgradeOutput=""
+        upgradeOutput="$(oc adm upgrade 2>&1)" || true
+        if [[ "${upgradeOutput}" != *"MissingUpgradeableAnnotation"* ]]; then
+            : "CCO annotation applied successfully"
             return 0
         fi
-        echo "Still waiting... (${elapsed}/5 min)"
+        : "Still waiting... (${elapsed}/5 min)"
     done
-    echo >&2 "Timed out waiting for CCO annotation"
+    : "Timed out waiting for CCO annotation"
     return 1
 }
 
-initiate_upgrade() {
-    local force_flag="${1}"
-    echo "Initiating upgrade to ${TARGET}"
-    echo "Force flag: ${force_flag}"
-    oc adm upgrade --to-image="${TARGET}" --allow-explicit-upgrade --force="${force_flag}"
-    echo "Upgrade command accepted at $(date '+%F %T')"
+InitiateUpgrade() {
+    typeset isForce="${1:-}"; (($#)) && shift
+    : "Initiating upgrade to ${upgradeTarget}"
+    : "Force flag: ${isForce}"
+    oc adm upgrade --to-image="${upgradeTarget}" --allow-explicit-upgrade --force="${isForce}"
+    : "Upgrade command accepted at $(date '+%F %T')"
 
     sleep 10
-    local progressing
-    progressing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}' 2>/dev/null)" || true
+    typeset progressing=""
+    progressing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')" || true
     if [[ "${progressing}" != "True" ]]; then
-        echo >&2 "WARNING: CVO Progressing is not True after upgrade initiation (status: ${progressing})"
+        : "WARNING: CVO Progressing is not True after upgrade initiation (status: ${progressing})"
     else
-        echo "CVO confirmed Progressing=True"
+        : "CVO confirmed Progressing=True"
     fi
 }
 
-monitor_upgrade() {
-    local poll_count=0
-    local last_progress_change
-    last_progress_change=$(date +%s)
+MonitorUpgrade() {
+    typeset -i pollCount=0
+    typeset -i lastProgressChange=0
+    lastProgressChange=$(date +%s)
 
-    local stat_cmd="oc adm upgrade 2>&1 | grep -vE 'Upstream is unset|Upstream: https|available channels|No updates available|^$'"
-    if (( TARGET_MINOR_VERSION >= 16 )); then
-        stat_cmd="env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 | grep -vE 'no token is currently in use|for additional description and links'"
+    typeset statCmd="oc adm upgrade 2>&1 | grep -vE 'Upstream is unset|Upstream: https|available channels|No updates available|^$'"
+    if (( targetMinorVersion >= 16 )); then
+        statCmd="env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 | grep -vE 'no token is currently in use|for additional description and links'"
     fi
 
-    local prev_status=""
-    local snapshot_dir="${ARTIFACT_DIR:-/tmp}/upgrade-progress"
-    mkdir -p "${snapshot_dir}"
+    typeset prevStatus=""
+    typeset snapshotDir="${ARTIFACT_DIR:-/tmp}/upgrade-progress"
+    mkdir -p "${snapshotDir}"
 
-    echo "Monitoring upgrade (timeout: ${UPGRADE_TIMEOUT}m, poll: ${POLL_INTERVAL}s)"
-    echo "Upgrade monitoring start: $(date '+%F %T')"
-    local start_time deadline
-    start_time=$(date +%s)
-    deadline=$(( start_time + UPGRADE_TIMEOUT * 60 ))
+    : "Monitoring upgrade (timeout: ${UPGRADE_TIMEOUT}m, poll: ${POLL_INTERVAL}s)"
+    : "Upgrade monitoring start: $(date '+%F %T')"
+    typeset -i startTime=0 deadline=0
+    startTime=$(date +%s)
+    deadline=$(( startTime + UPGRADE_TIMEOUT * 60 ))
 
     while (( $(date +%s) < deadline )); do
         sleep "${POLL_INTERVAL}"
-        (( poll_count += 1 ))
+        (( pollCount += 1 ))
 
-        local current_status
-        current_status="$(eval "${stat_cmd}" 2>/dev/null)" || true
-        if [[ -n "${current_status}" && "${current_status}" != "${prev_status}" ]]; then
-            echo -e "=== Upgrade Status $(date '+%T') ===\n${current_status}\n"
-            prev_status="${current_status}"
-            last_progress_change=$(date +%s)
+        typeset currentStatus=""
+        currentStatus="$(eval "${statCmd}")" || true
+        if [[ -n "${currentStatus}" && "${currentStatus}" != "${prevStatus}" ]]; then
+            : "=== Upgrade Status $(date '+%T') ==="
+            echo "${currentStatus}"
+            prevStatus="${currentStatus}"
+            lastProgressChange=$(date +%s)
         fi
 
-        if (( poll_count % 5 == 0 )); then
-            oc get clusterversion version -o json > "${snapshot_dir}/cv-$(date +%s).json" 2>/dev/null || true
+        if (( pollCount % 5 == 0 )); then
+            oc get clusterversion version -o json > "${snapshotDir}/cv-$(date +%s).json" || true
         fi
 
-        local cv_out avail progressing
-        cv_out="$(oc get clusterversion --no-headers 2>/dev/null)" || continue
-        avail="$(echo "${cv_out}" | awk '{print $3}')"
-        progressing="$(echo "${cv_out}" | awk '{print $4}')"
+        typeset avail="" progressing="" cvVersion=""
+        avail="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" || continue
+        progressing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')" || continue
+        cvVersion="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')" || continue
 
-        if [[ "${avail}" == "True" && "${progressing}" == "False" && "${cv_out}" == *"${TARGET_VERSION}"* ]]; then
-            local end_time
-            end_time=$(date +%s)
-            echo "Upgrade completed successfully at $(date '+%F %T')"
-            echo "Elapsed: $(( (end_time - start_time) / 60 ))m"
+        if [[ "${avail}" == "True" && "${progressing}" == "False" && "${cvVersion}" == "${targetVersion}" ]]; then
+            typeset -i endTime=0
+            endTime=$(date +%s)
+            : "Upgrade completed successfully at $(date '+%F %T')"
+            : "Elapsed: $(( (endTime - startTime) / 60 ))m"
             return 0
         fi
 
-        local now stall_seconds
+        typeset -i now=0 stallSeconds=0
         now=$(date +%s)
-        stall_seconds=$(( STALL_WINDOW * 60 ))
-        if (( now - last_progress_change > stall_seconds )); then
-            echo "WARNING: No upgrade progress change in ${STALL_WINDOW} minutes (possible stall)"
-            oc get clusterversion version -o json > "${snapshot_dir}/cv-stall-$(date +%s).json" 2>/dev/null || true
+        stallSeconds=$(( STALL_WINDOW * 60 ))
+        if (( now - lastProgressChange > stallSeconds )); then
+            : "WARNING: No upgrade progress change in ${STALL_WINDOW} minutes (possible stall)"
+            oc get clusterversion version -o json > "${snapshotDir}/cv-stall-$(date +%s).json" || true
         fi
     done
 
-    local end_time
-    end_time=$(date +%s)
-    echo >&2 "Upgrade timed out after ${UPGRADE_TIMEOUT} minutes at $(date '+%F %T')"
-    echo >&2 "Elapsed: $(( (end_time - start_time) / 60 ))m"
+    typeset -i endTime=0
+    endTime=$(date +%s)
+    : "Upgrade timed out after ${UPGRADE_TIMEOUT} minutes at $(date '+%F %T')"
+    : "Elapsed: $(( (endTime - startTime) / 60 ))m"
     exit 2
 }
 
-stabilize_cluster() {
-    echo "Waiting for cluster stability (minimum-stable-period=5m, timeout=30m)"
+StabilizeCluster() {
+    : "Waiting for cluster stability (minimum-stable-period=5m, timeout=30m)"
     oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m
-    echo "Cluster is stable"
+    : "Cluster is stable"
 }
 
-validate_platform_health() {
-    echo "Validating platform health"
+ValidatePlatformHealth() {
+    : "Validating platform health"
 
-    local avail progressing degraded
+    typeset avail="" progressing="" degraded=""
     avail="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')"
     progressing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')"
     degraded="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}')"
     if [[ "${avail}" != "True" || "${progressing}" != "False" || "${degraded}" != "False" ]]; then
-        echo >&2 "CVO health check failed: Available=${avail} Progressing=${progressing} Degraded=${degraded}"
+        : "CVO health check failed: Available=${avail} Progressing=${progressing} Degraded=${degraded}"
         return 1
     fi
-    echo "CVO: Available=True, Progressing=False, Degraded=False"
+    : "CVO: Available=True, Progressing=False, Degraded=False"
 
-    local unhealthy_co
-    unhealthy_co="$(oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}')"
-    if [[ -n "${unhealthy_co}" ]]; then
-        echo >&2 "Unhealthy ClusterOperators: ${unhealthy_co}"
+    typeset unhealthyCo=""
+    unhealthyCo="$(oc get co -o json | jq -r '.items[] | select(
+        (.status.conditions[] | select(.type=="Available")).status != "True" or
+        (.status.conditions[] | select(.type=="Progressing")).status != "False" or
+        (.status.conditions[] | select(.type=="Degraded")).status != "False"
+    ) | .metadata.name')"
+    if [[ -n "${unhealthyCo}" ]]; then
+        : "Unhealthy ClusterOperators: ${unhealthyCo}"
         return 1
     fi
-    echo "All ClusterOperators healthy"
+    : "All ClusterOperators healthy"
 
-    local unready_nodes
-    unready_nodes="$(oc get node --no-headers | awk '$2 != "Ready" {print $1}')"
-    if [[ -n "${unready_nodes}" ]]; then
-        echo >&2 "Not-Ready nodes: ${unready_nodes}"
+    typeset unreadyNodes=""
+    unreadyNodes="$(oc get node -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status!="True")) | .metadata.name')"
+    if [[ -n "${unreadyNodes}" ]]; then
+        : "Not-Ready nodes: ${unreadyNodes}"
         return 1
     fi
-    echo "All nodes Ready"
+    : "All nodes Ready"
 
-    local mcp_issues
-    mcp_issues="$(oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}')"
-    if [[ -n "${mcp_issues}" ]]; then
-        echo >&2 "Unhealthy MachineConfigPools: ${mcp_issues}"
+    typeset mcpIssues=""
+    mcpIssues="$(oc get machineconfigpools -o json | jq -r '.items[] | select(
+        (.status.conditions[] | select(.type=="Updated")).status != "True" or
+        (.status.conditions[] | select(.type=="Updating")).status != "False" or
+        (.status.conditions[] | select(.type=="Degraded")).status != "False"
+    ) | .metadata.name')"
+    if [[ -n "${mcpIssues}" ]]; then
+        : "Unhealthy MachineConfigPools: ${mcpIssues}"
         return 1
     fi
-    echo "All MachineConfigPools updated"
+    : "All MachineConfigPools updated"
+    true
 }
 
-validate_opp_operators() {
-    echo "Validating OPP operator health"
-    local operators
-    IFS=',' read -ra operators <<< "${OPP_OPERATORS}"
+ValidateOppOperators() {
+    : "Validating OPP operator health"
+    typeset -a operatorsArr=()
+    IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
 
-    echo "Waiting 5 minutes for operator settling"
+    : "Waiting 5 minutes for operator settling"
     sleep 300
 
-    local all_csvs failed=0
-    all_csvs="$(oc get csv -A --no-headers 2>/dev/null)" || {
-        echo >&2 "Failed to retrieve CSVs"
+    typeset allCsvsJson=""
+    typeset -i failCount=0
+    allCsvsJson="$(oc get csv -A -o json)" || {
+        : "Failed to retrieve CSVs"
         return 1
     }
 
-    for op in "${operators[@]}"; do
-        local csv_line phase
-        csv_line="$(echo "${all_csvs}" | grep "${op}" | head -1)" || true
-        if [[ -z "${csv_line}" ]]; then
-            echo >&2 "CSV not found for operator: ${op}"
-            (( failed += 1 ))
+    typeset phase=""
+    for op in "${operatorsArr[@]}"; do
+        phase="$(echo "${allCsvsJson}" | jq -r --arg op "${op}" '[.items[] | select(.metadata.name | contains($op))][0].status.phase // empty')" || true
+        if [[ -z "${phase}" ]]; then
+            : "CSV not found for operator: ${op}"
+            (( failCount += 1 ))
             continue
         fi
-        phase="$(echo "${csv_line}" | awk '{print $NF}')"
         if [[ "${phase}" != "Succeeded" ]]; then
-            echo >&2 "Operator ${op} CSV phase: ${phase} (expected: Succeeded)"
-            (( failed += 1 ))
+            : "Operator ${op} CSV phase: ${phase} (expected: Succeeded)"
+            (( failCount += 1 ))
         else
-            echo "Operator ${op}: CSV phase Succeeded"
+            : "Operator ${op}: CSV phase Succeeded"
         fi
     done
 
-    if (( failed > 0 )); then
-        echo >&2 "${failed} OPP operator(s) not healthy after upgrade"
-        echo -e "\nFull CSV listing:\n${all_csvs}"
+    if (( failCount > 0 )); then
+        : "${failCount} OPP operator(s) not healthy after upgrade"
+        : "Full CSV listing:"
+        echo "${allCsvsJson}" | jq -r '.items[] | "\(.metadata.namespace)\t\(.metadata.name)\t\(.status.phase)"'
         return 1
     fi
 
-    echo "Checking pod readiness for OPP operator namespaces"
-    local opp_namespaces
-    opp_namespaces="$(echo "${all_csvs}" | grep -E "$(echo "${OPP_OPERATORS}" | tr ',' '|')" | awk '{print $1}' | sort -u)"
-    for ns in ${opp_namespaces}; do
-        local not_ready
-        not_ready="$(oc get pods -n "${ns}" --no-headers 2>/dev/null | grep -v 'Completed' | grep -v 'Running' | grep -v 'Succeeded')" || true
-        if [[ -n "${not_ready}" ]]; then
-            echo "WARNING: Non-running pods in ${ns}:"
-            echo "${not_ready}"
+    : "Checking pod readiness for OPP operator namespaces"
+    typeset oppNamespaces=""
+    oppNamespaces="$(echo "${allCsvsJson}" | jq -r --arg ops "${OPP_OPERATORS}" '($ops | split(",")) as $opArr | [.items[] | select(.metadata.name as $n | $opArr | any(. as $op | $n | contains($op))) | .metadata.namespace] | unique | .[]')"
+    typeset notReady="" ns=""
+    for ns in ${oppNamespaces}; do
+        notReady="$(oc get pods -n "${ns}" --no-headers | grep -v 'Completed' | grep -v 'Running' | grep -v 'Succeeded')" || true
+        if [[ -n "${notReady}" ]]; then
+            : "WARNING: Non-running pods in ${ns}:"
+            echo "${notReady}"
+            (( failCount += 1 ))
         else
-            echo "All pods healthy in ${ns}"
+            : "All pods healthy in ${ns}"
         fi
     done
 
-    echo "All OPP operators validated successfully"
+    if (( failCount > 0 )); then
+        : "${failCount} OPP operator issue(s) found after upgrade"
+        return 1
+    fi
+
+    : "All OPP operators validated successfully"
+    true
 }
 
-main() {
+Main() {
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
 
-    resolve_target_image
+    ResolveTargetImage
 
-    TARGET_VERSION="$(oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
-    TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
-    export TARGET_VERSION TARGET_MINOR_VERSION
-    echo "Target release: ${TARGET_VERSION} (minor: ${TARGET_MINOR_VERSION})"
+    targetVersion="$(oc adm release info "${upgradeTarget}" --output=json | jq -r '.metadata.version')"
+    targetMinorVersion="$(echo "${targetVersion}" | cut -f2 -d.)"
+    export targetVersion targetMinorVersion
+    : "Target release: ${targetVersion} (minor: ${targetMinorVersion})"
 
-    SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
-    SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
-    export SOURCE_VERSION SOURCE_MINOR_VERSION
-    echo "Source release: ${SOURCE_VERSION} (minor: ${SOURCE_MINOR_VERSION})"
+    sourceVersion="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')"
+    sourceMinorVersion="$(echo "${sourceVersion}" | cut -f2 -d.)"
+    export sourceVersion sourceMinorVersion
+    : "Source release: ${sourceVersion} (minor: ${sourceMinorVersion})"
 
-    FORCE_UPDATE="false"
-    if ! check_signed "${TARGET}"; then
-        echo "Target is unsigned; will use --force"
-        FORCE_UPDATE="true"
+    isForceUpdate="false"
+    if ! CheckSigned "${upgradeTarget}"; then
+        : "Target is unsigned; will use --force"
+        isForceUpdate="true"
     fi
 
-    if [[ "${FORCE_UPDATE}" == "false" ]]; then
-        admin_ack "${SOURCE_MINOR_VERSION}" "${TARGET_MINOR_VERSION}"
-        update_cco_annotation "${SOURCE_VERSION}" "${TARGET_VERSION}"
+    if [[ "${isForceUpdate}" == "false" ]]; then
+        AdminAck "${sourceMinorVersion}" "${targetMinorVersion}"
+        UpdateCcoAnnotation "${sourceVersion}" "${targetVersion}"
     fi
 
-    initiate_upgrade "${FORCE_UPDATE}"
-    monitor_upgrade
-    stabilize_cluster
-    validate_platform_health
-    validate_opp_operators
-    echo "OCP upgrade and OPP validation completed successfully"
+    InitiateUpgrade "${isForceUpdate}"
+    MonitorUpgrade
+    StabilizeCluster
+    ValidatePlatformHealth
+    ValidateOppOperators
+    : "OCP upgrade and OPP validation completed successfully"
+    true
 }
 
-main "$@"
+Main "$@"
