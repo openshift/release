@@ -33,7 +33,7 @@ trap _term_handler TERM
 trap _on_exit EXIT
 
 typeset clusterRegion
-clusterRegion=$(jq -r '.aws.region // "us-east-1"' "${SHARED_DIR}/metadata.json" 2>/dev/null || echo 'us-east-1')
+clusterRegion="${LEASED_RESOURCE:-us-east-1}"
 
 set +x
 case "${clusterRegion}" in
