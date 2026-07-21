@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: slcm-ci-cd
+  annotations:
+    openshift.io/description: Service Accounts for slcm-ci-cd
+    openshift.io/display-name: slcm-ci-cd CI
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: periodic-job-bot
+  namespace: slcm-ci-cd
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-token-secret
+  namespace: slcm-ci-cd
+  annotations:
+    kubernetes.io/service-account.name: periodic-job-bot
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secret-owner
+  namespace: slcm-ci-cd
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["api-token-secret"]
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-owner-slcm-ci-cd
+  namespace: slcm-ci-cd
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: slcm-ci-cd
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-owner
