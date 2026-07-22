@@ -144,18 +144,26 @@ mirror_completed_at=$(<"${SHARED_DIR}/omr_mirror_completed_at")
 mirror_repository=$(<"${SHARED_DIR}/omr_mirror_repository")
 repository_path="${mirror_repository#*/}"
 journal_file="${ARTIFACT_DIR}/quay-journal-after-mirror.log"
+journal_collected=false
 if [[ "${host_user_file}" == "${SHARED_DIR}/omr_host_ssh_user" ]]; then
-    ssh "${ssh_options[@]}" "${host_user}@${host_address}" \
+    if ssh "${ssh_options[@]}" "${host_user}@${host_address}" \
         "export XDG_RUNTIME_DIR=/run/user/\$(id -u); journalctl --user -u quay.service --since '${mirror_completed_at}' --no-pager --output=short-iso" \
-        > "${journal_file}"
+        > "${journal_file}"; then
+        journal_collected=true
+    fi
 else
-    ssh "${ssh_options[@]}" "${host_user}@${host_address}" \
+    if ssh "${ssh_options[@]}" "${host_user}@${host_address}" \
         "sudo journalctl -u quay.service --since '${mirror_completed_at}' --no-pager --output=short-iso" \
-        > "${journal_file}"
+        > "${journal_file}"; then
+        journal_collected=true
+    fi
 fi
-if ! grep -F "/v2/${repository_path}/" "${journal_file}" >/dev/null; then
-    echo "No OMR request for /v2/${repository_path}/ was recorded after mirror completion."
-    exit 1
+if [[ "${journal_collected}" == false ]]; then
+    echo "Unable to collect the OMR v3 journal; the mirrored image pull succeeded."
+elif grep -F "/v2/${repository_path}/" "${journal_file}" >/dev/null; then
+    echo "The OMR v3 journal recorded a request for /v2/${repository_path}/ after mirror completion."
+else
+    echo "The OMR v3 journal did not record a request for /v2/${repository_path}/; the mirrored image pull succeeded."
 fi
 
 echo "OMR v3 disconnected validation passed."

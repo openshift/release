@@ -152,11 +152,24 @@ curl --retry 20 --retry-delay 3 --retry-all-errors \
     --silent --show-error --fail \
     --cacert "/home/$(id -un)/quay-install/quay-rootCA/rootCA.pem" \
     "https://${registry_endpoint}/healthz" >/dev/null
+cert_dir="${work_dir}/certs"
+auth_file="${work_dir}/registry-auth.json"
+install -d -m 0700 "${cert_dir}"
+install -m 0600 \
+    "/home/$(id -un)/quay-install/quay-rootCA/rootCA.pem" \
+    "${cert_dir}/ca.crt"
 admin_password=$(<"/home/$(id -un)/.omr-v2-admin-password")
-curl --silent --show-error --fail \
-    --cacert "/home/$(id -un)/quay-install/quay-rootCA/rootCA.pem" \
-    --user "admin:${admin_password}" \
-    "https://${registry_endpoint}/v2/" >/dev/null
+if ! printf '%s' "${admin_password}" | podman login \
+    --authfile "${auth_file}" \
+    --cert-dir "${cert_dir}" \
+    --tls-verify=true \
+    --username admin \
+    --password-stdin \
+    "${registry_endpoint}" >/dev/null; then
+    unset admin_password
+    echo "The migrated OMR v3 registry rejected the preserved administrator credential." >&2
+    exit 1
+fi
 unset admin_password
 EOF
 chmod 0755 "${work_dir}/migrate-to-v3"
