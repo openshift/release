@@ -40,40 +40,61 @@ log "  PKO image: ${OPERATOR_PKO_IMAGE}"
 log "  Operator image: ${OPERATOR_IMAGE}"
 log "  Namespace: ${OPERATOR_NAMESPACE}"
 
-# Add CI build cluster registry credentials to the ROSA cluster's global
-# pull secret so nodes can pull CI-built images. We temporarily unset
-# KUBECONFIG so oc registry login authenticates to the build cluster
-# (where the Prow pod runs), not the ROSA cluster.
-log "Adding CI registry credentials to cluster pull secret"
-KUBECONFIG="" oc registry login --to=/tmp/ci-registry-creds.json 2>/dev/null || true
-if [[ -s /tmp/ci-registry-creds.json ]]; then
-    CI_REGISTRIES=$(jq -r '.auths | keys | join(", ")' /tmp/ci-registry-creds.json 2>/dev/null || echo "unknown")
-    log "CI registries: ${CI_REGISTRIES}"
+# Mirror CI-built images to the cluster's internal registry so PKO can pull
+# them without modifying the global pull secret. This avoids a race condition
+# when multiple operators share a lease cluster concurrently: each job's CI
+# registry token is scoped to its own ci-op namespace, and docker config auth
+# is keyed by registry host, so the last writer's token wins.
+MIRROR_NS="ci-e2e-images"
+REGISTRY_ROUTE=$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}' 2>/dev/null || true)
 
-    # Update the global pull secret
-    CURRENT_PS=$(oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
-    MERGED_PS=$(echo "${CURRENT_PS}" | jq -s '.[0] * .[1]' - /tmp/ci-registry-creds.json)
-    echo "${MERGED_PS}" > /tmp/merged-pull-secret.json
-    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json
-    log "CI registry credentials merged into global pull secret"
-
-    # Also create an image pull secret in the package-operator namespace
-    # so PKO can pull immediately without waiting for MCO to propagate
-    oc create secret docker-registry ci-pull-secret \
-        -n openshift-package-operator \
-        --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
-        --dry-run=client -o yaml | oc apply -f -
-    # Patch the PKO service account to use the pull secret
-    oc patch sa package-operator -n openshift-package-operator \
-        --type json -p '[{"op":"add","path":"/imagePullSecrets/-","value":{"name":"ci-pull-secret"}}]' 2>/dev/null || true
-    log "CI pull secret added to PKO namespace"
-
-    # Restart PKO to pick up the new pull secret
-    oc rollout restart deployment -n openshift-package-operator 2>/dev/null || true
-    oc rollout status deployment -n openshift-package-operator --timeout=120s 2>/dev/null || true
-    log "PKO restarted with CI pull secret"
+if [[ -z "${REGISTRY_ROUTE}" ]]; then
+    log "WARNING: Internal registry route not found, falling back to direct pull"
 else
-    log "WARNING: Could not get CI registry credentials, PKO may fail to pull images"
+    log "Mirroring CI images to internal registry"
+    log "  Registry: ${REGISTRY_ROUTE}"
+
+    MIRROR_TMPDIR=$(mktemp -d)
+    # shellcheck disable=SC2064
+    trap "rm -rf ${MIRROR_TMPDIR}" EXIT
+
+    oc create namespace "${MIRROR_NS}" 2>/dev/null || true
+    oc create sa image-pusher -n "${MIRROR_NS}" 2>/dev/null || true
+    oc adm policy add-role-to-user registry-editor -z image-pusher -n "${MIRROR_NS}" 2>/dev/null || true
+
+    if ! SA_TOKEN=$(oc create token image-pusher -n "${MIRROR_NS}" --duration=10m 2>/dev/null); then
+        log "WARNING: Failed to create SA token, falling back to direct pull"
+    elif ! KUBECONFIG="" oc registry login --to="${MIRROR_TMPDIR}/ci-creds.json" 2>/dev/null; then
+        log "WARNING: Failed to get CI registry creds, falling back to direct pull"
+    else
+        AUTH_B64=$(echo -n "image-pusher:${SA_TOKEN}" | base64 -w0 2>/dev/null || echo -n "image-pusher:${SA_TOKEN}" | base64)
+        echo "{\"auths\":{\"${REGISTRY_ROUTE}\":{\"auth\":\"${AUTH_B64}\"}}}" > "${MIRROR_TMPDIR}/dest-creds.json"
+        if ! jq -s '.[0] * .[1]' "${MIRROR_TMPDIR}/ci-creds.json" "${MIRROR_TMPDIR}/dest-creds.json" > "${MIRROR_TMPDIR}/auth.json" 2>/dev/null; then
+            log "WARNING: Failed to merge registry creds, falling back to direct pull"
+        else
+            BUILD_TAG="${BUILD_ID:-$(date +%s)}"
+            MIRRORED_PKO_IMAGE="${REGISTRY_ROUTE}/${MIRROR_NS}/${OPERATOR_NAME}-pko:${BUILD_TAG}"
+            MIRRORED_OPERATOR_IMAGE="${REGISTRY_ROUTE}/${MIRROR_NS}/${OPERATOR_NAME}:${BUILD_TAG}"
+
+            log "  PKO: ${OPERATOR_PKO_IMAGE} -> ${MIRRORED_PKO_IMAGE}"
+            if oc image mirror --registry-config="${MIRROR_TMPDIR}/auth.json" \
+                "${OPERATOR_PKO_IMAGE}" "${MIRRORED_PKO_IMAGE}" --insecure=true 2>&1; then
+                OPERATOR_PKO_IMAGE="${MIRRORED_PKO_IMAGE}"
+                log "  PKO image mirrored"
+            else
+                log "WARNING: Failed to mirror PKO image, falling back to direct pull"
+            fi
+
+            log "  Operator: ${OPERATOR_IMAGE} -> ${MIRRORED_OPERATOR_IMAGE}"
+            if oc image mirror --registry-config="${MIRROR_TMPDIR}/auth.json" \
+                "${OPERATOR_IMAGE}" "${MIRRORED_OPERATOR_IMAGE}" --insecure=true 2>&1; then
+                OPERATOR_IMAGE="${MIRRORED_OPERATOR_IMAGE}"
+                log "  Operator image mirrored"
+            else
+                log "WARNING: Failed to mirror operator image, falling back to direct pull"
+            fi
+        fi
+    fi
 fi
 
 # Save operator CR instances before removing the ClusterPackage.
