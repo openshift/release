@@ -11,6 +11,7 @@ declare CATALOG_MODE="${CATALOG_MODE:-konflux}"
 declare CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-medik8s-catalog}"
 declare CATALOG_IMAGE=""
 declare IDMS_NAME="${IDMS_NAME:-medik8s-konflux}"
+declare SKIP_IDMS="${SKIP_IDMS:-false}"
 declare OCP_VERSION="${OCP_VERSION:-}"
 declare GIT_REF="${GIT_REF:-main}"
 declare FBC_COMMIT_SHA="${FBC_COMMIT_SHA:-}"
@@ -111,7 +112,11 @@ main() {
         fi
         resolve_commit_sha
         verify_fbc_image
-        apply_idms
+        if [[ "${SKIP_IDMS}" == "true" ]]; then
+            log "Skipping IDMS (SKIP_IDMS=true) — cluster can pull from quay.io directly"
+        else
+            apply_idms
+        fi
         CATALOG_IMAGE="${FBC_IMAGE_REPO}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}:${FBC_COMMIT_SHA}"
     fi
 
