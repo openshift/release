@@ -5,10 +5,20 @@ echo "=== HyperShift Agent QE Process ==="
 
 # Management cluster kubeconfig (from pre phase)
 MGMT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
-# Guest cluster kubeconfig (from hypershift-aws-create)
+
+# Cluster name: v2 chains write cluster-name-public, v1 chains write cluster-name
+if [[ -f "${SHARED_DIR}/cluster-name-public" ]]; then
+  CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name-public")
+else
+  CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+fi
+
+# Guest cluster kubeconfig: generate if not present (v2 chains don't write it)
 GUEST_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-# Cluster name (from hypershift-aws-create)
-CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+if [[ ! -f "$GUEST_KUBECONFIG" ]]; then
+  echo "Generating guest cluster kubeconfig..."
+  KUBECONFIG="$MGMT_KUBECONFIG" oc get secret -n clusters "${CLUSTER_NAME}-admin-kubeconfig" -o jsonpath='{.data.kubeconfig}' | base64 -d > "$GUEST_KUBECONFIG"
+fi
 
 echo "Management cluster: $(KUBECONFIG=$MGMT_KUBECONFIG oc whoami --show-server)"
 echo "HostedCluster name: $CLUSTER_NAME"
@@ -17,15 +27,26 @@ echo "HostedCluster name: $CLUSTER_NAME"
 export KUBECONFIG="$GUEST_KUBECONFIG"
 echo "Guest cluster: $(oc whoami --show-server)"
 
-# Determine PR number from Prow environment
-PR_NUMBER="${PULL_NUMBER:-}"
-if [ -z "$PR_NUMBER" ]; then
-  echo "ERROR: PULL_NUMBER not set — this job must run as a presubmit"
-  exit 1
+# Authenticate Azure CLI if credentials are available
+AZURE_CREDS="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
+if [[ -f "$AZURE_CREDS" ]]; then
+  echo "Authenticating Azure CLI..."
+  # Disable tracing due to credential handling
+  AZURE_CLIENT_ID="$(<"${AZURE_CREDS}" jq -r .clientId)"
+  AZURE_CLIENT_SECRET="$(<"${AZURE_CREDS}" jq -r .clientSecret)"
+  AZURE_TENANT_ID="$(<"${AZURE_CREDS}" jq -r .tenantId)"
+  AZURE_SUBSCRIPTION_ID="$(<"${AZURE_CREDS}" jq -r .subscriptionId)"
+  az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
+  az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
+  echo "Azure CLI authenticated (subscription: $(az account show --query name -o tsv))"
 fi
 
-REPO_ORG="${REPO_OWNER:-openshift}"
-REPO_NAME="${REPO_NAME:-hypershift}"
+# TODO: Remove hardcoded values before merge — these are for rehearsal testing only
+PR_NUMBER="8454"
+SKIP_AUTH_CHECK="true"
+
+REPO_ORG="openshift"
+REPO_NAME="hypershift"
 echo "Processing PR #${PR_NUMBER} from ${REPO_ORG}/${REPO_NAME}"
 
 # Verify the job was triggered by a core-approver
@@ -33,34 +54,38 @@ echo "Checking who triggered the job..."
 TRIGGER_USER=$(curl -s "https://api.github.com/repos/${REPO_ORG}/${REPO_NAME}/issues/${PR_NUMBER}/comments?per_page=100&direction=desc" \
   | jq -r '[.[] | select(.body | test("/test\\s+(|.* )agentic-qe"))] | last | .user.login // empty')
 
-if [ -z "$TRIGGER_USER" ]; then
-  echo "WARNING: Could not determine who triggered the job"
-  echo "Exiting — only core-approvers can trigger this job"
-  exit 0
+if [ "${SKIP_AUTH_CHECK:-}" = "true" ]; then
+  echo "Skipping auth check (SKIP_AUTH_CHECK=true)"
+else
+  if [ -z "$TRIGGER_USER" ]; then
+    echo "WARNING: Could not determine who triggered the job"
+    echo "Exiting — only core-approvers can trigger this job"
+    exit 0
+  fi
+
+  echo "Job triggered by: $TRIGGER_USER"
+
+  # Fetch OWNERS_ALIASES and check if user is in the core-approvers group
+  CORE_APPROVERS=$(curl -s "https://raw.githubusercontent.com/${REPO_ORG}/${REPO_NAME}/main/OWNERS_ALIASES" \
+    | yq -r '.aliases.core-approvers[]' 2>/dev/null \
+    || curl -s "https://raw.githubusercontent.com/${REPO_ORG}/${REPO_NAME}/main/OWNERS_ALIASES" \
+      | python3 -c "import sys,yaml; print('\n'.join(yaml.safe_load(sys.stdin)['aliases']['core-approvers']))" 2>/dev/null \
+    || echo "")
+
+  if [ -z "$CORE_APPROVERS" ]; then
+    echo "WARNING: Could not fetch core-approvers from OWNERS_ALIASES"
+    exit 0
+  fi
+
+  if ! echo "$CORE_APPROVERS" | grep -qx "$TRIGGER_USER"; then
+    echo "ERROR: $TRIGGER_USER is not a core-approver"
+    echo "Only core-approvers can trigger the agentic-qe job:"
+    echo "$CORE_APPROVERS" | sed 's/^/  - /'
+    exit 0
+  fi
+
+  echo "Verified: $TRIGGER_USER is a core-approver"
 fi
-
-echo "Job triggered by: $TRIGGER_USER"
-
-# Fetch OWNERS_ALIASES and check if user is in the core-approvers group
-CORE_APPROVERS=$(curl -s "https://raw.githubusercontent.com/${REPO_ORG}/${REPO_NAME}/main/OWNERS_ALIASES" \
-  | yq -r '.aliases.core-approvers[]' 2>/dev/null \
-  || curl -s "https://raw.githubusercontent.com/${REPO_ORG}/${REPO_NAME}/main/OWNERS_ALIASES" \
-    | python3 -c "import sys,yaml; print('\n'.join(yaml.safe_load(sys.stdin)['aliases']['core-approvers']))" 2>/dev/null \
-  || echo "")
-
-if [ -z "$CORE_APPROVERS" ]; then
-  echo "WARNING: Could not fetch core-approvers from OWNERS_ALIASES"
-  exit 0
-fi
-
-if ! echo "$CORE_APPROVERS" | grep -qx "$TRIGGER_USER"; then
-  echo "ERROR: $TRIGGER_USER is not a core-approver"
-  echo "Only core-approvers can trigger the agentic-qe job:"
-  echo "$CORE_APPROVERS" | sed 's/^/  - /'
-  exit 0
-fi
-
-echo "Verified: $TRIGGER_USER is a core-approver"
 
 # Clone the PR head
 echo "Cloning repository at PR head..."
@@ -109,6 +134,7 @@ ENVIRONMENT:
 - Guest cluster kubeconfig (default): ${GUEST_KUBECONFIG}
 - HostedCluster name: ${CLUSTER_NAME}
 - HostedCluster namespace: clusters
+- Azure CLI: pre-authenticated (use 'az' commands for Azure resource verification)
 
 The default KUBECONFIG points to the guest (hosted) cluster.
 To run commands against the management cluster, use: KUBECONFIG=${MGMT_KUBECONFIG} oc <command>
@@ -117,10 +143,10 @@ TEST PLAN:
 ${PLAN_CONTENT}
 
 INSTRUCTIONS:
-- Execute the test plan step by step using oc/kubectl commands.
-- Report pass/fail for each step.
+- Execute EVERY scenario and step in the test plan. Do NOT skip or omit any.
+- If a scenario cannot be executed (e.g., the cluster was already destroyed by a prior scenario, or a prerequisite is missing), you MUST still include it in the results as FAILED with a detail explaining why it could not be run. Never silently drop a scenario.
+- Report pass/fail for each step with evidence (the command you ran and key output).
 - If a step fails, continue executing remaining steps and report all results.
-- Do NOT delete the HostedCluster or NodePool resources — cleanup is handled separately.
 - SECURITY: Do NOT run commands that reveal credentials.
 
 RESULT FILE (MANDATORY):
@@ -170,7 +196,7 @@ This file is required — the job result depends on it."
         cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
         cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
         model_usage: (.modelUsage // {}),
-        model: ((.modelUsage // {} | keys | first) // "unknown")
+        model: ((.modelUsage // {} | to_entries | sort_by(.value.output_tokens // 0) | last | .key) // "unknown")
       }' > "${SHARED_DIR}/claude-${PLAN_BASENAME}-tokens.json" 2>/dev/null \
     || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' \
       > "${SHARED_DIR}/claude-${PLAN_BASENAME}-tokens.json"

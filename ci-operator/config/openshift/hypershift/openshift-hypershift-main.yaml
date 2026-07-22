@@ -59,6 +59,17 @@ images:
       RUN yum install -y jq && yum clean all
     from: hypershift-operator
     to: hypershift-cli
+  - dockerfile_literal: |
+      FROM claude-ai-helpers
+      USER root
+      RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
+          dnf install -y https://packages.microsoft.com/config/rhel/9/packages-microsoft-prod.rpm && \
+          mv /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/ && \
+          dnf install -y azure-cli && \
+          dnf clean all
+      USER 1001
+    from: claude-ai-helpers
+    to: claude-ai-helpers-azure
 promotion:
   to:
   - excluded_images:
@@ -165,6 +176,18 @@ tests:
     env:
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-agentic-qe-aws
+- always_run: false
+  as: agentic-qe-azure-self-managed
+  optional: true
+  steps:
+    cluster_profile: hypershift-azure
+    workflow: hypershift-agentic-qe-azure-self-managed
+- always_run: false
+  as: agentic-qe-azure-self-managed-private
+  optional: true
+  steps:
+    cluster_profile: hypershift-azure
+    workflow: hypershift-agentic-qe-azure-self-managed-private
 - always_run: false
   as: e2e-aks
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
