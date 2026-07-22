@@ -70,7 +70,7 @@ declare -a MIRRORED_IMAGES=(
 )
 
 function run-oc-image-mirror() {
-  oc image mirror -f /tmp/mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json || return 1
+  oc image mirror -f /tmp/mirror --keep-manifest-list --registry-config ${DS_WORKING_DIR}/pull_secret.json || return 1
   for image_pair in "\${MIRRORED_IMAGES[@]}"; do
     oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" \$image_pair || return 1
   done
