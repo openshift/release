@@ -152,14 +152,16 @@ def main():
     # *.apps.<cluster_domain> wildcard
     resource_names = [f"api.{cluster_domain}", f"*.apps.{cluster_domain}"]
 
-    # Windows nodes _still_ require api-int.<cluster_domain>
-    # This _should_ _not_ be here as we are not properly testing
-    # static pod coredns
-    api_int_change = copy.deepcopy(change)
-    api_int_change['ResourceRecordSet']['Name'] = f"api-int.{cluster_domain}"
-    api_int_change['ResourceRecordSet']['Type'] = 'A'
-    api_int_change['ResourceRecordSet']['ResourceRecords'].append({'Value': vips[0].strip()})
-    upsert_change_batch['Changes'].append(api_int_change)
+    enable_api_int = os.environ.get("VSPHERE_ENABLE_API_INT", "false").lower() == "true"
+    if enable_api_int:
+        # Optional public api-int A record (same VIP as api) for scenarios that need it in Route53.
+        api_int_change = copy.deepcopy(change)
+        api_int_change['ResourceRecordSet']['Name'] = f"api-int.{cluster_domain}"
+        api_int_change['ResourceRecordSet']['Type'] = 'A'
+        api_int_change['ResourceRecordSet']['ResourceRecords'].append({'Value': vips[0].strip()})
+        upsert_change_batch['Changes'].append(api_int_change)
+    else:
+        logger.info("Skipping api-int.%s (set VSPHERE_ENABLE_API_INT=true to create)", cluster_domain)
 
     # loop through FQDN DNS records to generate change batches
     for i, rn in enumerate(resource_names):
