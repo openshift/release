@@ -84,7 +84,6 @@ fi
 # IPI terraform names the libvirt network after infraID (cluster_id).
 NETWORK_NAME="${INFRA_ID}"
 BASE_VOLUME="${INFRA_ID}-base"
-IGNITION_VOLUME="${LEASED_RESOURCE}-worker-ignition-volume"
 
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
@@ -138,17 +137,55 @@ if [[ ! -s "${WORKER_IGN}" ]]; then
   exit 1
 fi
 
-echo "Uploading worker ignition volume ${IGNITION_VOLUME}..."
-${VIRSH} vol-delete --pool "${POOL_NAME}" "${IGNITION_VOLUME}" || true
-${VIRSH} vol-create-as \
-  --name "${IGNITION_VOLUME}" \
-  --pool "${POOL_NAME}" \
-  --format raw \
-  --capacity "$(wc -c < "${WORKER_IGN}")"
-${VIRSH} vol-upload \
-  --vol "${IGNITION_VOLUME}" \
-  --pool "${POOL_NAME}" \
-  --file "${WORKER_IGN}"
+# Shared worker.ign has no per-node hostname; without /etc/hostname both guests become
+# localhost.localdomain and only one can join the cluster. Inject a unique hostname per VM.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: python3 required to inject /etc/hostname into worker ignition"
+  exit 1
+fi
+
+inject_hostname_ignition() {
+  local src=$1
+  local hostname=$2
+  local dest=$3
+  python3 - "${src}" "${hostname}" "${dest}" <<'PY'
+import json, sys, urllib.parse
+
+src, hostname, dest = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(src, encoding="utf-8") as f:
+    ign = json.load(f)
+files = [f for f in ign.setdefault("storage", {}).setdefault("files", []) if f.get("path") != "/etc/hostname"]
+files.append(
+    {
+        "path": "/etc/hostname",
+        "mode": 420,
+        "overwrite": True,
+        "contents": {
+            "source": "data:text/plain;charset=utf-8,"
+            + urllib.parse.quote(hostname + "\n", safe="")
+        },
+    }
+)
+ign["storage"]["files"] = files
+with open(dest, "w", encoding="utf-8") as f:
+    json.dump(ign, f, separators=(",", ":"))
+PY
+}
+
+upload_ignition_volume() {
+  local vol=$1
+  local file=$2
+  ${VIRSH} vol-delete --pool "${POOL_NAME}" "${vol}" || true
+  ${VIRSH} vol-create-as \
+    --name "${vol}" \
+    --pool "${POOL_NAME}" \
+    --format raw \
+    --capacity "$(wc -c < "${file}")"
+  ${VIRSH} vol-upload \
+    --vol "${vol}" \
+    --pool "${POOL_NAME}" \
+    --file "${file}"
+}
 
 clone_volume() {
   local newname=$1
@@ -164,7 +201,8 @@ clone_volume() {
 write_worker_domain_xml() {
   local name=$1
   local mac=$2
-  local xml=$3
+  local ign_vol=$3
+  local xml=$4
   local arch_attr machine console_target uuid
 
   case "${ARCH:-s390x}" in
@@ -187,18 +225,14 @@ write_worker_domain_xml() {
 
   if [[ -r /proc/sys/kernel/random/uuid ]]; then
     uuid=$(cat /proc/sys/kernel/random/uuid)
-  elif command -v python3 >/dev/null 2>&1; then
-    uuid=$(python3 -c 'import uuid; print(uuid.uuid4())')
   else
-    uuid=""
+    uuid=$(python3 -c 'import uuid; print(uuid.uuid4())')
   fi
 
   {
     echo "<domain type='kvm'>"
     echo "  <name>${name}</name>"
-    if [[ -n "${uuid}" ]]; then
-      echo "  <uuid>${uuid}</uuid>"
-    fi
+    echo "  <uuid>${uuid}</uuid>"
     echo "  <memory unit='MiB'>${DOMAIN_MEMORY}</memory>"
     echo "  <currentMemory unit='MiB'>${DOMAIN_MEMORY}</currentMemory>"
     echo "  <vcpu placement='static'>${DOMAIN_VCPUS}</vcpu>"
@@ -218,7 +252,7 @@ write_worker_domain_xml() {
     echo "    </disk>"
     echo "    <disk type='volume' device='disk'>"
     echo "      <driver name='qemu' type='raw'/>"
-    echo "      <source pool='${POOL_NAME}' volume='${IGNITION_VOLUME}'/>"
+    echo "      <source pool='${POOL_NAME}' volume='${ign_vol}'/>"
     echo "      <target dev='vdb' bus='virtio'/>"
     echo "      <readonly/>"
     echo "      <serial>ignition</serial>"
@@ -240,8 +274,13 @@ write_worker_domain_xml() {
 create_worker() {
   local name=$1
   local mac=$2
+  local ign_vol="${name}-ignition-volume"
+  local node_ign="${WORKDIR}/${name}.ign"
   local xml
-  echo "Creating worker ${name} (mac=${mac})..."
+
+  echo "Creating worker ${name} (mac=${mac}, hostname=${name})..."
+  inject_hostname_ignition "${WORKER_IGN}" "${name}" "${node_ign}"
+  upload_ignition_volume "${ign_vol}" "${node_ign}"
   clone_volume "${name}-volume"
 
   # Match UPI: call virt-install directly (not via mock-nss.sh). Available on 4.16+ images.
@@ -258,13 +297,13 @@ create_worker() {
       --graphics=none \
       --import \
       --noautoconsole \
-      --disk "vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional"
+      --disk "vol=${POOL_NAME}/${ign_vol},format=raw,readonly=on,serial=ignition,startup_policy=optional"
     return
   fi
 
   echo "virt-install not in image; defining ${name} with virsh (4.15 libvirt-installer fallback)"
   xml="${WORKDIR}/${name}.xml"
-  write_worker_domain_xml "${name}" "${mac}" "${xml}"
+  write_worker_domain_xml "${name}" "${mac}" "${ign_vol}" "${xml}"
   echo "Domain XML:"
   cat "${xml}"
   ${VIRSH} define "${xml}"
