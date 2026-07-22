@@ -344,7 +344,7 @@ IEOF
 function generate_forcedns {
   cat <<IEOF
 #!/bin/bash
-export IP="${ADDITIONAL_NODE_IP}"
+export IP="127.0.0.1"
 export BASE_RESOLV_CONF=/run/NetworkManager/resolv.conf
 if [ "\${2}" = "dhcp4-change" ] || [ "\${2}" = "dhcp6-change" ] || [ "\${2}" = "up" ] || [ "\${2}" = "connectivity-change" ]; then
     export TMP_FILE=\$(mktemp /etc/forcedns_resolv.conf.XXXXXX)
