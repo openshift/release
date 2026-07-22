@@ -58,6 +58,8 @@ case "$ES_TYPE" in
             if curl -fsSL --retry 3 "$PROWJOB_URL" -o /tmp/prowjob.json 2>/dev/null; then
                 if jq -e '.metadata.labels["prow.k8s.io/refs.pull"]' /tmp/prowjob.json >/dev/null 2>&1; then
                     IS_PR_PAYLOAD=true
+                elif jq -e '.spec.extra_refs[]?.pulls[]?.number' /tmp/prowjob.json >/dev/null 2>&1; then
+                    IS_PR_PAYLOAD=true
                 fi
             fi
         fi
