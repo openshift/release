@@ -509,8 +509,8 @@ scp "${SSHOPTS[@]}" "${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-st
 
 timeout \
   --kill-after 5s \
-  61m \
+  121m \
   ssh \
   "${SSHOPTS[@]}" \
   "root@${IP}" \
-  RECERT_IMAGE="${RECERT_IMAGE}" timeout --kill-after 5s 60m /usr/local/bin/run-recert-cluster-rename-hostname-change-step.sh
+  RECERT_IMAGE="${RECERT_IMAGE}" timeout --kill-after 5s 120m /usr/local/bin/run-recert-cluster-rename-hostname-change-step.sh
