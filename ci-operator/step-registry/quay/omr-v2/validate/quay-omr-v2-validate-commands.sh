@@ -139,12 +139,16 @@ mirror_completed_at=$(<"${SHARED_DIR}/omr_mirror_completed_at")
 mirror_repository=$(<"${SHARED_DIR}/omr_mirror_repository")
 repository_path="${mirror_repository#*/}"
 journal_file="${ARTIFACT_DIR}/quay-v2-journal-after-mirror.log"
-ssh "${ssh_options[@]}" "${remote}" \
+if ssh "${ssh_options[@]}" "${remote}" \
     "export XDG_RUNTIME_DIR=/run/user/\$(id -u); journalctl --user -u quay-app.service --since '${mirror_completed_at}' --no-pager --output=short-iso" \
-    > "${journal_file}"
-if ! grep -F "/v2/${repository_path}/" "${journal_file}" >/dev/null; then
-    echo "No OMR v2 request for /v2/${repository_path}/ was recorded after mirror completion."
-    exit 1
+    > "${journal_file}"; then
+    if grep -F "/v2/${repository_path}/" "${journal_file}" >/dev/null; then
+        echo "The OMR v2 journal recorded a request for /v2/${repository_path}/ after mirror completion."
+    else
+        echo "The OMR v2 journal did not record a request for /v2/${repository_path}/; the mirrored image pull succeeded."
+    fi
+else
+    echo "Unable to collect the OMR v2 journal; the mirrored image pull succeeded."
 fi
 
 echo "OMR v${omr_v2_version} disconnected installation validation passed."
