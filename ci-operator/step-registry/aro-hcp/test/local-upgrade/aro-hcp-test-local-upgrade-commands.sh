@@ -28,6 +28,7 @@ source "${env_file}"
 
 export LOCATION="${SELECTED_LOCATION:-${LOCATION:-}}"
 : "${LOCATION:?LOCATION must be provided by SELECTED_LOCATION or the legacy runtime slot export file}"
+: "${CUSTOMER_SUBSCRIPTION:?CUSTOMER_SUBSCRIPTION must be provided by the runtime slot export file}"
 
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
@@ -156,9 +157,13 @@ make -C dev-infrastructure/ mgmt.aks.kubeconfig MGMT_KUBECONFIG_FILE=../mgmt-kub
 export KUBECONFIG=mgmt-kubeconfig
 
 az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
+CUSTOMER_SUBSCRIPTION="$(az account show --output tsv --query 'name')"
 make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
 
-SKIP_CERT_VERIFICATION=true ./test/aro-hcp-tests run-suite upgrade/in-place \
+SKIP_CERT_VERIFICATION=true \
+FRONTEND_ADDRESS="${FRONTEND_ADDRESS}" \
+CUSTOMER_SUBSCRIPTION="${CUSTOMER_SUBSCRIPTION}" \
+  ./test/aro-hcp-tests run-suite upgrade/in-place \
   --junit-path="${ARTIFACT_DIR}/junit.xml" \
   --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" \
   --max-concurrency 100
