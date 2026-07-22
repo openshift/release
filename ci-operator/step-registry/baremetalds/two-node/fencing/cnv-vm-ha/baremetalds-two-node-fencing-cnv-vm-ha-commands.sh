@@ -145,7 +145,7 @@ spec:
               name: default
         resources:
           requests:
-            memory: 1Gi
+            memory: 128Mi
       networks:
         - name: default
           pod: {}
