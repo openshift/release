@@ -38,6 +38,98 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
+- as: periodic-mcpchecker-eval
+  cron: 0 9 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: mcpchecker-eval
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        export TOOLSETS=core,config
+        export MCP_CONFIG_DIR=dev/config/mcp-configs
+        export PATH="${PATH}:$(pwd)/_output/tools/bin"
+
+        # Live cluster kubeconfig is provided by the ipi-aws workflow.
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        if ! command -v kubectl >/dev/null 2>&1; then
+          mkdir -p /tmp/bin
+          ln -s "$(command -v oc)" /tmp/bin/kubectl
+          export PATH="/tmp/bin:${PATH}"
+        fi
+
+        # OpenAI token from selfservice vault (ocp-mcp/openai-credentials).
+        export OPENAI_API_KEY="$(cat /var/run/ocp-mcp/openai-token)"
+
+        cleanup() {
+          make stop-server || true
+        }
+        trap cleanup EXIT
+
+        GOFLAGS='-mod=readonly' make build
+        GOFLAGS='' make mcpchecker
+
+        # CI pods expose in-cluster env (build farm). Without forcing kubeconfig,
+        # the MCP server auto-selects in-cluster and gets RBAC denials. Unset the
+        # env signals and pass --kubeconfig/--cluster-provider for the IPI cluster.
+        unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT
+        oc whoami
+        oc auth can-i list pods -A
+        oc auth can-i '*' '*' --all-namespaces
+        ls -la ./kubernetes-mcp-server
+
+        MCP_PORT=8080
+        ./kubernetes-mcp-server \
+          --port "${MCP_PORT}" \
+          --toolsets "${TOOLSETS}" \
+          --config-dir "${MCP_CONFIG_DIR}" \
+          --kubeconfig "${KUBECONFIG}" \
+          --cluster-provider kubeconfig \
+          >"${ARTIFACT_DIR}/mcp-server.log" 2>&1 \
+          & echo $! > .mcp-server.pid
+
+        elapsed=0
+        while [ "${elapsed}" -lt 60 ]; do
+          if curl -fsS "http://localhost:${MCP_PORT}/healthz" >/dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+          elapsed=$((elapsed + 2))
+        done
+        if ! curl -fsS "http://localhost:${MCP_PORT}/healthz" >/dev/null 2>&1; then
+          echo "ERROR: MCP server failed to become ready"
+          exit 1
+        fi
+
+        MCPCHECKER="$(pwd)/_output/tools/bin/mcpchecker"
+        "${MCPCHECKER}" check evals/core-eval-testing/builtin-openai/eval-core.yaml \
+          --label-selector suite=core \
+          --output json
+
+        RESULTS_FILE="$(ls -t mcpchecker-*-out.json | head -1)"
+        cp "${RESULTS_FILE}" "${ARTIFACT_DIR}/mcpchecker-out.json"
+
+        # Emit JUnit before verify so Spyglass/Sippy still get artifacts when the
+        # 80% gate fails.
+        "${MCPCHECKER}" result convert junit "${ARTIFACT_DIR}/mcpchecker-out.json" \
+          --output-file "${ARTIFACT_DIR}/junit_mcpchecker.xml"
+
+        "${MCPCHECKER}" result verify "${ARTIFACT_DIR}/mcpchecker-out.json" \
+          --task 0.8 --assertion 0.8
+      credentials:
+      - mount_path: /var/run/ocp-mcp
+        name: ocp-mcp
+        namespace: test-credentials
+      from: src
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 4h0m0s
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
