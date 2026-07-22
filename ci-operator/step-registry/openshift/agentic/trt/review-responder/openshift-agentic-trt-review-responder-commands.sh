@@ -174,10 +174,46 @@ is_trusted_user() {
     return 1
 }
 
+# --- Detect bot's prior replies for dedup across job runs (TRT-2781) ---
+# PROCESSED_IDS resets each job run, so without a baseline all comments look
+# "new". Detect which threads the bot already replied to so they can be
+# excluded from the "NEW" comment set below.
+BOT_LOGIN=$(gh api user --jq '.login' 2>/dev/null || echo "")
+BOT_REPLIED_TO_IDS=""
+BOT_LAST_ISSUE_TS=""
+BOT_LAST_ACTIVITY=""
+if [[ -n "${BOT_LOGIN}" ]]; then
+    echo "Bot login: ${BOT_LOGIN}"
+
+    # Inline threads: collect IDs of comments the bot already replied to
+    _all_inline=$(gh api "repos/${UPSTREAM_REPO}/pulls/${PR_NUM}/comments" --paginate 2>/dev/null || echo "[]")
+    BOT_REPLIED_TO_IDS=$(echo "${_all_inline}" | jq -r --arg bot "${BOT_LOGIN}" \
+        '[.[] | select(.user.login == $bot) | .in_reply_to_id // empty]
+         | map(tostring) | unique | .[]' 2>/dev/null || echo "")
+    _ts_inline=$(echo "${_all_inline}" | jq -r --arg bot "${BOT_LOGIN}" \
+        '[.[] | select(.user.login == $bot) | .created_at] | sort | last // empty' 2>/dev/null || echo "")
+
+    # Issue comments: find bot's last reply timestamp (no threading available)
+    _all_issue=$(gh api "repos/${UPSTREAM_REPO}/issues/${PR_NUM}/comments" --paginate 2>/dev/null || echo "[]")
+    BOT_LAST_ISSUE_TS=$(echo "${_all_issue}" | jq -r --arg bot "${BOT_LOGIN}" \
+        '[.[] | select(.user.login == $bot) | .created_at] | sort | last // empty' 2>/dev/null || echo "")
+
+    # Overall last activity for reviews (no per-review threading)
+    for _ts in "${_ts_inline}" "${BOT_LAST_ISSUE_TS}"; do
+        if [[ -n "${_ts}" ]] && [[ -z "${BOT_LAST_ACTIVITY}" || "${_ts}" > "${BOT_LAST_ACTIVITY}" ]]; then
+            BOT_LAST_ACTIVITY="${_ts}"
+        fi
+    done
+
+    _replied_count=$(echo "${BOT_REPLIED_TO_IDS}" | wc -w | xargs)
+    [[ "${_replied_count}" -gt 0 ]] && echo "Bot already replied to ${_replied_count} inline thread(s)"
+    [[ -n "${BOT_LAST_ISSUE_TS}" ]] && echo "Bot's last issue comment: ${BOT_LAST_ISSUE_TS}"
+fi
+PROCESSED_IDS=""
+
 # --- Poll for review comments and CI failures ---
 echo "=== Watching PR #${PR_NUM} for review comments and CI failures ==="
 
-PROCESSED_IDS=""
 LAST_FAILING_NAMES=""
 iteration=0
 idle_streak=0
@@ -206,12 +242,32 @@ while true; do
     REVIEWS_JSON=$(echo "${raw_reviews}" | jq --argjson trusted "${trusted_jq_filter}" '[.[] | select(.user.login as $u | $trusted | index($u))]')
     ISSUE_COMMENTS_JSON=$(echo "${raw_issue_comments}" | jq --argjson trusted "${trusted_jq_filter}" '[.[] | select(.user.login as $u | $trusted | index($u))]')
 
-    # Filter out already-processed items
+    # Filter out already-processed items (within this run)
     if [[ -n "${PROCESSED_IDS}" ]]; then
         processed_jq_filter=$(echo "${PROCESSED_IDS}" | tr ' ' '\n' | jq -R . | jq -s '.')
         INLINE_JSON=$(echo "${INLINE_JSON}" | jq --argjson seen "${processed_jq_filter}" '[.[] | select((.id | tostring) as $id | $seen | index($id) | not)]')
         REVIEWS_JSON=$(echo "${REVIEWS_JSON}" | jq --argjson seen "${processed_jq_filter}" '[.[] | select((.id | tostring) as $id | $seen | index($id) | not)]')
         ISSUE_COMMENTS_JSON=$(echo "${ISSUE_COMMENTS_JSON}" | jq --argjson seen "${processed_jq_filter}" '[.[] | select((.id | tostring) as $id | $seen | index($id) | not)]')
+    fi
+
+    # Filter out comments addressed in prior runs (TRT-2781)
+    if [[ -n "${BOT_LOGIN}" ]]; then
+        # Inline: remove comments the bot already replied to in their thread
+        if [[ -n "${BOT_REPLIED_TO_IDS}" ]]; then
+            replied_filter=$(echo "${BOT_REPLIED_TO_IDS}" | tr ' ' '\n' | jq -R . | jq -s '.')
+            INLINE_JSON=$(echo "${INLINE_JSON}" | jq --argjson replied "${replied_filter}" \
+                '[.[] | select((.id | tostring) as $id | $replied | index($id) | not)]')
+        fi
+        # Issue comments: only those posted after bot's last reply (no threading)
+        if [[ -n "${BOT_LAST_ISSUE_TS}" ]]; then
+            ISSUE_COMMENTS_JSON=$(echo "${ISSUE_COMMENTS_JSON}" | jq --arg ts "${BOT_LAST_ISSUE_TS}" \
+                '[.[] | select(.created_at > $ts)]')
+        fi
+        # Reviews: only those submitted after bot's last overall activity
+        if [[ -n "${BOT_LAST_ACTIVITY}" ]]; then
+            REVIEWS_JSON=$(echo "${REVIEWS_JSON}" | jq --arg ts "${BOT_LAST_ACTIVITY}" \
+                '[.[] | select((.submitted_at // .created_at) > $ts)]')
+        fi
     fi
 
     inline_count=$(echo "${INLINE_JSON}" | jq 'length')
