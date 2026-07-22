@@ -109,7 +109,7 @@ echo "Launching global IPv4 DHCP client for BOTH interfaces..."
 nsenter -m -u -n -i -p -t "$CONTAINER_PID" \
   /sbin/dhclient -nw -v \
   -pf "/etc/haproxy/dhclient.v4.pid" \
-  -lf "/etc/haproxy/dhclient.v4.lease" eth1 eth2
+  -lf "/etc/haproxy/dhclient.v4.lease" eth1 eth2 201>&-
 
 echo "Waiting for interfaces to obtain IP addresses inside the container namespace..."
 for i in {1..60}; do
@@ -131,9 +131,9 @@ done
 if [[ " ${devices[*]} " == *" eth2.br-int "* ]]; then
   echo "Launching IPv6 DHCP client for eth2..."
   nsenter -m -u -n -i -p -t "$CONTAINER_PID" \
-    /sbin/dhclient -6 -v \
+    /sbin/dhclient -6 -N -v \
     -pf "/etc/haproxy/dhclient.eth2.v6.pid" \
-    -lf "/etc/haproxy/dhclient.eth2.v6.lease" eth2
+    -lf "/etc/haproxy/dhclient.eth2.v6.lease" eth2 201>&-
   sleep 5
 fi
 
