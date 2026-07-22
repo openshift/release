@@ -105,7 +105,27 @@ fi
 if oc get clusterpackage "${OPERATOR_NAME}" &>/dev/null; then
     log "Removing existing ClusterPackage ${OPERATOR_NAME}"
     oc delete clusterpackage "${OPERATOR_NAME}" --timeout=120s || true
-    sleep 5
+    # Wait for the resource to be fully gone before recreating with the same name.
+    # PKO finalizers can delay actual deletion beyond what --timeout reports.
+    # Use --ignore-not-found so a 404 returns empty output (exit 0) while
+    # transient API errors still produce a non-empty error and non-zero exit.
+    for i in $(seq 1 24); do
+        RESULT=$(oc get clusterpackage "${OPERATOR_NAME}" --ignore-not-found -o name 2>&1) || true
+        if [[ -z "${RESULT}" ]]; then
+            break
+        fi
+        if [[ $i -eq 24 ]]; then
+            log "WARNING: ClusterPackage ${OPERATOR_NAME} still exists after 2 minutes, forcing removal"
+            oc patch clusterpackage "${OPERATOR_NAME}" --type merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
+        fi
+        sleep 5
+    done
+    # Confirm deletion after force-removal
+    RESULT=$(oc get clusterpackage "${OPERATOR_NAME}" --ignore-not-found -o name 2>&1) || true
+    if [[ -n "${RESULT}" ]]; then
+        log "ERROR: ClusterPackage ${OPERATOR_NAME} could not be removed: ${RESULT}"
+        exit 1
+    fi
 fi
 
 # Remove orphaned ClusterObjectSets from the old package
@@ -127,7 +147,31 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
         fi
     done
 fi
-sleep 5
+
+# Also remove any leftover e2e ClusterPackage from a previous run
+if [[ "${CLUSTER_PACKAGE_NAME}" != "${OPERATOR_NAME}" ]]; then
+    RESULT=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" --ignore-not-found -o name 2>&1) || true
+    if [[ -n "${RESULT}" ]]; then
+        log "Removing leftover e2e ClusterPackage ${CLUSTER_PACKAGE_NAME}"
+        oc delete clusterpackage "${CLUSTER_PACKAGE_NAME}" --timeout=60s || true
+        for i in $(seq 1 12); do
+            RESULT=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" --ignore-not-found -o name 2>&1) || true
+            if [[ -z "${RESULT}" ]]; then
+                break
+            fi
+            if [[ $i -eq 12 ]]; then
+                log "WARNING: ClusterPackage ${CLUSTER_PACKAGE_NAME} still exists, forcing removal"
+                oc patch clusterpackage "${CLUSTER_PACKAGE_NAME}" --type merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
+            fi
+            sleep 5
+        done
+        RESULT=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" --ignore-not-found -o name 2>&1) || true
+        if [[ -n "${RESULT}" ]]; then
+            log "ERROR: ClusterPackage ${CLUSTER_PACKAGE_NAME} could not be removed: ${RESULT}"
+            exit 1
+        fi
+    fi
+fi
 
 # Create the ClusterPackage CR
 cat <<EOF | oc apply -f -
