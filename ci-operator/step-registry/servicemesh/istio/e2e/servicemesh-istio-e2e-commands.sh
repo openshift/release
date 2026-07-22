@@ -70,6 +70,12 @@ spec:
   - name: testpmd
     command: ["sleep", "99999"]
     image: ${MAISTRA_BUILDER_IMAGE}
+    resources:
+      requests:
+        cpu: "2"
+        memory: 8Gi
+      limits:
+        memory: 14Gi
     securityContext:
       capabilities:
         add: ["IPC_LOCK","SYS_ADMIN"]
