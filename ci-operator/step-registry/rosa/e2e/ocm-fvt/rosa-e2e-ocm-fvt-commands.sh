@@ -53,6 +53,17 @@ if [[ -f "${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig" ]]; then
   $WAS_TRACING && set -x
 fi
 
+# DR_AWS_CREDENTIALS lets DR-account validation tests (e.g. OSDFM disaster_recovery_test.go,
+# oadp_v2_mc_backup_test.go) use a static, single-region AWS credentials file instead of fetching
+# per-region creds live from Hive (build farm has no network route to Hive, see ROSAENG-60596).
+dr_aws_creds_env=()
+if [[ -f "${osdfm_qe_creds_dir}/aws_dr_cred" ]]; then
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
+  dr_aws_creds_env=("-e" "DR_AWS_CREDENTIALS=$(<"${osdfm_qe_creds_dir}/aws_dr_cred")")
+  $WAS_TRACING && set -x
+fi
+
 cred_sources='source /usr/local/cs-qe-credentials/ocm-tokens'
 if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
   cred_sources="${cred_sources}; source /usr/local/cs-qe-credentials/jira-cred"
@@ -98,14 +109,15 @@ echo "=========================="
 
 echo "Running ocmtest: ${ocmtest_args[*]}"
 exit_code=0
-# aao_kubeconfig_env may hold the raw AWS_ACCOUNT_OPERATOR_KUBECONFIG contents
-# as a literal "-e KEY=VALUE" arg; keep xtrace off while it is expanded so the
-# kubeconfig is never printed to the (public) build log.
+# aao_kubeconfig_env / dr_aws_creds_env may hold raw secret contents as literal
+# "-e KEY=VALUE" args; keep xtrace off while they are expanded so the values
+# are never printed to the (public) build log.
 [[ $- == *x* ]] && WAS_TRACING_RUN=true || WAS_TRACING_RUN=false
 set +x
 podman run \
   "${podman_args[@]}" \
   "${aao_kubeconfig_env[@]}" \
+  "${dr_aws_creds_env[@]}" \
   quay.io/redhat-services-prod/ocmci/ocmci:latest \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 $WAS_TRACING_RUN && set -x
