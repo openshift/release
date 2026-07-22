@@ -339,6 +339,12 @@ case "${LEASED_RESOURCE}" in
    ;;
 esac
 
+# For OCP 5.0+, override sysType to s1022 for all leased resources
+if printf '%s\n' "${BRANCH}" | awk -F. '{ if ($1 >= 5) { exit 0 } else { exit 1 } }'; then
+  PLATFORM_ARGS_COMPUTE+=( "sysType" "s1022" )
+  PLATFORM_ARGS_WORKER+=( "sysType" "s1022" )
+fi
+
 echo "POWERVS_SERVICE_INSTANCE_ID=${POWERVS_SERVICE_INSTANCE_ID}"
 echo "POWERVS_REGION=${POWERVS_REGION}"
 echo "POWERVS_ZONE=${POWERVS_ZONE}"
