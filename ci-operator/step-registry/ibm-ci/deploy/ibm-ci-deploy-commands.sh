@@ -9,7 +9,7 @@ chmod 600 /tmp/id_rsa
 # Setup pull secret
 cp /var/run/ibm-ci/pull-secret /tmp/pull-secret.json
 
-# Generate Ansible inventory
+# Generate Ansible inventory with SSH options for CI environment
 mkdir -p ansible/inventory
 cat > ansible/inventory/hosts.yml <<EOF
 ---
@@ -20,7 +20,8 @@ all:
         ${IBM_HOST}:
           ansible_user: root
           ansible_ssh_private_key_file: /tmp/id_rsa
+          ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 EOF
 
-# Run deployment
-make -C ansible install
+# Run deployment with pull secret path injected
+make -C ansible install VERBOSE="--extra-vars ocp_pull_secret_file=/tmp/pull-secret.json"
