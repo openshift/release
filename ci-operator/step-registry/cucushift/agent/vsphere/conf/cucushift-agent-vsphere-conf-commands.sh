@@ -223,6 +223,7 @@ for ((i = 0; i < total_host; i++)); do
       - name: ens32
         type: ethernet
         state: up
+        mtu: 9100
         mac-address: ${mac_addresses[$i]}${ipv4}${ipv6}
     dns-resolver:
      config:

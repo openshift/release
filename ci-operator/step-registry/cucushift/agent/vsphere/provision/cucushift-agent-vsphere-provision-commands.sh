@@ -30,9 +30,19 @@ oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "$OPENSHIFT_INSTA
 
 echo "Creating agent image..."
 dir=/tmp/installer
-mkdir "${dir}/"
+mkdir -p "${dir}/openshift"
 pushd ${dir}
 cp -t "${dir}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
+cat >>"${dir}/openshift/set-cluster-mtu.yaml" <<EOF
+apiVersion: operator.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  defaultNetwork:
+    ovnKubernetesConfig:
+      mtu: 8900 # Explicitly set MTU (200 bytes lower than 9100 host MTU)
+EOF
 
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true

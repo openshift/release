@@ -61,6 +61,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     - name: ${baremetal_iface}
       type: ethernet
       state: up
+      mtu: 9100
       ipv4:
         enabled: ${ipv4_enabled}
         dhcp: false
