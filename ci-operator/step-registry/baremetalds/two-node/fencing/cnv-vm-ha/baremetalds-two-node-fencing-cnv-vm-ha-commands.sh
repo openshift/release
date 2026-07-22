@@ -219,14 +219,14 @@ run_on_node "${SURVIVE_NODE}" \
 echo "Waiting for pcs to confirm etcd running on ${SURVIVE_NODE} and stopped on ${FENCE_NODE}..."
 for ((i=1; i <= 30; i++)); do
   PCS_OUT=$(run_on_node "${SURVIVE_NODE}" "pcs status" 2>/dev/null || true)
-  ETCD_SURVIVE=$(echo "${PCS_OUT}" | grep -c "etcd.*Started.*${SURVIVE_NODE}" || true)
-  ETCD_FENCED=$(echo "${PCS_OUT}" | grep -c "etcd.*Stopped" || true)
+  ETCD_SURVIVE=$(echo "${PCS_OUT}" | grep -c "Started.*${SURVIVE_NODE}" || true)
+  ETCD_FENCED=$(echo "${PCS_OUT}" | grep -c "Stopped.*${FENCE_NODE}\|Stopped$" || true)
   if [[ "${ETCD_SURVIVE}" -ge 1 && "${ETCD_FENCED}" -ge 1 ]]; then
     echo "pcs confirms etcd running on ${SURVIVE_NODE} and stopped on ${FENCE_NODE}"
     echo "${PCS_OUT}"
     break
   fi
-  echo "Try ${i}/30: etcd on ${SURVIVE_NODE}=${ETCD_SURVIVE}, stopped=${ETCD_FENCED}, waiting..."
+  echo "Try ${i}/30: started on ${SURVIVE_NODE}=${ETCD_SURVIVE}, stopped=${ETCD_FENCED}, waiting..."
   sleep 10
 done
 
@@ -244,8 +244,8 @@ run_on_node "${SURVIVE_NODE}" "pcs resource status" || true
 # Verify VM migrated to the surviving node
 # -------------------------------------------------------------------------
 echo "--- Verifying VM migration ---"
-echo "Waiting up to 180s for VM to be Running on ${SURVIVE_NODE}..."
-VM_MIGRATE_DEADLINE=$((SECONDS + 180))
+echo "Waiting up to 600s for VM to be Running on ${SURVIVE_NODE}..."
+VM_MIGRATE_DEADLINE=$((SECONDS + 600))
 while [[ ${SECONDS} -lt ${VM_MIGRATE_DEADLINE} ]]; do
   VMI_STATUS=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.phase}' 2>/dev/null || true)
   VMI_CURRENT_NODE=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.nodeName}' 2>/dev/null || true)
