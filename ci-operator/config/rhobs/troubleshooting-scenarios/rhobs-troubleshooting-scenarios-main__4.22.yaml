@@ -1,0 +1,381 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
+      RUN dnf install -y git && dnf clean all
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: agentic-eval-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 30 14 * * 1
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export VERTEX_PROVIDER_KEY_PATH=/var/run/vertex/token
+
+        tests/scripts/test-troubleshooting-scenarios-agentic.sh --artifact-dir "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/vertex
+        name: vertex-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: ols-kiali-openai-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 10 2 * * 2
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export OLS_DEFAULT_PROVIDER=openai
+        export EVAL_SUITE=kiali-ossm
+
+        scripts/test-ols-evals.sh --artifact-dir "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: ols-kiali-vertex-gemini-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 10 3 * * 2
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export OLS_DEFAULT_PROVIDER=google
+        export GCP_SERVICE_ACCOUNT_JSON=/var/run/vertex/token
+        export EVAL_SUITE=kiali-ossm
+
+        scripts/test-ols-evals.sh --artifact-dir "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/vertex
+        name: vertex-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: ols-kiali-vertex-anthropic-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 10 4 * * 2
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export OLS_DEFAULT_PROVIDER=anthropic
+        export GCP_SERVICE_ACCOUNT_JSON=/var/run/vertex/token
+        export EVAL_SUITE=kiali-ossm
+
+        scripts/test-ols-evals.sh --artifact-dir "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/vertex
+        name: vertex-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: ols-kubevirt-openai-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 10 5 * * 2
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export OLS_DEFAULT_PROVIDER=openai
+        export EVAL_SUITE=kubevirt
+
+        scripts/test-ols-evals.sh --artifact-dir "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: ols-kubevirt-vertex-gemini-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 10 6 * * 2
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export OLS_DEFAULT_PROVIDER=google
+        export GCP_SERVICE_ACCOUNT_JSON=/var/run/vertex/token
+        export EVAL_SUITE=kubevirt
+
+        scripts/test-ols-evals.sh --artifact-dir "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/vertex
+        name: vertex-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: ols-kubevirt-vertex-anthropic-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 10 7 * * 2
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export OLS_DEFAULT_PROVIDER=anthropic
+        export GCP_SERVICE_ACCOUNT_JSON=/var/run/vertex/token
+        export EVAL_SUITE=kubevirt
+
+        scripts/test-ols-evals.sh --artifact-dir "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/vertex
+        name: vertex-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: ols-netobserv-openai-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 10 8 * * 2
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export OLS_DEFAULT_PROVIDER=openai
+        export EVAL_SUITE=netobserv
+
+        scripts/test-ols-evals.sh --artifact-dir "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: ols-netobserv-vertex-gemini-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 10 9 * * 2
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export OLS_DEFAULT_PROVIDER=google
+        export GCP_SERVICE_ACCOUNT_JSON=/var/run/vertex/token
+        export EVAL_SUITE=netobserv
+
+        scripts/test-ols-evals.sh --artifact-dir "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/vertex
+        name: vertex-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: ols-netobserv-vertex-anthropic-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 10 10 * * 2
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export OLS_DEFAULT_PROVIDER=anthropic
+        export GCP_SERVICE_ACCOUNT_JSON=/var/run/vertex/token
+        export EVAL_SUITE=netobserv
+
+        scripts/test-ols-evals.sh --artifact-dir "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/vertex
+        name: vertex-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: rhobs
+  repo: troubleshooting-scenarios
+  variant: "4.22"
