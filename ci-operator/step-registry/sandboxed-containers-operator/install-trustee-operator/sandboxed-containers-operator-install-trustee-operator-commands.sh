@@ -930,12 +930,15 @@ function verify_trustee_connectivity() {
   #   1. GET resource → 401 (no token)
   #   2. POST /auth + POST /attest (get attestation token)
   #   3. GET resource → 200 (with token)
+  # Use HTTP via in-cluster service DNS — the test pod is in the same namespace,
+  # so it can reach kbs-service directly without TLS.
+  local kbs_test_url="http://kbs-service.${kbs_client_namespace}.svc:${TRUSTEE_PORT}"
   local kbs_test_failed=false
-  echo ">>> Testing KBS connectivity: ${TRUSTEE_URL}/default/kbsres1/key1"
+  echo ">>> Testing KBS connectivity: ${kbs_test_url}/default/kbsres1/key1"
   echo ">>> Expected resource value: ${expected_value}"
 
   if oc exec "${kbs_client_pod}" -n "${kbs_client_namespace}" -- \
-    kbs-client --url "${TRUSTEE_URL}" get-resource --path default/kbsres1/key1 \
+    kbs-client --url "${kbs_test_url}" get-resource --path default/kbsres1/key1 \
     > /tmp/kbs-resource.txt 2> /tmp/kbs-stderr.txt; then
 
     # Success - verify the retrieved value
@@ -956,7 +959,7 @@ function verify_trustee_connectivity() {
     fi
   else
     # Failure - show diagnostics
-    echo ">>> ERROR: Failed to retrieve resource from Trustee KBS at ${TRUSTEE_URL}"
+    echo ">>> ERROR: Failed to retrieve resource from Trustee KBS at ${kbs_test_url}"
 
     # Show stderr (has the actual error)
     if [[ -s /tmp/kbs-stderr.txt ]]; then
@@ -981,7 +984,7 @@ function verify_trustee_connectivity() {
       echo ">>> ERROR: Cannot connect to KBS service"
     fi
     if echo "${all_output}" | grep -q "certificate verify failed\|SSL\|TLS"; then
-      echo ">>> ERROR: SSL/TLS error for: ${TRUSTEE_URL}"
+      echo ">>> ERROR: SSL/TLS error for: ${kbs_test_url}"
     fi
 
     kbs_test_failed=true
