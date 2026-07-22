@@ -1,0 +1,66 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.22-openshift-4.17
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: ibm-ci
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: deploy-spyre-operator
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    test:
+    - as: deploy
+      commands: |
+        # Setup SSH from Vault secret (base64-encoded private key)
+        cat /var/run/ibm-ci/private-key | base64 -d > /tmp/id_rsa
+        echo "" >> /tmp/id_rsa
+        chmod 600 /tmp/id_rsa
+
+        # Setup pull secret
+        cp /var/run/ibm-ci/pull-secret /tmp/pull-secret.json
+
+        # Generate Ansible inventory
+        mkdir -p ansible/inventory
+        cat > ansible/inventory/hosts.yml <<EOF
+        ---
+        all:
+          children:
+            ibm_hosts:
+              hosts:
+                ${IBM_HOST}:
+                  ansible_user: root
+                  ansible_ssh_private_key_file: /tmp/id_rsa
+        EOF
+
+        # Run deployment
+        make -C ansible install
+      credentials:
+      - mount_path: /var/run/ibm-ci
+        name: ibm-ci
+        namespace: test-credentials
+      env:
+      - default: nvd-srv-38.nvidia.eng.rdu2.dc.redhat.com
+        name: IBM_HOST
+      from: ibm-ci
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 3h0m0s
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: ibm-ci
