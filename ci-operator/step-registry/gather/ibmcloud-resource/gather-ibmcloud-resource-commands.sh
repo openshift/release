@@ -97,6 +97,10 @@ function gather_lb_resources {
             "${IBMCLOUD_CLI}" is lb-ps "${lb}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is lb-p ${lb} % -q"
             echo -e "\n\n\n# ibmcloud is lb-pms ${lb} <pool>\n"
             "${IBMCLOUD_CLI}" is lb-ps "${lb}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is lb-pms ${lb} % -q"
+            # DEBUG: full JSON detail — captures hostname and provisioning_status.
+            # hostname being empty at DNS-registration time is a known cause of 400.
+            echo -e "\n\n\n# ibmcloud is lb ${lb} --output JSON\n"
+            "${IBMCLOUD_CLI}" is lb "${lb}" --output JSON
         } > "${RESOURCE_DUMP_DIR}/load-balancer-${lb}.txt"
     done
 }
@@ -140,13 +144,22 @@ function gather_cis {
     if [[ -z "${DOMAIN_ID}" ]] ; then
         echo "Debug: Did not find the cis domain id of ${BASE_DOMAIN}"
         run_command "${IBMCLOUD_CLI} cis domains"
-    else 
+    else
     {
         echo -e "## ibmcloud cis dns-records ${DOMAIN_ID}\n"
         # DNS Record Names do not contain the $UNIQUE_HASH, so we filter on the $NAMESPACE only
         command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter'
         echo -e "## ibmcloud cis dns-record ${DOMAIN_ID} <dns-record>\n"
         command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} cis dns-record ${DOMAIN_ID} %"
+
+        # DEBUG: dump every api/api-int record across the whole zone, unfiltered
+        # by NAMESPACE.  A stale record from a prior failed run will not match
+        # NAMESPACE but will still collide and trigger the 400 from CIS.
+        echo -e "\n## DEBUG: all api/api-int CIS records in ${BASE_DOMAIN} (unfiltered)\n"
+        set +e
+        command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" \
+            | grep -i "api" || echo "(none found)"
+        set -e
     } > "${RESOURCE_DUMP_DIR}/cis.txt"
     fi
 }

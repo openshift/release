@@ -706,6 +706,9 @@ ibmcloud*)
       IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     fi
     export IC_API_KEY
+    # DEBUG: enable IBM Cloud Go SDK HTTP tracing so every CIS API request
+    # and response (including the 400 body) appears in the installer log.
+    export IBMCLOUD_TRACE=true
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
@@ -754,7 +757,7 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 set +o errexit
 echo "=============== openshift-install version =============="
 ${INSTALLER_BINARY} version
-${INSTALLER_BINARY} --dir="${dir}" create manifests &
+${INSTALLER_BINARY} --dir="${dir}" --log-level=debug create manifests &
 wait "$!"
 ret="$?"
 if test "${ret}" -ne 0 ; then
@@ -762,6 +765,16 @@ if test "${ret}" -ne 0 ; then
 	exit "${ret}"
 fi
 set -o errexit
+
+# DEBUG(ibmcloud): dump every CAPI manifest the installer generated so we can
+# inspect IBMVPCCluster spec (LB names, CIS zone, network settings) before the
+# cluster create call touches any IBM Cloud API.
+if [[ "${CLUSTER_TYPE}" == ibmcloud* ]]; then
+  echo "===== DEBUG: post-manifests IBMVPCCluster YAML ====="
+  find "${dir}" -name 'IBMVPCCluster*.yaml' -print -exec cat {} \; 2>/dev/null || true
+  echo "===== DEBUG: full CAPI manifest list ====="
+  find "${dir}" \( -name '*.yaml' -o -name '*.json' \) | sort || true
+fi
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
@@ -894,10 +907,35 @@ do
   refresh_create_cluster_install_lease || true
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
-  ${INSTALLER_BINARY} --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+  ${INSTALLER_BINARY} --dir="${dir}" --log-level=debug create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
   echo "Installer exit with code $ret"
+
+  # DEBUG(ibmcloud): on any infrastructure failure (exit 4) copy the full
+  # installer state and CAPI output immediately, before populate_artifact_dir
+  # runs, so nothing is overwritten.
+  # test
+  if [[ "${CLUSTER_TYPE}" == ibmcloud* ]] && [[ "${ret}" -eq 4 ]]; then
+    echo "===== DEBUG: .openshift_install_state.json ====="
+    if [[ -f "${dir}/.openshift_install_state.json" ]]; then
+      cp "${dir}/.openshift_install_state.json" "${ARTIFACT_DIR}/openshift_install_state.json"
+      cat "${dir}/.openshift_install_state.json"
+    else
+      echo "(not present)"
+    fi
+
+    echo "===== DEBUG: .openshift_install.log (tail 300) ====="
+    tail -300 "${dir}/.openshift_install.log" 2>/dev/null || true
+
+    echo "===== DEBUG: CAPI output directory ====="
+    if [[ -d "${dir}/.clusterapi_output" ]]; then
+      cp -r "${dir}/.clusterapi_output" "${ARTIFACT_DIR}/clusterapi_output_debug" 2>/dev/null || true
+      find "${dir}/.clusterapi_output" -name '*.yaml' -print -exec echo "---" \; -exec cat {} \; 2>/dev/null || true
+    else
+      echo "(${dir}/.clusterapi_output not present)"
+    fi
+  fi
 
   tries=$((tries+1))
 done
