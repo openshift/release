@@ -1,0 +1,44 @@
+base_images:
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: ocp
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-m2m-disconnected
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      ENABLE_IDMS: "yes"
+      MIRROR_BIN: oc-mirror
+    workflow: openshift-e2e-aws-disconnected
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: oc-mirror
+  variant: periodics
