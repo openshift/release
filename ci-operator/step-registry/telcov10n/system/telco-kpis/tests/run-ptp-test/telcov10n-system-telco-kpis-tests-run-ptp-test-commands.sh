@@ -28,6 +28,7 @@ main() {
     fi
 
     echo "Running PTP test (duration: ${DURATION})"
+    local rc=0
     ansible-playbook ./playbooks/telco-kpis/run-test.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e test_name=ptp \
@@ -36,7 +37,7 @@ main() {
         -e spoke_kubeconfig="${SPOKE_KUBECONFIG}" \
         -e duration="${DURATION}" \
         -e skip_rebuild_image="${SKIP_REBUILD_IMAGE}" \
-        ${DEBUG_FLAG}
+        ${DEBUG_FLAG} || rc=$?
 
     echo "Copy artifacts to SHARED_DIR for reporter step"
     local artifact_subdir="${ARTIFACT_DIR}/ptp-${SPOKE_CLUSTER}"
@@ -46,7 +47,8 @@ main() {
         echo "WARNING: artifact directory not found at ${artifact_subdir}"
     fi
 
-    echo "PTP test completed for ${SPOKE_CLUSTER}"
+    echo "PTP test completed for ${SPOKE_CLUSTER} (rc=${rc})"
+    return "${rc}"
 }
 
 main

@@ -28,6 +28,7 @@ main() {
     fi
 
     echo "Running RFC2544 test (duration: ${DURATION}, frame_size: ${FRAME_SIZE}, lat_rate: ${LAT_RATE})"
+    local rc=0
     ansible-playbook ./playbooks/telco-kpis/run-test.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e test_name=rfc2544 \
@@ -45,7 +46,7 @@ main() {
         -e tolerance_nines="${TOLERANCE_NINES}" \
         -e absolute_max_latency="${ABSOLUTE_MAX_LATENCY}" \
         -e skip_rebuild_image="${SKIP_REBUILD_IMAGE}" \
-        ${DEBUG_FLAG}
+        ${DEBUG_FLAG} || rc=$?
 
     echo "Copy artifacts to SHARED_DIR for reporter step"
     local artifact_subdir="${ARTIFACT_DIR}/rfc2544-${SPOKE_CLUSTER}"
@@ -55,7 +56,8 @@ main() {
         echo "WARNING: artifact directory not found at ${artifact_subdir}"
     fi
 
-    echo "RFC2544 test completed for ${SPOKE_CLUSTER}"
+    echo "RFC2544 test completed for ${SPOKE_CLUSTER} (rc=${rc})"
+    return "${rc}"
 }
 
 main
