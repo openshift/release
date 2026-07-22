@@ -17,13 +17,43 @@ resources:
       memory: 4Gi
 tests:
 - as: terraform-validate
-  commands: make terraform-validate
-  container:
-    from: src
+  steps:
+    test:
+    - as: validate
+      commands: |
+        GITHUB_TOKEN="$(cat /etc/github-private/oauth)"
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GITHUB_TOKEN}"; }; f'
+        unset GITHUB_TOKEN
+        make terraform-validate
+      credentials:
+      - mount_path: /etc/github-private
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: "8"
+          memory: 4Gi
 - as: terraform-test
-  commands: make terraform-test
-  container:
-    from: src
+  steps:
+    test:
+    - as: test
+      commands: |
+        GITHUB_TOKEN="$(cat /etc/github-private/oauth)"
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GITHUB_TOKEN}"; }; f'
+        unset GITHUB_TOKEN
+        make terraform-test
+      credentials:
+      - mount_path: /etc/github-private
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: "8"
+          memory: 4Gi
 - as: check-orphan-modules
   commands: make check-orphan-modules
   container:
