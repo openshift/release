@@ -61,7 +61,6 @@ log "INFO: Start e2e testing ...\n$cmd"
 # Execute the running cmd 
 eval "${cmd}" || true
 
-# cp ${SHARED_DIR}/junit.tar.gz ${ARTIFACT_DIR}
-upload_junit_result $JUNIT_XML $SHARED_DIR ${ARTIFACT_DIR}
+cp "${JUNIT_XML}" "${ARTIFACT_DIR}/"
 
 log "Testing is finished and uploaded."
