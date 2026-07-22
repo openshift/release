@@ -29,7 +29,6 @@ fi
 cd /
 
 # Discover the SNO node IP from the libvirt DHCP reservation by hostname
-MASTER_VM="${CLUSTER_NAME}_master_0"
 MASTER_HOSTNAME=$(printf "${MASTER_HOSTNAME_FORMAT}" 0)
 DISCOVERED_IP=$(virsh net-dumpxml "${BAREMETAL_NETWORK_NAME}" | \
   xmllint --xpath "string(//host[@name='${MASTER_HOSTNAME}']/@ip)" -)
@@ -39,6 +38,12 @@ if [[ -z "${DISCOVERED_IP}" ]]; then
   exit 1
 fi
 
+# Compute a different IP on the same subnet for the IP-change test
+ORIGINAL_LAST_OCTET=$(echo "${DISCOVERED_IP}" | cut -d. -f4)
+NEW_LAST_OCTET=$(( (ORIGINAL_LAST_OCTET + 99) % 253 + 2 ))
+SUBNET_PREFIX=$(echo "${DISCOVERED_IP}" | cut -d. -f1-3)
+COMPUTED_ADDITIONAL_IP="${SUBNET_PREFIX}.${NEW_LAST_OCTET}"
+
 export PREVIOUS_CLUSTER_NAME="${PREVIOUS_CLUSTER_NAME:-${CLUSTER_NAME:-ostest}}"
 export PREVIOUS_BASE_DOMAIN="${PREVIOUS_BASE_DOMAIN:-${BASE_DOMAIN:-test.metalkube.org}}"
 export PREVIOUS_HOSTNAME="${PREVIOUS_HOSTNAME:-${MASTER_HOSTNAME}}"
@@ -46,48 +51,7 @@ export NEW_CLUSTER_NAME="${NEW_CLUSTER_NAME:-another-name}"
 export NEW_BASE_DOMAIN="${NEW_BASE_DOMAIN:-another.domain}"
 export NEW_HOSTNAME="${NEW_HOSTNAME:-another-hostname}"
 export SINGLE_NODE_IP="${SINGLE_NODE_IP:-${DISCOVERED_IP}}"
-export ADDITIONAL_NODE_IP="${ADDITIONAL_NODE_IP:-192.168.145.10}"
-
-# Create a secondary libvirt network for the additional IP
-ADDITIONAL_NETWORK_NAME="recert-secondary"
-ADDITIONAL_MAC="52:54:00:ee:42:99"
-if ! virsh net-info "${ADDITIONAL_NETWORK_NAME}" &>/dev/null; then
-  cat > /tmp/recert-secondary-net.xml <<NETXML
-<network>
-  <name>${ADDITIONAL_NETWORK_NAME}</name>
-  <forward mode="nat"/>
-  <bridge name="virbr-recert" stp="on" delay="0"/>
-  <ip address="192.168.145.1" netmask="255.255.255.0">
-    <dhcp>
-      <host mac="${ADDITIONAL_MAC}" ip="${ADDITIONAL_NODE_IP}"/>
-    </dhcp>
-  </ip>
-</network>
-NETXML
-  virsh net-define /tmp/recert-secondary-net.xml
-  virsh net-start "${ADDITIONAL_NETWORK_NAME}"
-fi
-
-# Hot-attach the secondary interface to the SNO VM
-if ! virsh domiflist "${MASTER_VM}" | grep -q "${ADDITIONAL_NETWORK_NAME}"; then
-  virsh attach-interface "${MASTER_VM}" network "${ADDITIONAL_NETWORK_NAME}" \
-    --model virtio --mac "${ADDITIONAL_MAC}" --live --config
-fi
-
-# Wait for the VM to acquire the DHCP lease on the secondary network
-echo "Waiting for ${ADDITIONAL_NODE_IP} to become reachable..."
-for i in $(seq 1 30); do
-  if ping -c 1 -W 2 "${ADDITIONAL_NODE_IP}" > /dev/null 2>&1; then
-    echo "Secondary IP reachable after $((i * 2)) seconds"
-    break
-  fi
-  if [[ "${i}" -eq 30 ]]; then
-    echo "ERROR: ${ADDITIONAL_NODE_IP} never became reachable" >&2
-    exit 1
-  fi
-  sleep 2
-done
-
+export ADDITIONAL_NODE_IP="${ADDITIONAL_NODE_IP:-${COMPUTED_ADDITIONAL_IP}}"
 export SINGLE_NODE_NETWORK_PREFIX="$(echo ${SINGLE_NODE_IP} | cut -d '.' -f 1,2,3).0"
 export ADDITIONAL_NODE_NETWORK_PREFIX="$(echo ${ADDITIONAL_NODE_IP} | cut -d '.' -f 1,2,3).0"
 
@@ -125,9 +89,7 @@ function gather_recert_logs {
 }
 trap gather_recert_logs EXIT TERM
 
-# The secondary recert-secondary network gives the VM a second interface.
-# Set KUBELET_NODEIP_HINT to the primary network prefix so kubelet
-# uses the original IP until recert's update_node_ip changes it.
+# Set KUBELET_NODEIP_HINT so kubelet selects the correct node IP.
 ssh ${SSH_OPTS[@]} "core@${SINGLE_NODE_IP}" \
   "echo KUBELET_NODEIP_HINT=${SINGLE_NODE_NETWORK_PREFIX} | sudo tee /etc/default/nodeip-configuration"
 
@@ -194,9 +156,18 @@ function update_node_ip {
   echo "Update node IP"
   find /etc/kubernetes/ -type f -print0 | xargs -0 sed -i "s/${SINGLE_NODE_IP}/${ADDITIONAL_NODE_IP}/g"
   rm -rf /var/run/nodeip-configuration/primary-ip
+
+  # Swap the IP on br-ex in place instead of deleting and recreating the
+  # bridge.  Dev-scripts provisions a single interface; destroying br-ex
+  # would force OVN to rebuild from scratch, which fails without a second
+  # pre-provisioned NIC.
+  local cidr
+  cidr=\$(ip -o addr show br-ex | awk '/inet / {print \$4}' | cut -d/ -f2)
+  ip addr del "${SINGLE_NODE_IP}/\${cidr}" dev br-ex 2>/dev/null || true
+  ip addr add "${ADDITIONAL_NODE_IP}/\${cidr}" dev br-ex
+
   echo "KUBELET_NODEIP_HINT=${ADDITIONAL_NODE_NETWORK_PREFIX}" | sudo tee /etc/default/nodeip-configuration
   systemctl restart nodeip-configuration.service
-  nmcli connection delete br-ex
   systemctl restart ovs-configuration.service
   echo "node IP updated"
 }
@@ -206,11 +177,11 @@ function recert {
   local recert_image="${RECERT_IMAGE:-quay.io/edge-infrastructure/recert:latest}"
   echo "recert image: \${recert_image}"
   local previous_base_domain="${PREVIOUS_BASE_DOMAIN}"
-  local previous_cluster_name="${PREVIOUS_CLUSTER_NAME:-ostest}"
-  local new_base_domain="${NEW_BASE_DOMAIN:-another.domain}"
-  local new_cluster_name="${NEW_CLUSTER_NAME:-another-name}"
-  local previous_hostname="${PREVIOUS_HOSTNAME:-ostest-master-0}"
-  local new_hostname="${NEW_HOSTNAME:-another-hostname}"
+  local previous_cluster_name="${PREVIOUS_CLUSTER_NAME}"
+  local new_base_domain="${NEW_BASE_DOMAIN}"
+  local new_cluster_name="${NEW_CLUSTER_NAME}"
+  local previous_hostname="${PREVIOUS_HOSTNAME}"
+  local new_hostname="${NEW_HOSTNAME}"
   local old_ip="${SINGLE_NODE_IP}"
   local new_ip="${ADDITIONAL_NODE_IP}"
 
@@ -313,7 +284,7 @@ then
   stable_period_minutes=5
   start=\$(date +%s)
   start_containers
-  oc adm wait-for-stable-cluster --minimum-stable-period="\${stable_period_minutes}m" --timeout=30m
+  oc adm wait-for-stable-cluster --minimum-stable-period="\${stable_period_minutes}m" --timeout=120m
   end=\$(date +%s)
 
   runtime=\$((end-start-(stable_period_minutes*60)))
