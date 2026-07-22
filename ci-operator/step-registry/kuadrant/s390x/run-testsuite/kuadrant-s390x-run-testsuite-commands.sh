@@ -271,7 +271,102 @@ PY
 # newer lock entry. Re-pin pyproject+lock in the Job before make so sync stays
 # on 6.32.1.
 PROTOBUF_PIN="${PROTOBUF_PIN:-6.32.1}"
-PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve -vv --tb=short --setup-show"
+PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve -p kuadrant_debug_logger -vv --tb=short --setup-show"
+
+# Build in-container diagnostics plugin with strict timeouts and fail-safe
+DIAGNOSTICS_PLUGIN="${WORK_DIR}/kuadrant_debug_logger.py"
+cat > "${DIAGNOSTICS_PLUGIN}" <<'DIAGPY'
+"""Pytest plugin to capture cluster state during test execution.
+All operations are non-blocking with strict timeouts and exception handling.
+"""
+import subprocess
+import sys
+from datetime import datetime
+import threading
+
+def run_oc_safe(cmd, timeout=10):
+    """Run oc command with strict timeout, never hangs, always returns."""
+    result = {"output": f"TIMEOUT after {timeout}s"}
+    def target():
+        try:
+            proc = subprocess.run(
+                f"oc {cmd}",
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+            result["output"] = proc.stdout if proc.returncode == 0 else f"ERROR(rc={proc.returncode})"
+        except subprocess.TimeoutExpired:
+            result["output"] = f"TIMEOUT_EXPIRED after {timeout}s"
+        except Exception as e:
+            result["output"] = f"EXCEPTION: {type(e).__name__}"
+
+    thread = threading.Thread(target=target, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout + 1)  # +1s grace period for thread overhead
+    return result["output"]
+
+def safe_capture(label, cmd):
+    """Capture with label, guaranteed to complete quickly."""
+    try:
+        output = run_oc_safe(cmd, timeout=8)
+        return f"\n--- {label} ---\n{output}\n"
+    except Exception:
+        return f"\n--- {label} ---\nCAPTURE_FAILED\n"
+
+def log_diagnostics(phase):
+    """Capture critical state only, maximum 60s total."""
+    try:
+        print(f"\n{'='*80}", file=sys.stderr)
+        print(f"[DIAGNOSTIC {datetime.utcnow().strftime('%H:%M:%S')}] {phase}", file=sys.stderr)
+        print(f"{'='*80}", file=sys.stderr)
+
+        # Only capture critical resources - backends and HTTPRoutes
+        print(safe_capture("Backends (kuadrant)", "get pods -n kuadrant -l app=backend -o wide"), file=sys.stderr)
+        print(safe_capture("Backends (kuadrant2)", "get pods -n kuadrant2 -l app=backend -o wide"), file=sys.stderr)
+        print(safe_capture("HTTPRoutes (kuadrant)", "get httproute -n kuadrant -o wide"), file=sys.stderr)
+        print(safe_capture("Services (kuadrant)", "get svc -n kuadrant"), file=sys.stderr)
+
+        print(f"{'='*80}\n", file=sys.stderr)
+    except Exception as e:
+        print(f"[DIAGNOSTIC] Failed: {type(e).__name__} (non-fatal)", file=sys.stderr)
+
+# Only log at critical pytest hooks - not every test
+def pytest_sessionstart(session):
+    log_diagnostics("SESSION_START (before fixtures)")
+
+def pytest_collection_finish(session):
+    """After collection, before session fixtures run."""
+    print(f"[DIAGNOSTIC] Collected {len(session.items)} tests", file=sys.stderr)
+
+def pytest_fixture_setup(fixturedef, request):
+    """Log only backend-related session fixtures."""
+    if fixturedef.scope == "session" and "backend" in fixturedef.argname.lower():
+        print(f"[DIAGNOSTIC] Setting up session fixture: {fixturedef.argname}", file=sys.stderr)
+
+def pytest_runtest_logstart(nodeid, location):
+    """Log first test start to capture post-fixture state."""
+    if location[2] == "test_gateway_basic_dns_tls" or "test_" in nodeid and nodeid.count("::") == 1:
+        log_diagnostics(f"BEFORE_TEST: {nodeid}")
+
+def pytest_sessionfinish(session, exitstatus):
+    log_diagnostics(f"SESSION_END (status={exitstatus})")
+
+    # Critical summary: what backends should exist vs what actually exists
+    print("\n" + "="*80, file=sys.stderr)
+    print("[DIAGNOSTIC] BACKEND DEPLOYMENT SUMMARY", file=sys.stderr)
+    print("="*80, file=sys.stderr)
+    print("Expected: MockServer backend pods in 'kuadrant' namespace", file=sys.stderr)
+    print("Expected: Service name contains 'backend' or 'mockserver'", file=sys.stderr)
+    print("Expected: HTTPRoutes pointing to backend services", file=sys.stderr)
+    print("\nActual findings:", file=sys.stderr)
+    print(run_oc_safe("get pods -n kuadrant -l app=backend -o name", timeout=5), file=sys.stderr)
+    print(run_oc_safe("get pods -n kuadrant -l app=mockserver -o name", timeout=5), file=sys.stderr)
+    print(run_oc_safe("get svc -n kuadrant | grep -i backend || echo 'No backend services'", timeout=5), file=sys.stderr)
+    print("="*80 + "\n", file=sys.stderr)
+DIAGPY
+
 CONTAINER_SCRIPT="set -o pipefail
 cd /opt/workdir/kuadrant-testsuite
 rc=0
@@ -281,6 +376,22 @@ if ! poetry add --group main --no-interaction 'protobuf==${PROTOBUF_PIN}'; then
   poetry add --no-interaction 'protobuf==${PROTOBUF_PIN}'
 fi
 poetry run python -c \"from importlib.metadata import version; print('protobuf', version('protobuf'))\"
+
+echo '=== Testsuite configuration verification ==='
+poetry run python -c \"
+from dynaconf import Dynaconf
+settings = Dynaconf(
+    settings_files=['/config/secrets.yaml'],
+    environments=True,
+    env_switcher='ENV_FOR_DYNACONF',
+    load_dotenv=False,
+)
+print('Configuration loaded from:', settings.settings_files)
+print('mockserver.image:', getattr(settings, 'mockserver', {}).get('image', 'NOT SET'))
+print('httpbin.image:', getattr(settings, 'httpbin', {}).get('image', 'NOT SET'))
+print('service_protection.project:', getattr(settings, 'service_protection', {}).get('project', 'NOT SET'))
+print('control_plane.provider_secret:', getattr(settings, 'control_plane', {}).get('provider_secret', 'NOT SET'))
+\" || echo 'Config verification failed (non-fatal)'
 "
 if [[ "${RUN_SMOKE}" == "true" ]]; then
   CONTAINER_SCRIPT+="echo '=== make smoke ==='
@@ -320,9 +431,10 @@ oc -n "${TEST_RUNNER_NAMESPACE}" create secret generic kuadrant-testrunner-confi
   --from-file=kubeconfig="${SHARED_DIR}/kubeconfig" \
   --dry-run=client -o yaml | oc apply -f -
 
-# ConfigMap: getaddrinfo resolver plugin.
+# ConfigMap: pytest plugins (DNS resolver + diagnostics logger).
 oc -n "${TEST_RUNNER_NAMESPACE}" create configmap kuadrant-testrunner-hook \
   --from-file=kuadrant_coredns_resolve.py="${PLUGIN_FILE}" \
+  --from-file=kuadrant_debug_logger.py="${DIAGNOSTICS_PLUGIN}" \
   --dry-run=client -o yaml | oc apply -f -
 
 JOB_FILE="${WORK_DIR}/job.yaml"
