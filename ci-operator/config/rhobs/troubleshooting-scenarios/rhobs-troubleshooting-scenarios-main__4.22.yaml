@@ -1,0 +1,60 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
+      RUN dnf install -y git && dnf clean all
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: agentic-eval-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 30 14 * * 1
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export VERTEX_PROVIDER_KEY_PATH=/var/run/vertex/token
+
+        tests/scripts/test-troubleshooting-scenarios-agentic.sh --artifact-dir "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/vertex
+        name: vertex-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: rhobs
+  repo: troubleshooting-scenarios
+  variant: "4.22"
