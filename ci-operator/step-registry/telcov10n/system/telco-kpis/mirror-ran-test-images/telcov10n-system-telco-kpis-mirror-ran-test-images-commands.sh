@@ -26,8 +26,8 @@ main() {
         exit 1
     fi
 
-    local images_payload
-    images_payload=$(python3 -c "
+    local images_file="/tmp/mirror-images-extra-vars.json"
+    python3 -c "
 import json, sys
 raw = json.loads(sys.argv[1])
 source_images = raw.get('images', [])
@@ -35,14 +35,14 @@ result = []
 for src in source_images:
     name_tag = src.rsplit('/', 1)[-1]
     result.append({'source': src, 'dest': 'ran-test/' + name_tag})
-print(json.dumps(result))
-" "${RAN_IMAGES}")
-
-    echo "Mirroring $(echo "${images_payload}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))') image(s)"
+with open(sys.argv[2], 'w') as f:
+    json.dump({'images': result}, f)
+print(f'Mirroring {len(result)} image(s)')
+" "${RAN_IMAGES}" "${images_file}"
 
     ansible-playbook ./playbooks/telco-kpis/mirror-images.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
-        -e "images=${images_payload}" \
+        -e "@${images_file}" \
         -e "registry_host=disconnected.registry.local" \
         ${DEBUG_FLAG}
 
