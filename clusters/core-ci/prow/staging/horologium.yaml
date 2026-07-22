@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci-staging
+  name: horologium
+  labels:
+    app: horologium
+spec:
+  replicas: 1 # Do not scale up.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: horologium
+  template:
+    metadata:
+      labels:
+        app: horologium
+    spec:
+      serviceAccountName: "horologium"
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: horologium
+        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260217-999e46ca7
+        args:
+        - --dry-run=false
+        - --config-path=/etc/config/config.yaml
+        - --job-config-path=/etc/jobs
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: job-configs
+          mountPath: /etc/jobs
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: config
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
