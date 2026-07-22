@@ -33,6 +33,7 @@ main() {
     fi
 
     echo "Running cpu_util test (baseline: ${BASELINE}, duration: ${DURATION}, test_name: ${TEST_NAME})"
+    local rc=0
     ansible-playbook ./playbooks/telco-kpis/run-test.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e test_name="${TEST_NAME}" \
@@ -42,7 +43,7 @@ main() {
         -e duration="${DURATION}" \
         -e baseline="${BASELINE}" \
         -e skip_rebuild_image="${SKIP_REBUILD_IMAGE}" \
-        ${DEBUG_FLAG}
+        ${DEBUG_FLAG} || rc=$?
 
     echo "Copy artifacts to SHARED_DIR for reporter step"
     local artifact_subdir="${ARTIFACT_DIR}/${TEST_NAME}-${SPOKE_CLUSTER}"
@@ -52,7 +53,8 @@ main() {
         echo "WARNING: artifact directory not found at ${artifact_subdir}"
     fi
 
-    echo "cpu_util test completed for ${SPOKE_CLUSTER}"
+    echo "cpu_util test completed for ${SPOKE_CLUSTER} (rc=${rc})"
+    return "${rc}"
 }
 
 main

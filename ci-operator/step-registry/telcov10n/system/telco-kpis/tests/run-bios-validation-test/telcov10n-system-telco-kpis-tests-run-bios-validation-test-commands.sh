@@ -32,6 +32,7 @@ main() {
     fi
 
     echo "Running BIOS validation playbook (apply_fixes: ${APPLY_FIXES}, reboot: ${REBOOT_AFTER_APPLY})"
+    local rc=0
     ansible-playbook ./playbooks/telco-kpis/run-bios-validation.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e spoke_cluster="${SPOKE_CLUSTER}" \
@@ -40,7 +41,7 @@ main() {
         -e bios_profile_url="${BIOS_PROFILE_URL}" \
         -e apply_fixes="${APPLY_FIXES}" \
         -e reboot_after_apply="${REBOOT_AFTER_APPLY}" \
-        ${DEBUG_FLAG}
+        ${DEBUG_FLAG} || rc=$?
 
     echo "Copy artifacts to ARTIFACT_DIR and SHARED_DIR"
     local artifact_subdir="${ARTIFACT_DIR}/bios_validation-${SPOKE_CLUSTER}"
@@ -50,7 +51,8 @@ main() {
         echo "WARNING: artifact directory not found at ${artifact_subdir}"
     fi
 
-    echo "BIOS validation test completed for ${SPOKE_CLUSTER}"
+    echo "BIOS validation test completed for ${SPOKE_CLUSTER} (rc=${rc})"
+    return "${rc}"
 }
 
 main

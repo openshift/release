@@ -33,6 +33,7 @@ main() {
     fi
 
     echo "Running RDS compare (version: ${VERSION}, branch: ${EFFECTIVE_REFERENCE_BRANCH}, baseline: ${BASELINE})"
+    local rc=0
     ansible-playbook ./playbooks/telco-kpis/run-rds-compare.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e spoke_cluster="${SPOKE_CLUSTER}" \
@@ -42,7 +43,7 @@ main() {
         -e reference_repo_url="${REFERENCE_REPO_URL}" \
         -e metadata_relpath="${METADATA_RELPATH}" \
         -e baseline="${BASELINE}" \
-        ${DEBUG_FLAG}
+        ${DEBUG_FLAG} || rc=$?
 
     echo "Copy artifacts to SHARED_DIR for reporter step"
     local artifact_subdir="${ARTIFACT_DIR}/rds_compare-${SPOKE_CLUSTER}"
@@ -52,7 +53,8 @@ main() {
         echo "WARNING: artifact directory not found at ${artifact_subdir}"
     fi
 
-    echo "RDS compare test completed for ${SPOKE_CLUSTER}"
+    echo "RDS compare test completed for ${SPOKE_CLUSTER} (rc=${rc})"
+    return "${rc}"
 }
 
 main

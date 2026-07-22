@@ -30,6 +30,7 @@ main() {
     fi
 
     echo "Running ztp-ai-deployment-time playbook (threshold: ${THRESHOLD_DURATION})"
+    local rc=0
     ansible-playbook ./playbooks/telco-kpis/ztp-ai-deployment-time.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e test_name=ztp_ai_deployment_time \
@@ -37,7 +38,7 @@ main() {
         -e hub_cluster="${HUB_CLUSTER}" \
         -e hub_kubeconfig="${HUB_KUBECONFIG}" \
         -e threshold_duration="${THRESHOLD_DURATION}" \
-        ${DEBUG_FLAG}
+        ${DEBUG_FLAG} || rc=$?
 
     echo "Copy JUnit XML to SHARED_DIR for reporter step"
     local artifact_subdir="${ARTIFACT_DIR}/ztp_ai_deployment_time-${SPOKE_CLUSTER}"
@@ -47,7 +48,8 @@ main() {
         echo "WARNING: artifact directory not found at ${artifact_subdir}"
     fi
 
-    echo "ZTP AI deployment time test completed for ${SPOKE_CLUSTER}"
+    echo "ZTP AI deployment time test completed for ${SPOKE_CLUSTER} (rc=${rc})"
+    return "${rc}"
 }
 
 main

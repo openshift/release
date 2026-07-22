@@ -28,6 +28,7 @@ main() {
     fi
 
     echo "Running reboot test (reboot_count: ${REBOOT_COUNT})"
+    local rc=0
     ansible-playbook ./playbooks/telco-kpis/run-test.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e test_name=reboot \
@@ -38,7 +39,7 @@ main() {
         -e ran_integration_repo="${RAN_INTEGRATION_REPO}" \
         -e cnf_gotests_repo="${CNF_GOTESTS_REPO}" \
         -e skip_rebuild_image="${SKIP_REBUILD_IMAGE}" \
-        ${DEBUG_FLAG}
+        ${DEBUG_FLAG} || rc=$?
 
     echo "Copy artifacts to SHARED_DIR for reporter step"
     local artifact_subdir="${ARTIFACT_DIR}/reboot-${SPOKE_CLUSTER}"
@@ -48,7 +49,8 @@ main() {
         echo "WARNING: artifact directory not found at ${artifact_subdir}"
     fi
 
-    echo "Reboot test completed for ${SPOKE_CLUSTER}"
+    echo "Reboot test completed for ${SPOKE_CLUSTER} (rc=${rc})"
+    return "${rc}"
 }
 
 main
