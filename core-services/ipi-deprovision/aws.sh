@@ -37,9 +37,17 @@ function deprovision() {
 }
 
 function strip_finalizers() {
-	local resource="${1}" ns="${2}"
-	oc get "${resource}" -n "${ns}" -o json 2>/dev/null | \
-		jq -r '.items[] | select(.metadata.deletionTimestamp != null) | .metadata.name' | \
+	local resource="${1}" ns="${2}" filter_name="${3:-}"
+	local items
+	if [[ -n "${filter_name}" ]]; then
+		items="$(oc get "${resource}" "${filter_name}" -n "${ns}" -o json 2>/dev/null || echo '{}')"
+		if [[ "$(echo "${items}" | jq -r '.kind // empty' 2>/dev/null)" != "List" ]]; then
+			items="$(echo "${items}" | jq '{items: [.]}')"
+		fi
+	else
+		items="$(oc get "${resource}" -n "${ns}" -o json 2>/dev/null || echo '{"items":[]}')"
+	fi
+	echo "${items}" | jq -r '.items[] | select(.metadata.deletionTimestamp != null) | .metadata.name' | \
 		while read -r obj; do
 			[[ -n "${obj}" ]] && oc patch "${resource}" "${obj}" -n "${ns}" -p '{"metadata":{"finalizers":null}}' --type=merge 2>/dev/null || true
 		done
@@ -65,17 +73,26 @@ function deletion_age_seconds() {
 # tier. This avoids wasting time on lower-level cleanup when the HC has been
 # stuck long enough to justify escalation.
 #
-# Tier 4 (>=2hr):    HC and NodePool finalizers (last resort, skips all lower tiers)
-# Tier 3 (>=1.5hr):  delete CP namespace if not already deleting
-# Tier 2 (>=1hr):    HCP + CAPI resource finalizers
-# Tier 1 (>=30min):  awsmachine finalizers + terminate EC2 instances
+# Tier 4 (>=4hr):    HC and NodePool finalizers (last resort, skips all lower tiers)
+# Tier 3 (>=3hr):    delete CP namespace if not already deleting
+# Tier 2 (>=2hr):    HCP + CAPI resource finalizers
+# Tier 1 (>=1hr):    awsmachine finalizers + terminate EC2 instances
 function hypershift_force_cleanup() {
 	local hc_ns="${1}" hc_name="${2}"
+	local passed_infra_id="${3:-}" passed_region="${4:-}"
 	local hcp_ns="${hc_ns}-${hc_name}"
 
 	local infra_id region
-	infra_id="$(oc get hostedcluster -n "${hc_ns}" "${hc_name}" -o jsonpath='{.spec.infraID}' 2>/dev/null || echo "")"
-	region="$(oc get hostedcluster -n "${hc_ns}" "${hc_name}" -o jsonpath='{.spec.platform.aws.region}' 2>/dev/null || echo "")"
+	if [[ -n "${passed_infra_id}" ]]; then
+		infra_id="${passed_infra_id}"
+	else
+		infra_id="$(oc get hostedcluster -n "${hc_ns}" "${hc_name}" -o jsonpath='{.spec.infraID}' 2>/dev/null || echo "")"
+	fi
+	if [[ -n "${passed_region}" ]]; then
+		region="${passed_region}"
+	else
+		region="$(oc get hostedcluster -n "${hc_ns}" "${hc_name}" -o jsonpath='{.spec.platform.aws.region}' 2>/dev/null || echo "")"
+	fi
 	: "${infra_id:=${hc_name}}"
 	: "${region:=us-east-1}"
 
@@ -86,31 +103,37 @@ function hypershift_force_cleanup() {
 	age="$(deletion_age_seconds "${hc_ns}" "${hc_name}")"
 	echo "Force-cleaning ${hc_ns}/${hc_name} (infraID=${infra_id} region=${region} age=${age}s)"
 
-	if [[ ${age} -ge 7200 ]]; then
-		# Tier 4 (>=2hr): strip HC and NodePool finalizers as last resort
-		echo "  Tier 4 (>=2hr): HC + NodePool finalizers (skipping lower tiers)"
-		oc delete nodepool --all -n "${hc_ns}" --wait=false 2>/dev/null || true
-		strip_finalizers nodepool "${hc_ns}"
-		strip_finalizers hostedcluster "${hc_ns}"
-	elif [[ ${age} -ge 5400 ]]; then
-		# Tier 3 (>=1.5hr): delete CP namespace if not already deleting
-		echo "  Tier 3 (>=1.5hr): CP namespace"
+	if [[ ${age} -ge 14400 ]]; then
+		# Tier 4 (>=4hr): strip HC and NodePool finalizers as last resort
+		echo "  Tier 4 (>=4hr): HC + NodePool finalizers (skipping lower tiers)"
+		local -a np_names
+		readarray -t np_names < <(oc get nodepool -n "${hc_ns}" -o json 2>/dev/null | \
+			jq -r --arg hc "${hc_name}" '.items[] | select(.spec.clusterName == $hc) | .metadata.name' 2>/dev/null || true)
+		for np in "${np_names[@]+"${np_names[@]}"}"; do
+			[[ -z "${np}" ]] && continue
+			oc delete nodepool "${np}" -n "${hc_ns}" --wait=false 2>/dev/null || true
+			strip_finalizers nodepool "${hc_ns}" "${np}"
+		done
+		strip_finalizers hostedcluster "${hc_ns}" "${hc_name}"
+	elif [[ ${age} -ge 10800 ]]; then
+		# Tier 3 (>=3hr): delete CP namespace if not already deleting
+		echo "  Tier 3 (>=3hr): CP namespace"
 		local ns_ts
 		ns_ts="$(oc get namespace "${hcp_ns}" -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || echo "")"
 		if [[ -z "${ns_ts}" ]]; then
 			echo "    Deleting CP namespace ${hcp_ns}"
 			oc delete namespace "${hcp_ns}" --wait=false 2>/dev/null || true
 		fi
-	elif [[ ${age} -ge 3600 ]]; then
-		# Tier 2 (>=1hr): strip HCP and CAPI resource finalizers
-		echo "  Tier 2 (>=1hr): HCP + CAPI finalizers"
+	elif [[ ${age} -ge 7200 ]]; then
+		# Tier 2 (>=2hr): strip HCP and CAPI resource finalizers
+		echo "  Tier 2 (>=2hr): HCP + CAPI finalizers"
 		for resource in machineset.cluster.x-k8s.io machinedeployment.cluster.x-k8s.io cluster.cluster.x-k8s.io awsendpointservice hostedcontrolplane; do
 			oc delete "${resource}" --all -n "${hcp_ns}" --wait=false 2>/dev/null || true
 			strip_finalizers "${resource}" "${hcp_ns}"
 		done
-	elif [[ ${age} -ge 1800 ]]; then
-		# Tier 1 (>=30min): strip awsmachine finalizers + terminate EC2 instances
-		echo "  Tier 1 (>=30min): awsmachine finalizers + EC2 termination"
+	elif [[ ${age} -ge 3600 ]]; then
+		# Tier 1 (>=1hr): strip awsmachine finalizers + terminate EC2 instances
+		echo "  Tier 1 (>=1hr): awsmachine finalizers + EC2 termination"
 		oc delete awsmachine --all -n "${hcp_ns}" --wait=false 2>/dev/null || true
 		oc delete machine.cluster.x-k8s.io --all -n "${hcp_ns}" --wait=false 2>/dev/null || true
 		strip_finalizers awsmachine "${hcp_ns}"
@@ -160,19 +183,27 @@ function hypershift_pruner() {
 			hc_name="${hostedcluster}"
 		fi
 
+		local hc_infra_id hc_region
+		hc_infra_id="$(oc get hostedcluster "${hc_name}" -n "${hc_ns}" -o jsonpath='{.spec.infraID}' 2>/dev/null || echo "")"
+		hc_region="$(oc get hostedcluster "${hc_name}" -n "${hc_ns}" -o jsonpath='{.spec.platform.aws.region}' 2>/dev/null || echo "")"
+
 		echo "Destroying HostedCluster: ${hc_ns}/${hc_name}"
 		if ! timeout --signal=SIGTERM 30m hypershift destroy cluster aws \
 			--aws-creds "${AWS_SHARED_CREDENTIALS_FILE}" \
 			--namespace "${hc_ns}" --name "${hc_name}" \
 			--cluster-grace-period 15m; then
 			echo "ERROR: graceful destroy failed for ${hc_ns}/${hc_name}, forcing cleanup ..."
-			failed_clusters+=("${hc_ns}/${hc_name}")
+			failed_clusters+=("${hc_ns}/${hc_name}|${hc_infra_id}|${hc_region}")
 		fi
 	done
 
 	for failed_hc in "${failed_clusters[@]+"${failed_clusters[@]}"}"; do
-		local fc_ns="${failed_hc%%/*}" fc_name="${failed_hc##*/}"
-		hypershift_force_cleanup "${fc_ns}" "${fc_name}" || had_failure=$((had_failure+1))
+		local fc_spec="${failed_hc%%|*}"
+		local fc_rest="${failed_hc#*|}"
+		local fc_infra_id="${fc_rest%%|*}"
+		local fc_region="${fc_rest#*|}"
+		local fc_ns="${fc_spec%%/*}" fc_name="${fc_spec##*/}"
+		hypershift_force_cleanup "${fc_ns}" "${fc_name}" "${fc_infra_id}" "${fc_region}" || had_failure=$((had_failure+1))
 	done
 
 	if [[ ${had_failure} -ne 0 ]]; then
