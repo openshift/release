@@ -145,7 +145,7 @@ spec:
               name: default
         resources:
           requests:
-            memory: 128Mi
+            memory: 1Gi
       networks:
         - name: default
           pod: {}
@@ -189,11 +189,11 @@ recover_fenced_node() {
   sleep 30
 
   run_on_node "${SURVIVE_NODE}" \
-    "sudo pcs stonith update ${FENCE_NODE}_redfish action=reboot --force" || true
+    "pcs stonith update ${FENCE_NODE}_redfish action=reboot --force" || true
 
   oc wait "node/${FENCE_NODE}" --for=condition=Ready --timeout=10m || true
 
-  run_on_node "${SURVIVE_NODE}" "sudo pcs resource cleanup etcd" || true
+  run_on_node "${SURVIVE_NODE}" "pcs resource cleanup etcd" || true
   echo "--- Recovery trap complete ---"
 }
 
@@ -205,20 +205,20 @@ trap recover_fenced_node EXIT
 echo "--- Fencing ${FENCE_NODE} ---"
 
 echo "Pre-fence pcs status:"
-run_on_node "${SURVIVE_NODE}" "sudo pcs status" || true
+run_on_node "${SURVIVE_NODE}" "pcs status" || true
 
 echo "Setting STONITH action to off for ${FENCE_NODE}..."
 run_on_node "${SURVIVE_NODE}" \
-  "sudo pcs stonith update ${FENCE_NODE}_redfish action=off --force"
+  "pcs stonith update ${FENCE_NODE}_redfish action=off --force"
 RECOVERY_NEEDED=true
 
 echo "Fencing ${FENCE_NODE}..."
 run_on_node "${SURVIVE_NODE}" \
-  "sudo pcs stonith fence ${FENCE_NODE}"
+  "pcs stonith fence ${FENCE_NODE}"
 
 echo "Waiting for pcs to confirm etcd running on ${SURVIVE_NODE} and stopped on ${FENCE_NODE}..."
 for ((i=1; i <= 30; i++)); do
-  PCS_OUT=$(run_on_node "${SURVIVE_NODE}" "sudo pcs status" 2>/dev/null || true)
+  PCS_OUT=$(run_on_node "${SURVIVE_NODE}" "pcs status" 2>/dev/null || true)
   ETCD_SURVIVE=$(echo "${PCS_OUT}" | grep -c "etcd.*Started.*${SURVIVE_NODE}" || true)
   ETCD_FENCED=$(echo "${PCS_OUT}" | grep -c "etcd.*Stopped" || true)
   if [[ "${ETCD_SURVIVE}" -ge 1 && "${ETCD_FENCED}" -ge 1 ]]; then
@@ -235,10 +235,10 @@ oc wait "node/${FENCE_NODE}" --for=condition=Ready=False --timeout=5m || \
   oc wait "node/${FENCE_NODE}" --for=condition=Ready=Unknown --timeout=5m || true
 
 echo "Verifying pcs status..."
-run_on_node "${SURVIVE_NODE}" "sudo pcs status" || true
+run_on_node "${SURVIVE_NODE}" "pcs status" || true
 
 echo "Verifying etcd is running only on ${SURVIVE_NODE}..."
-run_on_node "${SURVIVE_NODE}" "sudo pcs resource status" || true
+run_on_node "${SURVIVE_NODE}" "pcs resource status" || true
 
 # -------------------------------------------------------------------------
 # Verify VM migrated to the surviving node
@@ -263,6 +263,7 @@ while [[ ${SECONDS} -lt ${VM_MIGRATE_DEADLINE} ]]; do
   sleep 10
 done
 
+echo "Deadline reached, checking final state..."
 VMI_STATUS=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.phase}' 2>/dev/null || true)
 VMI_CURRENT_NODE=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.nodeName}' 2>/dev/null || true)
 
@@ -286,7 +287,7 @@ echo "Verifying cluster health..."
 oc wait "node/${NODE_0}" "node/${NODE_1}" --for=condition=Ready --timeout=5m
 echo "All nodes Ready"
 
-run_on_node "${SURVIVE_NODE}" "sudo pcs status" || true
+run_on_node "${SURVIVE_NODE}" "pcs status" || true
 
 VMI_FINAL=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.phase}' 2>/dev/null || true)
 echo "VMI phase after recovery: ${VMI_FINAL:-unknown}"
