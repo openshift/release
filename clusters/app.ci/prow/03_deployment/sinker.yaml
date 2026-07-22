@@ -31,10 +31,14 @@ spec:
         - --root=/tmp/git-sync
         - --one-time=true
         - --link=release
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout
+          mountPath: /etc/git-sync
+          readOnly: true
       containers:
       - name: sinker
         image: us-docker.pkg.dev/k8s-infra-prow/images/sinker:v20260714-0633879af
@@ -71,13 +75,23 @@ spec:
         - --period=30s
         - --root=/tmp/git-sync
         - --link=release
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout
+          mountPath: /etc/git-sync
+          readOnly: true
       volumes:
       - name: release
         emptyDir: {}
+      - name: sparse-checkout
+        configMap:
+          name: git-sync-sparse-checkout
+          items:
+          - key: jobs-and-prow-config
+            path: sparse-checkout
       - name: service-account-token
         projected:
           sources:
