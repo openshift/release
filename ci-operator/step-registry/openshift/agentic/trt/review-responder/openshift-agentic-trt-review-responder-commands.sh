@@ -178,7 +178,13 @@ is_trusted_user() {
 # PROCESSED_IDS resets each job run, so without a baseline all comments look
 # "new". Detect which threads the bot already replied to so they can be
 # excluded from the "NEW" comment set below.
-BOT_LOGIN=$(gh api user --jq '.login' 2>/dev/null || echo "")
+
+# Bot login written by the github-app-auth init step
+BOT_LOGIN=$(cat "${SHARED_DIR}/gh-app-bot-login" 2>/dev/null || echo "")
+if [[ -z "${BOT_LOGIN}" ]]; then
+    echo "ERROR: ${SHARED_DIR}/gh-app-bot-login not found — github-app-auth step must run first"
+    exit 1
+fi
 BOT_REPLIED_TO_IDS=""
 BOT_LAST_ISSUE_TS=""
 BOT_LAST_ACTIVITY=""

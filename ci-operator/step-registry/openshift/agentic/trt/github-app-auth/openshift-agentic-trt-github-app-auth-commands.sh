@@ -38,6 +38,20 @@ generate_token() {
     echo "${token}"
 }
 
+# Resolve app slug (used by review-responder for bot identity)
+_now=$(date +%s)
+_hdr=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+_pay=$(echo -n "{\"iat\":$((_now - 60)),\"exp\":$((_now + 120)),\"iss\":\"${APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+_sig=$(echo -n "${_hdr}.${_pay}" | openssl dgst -sha256 -sign "${PRIVATE_KEY}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+APP_SLUG=$(curl -sf --connect-timeout 10 --max-time 15 \
+    -H "Authorization: Bearer ${_hdr}.${_pay}.${_sig}" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/app" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('slug',''))")
+[[ -n "${APP_SLUG}" ]] || { echo "ERROR: Failed to resolve app slug from /app endpoint."; exit 1; }
+echo "${APP_SLUG}[bot]" > "${SHARED_DIR}/gh-app-bot-login"
+echo "App slug: ${APP_SLUG} (bot login: ${APP_SLUG}[bot])"
+
 IFS=',' read -ra PAIRS <<< "${GITHUB_APP_TOKEN_OUTPUTS}"
 for pair in "${PAIRS[@]}"; do
     id_file="${pair%%:*}"
