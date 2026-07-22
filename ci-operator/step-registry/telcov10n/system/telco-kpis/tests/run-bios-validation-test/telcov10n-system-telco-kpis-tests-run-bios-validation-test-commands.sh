@@ -20,7 +20,7 @@ main() {
     SPOKE_KUBECONFIG="/tmp/${SPOKE_CLUSTER}-kubeconfig"
 
     if [[ -z "${BIOS_PROFILE_URL}" ]]; then
-        BIOS_PROFILE_URL="https://gitlab.cee.redhat.com/ccardeno/ztp-site-configs-ci/-/raw/telco-kpis/siteconfigs/${VERSION}/${SPOKE_CLUSTER}/bios/kpi.profile"
+        BIOS_PROFILE_URL="https://gitlab.cee.redhat.com/ocp-edge-qe/ztp-site-configs/-/raw/${SPOKE_CLUSTER}-kpi-${VERSION}/siteconfig/bios/kpi.profile"
         echo "Auto-constructed BIOS profile URL: ${BIOS_PROFILE_URL}"
     fi
 
