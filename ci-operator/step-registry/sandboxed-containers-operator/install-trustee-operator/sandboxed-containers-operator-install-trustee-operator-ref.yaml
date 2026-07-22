@@ -1,6 +1,9 @@
 ref:
   as: sandboxed-containers-operator-install-trustee-operator
-  from: cli
+  from_image:
+    name: rhdh-e2e-runner
+    namespace: ci
+    tag: main
   grace_period: 10m
   commands: sandboxed-containers-operator-install-trustee-operator-commands.sh
   resources:
@@ -8,15 +11,6 @@ ref:
       cpu: 1000m
       memory: 2000Mi
   env:
-  - name: HELM_CHART_IMAGE
-    default: ""
-    documentation: |-
-      Pre-built container image containing the helm binary at /usr/local/bin/helm and
-      helm charts at /charts/ (with trustee-operator/ and trustee-operands/ subdirectories).
-      Required when TRUSTEE_INSTALL=true. Both helm and charts are extracted using
-      "oc image extract", which works with restrict_network_access: true since image pulls
-      go through the cluster, not the step pod's network.
-      Example: "quay.io/myorg/trustee-helm-charts:v1.0"
   - name: TRUSTEE_INSTALL
     default: "false"
     documentation: |-
@@ -33,23 +27,27 @@ ref:
       If set, helm chart creates a new CatalogSource named "trustee-operator-dev-catalog" with this image.
       Note: The CatalogSource name is hardcoded in the helm chart and cannot be overridden.
       Example: "quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656"
+  - name: TRUSTEE_CHARTS_REPO
+    default: "https://gitlab.cee.redhat.com/osc/midstream/charts.git"
+    documentation: |-
+      The git repository URL for trustee Helm charts.
+  - name: TRUSTEE_CHARTS_REF
+    default: "main"
+    documentation: |-
+      The git ref (branch/tag/commit) to use from the charts repository
   - name: KBS_CLIENT_TAG
     default: ""
     documentation: |-
-      The kbs-client image tag to use for connectivity testing. If empty, automatically
-      discovers the latest v.X.Y.Z tag using skopeo. Override to pin a specific version
-      (e.g., "v0.19.0"). Fallback is v0.19.0 if skopeo lookup fails.
+      The kbs-client image tag to use for connectivity testing. If empty, maps from
+      the installed trustee operator version. Override to pin a specific version
+      (e.g., "v0.19.0"). Fallback is v0.17.0 if version mapping fails.
   documentation: |-
     Installs the trustee operator and operands on the cluster using helm charts.
-    Charts are extracted from HELM_CHART_IMAGE (required). First installs the trustee-operator,
-    waits for it to be ready, then installs the trustee-operands with the derived cluster domain.
-    Retrieves the Trustee KBS service URL and saves it to ${SHARED_DIR}/TRUSTEE_URL,
-    ${SHARED_DIR}/TRUSTEE_HOST, and ${SHARED_DIR}/TRUSTEE_PORT for use by subsequent test steps.
-    Creates INITDATA for confidential containers including TLS certificate and image security
-    policy, saving both the encoded INITDATA and plain text initdata.toml to ${SHARED_DIR}.
-    Updates the osc-config ConfigMap with the generated TRUSTEE_URL and INITDATA values.
-    Verifies Trustee connectivity by creating a kbs-client pod, testing resource fetching, and
-    capturing KBS pod logs to ${ARTIFACT_DIR}/kbs-attestation-logs.txt.
+    Charts are cloned from TRUSTEE_CHARTS_REPO (defaults to internal GitLab).
+    Uses ci/rhdh-e2e-runner image which has helm pre-installed.
 
-    When HELM_CHART_IMAGE is set, works with restrict_network_access: true since oc image extract
-    pulls through the cluster, not the step pod's network.
+    After installation, retrieves the Trustee KBS service URL and saves it to
+    ${SHARED_DIR}/TRUSTEE_URL, ${SHARED_DIR}/TRUSTEE_HOST, and ${SHARED_DIR}/TRUSTEE_PORT.
+    Also creates INITDATA for confidential containers and saves to ${SHARED_DIR}.
+    When TRUSTEE_INSTALL=true, updates the osc-config ConfigMap with the generated
+    TRUSTEE_URL and INITDATA values.
