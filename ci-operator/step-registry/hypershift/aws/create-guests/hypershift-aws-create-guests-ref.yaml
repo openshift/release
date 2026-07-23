@@ -1,0 +1,48 @@
+ref:
+  as: hypershift-aws-create-guests
+  cli: latest
+  commands: hypershift-aws-create-guests-commands.sh
+  credentials:
+  - mount_path: /etc/ci-pull-credentials
+    name: ci-pull-credentials
+    namespace: test-credentials
+  - mount_path: /etc/hypershift-ci-jobs-awscreds
+    name: hypershift-ci-jobs-awscreds
+    namespace: test-credentials
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  - name: "release:latest"
+    env: OCP_IMAGE_N1
+  env:
+  - name: HYPERSHIFT_NODE_COUNT
+    default: "3"
+    documentation: "The number of nodes per guest cluster."
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: "ci.hypershift.devcluster.openshift.com"
+    documentation: "The cluster's FQDN will be a subdomain of the base domain."
+  - name: HYPERSHIFT_AWS_REGION
+    default: "us-east-1"
+    documentation: "AWS region for the hosted clusters."
+  - name: HYPERSHIFT_AWS_ZONES
+    default: "us-east-1a"
+    documentation: "Comma-separated availability zones for the hosted clusters."
+  - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+    default: ""
+    documentation: "The external DNS domain for service publishing strategy hostnames."
+  - name: HYPERSHIFT_ETCD_STORAGE_CLASS
+    default: ""
+    documentation: "The persistent volume storage class for etcd data volumes."
+  - name: HYPERSHIFT_PLATFORM
+    default: ""
+    documentation: "The cloud platform for the clusters (e.g. aws). Set in the workflow env block."
+  - name: HYPERSHIFT_CLUSTER_VARIANTS
+    default: ""
+    documentation: "Comma-separated list of cluster variants to create (e.g. 'public'). When empty, all variants are created."
+  from: hypershift-tests
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 120m0s

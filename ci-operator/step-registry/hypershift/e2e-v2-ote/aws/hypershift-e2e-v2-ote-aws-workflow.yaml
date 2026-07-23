@@ -1,0 +1,21 @@
+workflow:
+  as: hypershift-e2e-v2-ote-aws
+  documentation: |-
+    OTE variant of the HyperShift AWS e2e v2 workflow. Uses
+    hypershift-tests-ext (OTE binary) instead of run-tests for test
+    orchestration. Single public cluster, non-mutating tests only.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-aws-create-guests
+    test:
+    - chain: hypershift-e2e-v2-ote-run
+    post:
+    - chain: hypershift-aws-dump-guests
+    - chain: hypershift-aws-destroy-guests
+    - chain: hypershift-destroy-nested-management-cluster
+    env:
+      HYPERSHIFT_PLATFORM: "aws"
+      HYPERSHIFT_CLUSTER_VARIANTS: "public"
