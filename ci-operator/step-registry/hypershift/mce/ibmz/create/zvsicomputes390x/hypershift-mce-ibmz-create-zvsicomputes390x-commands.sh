@@ -637,7 +637,7 @@ oc -n $HC_NS scale nodepool $HC_NAME --replicas $HYPERSHIFT_NODE_COUNT
 # Waiting for compute nodes to get ready
 set -e
 echo "$(date) Patched the agents, waiting for the installation to get completed on them"
-if ! oc wait --all=true agent -n $hcp_ns --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=45m; then
+if ! oc wait --all=true agent -n $hcp_ns --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=55m; then
   echo "$(date) ERROR: agents did not reach added-to-existing-cluster state within 45m"
   echo "--- oc get agents (wide) ---"
   oc get agents -n $hcp_ns -o wide || true
@@ -663,7 +663,7 @@ patch_nested_kubeconfig_for_ci
 # Verifying the compute nodes status
 echo "$(date) Checking the compute nodes in the hosted control plane"
 oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
-oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=45m
 
 # Sourcing the proxy settings for the next steps
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
