@@ -284,6 +284,46 @@ servicemesh_job_container_exit_code() {
     || echo "1"
 }
 
+servicemesh_duration_to_seconds() {
+  local d="$1"
+  case "${d}" in
+    *h) echo $(( ${d%h} * 3600 )) ;;
+    *m) echo $(( ${d%m} * 60 )) ;;
+    *s) echo "${d%s}" ;;
+    *) echo "${d}" ;;
+  esac
+}
+
+# Wait until Job reaches Complete or Failed (or timeout). Returns 0 on Complete, 1 otherwise.
+servicemesh_wait_job_terminal() {
+  local ns="$1"
+  local job="$2"
+  local wait_timeout="${3:-${MAISTRA_JOB_WAIT_TIMEOUT}}"
+  local timeout_s interval=15 elapsed=0
+  local complete failed
+
+  timeout_s="$(servicemesh_duration_to_seconds "${wait_timeout}")"
+  echo "Waiting for Job ${ns}/${job} Complete|Failed (timeout=${wait_timeout})..."
+
+  while (( elapsed <= timeout_s )); do
+    complete="$(oc get job "${job}" -n "${ns}" -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null || true)"
+    failed="$(oc get job "${job}" -n "${ns}" -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null || true)"
+    if [[ "${complete}" == "True" ]]; then
+      echo "Job ${ns}/${job} condition Complete=True"
+      return 0
+    fi
+    if [[ "${failed}" == "True" ]]; then
+      echo "Job ${ns}/${job} condition Failed=True"
+      return 1
+    fi
+    sleep "${interval}"
+    elapsed=$((elapsed + interval))
+  done
+
+  echo "ERROR: timed out waiting for Job ${ns}/${job} after ${wait_timeout}" >&2
+  return 1
+}
+
 # Apply a Job manifest from stdin, wait for completion, collect logs/artifacts.
 # Returns the container exit code (non-zero on failure/timeout).
 servicemesh_apply_wait_collect_job() {
@@ -291,14 +331,19 @@ servicemesh_apply_wait_collect_job() {
   local job="$2"
   local remote_artifacts="${3:-/work/artifacts}"
   local wait_timeout="${4:-${MAISTRA_JOB_WAIT_TIMEOUT}}"
+  local was_errexit=false
+  local wait_rc exit_code
+
+  [[ $- == *e* ]] && was_errexit=true
 
   oc apply -n "${ns}" -f -
 
-  echo "Waiting for Job ${ns}/${job} (timeout=${wait_timeout})..."
   set +e
-  oc wait --for=condition=complete "job/${job}" -n "${ns}" --timeout="${wait_timeout}"
-  local wait_rc=$?
-  set -e
+  servicemesh_wait_job_terminal "${ns}" "${job}" "${wait_timeout}"
+  wait_rc=$?
+  if ${was_errexit}; then
+    set -e
+  fi
 
   servicemesh_collect_job_logs "${ns}" "${job}" "${ARTIFACT_DIR}"
   servicemesh_collect_job_artifacts "${ns}" "${job}" "${remote_artifacts}" "${ARTIFACT_DIR}"
@@ -306,7 +351,6 @@ servicemesh_apply_wait_collect_job() {
   if [[ "${wait_rc}" -ne 0 ]]; then
     echo "ERROR: Job ${ns}/${job} did not reach Complete condition" >&2
     servicemesh_describe_job_failure "${ns}" "${job}"
-    local exit_code
     exit_code="$(servicemesh_job_container_exit_code "${ns}" "${job}")"
     if [[ -z "${exit_code}" ]]; then
       exit_code=1
@@ -314,7 +358,6 @@ servicemesh_apply_wait_collect_job() {
     return "${exit_code}"
   fi
 
-  local exit_code
   exit_code="$(servicemesh_job_container_exit_code "${ns}" "${job}")"
   if [[ -z "${exit_code}" ]]; then
     exit_code=0

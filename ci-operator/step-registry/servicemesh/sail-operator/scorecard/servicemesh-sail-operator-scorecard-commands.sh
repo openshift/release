@@ -24,7 +24,7 @@ source "${SHARED_DIR}/servicemesh-common-job-lib.sh"
 : "${MAISTRA_KUBECONFIG_SECRET:=ci-kubeconfig}"
 : "${MAISTRA_JOB_TTL_SECONDS:=3600}"
 : "${SCORECARD_JOB_NAME:=sail-scorecard}"
-: "${SCORECARD_COMMAND:=OCP=true make test.scorecard}"
+: "${SCORECARD_COMMAND:=make test.scorecard}"
 
 if [[ -z "${MAISTRA_BUILDER_IMAGE:-}" ]]; then
   echo "ERROR: MAISTRA_BUILDER_IMAGE is required" >&2
@@ -80,6 +80,8 @@ spec:
           privileged: true
           runAsUser: 0
         env:
+        - name: OCP
+          value: "true"
         - name: BUILD_WITH_CONTAINER
           value: "0"
         - name: CI
