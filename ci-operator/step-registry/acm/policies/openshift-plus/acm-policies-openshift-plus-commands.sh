@@ -7,7 +7,11 @@ git clone https://github.com/stolostron/policy-collection.git
 cd policy-collection/deploy/
 echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
 
-until (($(oc get policies -n policies -o name 2>/dev/null | wc -l))); do sleep 5; done
+typeset -i pollDeadline=$((SECONDS + 600))
+until (($(oc get policies -n policies -o name 2>/dev/null | wc -l))); do
+  ((SECONDS > pollDeadline)) && { : "Error: no policies appeared after 10 minutes"; exit 1; }
+  sleep 5
+done
 
 # Wait for Quay registry to be ready (checks operator-deployed Quay)
 typeset -a quayNamespacesArr=(quay openshift-quay quay-enterprise)
