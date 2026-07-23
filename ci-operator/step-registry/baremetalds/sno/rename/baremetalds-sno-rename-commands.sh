@@ -10,7 +10,8 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 function collect_artifacts {
   echo "Collecting systemd recert.service log and redacted recert summary to CI artifacts..."
-  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/{recert.log,recert_summary_clean.yaml}" "${ARTIFACT_DIR}"
+  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/recert.log" "${ARTIFACT_DIR}" 2>/dev/null || true
+  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/recert_summary_clean.yaml" "${ARTIFACT_DIR}" 2>/dev/null || true
 }
 trap collect_artifacts EXIT TERM
 
@@ -106,6 +107,56 @@ on_error() {
 trap on_error ERR
 
 export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost.kubeconfig
+
+# On dev-scripts SNO, image-registry is permanently Degraded+Progressing due to
+# pod anti-affinity rules that cannot be satisfied on a single node.  Exclude it
+# so wait-for-stable-cluster does not time out needlessly.
+EXCLUDED_OPERATORS="image-registry"
+function wait_for_stable_cluster {
+  local timeout_minutes=\${1:-30}
+  local stable_period_minutes=\${2:-2}
+  local deadline=\$(( \$(date +%s) + timeout_minutes * 60 ))
+  local stable_since=""
+  echo "Waiting for cluster operators to stabilize (timeout=\${timeout_minutes}m, stable-period=\${stable_period_minutes}m, excluding: \${EXCLUDED_OPERATORS})..."
+  while true; do
+    local now=\$(date +%s)
+    if (( now >= deadline )); then
+      echo "ERROR: timed out waiting for cluster operators to stabilize after \${timeout_minutes}m"
+      oc get co 2>/dev/null || true
+      return 1
+    fi
+    local unstable
+    unstable=\$(oc get co -o json 2>/dev/null | jq -r --arg excluded "\${EXCLUDED_OPERATORS}" '
+      (\$excluded | split(",")) as \$excl |
+      [.items[] |
+        select((.metadata.name as \$n | \$excl | index(\$n) | not)) |
+        select(
+          (.status.conditions // [] | map(select(.type == "Available" and .status != "True")) | length > 0) or
+          (.status.conditions // [] | map(select(.type == "Progressing" and .status == "True")) | length > 0) or
+          (.status.conditions // [] | map(select(.type == "Degraded" and .status == "True")) | length > 0)
+        ) | .metadata.name
+      ] | join(",")
+    ' 2>/dev/null || echo "QUERY_FAILED")
+    if [[ "\${unstable}" == "QUERY_FAILED" ]]; then
+      echo "  Could not query cluster operators, retrying..."
+      stable_since=""
+    elif [[ -n "\${unstable}" ]]; then
+      echo "  Unstable operators: \${unstable}"
+      stable_since=""
+    else
+      if [[ -z "\${stable_since}" ]]; then
+        stable_since=\${now}
+        echo "  All monitored operators are stable, waiting for \${stable_period_minutes}m stable period..."
+      fi
+      local elapsed=\$(( now - stable_since ))
+      if (( elapsed >= stable_period_minutes * 60 )); then
+        echo "Cluster operators have been stable for \${stable_period_minutes}m"
+        return 0
+      fi
+    fi
+    sleep 30
+  done
+}
 function fetch_crts_keys {
   mkdir -p /tmp/certs /tmp/keys
 
@@ -248,7 +299,7 @@ function delete_crts_keys {
   rm -rf /tmp/certs /tmp/keys
 }
 
-oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m
+wait_for_stable_cluster 30 2
 
 if [[ "\$(hostname)" != "${NEW_HOSTNAME}" ]]
 then
@@ -284,7 +335,7 @@ then
   stable_period_minutes=5
   start=\$(date +%s)
   start_containers
-  oc adm wait-for-stable-cluster --minimum-stable-period="\${stable_period_minutes}m" --timeout=120m
+  wait_for_stable_cluster 120 \${stable_period_minutes}
   end=\$(date +%s)
 
   runtime=\$((end-start-(stable_period_minutes*60)))
@@ -418,19 +469,28 @@ oc wait --for=condition=updating machineconfigpools master --timeout 10m
 info "Waiting for recert to be completed..."
 # After the MachineConfig triggers a reboot and recert runs update_node_ip,
 # the node switches from SINGLE_NODE_IP to ADDITIONAL_NODE_IP. Poll both.
+RECERT_RESULT=""
 while true; do
   for poll_ip in "${SINGLE_NODE_IP}" "${ADDITIONAL_NODE_IP}"; do
     if ssh ${SSH_OPTS[@]} core@${poll_ip} test -e /var/recert.done 2>/dev/null; then
       info "Recert completed successfully (reached via ${poll_ip})"
+      RECERT_RESULT="done"
       break 2
     elif ssh ${SSH_OPTS[@]} core@${poll_ip} test -e /var/recert.failed 2>/dev/null; then
-      info "Recert failed (reached via ${poll_ip})"
+      info "Recert FAILED (reached via ${poll_ip})"
+      RECERT_RESULT="failed"
       break 2
     fi
   done
   info "Waiting for recert to be completed..."
   sleep 5
 done
+
+if [[ "${RECERT_RESULT}" == "failed" ]]; then
+  info "Recert failed on the node — collecting logs and exiting with error."
+  gather_recert_logs || true
+  exit 1
+fi
 
 sed -i -e "s/${PREVIOUS_CLUSTER_NAME}/${NEW_CLUSTER_NAME}/g" -e "s/${PREVIOUS_BASE_DOMAIN}/${NEW_BASE_DOMAIN}/g" ${KUBECONFIG}
 echo "${ADDITIONAL_NODE_IP} api.${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}" | tee --append /etc/hosts
