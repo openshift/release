@@ -55,6 +55,25 @@ tests:
     clone: true
     from: root
   run_if_changed: (SKILL\.md|^scripts/lint-skills\.py|^Makefile|^plugins/.*/skills/)
+- always_run: false
+  as: eval-all
+  optional: true
+  steps:
+    env:
+      EVAL_DISCOVER: "true"
+      EVAL_MODEL: claude-opus-4-6
+      EVAL_PARALLELISM: "3"
+    workflow: openshift-claude-agent-eval
+- as: eval-changed
+  optional: true
+  run_if_changed: ^plugins/.*/evals/|^plugins/.*/skills/
+  steps:
+    env:
+      EVAL_CHANGED_ONLY: "true"
+      EVAL_DISCOVER: "true"
+      EVAL_MODEL: claude-opus-4-6
+      EVAL_PARALLELISM: "3"
+    workflow: openshift-claude-agent-eval
 - as: ocp-ci-monitor
   cron: 0 7 * * 1-5
   reporter_config:

@@ -40,35 +40,47 @@ log "  PKO image: ${OPERATOR_PKO_IMAGE}"
 log "  Operator image: ${OPERATOR_IMAGE}"
 log "  Namespace: ${OPERATOR_NAMESPACE}"
 
-# Add CI build cluster registry credentials to the ROSA cluster's global
-# pull secret so nodes can pull CI-built images. We temporarily unset
-# KUBECONFIG so oc registry login authenticates to the build cluster
-# (where the Prow pod runs), not the ROSA cluster.
+# Add CI build cluster registry credentials to the cluster's global pull
+# secret so both PKO and nodes can pull CI-built images. Uses oc replace
+# with optimistic concurrency (resourceVersion) to avoid race conditions
+# when multiple operator jobs share the same lease cluster concurrently.
+# Each job's CI creds use a different registry host (e.g., build01 vs
+# build11), so a concurrent read-modify-write without CAS can lose one
+# job's registry entry when another overwrites the secret.
 log "Adding CI registry credentials to cluster pull secret"
 KUBECONFIG="" oc registry login --to=/tmp/ci-registry-creds.json 2>/dev/null || true
 if [[ -s /tmp/ci-registry-creds.json ]]; then
     CI_REGISTRIES=$(jq -r '.auths | keys | join(", ")' /tmp/ci-registry-creds.json 2>/dev/null || echo "unknown")
     log "CI registries: ${CI_REGISTRIES}"
 
-    # Update the global pull secret
-    CURRENT_PS=$(oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
-    MERGED_PS=$(echo "${CURRENT_PS}" | jq -s '.[0] * .[1]' - /tmp/ci-registry-creds.json)
-    echo "${MERGED_PS}" > /tmp/merged-pull-secret.json
-    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json
-    log "CI registry credentials merged into global pull secret"
+    for attempt in $(seq 1 5); do
+        SECRET_JSON=$(oc get secret pull-secret -n openshift-config -o json)
+        CURRENT_PS=$(echo "${SECRET_JSON}" | jq -r '.data[".dockerconfigjson"]' | base64 -d)
+        MERGED_PS=$(echo "${CURRENT_PS}" | jq -s '.[0] * .[1]' - /tmp/ci-registry-creds.json)
+        MERGED_B64=$(echo "${MERGED_PS}" | base64 -w0 2>/dev/null || echo "${MERGED_PS}" | base64)
+        UPDATED=$(echo "${SECRET_JSON}" | jq '.data[".dockerconfigjson"] = "'"${MERGED_B64}"'"')
+        if echo "${UPDATED}" | oc replace -f - 2>/dev/null; then
+            log "CI registry credentials merged into global pull secret"
+            break
+        fi
+        if [[ ${attempt} -eq 5 ]]; then
+            log "ERROR: Failed to update global pull secret after 5 retries"
+            exit 1
+        else
+            log "  Pull secret conflict (attempt ${attempt}), retrying..."
+            sleep 1
+        fi
+    done
 
-    # Also create an image pull secret in the package-operator namespace
-    # so PKO can pull immediately without waiting for MCO to propagate
+    echo "${MERGED_PS}" > /tmp/merged-pull-secret.json
     oc create secret docker-registry ci-pull-secret \
         -n openshift-package-operator \
         --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
         --dry-run=client -o yaml | oc apply -f -
-    # Patch the PKO service account to use the pull secret
     oc patch sa package-operator -n openshift-package-operator \
         --type json -p '[{"op":"add","path":"/imagePullSecrets/-","value":{"name":"ci-pull-secret"}}]' 2>/dev/null || true
     log "CI pull secret added to PKO namespace"
 
-    # Restart PKO to pick up the new pull secret
     oc rollout restart deployment -n openshift-package-operator 2>/dev/null || true
     oc rollout status deployment -n openshift-package-operator --timeout=120s 2>/dev/null || true
     log "PKO restarted with CI pull secret"

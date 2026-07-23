@@ -9,6 +9,7 @@
 #   EVAL_MODEL        -- model for the skill under test (default: claude-sonnet-4-6)
 #   EVAL_PARALLELISM  -- number of test cases to run concurrently (default: 1)
 #   EVAL_CASES        -- comma-separated list of case IDs to run (default: all)
+#   EVAL_DISCOVER     -- "true" or glob pattern to auto-discover eval configs
 #   EVAL_BASELINE     -- run-id of a previous run to compare against
 #   EVAL_EXTRA_ARGS   -- additional args passed to /eval-run
 #   EVAL_SETUP_SCRIPT -- script to run before eval (e.g. snapshot extraction)
@@ -40,15 +41,67 @@ fi
 # The repo is at /opt/ai-helpers; WORKDIR is /workspace
 cd /opt/ai-helpers
 
-echo "Config: ${EVAL_CONFIG}"
 echo "Skill model: ${EVAL_MODEL}"
 
 # -----------------------------------------------------------------------
-# Verify eval config exists
+# Build list of eval configs to run (single or discovery mode)
 # -----------------------------------------------------------------------
-if [[ ! -f "${EVAL_CONFIG}" ]]; then
-    echo "ERROR: EVAL_CONFIG not found at ${EVAL_CONFIG}"
-    exit 1
+CONFIGS_TO_RUN=()
+if [[ -n "${EVAL_DISCOVER}" ]]; then
+    if [[ -n "${EVAL_CONFIG}" ]] && [[ "${EVAL_CONFIG}" != "eval.yaml" ]]; then
+        echo "ERROR: EVAL_DISCOVER and EVAL_CONFIG are mutually exclusive"
+        exit 1
+    fi
+
+    # Default discovery pattern: all YAML files directly under */evals/ directories
+    DISCOVER_PATTERN="${EVAL_DISCOVER}"
+    if [[ "${EVAL_DISCOVER}" == "true" ]]; then
+        DISCOVER_PATTERN="plugins/*/evals/*.yaml"
+    fi
+
+    echo "=== Discovering eval configs: ${DISCOVER_PATTERN} ==="
+    while IFS= read -r config; do
+        [[ -n "${config}" ]] && CONFIGS_TO_RUN+=("${config}")
+    done < <(find . -path "./${DISCOVER_PATTERN}" -name '*.yaml' ! -path '*/cases/*' | sed 's|^\./||' | sort)
+
+    echo "Found ${#CONFIGS_TO_RUN[@]} eval config(s):"
+    printf '  %s\n' "${CONFIGS_TO_RUN[@]}"
+
+    if [[ ${#CONFIGS_TO_RUN[@]} -eq 0 ]]; then
+        echo "No eval configs found matching ${DISCOVER_PATTERN}"
+        exit 0
+    fi
+
+    # Filter to only changed evals when EVAL_CHANGED_ONLY is set
+    if [[ "${EVAL_CHANGED_ONLY:-}" == "true" ]] && [[ -n "${PULL_BASE_SHA:-}" ]]; then
+        echo ""
+        echo "=== Filtering to changed evals ==="
+        CHANGED_FILES=$(git diff --name-only "${PULL_BASE_SHA}...HEAD" || true)
+
+        FILTERED=()
+        for config in "${CONFIGS_TO_RUN[@]}"; do
+            config_name=$(basename "${config}" .yaml)
+            config_dir=$(dirname "${config}")
+
+            if echo "${CHANGED_FILES}" | grep -qE "(${config}|${config_dir}/${config_name}/|skills/${config_name}/)"; then
+                echo "  MATCH: ${config}"
+                FILTERED+=("${config}")
+            fi
+        done
+
+        if [[ ${#FILTERED[@]} -eq 0 ]]; then
+            echo "No eval configs affected by changes, skipping."
+            exit 0
+        fi
+        CONFIGS_TO_RUN=("${FILTERED[@]}")
+    fi
+else
+    echo "Config: ${EVAL_CONFIG}"
+    if [[ ! -f "${EVAL_CONFIG}" ]]; then
+        echo "ERROR: EVAL_CONFIG not found at ${EVAL_CONFIG}"
+        exit 1
+    fi
+    CONFIGS_TO_RUN=("${EVAL_CONFIG}")
 fi
 
 # -----------------------------------------------------------------------
@@ -102,92 +155,119 @@ trap copy_artifacts EXIT TERM INT
 export CLAUDE_CODE_ENTRYPOINT=sdk-cli
 
 # -----------------------------------------------------------------------
-# Auto-detect changed eval cases from PR diff
+# Build common arguments and run evals
 # -----------------------------------------------------------------------
-if [[ "${EVAL_CHANGED_ONLY}" == "true" ]] && [[ -n "${EVAL_CASES_DIR}" ]] && [[ -z "${EVAL_CASES}" ]]; then
+ALLOWED_TOOLS="Bash Read Write Edit Grep Glob Agent Skill"
+OVERALL_EXIT=0
+JUNIT_TESTCASES=""
+TOTAL_DURATION=0
+FAILURE_COUNT=0
+CONFIGS_RUN=0
+JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-eval.xml"
+STEP_START=${SECONDS}
+STEP_TIMEOUT=10200  # 2h50m — leave margin within the 3h step limit
+
+write_junit() {
+    cat > "${JUNIT_FILE}" <<JEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="claude-eval" tests="${CONFIGS_RUN}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
+${JUNIT_TESTCASES}
+</testsuite>
+JEOF
+}
+
+for config in "${CONFIGS_TO_RUN[@]}"; do
+    ELAPSED=$(( SECONDS - STEP_START ))
+    if [[ ${ELAPSED} -ge ${STEP_TIMEOUT} ]]; then
+        echo "WARNING: approaching step timeout (${ELAPSED}s elapsed), skipping remaining configs."
+        break
+    fi
+    config_name=$(echo "${config}" | sed 's|\.yaml$||' | tr '/' '-')
+    config_basename=$(basename "${config}" .yaml)
     echo ""
-    echo "=== Detecting changed eval cases ==="
-    if [[ -z "${PULL_BASE_SHA:-}" ]]; then
-        echo "PULL_BASE_SHA not set, running all cases."
-    else
-        if ! CHANGED_FILES=$(git diff --name-only "${PULL_BASE_SHA}...HEAD" -- "${EVAL_CASES_DIR}"); then
-            echo "Failed to diff against PULL_BASE_SHA (${PULL_BASE_SHA}); running all cases."
-        elif [[ -n "${CHANGED_FILES}" ]]; then
-            DETECTED_CASES=$(echo "${CHANGED_FILES}" | sed "s|^${EVAL_CASES_DIR}/||" | cut -d'/' -f1 | sort -u | paste -sd, -)
-            echo "Changed cases: ${DETECTED_CASES}"
-            EVAL_CASES="${DETECTED_CASES}"
+    echo "========================================"
+    echo "=== Running eval: ${config_name} ==="
+    echo "========================================"
+
+    RUN_ID="ci-$(date +%Y%m%d-%H%M%S)-${config_name}-${EVAL_MODEL}"
+
+    # Per-config changed-case detection
+    CASE_ARGS=""
+    if [[ "${EVAL_CHANGED_ONLY:-}" == "true" ]] && [[ -n "${PULL_BASE_SHA:-}" ]]; then
+        # In discovery mode, derive cases dir from config path convention
+        if [[ -n "${EVAL_DISCOVER}" ]]; then
+            CASES_DIR="$(dirname "${config}")/${config_basename}/cases"
+        elif [[ -n "${EVAL_CASES_DIR}" ]]; then
+            CASES_DIR="${EVAL_CASES_DIR}"
         else
-            echo "No changed cases detected in ${EVAL_CASES_DIR}, skipping eval."
-            exit 0
+            CASES_DIR=""
+        fi
+
+        if [[ -n "${CASES_DIR}" ]] && [[ -d "${CASES_DIR}" ]]; then
+            if CASE_CHANGES=$(git diff --name-only "${PULL_BASE_SHA}...HEAD" -- "${CASES_DIR}"); then
+                if [[ -n "${CASE_CHANGES}" ]]; then
+                    DETECTED=$(echo "${CASE_CHANGES}" | sed "s|^${CASES_DIR}/||" | cut -d'/' -f1 | sort -u | paste -sd, -)
+                    echo "Changed cases: ${DETECTED}"
+                    CASE_ARGS="--cases ${DETECTED//,/ }"
+                fi
+            fi
         fi
     fi
-fi
 
-# -----------------------------------------------------------------------
-# Build arguments
-# -----------------------------------------------------------------------
-RUN_ID="ci-$(date +%Y%m%d-%H%M%S)-${EVAL_MODEL}"
-ALLOWED_TOOLS="Bash Read Write Edit Grep Glob Agent Skill"
+    # Skip configs with no changed cases in changed-only mode
+    if [[ "${EVAL_CHANGED_ONLY:-}" == "true" ]] && [[ -z "${CASE_ARGS}" ]] && [[ -z "${EVAL_CASES}" ]]; then
+        echo "No changed cases for ${config_name}, skipping."
+        continue
+    fi
 
-EVAL_RUN_ARGS="--config ${EVAL_CONFIG} --model ${EVAL_MODEL} --run-id ${RUN_ID} --parallelism ${EVAL_PARALLELISM}"
-if [[ -n "${EVAL_CASES}" ]]; then
-    EVAL_RUN_ARGS="${EVAL_RUN_ARGS} --cases ${EVAL_CASES//,/ }"
-fi
-if [[ -n "${EVAL_BASELINE}" ]]; then
-    EVAL_RUN_ARGS="${EVAL_RUN_ARGS} --baseline ${EVAL_BASELINE}"
-fi
-if [[ -n "${EVAL_EXTRA_ARGS}" ]]; then
-    EVAL_RUN_ARGS="${EVAL_RUN_ARGS} ${EVAL_EXTRA_ARGS}"
-fi
+    # Include explicit EVAL_CASES if set (single-config mode)
+    if [[ -z "${CASE_ARGS}" ]] && [[ -n "${EVAL_CASES}" ]]; then
+        CASE_ARGS="--cases ${EVAL_CASES//,/ }"
+    fi
 
-# -----------------------------------------------------------------------
-# Run evaluation
-# -----------------------------------------------------------------------
-echo ""
-echo "=== Running eval ==="
-echo "Run ID: ${RUN_ID}"
-echo "Args: ${EVAL_RUN_ARGS}"
+    EVAL_RUN_ARGS="--config ${config} --model ${EVAL_MODEL} --run-id ${RUN_ID} --parallelism ${EVAL_PARALLELISM}"
+    [[ -n "${CASE_ARGS}" ]] && EVAL_RUN_ARGS="${EVAL_RUN_ARGS} ${CASE_ARGS}"
+    [[ -n "${EVAL_BASELINE}" ]] && EVAL_RUN_ARGS="${EVAL_RUN_ARGS} --baseline ${EVAL_BASELINE}"
+    [[ -n "${EVAL_EXTRA_ARGS}" ]] && EVAL_RUN_ARGS="${EVAL_RUN_ARGS} ${EVAL_EXTRA_ARGS}"
 
-EVAL_START=$(date +%s)
-EVAL_EXIT=0
-timeout 7200 claude \
-    --model "${CLAUDE_MODEL}" \
-    --plugin-dir "${EVAL_HARNESS_DIR}" \
-    --allowedTools "${ALLOWED_TOOLS}" \
-    --output-format stream-json \
-    --max-turns "${EVAL_MAX_TURNS}" \
-    -p "/eval-run ${EVAL_RUN_ARGS}" \
-    --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-eval.log" || EVAL_EXIT=$?
-EVAL_DURATION=$(( $(date +%s) - EVAL_START ))
+    echo "Run ID: ${RUN_ID}"
+    echo "Args: ${EVAL_RUN_ARGS}"
 
-echo "eval-run completed in ${EVAL_DURATION}s (exit ${EVAL_EXIT})"
+    EVAL_START=$(date +%s)
+    THIS_EXIT=0
+    timeout 7200 claude \
+        --model "${CLAUDE_MODEL}" \
+        --plugin-dir "${EVAL_HARNESS_DIR}" \
+        --allowedTools "${ALLOWED_TOOLS}" \
+        --output-format stream-json \
+        --max-turns "${EVAL_MAX_TURNS}" \
+        -p "/eval-run ${EVAL_RUN_ARGS}" \
+        --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-eval-${config_name}.log" || THIS_EXIT=$?
+    THIS_DURATION=$(( $(date +%s) - EVAL_START ))
+    TOTAL_DURATION=$(( TOTAL_DURATION + THIS_DURATION ))
 
-# -----------------------------------------------------------------------
-# Generate JUnit XML
-# -----------------------------------------------------------------------
-JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-eval.xml"
-FAILURE_COUNT=0
-TESTCASE="[sig-claude] Skill evaluation should pass"
-
-if [[ "${EVAL_EXIT}" -ne 0 ]]; then
-    FAILURE_COUNT=1
-    TESTCASES="  <testcase name=\"${TESTCASE}\" time=\"${EVAL_DURATION}\">
-    <failure message=\"eval-run failed (exit ${EVAL_EXIT})\">eval-run exited with code ${EVAL_EXIT}.</failure>
+    TESTCASE="[sig-claude] ${config_name} evaluation"
+    if [[ "${THIS_EXIT}" -ne 0 ]]; then
+        OVERALL_EXIT=1
+        FAILURE_COUNT=$(( FAILURE_COUNT + 1 ))
+        JUNIT_TESTCASES="${JUNIT_TESTCASES}
+  <testcase name=\"${TESTCASE}\" time=\"${THIS_DURATION}\">
+    <failure message=\"eval-run failed (exit ${THIS_EXIT})\">eval-run exited with code ${THIS_EXIT}.</failure>
   </testcase>"
-else
-    TESTCASES="  <testcase name=\"${TESTCASE}\" time=\"${EVAL_DURATION}\"/>"
-fi
+    else
+        JUNIT_TESTCASES="${JUNIT_TESTCASES}
+  <testcase name=\"${TESTCASE}\" time=\"${THIS_DURATION}\"/>"
+    fi
 
-cat > "${JUNIT_FILE}" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="claude-eval" tests="1" failures="${FAILURE_COUNT}" time="${EVAL_DURATION}">
-${TESTCASES}
-</testsuite>
-EOF
+    CONFIGS_RUN=$(( CONFIGS_RUN + 1 ))
+    echo "=== ${config_name}: completed in ${THIS_DURATION}s (exit ${THIS_EXIT}) ==="
+
+    write_junit
+done
 
 echo "JUnit XML written to ${JUNIT_FILE}"
 
-if [[ "${EVAL_EXIT}" -ne 0 ]]; then
+if [[ "${OVERALL_EXIT}" -ne 0 ]]; then
     echo "Evaluation failed."
     exit 1
 fi
