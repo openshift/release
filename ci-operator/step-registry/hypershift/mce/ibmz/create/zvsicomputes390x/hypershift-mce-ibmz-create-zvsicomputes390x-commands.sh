@@ -639,8 +639,20 @@ set -e
 echo "$(date) Patched the agents, waiting for the installation to get completed on them"
 if ! oc wait --all=true agent -n $hcp_ns --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=45m; then
   echo "$(date) ERROR: agents did not reach added-to-existing-cluster state within 45m"
+  echo "--- oc get agents (wide) ---"
   oc get agents -n $hcp_ns -o wide || true
+  echo "--- oc get agents (state + conditions) ---"
   oc get agents -n $hcp_ns -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.debugInfo.state}{"\t"}{.status.conditions[*].message}{"\n"}{end}' || true
+  echo "--- oc describe agents ---"
+  oc describe agents -n $hcp_ns || true
+  echo "--- oc get agentmachines ---"
+  oc get agentmachines -n $hcp_ns -o wide || true
+  echo "--- oc describe agentmachines ---"
+  oc describe agentmachines -n $hcp_ns || true
+  echo "--- oc get machines ---"
+  oc get machines -n $hcp_ns -o wide || true
+  echo "--- oc describe machines ---"
+  oc describe machines -n $hcp_ns || true
   exit 1
 fi
 echo "$(date) All the agents are attached as compute nodes to the hosted control plane"
