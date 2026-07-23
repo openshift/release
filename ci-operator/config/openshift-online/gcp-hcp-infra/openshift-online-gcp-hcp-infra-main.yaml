@@ -23,10 +23,18 @@ tests:
       commands: |
         git config --global url."https://github.com/".insteadOf "git@github.com:"
         git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(cat /etc/github-private/oauth)"; }; f'
+        cat > "$HOME/.terraformrc" <<TFRC
+        credentials "app.terraform.io" {
+          token = "$(cat /etc/terraform-cloud/token)"
+        }
+        TFRC
         make terraform-validate
       credentials:
       - mount_path: /etc/github-private
         name: github-credentials-openshift-ci-robot-private-git-cloner
+        namespace: ci
+      - mount_path: /etc/terraform-cloud
+        name: tfcloud-ci-secret
         namespace: ci
       from: src
       resources:
@@ -40,10 +48,18 @@ tests:
       commands: |
         git config --global url."https://github.com/".insteadOf "git@github.com:"
         git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(cat /etc/github-private/oauth)"; }; f'
+        cat > "$HOME/.terraformrc" <<TFRC
+        credentials "app.terraform.io" {
+          token = "$(cat /etc/terraform-cloud/token)"
+        }
+        TFRC
         make terraform-test
       credentials:
       - mount_path: /etc/github-private
         name: github-credentials-openshift-ci-robot-private-git-cloner
+        namespace: ci
+      - mount_path: /etc/terraform-cloud
+        name: tfcloud-ci-secret
         namespace: ci
       from: src
       resources:
