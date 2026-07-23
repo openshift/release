@@ -193,19 +193,49 @@ if [[ -n "${SHARED_DIR:-}" ]]; then
     echo "${OPERATOR_NAMESPACE}" > "${SHARED_DIR}/operator-e2e-namespace"
 fi
 
-# Wait for PKO to reconcile and create the deployment
-log "Waiting for deployment ${OPERATOR_DEPLOYMENT_NAME} to exist..."
-for i in $(seq 1 30); do
-    if oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+# Wait for PKO to reconcile and create the deployment.
+# PKO may fail to pull the package image if the CI pull secret hasn't
+# fully propagated. Detect UNAUTHORIZED/ImagePullBackOff and retry.
+PKO_AUTH_RETRIES=0
+MAX_PKO_AUTH_RETRIES=2
+
+wait_for_deployment() {
+    log "Waiting for deployment ${OPERATOR_DEPLOYMENT_NAME} to exist..."
+    for i in $(seq 1 30); do
+        if oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+            return 0
+        fi
+        # Check ClusterPackage for image pull auth errors
+        if [[ $((i % 6)) -eq 0 ]]; then
+            CP_STATUS=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o jsonpath='{.status.conditions[*].message}' 2>/dev/null || echo "")
+            if echo "${CP_STATUS}" | grep -qi "UNAUTHORIZED\|ImagePullBackOff\|authentication required"; then
+                return 1
+            fi
+        fi
+        sleep 10
+    done
+    return 2
+}
+
+while true; do
+    wait_for_deployment
+    WAIT_RC=$?
+
+    if [[ ${WAIT_RC} -eq 0 ]]; then
         break
-    fi
-    if [[ $i -eq 30 ]]; then
+    elif [[ ${WAIT_RC} -eq 1 && ${PKO_AUTH_RETRIES} -lt ${MAX_PKO_AUTH_RETRIES} ]]; then
+        PKO_AUTH_RETRIES=$((PKO_AUTH_RETRIES + 1))
+        log "WARNING: PKO image pull auth failure detected (attempt ${PKO_AUTH_RETRIES}/${MAX_PKO_AUTH_RETRIES}), restarting PKO..."
+        oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o yaml 2>/dev/null | grep -A5 "message:" || true
+        oc rollout restart deployment -n openshift-package-operator 2>/dev/null || true
+        oc rollout status deployment -n openshift-package-operator --timeout=120s 2>/dev/null || true
+        log "PKO restarted, retrying..."
+    else
         log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} not found after 5 minutes"
         oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o yaml || true
         oc get clusterobjectset -o wide 2>/dev/null | grep "${OPERATOR_NAME}" || true
         exit 1
     fi
-    sleep 10
 done
 
 # Wait for the operator deployment to be available
