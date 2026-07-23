@@ -51,7 +51,7 @@ esac
 scaleNodes=$(oc get nodes -l kubevirt.io/schedulable=true -o jsonpath-as-json='{.items[*].metadata.name}' | jq -r '[ .[] | "'"'"'" + . + "'"'"'" ] | "[" + join(", ") + "]"')
 
 set +x
-export KUBEADMIN_PASSWORD="$(cat "${SHARED_DIR}/kubeadmin-password")"
+export KUBEADMIN_PASSWORD="$(cat "${KUBEADMIN_PASSWORD_FILE}")"
 set -x
 
 oc create namespace "${benchmarkNs}" --dry-run=client -o json --save-config | oc apply -f -
