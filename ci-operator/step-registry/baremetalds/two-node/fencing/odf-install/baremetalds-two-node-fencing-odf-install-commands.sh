@@ -423,20 +423,3 @@ oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster" \
 
 echo "ODF 2-node installation complete"
 oc get sc
-
-# ---------------------------------------------------------------------------
-# Step 10: Enable Ceph toolbox for diagnostics
-# ---------------------------------------------------------------------------
-echo "--- Step 10: Enable Ceph toolbox ---"
-oc patch OCSInitialization ocsinit -n "${ODF_INSTALL_NAMESPACE}" \
-    --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
-echo "Waiting for Ceph toolbox pod..."
-for ((i=1; i <= 30; i++)); do
-    if oc wait --for=condition=Ready pod -l app=rook-ceph-tools \
-        -n "${ODF_INSTALL_NAMESPACE}" --timeout=10s 2>/dev/null; then
-        echo "Ceph toolbox pod is ready"
-        break
-    fi
-    echo "Try ${i}/30: Waiting for toolbox pod..."
-    sleep 10
-done
