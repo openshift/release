@@ -1,0 +1,26 @@
+chain:
+  as: hypershift-e2e-v2-ote-run-azure-selfmanaged
+  steps:
+  - as: tests
+    cli: latest
+    env:
+    - name: HYPERSHIFT_PLATFORM
+      default: ""
+      documentation: "The cloud platform for the self-managed clusters (e.g. azure). Set in the workflow env block."
+    commands: |-
+      set -xuo pipefail
+      export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+      /hypershift/bin/hypershift-tests-ext run \
+        --shared-dir="${SHARED_DIR}" \
+        --artifact-dir="${ARTIFACT_DIR}"
+    timeout: 150m
+    grace_period: 5m
+    # TODO: switch to `from: hypershift-tests` after merging hypershift PR #9085
+    from: hypershift-tests-ote
+    dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST
+    resources:
+      requests:
+        cpu: "1"
+        memory: 200Mi
