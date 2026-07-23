@@ -293,6 +293,18 @@ elif (echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-node] [DRA] ResourceSlice Controller creates slices"
 EOF
+    # Skip tests specific to the PowerVC (IPI) environment:
+    #   - egressFirewall test is unsupported in the PowerVC network topology
+    #   - Internet connectivity (IPv4) is not available from PowerVC nodes
+    #   - Image registry blob-pull redirect returns 200 instead of 307 due to
+    #     node resource pressure; skip until root cause is resolved
+    if [ "${CLUSTER_TYPE}" == "powervc" ]; then
+       cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network][Feature:EgressFirewall] egressFirewall should have no impact outside its namespace [Suite:openshift/conformance/parallel]"
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:Disconnected] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-imageregistry] Image registry [apigroup:route.openshift.io] should redirect on blob pull [apigroup:image.openshift.io] [Suite:openshift/conformance/parallel]"
+EOF
+    fi
     # Skip the below defect for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-46563 is fixed
     # Skip the below etcd testcases for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-54839 is fixed
     # Skip the ResourceQuota testcase for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-65786. is fixed.
