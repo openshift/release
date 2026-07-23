@@ -7,8 +7,8 @@
 # to validate operator best practices and functionality.
 #
 # It performs the following steps:
-# 1. Executes scorecard tests inside a dedicated test pod running in the
-#    OpenShift cluster environment.
+# 1. Starts scorecard tests detached inside the builder pod (no long-lived
+#    oc rsh WebSocket), then polls done/RC markers with short oc exec.
 # 2. Configures the test environment with the appropriate kubeconfig and
 #    working directory within the test pod.
 # 3. Runs the scorecard test suite using the configured test command,
@@ -34,19 +34,121 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+readonly POLL_INTERVAL=15
+readonly LOG_TAIL_LINES=80
+readonly DONE_MARKER=/tmp/TESTS_DONE
+readonly RC_MARKER=/tmp/TESTS_RC
+readonly TEST_LOG=/tmp/test-run.log
+readonly RUNNER_SCRIPT=/tmp/run-sail-scorecard-tests.sh
+
+pod_exec() {
+  oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -- "$@"
+}
+
+clear_test_markers() {
+  pod_exec sh -c "rm -f '${DONE_MARKER}' '${RC_MARKER}' '${TEST_LOG}' '${RUNNER_SCRIPT}'" || true
+}
+
+are_tests_done() {
+  echo "Checking for ${DONE_MARKER} and ${RC_MARKER}"
+  pod_exec sh -c "test -f '${DONE_MARKER}' && test -f '${RC_MARKER}'"
+}
+
+read_test_rc() {
+  pod_exec sh -c "tr -d '[:space:]' < '${RC_MARKER}'"
+}
+
+tail_test_log() {
+  pod_exec sh -c "if [ -f '${TEST_LOG}' ]; then echo '--- test log (last ${LOG_TAIL_LINES} lines) ---'; tail -n ${LOG_TAIL_LINES} '${TEST_LOG}'; fi" || true
+}
+
+# Dump the complete detached suite log into the Prow build log and ARTIFACT_DIR.
+dump_full_test_log() {
+  echo "================================================================"
+  echo "BEGIN full detached test log (${TEST_LOG})"
+  echo "================================================================"
+  if pod_exec sh -c "test -f '${TEST_LOG}'"; then
+    pod_exec cat "${TEST_LOG}" || true
+    mkdir -p "${ARTIFACT_DIR}"
+    oc cp "${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:${TEST_LOG}" "${ARTIFACT_DIR}/detached-test-run.log" || true
+    echo "Full detached test log also saved to ${ARTIFACT_DIR}/detached-test-run.log"
+  else
+    echo "WARNING: ${TEST_LOG} not found in ${MAISTRA_SC_POD}; nothing to dump"
+  fi
+  echo "================================================================"
+  echo "END full detached test log"
+  echo "================================================================"
+}
+
+wait_for_tests() {
+  echo "Polling for detached scorecard completion (${DONE_MARKER} + ${RC_MARKER})..."
+  local poll_failures=0
+  local max_consecutive_poll_failures=20
+
+  while true; do
+    if are_tests_done; then
+      echo "Detached scorecard finished (markers present)."
+      return 0
+    fi
+
+    if pod_exec sh -c "true" >/dev/null 2>&1; then
+      poll_failures=0
+      tail_test_log
+    else
+      poll_failures=$((poll_failures + 1))
+      echo "WARNING: short oc exec failed while polling (${poll_failures}/${max_consecutive_poll_failures}). Will retry."
+      if [ "${poll_failures}" -ge "${max_consecutive_poll_failures}" ]; then
+        echo "ERROR: too many consecutive poll failures talking to ${MAISTRA_SC_POD}" >&2
+        return 1
+      fi
+    fi
+
+    sleep "${POLL_INTERVAL}"
+  done
+}
+
+start_detached_tests() {
+  clear_test_markers
+
+  local local_runner
+  local_runner="$(mktemp)"
+  cat > "${local_runner}" <<EOF
+#!/bin/bash
+set +e
+export KUBECONFIG=/work/ci-kubeconfig
+export BUILD_WITH_CONTAINER="0"
+cd /work
+entrypoint ${SCORECARD_COMMAND:-make test.scorecard}
+rc=\$?
+echo "\$rc" > ${RC_MARKER}
+touch ${DONE_MARKER}
+exit "\$rc"
+EOF
+
+  echo "Copying detached runner into ${MAISTRA_SC_POD}:${RUNNER_SCRIPT}"
+  oc cp "${local_runner}" "${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:${RUNNER_SCRIPT}"
+  rm -f "${local_runner}"
+  pod_exec chmod +x "${RUNNER_SCRIPT}"
+
+  echo "Starting detached scorecard suite in ${MAISTRA_SC_POD}..."
+  pod_exec sh -c "nohup '${RUNNER_SCRIPT}' > '${TEST_LOG}' 2>&1 < /dev/null & echo \"Started PID \$!\""
+}
+
 echo "Starting scorecard test execution in pod ${MAISTRA_SC_POD}..."
 
-# Execute the scorecard tests inside the test pod
-oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-  entrypoint \
-  sh -c \
-  "export KUBECONFIG=/work/ci-kubeconfig && \
-  cd /work && \
-  export BUILD_WITH_CONTAINER=\"0\" && \
-  ${SCORECARD_COMMAND:-make test.scorecard}"
+set +o errexit
+start_detached_tests
+if ! wait_for_tests; then
+  echo "ERROR: failed while waiting for detached scorecard tests" >&2
+  dump_full_test_log
+  exit 1
+fi
+TEST_RC="$(read_test_rc)"
+dump_full_test_log
+set -o errexit
 
 echo "Copying artifacts from test pod..."
-# Copy artifacts from the test pod
-oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}" || true
 
-echo "Scorecard test execution completed"
+echo "Scorecard test execution completed with exit code: ${TEST_RC}"
+exit "${TEST_RC}"
