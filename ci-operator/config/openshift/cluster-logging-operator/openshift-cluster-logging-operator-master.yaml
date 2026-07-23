@@ -158,7 +158,11 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make test-e2e-from-ci-bundle IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
+      commands: RELATED_IMAGE_VECTOR=${IMAGE_LOGGING_VECTOR} RELATED_IMAGE_LOG_FILE_METRIC_EXPORTER=${IMAGE_LOG_FILE_METRIC_EXPORTER}
+        IMAGE_LOGGING_EVENTROUTER=${IMAGE_LOGGING_EVENTROUTER} IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
+        LOG_LEVEL=3 GOFLAGS=-mod=mod NO_COLOR=1 go test -v -timeout=90m -ginkgo.v
+        -ginkgo.trace -ginkgo.poll-progress-after=300s -ginkgo.poll-progress-interval=30s
+        ./test/e2e/...
       dependencies:
       - env: IMAGE_LOGGING_VECTOR
         name: pipeline:logging-vector
