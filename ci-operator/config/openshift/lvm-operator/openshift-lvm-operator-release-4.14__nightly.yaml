@@ -8,7 +8,7 @@ base_images:
     namespace: ocp
     tag: base-rhel9
   upi-installer:
-    name: "4.16"
+    name: "4.14"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -139,12 +139,25 @@ tests:
 - as: e2e-aws-disc-sno-qe-integration-tests
   cron: 0 8 * * 1
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: openshift-org-aws
     env:
+      CONTROL_PLANE_INSTANCE_TYPE: m5d.2xlarge
+      DISCONNECTED: "true"
       ENABLE_IDMS: "no"
+      EXTRA_DISKS_COUNT: "2"
       EXTRACT_MANIFEST_INCLUDED: "false"
+      LVM_CLUSTER_AUTO_SELECT_AVAILABLE_DEVICES: "true"
+      LVM_CLUSTER_TOLERATE_MASTER: "true"
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      PERSISTENT_MONITORING: "false"
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-disconnected-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno-provision
+    - ref: storage-create-aws-extra-disks
+    - chain: storage-conf-csi-optional-topolvm
     test:
     - as: lvms-sno-integration-test
       cli: latest
@@ -159,16 +172,26 @@ tests:
           cpu: 100m
           memory: 200Mi
       timeout: 4h0m0s
-    workflow: openshift-e2e-aws-disconnected-lvms-sno
 - as: e2e-aws-disc-mno-qe-integration-tests
   cron: 0 8 * * 1
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: openshift-org-aws
     env:
+      DISCONNECTED: "true"
       ENABLE_IDMS: "no"
+      EXTRA_DISKS_COUNT: "2"
       EXTRACT_MANIFEST_INCLUDED: "false"
+      LVM_CLUSTER_AUTO_SELECT_AVAILABLE_DEVICES: "true"
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      PERSISTENT_MONITORING: "false"
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-disconnected-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-disconnected-private-provision
+    - ref: storage-create-aws-extra-disks
+    - chain: storage-conf-csi-optional-topolvm
     test:
     - as: lvms-mno-integration-test
       cli: latest
@@ -183,7 +206,6 @@ tests:
           cpu: 100m
           memory: 200Mi
       timeout: 4h0m0s
-    workflow: openshift-e2e-aws-disconnected-lvms-mno
 - as: e2e-baremetalds-sno-dualstack-qe-integration-tests
   capabilities:
   - intranet
