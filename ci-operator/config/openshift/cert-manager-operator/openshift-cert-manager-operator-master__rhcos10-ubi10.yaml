@@ -1,0 +1,199 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+images:
+- dockerfile_literal: |
+    FROM registry.redhat.io/ubi10/go-toolset:10.1 AS builder
+    WORKDIR /go/src/github.com/openshift/cert-manager-operator
+
+    RUN git config --global --add safe.directory /go/src/github.com/openshift/cert-manager-operator
+    # build operator
+    COPY . .
+    ENV GO_BUILD_TAGS=strictfipsruntime,openssl
+    ENV GOEXPERIMENT=strictfipsruntime
+    ENV CGO_ENABLED=1
+    ENV GOFLAGS=""
+
+    RUN go build -mod=vendor -tags $GO_BUILD_TAGS -o cert-manager-operator .
+
+    FROM registry.access.redhat.com/ubi10-minimal
+    COPY --from=builder /go/src/github.com/openshift/cert-manager-operator/cert-manager-operator /usr/bin/
+
+    USER 65532:65532
+
+    ENTRYPOINT ["/usr/bin/cert-manager-operator"]
+  to: cert-manager-operator
+- dockerfile_literal: |
+    FROM registry.redhat.io/ubi10/go-toolset:10.1 AS builder
+
+    ARG RELEASE_BRANCH=v1.19.2
+
+    ARG GO_BUILD_TAGS=strictfipsruntime,openssl
+    ARG SRC_DIR=/go/src/github.com/cert-manager/cert-manager
+
+    ENV GOEXPERIMENT strictfipsruntime
+    ENV CGO_ENABLED 1
+
+    WORKDIR /go/src/github.com/cert-manager/cert-manager
+    RUN git clone --depth 1 --branch $RELEASE_BRANCH https://github.com/openshift/jetstack-cert-manager.git $SRC_DIR
+
+    # build acmesolver
+    WORKDIR /go/src/github.com/cert-manager/cert-manager/cmd/acmesolver
+    RUN go mod vendor
+    RUN go build -mod=vendor -tags $GO_BUILD_TAGS -o $SRC_DIR/app/_output/acmesolver main.go
+
+    # build cainjector
+    WORKDIR /go/src/github.com/cert-manager/cert-manager/cmd/cainjector
+    RUN go mod vendor
+    RUN go build -mod=vendor -tags $GO_BUILD_TAGS -o $SRC_DIR/app/_output/cainjector main.go
+
+    # build controller
+    WORKDIR /go/src/github.com/cert-manager/cert-manager/cmd/controller
+    RUN go mod vendor
+    RUN go build -mod=vendor -tags $GO_BUILD_TAGS -o $SRC_DIR/app/_output/controller main.go
+
+    # build webhook
+    WORKDIR /go/src/github.com/cert-manager/cert-manager/cmd/webhook
+    RUN go mod vendor
+    RUN go build -mod=vendor -tags $GO_BUILD_TAGS -o $SRC_DIR/app/_output/webhook main.go
+
+
+    FROM registry.access.redhat.com/ubi10-minimal
+    ARG SRC_DIR=/go/src/github.com/cert-manager/cert-manager
+
+    COPY --from=builder $SRC_DIR/app/_output/acmesolver /app/cmd/acmesolver/acmesolver
+    COPY --from=builder $SRC_DIR/app/_output/cainjector /app/cmd/cainjector/cainjector
+    COPY --from=builder $SRC_DIR/app/_output/controller /app/cmd/controller/controller
+    COPY --from=builder $SRC_DIR/app/_output/webhook /app/cmd/webhook/webhook
+
+    USER 65532:65532
+  to: cert-manager
+- dockerfile_literal: |
+    FROM registry.redhat.io/ubi10/go-toolset:10.1 AS builder
+
+    ARG RELEASE_BRANCH=main
+    ARG SRC_DIR=/go/src/github.com/openshift/cert-manager-istio-csr
+
+    ARG GO_BUILD_TAGS=strictfipsruntime,openssl
+    ENV GOEXPERIMENT strictfipsruntime
+    ENV CGO_ENABLED 1
+
+    WORKDIR /go/src/github.com/openshift/cert-manager-istio-csr
+    RUN git clone --depth 1 --branch $RELEASE_BRANCH https://github.com/openshift/cert-manager-istio-csr.git /go/src/github.com/openshift/cert-manager-istio-csr
+
+    ARG SOURCE_DIR="/go/src/github.com/openshift/cert-manager-istio-csr"
+    RUN go mod vendor
+    RUN cd $SOURCE_DIR/cmd && go build -mod=vendor -o $SOURCE_DIR/_output/cert-manager-istio-csr -ldflags '-w -s' -tags ${GO_BUILD_TAGS} main.go
+
+    FROM registry.access.redhat.com/ubi10-minimal
+    ARG SOURCE_DIR="/go/src/github.com/openshift/cert-manager-istio-csr"
+
+    COPY --from=builder $SOURCE_DIR/_output/cert-manager-istio-csr /usr/local/bin/cert-manager-istio-csr
+
+    USER 65532:65532
+
+    ENTRYPOINT ["/usr/local/bin/cert-manager-istio-csr"]
+  to: cert-manager-istio-csr
+operator:
+  bundles:
+  - as: cert-manager-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: openshift.io/cert-manager-operator:.*
+    with: pipeline:cert-manager-operator
+  - pullspec: quay.io/jetstack/cert-manager-controller:.*
+    with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-webhook:.*
+    with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:.*
+    with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-istio-csr:.*
+    with: pipeline:cert-manager-istio-csr
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-operator-fips
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+      OSSTREAM: rhel-10
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc wait --for condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && !TechPreview"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: e2e-operator
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "false"
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+      OSSTREAM: rhel-10
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc wait --for condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && !TechPreview"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cert-manager-operator
+  variant: rhcos10-ubi10
