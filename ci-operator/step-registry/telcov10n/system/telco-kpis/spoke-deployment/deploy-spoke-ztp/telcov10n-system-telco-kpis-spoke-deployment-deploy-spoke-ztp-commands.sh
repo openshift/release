@@ -41,10 +41,18 @@ main() {
     )
 
     if [[ -n "${OCP_RELEASE_IMAGE:-}" ]]; then
-        extra_vars+=(-e "ocp_release_image=${OCP_RELEASE_IMAGE}")
+        if [[ "${OCP_RELEASE_IMAGE}" != *"@sha256:"* ]]; then
+            echo "OCP_RELEASE_IMAGE is tag-based — wrapper will resolve to digest format"
+        fi
+        extra_vars+=(-e "raw_ocp_release_image=${OCP_RELEASE_IMAGE}")
     fi
 
-    ansible-playbook ./playbooks/ran/deploy-spoke-ztp.yml \
+    if [[ -n "${LOCKDOWN_URI:-}" ]]; then
+        echo "Lockdown URI provided for OCP release image resolution: ${LOCKDOWN_URI}"
+        extra_vars+=(-e "lockdown_uri=${LOCKDOWN_URI}")
+    fi
+
+    ansible-playbook ./playbooks/telco-kpis/deploy-spoke-ztp.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         "${extra_vars[@]}" \
         ${DEBUG_FLAG}

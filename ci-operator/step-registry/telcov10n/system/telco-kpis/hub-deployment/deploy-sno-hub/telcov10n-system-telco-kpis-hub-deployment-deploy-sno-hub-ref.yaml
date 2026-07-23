@@ -34,19 +34,23 @@ ref:
       documentation: >-
         JSON object for per-step infrastructure configuration. The "deploy_sno_hub" key supports:
         skip (bool) - when true, skip this step entirely and exit 0;
-        version (str) - OpenShift version to deploy (fallback when no lockdown or release image);
-        ocp_release_image (str) - optional OCP release pull spec (overrides version, overridden by lockdown);
-        hub_lockdown_uri (str) - optional URL to hub lockdown JSON. When provided, the OCP release
-        image tag is extracted from .hub.ocp.pull_spec.tag and used as the release. This takes
-        highest priority over ocp_release_image and version. Recommended defaults (symlinks to
-        latest verified lockdowns):
-        x86_64: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json
-        arm64: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-arm64.json
-        Version-specific URLs are also available (e.g. lockdown-hub-4.22-x86_64.json).
+        version (str) - OpenShift version to deploy (e.g. "4.22"). Used only when neither
+        hub_lockdown_uri nor ocp_release_image are provided;
+        ocp_release_image (str) - explicit OCP release image (tag or digest format). Overrides
+        version but is overridden by hub_lockdown_uri. Examples:
+        tag: quay.io/openshift-release-dev/ocp-release:4.22.0-x86_64,
+        digest: quay.io/openshift-release-dev/ocp-release@sha256:abc123...;
+        hub_lockdown_uri (str) - URL to hub lockdown JSON. The OCP release image tag is extracted
+        from .hub.ocp.pull_spec.tag and used as the release. Takes highest priority.
+        Supports GitLab symlinks (follows raw file redirects). Examples:
+        latest verified: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json,
+        version-pinned: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-4.22-x86_64.json,
+        arm64: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-arm64.json.
         Empty string disables lockdown;
         architecture (str) - target architecture (x86_64 or arm64);
         disable_insights (bool) - disable Red Hat Insights operator;
         debug (bool) - when true, enables Ansible -vvv verbose output.
+        Release resolution precedence: hub_lockdown_uri > ocp_release_image > version.
         Values are exported as uppercase env vars.
   credentials:
     # Common hypervisor (shared across all spokes)
