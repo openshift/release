@@ -142,6 +142,20 @@ function wait_for_stable_cluster {
       stable_since=""
     elif [[ -n "\${unstable}" ]]; then
       echo "  Unstable operators: \${unstable}"
+      # Print condition details for each unstable operator (first occurrence only per operator)
+      if [[ -z "\${stable_since}" ]]; then
+        oc get co -o json 2>/dev/null | jq -r --arg names "\${unstable}" '
+          (\$names | split(",")) as \$ns |
+          .items[] | select(.metadata.name as \$n | \$ns | index(\$n)) |
+          "    " + .metadata.name + ": " +
+            ([.status.conditions[] |
+              select((.type == "Available" and .status != "True") or
+                     (.type == "Progressing" and .status == "True") or
+                     (.type == "Degraded" and .status == "True")) |
+              .type + "=" + .status + " (" + (.message // "no message" | .[0:120]) + ")"
+            ] | join("; "))
+        ' 2>/dev/null || true
+      fi
       stable_since=""
     else
       if [[ -z "\${stable_since}" ]]; then
@@ -223,9 +237,24 @@ function update_node_ip {
     ip route add default via "\${default_gw}" dev br-ex src "${ADDITIONAL_NODE_IP}" 2>/dev/null || true
   fi
 
+  # Update the NM connection profile for br-ex so NetworkManager does not
+  # revert the IP swap when ovs-configuration or any NM event re-applies the
+  # profile.  On assisted-test-infra the profile was deleted entirely
+  # (nmcli connection delete br-ex), but on dev-scripts we must keep it —
+  # OVN cannot rebuild br-ex from scratch without a secondary NIC.
+  local br_ex_con
+  br_ex_con=\$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | awk -F: '/br-ex\$/{print \$1; exit}')
+  if [[ -n "\${br_ex_con}" ]]; then
+    echo "Updating NM profile '\${br_ex_con}' for br-ex: ${SINGLE_NODE_IP} -> ${ADDITIONAL_NODE_IP}"
+    nmcli con mod "\${br_ex_con}" ipv4.addresses "${ADDITIONAL_NODE_IP}/\${cidr}" 2>/dev/null || true
+  fi
+
   echo "KUBELET_NODEIP_HINT=${ADDITIONAL_NODE_NETWORK_PREFIX}" | sudo tee /etc/default/nodeip-configuration
   systemctl restart nodeip-configuration.service
-  systemctl restart ovs-configuration.service
+  # Do NOT restart ovs-configuration.service here.  Unlike assisted-test-infra
+  # (which deleted and recreated br-ex), we did an in-place IP swap.
+  # Restarting ovs-configuration would re-read the NM profile and could
+  # revert the IP before NM fully applies the profile update above.
   echo "node IP updated"
 }
 
