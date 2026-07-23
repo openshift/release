@@ -11,6 +11,126 @@ resources:
       cpu: 200m
       memory: 300Mi
 tests:
+- as: dev-kpi-01-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: dev-kpi-01
+      SPOKE_CLUSTER: spree-04
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: dev-kpi-02-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: dev-kpi-02
+      SPOKE_CLUSTER: spree-03
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: dev-kpi-03-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: dev-kpi-03
+      SPOKE_CLUSTER: kni-qe-100
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: dev-kpi-04-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: dev-kpi-04
+      SPOKE_CLUSTER: cnfdg46
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: kni-qe-70-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: kni-qe-70
+      SPOKE_CLUSTER: spree-01
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: kni-qe-71-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: kni-qe-71
+      SPOKE_CLUSTER: spree-02
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
 - as: run-1hr-baselines
   capabilities:
   - intranet
@@ -29,60 +149,6 @@ tests:
   steps:
     env:
       HUB_CLUSTER: kni-qe-71
-      INFRA_SETTINGS: |-
-        {
-          "deploy_vm_bastion": {
-            "skip": false,
-            "debug_on_fail": true
-          },
-          "deploy_sno_hub": {
-            "skip": false,
-            "debug_on_fail": true,
-            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
-          },
-          "install_hub_operators": {
-            "skip": false,
-            "debug_on_fail": true,
-            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
-          },
-          "hub_config": {
-            "skip": false,
-            "debug_on_fail": true,
-            "debug_timeout": "+11 min"
-          },
-          "mirror_spoke_operators": {
-            "skip": false,
-            "debug_on_fail": true,
-            "spoke_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64-baseline.json"
-          },
-          "mirror_ran_test_images": {
-            "skip": false,
-            "debug_on_fail": true,
-            "ran_images": {
-              "images": [
-                "quay.io/telcov10n-ci/oslat:latest",
-                "quay.io/telcov10n-ci/cyclictest:latest",
-                "quay.io/telcov10n-ci/cnf-tests:4.8",
-                "quay.io/telcov10n-ci/stress-ng:latest",
-                "quay.io/telcov10n-ci/cnf-gotests-client:latest",
-                "quay.io/telcov10n-ci/dpdk-testpmd:latest",
-                "quay.io/telcov10n-ci/process-exporter:ppid-2",
-                "quay.io/telcov10n-ci/fedora-stress-ng:latest",
-                "quay.io/telcov10n-ci/curl:latest",
-                "quay.io/telcov10n-ci/sampleapp:latest",
-                "quay.io/telcov10n-ci/kubectl:latest",
-                "quay.io/telcov10n-ci/rtla:latest",
-                "quay.io/telcov10n-ci/oran-subscriber:latest"
-              ]
-            }
-          },
-          "deploy_spoke_ztp": {
-            "skip": false,
-            "debug_on_fail": true,
-            "lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64-baseline.json",
-            "ztp_git_branch": "spree-02-kpi-4.21-prow"
-          }
-        }
       REPORTING_SETTINGS: |-
         {
           "generate_report": {
@@ -125,60 +191,6 @@ tests:
   steps:
     env:
       HUB_CLUSTER: kni-qe-71
-      INFRA_SETTINGS: |-
-        {
-          "deploy_vm_bastion": {
-            "skip": false,
-            "debug_on_fail": true
-          },
-          "deploy_sno_hub": {
-            "skip": false,
-            "debug_on_fail": true,
-            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
-          },
-          "install_hub_operators": {
-            "skip": false,
-            "debug_on_fail": true,
-            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
-          },
-          "hub_config": {
-            "skip": false,
-            "debug_on_fail": true,
-            "debug_timeout": "+11 min"
-          },
-          "mirror_spoke_operators": {
-            "skip": false,
-            "debug_on_fail": true,
-            "spoke_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json"
-          },
-          "mirror_ran_test_images": {
-            "skip": false,
-            "debug_on_fail": true,
-            "ran_images": {
-              "images": [
-                "quay.io/telcov10n-ci/oslat:latest",
-                "quay.io/telcov10n-ci/cyclictest:latest",
-                "quay.io/telcov10n-ci/cnf-tests:4.8",
-                "quay.io/telcov10n-ci/stress-ng:latest",
-                "quay.io/telcov10n-ci/cnf-gotests-client:latest",
-                "quay.io/telcov10n-ci/dpdk-testpmd:latest",
-                "quay.io/telcov10n-ci/process-exporter:ppid-2",
-                "quay.io/telcov10n-ci/fedora-stress-ng:latest",
-                "quay.io/telcov10n-ci/curl:latest",
-                "quay.io/telcov10n-ci/sampleapp:latest",
-                "quay.io/telcov10n-ci/kubectl:latest",
-                "quay.io/telcov10n-ci/rtla:latest",
-                "quay.io/telcov10n-ci/oran-subscriber:latest"
-              ]
-            }
-          },
-          "deploy_spoke_ztp": {
-            "skip": false,
-            "debug_on_fail": true,
-            "lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json",
-            "ztp_git_branch": "spree-02-kpi-4.22-prow"
-          }
-        }
       REPORTING_SETTINGS: |-
         {
           "generate_report": {
@@ -245,60 +257,6 @@ tests:
   steps:
     env:
       HUB_CLUSTER: dev-kpi-02
-      INFRA_SETTINGS: |-
-        {
-          "deploy_vm_bastion": {
-            "skip": false,
-            "debug_on_fail": true
-          },
-          "deploy_sno_hub": {
-            "skip": false,
-            "debug_on_fail": true,
-            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
-          },
-          "install_hub_operators": {
-            "skip": false,
-            "debug_on_fail": true,
-            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
-          },
-          "hub_config": {
-            "skip": false,
-            "debug_on_fail": true,
-            "debug_timeout": "+11 min"
-          },
-          "mirror_spoke_operators": {
-            "skip": false,
-            "debug_on_fail": true,
-            "spoke_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json"
-          },
-          "mirror_ran_test_images": {
-            "skip": false,
-            "debug_on_fail": true,
-            "ran_images": {
-              "images": [
-                "quay.io/telcov10n-ci/oslat:latest",
-                "quay.io/telcov10n-ci/cyclictest:latest",
-                "quay.io/telcov10n-ci/cnf-tests:4.8",
-                "quay.io/telcov10n-ci/stress-ng:latest",
-                "quay.io/telcov10n-ci/cnf-gotests-client:latest",
-                "quay.io/telcov10n-ci/dpdk-testpmd:latest",
-                "quay.io/telcov10n-ci/process-exporter:ppid-2",
-                "quay.io/telcov10n-ci/fedora-stress-ng:latest",
-                "quay.io/telcov10n-ci/curl:latest",
-                "quay.io/telcov10n-ci/sampleapp:latest",
-                "quay.io/telcov10n-ci/kubectl:latest",
-                "quay.io/telcov10n-ci/rtla:latest",
-                "quay.io/telcov10n-ci/oran-subscriber:latest"
-              ]
-            }
-          },
-          "deploy_spoke_ztp": {
-            "skip": false,
-            "debug_on_fail": true,
-            "lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json",
-            "ztp_git_branch": "spree-03-kpi-4.22_powersave-prow"
-          }
-        }
       REPORTING_SETTINGS: |-
         {
           "generate_report": {
@@ -364,60 +322,6 @@ tests:
   steps:
     env:
       HUB_CLUSTER: dev-kpi-01
-      INFRA_SETTINGS: |-
-        {
-          "deploy_vm_bastion": {
-            "skip": false,
-            "debug_on_fail": true
-          },
-          "deploy_sno_hub": {
-            "skip": false,
-            "debug_on_fail": true,
-            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
-          },
-          "install_hub_operators": {
-            "skip": false,
-            "debug_on_fail": true,
-            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
-          },
-          "hub_config": {
-            "skip": false,
-            "debug_on_fail": true,
-            "debug_timeout": "+11 min"
-          },
-          "mirror_spoke_operators": {
-            "skip": false,
-            "debug_on_fail": true,
-            "spoke_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json"
-          },
-          "mirror_ran_test_images": {
-            "skip": false,
-            "debug_on_fail": true,
-            "ran_images": {
-              "images": [
-                "quay.io/telcov10n-ci/oslat:latest",
-                "quay.io/telcov10n-ci/cyclictest:latest",
-                "quay.io/telcov10n-ci/cnf-tests:4.8",
-                "quay.io/telcov10n-ci/stress-ng:latest",
-                "quay.io/telcov10n-ci/cnf-gotests-client:latest",
-                "quay.io/telcov10n-ci/dpdk-testpmd:latest",
-                "quay.io/telcov10n-ci/process-exporter:ppid-2",
-                "quay.io/telcov10n-ci/fedora-stress-ng:latest",
-                "quay.io/telcov10n-ci/curl:latest",
-                "quay.io/telcov10n-ci/sampleapp:latest",
-                "quay.io/telcov10n-ci/kubectl:latest",
-                "quay.io/telcov10n-ci/rtla:latest",
-                "quay.io/telcov10n-ci/oran-subscriber:latest"
-              ]
-            }
-          },
-          "deploy_spoke_ztp": {
-            "skip": false,
-            "debug_on_fail": true,
-            "lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json",
-            "ztp_git_branch": "spree-04-kpi-4.22_stdkernel-prow"
-          }
-        }
       REPORTING_SETTINGS: |-
         {
           "generate_report": {
