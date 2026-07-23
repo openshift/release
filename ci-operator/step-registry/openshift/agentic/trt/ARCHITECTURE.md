@@ -61,8 +61,9 @@ flowchart TD
     M2 --> M8
     M3 --> M4 --> M5
     M5 --> M6
-    M6 -->|"no comments"| M10
+    M6 -->|"no comments"| M1
     M6 -->|"comments found"| M7
+    M6 -->|"PR merged/closed"| M10
     M7 -->|"Gangway"| followup_job
     M7 --> M8
     M8 --> M9
@@ -133,7 +134,7 @@ Both are `cron: '@yearly'` (Gangway-triggered only, never scheduled).
 
 The `agentic-dev` image is built per CI run via `dockerfile_literal` in the CI operator config. It layers four images:
 
-```
+```text
 repo devcontainer (Fedora 43, Go, npm, Python, Chromium, gh, gcloud)
   + nested-podman (/entrypoint.sh, podman-in-pod)
   + src (repo source → /workspace)
