@@ -35,7 +35,6 @@ set -o errexit
 set -o pipefail
 
 readonly POLL_INTERVAL=15
-readonly LOG_TAIL_LINES=80
 readonly DONE_MARKER=/tmp/TESTS_DONE
 readonly RC_MARKER=/tmp/TESTS_RC
 readonly TEST_LOG=/tmp/test-run.log
@@ -58,11 +57,8 @@ read_test_rc() {
   pod_exec sh -c "tr -d '[:space:]' < '${RC_MARKER}'"
 }
 
-tail_test_log() {
-  pod_exec sh -c "if [ -f '${TEST_LOG}' ]; then echo '--- test log (last ${LOG_TAIL_LINES} lines) ---'; tail -n ${LOG_TAIL_LINES} '${TEST_LOG}'; fi" || true
-}
-
-# Dump the complete detached suite log into the Prow build log and ARTIFACT_DIR.
+# Dump the complete detached suite log into the Prow build log and ARTIFACT_DIR
+# once the run finishes (success or failure).
 dump_full_test_log() {
   echo "================================================================"
   echo "BEGIN full detached test log (${TEST_LOG})"
@@ -93,7 +89,7 @@ wait_for_tests() {
 
     if pod_exec sh -c "true" >/dev/null 2>&1; then
       poll_failures=0
-      tail_test_log
+      echo "Detached tests still running; waiting for ${DONE_MARKER} + ${RC_MARKER}..."
     else
       poll_failures=$((poll_failures + 1))
       echo "WARNING: short oc exec failed while polling (${poll_failures}/${max_consecutive_poll_failures}). Will retry."
