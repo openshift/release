@@ -62,11 +62,16 @@ KUBE_APPLIER_REPOSITORY=$(echo "${KUBE_APPLIER_IMAGE}" | cut -d'@' -f1 | cut -d 
 KUBE_APPLIER_SOURCE_REGISTRY=$(echo "${KUBE_APPLIER_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
 echo "source registry set to ${KUBE_APPLIER_SOURCE_REGISTRY} and repo ${KUBE_APPLIER_REPOSITORY} for Kube Applier Image"
 
+EXPORTER_DIGEST=$(echo "${EXPORTER_IMAGE}" | cut -d'@' -f2)
+EXPORTER_REPOSITORY=$(echo "${EXPORTER_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
+EXPORTER_SOURCE_REGISTRY=$(echo "${EXPORTER_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
+echo "source registry set to ${EXPORTER_SOURCE_REGISTRY} and repo ${EXPORTER_REPOSITORY} for Exporter Image"
+
 # Set up registries that require oc login for ImageMirror to pull from CI registry
 if [[ -n "${USE_OC_LOGIN_REGISTRIES}" ]]; then
-    USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY}"
+    USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY} ${EXPORTER_SOURCE_REGISTRY}"
 else
-    USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY}"
+    USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY} ${EXPORTER_SOURCE_REGISTRY}"
 fi
 echo "USE_OC_LOGIN_REGISTRIES set to: ${USE_OC_LOGIN_REGISTRIES}"
 export USE_OC_LOGIN_REGISTRIES
@@ -97,7 +102,10 @@ yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.digest = \"${MGMT_AGENT_DIGEST}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.registry = \"${KUBE_APPLIER_SOURCE_REGISTRY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.repository = \"${KUBE_APPLIER_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\"
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.registry = \"${EXPORTER_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.repository = \"${EXPORTER_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.digest = \"${EXPORTER_DIGEST}\"
 " > "${OVERRIDE_CONFIG_FILE}"
 echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
 cat "${OVERRIDE_CONFIG_FILE}"
