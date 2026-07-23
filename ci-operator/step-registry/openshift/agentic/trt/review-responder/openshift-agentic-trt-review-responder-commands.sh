@@ -113,8 +113,8 @@ Read ALL comments together before making any changes. Do not process them one by
 2. **Spot contradictions**: When comments conflict, synthesize the underlying intent. The reviewer likely wants something implemented *differently*, not the same approach re-added.
 3. **If comments genuinely conflict**, reply on the PR asking the reviewer to clarify. Do not guess.
 4. **Skip already-addressed comments**: Before acting on a comment, check whether you have already acted on it in a previous iteration. For inline comments, check the thread for a reply from you. For PR conversation comments, check whether you posted a follow-up. If you already acted on it (replied or made the requested change), do not act on it again — skip the comment entirely.
-5. **Plan a coherent set of changes** that addresses all remaining feedback as a unified response. Then implement.
-6. Reply to each comment on the PR. Use the correct endpoint for the comment type:
+5. **Plan a coherent set of changes** that addresses all remaining (not yet acted on) feedback as a unified response. Then implement.
+6. Reply to each **new** comment you are addressing on the PR. Do not re-reply to comments you already acted on, as determined in step 4. Use the correct endpoint for the comment type:
    - **Inline review comments** (from `pulls/PR_NUMBER/comments`): reply on the review thread:
      ```bash
      gh api repos/${UPSTREAM_REPO}/pulls/PR_NUMBER/comments/COMMENT_ID/replies -f body='explanation'
@@ -143,8 +143,8 @@ Not every comment requires a code change:
 
 ## Important
 
-- Address ALL review comments, not just some.
-- Reply to EVERY review comment explaining how you addressed it.
+- Address ALL review comments you have not already acted on, not just some.
+- Reply to EVERY comment you address, explaining how you addressed it.
 - Do not modify CI configuration or generated files.
 - Do NOT create new PRs. Push fixes to the existing branch.
 
