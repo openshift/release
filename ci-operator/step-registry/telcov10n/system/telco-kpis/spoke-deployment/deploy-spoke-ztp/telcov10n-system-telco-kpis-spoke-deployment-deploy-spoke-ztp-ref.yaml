@@ -31,6 +31,7 @@ ref:
             "debug_timeout": "+10 min",
             "version": "4.22",
             "ocp_release_image": "",
+            "lockdown_uri": "",
             "ztp_git_repo": "https://gitlab.cee.redhat.com/ocp-edge-qe/ztp-site-configs.git",
             "ztp_git_branch": "",
             "ztp_clusters_path": "siteconfig",
@@ -42,14 +43,26 @@ ref:
       documentation: >-
         JSON object for per-step infrastructure configuration. The "deploy_spoke_ztp" key supports:
         skip (bool) - when true, skip this step entirely and exit 0;
-        version (str) - OpenShift version to deploy on spoke;
-        ocp_release_image (str) - optional explicit release pull spec (overrides version);
+        version (str) - OpenShift version to deploy on spoke (e.g. "4.22"). Used only when
+        neither ocp_release_image nor lockdown_uri are provided;
+        ocp_release_image (str) - explicit OCP release image for ClusterImageSet. Accepts tag
+        or digest format; tags are resolved to digest via skopeo. Takes precedence over
+        lockdown_uri. Examples:
+        tag: quay.io/openshift-release-dev/ocp-release:4.22.0-x86_64,
+        digest: quay.io/openshift-release-dev/ocp-release@sha256:abc123...;
+        lockdown_uri (str) - URL to a hub or spoke lockdown JSON file. The OCP release image
+        is extracted automatically (hub format: hub.ocp.pull_spec.digest, spoke format:
+        deployment.ocp_pull_spec). Supports GitLab symlinks. Only used when ocp_release_image
+        is empty. Examples:
+        version-pinned: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-4.22-x86_64.json,
+        baseline: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-4.22-x86_64-baseline.json;
         ztp_git_repo (str) - ZTP site configurations repository URL;
         ztp_git_branch (str) - ZTP branch (empty to auto-generate as ${SPOKE_CLUSTER}-kpi-${VERSION});
         ztp_clusters_path (str) - path to cluster configurations in ZTP repository;
         ztp_policies_path (str) - path to policy templates in ZTP repository;
         force_cleanup (bool) - force cleanup of spoke resources on hub before deployment;
         debug (bool) - when true, enables Ansible -vvv verbose output.
+        Release image resolution precedence: ocp_release_image > lockdown_uri > hub clusterversion.
         Values are exported as uppercase env vars.
   credentials:
     # Common hypervisor (shared across all spokes)

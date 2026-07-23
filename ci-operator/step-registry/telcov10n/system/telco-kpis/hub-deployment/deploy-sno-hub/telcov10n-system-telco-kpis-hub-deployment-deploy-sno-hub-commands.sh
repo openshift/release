@@ -20,35 +20,26 @@ main() {
         DEBUG_FLAG="-vvv"
     fi
 
-    # Determine release: lockdown > explicit image > version
-    local release=""
+    # Pass release sources to wrapper playbook for resolution
+    # Precedence: lockdown_uri > raw_ocp_release_image > raw_release
+    local extra_vars=(
+        -e "cluster_name=${HUB_CLUSTER}"
+        -e "disconnected=true"
+        -e "raw_release=${VERSION}"
+    )
+
     if [[ -n "${HUB_LOCKDOWN_URI:-}" ]]; then
-        echo "Resolving OCP release from hub lockdown: ${HUB_LOCKDOWN_URI}"
-        ansible-playbook ./playbooks/telco-kpis/download-lockdown.yml \
-            -i ./inventories/ocp-deployment/build-inventory.py \
-            -e "lockdown_uri=${HUB_LOCKDOWN_URI}" \
-            -e "lockdown_local_path=/tmp/hub-lockdown.json" \
-            ${DEBUG_FLAG}
-        release=$(python3 -c "
-import json, sys
-data = json.load(open('/tmp/hub-lockdown.json'))
-ps = data['hub']['ocp']['pull_spec']
-print(ps['tag'] if isinstance(ps, dict) else ps)
-")
-        echo "OCP release from lockdown: ${release}"
-    elif [[ -n "${OCP_RELEASE_IMAGE:-}" ]]; then
-        release="${OCP_RELEASE_IMAGE}"
-        echo "OCP release from explicit image: ${release}"
-    else
-        release="${VERSION}"
-        echo "OCP release from version: ${release}"
+        echo "Lockdown URI provided for OCP release resolution: ${HUB_LOCKDOWN_URI}"
+        extra_vars+=(-e "lockdown_uri=${HUB_LOCKDOWN_URI}")
     fi
 
-    ansible-playbook ./playbooks/deploy-ocp-sno.yml \
+    if [[ -n "${OCP_RELEASE_IMAGE:-}" ]]; then
+        extra_vars+=(-e "raw_ocp_release_image=${OCP_RELEASE_IMAGE}")
+    fi
+
+    ansible-playbook ./playbooks/telco-kpis/deploy-ocp-sno.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
-        -e release="${release}" \
-        -e cluster_name="${HUB_CLUSTER}" \
-        -e disconnected=true \
+        "${extra_vars[@]}" \
         ${DEBUG_FLAG}
 
     echo "SNO hub deployment completed: ${HUB_CLUSTER}"
