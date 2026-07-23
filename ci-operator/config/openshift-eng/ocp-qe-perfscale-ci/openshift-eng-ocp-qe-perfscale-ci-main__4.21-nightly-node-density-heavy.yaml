@@ -153,6 +153,34 @@ tests:
     - chain: openshift-qe-node-density-heavy
     workflow: baremetal-lab-upi
 - always_run: false
+  as: aws-3nodes-ocpbugs-98252
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BURST: "300"
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      MAX_PODS: "500"
+      NDH_EXTRA_FLAGS: --churn=true --churn-percent=100 --pod-ready-threshold=300s
+      PODS_PER_NODE: "400"
+      PPROF: "false"
+      PROFILE_TYPE: both
+      QPS: "300"
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: openshift-qe-set-max-pods
+    test:
+    - ref: openshift-qe-ovn-libovsdb-check
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws
+  timeout: 4h0m0s
+- always_run: false
   as: aws-3nodes-1500ppn
   steps:
     allow_skip_on_success: true
