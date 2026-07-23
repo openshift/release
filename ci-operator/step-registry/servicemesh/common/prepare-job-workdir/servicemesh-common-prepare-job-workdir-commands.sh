@@ -60,6 +60,8 @@ servicemesh_ensure_workdir_pvc() {
     return 0
   fi
 
+  # Do not wait for Bound here: default CSI classes (e.g. gp3-csi) use
+  # WaitForFirstConsumer and only bind after a consumer pod is scheduled.
   oc apply -n "${ns}" -f - <<EOF
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -73,22 +75,7 @@ spec:
     requests:
       storage: ${size}
 EOF
-
-  echo "Waiting for PVC ${ns}/${pvc} to bind..."
-  local i
-  for i in $(seq 1 60); do
-    local phase
-    phase="$(oc get pvc "${pvc}" -n "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
-    if [[ "${phase}" == "Bound" ]]; then
-      echo "PVC ${ns}/${pvc} is Bound"
-      return 0
-    fi
-    sleep 5
-  done
-
-  echo "ERROR: PVC ${ns}/${pvc} did not bind" >&2
-  oc describe pvc "${pvc}" -n "${ns}" >&2 || true
-  return 1
+  echo "Created PVC ${ns}/${pvc} (bind deferred until copy-pod consumer)"
 }
 
 servicemesh_ensure_kubeconfig_secret() {
@@ -139,6 +126,40 @@ servicemesh_wait_pod_running() {
 
   echo "ERROR: timed out waiting for pod ${ns}/${pod}" >&2
   oc describe pod "${pod}" -n "${ns}" >&2 || true
+  oc describe pvc -n "${ns}" >&2 || true
+  return 1
+}
+
+# Wait until no VolumeAttachment remains for the PVC's PV (EBS Multi-Attach risk).
+servicemesh_wait_volume_detached() {
+  local ns="$1"
+  local pvc="$2"
+  local timeout_s="${3:-300}"
+  local interval=5
+  local elapsed=0
+  local pv attachments
+
+  pv="$(oc get pvc "${pvc}" -n "${ns}" -o jsonpath='{.spec.volumeName}' 2>/dev/null || true)"
+  if [[ -z "${pv}" ]]; then
+    echo "PVC ${ns}/${pvc} has no bound PV yet; nothing to detach"
+    return 0
+  fi
+
+  echo "Waiting for VolumeAttachments of PV ${pv} to clear..."
+  while (( elapsed < timeout_s )); do
+    attachments="$(oc get volumeattachment -o custom-columns=NAME:.metadata.name,PV:.spec.source.persistentVolumeName --no-headers 2>/dev/null \
+      | awk -v pv="${pv}" '$2 == pv { print $1 }' || true)"
+    if [[ -z "${attachments}" ]]; then
+      echo "VolumeAttachments cleared for PV ${pv}"
+      return 0
+    fi
+    sleep "${interval}"
+    elapsed=$((elapsed + interval))
+  done
+
+  echo "ERROR: VolumeAttachments still present for PV ${pv} after ${timeout_s}s:" >&2
+  echo "${attachments}" >&2
+  oc get volumeattachment >&2 || true
   return 1
 }
 
@@ -147,6 +168,7 @@ servicemesh_fill_workdir_pvc() {
   local pvc="${2:-${MAISTRA_WORKDIR_PVC}}"
   local copy_pod="${3:-${MAISTRA_COPY_POD}}"
   local image="${4:-${MAISTRA_BUILDER_IMAGE}}"
+  local pvc_phase
 
   if [[ -z "${image}" ]]; then
     echo "ERROR: MAISTRA_BUILDER_IMAGE is required to fill the workdir PVC" >&2
@@ -154,7 +176,9 @@ servicemesh_fill_workdir_pvc() {
   fi
 
   oc delete pod "${copy_pod}" -n "${ns}" --ignore-not-found --wait=true >/dev/null 2>&1 || true
+  servicemesh_wait_volume_detached "${ns}" "${pvc}" 120 || true
 
+  # Create the consumer first so WaitForFirstConsumer StorageClasses can bind.
   oc apply -n "${ns}" -f - <<EOF
 apiVersion: v1
 kind: Pod
@@ -181,12 +205,22 @@ EOF
 
   servicemesh_wait_pod_running "${ns}" "${copy_pod}" 600
 
+  pvc_phase="$(oc get pvc "${pvc}" -n "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+  echo "PVC ${ns}/${pvc} phase after copy-pod Running: ${pvc_phase:-unknown}"
+  if [[ "${pvc_phase}" != "Bound" ]]; then
+    echo "ERROR: PVC ${ns}/${pvc} is not Bound after copy-pod is Running" >&2
+    oc describe pvc "${pvc}" -n "${ns}" >&2 || true
+    oc describe pod "${copy_pod}" -n "${ns}" >&2 || true
+    return 1
+  fi
+
   echo "Copying source checkout into ${ns}/${copy_pod}:/work/ ..."
   # Trailing /. copies directory contents into dest.
   oc cp ./. "${ns}/${copy_pod}:/work/"
 
   echo "Deleting copy pod ${ns}/${copy_pod} to release RWO volume..."
   oc delete pod "${copy_pod}" -n "${ns}" --wait=true
+  servicemesh_wait_volume_detached "${ns}" "${pvc}" 300
   echo "Workdir PVC ${ns}/${pvc} filled"
 }
 
