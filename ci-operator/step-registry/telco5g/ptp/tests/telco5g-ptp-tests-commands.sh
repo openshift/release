@@ -6,23 +6,27 @@ set -o errexit
 set -o pipefail
 
 get_ci_images() {
+  # Prefer RELEASE_IMAGE_LATEST (CI registry) over cluster desired.image, which on
+  # telco lab clusters is often a local mirror (sslip.io) the test pod cannot trust.
+  local release_image
+  release_image="${RELEASE_IMAGE_LATEST:-}"
+  if [[ -z "${release_image}" ]]; then
+    release_image=$(oc get clusterversion version -o jsonpath='{.status.desired.image}')
+  fi
+
   if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
     export IMG="${PTP_OPERATOR_IMAGE:?PTP_OPERATOR_IMAGE not set by ci-operator dependency}"
     export DAEMON_IMG="${PTP_DAEMON_IMAGE:?PTP_DAEMON_IMAGE not set by ci-operator dependency}"
-    local release_image
-    release_image=$(oc get clusterversion version -o jsonpath='{.status.desired.image}')
-    SIDECAR_IMG=$(oc adm release info "${release_image}" --image-for=cloud-event-proxy)
-    export SIDECAR_IMG
   else
-    local release_image
-    release_image=$(oc get clusterversion version -o jsonpath='{.status.desired.image}')
     IMG=$(oc adm release info "${release_image}" --image-for=ptp-operator)
     export IMG
     DAEMON_IMG=$(oc adm release info "${release_image}" --image-for=ptp)
     export DAEMON_IMG
-    SIDECAR_IMG=$(oc adm release info "${release_image}" --image-for=cloud-event-proxy)
-    export SIDECAR_IMG
   fi
+  SIDECAR_IMG=$(oc adm release info "${release_image}" --image-for=cloud-event-proxy)
+  export SIDECAR_IMG
+
+  echo "[INFO] release_image=${release_image}"
   echo "[INFO] IMG=${IMG}"
   echo "[INFO] DAEMON_IMG=${DAEMON_IMG}"
   echo "[INFO] SIDECAR_IMG=${SIDECAR_IMG}"
