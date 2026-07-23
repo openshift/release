@@ -34,28 +34,28 @@ github_app_token() {
 }
 
 load_secrets() {
+    # Disable command tracing to prevent leaking credentials in logs
+    # and restore it after the secrets are loaded
     trap 'set -x' RETURN
     set +x
 
     echo "Loading secrets..."
     if [ -f "${GITHUB_APP_ID_PATH}" ] && [ -f "${GITHUB_KEY_PATH}" ]; then
-        local github_app_jwt
-        github_app_jwt="$(gh-token generate \
+        GITHUB_APP_JWT="$(gh-token generate \
             --app-id "$(< "${GITHUB_APP_ID_PATH}")" \
             --key "${GITHUB_KEY_PATH}" \
             --jwt \
             --token-only)"
-        if [ -z "${github_app_jwt}" ]; then
+        if [ -z "${GITHUB_APP_JWT}" ]; then
             echo "ERROR: Failed to generate GitHub App JWT"
             return 1
         fi
 
-        GITHUB_TOKEN="$(github_app_token "${github_app_jwt}" openshift/lvm-operator)"
-        if [ -z "${GITHUB_TOKEN}" ] || [ "${GITHUB_TOKEN}" = "null" ]; then
+        GITHUB_TOKEN_LVM="$(github_app_token "${GITHUB_APP_JWT}" openshift/lvm-operator)"
+        if [ -z "${GITHUB_TOKEN_LVM}" ] || [ "${GITHUB_TOKEN_LVM}" = "null" ]; then
             echo "ERROR: Failed to generate installation access token for openshift/lvm-operator"
             return 1
         fi
-        export GITHUB_TOKEN
 
         echo "GitHub token generated."
     else
@@ -154,6 +154,9 @@ configure_claude
 SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/lvms-ci"
 cd "${SRC_DIR}"
+
+# Configure the GitHub token for lvm-operator repo operations
+{ set +x; export GITHUB_TOKEN="${GITHUB_TOKEN_LVM}"; set -x; }
 
 # Run analysis on all releases.
 # Time-box analysis and limit turns to avoid uncontrolled billable minutes.
