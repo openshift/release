@@ -142,13 +142,16 @@ def _controller_rbac(gendoc):
     for private in (False, True):
         for arch in config.arches:
             namespace = f'{config.rpc_release_namespace}{config.get_suffix(arch, private)}'
-            _namespaced_rbac_resources(gendoc, namespace)
+            _namespaced_releasepayloads_rbac_resources(gendoc, namespace)
+
+            namespace = f'{gendoc.context.jobs_namespace}{config.get_suffix(arch, private)}'
+            _namespaced_jobs_rbac_resources(gendoc, namespace)
 
     # OKD Resources
-    _namespaced_rbac_resources(gendoc, 'origin')
+    _namespaced_releasepayloads_rbac_resources(gendoc, 'origin')
 
 
-def _namespaced_rbac_resources(gendoc, namespace):
+def _namespaced_releasepayloads_rbac_resources(gendoc, namespace):
     config = gendoc.context.config
 
     gendoc.add_comments(f'These RBAC resources allow the release-payload-controller to update ReleasePayloads in the {namespace} namespace.')
@@ -165,6 +168,47 @@ def _namespaced_rbac_resources(gendoc, namespace):
                     'apiGroups': ['release.openshift.io'],
                     'resources': ['releasepayloads', 'releasepayloads/status'],
                     'verbs': ['get', 'list', 'watch', 'update']
+                },
+            ]
+        },
+        {
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
+            'kind': 'RoleBinding',
+            'metadata': {
+                'name': 'release-payload-controller',
+                'namespace': namespace
+            },
+            'roleRef': {
+                'apiGroup': 'rbac.authorization.k8s.io',
+                'kind': 'Role',
+                'name': 'release-payload-controller'
+            },
+            'subjects': [{
+                'kind': 'ServiceAccount',
+                'name': 'release-payload-controller',
+                'namespace': config.rc_deployment_namespace
+            }]
+        },
+    ])
+
+
+def _namespaced_jobs_rbac_resources(gendoc, namespace):
+    config = gendoc.context.config
+
+    gendoc.add_comments(f'These RBAC resources allow the release-payload-controller to watch pods in the {namespace} namespace.')
+    gendoc.append_all([
+        {
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
+            'kind': 'Role',
+            'metadata': {
+                'name': 'release-payload-controller',
+                'namespace': namespace
+            },
+            'rules': [
+                {
+                    'apiGroups': [''],
+                    'resources': ['pods'],
+                    'verbs': ['get', 'list', 'watch']
                 },
             ]
         },
