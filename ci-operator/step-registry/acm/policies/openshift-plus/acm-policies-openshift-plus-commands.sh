@@ -31,7 +31,7 @@ typeset -a secondaryPoliciesArr=(
   policy-quay-status
 )
 
-if [[ "${IGNORE_SECONDARY_POLICIES}" == "true" ]]; then
+if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
   typeset criticalPolicies=''
   criticalPolicies=$(oc get policies -n policies -o name | grep -Ev "$(IFS='|'; echo "${secondaryPoliciesArr[*]}")" || true)
 
