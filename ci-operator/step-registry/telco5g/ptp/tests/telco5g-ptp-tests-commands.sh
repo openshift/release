@@ -14,17 +14,24 @@ get_ci_images() {
     release_image=$(oc get clusterversion version -o jsonpath='{.status.desired.image}')
   fi
 
+  # Same pattern as telco5g-origin-tests: cluster pull-secret has CI registry auth.
+  local pull_secret
+  pull_secret="$(mktemp)"
+  oc get secret pull-secret -n openshift-config -o jsonpath="{.data['\.dockerconfigjson']}" \
+    | base64 --decode > "${pull_secret}"
+
   if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
     export IMG="${PTP_OPERATOR_IMAGE:?PTP_OPERATOR_IMAGE not set by ci-operator dependency}"
     export DAEMON_IMG="${PTP_DAEMON_IMAGE:?PTP_DAEMON_IMAGE not set by ci-operator dependency}"
   else
-    IMG=$(oc adm release info "${release_image}" --image-for=ptp-operator)
+    IMG=$(oc adm release info --registry-config "${pull_secret}" "${release_image}" --image-for=ptp-operator)
     export IMG
-    DAEMON_IMG=$(oc adm release info "${release_image}" --image-for=ptp)
+    DAEMON_IMG=$(oc adm release info --registry-config "${pull_secret}" "${release_image}" --image-for=ptp)
     export DAEMON_IMG
   fi
-  SIDECAR_IMG=$(oc adm release info "${release_image}" --image-for=cloud-event-proxy)
+  SIDECAR_IMG=$(oc adm release info --registry-config "${pull_secret}" "${release_image}" --image-for=cloud-event-proxy)
   export SIDECAR_IMG
+  rm -f "${pull_secret}"
 
   echo "[INFO] release_image=${release_image}"
   echo "[INFO] IMG=${IMG}"
