@@ -10,6 +10,10 @@ slot_manager_args=(
     --shared-dir "${SHARED_DIR}"
 )
 
+if [[ -n "${CLUSTER_PROFILE_DIRS:-}" ]]; then
+    slot_manager_args+=(--cluster-profile-dirs "${CLUSTER_PROFILE_DIRS}")
+fi
+
 if [[ -n "${ALLOWED_SUBSCRIPTIONS:-}" ]]; then
     slot_manager_args+=(--allowed-subscriptions "${ALLOWED_SUBSCRIPTIONS}")
 fi
