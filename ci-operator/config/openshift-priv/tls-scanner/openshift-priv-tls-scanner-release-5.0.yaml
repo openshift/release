@@ -89,6 +89,28 @@ tests:
     test:
     - ref: tls-scanner-run
     workflow: openshift-e2e-aws-ovn-tls-13
+- as: periodic-tls13-adherence
+  interval: 72h
+  reporter_config:
+    channel: '#forum-case'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :warning:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      PQC_CHECK: "false"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-aws-ovn-tls-13
 - as: tls13-pqc-readiness
   optional: true
   steps:
