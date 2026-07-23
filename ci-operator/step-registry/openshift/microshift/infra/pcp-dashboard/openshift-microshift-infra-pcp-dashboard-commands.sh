@@ -31,7 +31,6 @@ fi
 echo "Generating PCP dashboard..."
 bash "${PCP_SCRIPTS}/generate-dashboard.sh" \
     --local "${LOCAL_ARTIFACTS}" \
-    --title "Test PCP" \
     --output "${ARTIFACT_DIR}/custom-link-pcp.html"
 
 rm -rf "${LOCAL_ARTIFACTS}"
