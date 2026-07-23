@@ -78,9 +78,33 @@ tests:
     - ref: quay-tests-resource-provisioning-builder
     - ref: quay-tests-quay-deploy-operator
     - ref: quay-tests-quay-deploy-registry-builder
-    - ref: quay-tests-test-quay-api
     - ref: quay-tests-test-quay-newui
-    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay318-ocp422-baremetal-builder
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: c5n.metal
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-22@sha256:dc85edf1095b3be72cf2a3f4e727857944c0538d56face1f3b96700dc0846053
+      NEW_UI_TESTING_COVERAGE: builder
+      ODF_OPERATOR_CHANNEL: stable-4.21
+      QUAY_BUILDER_IMAGE: image-rbac-proxy.apps.stone-prd-rh01.pg1f.p1.openshiftapps.com/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-18@sha256:a2f8c1dfcb5f9b5f6defc69e3c77172c63d2977890123dc2803918540f02ac7c
+      QUAY_BUILDER_WORKER_IMAGE: quay.io/quay-qetest/quaybuild
+      QUAY_BUILDER_WORKER_TAG: latest
+      QUAY_OLD_UI_DISABLED: "true"
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.18"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-resource-provisioning-tls
+    - ref: quay-tests-resource-provisioning-baremetal-builder
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-builder
+    - ref: quay-tests-test-quay-newui
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: quay-e2e-tests-quay318-ocp422-azure
   cron: '@yearly'
