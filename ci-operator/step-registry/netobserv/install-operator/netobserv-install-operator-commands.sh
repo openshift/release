@@ -6,9 +6,9 @@ set -o pipefail
 set -x
 
 install_jq() {
-  local jq_version
-  jq_version=$(curl -s https://api.github.com/repos/jqlang/jq/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
-  curl -sSfL "https://github.com/jqlang/jq/releases/download/${jq_version}/jq-linux-amd64" -o /tmp/jq
+  # Use GitHub's latest/download redirect instead of parsing the releases API JSON
+  # (grep|cut on tag_name breaks on single-line JSON and caused 404s in CI).
+  curl -sSfL "https://github.com/jqlang/jq/releases/latest/download/jq-linux-amd64" -o /tmp/jq
   chmod u+x /tmp/jq
   export PATH=${PATH}:/tmp
 }
