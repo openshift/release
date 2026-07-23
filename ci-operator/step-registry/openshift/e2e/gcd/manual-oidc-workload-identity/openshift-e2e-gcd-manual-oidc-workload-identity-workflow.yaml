@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-e2e-gcd-manual-oidc-workload-identity
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      TEST_SKIPS: >-
+        CSRs from machines that are not recognized by the cloud provider are not approved
+    pre:
+    - chain: ipi-gcd-pre-manual-oidc-workload-identity
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-gcp-post
+    - ref: ipi-conf-gcp-oidc-creds-deprovision
+    - ref: gcp-deprovision-bastionhost
+    - ref: gcp-deprovision-vpc
+  documentation: |-
+    The OpenShift E2E GCD manual OIDC workflow executes the common
+    end-to-end test suite on a private cluster on Google Cloud Dedicated
+    with manual OIDC workload identity credentials provisioned by ccoctl.
