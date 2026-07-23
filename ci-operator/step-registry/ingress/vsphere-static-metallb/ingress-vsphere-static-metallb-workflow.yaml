@@ -1,0 +1,20 @@
+
+workflow:
+  as: ingress-vsphere-static-metallb
+  steps:
+    pre:
+    - chain: ipi-vsphere-pre-staticip
+    - ref: ingress-metallb-conf
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-vsphere-post
+  documentation: |-
+    The ingress-vsphere-static-metallb workflow provides pre- and post- steps that provision and
+    deprovision an OpenShift cluster on vSphere with static IP addresses and MetalLB configured,
+    allowing job authors to inject their own ingress-related test logic for MetalLB scenarios.
+    This workflow uses the ipi-vsphere-pre-staticip chain to set up a vSphere cluster with
+    static IP assignment, then configures MetalLB operator with IP addresses allocated from
+    the free IP range in the vSphere subnet (indices #40-49, 10 IPs). The MetalLB IP pool is
+    dynamically configured based on the actual subnet allocation to avoid conflicts with cluster
+    nodes, VIPs, and the IPAM pool.

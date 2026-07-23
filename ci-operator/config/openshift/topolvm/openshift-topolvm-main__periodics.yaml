@@ -1,0 +1,48 @@
+base_images:
+  rebasebot:
+    name: rebasebot
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rebasebot
+  cron: 0 23 * * 1-5
+  steps:
+    test:
+    - as: rebasebot
+      commands: |
+        rebasebot --source https://github.com/topolvm/topolvm:main \
+                  --dest openshift/topolvm:main \
+                  --rebase openshift/topolvm-rebase:rebase-bot-main \
+                  --github-app-id 966050 \
+                  --github-app-key /secrets/lvms/rebase-bot/edge-enablement-team-rebase-bot-key \
+                  --github-cloner-key /secrets/lvms/rebase-bot/edge-enablement-team-cloner-bot-key \
+                  --github-cloner-id 966053 \
+                  --git-username edge-enablement-team-rebase-bot \
+                  --git-email openshift-edge-enablement@redhat.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/lvms/rebase-bot
+        name: lvms-rebase-bot-creds
+        namespace: test-credentials
+      from_image:
+        name: rebasebot
+        namespace: ci
+        tag: latest
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: topolvm
+  variant: periodics

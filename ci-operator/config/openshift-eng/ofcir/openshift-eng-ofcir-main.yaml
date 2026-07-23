@@ -1,0 +1,82 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/ofcir
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: ofcir
+  - dockerfile_literal: |
+      FROM base-build
+      COPY . .
+    inputs:
+      dev-scripts:
+        as:
+        - base-build
+      src:
+        paths:
+        - destination_dir: ./ofcir
+          source_path: /go/src/github.com/openshift/ofcir/.
+    to: ofcir-tests-base
+promotion:
+  to:
+  - excluded_images:
+    - ofcir-tests-base
+    name: test
+    namespace: ocp-kni
+    tag_by_commit: true
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  dnf install -y libvirt-devel
+tests:
+- always_run: true
+  as: e2e-tests
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    post:
+    - ref: ofcir-release
+    pre:
+    - ref: ofcir-acquire
+    test:
+    - as: test
+      commands: |
+        ./ofcir/hack/ci-e2e-test.sh
+      from: ofcir-tests-base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: unit
+  commands: |
+    XDG_CACHE_HOME="/tmp/cache" \
+    GOCACHE="/tmp/cache" \
+    GOFLAGS="-mod=readonly" \
+    make unit-tests
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ofcir

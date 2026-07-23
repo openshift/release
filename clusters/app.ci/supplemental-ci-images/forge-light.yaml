@@ -1,0 +1,85 @@
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: forge-light
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_forge-light_latest
+  source:
+    dockerfile: |
+      # synchronized on 2026-04-13 from openshift-psap/forge:projects/core/image/Containerfile.lightweight
+      FROM quay.io/centos/centos:stream10
+
+      MAINTAINER Perf&Scale PSAP Team <team-psap@redhat.com>
+
+      LABEL     io.k8s.display-name="OpenShift PSAP FORGE lightweight image" \
+                io.k8s.description="A lightweight image for running FORGE in a remote host" \
+                name="forge" \
+                url="https://github.com/openshift-psap/forge"
+
+      RUN dnf install -y --quiet \
+            git jq vim wget curl rsync time file psmisc procps ca-certificates \
+            python3 python3-pip python3-setuptools \
+          && dnf clean all \
+          && rm -rf /var/cache/yum
+
+      # Install OpenShift CLI (oc)
+      RUN curl -LO "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" && \
+          tar -xzf openshift-client-linux.tar.gz && \
+          chmod +x oc && \
+          mv oc /usr/local/bin/ && \
+          rm -f openshift-client-linux.tar.gz kubectl
+
+      COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+      ARG APP_NAME=forge
+      ARG APP_HOME=/app/forge
+
+      # Set up the runner user
+      ENV USER_NAME=${APP_NAME} \
+          USER=${APP_NAME} \
+          HOME=${APP_HOME} \
+          FORGE_LIGHT_IMAGE="true"
+
+      ENV PYTHONPATH=$HOME
+
+      WORKDIR ${APP_HOME}
+
+      RUN git clone https://github.com/openshift-psap/forge/ $HOME
+
+      RUN chgrp -R 0 "$HOME" && chmod -R g=u "$HOME"
+
+      # Install Python requirements
+
+      # Optimize uv for container environments
+      ENV UV_COMPILE_BYTECODE=1
+      ENV UV_SYSTEM_PYTHON=1
+
+      # Set environment variables
+      ENV PYTHONPATH=${APP_HOME} \
+          PYTHONUNBUFFERED=1 \
+          FORGE_HOME=${APP_HOME}
+
+      RUN cp projects/core/image/pyproject-lightweight.toml pyproject.toml
+      RUN uv lock
+      RUN uv pip install --system -r pyproject.toml
+
+      CMD ["bash"]
+
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: DockerImage
+        name: quay.io/centos/centos:stream10
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+  - type: ConfigChange

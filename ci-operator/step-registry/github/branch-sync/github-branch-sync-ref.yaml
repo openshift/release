@@ -1,0 +1,38 @@
+ref:
+  as: github-branch-sync
+  from: dev-scripts
+  commands: github-branch-sync-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+    - namespace: test-credentials
+      name: openshift-pr-manager-app-private-key
+      mount_path: /secrets/openshift-ovnk-bot
+  timeout: 15m0s
+  grace_period: 1m0s
+  env:
+    - name: SOURCE_BRANCH
+      default: ""
+      documentation: |-
+        The branch to merge from
+    - name: TARGET_BRANCH
+      default: ""
+      documentation: |-
+        The branch to merge to
+    - name: REPO
+      default: ""
+      documentation: |-
+        The downstream repo to merge in to
+    - name: GITHUB_APP_ID
+      default: "1460951"
+      documentation: |-
+        The GitHub App ID needed to create the install token which is used to make API requests.
+        https://github.com/settings/apps/openshift-pr-manager
+    - name: GITHUB_APP_PRIVATE_KEY_FILE
+      default: "/secrets/openshift-ovnk-bot/openshift-pr-manager-app-private-key"
+      documentation: |-
+        The name of the file containing the GitHub App private key needed to create an API Token.
+  documentation: |-
+    Check if a "Branch Sync [MM-DD-YYYY]" PR is needed, and create one if so.

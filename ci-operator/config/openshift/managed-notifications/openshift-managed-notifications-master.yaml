@@ -1,0 +1,43 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.25-openshift-4.23
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: validate
+  commands: make validate
+  container:
+    from: src
+- as: checklinks-severity
+  commands: make checkseverity
+  container:
+    from: src
+- as: checklinks-pr
+  commands: make checklinks
+  container:
+    from: src
+  optional: true
+- as: checklinks-weekly
+  commands: make checklinks
+  container:
+    from: src
+  cron: 0 0 * * 4
+  reporter_config:
+    channel: '#alerts-sd-docs-prs'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      Weekly check-links job has found broken URLs in <https://github.com/openshift/managed-notifications|Managed Notifications repository>.
+      To see list of broken URLs, <{{.Status.URL}}|see log>.
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: managed-notifications

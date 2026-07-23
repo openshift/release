@@ -1,0 +1,20 @@
+workflow:
+  as: cucushift-hypershift-extended-capacity-reservation
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-provision
+    - chain: cucushift-hypershift-extended-install-private
+    - chain: hypershift-aws-create
+    - ref: cucushift-hypershift-extended-capacity-reservation-create
+    - ref: hypershift-aws-create-nodepool
+    - ref: cucushift-hypershift-extended-enable-guest
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    post:
+    - ref: cucushift-hypershift-extended-disable-guest
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-deprovision
+    - ref: cucushift-hypershift-extended-capacity-reservation-cancel
+    - ref: send-results-to-reportportal
+  documentation: |-
+    This workflow creates capacity reservation instances for nodepool using, and later to cancel the capacity reservation.

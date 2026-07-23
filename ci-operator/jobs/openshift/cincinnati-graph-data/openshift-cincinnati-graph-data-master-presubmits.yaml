@@ -1,0 +1,402 @@
+presubmits:
+  openshift/cincinnati-graph-data:
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cincinnati-graph-data-master-e2e
+    rerun_command: /test e2e
+    run_if_changed: internal-channels/candidate.yaml|graph-data.rs/.*
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=e2e
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/e2e-latest-cincinnati
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cincinnati-graph-data-master-e2e-latest-cincinnati
+    optional: true
+    rerun_command: /test e2e-latest-cincinnati
+    run_if_changed: internal-channels/candidate.yaml
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-latest-cincinnati
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-latest-cincinnati,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cincinnati-graph-data-master-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/stabilization-bot-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cincinnati-graph-data-master-stabilization-bot-tests
+    rerun_command: /test stabilization-bot-tests
+    run_if_changed: hack/(stabilization-changes|util).py
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=stabilization-bot-tests
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )stabilization-bot-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/validate-blocked-edges
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cincinnati-graph-data-master-validate-blocked-edges
+    rerun_command: /test validate-blocked-edges
+    run_if_changed: hack/validate-blocked-edges.py|blocked-edges/.*
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=validate-blocked-edges
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )validate-blocked-edges,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/validate-release
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cincinnati-graph-data-master-validate-release
+    rerun_command: /test validate-release
+    run_if_changed: internal-channels/candidate.yaml
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=validate-release
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )validate-release,?($|\s.*)

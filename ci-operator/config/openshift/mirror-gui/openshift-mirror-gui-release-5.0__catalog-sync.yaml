@@ -1,0 +1,108 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci-operator/build-root/Dockerfile
+images:
+  items:
+  - dockerfile_path: Dockerfile.catalog-sync
+    to: synced-catalog-data
+  - dockerfile_path: Dockerfile
+    inputs:
+      synced-catalog-data:
+        paths:
+        - destination_dir: .
+          source_path: /app/catalog-data-synced
+    to: mirror-gui
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: catalog-sync-verify
+  steps:
+    test:
+    - as: catalog-sync-verify
+      commands: |
+        set -euo pipefail
+        export PULL_SECRET_PATH=/var/run/secrets/ci-pull-credentials/.dockerconfigjson
+        export CATALOG_DATA_DIR=/tmp/catalog-data
+        export MAX_PARALLEL_JOBS=3
+        cd /app
+        ./sync-catalogs.sh
+        echo "--- Verification ---"
+        cat /tmp/catalog-data/catalog-index.json
+        CATALOG_COUNT=$(jq -r 'if (.catalogs | type) == "array" then (.catalogs | length) else 0 end' /tmp/catalog-data/catalog-index.json)
+        echo "Synced catalog entries: $CATALOG_COUNT"
+        if [ "$CATALOG_COUNT" -lt 1 ]; then
+          echo "ERROR: No catalogs synced"
+          exit 1
+        fi
+      credentials:
+      - mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: ci
+      from: mirror-gui
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: catalog-data-freshness
+  steps:
+    test:
+    - as: catalog-data-freshness
+      commands: |
+        set -euo pipefail
+        cd /app
+        echo "=== Verifying baked-in catalog data is from build (not git) ==="
+        INDEX=./catalog-data/catalog-index.json
+        if [ ! -f "$INDEX" ]; then
+          echo "ERROR: catalog-index.json not found in image"
+          exit 1
+        fi
+        cat "$INDEX"
+        CATALOG_COUNT=$(jq '.catalogs | length' "$INDEX")
+        echo "Baked-in catalog entries: $CATALOG_COUNT"
+        if [ "$CATALOG_COUNT" -lt 18 ]; then
+          echo "ERROR: Expected 18 catalogs, got $CATALOG_COUNT"
+          exit 1
+        fi
+        FROM_BUILD_COUNT=$(jq '[.catalogs[] | select(.digest == "from-build")] | length' "$INDEX")
+        echo "Entries with digest=from-build: $FROM_BUILD_COUNT"
+        if [ "$FROM_BUILD_COUNT" -lt 18 ]; then
+          echo "ERROR: Expected all 18 catalogs to have digest=from-build (got $FROM_BUILD_COUNT). Data may be from git, not from build."
+          exit 1
+        fi
+        TODAY=$(date -u +"%Y-%m-%d")
+        RECENT_COUNT=$(jq --arg today "$TODAY" '[.catalogs[] | select(.synced_at | startswith($today))] | length' "$INDEX")
+        echo "Entries synced today ($TODAY): $RECENT_COUNT"
+        if [ "$RECENT_COUNT" -lt 1 ]; then
+          echo "WARN: No catalogs have today's timestamp (may be stale or timezone difference)"
+        fi
+        echo "=== Catalog data freshness verified ==="
+      from: mirror-gui
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift
+  repo: mirror-gui
+  variant: catalog-sync

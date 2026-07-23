@@ -1,0 +1,127 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: build/Dockerfile
+    to: managed-upgrade-operator
+  - dockerfile_literal: |
+      FROM scratch
+      COPY deploy_pko/ /package/
+    to: operator-pko
+  - dockerfile_literal: |
+      FROM src
+      RUN CGO_ENABLED=0 go test ./test/e2e -v -c --tags=osde2e -o /usr/local/bin/e2e.test
+    from: src
+    to: operator-e2e
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 500Mi
+tests:
+- as: e2e-binary-build-success
+  commands: |
+    make e2e-binary-build
+  container:
+    from: src
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: managed-upgrade-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: managed-upgrade-operator-codecov-token
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: validate
+  commands: make validate
+  container:
+    from: src
+- as: rosa-sts-e2e
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:managed-upgrade-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      OPERATOR_CRDS: upgradeconfigs.upgrade.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: managed-upgrade-operator
+      OPERATOR_NAME: managed-upgrade-operator
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: rosa-sts-e2e-promotion-int
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:managed-upgrade-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      LEASE_ENV: integration
+      OPERATOR_CRDS: upgradeconfigs.upgrade.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: managed-upgrade-operator
+      OPERATOR_NAME: managed-upgrade-operator
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: rosa-sts-e2e-promotion-stage
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:managed-upgrade-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      LEASE_ENV: staging
+      OPERATOR_CRDS: upgradeconfigs.upgrade.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: managed-upgrade-operator
+      OPERATOR_NAME: managed-upgrade-operator
+    workflow: rosa-cluster-lease-e2e-workflow
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: managed-upgrade-operator

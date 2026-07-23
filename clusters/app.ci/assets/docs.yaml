@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: ci-docs
+spec:
+  selector:
+    app: ci-docs
+  ports:
+  - name: ci-docs
+    port: 8080
+  - name: cluster-display
+    port: 8090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: ci-docs
+  labels:
+    app: ci-docs
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: ci-docs
+  template:
+    metadata:
+      labels:
+        app: ci-docs
+    spec:
+      containers:
+      - name: ci-docs
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-docs_latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            memory: "250Mi"
+            cpu: "100m"
+      - args:
+        - --kubeconfig-dir=/etc/build-farm-credentials
+        - --kubeconfig-suffix=config
+        name: cluster-display
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_cluster-display_latest
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8090
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8090
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 600
+        resources:
+          requests:
+            memory: "250Mi"
+            cpu: "100m"
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: cluster-display
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          secretName: cluster-display

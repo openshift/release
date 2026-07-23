@@ -1,0 +1,85 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_5.0_base-rhel9:
+    name: "5.0"
+    namespace: ocp
+    tag: base-rhel9
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-5.0
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+  target:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-sno-y-stream-upgrade
+  cron: 0 8 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_CATALOG_SOURCE: redhat-operators
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_PACKAGE: lvms-operator
+      LVM_OPERATOR_SUB_SOURCE: redhat-operators
+      LVMS_NAMESPACE: openshift-lvm-storage
+      REDHAT_OPERATORS_INDEX_TAG: v4.22
+      STORAGE_WORKLOAD_COUNT: "3"
+      TARGET_LVMS_CHANNEL: stable-5.0
+      TARGET_LVMS_SOURCE: lvm-catalogsource
+    test:
+    - ref: storage-data-create
+    - chain: openshift-upgrade-qe-sanity
+    - ref: lvms-upgrade
+    - ref: storage-data-check
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
+- as: e2e-aws-mno-y-stream-upgrade
+  cron: 0 8 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_CATALOG_SOURCE: redhat-operators
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_PACKAGE: lvms-operator
+      LVM_OPERATOR_SUB_SOURCE: redhat-operators
+      LVMS_NAMESPACE: openshift-lvm-storage
+      REDHAT_OPERATORS_INDEX_TAG: v4.22
+      STORAGE_WORKLOAD_COUNT: "3"
+      TARGET_LVMS_CHANNEL: stable-5.0
+      TARGET_LVMS_SOURCE: lvm-catalogsource
+    test:
+    - ref: storage-data-create
+    - chain: openshift-upgrade-qe-sanity
+    - ref: lvms-upgrade
+    - ref: storage-data-check
+    workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: lvm-operator
+  variant: nightly-upgrade

@@ -1,0 +1,78 @@
+ref:
+  as: baremetal-lab-agent-day2
+  cli: latest
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: baremetal-lab-agent-day2-commands.sh
+  resources:
+    requests:
+      cpu: '1'
+      memory: 128Mi
+  grace_period: 60
+  env:
+    - name: BOOT_MODE
+      default: "iso"
+      documentation: |-
+        The boot mode to use for the installation. Valid values are "iso" and "pxe".
+    - name: INTERNAL_NET_IP
+      default: "192.168.80.1"
+      documentation: ""
+    - name: INTERNAL_NET_CIDR
+      default: "192.168.80.0/22"
+      documentation: ""
+    - name: architecture
+      default: ""
+      documentation: ""
+    - name: ipv4_enabled
+      default: "true"
+      documentation: "Whether to enable the ipv4 stack"
+    - name: ipv6_enabled
+      default: "true"
+      documentation: "Whether to enable the ipv6 stack"
+    - name: masters
+      default: "3"
+      documentation: ""
+    - name: workers
+      default: "2"
+      documentation: ""
+    - name: AUX_HOST
+      default: ""
+      documentation: ""
+    - name: DISCONNECTED
+      default: "false"
+    - name: ADDITIONAL_WORKER_ARCHITECTURE
+      default: "aarch64"
+      documentation: "Heterogeneous worker architecture, default set to arm64(aarch64)"
+    - name: AGENT_PLATFORM_TYPE
+      default: ""
+      documentation: |-
+        The platform type to use for the installation. Valid values are "none" and "" (baremetal). Default is "".
+    - name: ADDITIONAL_WORKERS
+      default: "0"
+      documentation: |
+        Number of additional workers. When testing multi-arch compute nodes clusters, this should be set to the desired
+        number of additional workers for the non-default architecture to add to the cluster. This can only work with
+        payload images that support multi-arch.
+    - name: ADDITIONAL_WORKERS_DAY2
+      default: "true"
+      documentation: |
+        Whether to add (power on) the additional workers after the cluster is installed. And the default value is "true"
+        when ADDITIONAL_WORKERS > 0, "false" is not supported in ABI. This is useful for testing multi-arch compute node
+        clusters as a real day2 operation and is especially important for testing single-architectures clusters based on
+        single-architecture payloads migrating to a multi-arch payload.
+    - name: AGENT_BM_HOSTS_IN_INSTALL_CONFIG
+      default: "false"
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    The baremetal-lab-agent-day2 will provision a baremetal cluster using the agent installer, given the configuration assets
+    prepared in the earlier steps.
+    The minimum requirement for this step to work is to run it after the chain baremetal-lab-agent-conf.
+    Users that want implement their specific installation configuration should implement workflows that execute
+    (1) the baremetal-lab-agent-conf(-*) chain,
+    (2) a set of custom chains/steps to either patch the nodes-config.yaml that will be included in install-dir/manifests,
+    to be consumed by the installer,
+    (3) the baremetal-lab-agent-day2 step.

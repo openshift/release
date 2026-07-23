@@ -1,0 +1,67 @@
+workflow:
+  as: nvidia-gpu-operator-e2e-aws
+  steps:
+    pre:
+      - chain: ipi-conf-aws
+      - ref: ipi-conf-aws-secureboot
+      - chain: ipi-install
+    test:
+      - ref: aws-secureboot-verify
+      - ref: nvidia-gpu-operator-merge-stage-credentials
+      - as: gpu-operator-e2e
+        commands: make run-tests
+        from: nvidia-ci
+        resources:
+          requests:
+            cpu: 2000m
+            memory: 2Gi
+        env:
+          - name: NVIDIAGPU_CLEANUP
+            default: "false"
+            documentation: |-
+              Clean up installed operators on test completion. Is not needed when
+              the cluster will be destroyed after running the tests.
+          - name: NVIDIAGPU_DEPLOY_FROM_BUNDLE
+            default: "false"
+            documentation: |-
+              Deploy the NVIDIA GPU Operator from a bundle instead of an OLM catalog source.
+          - name: TEST_FEATURES
+            default: "nvidiagpu"
+            documentation: |-
+              The subset of tests to run.
+          - name: NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
+            default: ""
+            documentation: |-
+              The catalog source index image to use if the NFD operator
+              does not exist in the default catalog source.
+          - name: NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
+            default: ""
+            documentation: |-
+              The catalog source index image to use if the NVIDIA GPU operator
+              does not exist in the default catalog source.
+          - name: NVIDIAGPU_SUBSCRIPTION_CHANNEL
+            default: ""
+            documentation: |-
+              The OLM subscription channel for the NVIDIA GPU operator.
+              Latest if not specified.
+          - name: NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH
+            default: ""
+            documentation: |-
+              A JSON patch that if specified, will be applied to the default cluster policy from ALM examples.
+              The patch must be written according to RFC 6902, which is used with `kubectl patch` command.
+    post:
+      - ref: gather-must-gather
+      - ref: aws-deprovision-secureboot
+      - ref: ipi-deprovision-deprovision
+      - ref: aws-deprovision-users-and-policies
+      - ref: aws-deprovision-verification
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      CONTROL_PLANE_REPLICAS: "1"
+      CONTROL_PLANE_INSTANCE_TYPE: m5d.2xlarge
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: g4dn.xlarge
+  documentation: |-
+    This workflow provisions an OpenShift cluster on AWS suitable for installing the
+    NVIDIA GPU operator, and preforms E2E tests on the operator.

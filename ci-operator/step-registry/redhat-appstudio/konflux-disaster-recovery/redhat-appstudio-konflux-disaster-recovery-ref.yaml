@@ -1,0 +1,25 @@
+ref:
+  as: redhat-appstudio-konflux-disaster-recovery
+  cli: latest
+  commands: redhat-appstudio-konflux-disaster-recovery-commands.sh
+  credentials:
+  - mount_path: /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe
+    name: konflux-ci-secrets-new
+    namespace: test-credentials
+  dependencies:
+  - env: COMPONENT_IMAGE
+    # A placeholder for a component image tag. It's about to be overriden
+    # by an image built in application-service job, build-service job etc.
+    # It's not used in infra-deployments and e2e-tests PR jobs
+    name: "release:latest"
+  env:
+  - name: SKIP_BOOTSTRAP
+    default: "true"
+    documentation: Whether to skip konflux bootstrap before running E2E tests. Set to true because the DR workflow handles its own bootstrapping via BootstrapClusterForUpgrade.
+  - name: E2E_TEST_SUITE_LABEL
+    default: "disaster-recovery"
+    documentation: A label passed to ginkgo CLI to run only the disaster recovery E2E tests.
+  from: e2e-test-runner
+  resources:
+    requests:
+      cpu: 100m 

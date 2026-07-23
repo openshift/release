@@ -1,0 +1,35 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-update-console-plugin
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: ocp
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: yarn install --immutable && yarn build
+tests:
+- as: frontend
+  commands: ./test-frontend.sh
+  container:
+    from: test-bin
+  skip_if_only_changed: ^(README\.md|OWNERS|LICENSE|AGENTS\.md|CLAUDE\.md|\.gitignore)$
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift
+  repo: cluster-update-console-plugin

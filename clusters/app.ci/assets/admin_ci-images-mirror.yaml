@@ -1,0 +1,152 @@
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: ci-images-mirror
+  namespace: ci
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-images-mirror
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ci-images-mirror
+subjects:
+- kind: ServiceAccount
+  name: ci-images-mirror
+  namespace: ci
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-images-mirror
+rules:
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - '*'
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - "coordination.k8s.io"
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  labels:
+    app: ci-images-mirror
+  name: ci-images-mirror
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ci-images-mirror
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ci-images-mirror
+    spec:
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-images-mirror_latest
+        name: ci-images-mirror
+        imagePullPolicy: Always
+        args:
+        - --leader-election-namespace=ci
+        - --release-repo-git-sync-path=/var/repo/release
+        - --registry-config=/etc/push/.dockerconfigjson
+        - --config=/var/repo/release/core-services/image-mirroring/_config.yaml
+        ports:
+        - name: http
+          containerPort: 8090
+        - name: metrics
+          containerPort: 8080
+        volumeMounts:
+        - name: release
+          mountPath: /var/repo
+        - mountPath: "/etc/push"
+          name: push-credentials
+          readOnly: true
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+      serviceAccountName: ci-images-mirror
+      volumes:
+      - name: release
+        emptyDir: {}
+      - name: push-credentials
+        secret:
+          secretName: registry-push-credentials-ci-images-mirror
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: ci-images-mirror
+  name: ci-images-mirror
+  namespace: ci
+spec:
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: ci-images-mirror
+  podMetricsEndpoints:
+  - port: metrics
+    scheme: http
+    scrapeTimeout: 20s

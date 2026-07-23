@@ -1,0 +1,132 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+build_root:
+  from_repository: true
+images:
+  items:
+  - context_dir: base
+    dockerfile_path: Dockerfile.rhel
+    to: base
+  - context_dir: base
+    dockerfile_path: Dockerfile.rhel9
+    to: base-rhel9
+  - context_dir: ipfailover/keepalived
+    to: keepalived-ipfailover
+promotion:
+  to:
+  - excluded_images:
+    - base-rhel9
+    name: "5.0"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-upgrade-aws
+- as: unit
+  commands: go test -race ./...
+  container:
+    from: src
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: tests-extension
+  run_if_changed: ^(tests-extension/)
+  steps:
+    test:
+    - as: sanity
+      commands: |
+        cd tests-extension
+        make verify
+        make build
+        make verify-metadata
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- always_run: false
+  as: e2e-metal-ipi-tests-ext
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        cd tests-extension
+        make build
+        ./bin/ipfailover-tests-ext run-suite ipfailover/all --max-concurrency=1
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: baremetalds-e2e-ovn-ipv4
+- always_run: false
+  as: e2e-openstack-ipi-tests-ext
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        cd tests-extension
+        make build
+        ./bin/ipfailover-tests-ext run-suite ipfailover/all --max-concurrency=1
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+- always_run: false
+  as: e2e-vsphere-ovn-tests-ext
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        cd tests-extension
+        make build
+        ./bin/ipfailover-tests-ext run-suite ipfailover/all --max-concurrency=1
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere-ovn
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: images

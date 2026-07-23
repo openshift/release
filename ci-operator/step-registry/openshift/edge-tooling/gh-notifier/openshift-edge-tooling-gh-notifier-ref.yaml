@@ -1,0 +1,54 @@
+ref:
+  as: openshift-edge-tooling-gh-notifier
+  from_image:
+    namespace: ci
+    name: edge-tooling-ai-helpers
+    tag: latest
+  commands: openshift-edge-tooling-gh-notifier-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: pr-creds
+    mount_path: /var/run/pr-creds
+  - namespace: test-credentials
+    name: edge-tooling-ci-monitor-slack-webhook
+    mount_path: /var/run/slack-notifier/slack-webhooks
+  env:
+  - name: GITHUB_APP_ID_PATH
+    default: /var/run/pr-creds/app_id
+    documentation: Path to GitHub App ID file for gh-token.
+  - name: GITHUB_KEY_PATH
+    default: /var/run/pr-creds/key.pem
+    documentation: Path to GitHub App private key for gh-token.
+  - name: GITHUB_REPOS
+    default: openshift-eng/edge-tooling
+    documentation: |-
+      Comma- or whitespace-separated GitHub repositories to consider, each as org/repo (for example openshift/foo).
+      Optional; defaults to openshift-eng/edge-tooling.
+  - name: SLACK_WEBHOOK_SECRET_FILE
+    default: /var/run/slack-notifier/slack-webhooks/team-ocp-edge-notifications
+    documentation: |-
+      File containing Slack incoming webhook URL (plain text). Exported as SLACK_WEBHOOK_URL
+      for the notifier script if this file exists.
+  - name: EXCLUDE_LABELS
+    default: ""
+    documentation: |-
+      Comma- or semicolon-separated labels. If set, pull requests missing any of these labels are flagged. Optional;
+      empty means this check will default to, "do-not-merge/hold,do-not-merge/work-in-progress,wip,work in progress".
+  - name: REQUIRED_LABELS
+    default: ""
+    documentation: |-
+      Comma- or semicolon-separated labels. If set, pull requests missing any of these labels are flagged. Optional;
+      empty means this check is disabled.
+  - name: FORBIDDEN_LABELS
+    default: ""
+    documentation: |-
+      Comma- or semicolon-separated labels. If set, pull requests that have any of these labels are flagged. Optional;
+      empty means this check is disabled.
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  timeout: 30m0s
+  grace_period: 5m0s
+  documentation: |-
+    Runs gh-notifier a tool to notify about pull requests that need attention, see more in https://github.com/openshift-eng/edge-tooling/blob/main/gh-notifier/README.md.

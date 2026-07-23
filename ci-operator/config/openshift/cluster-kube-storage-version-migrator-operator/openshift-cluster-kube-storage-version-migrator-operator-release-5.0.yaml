@@ -1,0 +1,81 @@
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: images/ci/Dockerfile
+    to: cluster-kube-storage-version-migrator-operator
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 1Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-operator-disruptive
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      TEST_SUITE: openshift/cluster-kube-storage-version-migrator-operator/operator/disruptive
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp
+- as: e2e-gcp-operator
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      TEST_SUITE: openshift/cluster-kube-storage-version-migrator-operator/operator/parallel
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift
+  repo: cluster-kube-storage-version-migrator-operator

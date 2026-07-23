@@ -1,0 +1,46 @@
+binary_build_commands: export GOFLAGS=-mod=mod; OUT_DIR=/go/bin hack/build.sh
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-5.0
+images:
+  items:
+  - dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+      ADD validate-release /usr/local/bin/validate-release
+      ENTRYPOINT ["/usr/local/bin/validate-release"]
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/bin/validate-release
+    to: validate-release
+promotion:
+  to:
+  - namespace: cincinnati-ci-public
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  steps:
+    test:
+    - as: test
+      commands: |
+        export GOFLAGS=-mod=mod
+        make verify
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ota-tools

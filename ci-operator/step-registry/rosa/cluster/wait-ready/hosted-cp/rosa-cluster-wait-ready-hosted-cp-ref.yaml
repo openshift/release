@@ -1,0 +1,25 @@
+ref:
+  as: rosa-cluster-wait-ready-hosted-cp
+  from: rosa-aws-cli
+  grace_period: 10m
+  timeout: 30m
+  commands: rosa-cluster-wait-ready-hosted-cp-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for ocm login. The supported values are [production, staging, integration].
+  - name: HCP_READY_TIMEOUT
+    default: "1800"
+    documentation: Global timeout in seconds for all readiness checks. Default is 1800 (30 minutes).
+
+  documentation: |-
+    This step logs into the management cluster via OCM API and performs
+    readiness checks for a ROSA HCP cluster:
+    1. HostedCluster CR status in the HC namespace (ocm-<env>-<cluster_id>)
+    2. HostedControlPlane CR status in the HCP namespace (ocm-<env>-<cluster_id>-<cluster_name>)
+    3. All pods in the HCP namespace are running and ready
+    4. VpcEndpoint 'private-hcp' is healthy in the HCP namespace

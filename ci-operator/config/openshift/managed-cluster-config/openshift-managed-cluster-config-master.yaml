@@ -1,0 +1,35 @@
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.prow
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-check
+  commands: hack/pr_check.sh
+  container:
+    from: src
+- as: checklinks-pr
+  commands: make checklinks
+  container:
+    from: src
+  optional: true
+- as: checklinks-weekly
+  commands: make checklinks
+  container:
+    from: src
+  cron: 0 0 * * 3
+  reporter_config:
+    channel: '#alerts-sd-docs-prs'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      Weekly check-links job has found broken URLs in <https://github.com/openshift/managed-cluster-config|Managed Cluster Config repository >.
+      To see list of broken URLs, <{{.Status.URL}}|see log>.
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: managed-cluster-config

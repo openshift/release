@@ -1,0 +1,194 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src
+      WORKDIR /opt/app-root/src/rosa-service-log
+      USER root
+      RUN dnf install -y git make gcc jq && dnf clean all
+      RUN curl -fsSL https://go.dev/dl/go1.25.10.linux-amd64.tar.gz -o /tmp/go.tar.gz && \
+          tar -C /usr/local -xzf /tmp/go.tar.gz && \
+          rm /tmp/go.tar.gz
+      ENV GOPATH=/go
+      ENV PATH="/usr/local/go/bin:/go/bin:${PATH}"
+      RUN mkdir -p /go/bin /go/pkg/mod && chmod -R g=u /go && chmod -R g+w /go
+      RUN GOCACHE=/root/.cache/go-build GOMODCACHE=/go/pkg/mod go install gotest.tools/gotestsum@v0.3.5 && \
+          GOCACHE=/root/.cache/go-build GOMODCACHE=/go/pkg/mod go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-online/rosa-service-log
+    to: golang-plus
+prowgen:
+  expose: true
+  private: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    unset GOFLAGS
+    export GOPATH=/go
+    export PATH="/usr/local/go/bin:/go/bin:${PATH}"
+    export HOME=/tmp
+    export GOLANGCI_LINT_CACHE=/tmp/golangci-lint
+    export GOCACHE=$(mktemp -d)
+    export GOMODCACHE=$(mktemp -d)
+    mkdir -p "$GOLANGCI_LINT_CACHE"
+    export GOTOOLCHAIN=go1.25.10
+    echo "Go Version: $(go version)"
+    mkdir -p secrets
+    cp /opt/app-root/osl-secrets/* secrets/
+    make verify
+    make lint
+  container:
+    from: golang-plus
+  secrets:
+  - mount_path: /opt/app-root/osl-secrets
+    name: openshift-online-osl-secrets
+- as: unit
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    export GOPATH=/go
+    export PATH="/usr/local/go/bin:/go/bin:${PATH}"
+    export HOME=/tmp
+    export GOCACHE=$(mktemp -d)
+    export GOMODCACHE=$(mktemp -d)
+    export XDG_CONFIG_HOME=$HOME/.config
+    mkdir -p "$XDG_CONFIG_HOME/containers"
+    { echo 'unqualified-search-registries = ["registry.access.redhat.com", "registry.redhat.io", "docker.io"]'; echo 'short-name-mode = "permissive"'; } >"$XDG_CONFIG_HOME/containers/registries.conf"
+    export GOTOOLCHAIN=go1.25.10
+    echo "Go Version: $(go version)"
+    mkdir -p secrets
+    cp /opt/app-root/osl-secrets/* secrets/
+    for dir in cmd/ocm-service-log pkg/services test/integration; do
+      ln -sfn "$(pwd)/secrets" "$dir/secrets"
+      ln -sfn "$(pwd)/config" "$dir/config"
+    done
+    make db/setup
+    sleep 5
+    make test
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - mount_path: /opt/app-root/osl-secrets
+    name: openshift-online-osl-secrets
+- as: integration
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    export GOPATH=/go
+    export PATH="/usr/local/go/bin:/go/bin:${PATH}"
+    export HOME=/tmp
+    export GOCACHE=$(mktemp -d)
+    export GOMODCACHE=$(mktemp -d)
+    export XDG_CONFIG_HOME=$HOME/.config
+    mkdir -p "$XDG_CONFIG_HOME/containers"
+    { echo 'unqualified-search-registries = ["registry.access.redhat.com", "registry.redhat.io", "docker.io"]'; echo 'short-name-mode = "permissive"'; } >"$XDG_CONFIG_HOME/containers/registries.conf"
+    export GOTOOLCHAIN=go1.25.10
+    echo "Go Version: $(go version)"
+    mkdir -p secrets
+    cp /opt/app-root/osl-secrets/* secrets/
+    for dir in cmd/ocm-service-log pkg/services test/integration; do
+      ln -sfn "$(pwd)/secrets" "$dir/secrets"
+      ln -sfn "$(pwd)/config" "$dir/config"
+    done
+    make db/setup
+    sleep 5
+    make test-integration
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - mount_path: /opt/app-root/osl-secrets
+    name: openshift-online-osl-secrets
+- as: coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    export GOPATH=/go
+    export PATH="/usr/local/go/bin:/go/bin:${PATH}"
+    export HOME=/tmp
+    export GOCACHE=$(mktemp -d)
+    export GOMODCACHE=$(mktemp -d)
+    export XDG_CONFIG_HOME=$HOME/.config
+    mkdir -p "$XDG_CONFIG_HOME/containers"
+    { echo 'unqualified-search-registries = ["registry.access.redhat.com", "registry.redhat.io", "docker.io"]'; echo 'short-name-mode = "permissive"'; } >"$XDG_CONFIG_HOME/containers/registries.conf"
+    export GOTOOLCHAIN=go1.25.10
+    echo "Go Version: $(go version)"
+    mkdir -p secrets
+    cp /opt/app-root/osl-secrets/* secrets/
+    for dir in cmd/ocm-service-log pkg/services test/integration; do
+      ln -sfn "$(pwd)/secrets" "$dir/secrets"
+      ln -sfn "$(pwd)/config" "$dir/config"
+    done
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - mount_path: /opt/app-root/osl-secrets
+    name: openshift-online-osl-secrets
+  - mount_path: /var/run/codecov-secret
+    name: rosa-service-log-codecov
+- as: publish-coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    export GOPATH=/go
+    export PATH="/usr/local/go/bin:/go/bin:${PATH}"
+    export HOME=/tmp
+    export GOCACHE=$(mktemp -d)
+    export GOMODCACHE=$(mktemp -d)
+    export XDG_CONFIG_HOME=$HOME/.config
+    mkdir -p "$XDG_CONFIG_HOME/containers"
+    { echo 'unqualified-search-registries = ["registry.access.redhat.com", "registry.redhat.io", "docker.io"]'; echo 'short-name-mode = "permissive"'; } >"$XDG_CONFIG_HOME/containers/registries.conf"
+    export GOTOOLCHAIN=go1.25.10
+    echo "Go Version: $(go version)"
+    mkdir -p secrets
+    cp /opt/app-root/osl-secrets/* secrets/
+    for dir in cmd/ocm-service-log pkg/services test/integration; do
+      ln -sfn "$(pwd)/secrets" "$dir/secrets"
+      ln -sfn "$(pwd)/config" "$dir/config"
+    done
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  postsubmit: true
+  secrets:
+  - mount_path: /opt/app-root/osl-secrets
+    name: openshift-online-osl-secrets
+  - mount_path: /var/run/codecov-secret
+    name: rosa-service-log-codecov
+zz_generated_metadata:
+  branch: master
+  org: openshift-online
+  repo: rosa-service-log

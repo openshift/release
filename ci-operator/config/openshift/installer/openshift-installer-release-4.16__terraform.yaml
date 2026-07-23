@@ -1,0 +1,44 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: images/infrastructure-providers/Dockerfile
+    to: installer-terraform-providers
+promotion:
+  to:
+  - name: "4.16"
+    namespace: ocp
+    tag_by_commit: true
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  terraform-artifacts:
+    requests:
+      cpu: "5"
+      memory: 5Gi
+tests:
+- always_run: false
+  as: verify-vendor
+  commands: |
+    make -C terraform go-mod-tidy-vendor
+    git diff --exit-code
+  container:
+    from: src
+  run_if_changed: ^terraform/.*
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: installer
+  variant: terraform

@@ -1,0 +1,24 @@
+ref:
+  as: aro-hcp-provision-dev-ci
+  from: aro-hcp-e2e-tools
+  commands: aro-hcp-provision-dev-ci-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  credentials:
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "dev"
+    documentation: |-
+      Selects which environment's cluster secrets to use (dev, int, stg, prod).
+  documentation: |-
+    Reconcile the shared dev/CI support infrastructure by rolling out the
+    non-privileged Microsoft.Azure.ARO.HCP.DevCI.Unprivileged entrypoint of the
+    dev-ci topology (opstool AKS, gateway, cert-manager, tenant-quota, CIHealth
+    and the non-privileged CI bot identities). The Owner-only
+    Microsoft.Azure.ARO.HCP.DevCI.Privileged entrypoint is deliberately excluded
+    from this unattended job and is applied on demand by an OWNERS member.

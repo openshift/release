@@ -1,0 +1,33 @@
+ref:
+  as: opendatahub-operator-e2e-cluster-preflight-health-check
+  from: cli
+  commands: opendatahub-operator-e2e-cluster-preflight-health-check-commands.sh
+  timeout: 15m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Cluster preflight health check for opendatahub-operator E2E tests.
+
+    This step validates that a claimed cluster from the Hive pool is fully
+    operational after hibernation resume. It checks:
+    1. All nodes are Ready (4m timeout)
+    2. ServiceAccount controller is operational (10m timeout)
+
+    The ServiceAccount controller check creates a test namespace and waits
+    for the default ServiceAccount to be auto-created. This verifies that
+    kube-controller-manager has fully synchronized its informer caches after
+    hibernation resume.
+
+    Based on analysis of 14 days of CI data showing:
+    - Zero successful builds with cluster claim < 35 min
+    - 100% SA timeout failures in 600-900s range
+    - Fastest successful claim: 2121s (35.4 min)
+
+    Timing instrumentation logs:
+    - Node readiness duration
+    - SA controller recovery duration (critical metric)
+    - Total preflight duration
+
+    Step timeout: 15m (accommodates 4m node wait + 10m SA timeout + buffer)

@@ -1,0 +1,67 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.15-openshift-4.7
+images:
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: cosa-build
+  - inputs:
+      cosa-build:
+        paths:
+        - destination_dir: .
+          source_path: /tmp/Dockerfile
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/okd-machine-os/manifests/
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/okd-machine-os/bootstrap/
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/okd-machine-os/extensions/
+    to: machine-os-content
+promotion:
+  to:
+  - excluded_images:
+    - cosa-build
+    name: "4.7"
+    namespace: origin
+releases:
+  initial:
+    integration:
+      name: "4.7"
+      namespace: origin
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.7"
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-gcp
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-ovirt
+  optional: true
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-minimal-release-4.6-4.7
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-upgrade-aws
+zz_generated_metadata:
+  branch: release-4.7
+  org: openshift
+  repo: okd-machine-os

@@ -1,0 +1,33 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.clients
+    to: terraform-provider-rhcs-clients
+  skip_if_only_changed: ^(LICENSE|OWNERS|.*\.md|\.gitignore|\.goreleaser\.yaml|\.golang-ci\.yml|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton|subsystem|examples)(?:/|$)
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pre-push-checks
+  commands: make pre-push-checks
+  container:
+    from: terraform-provider-rhcs-clients
+  skip_if_only_changed: ^(LICENSE|OWNERS|.*\.md|\.gitignore|\.goreleaser\.yaml|\.golang-ci\.yml|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton|subsystem|examples)(?:/|$)
+- as: security
+  optional: true
+  skip_if_only_changed: ^(LICENSE|OWNERS|.*\.md|\.gitignore|\.goreleaser\.yaml|\.golang-ci\.yml|renovate\.json|\.ci-operator\.yaml)$|^(?:docs|\.github|\.tekton|subsystem|examples)(?:/|$)
+  steps:
+    env:
+      PROJECT_NAME: terraform-provider-rhcs
+      SNYK_ENABLE_DEPS_SCAN: "true"
+      SNYK_PRE_EXECUTION_HOOK_CMD: unset GOFLAGS && go mod tidy && go mod vendor
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: main
+  org: terraform-redhat
+  repo: terraform-provider-rhcs

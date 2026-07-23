@@ -1,0 +1,53 @@
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+canonical_go_repository: github.com/openperouter/openperouter
+images:
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: openperouter-operator
+  - dockerfile_path: operator/bundle.Dockerfile.openshift
+    to: openperouter-operator-bundle
+  - build_args:
+    - name: BASE_IMAGE
+      value: quay.io/centos/centos:stream10
+    dockerfile_path: Dockerfile.edge.openshift
+    to: openperouter-operator-edge
+operator:
+  bundles:
+  - as: operator-bundle
+    dockerfile_path: operator/bundle.Dockerfile.openshift
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/redhat-user-workloads/telco-5g-tenant/openperouter-operator-[\d].*
+    with: pipeline:openperouter-operator
+promotion:
+  to:
+  - name: "5.0"
+    namespace: ocp
+prowgen:
+  disable_sparse_checkout: true
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: openperouter

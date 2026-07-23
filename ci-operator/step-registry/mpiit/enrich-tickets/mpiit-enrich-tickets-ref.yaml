@@ -1,0 +1,59 @@
+ref:
+  as: mpiit-enrich-tickets
+  from_image:
+    namespace: firewatch
+    name: firewatch
+    tag: main
+  commands: mpiit-enrich-tickets-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: firewatch-tool-jira-credentials
+      mount_path: /tmp/secrets/jira
+  timeout: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: FIREWATCH_JIRA_SERVER
+    default: https://redhat.atlassian.net
+    documentation: The Jira server to query and update tickets on.
+  - name: FIREWATCH_JIRA_API_TOKEN_PATH
+    default: /tmp/secrets/jira/access_token
+    documentation: Path to the Jira API token file.
+  - name: FIREWATCH_JIRA_EMAIL_PATH
+    default: /tmp/secrets/jira/email
+    documentation: Path to the Jira email file for Basic auth.
+  - name: MPIIT__CHAI_API_URL
+    default: ""
+    documentation: >-
+      Optional Chai bot API endpoint for AI-assisted root cause analysis.
+      When set, the step sends failure context to Chai and prepends the
+      analysis to the ticket description. When empty, only structured
+      label extraction is performed.
+  - name: MPIIT__CHAI_API_TOKEN
+    default: ""
+    documentation: >-
+      Bearer token for Chai bot API authentication. Required when
+      MPIIT__CHAI_API_URL is set.
+  - name: FIREWATCH_ENRICH_SEARCH_WINDOW
+    default: "10"
+    documentation: >-
+      How many minutes back to search for freshly-created firewatch
+      tickets. Increase if the firewatch-report-issues step takes
+      longer than usual.
+  - name: FIREWATCH_ENRICH_TARGET_JOB
+    default: ""
+    documentation: >-
+      Override the Prow job to enrich, formatted as "job-name/build-id".
+      When set, the step targets this job instead of the current run's
+      JOB_NAME and BUILD_ID. This allows running the step in rehearsal
+      jobs by pointing it at a previously completed real job.
+  best_effort: true
+  documentation: |-
+    Post-processes Jira tickets created by firewatch.
+    Downloads JUnit XML from GCS, extracts structured failure metadata
+    (error excerpts, operator names, components, file locations), and
+    updates tickets with granular labels and enriched descriptions.
+    Optionally calls Chai bot for AI-assisted root cause analysis.
+    Place in the post chain AFTER firewatch.

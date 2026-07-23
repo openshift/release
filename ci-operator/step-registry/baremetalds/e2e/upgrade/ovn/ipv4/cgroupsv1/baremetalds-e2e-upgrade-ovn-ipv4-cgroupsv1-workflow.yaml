@@ -1,0 +1,23 @@
+workflow:
+  as: baremetalds-e2e-upgrade-ovn-ipv4-cgroupsv1
+  steps:
+    pre:
+      - ref: openshift-manifests-cgroupsv1
+      - chain: baremetalds-ofcir-pre
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ofcir-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_DISK=50
+        WORKER_DISK=50
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+  documentation: |-
+    This workflow executes the common end-to-end upgrade test suite on a cluster provisioned by running dev-scripts on a packet server using cgroups v1.

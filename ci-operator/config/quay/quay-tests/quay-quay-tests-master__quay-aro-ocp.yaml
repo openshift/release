@@ -1,0 +1,81 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.21
+prowgen:
+  expose: true
+  private: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: quay-e2e-tests-quay317-aro
+  cron: 0 12 1 1 *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ARO_WORKER_COUNT: "6"
+      ARO_WORKER_VM_SIZE: Standard_D8s_v3
+      CSO_CHANNEL: stable-3.17
+      CSO_SOURCE: fbc-operator-catalog
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:2a048c3d57231d7cb7885439217af05cb36df14589c2b7dda2d9da657108319b
+      QBO_CHANNEL: stable-3.17
+      QBO_SOURCE: fbc-operator-catalog
+      QUAY_OPERATOR_CHANNEL: stable-3.17
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.17"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-azure
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-azure-aro
+- as: quay-e2e-tests-quay318-aro
+  cron: 0 12 1 1 *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ARO_WORKER_COUNT: "6"
+      ARO_WORKER_VM_SIZE: Standard_D8s_v3
+      CSO_CHANNEL: stable-3.18
+      CSO_SOURCE: fbc-operator-catalog
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-21@sha256:5684950962c8d86d0dc82ef502a19664c8ad6f274a4f391145711e8babdc241a
+      QBO_CHANNEL: stable-3.18
+      QBO_SOURCE: fbc-operator-catalog
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.18"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-azure
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-azure-aro
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: quay-aro-ocp

@@ -1,0 +1,36 @@
+workflow:
+  as: hypershift-jira-agent
+  steps:
+    pre:
+      - ref: jira-agent-setup
+      - ref: jira-agent-github-app-auth
+      - ref: jira-agent-slack-pr-notify
+      - ref: jira-agent-claude-helpers
+      - ref: jira-agent-jira-helpers
+      - ref: jira-agent-git-helpers
+    test:
+      - ref: jira-agent-process
+    post:
+      - ref: jira-agent-report
+    env:
+      JIRA_AGENT_FORK_REPO: "hypershift-community/hypershift"
+      JIRA_AGENT_UPSTREAM_REPO: "openshift/hypershift"
+      JIRA_AGENT_JQL: 'project in (OCPBUGS, CNTRLPLANE) AND resolution = Unresolved AND status in (New, "To Do") AND component = "HyperShift" AND labels = issue-for-agent AND labels = ready-to-solve AND labels != agent-processed'
+      JIRA_AGENT_TARGET_STATUS: '{"OCPBUGS":"ASSIGNED","CNTRLPLANE":"Code Review"}'
+      JIRA_AGENT_ASSIGNEE: "hypershift-automation"
+      JIRA_AGENT_UPSTREAM_INSTALLATION_ID_KEY: "o-h-installation-id"
+      JIRA_AGENT_FORK_INSTALLATION_ID_KEY: "installation-id"
+      JIRA_AGENT_TOOL_SETUP_SCRIPT: "GOFLAGS='' go install golang.org/x/tools/gopls@v0.21.0 && python3.9 -m ensurepip --user 2>/dev/null || true && python3.9 -m pip install --user pre-commit 2>&1 | tail -1"
+      JIRA_AGENT_REVIEW_LANGUAGE: "go"
+      JIRA_AGENT_REVIEW_PROFILE: "hypershift"
+      JIRA_AGENT_SLACK_EMOJI: ":hypershift-bot:"
+  documentation: |-
+    HyperShift-specific wrapper for the generic Jira Agent workflow.
+
+    This workflow delegates to the generic jira-agent steps with HyperShift-specific
+    configuration (fork repo, JQL query, status transitions, plugins, etc.).
+
+    Credentials: Uses hypershift-team-claude-prow (configured in generic step refs).
+    When another team onboards, they will need to either:
+    1. Create their own ref YAMLs pointing to the generic commands with their credential
+    2. Request the generic credential name be updated to a shared secret

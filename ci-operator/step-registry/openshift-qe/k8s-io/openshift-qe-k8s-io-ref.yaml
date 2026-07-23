@@ -1,0 +1,44 @@
+ref:
+  as: openshift-qe-k8s-io
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: CONFIG
+    default: "full-run.yaml"
+    documentation: |-
+      The k8s-io FIO configuration file to use, defaults to full-run.yaml
+  - name: K8S_IO_VERSION
+    default: "default"
+    documentation: |-
+      Override the k8s-io version
+  - name: ES_METADATA_INDEX
+    default: "perf_scale_ci"
+    documentation: |-
+      Elasticsearch metadata index
+  - name: ADDITIONAL_PARAMS
+    default: '{}'
+    documentation: |-
+      JSON value to upload additonal metadata to the fingerprint
+  - name: CLEANUP
+    default: "true"
+    documentation: |-
+      Clean up the test namespace after the test. Defaults to true.
+  commands: openshift-qe-k8s-io-commands.sh
+  timeout: 4h
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale k8s-io FIO storage benchmark workload in the deployed cluster

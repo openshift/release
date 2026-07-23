@@ -1,0 +1,48 @@
+base_images:
+  rebasebot:
+    name: rebasebot
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rebasebot
+  cron: 50 12 * * Mon,Thu
+  steps:
+    test:
+    - as: rebasebot
+      commands: |
+        rebasebot --source https://github.com/kubernetes/cloud-provider-vsphere:master \
+                  --dest openshift/cloud-provider-vsphere:main \
+                  --rebase openshift-cloud-team/cloud-provider-vsphere:rebase-bot-main \
+                  --update-go-modules \
+                  --slack-webhook /secrets/rebasebot/pixaa-alerts-slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
+        namespace: test-credentials
+      from_image:
+        name: rebasebot
+        namespace: ci
+        tag: latest
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: cloud-provider-vsphere
+  variant: periodics

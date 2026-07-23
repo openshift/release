@@ -1,0 +1,306 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 3 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-ad-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-amd64-upgrade-staging-main
+  capabilities:
+  - nested-podman
+  cron: 40 4 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-amd64-upgrade-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-zero-egress-upgrade-staging-main
+  capabilities:
+  - nested-podman
+  cron: 40 3 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-zero-egress-upgrade-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-shared-vpc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 4 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-shared-vpc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-pl-staging-main
+  capabilities:
+  - nested-podman
+  cron: 20 4 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-pl-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-adobe-staging-main
+  capabilities:
+  - nested-podman
+  cron: 20 3 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-adobe-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-y-upgrade-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 2 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-y-upgrade-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-nx-y-upgrade-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 0 31 2 *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_EXTRA_ENVS: |-
+        CLUSTER_PROFILE=rosa-hcp-y-upg
+        UPGRADE_DISTANCE=4
+        UPGRADE_TARGET_CHANNEL=candidate
+        UPGRADE_TARGET_VERSION=4.22.6
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-nx-y-upgrade-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt-longrunning
+  timeout: 12h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-arm-staging-main
+  capabilities:
+  - nested-podman
+  cron: 20 5 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-arm-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-amd64-staging-main
+  capabilities:
+  - nested-podman
+  cron: 40 2 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-amd64-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-autonode-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 5 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-autonode-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-hcp-e2e-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 6 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-hcp-e2e-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-zero-egress-staging-main
+  capabilities:
+  - nested-podman
+  cron: 40 5 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-zero-egress-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-upgrade-staging-main
+  capabilities:
+  - nested-podman
+  cron: 20 2 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-upgrade-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-sanity-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 0 31 2 *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-sanity-staging
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-sanity-jira-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 0 31 2 *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-sanity-jira-staging
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-access-request-staging-main
+  capabilities:
+  - nested-podman
+  cron: 20 6 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-access-request-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-e2e
+  variant: ocm-fvt-rosa-hcp-staging

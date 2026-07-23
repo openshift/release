@@ -1,0 +1,1 @@
+../frontend-tests/netobserv-frontend-tests-commands.sh

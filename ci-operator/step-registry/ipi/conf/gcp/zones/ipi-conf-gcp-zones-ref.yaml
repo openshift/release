@@ -1,0 +1,40 @@
+ref:
+  as: ipi-conf-gcp-zones
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  commands: ipi-conf-gcp-zones-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: ZONES_EXCLUSION_PATTERN
+    default: "\\-ai[0-9]"
+    documentation: |-
+      The pattern to be used to filter out un-interested zones (e.g. "\\-ai[0-9]" to exclude zones having '-ai' in zone name). 
+      When empty (by default), nothing special to do. 
+      When non-empty, even if all other env variables are empty, zones will be set.
+  - name: COMPUTE_ZONES
+    default: ""
+    documentation: |-
+      The availability zones that can be used, e.g. "[us-central1-a us-central1-b]"
+  - name: COMPUTE_NODE_TYPE
+    default: ""
+    documentation: |-
+      Set zones for compute/worker nodes according to the node type.
+  - name: CONTROL_PLANE_ZONES
+    default: ""
+    documentation: |-
+      The availability zones that can be used, e.g. "[us-central1-a us-central1-b]"
+  - name: CONTROL_PLANE_NODE_TYPE
+    default: ""
+    documentation: |-
+      Set zones for control-plane nodes according to the node type.
+  - name: ADDITIONAL_WORKER_VM_TYPE
+    default: ""
+    documentation: |-
+      For heterogeneous clusters, restrict zones to those supporting the additional worker machine type (e.g. ARM instances).
+  documentation: |-
+    The IPI configure step updates install-config.yaml with the controlPlane & compute zones settings according to the specified zone(s), or machine type(s).

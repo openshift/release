@@ -1,0 +1,65 @@
+ref:
+  as: acm-interop-p2p-submariner-verify
+  from: cli
+  commands: acm-interop-p2p-submariner-verify-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  timeout: 45m0s
+  grace_period: 10m0s
+  env:
+    - name: ACM_SPOKE_CLUSTER_COUNT
+      default: "2"
+      documentation: |-
+        Number of ACM spoke clusters to verify Submariner connectivity for.
+    - name: SUBMARINER_VERIFY_DEBUG_MODE
+      default: "false"
+      documentation: |-
+        When true, a verify failure is logged but does not fail the job.
+        Set to "true" during active debugging to allow the job to proceed
+        past this step even when Submariner connectivity is not healthy.
+    - name: SUBMARINER_VERIFY_CCLM_SYNC
+      default: "true"
+      documentation: |-
+        When true, probe TCP port 8443 between virt-synchronization-controller
+        pod IPs on each spoke pair (KubeVirt CCLM sync path).
+    - name: SUBMARINER_CCLM_CNV_NAMESPACE
+      default: "openshift-cnv"
+      documentation: CNV namespace where virt-synchronization-controller runs.
+    - name: SUBMARINER_CCLM_SYNC_PORT
+      default: "8443"
+      documentation: KubeVirt cross-cluster sync controller TCP port.
+    - name: SUBMARINER_CCLM_SYNC_PROBE_TIMEOUT
+      default: "10"
+      documentation: Seconds to wait for each CCLM sync TCP probe.
+  documentation: |-
+    Step 3 of 3 in the Submariner installation chain.
+
+    Installs subctl locally (not SHARED_DIR), then validates cross-cluster
+    Submariner connectivity:
+      1. Shows initial tunnel connection status on each spoke
+      2. Waits for all IPsec tunnels to reach "connected" state (up to 600s)
+      3. Asserts remote subnets are pod CIDRs (not Globalnet 242.x)
+      4. Pre-warms Lighthouse service discovery between each spoke pair
+         (exports a Service, waits for ServiceImport + EndpointSlice propagation)
+      5. Runs 'subctl verify' for connectivity and service-discovery tests
+         between each spoke pair (kubeconfig contexts merged with unique names)
+      6. Probes bidirectional TCP :8443 between virt-synchronization-controller
+         pod IPs (CCLM sync path; requires p2p-acm-cnv-install-policy)
+
+    Submariner is deployed without Globalnet; remote subnets must be pod CIDRs
+    (not 242.x Globalnet ranges) for KubeVirt CCLM sync traffic to work.
+
+    Failure behaviour: when SUBMARINER_VERIFY_DEBUG_MODE=true the step logs
+    failures but exits 0 so the job can continue to CCLM migration steps.
+
+    Env vars consumed:
+      ACM_SPOKE_CLUSTER_COUNT            - number of spoke clusters (default: 2)
+      SUBMARINER_VERIFY_DEBUG_MODE       - swallow failures for debugging (default: false)
+      SUBMARINER_VERIFY_CCLM_SYNC        - probe virt-sync-controller TCP path (default: true)
+      SUBMARINER_CCLM_CNV_NAMESPACE      - CNV namespace (default: openshift-cnv)
+      SUBMARINER_CCLM_SYNC_PORT          - CCLM sync TCP port (default: 8443)
+      SUBMARINER_CCLM_SYNC_PROBE_TIMEOUT - TCP probe timeout seconds (default: 10)
+      KUBECONFIG                         - hub cluster kubeconfig
+      SHARED_DIR                         - shared artifact directory

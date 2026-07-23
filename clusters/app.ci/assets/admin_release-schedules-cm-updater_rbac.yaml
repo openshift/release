@@ -1,0 +1,44 @@
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  annotations:
+    openshift.io/description: This SA is used to update the configmap release-schedules in ci namespace
+  name: release-schedules-cm-updater
+  namespace: ci
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: release-schedules-cm-updater
+  namespace: ci
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  resourceNames:
+  - release-schedules
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-schedules-cm-updater
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-schedules-cm-updater
+subjects:
+- kind: ServiceAccount
+  name: release-schedules-cm-updater
+  namespace: ci

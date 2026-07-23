@@ -1,0 +1,61 @@
+base_images:
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- as: e2e-far-weekly-aws-disconnected
+  capabilities:
+  - intranet
+  cron: 0 12 * * 4
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      ECO_TEST_FEATURES: far-operator
+      ENABLE_IDMS: "yes"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      MEDIK8S_PACKAGES: fence-agents-remediation
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: medik8s-lib
+    - ref: medik8s-disconnected-catalogsource
+    - ref: medik8s-operator-subscribe
+    - ref: medik8s-aws-credentials
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws-disconnected
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: system-tests
+  variant: 4.22-disconnected

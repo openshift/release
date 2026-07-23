@@ -1,0 +1,27 @@
+workflow:
+  as: hypershift-mce-kubevirt-conformance
+  documentation: |-
+    The HyperShift mce kubevirt conformance workflow executes tests against a new ephemeral
+  steps:
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: "m6i.2xlarge"
+      ZONES_COUNT: "3"
+      TEST_SKIPS: etcd leader changes are not excessive
+      SKIP_MONITOR_TEST: "true"
+    pre:
+      - chain: ipi-aws-ovn-pre
+      - chain: ipi-install
+      - ref: hypershift-kubevirt-install
+      - ref: hypershift-kubevirt-install-odf
+      - ref: hypershift-mce-install
+      - ref: hypershift-kubevirt-create
+      - ref: hypershift-kubevirt-health-check
+    test:
+    - chain: hypershift-conformance
+    post:
+      - ref: hypershift-mce-dump
+      - chain: gather-core-dump
+      - chain: hypershift-mce-kubevirt-destroy
+      - chain: ipi-aws-post

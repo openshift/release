@@ -1,0 +1,86 @@
+binary_build_commands: make terraform-init
+build_root:
+  image_stream_tag:
+    name: gcp-hcp-infra-base
+    namespace: ci
+    tag: latest
+  use_build_cache: true
+prowgen:
+  expose: true
+  private: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: "8"
+      memory: 4Gi
+tests:
+- as: terraform-validate
+  steps:
+    test:
+    - as: validate
+      commands: |
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(cat /etc/github-private/oauth)"; }; f'
+        cat > "$HOME/.terraformrc" <<TFRC
+        credentials "app.terraform.io" {
+          token = "$(cat /etc/terraform-cloud/token)"
+        }
+        TFRC
+        make terraform-validate
+      credentials:
+      - mount_path: /etc/github-private
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        namespace: ci
+      - mount_path: /etc/terraform-cloud
+        name: tfcloud-ci-secret
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: "8"
+          memory: 4Gi
+- as: terraform-test
+  steps:
+    test:
+    - as: test
+      commands: |
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(cat /etc/github-private/oauth)"; }; f'
+        cat > "$HOME/.terraformrc" <<TFRC
+        credentials "app.terraform.io" {
+          token = "$(cat /etc/terraform-cloud/token)"
+        }
+        TFRC
+        make terraform-test
+      credentials:
+      - mount_path: /etc/github-private
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        namespace: ci
+      - mount_path: /etc/terraform-cloud
+        name: tfcloud-ci-secret
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: "8"
+          memory: 4Gi
+- as: check-orphan-modules
+  commands: make check-orphan-modules
+  container:
+    from: src
+- as: check-generated-files
+  commands: export UV_CACHE_DIR=/tmp/.uv-cache UV_PYTHON_INSTALL_DIR=/tmp/.uv-python
+    UV_NO_PROGRESS=true && make check-generated-files
+  container:
+    from: src
+- as: generate-bin
+  commands: make terraform-init
+  container:
+    from: bin
+  postsubmit: true
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: gcp-hcp-infra

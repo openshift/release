@@ -1,0 +1,75 @@
+chain:
+  as: hypershift-mce-aws-destroy
+  steps:
+    - as: destroy
+      cli: latest
+      env:
+        - name: MCE_VERSION
+          default: "2.4"
+          documentation: "version of the mce.(2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10)"
+        - name: HYPERSHIFT_BASE_DOMAIN
+          default: "origin-ci-int-aws.dev.rhcloud.com"
+          documentation: "The cluster's FQDN will be a subdomain of the base domain."
+        - name: HYPERSHIFT_AWS_REGION
+          default: "us-east-1"
+          documentation: "The AWS region of the cluster."
+      commands: |-
+        set -exuo pipefail
+
+        HYPERSHIFT_NAME=hcp
+        arch=$(arch)
+        if [ "$arch" == "x86_64" ]; then
+          downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+          cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
+          chmod +x /tmp/${HYPERSHIFT_NAME}
+          cd -
+        fi
+
+        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+
+        CRED_COMMAND=""
+        # >= 2.6
+        if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
+          CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")
+        else
+          CRED_COMMAND=$(echo "--aws-creds ${CLUSTER_PROFILE_DIR}/.awscred")
+        fi
+
+        echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+        /tmp/${HYPERSHIFT_NAME} destroy cluster aws ${CRED_COMMAND} \
+          --name ${CLUSTER_NAME} \
+          --region ${HYPERSHIFT_AWS_REGION} \
+          --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+          --namespace local-cluster \
+          --cluster-grace-period 40m
+        echo "$(date) Finished deleting cluster"
+
+        oc delete managedcluster ${CLUSTER_NAME} --ignore-not-found
+        echo "$(date) Finished destroying hypershift managed cluster"
+      from_image:
+        namespace: ocp
+        name: "4.16"
+        tag: upi-installer
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 30m0s
+    - as: destroy-aws-iam-cli-role
+      cli: latest
+      commands: |-
+        set -exuo pipefail
+        if [[ -f "${SHARED_DIR}/hcp-role-arn" && -f ${SHARED_DIR}/sts-creds.json ]]; then
+            hcp_role_arn="$(cat ${SHARED_DIR}/hcp-role-arn)"
+            CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+            echo "arn: $hcp_role_arn was created during the test, need to destroy it"
+            bin/hypershift destroy iam aws --infra-id $CLUSTER_NAME --role-arn $hcp_role_arn --sts-creds ${SHARED_DIR}/sts-creds.json
+        fi
+      from: hypershift-operator
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 15m0s

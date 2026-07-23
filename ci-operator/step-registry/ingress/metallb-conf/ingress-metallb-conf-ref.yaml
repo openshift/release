@@ -1,0 +1,22 @@
+ref:
+  as: ingress-metallb-conf
+  from: tools
+  grace_period: 10m
+  commands: ingress-metallb-conf-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-config
+    mount_path: /var/run/vault/vsphere-ibmcloud-config
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  timeout: 20m0s
+  documentation: |-
+    This step installs the MetalLB operator and configures it for ingress testing.
+    It automatically detects the environment (baremetalds or vSphere static IP) and
+    configures MetalLB with the appropriate IP address pool:
+    - For baremetalds: Uses hardcoded IP range 192.168.111.30-192.168.111.39
+    - For vSphere static IP: Dynamically extracts IPs from subnets.json (indices #40-49)
+    Creates MetalLB instance, IPAddressPool, and L2Advertisement resources to enable
+    load balancer services for ingress testing.

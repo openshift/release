@@ -1,0 +1,80 @@
+base_images:
+  base:
+    name: "4.11"
+    namespace: ocp
+    tag: base
+  os-min8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+images:
+  items:
+  - context_dir: .
+    dockerfile_path: cnf-tests/Dockerfile.openshift
+    from: base
+    to: cnf-tests
+  - context_dir: tools/s2i-dpdk/
+    dockerfile_path: Dockerfile
+    from: base
+    to: dpdk
+  - context_dir: .
+    dockerfile_path: ztp/resource-generator/Containerfile
+    from: os-min8
+    to: ztp-site-generator
+promotion:
+  to:
+  - name: "4.11"
+    namespace: ocp-kni
+prowgen:
+  disable_sparse_checkout: true
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ci
+  commands: make ci-job
+  container:
+    from: src
+- as: e2e-aws-ran-profile
+  optional: true
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.11
+        ci-job-fullname openshift-kni-cnf-features-deploy-e2e-aws-ran-profile-release-4.11
+        ci-job-type e2e-aws-ran-profile
+        ci-repo-name cnf-features-deploy
+        ci-org-name openshift-kni
+    test:
+    - as: e2e-aws-ran-profile
+      commands: FEATURES_ENVIRONMENT=cn-ran-overlays FEATURES=ran-profile-gcp SKIP_TESTS="xt_u32
+        container-mount-namespace gatekeeper n3000 fec metallb sro" make validate-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-ovn
+zz_generated_metadata:
+  branch: release-4.11
+  org: openshift-kni
+  repo: cnf-features-deploy

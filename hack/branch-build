@@ -1,0 +1,59 @@
+#!/bin/sh
+
+set -euo pipefail
+
+# Start builds for all repos that are tagged with "artifacts" on the branch or tag
+# REF
+#
+# Usage: REF= ./branch [create]
+#
+# Argument:
+# * <empty>: prints the commands we'll run
+# * create:  creates the tags and branches locally
+
+base=$( dirname "${BASH_SOURCE[0]}")
+source "${base}/lib/constants.sh"
+
+BRANCH=${BRANCH:-master}
+REF=${REF:-${BRANCH}}
+
+file="$( mktemp -t prowjobs )"
+config="${base}/../ci-operator/jobs/*.yaml"
+prowconfig="-config-path ${base}/../core-services/prow/02_config/_config.yaml -job-config-path ${base}/../ci-operator/jobs"
+
+# TODO: force all repos to normalize to a standard branch strategy (monitoring team)
+for repo in `managed_repos "${BRANCH}"`; do
+  if [[ -n "${2-}" && "${2-}" != "${repo}" ]]; then
+    continue
+  fi
+
+  ref="$( git ls-remote -t https://github.com/${repo}.git ${REF} | cut -f 1 -d $'\t' )"
+  if [[ -z "${ref}" ]]; then
+    ref="$( git ls-remote -h https://github.com/${repo}.git ${REF} | cut -f 1 -d $'\t' )"
+    if [[ -z "${ref}" ]]; then
+      echo "warning: No tag or branch ${REF} found, using ${REF} as-is" 2>&1
+      ref="${REF}"
+    fi
+  fi
+
+  echo "${BRANCH} @ ${ref} | ${repo}"
+  if [[ -z "${1-}" ]]; then
+    continue
+  fi
+  if ! jobs="$( python "${base}/lib/jobs_with_labels.py" "${config}" "${repo}" "${BRANCH}" "artifacts" )"; then
+    echo "info: ${repo} has no jobs tagged for artifacts on branch ${BRANCH}" 2>&1
+    continue
+  fi
+  for job in "${jobs}"; do
+    if [[ "${1-}" == "create" ]]; then
+      echo "---" >> ${file}
+      mkpj $prowconfig -job ${job} -base-ref ${REF} -base-sha ${ref} >> ${file}
+    else
+      echo "mkpj $prowconfig -job ${job} -base-ref ${REF} -base-sha ${ref}"
+    fi
+  done
+done
+
+if [[ "${1-}" == "create" ]]; then
+  echo "Definition in ${file}"
+fi

@@ -1,0 +1,111 @@
+base_images:
+  openstack-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: openstack-installer
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-control-plane-machine-set-operator
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.17"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  cron: 58 7 8 9 *
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
+- as: e2e-aws-arm
+  cron: 35 23 21 10 *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      OCP_ARCH: arm64
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
+- as: e2e-azure
+  cron: 3 5 8 8 *
+  steps:
+    cluster_profile: openshift-org-azure
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-azure
+- as: e2e-gcp
+  cron: 48 20 24 3 *
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- as: e2e-openstack
+  cron: 2 22 25 6 *
+  steps:
+    cluster_profile: openstack-vexxhost
+    test:
+    - as: test
+      commands: |
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: openshift-e2e-openstack-ipi
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift
+  repo: cluster-control-plane-machine-set-operator
+  variant: periodics

@@ -1,0 +1,66 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: claim-cluster
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  cron: 0 23 31 2 *
+  steps:
+    test:
+    - as: export-kubeconfig
+      commands: |
+        openssl enc -aes-256-cbc -pbkdf2 \
+          -pass file:/var/run/encryption-key/kubeconfig-encryption-key \
+          -in "${KUBECONFIG}" \
+          -out "${ARTIFACT_DIR}/kubeconfig.enc"
+        if [[ -f "${KUBEADMIN_PASSWORD_FILE}" ]]; then
+          openssl enc -aes-256-cbc -pbkdf2 \
+            -pass file:/var/run/encryption-key/kubeconfig-encryption-key \
+            -in "${KUBEADMIN_PASSWORD_FILE}" \
+            -out "${ARTIFACT_DIR}/kubeadmin-password.enc"
+        fi
+        oc whoami --show-server
+        oc get clusterversion
+        echo "Encrypted kubeconfig exported to artifacts."
+      credentials:
+      - mount_path: /var/run/encryption-key
+        name: quay-ambient-ci-kubeconfig-encryption
+        namespace: test-credentials
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    - as: hold-cluster
+      commands: |
+        echo "Holding cluster open for 4 hours..."
+        for i in $(seq 1 48); do
+          echo "[$(date -u +%H:%M:%S)] ($((i * 5))/240 min)"
+          sleep 300
+        done
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay
+  variant: claim

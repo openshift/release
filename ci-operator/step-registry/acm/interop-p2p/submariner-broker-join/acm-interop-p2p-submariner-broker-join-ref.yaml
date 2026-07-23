@@ -1,0 +1,70 @@
+ref:
+  as: acm-interop-p2p-submariner-broker-join
+  from: cli
+  commands: acm-interop-p2p-submariner-broker-join-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  timeout: 1h0m0s
+  grace_period: 10m0s
+  env:
+    - name: ACM_SPOKE_CLUSTER_COUNT
+      default: "2"
+      documentation: |-
+        Number of ACM spoke clusters to join to the Submariner broker.
+    - name: SUBMARINER_REMEDIATE_GLOBALNET
+      default: "true"
+      documentation: |-
+        When true, detect a stale Globalnet broker (242.x routes or
+        submariner-globalnet DaemonSet) and uninstall Submariner from hub and
+        spokes before redeploying without Globalnet.
+    - name: SUBMARINER_UNINSTALL_WAIT_SECS
+      default: "30"
+      documentation: |-
+        Seconds to wait after Globalnet remediation uninstall before redeploy.
+    - name: SUBMARINER_COREDNS_SETTLE_SECS
+      default: "35"
+      documentation: |-
+        Seconds to wait after the clusterset.local stub zone is detected in CoreDNS
+        before triggering a CoreDNS rollout status check. Allows the forwarding rule
+        to propagate to all DNS pods before connectivity is assumed.
+    - name: SUBMARINER_BROKER_JOIN_DEBUG_MODE
+      default: "false"
+      documentation: |-
+        When "true", broker-join failures are logged but do not fail the job.
+        Used for iterative debugging of broker deployment and cluster join.
+  documentation: |-
+    Step 2 of 3 in the Submariner installation chain.
+
+    Installs subctl locally (not SHARED_DIR), deploys the Submariner broker on
+    the hub cluster (no --globalnet), then joins each spoke with
+    'subctl join --globalnet=false --label-gateway=false'.
+    If a previous Globalnet deployment is detected, uninstalls Submariner from
+    all clusters and redeploys without Globalnet before joining.
+    After all spokes have joined, waits on each spoke for:
+      - submariner-operator Deployment Available
+      - submariner-gateway DaemonSet rollout
+      - submariner-routeagent DaemonSet rollout (all-nodes routing)
+      - submariner-lighthouse-agent Deployment rollout
+      - submariner-lighthouse-coredns Deployment rollout
+    Asserts submariner-globalnet is absent and remote subnets are not 242.x.
+    Finally waits for OpenShift CoreDNS (dns-default) or kube-system coredns
+    to include the Lighthouse clusterset.local stub zone on each spoke.
+
+    Submariner broker is deployed WITHOUT Globalnet. Spokes must use
+    non-overlapping pod CIDRs (acm-interop-p2p-cluster-install ResolveSpokeCidr)
+    so cross-cluster pod IP routing works for KubeVirt CCLM sync traffic.
+
+    Sensitive data handling:
+      broker-info.subm is written to /tmp (never to SHARED_DIR) and removed
+      via a trap on EXIT after all 'subctl join' calls complete.
+
+    Env vars consumed:
+      ACM_SPOKE_CLUSTER_COUNT          - number of spoke clusters (default: 2)
+      SUBMARINER_REMEDIATE_GLOBALNET   - uninstall stale Globalnet before redeploy (default: true)
+      SUBMARINER_UNINSTALL_WAIT_SECS   - wait after Globalnet uninstall (default: 30)
+      SUBMARINER_COREDNS_SETTLE_SECS   - CoreDNS propagation settle time (default: 35)
+      SUBMARINER_BROKER_JOIN_DEBUG_MODE - when true, failures do not fail the job (default: false)
+      KUBECONFIG                       - hub cluster kubeconfig
+      SHARED_DIR                       - shared artifact directory

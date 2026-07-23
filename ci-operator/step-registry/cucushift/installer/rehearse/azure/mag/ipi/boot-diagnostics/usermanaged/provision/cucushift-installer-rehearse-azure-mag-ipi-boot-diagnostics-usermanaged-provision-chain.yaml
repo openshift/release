@@ -1,0 +1,24 @@
+chain:
+  as: cucushift-installer-rehearse-azure-mag-ipi-boot-diagnostics-usermanaged-provision
+  steps:
+  - chain: ipi-conf-azuremag
+  - ref: azure-provision-storage-account
+  - ref: ipi-conf-azure-bootdiagnostics
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - chain: cucushift-installer-check-azure
+  - ref: cucushift-installer-check-azure-boot-diagnostics
+  env:
+  - name: AZURE_CONTROL_PLANE_BOOT_DIAGNOSTICS_TYPE
+    default: "userManaged"
+    documentation: |-
+      Specify boot diagnostics type for controlplane machines
+      Value: Disabled, Managed and UserManaged
+      if not specify in install-config, default behavior is Managed on control plane nodes.
+  - name: BOOT_DIAGNOSTICS
+    default: "false"
+    documentation: "Inject boot diagnostics for *worker* nodes, configured via manifests during installation. Disable it in this workflow to test installer behavior."
+  documentation: |-
+    Create an IPI cluster on Azure for QE e2e tests.
+    Configure userManaged boot diagnostics in install-config. Applicable on 4.19+.

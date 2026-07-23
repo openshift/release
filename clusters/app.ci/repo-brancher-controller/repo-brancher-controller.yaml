@@ -1,0 +1,280 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: repo-brancher-controller
+  name: repo-brancher-controller
+  namespace: ci
+data:
+  config.yaml: |
+    default_branch:
+      configs_promoting_to: "5.0"
+      forward:
+      - family: release
+        targets:
+        - "5.0"
+        - "5.1"
+        ignore:
+        - org: Azure
+          repo: ARO-HCP
+        - org: openshift-eng
+        - org: openshift-priv
+          repo: ocp-build-data
+      - family: openshift
+        targets:
+        - "5.0"
+        - "5.1"
+        only:
+        - org: openshift
+          repo: kubecsr
+        - org: openshift-priv
+          repo: kubecsr
+        ignore:
+        - org: Azure
+          repo: ARO-HCP
+        - org: openshift-eng
+        - org: openshift-priv
+          repo: ocp-build-data
+    release_branches:
+    - source: "5.0"
+      forward:
+      - family: release
+        targets:
+        - "4.23"
+        ignore:
+        - org: Azure
+          repo: ARO-HCP
+        - org: openshift-eng
+        - org: openshift-priv
+          repo: ocp-build-data
+        - org: stolostron
+      - family: openshift
+        targets:
+        - "4.23"
+        only:
+        - org: openshift
+          repo: kubecsr
+        - org: openshift-priv
+          repo: kubecsr
+        ignore:
+        - org: Azure
+          repo: ARO-HCP
+        - org: openshift-eng
+        - org: openshift-priv
+          repo: ocp-build-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: repo-brancher-controller
+  name: repo-brancher-controller
+  namespace: ci
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: metrics
+  selector:
+    app: repo-brancher-controller
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: repo-brancher-controller
+  name: repo-brancher-controller
+  namespace: ci
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    scheme: http
+  selector:
+    matchLabels:
+      app: repo-brancher-controller
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    app: repo-brancher-controller
+  name: repo-brancher-controller
+  namespace: ci
+spec:
+  ingress:
+  - from:
+    - podSelector:
+        matchExpressions:
+        - key: component
+          operator: In
+          values:
+          - hook
+          - hook-apps
+        matchLabels:
+          app: prow
+    ports:
+    - port: http
+      protocol: TCP
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-user-workload-monitoring
+    ports:
+    - port: metrics
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      app: repo-brancher-controller
+  policyTypes:
+  - Ingress
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/matchTag: "true"
+    keel.sh/policy: force
+    keel.sh/pollSchedule: "@every 5m"
+    keel.sh/trigger: poll
+  labels:
+    app: repo-brancher-controller
+  name: repo-brancher-controller
+  namespace: ci
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: repo-brancher-controller
+  template:
+    metadata:
+      annotations:
+        ci-workload-autoscaler.openshift.io/scale: "false"
+      labels:
+        app: repo-brancher-controller
+    spec:
+      initContainers:
+      - args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        command:
+        - /git-sync
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        name: git-sync-init
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - mountPath: /tmp/git-sync
+          name: release
+      containers:
+      - args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        command:
+        - /git-sync
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        name: git-sync
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - mountPath: /tmp/git-sync
+          name: release
+      - args:
+        - --config-dir=/var/repo/release/ci-operator/config
+        - --forwarding-config=/etc/repo-brancher-controller/config.yaml
+        - --plugin-config-dir=/var/repo/release/core-services/prow/02_config
+        - --github-token-path=/etc/github/oauth
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --hmac-secret-file=/etc/webhook/hmac.yaml
+        - --slack-token-path=/etc/slack/oauth_token
+        - --ops-channel-id=CHY2E1BL4
+        - --endpoint=/
+        - --port=8888
+        command:
+        - repo-brancher-controller
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-brancher-controller_latest
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        name: repo-brancher-controller
+        ports:
+        - containerPort: 8888
+          name: http
+        - containerPort: 9090
+          name: metrics
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+        volumeMounts:
+        - mountPath: /var/repo
+          name: release
+          readOnly: true
+        - mountPath: /etc/github
+          name: oauth
+          readOnly: true
+        - mountPath: /etc/webhook
+          name: hmac
+          readOnly: true
+        - mountPath: /etc/slack
+          name: slack
+          readOnly: true
+        - mountPath: /etc/repo-brancher-controller
+          name: config
+          readOnly: true
+      volumes:
+      - emptyDir: {}
+        name: release
+      - name: oauth
+        secret:
+          secretName: github-credentials-openshift-merge-robot
+      - name: hmac
+        secret:
+          secretName: github-webhook-credentials
+      - name: slack
+        secret:
+          secretName: slack-credentials-dptp-bot
+      - configMap:
+          name: repo-brancher-controller
+        name: config

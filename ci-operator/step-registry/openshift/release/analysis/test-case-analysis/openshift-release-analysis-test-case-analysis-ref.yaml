@@ -1,0 +1,41 @@
+ref:
+  as: openshift-release-analysis-test-case-analysis
+  from_image:
+    namespace: ci
+    name: job-run-aggregator
+    tag: latest
+  commands: openshift-release-analysis-test-case-analysis-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 6h0m0s
+  grace_period: 30s
+  credentials:
+  - namespace: test-credentials
+    name: crt-job-aggregator-credentials
+    mount_path: /var/run/secrets
+  - namespace: test-credentials
+    name: trt-aggregator-waiter-kubeconfig
+    mount_path: /var/run/kubeconfig
+  env:
+  - name: GOOGLE_SA_CREDENTIAL_FILE
+  - name: PAYLOAD_TAG
+  - name: JOB_START_TIME
+  - name: WORKING_DIR
+  - name: MINIMUM_SUCCESSFUL_COUNT
+    default: "1"
+  - name: TEST_GROUP
+    default: "install"
+  - name: JOB_CONFIGURATION
+    default: |
+      aws-ovn-ipi,1,--platform=aws --network=ovn --infrastructure=ipi
+      aws-proxy,1,--include-job-names=ovn-proxy
+      azure-ovn-ipi,1,--platform=azure --network=ovn --infrastructure=ipi --exclude-job-names=kubevirt
+      fips,1,--include-job-names=fips --exclude-job-names=fips-scan
+      gcp-ovn-ipi,1,--platform=gcp --network=ovn --infrastructure=ipi
+      metal-ovn-ipi,1,--platform=metal --network=ovn --infrastructure=ipi
+      vsphere-ovn-upi,1,--platform=vsphere --network=ovn --infrastructure=upi
+      single-node,1,--platform=aws --include-job-names=single-node
+  documentation: |-
+    Launches the job-run-aggregator to analyze test case status of jobs launched by the release-controller.

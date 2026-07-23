@@ -1,0 +1,33 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: build/Dockerfile
+    to: unused
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  scan:
+    requests:
+      cpu: 1000m
+      memory: 8Gi
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: scan
+  commands: make scan
+  container:
+    from: src
+  optional: true
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: osd-cluster-ready

@@ -1,0 +1,208 @@
+base_images:
+  aks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aks-stable
+  aro:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aro-stable
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-stable
+  osd:
+    name: automation-flavors
+    namespace: stackrox
+    tag: osd-stable
+  rosa:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-stable
+  rosa-hcp:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-stable
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-ui-test-stable
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- as: gke-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-oldest-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      GKE_CLUSTER_VERSION: oldest
+      TEST_SUITE: gke-qa-e2e-tests
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-latest-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      GKE_CLUSTER_VERSION: latest
+      TEST_SUITE: gke-qa-e2e-tests
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-ui-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-oldest-ui-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      GKE_CLUSTER_VERSION: oldest
+      TEST_SUITE: gke-ui-e2e-tests
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-latest-ui-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      GKE_CLUSTER_VERSION: latest
+      TEST_SUITE: gke-ui-e2e-tests
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-oldest-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      GKE_CLUSTER_VERSION: oldest
+      TEST_SUITE: gke-nongroovy-e2e-tests
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-latest-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      GKE_CLUSTER_VERSION: latest
+      TEST_SUITE: gke-nongroovy-e2e-tests
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-nongroovy-compatibility-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-operator-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-latest-operator-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      GKE_CLUSTER_VERSION: latest
+      TEST_SUITE: gke-operator-e2e-tests
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-oldest-operator-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      GKE_CLUSTER_VERSION: oldest
+      TEST_SUITE: gke-operator-e2e-tests
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-upgrade-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-version-compatibility-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-race-condition-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-scale-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-stackrox-e2e-job
+- as: gke-external-pg-17-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-stackrox-e2e-job
+- as: eks-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-eks-e2e
+- as: osd-aws-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-osd-aws-e2e
+- as: osd-gcp-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-osd-gcp-e2e
+- as: aro-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-aro-e2e
+- as: aks-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-aks-e2e
+- as: rosa-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-rosa-e2e
+- as: rosa-fips-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      FIPS_ENABLED: "true"
+      TEST_SUITE: rosa-qa-e2e-tests
+    workflow: stackrox-automation-flavors-rosa-e2e
+- as: rosa-hcp-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: rosa-qa-e2e-tests
+    workflow: stackrox-automation-flavors-rosa-hcp-e2e
+zz_generated_metadata:
+  branch: nightlies
+  org: stackrox
+  repo: stackrox
