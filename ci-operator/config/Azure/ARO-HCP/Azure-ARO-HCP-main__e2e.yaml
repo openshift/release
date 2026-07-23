@@ -78,17 +78,12 @@ tests:
   run_if_changed: ^$
   steps:
     env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_SUITE_NAME: prod/parallel
       LOCATION: uksouth
       VAULT_SECRET_PROFILE: prod
-      # Restrict slot-manager to the MSFT Test-Tenant prod sub ("ARO HCP E2E"),
-      # so this gating job keeps running against the same subscription and
-      # credentials as before the slot-manager migration. Cross-tenant leasing
-      # of the RH-tenant prod subs is enabled later via per-region
-      # ALLOWED_SUBSCRIPTIONS + CLUSTER_PROFILE_DIRS overrides.
-      ALLOWED_SUBSCRIPTIONS: "ARO HCP E2E"
     workflow: aro-hcp-persistent-e2e
 - as: prod-e2e-parallel-slot-manager
   postsubmit: true
@@ -102,11 +97,13 @@ tests:
   run_if_changed: ^$
   steps:
     env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_SUITE_NAME: prod/parallel
+      CLUSTER_PROFILE_DIRS: /var/run/aro-hcp-prod,/var/run/aro-hcp-prod-rh
       LOCATION: uksouth
-      VAULT_SECRET_PROFILE: prod-rh
+      VAULT_SECRET_PROFILE: prod
     workflow: aro-hcp-persistent-e2e
 zz_generated_metadata:
   branch: main
