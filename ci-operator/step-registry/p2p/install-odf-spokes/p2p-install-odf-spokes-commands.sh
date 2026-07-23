@@ -11,6 +11,11 @@ eval "$(
     "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq
 
+# ODF_SPOKE_OPERATOR_CHANNEL takes precedence over ODF_OPERATOR_CHANNEL.
+# This decouples the hub channel (ODF_OPERATOR_CHANNEL) from the spoke channel when hub and
+# spoke run different OCP versions (e.g. hub=4.22, spoke starts at 4.21).
+ODF_OPERATOR_CHANNEL="${ODF_SPOKE_OPERATOR_CHANNEL:-${ODF_OPERATOR_CHANNEL}}"
+
 typeset -i odfCsvPollInt="${ODF_CSV_POLL_INTERVAL_SECONDS}"
 typeset -i odfCsvPollMax="${ODF_CSV_POLL_TIMEOUT_SECONDS}"
 typeset -i odfCephPollInt="${ODF_CEPH_POLL_INTERVAL_SECONDS}"
