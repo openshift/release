@@ -16,11 +16,16 @@ resources:
 tests:
 - as: lint
   commands: |
-    # Only run checks that don't require fetching dependencies
-    make shell-lint make-lint
+    unset GOFLAGS
+    export HOME=/tmp
+    git config --global url."https://$(cat /usr/local/ocm-github-credentials/token)@github.com/".insteadOf "https://github.com/"
+    make lint
   container:
     from: src
+  secrets:
+  - mount_path: /usr/local/ocm-github-credentials
+    name: ocm-github-credentials
 zz_generated_metadata:
-  branch: master
+  branch: github-master
   org: openshift-online
   repo: rosa-backend-tests
