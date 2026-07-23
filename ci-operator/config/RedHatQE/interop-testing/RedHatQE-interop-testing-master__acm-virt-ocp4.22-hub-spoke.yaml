@@ -30,8 +30,9 @@ images:
     to: cli-with-git
 releases:
   initial:
-    release:
-      channel: stable
+    candidate:
+      product: ocp
+      stream: nightly
       version: "4.22"
   latest:
     candidate:
@@ -50,7 +51,6 @@ tests:
     cluster_profile: aws-cspi-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ACM_SPOKE_CLUSTER_COUNT: "1"
       ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.22"
@@ -61,7 +61,7 @@ tests:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       CNV_ENABLE_CCLM: "true"
       CNV_HUB_INSTALL_MAJOR_MINOR: "4.22"
-      CNV_POLICY_INSTALL_MAJOR_MINOR: "4.21"
+      CNV_POLICY_INSTALL_MAJOR_MINOR: "4.22"
       COMPUTE_NODE_TYPE: m8i.8xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIREWATCH_CONFIG: |
@@ -82,11 +82,7 @@ tests:
               {"step": "p2p-mtv-register-providers", "failure_type": "all", "classification": "MTV provider registration failure", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "p2p-create-hub-spoke-test-vms", "failure_type": "all", "classification": "Hub-spoke CCLM test VM creation failure", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_additional_labels": ["!default", "interop-tests"]},
               {"step": "p2p-mtv-create-hub-spoke-maps", "failure_type": "all", "classification": "Hub-spoke MTV migration maps failure", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-              {"step": "p2p-mtv-execute-hub-spoke-migration", "failure_type": "all", "classification": "Hub-to-spoke CCLM live migration failure (pre-upgrade pass)", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_additional_labels": ["!default", "interop-tests"]},
-              {"step": "acm-interop-p2p-spoke-upgrade-prehealthcheck", "failure_type": "all", "classification": "Spoke pre-upgrade health check failure", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
-              {"step": "acm-interop-p2p-spoke-upgrade", "failure_type": "all", "classification": "Spoke OCP upgrade failure (4.21 to 4.22)", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-              {"step": "acm-interop-p2p-spoke-upgrade-healthcheck", "failure_type": "all", "classification": "Spoke post-upgrade health check failure", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
-              {"step": "p2p-mtv-spoke-to-hub-migration", "failure_type": "all", "classification": "Spoke-to-hub CCLM live migration failure (post-upgrade reverse pass)", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_additional_labels": ["!default", "interop-tests"]},
+              {"step": "p2p-mtv-execute-hub-spoke-migration", "failure_type": "all", "classification": "Hub-spoke CCLM live migration failure (hub→spoke and spoke→hub)", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_additional_labels": ["!default", "interop-tests"]},
               {"step": "acm-mch", "failure_type": "all", "classification": "ACM MCH install", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]}
             ]
         }
@@ -112,6 +108,7 @@ tests:
       MTV_PROVIDER_NAMES: spoke-1
       MTV_SPOKE_CLUSTER_COUNT: "1"
       ODF_OPERATOR_CHANNEL: stable-4.22
+      ODF_SPOKE_OPERATOR_CHANNEL: stable-4.22
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
@@ -124,8 +121,7 @@ tests:
       P2P_HS_SPOKE_VM_PREFIX: spoke-vm
       P2P_HS_VM_COUNT: "2"
       P2P_HS_VM_NAMESPACE: hub-spoke-test
-      P2P_MIGRATION_DIRECTION: hub-to-spoke
-      SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL: candidate-4.22
+      P2P_MIGRATION_DIRECTION: both
       SUBMARINER_VERIFY_HUB_SPOKE: "true"
       USER_TAGS: |
         scenario acm-cnv-p2p-hub-spoke-upgrade
