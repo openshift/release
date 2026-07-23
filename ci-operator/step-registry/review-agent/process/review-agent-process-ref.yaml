@@ -19,16 +19,37 @@ ref:
     default: "/var/run/claude-code-service-account/claude-prow"
     documentation: |-
       Path to the Google Cloud service account JSON key file for Vertex AI authentication.
+  - name: REVIEW_AGENT_AUTH_MODE
+    default: "app"
+    documentation: |-
+      Authentication mode: "app" (GitHub App, default) or "pat" (classic PAT).
+      In "pat" mode, a single classic PAT handles fork creation, push, and PR
+      operations against any public repo. Requires REVIEW_AGENT_FORK_ORG.
+  - name: REVIEW_AGENT_FORK_ORG
+    default: ""
+    documentation: |-
+      GitHub org or user account to fork repos into (PAT mode only).
+      Example: "jira-solve-bot"
+  - name: REVIEW_AGENT_PAT_KEY
+    default: "gh-pat"
+    documentation: |-
+      Key name in the credential secret for the GitHub classic PAT (PAT mode only).
   - name: REVIEW_AGENT_FORK_REPO
     default: ""
     documentation: |-
       Fork repo URL to clone and push to (e.g. https://github.com/hypershift-community/hypershift).
-      Set by the team's wrapper workflow.
+      Required in App mode. In PAT mode, auto-derived from REVIEW_AGENT_FORK_ORG
+      and the upstream repo name.
   - name: REVIEW_AGENT_UPSTREAM_REPO
     default: ""
     documentation: |-
       Upstream owner/repo for gh CLI PR operations (e.g. openshift/hypershift).
-      Set by the team's wrapper workflow.
+      Required in both App and PAT modes. Set by the team's wrapper workflow.
+  - name: REVIEW_AGENT_TARGET_PR
+    default: ""
+    documentation: |-
+      Explicit PR number to process. When set, overrides PULL_NUMBER from the
+      presubmit context. Useful for periodic jobs triggered via gangway.
   - name: MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_TARGET_PR
     default: ""
     documentation: |-
@@ -57,5 +78,10 @@ ref:
     review comments on a single PR. Designed for presubmit use:
     PULL_NUMBER is provided by the Prow presubmit context.
 
-    Requires REVIEW_AGENT_FORK_REPO and REVIEW_AGENT_UPSTREAM_REPO
-    to be set by the wrapper workflow.
+    App mode (default): requires REVIEW_AGENT_FORK_REPO and
+    REVIEW_AGENT_UPSTREAM_REPO to be set by the wrapper workflow.
+
+    PAT mode: requires REVIEW_AGENT_AUTH_MODE="pat",
+    REVIEW_AGENT_FORK_ORG, and REVIEW_AGENT_UPSTREAM_REPO.
+    REVIEW_AGENT_FORK_REPO is auto-derived from FORK_ORG and the
+    upstream repo name.

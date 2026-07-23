@@ -3,15 +3,31 @@ set -euo pipefail
 
 echo "=== Review Agent Process ==="
 
+# Auth mode: "app" (GitHub App, default) or "pat" (classic PAT)
+REVIEW_AGENT_AUTH_MODE="${REVIEW_AGENT_AUTH_MODE:-app}"
+REVIEW_AGENT_PAT_KEY="${REVIEW_AGENT_PAT_KEY:-gh-pat}"
+REVIEW_AGENT_FORK_ORG="${REVIEW_AGENT_FORK_ORG:-}"
+
 # Validate required env vars
-if [[ -z "${REVIEW_AGENT_FORK_REPO:-}" ]]; then
-  echo "ERROR: REVIEW_AGENT_FORK_REPO is required (e.g. https://github.com/hypershift-community/hypershift)"
+if [[ "$REVIEW_AGENT_AUTH_MODE" == "app" ]] && [[ -z "${REVIEW_AGENT_FORK_REPO:-}" ]]; then
+  echo "ERROR: REVIEW_AGENT_FORK_REPO is required in App auth mode (e.g. https://github.com/hypershift-community/hypershift)"
+  exit 1
+fi
+if [[ "$REVIEW_AGENT_AUTH_MODE" == "pat" ]] && [[ -z "$REVIEW_AGENT_FORK_ORG" ]]; then
+  echo "ERROR: REVIEW_AGENT_FORK_ORG is required in PAT auth mode"
   exit 1
 fi
 if [[ -z "${REVIEW_AGENT_UPSTREAM_REPO:-}" ]]; then
   echo "ERROR: REVIEW_AGENT_UPSTREAM_REPO is required (e.g. openshift/hypershift)"
   exit 1
 fi
+
+# In PAT mode, derive fork repo from FORK_ORG + upstream repo name if not set
+if [[ "$REVIEW_AGENT_AUTH_MODE" == "pat" ]] && [[ -z "${REVIEW_AGENT_FORK_REPO:-}" ]]; then
+  REVIEW_AGENT_FORK_REPO="https://github.com/${REVIEW_AGENT_FORK_ORG}/${REVIEW_AGENT_UPSTREAM_REPO#*/}"
+fi
+
+echo "Configuration: AUTH_MODE=$REVIEW_AGENT_AUTH_MODE"
 
 # Derive clone directory from fork repo URL
 CLONE_DIR="/tmp/$(basename "$REVIEW_AGENT_FORK_REPO")"
@@ -66,62 +82,121 @@ git config user.email "ci-bot@redhat.com"
 # Add upstream remote for PR operations
 git remote add upstream "https://github.com/${REVIEW_AGENT_UPSTREAM_REPO}.git"
 
-# Source the github-app-auth library (written by jira-agent-github-app-auth pre step)
-echo "Loading GitHub App auth library..."
-if [ ! -f "${SHARED_DIR}/github-app-auth.sh" ]; then
-  echo "ERROR: github-app-auth.sh not found in SHARED_DIR."
-  echo "Ensure jira-agent-github-app-auth runs as a pre step."
-  exit 1
-fi
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/github-app-auth.sh"
-
 GITHUB_APP_CREDS_DIR="/var/run/claude-code-service-account"
-INSTALLATION_ID_FORK_FILE="${GITHUB_APP_CREDS_DIR}/installation-id"
-INSTALLATION_ID_UPSTREAM_FILE="${GITHUB_APP_CREDS_DIR}/o-h-installation-id"
 
-if [ ! -f "$INSTALLATION_ID_FORK_FILE" ] || [ ! -f "$INSTALLATION_ID_UPSTREAM_FILE" ]; then
-  echo "GitHub App credentials not yet available in ${GITHUB_APP_CREDS_DIR}"
-  echo "Available files:"
-  ls -la "${GITHUB_APP_CREDS_DIR}/" || echo "Directory does not exist"
-  echo ""
-  echo "Waiting for Vault secretsync to complete. The following keys are required:"
-  echo "  - app-id"
-  echo "  - installation-id (for fork)"
-  echo "  - o-h-installation-id (for upstream)"
-  echo "  - private-key"
-  echo ""
-  echo "ERROR: Required credentials are missing. Re-run once secrets are synced."
-  exit 1
+if [[ "$REVIEW_AGENT_AUTH_MODE" == "pat" ]]; then
+  # PAT mode: single token for push + PR operations
+  echo "Loading GitHub PAT credentials..."
+  PAT_FILE="${GITHUB_APP_CREDS_DIR}/${REVIEW_AGENT_PAT_KEY}"
+  if [ ! -f "$PAT_FILE" ]; then
+    echo "ERROR: PAT file not found: $PAT_FILE"
+    ls -la "${GITHUB_APP_CREDS_DIR}/" || echo "Directory does not exist"
+    exit 1
+  fi
+  [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
+  set +x
+  GITHUB_TOKEN_PAT=$(cat "$PAT_FILE")
+  if [ -z "$GITHUB_TOKEN_PAT" ]; then
+    echo "ERROR: PAT file is empty: $PAT_FILE"
+    $_was_tracing && set -x || true
+    exit 1
+  fi
+  git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_PAT}; }; f"
+  export GITHUB_TOKEN="$GITHUB_TOKEN_PAT"
+  echo "PAT configured for git and GitHub CLI"
+  $_was_tracing && set -x || true
+
+  # Ensure the fork exists (auto-fork if needed)
+  FORK_REPO_NAME="${REVIEW_AGENT_UPSTREAM_REPO#*/}"
+  echo "Checking if fork ${REVIEW_AGENT_FORK_ORG}/${FORK_REPO_NAME} exists..."
+  FORK_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${REVIEW_AGENT_FORK_ORG}/${FORK_REPO_NAME}")
+  if [ "$FORK_HTTP_CODE" != "200" ]; then
+    echo "Fork not found (HTTP ${FORK_HTTP_CODE}). Creating fork of ${REVIEW_AGENT_UPSTREAM_REPO}..."
+    FORK_RESPONSE=$(curl -s -X POST \
+      --connect-timeout 10 --max-time 30 \
+      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${REVIEW_AGENT_UPSTREAM_REPO}/forks" \
+      -d '{"default_branch_only":true}')
+    FORK_FULL_NAME=$(echo "$FORK_RESPONSE" | jq -r '.full_name // empty' 2>/dev/null)
+    if [ -z "$FORK_FULL_NAME" ]; then
+      echo "ERROR: Failed to create fork. API response:"
+      echo "$FORK_RESPONSE" | head -20
+      exit 1
+    fi
+    echo "Fork creation initiated: ${FORK_FULL_NAME}"
+    # Poll until ready
+    WAITED=0
+    while [ $WAITED -lt 120 ]; do
+      FORK_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/${REVIEW_AGENT_FORK_ORG}/${FORK_REPO_NAME}")
+      [ "$FORK_HTTP_CODE" = "200" ] && break
+      echo "Waiting for fork to be ready... (${WAITED}s/120s)"
+      sleep 10
+      WAITED=$((WAITED + 10))
+    done
+    if [ "$FORK_HTTP_CODE" != "200" ]; then
+      echo "ERROR: Fork not ready after 120s"
+      exit 1
+    fi
+    echo "Fork ${REVIEW_AGENT_FORK_ORG}/${FORK_REPO_NAME} is ready"
+  else
+    echo "Fork ${REVIEW_AGENT_FORK_ORG}/${FORK_REPO_NAME} already exists"
+  fi
+else
+  # App mode: separate fork/upstream tokens
+  echo "Loading GitHub App auth library..."
+  if [ ! -f "${SHARED_DIR}/github-app-auth.sh" ]; then
+    echo "ERROR: github-app-auth.sh not found in SHARED_DIR."
+    echo "Ensure jira-agent-github-app-auth runs as a pre step."
+    exit 1
+  fi
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/github-app-auth.sh"
+
+  INSTALLATION_ID_FORK_FILE="${GITHUB_APP_CREDS_DIR}/installation-id"
+  INSTALLATION_ID_UPSTREAM_FILE="${GITHUB_APP_CREDS_DIR}/o-h-installation-id"
+
+  if [ ! -f "$INSTALLATION_ID_FORK_FILE" ] || [ ! -f "$INSTALLATION_ID_UPSTREAM_FILE" ]; then
+    echo "GitHub App credentials not yet available in ${GITHUB_APP_CREDS_DIR}"
+    echo "Available files:"
+    ls -la "${GITHUB_APP_CREDS_DIR}/" || echo "Directory does not exist"
+    echo "ERROR: Required credentials are missing. Re-run once secrets are synced."
+    exit 1
+  fi
+
+  INSTALLATION_ID_FORK=$(cat "$INSTALLATION_ID_FORK_FILE")
+  INSTALLATION_ID_UPSTREAM=$(cat "$INSTALLATION_ID_UPSTREAM_FILE")
+
+  echo "Generating GitHub App token for fork..."
+  GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
+  if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
+    echo "ERROR: Failed to generate GitHub App token for fork"
+    exit 1
+  fi
+  echo "Fork token generated successfully"
+
+  echo "Generating GitHub App token for upstream..."
+  GITHUB_TOKEN_UPSTREAM=$(generate_github_token "$INSTALLATION_ID_UPSTREAM")
+  if [ -z "$GITHUB_TOKEN_UPSTREAM" ] || [ "$GITHUB_TOKEN_UPSTREAM" = "null" ]; then
+    echo "ERROR: Failed to generate GitHub App token for upstream"
+    exit 1
+  fi
+  echo "Upstream token generated successfully"
+
+  # Disable tracing due to token handling
+  [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
+  set +x
+  git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
+  export GITHUB_TOKEN="$GITHUB_TOKEN_UPSTREAM"
+  echo "GitHub App tokens configured successfully"
+  $_was_tracing && set -x || true
 fi
-
-INSTALLATION_ID_FORK=$(cat "$INSTALLATION_ID_FORK_FILE")
-INSTALLATION_ID_UPSTREAM=$(cat "$INSTALLATION_ID_UPSTREAM_FILE")
-
-# Generate token for fork - for pushing branches
-echo "Generating GitHub App token for fork..."
-GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
-if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
-  echo "ERROR: Failed to generate GitHub App token for fork"
-  exit 1
-fi
-echo "Fork token generated successfully"
-
-# Generate token for upstream - for reading PRs and comments
-echo "Generating GitHub App token for upstream..."
-GITHUB_TOKEN_UPSTREAM=$(generate_github_token "$INSTALLATION_ID_UPSTREAM")
-if [ -z "$GITHUB_TOKEN_UPSTREAM" ] || [ "$GITHUB_TOKEN_UPSTREAM" = "null" ]; then
-  echo "ERROR: Failed to generate GitHub App token for upstream"
-  exit 1
-fi
-echo "Upstream token generated successfully"
-
-# Configure git to use the fork token for push operations via credential helper
-git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
-
-# Export upstream token as GITHUB_TOKEN for gh CLI (used for PR operations)
-export GITHUB_TOKEN="$GITHUB_TOKEN_UPSTREAM"
-echo "GitHub App tokens configured successfully"
 
 # TODO: Stronger sandboxing (container-level isolation, ai-guardian, PreToolUse hooks)
 # tracked in https://redhat.atlassian.net/browse/CNTRLPLANE-3750

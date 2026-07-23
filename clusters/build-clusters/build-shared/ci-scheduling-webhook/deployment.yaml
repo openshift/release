@@ -42,6 +42,17 @@ spec:
         app: ci-scheduling-admission-webhook
     spec:
       serviceAccountName: ci-scheduling-webhook
+      # Image ships amd64/arm64 only; avoid s390x ImagePullBackOff (empty endpoints).
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - arm64
       tolerations:
         - key: node-role.kubernetes.io/infra
           operator: Exists

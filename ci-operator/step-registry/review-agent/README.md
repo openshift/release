@@ -12,14 +12,27 @@ This workflow processes a single PR per invocation:
 
 ## Architecture
 
-Teams onboard by creating a thin wrapper workflow that sets two environment variables:
+Teams onboard by creating a thin wrapper workflow. Two authentication modes are supported:
 
-| Variable | Purpose |
-|---|---|
-| `REVIEW_AGENT_FORK_REPO` | Fork repo URL to clone and push to |
-| `REVIEW_AGENT_UPSTREAM_REPO` | Upstream `owner/repo` for `gh pr` operations |
+### App mode (default)
 
-All other values (clone dir, git remote URL, system prompt, PR links, report footer, telemetry repo field) are derived from these two.
+| Variable | Required | Purpose |
+|---|---|---|
+| `REVIEW_AGENT_FORK_REPO` | Yes | Fork repo URL to clone and push to |
+| `REVIEW_AGENT_UPSTREAM_REPO` | Yes | Upstream `owner/repo` for `gh pr` operations |
+
+### PAT mode
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `REVIEW_AGENT_AUTH_MODE` | Yes | Set to `"pat"` |
+| `REVIEW_AGENT_FORK_ORG` | Yes | GitHub org/user to fork into (fork auto-created if missing) |
+| `REVIEW_AGENT_UPSTREAM_REPO` | Yes | Upstream `owner/repo` for `gh pr` operations |
+| `REVIEW_AGENT_PAT_KEY` | No | Key name in secret for the PAT (default: `gh-pat`) |
+
+In PAT mode, `REVIEW_AGENT_FORK_REPO` is auto-derived from `REVIEW_AGENT_FORK_ORG` and the upstream repo name.
+
+All other values (clone dir, git remote URL, system prompt, PR links, report footer, telemetry repo field) are derived from these variables.
 
 Teams with a different credential secret create thin ref YAML wrappers pointing to the generic commands scripts with their own `credentials:` block. See [ONBOARDING.md](ONBOARDING.md).
 

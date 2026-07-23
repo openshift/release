@@ -27,6 +27,13 @@ else
     MACHINE_CONFIG_ROLE="worker"
 fi
 
+# Create helper variable for useSourceImage to be used in the config file below
+if [[ -n "${USE_SOURCE_IMAGE:-}" ]]; then
+    USE_SOURCE_IMAGE_STR="use_source_image: ${USE_SOURCE_IMAGE}"
+else
+    USE_SOURCE_IMAGE_STR=""
+fi
+
 # Generate cluster config file from environment variables
 CONFIG_FILE=/tmp/cluster-config.yaml
 cat > "${CONFIG_FILE}" <<EOF
@@ -73,6 +80,7 @@ operators:
   machine_config_role: "${MACHINE_CONFIG_ROLE}"
   driver_version: "${AMD_DRIVER_VERSION:-30.20.1}"
   enable_metrics: true
+  ${USE_SOURCE_IMAGE_STR}
 EOF
 
 echo "Generated cluster config:"

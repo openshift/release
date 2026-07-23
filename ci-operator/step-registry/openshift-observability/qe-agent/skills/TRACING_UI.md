@@ -374,6 +374,40 @@ Do not attempt to fix the plugin or operator code. Instead, write `${ARTIFACT_DI
 <Critical / Major / Minor — based on whether this blocks a release gate>
 ````
 
+After writing `bug-report.md`, also write `${ARTIFACT_DIR}/jira-payload.json` for automated Jira filing.
+Convert the bug report content to **Jira wiki notation** using these rules:
+
+| Markdown | Jira wiki notation |
+|---|---|
+| `# heading` | `h1. heading` |
+| `## heading` | `h2. heading` |
+| `### heading` | `h3. heading` |
+| `**bold**` | `*bold*` |
+| `` `code` `` | `{{code}}` |
+| ` ```text ... ``` ` | `{code:title=text}...{code}` |
+| `- item` | `* item` |
+| `1. item` | `# item` |
+| `> quote` | `bq. quote` |
+
+Write the JSON using `jq` for safe escaping:
+
+```bash
+_SUMMARY="[qe-agent] <one-sentence summary from the bug report>"
+# Summary must be ≤ 255 characters
+_SUMMARY="${_SUMMARY:0:255}"
+
+_DESCRIPTION="<full bug report content converted to Jira wiki notation>"
+
+jq -n \
+  --arg summary "${_SUMMARY}" \
+  --arg description "${_DESCRIPTION}" \
+  --arg severity "<Critical / Major / Minor>" \
+  '{summary: $summary, description: $description, severity: $severity}' \
+  > "${ARTIFACT_DIR}/jira-payload.json"
+```
+
+The description must NOT contain raw credentials, tokens, passwords, or SHA-256 digests — redact with `[REDACTED]` if any appear in the evidence.
+
 ---
 
 ## Step 5c — If FLAKY: Fix and Export
@@ -469,4 +503,5 @@ Examples of what belongs here:
 - `$KUBECONFIG` is set and points to the test cluster; `oc`, `kubectl`, and `npm`/`npx` are available in PATH
 - Cypress screenshots and videos are binary artifacts — do **not** copy them to `$SHARED_DIR` (its 1 MiB Secret limit would be exceeded immediately). Only JUnit XML reports are safe to copy
 - All output files must go to `$ARTIFACT_DIR` (uploaded to GCS by the sidecar) or `$SHARED_DIR` (accessible to other steps)
+- **Namespace restriction**: You MUST NOT access, read, list, or modify any resources in the `kube-system` namespace. This namespace contains cloud provider credentials and platform-critical components. Do not run `oc get`, `oc describe`, `oc logs`, `kubectl`, or any other command that targets `kube-system`. If a diagnostic command defaults to all namespaces (e.g., `oc get pods -A`), filter out `kube-system` from the output before analysis
 - This step runs `best_effort: true` — always exit 0 even if analysis is incomplete

@@ -62,10 +62,22 @@ FOCUS=""
 cmd=$(generate_running_cmd "$LABEL_FILTER_SWITCH"  "$FOCUS" "$TEST_TIMEOUT" "$JUNIT_XML")
 log "INFO: Start e2e testing ...\n$cmd"
 
-# Execute the running cmd 
-eval "${cmd}" || true
+# Execute the running cmd; preserve exit code for later
+eval "${cmd}" && test_exit=0 || test_exit=$?
 
-# cp ${SHARED_DIR}/junit.tar.gz ${ARTIFACT_DIR}
-upload_junit_result $JUNIT_XML $SHARED_DIR ${ARTIFACT_DIR}
+if [[ "${STRIP_JUNIT_OUTPUT}" == "true" ]]; then
+  log "Stripping system-out/system-err from junit XML to avoid sidecar censoring"
+  python3 -c "
+import xml.etree.ElementTree as ET, sys
+tree = ET.parse(sys.argv[1])
+for elem in tree.iter():
+    for child in list(elem):
+        if child.tag in ('system-out', 'system-err'):
+            elem.remove(child)
+tree.write(sys.argv[1], xml_declaration=True, encoding='unicode')
+" "${JUNIT_XML}"
+fi
+cp "${JUNIT_XML}" "${ARTIFACT_DIR}/"
 
 log "Testing is finished and uploaded."
+exit ${test_exit}
