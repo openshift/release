@@ -3,12 +3,15 @@ build_root:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/ubi:latest
       RUN dnf install -y git tar xz && dnf clean all
-      RUN curl -fsSL https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz \
-            | tar -xJf - --strip-components=1 -C /usr/local/bin shellcheck-v0.10.0/shellcheck \
+      RUN SHELLCHECK_SHA=6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87 \
+          && curl -fsSL -o /tmp/shellcheck.tar.xz https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.linux.x86_64.tar.xz \
+          && echo "${SHELLCHECK_SHA}  /tmp/shellcheck.tar.xz" | sha256sum -c - \
+          && tar -xJf /tmp/shellcheck.tar.xz --strip-components=1 -C /usr/local/bin shellcheck-v0.10.0/shellcheck \
+          && rm -f /tmp/shellcheck.tar.xz \
           && shellcheck --version
       RUN curl -fsSL https://packages.microsoft.com/config/rhel/9/prod.repo -o /etc/yum.repos.d/microsoft.repo \
           && dnf install -y powershell && dnf clean all \
-          && pwsh -NoLogo -Command "Set-PSRepository PSGallery -InstallationPolicy Trusted; Install-Module -Name PSScriptAnalyzer -Scope AllUsers -Force"
+          && pwsh -NoLogo -Command "Set-PSRepository PSGallery -InstallationPolicy Trusted; Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.23.0 -Scope AllUsers -Force"
 resources:
   '*':
     requests:
