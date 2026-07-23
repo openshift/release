@@ -40,6 +40,65 @@ run_on_node() {
     "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@${ip} 'sudo bash -c \"$*\"'"
 }
 
+collect_rbd_diagnostics() {
+  local label="$1"
+  echo ""
+  echo "=== RBD/Ceph Diagnostics (${label}) ==="
+
+  local toolbox
+  toolbox=$(oc get pod -n openshift-storage -l app=rook-ceph-tools \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+  if [[ -n "${toolbox}" ]]; then
+    echo "--- ceph -s ---"
+    oc exec -n openshift-storage "${toolbox}" -- ceph -s 2>&1 || true
+
+    echo "--- ceph osd tree ---"
+    oc exec -n openshift-storage "${toolbox}" -- ceph osd tree 2>&1 || true
+
+    echo "--- ceph osd blocklist ls ---"
+    oc exec -n openshift-storage "${toolbox}" -- ceph osd blocklist ls 2>&1 || true
+
+    echo "--- rbd ls ocs-storagecluster-cephblockpool ---"
+    oc exec -n openshift-storage "${toolbox}" -- rbd ls ocs-storagecluster-cephblockpool 2>&1 || true
+
+    local rbd_images
+    rbd_images=$(oc exec -n openshift-storage "${toolbox}" -- \
+        rbd ls ocs-storagecluster-cephblockpool 2>/dev/null || true)
+    for img in ${rbd_images}; do
+      echo "--- rbd status ocs-storagecluster-cephblockpool/${img} ---"
+      oc exec -n openshift-storage "${toolbox}" -- \
+          rbd status "ocs-storagecluster-cephblockpool/${img}" 2>&1 || true
+    done
+  else
+    echo "WARNING: Ceph toolbox pod not found, skipping ceph/rbd diagnostics"
+  fi
+
+  echo "--- CephCluster health ---"
+  oc get cephcluster -n openshift-storage \
+      -o jsonpath='{.items[0].status.ceph}' 2>/dev/null || true
+  echo ""
+
+  echo "--- VolumeAttachments ---"
+  oc get volumeattachment 2>&1 || true
+
+  echo "--- CSI RBD attacher pods ---"
+  oc get pods -n openshift-storage -l app=csi-rbdplugin-provisioner -o wide 2>&1 || true
+
+  echo "--- CSI RBD attacher logs (last 50 lines) ---"
+  for pod in $(oc get pods -n openshift-storage -l app=csi-rbdplugin-provisioner \
+      --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
+    echo "--- ${pod} / csi-attacher ---"
+    oc logs "${pod}" -n openshift-storage -c csi-attacher --tail=50 2>&1 || true
+  done
+
+  echo "--- CSI RBD node plugin pods ---"
+  oc get pods -n openshift-storage -l app=csi-rbdplugin -o wide 2>&1 || true
+
+  echo "=== End RBD/Ceph Diagnostics (${label}) ==="
+  echo ""
+}
+
 # -------------------------------------------------------------------------
 # Wait for the virtualization StorageClass
 # -------------------------------------------------------------------------
@@ -240,6 +299,8 @@ run_on_node "${SURVIVE_NODE}" "pcs status" || true
 echo "Verifying etcd is running only on ${SURVIVE_NODE}..."
 run_on_node "${SURVIVE_NODE}" "pcs resource status" || true
 
+collect_rbd_diagnostics "post-fencing"
+
 # -------------------------------------------------------------------------
 # Verify VM migrated to the surviving node
 # -------------------------------------------------------------------------
@@ -269,6 +330,7 @@ VMI_CURRENT_NODE=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.nodeNa
 
 if [[ "${VMI_STATUS}" != "Running" || "${VMI_CURRENT_NODE}" != "${SURVIVE_NODE}" ]]; then
   echo "ERROR: VM did not migrate successfully. status=${VMI_STATUS}, node=${VMI_CURRENT_NODE}"
+  collect_rbd_diagnostics "migration-failure"
   oc get vmi -n default -o yaml || true
   oc get events -n default --sort-by='.lastTimestamp' || true
   exit 1
