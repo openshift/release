@@ -35,27 +35,19 @@ DebugOnExit() {
         oc get machineconfig || : "unavailable"
 
         : "# Abnormal nodes"
-        oc get node -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status!="True")) | .metadata.name' | while read -r node; do
+        oc get node -o go-template='{{range .items}}{{$ready := ""}}{{range .status.conditions}}{{if eq .type "Ready"}}{{$ready = .status}}{{end}}{{end}}{{if ne $ready "True"}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | while read -r node; do
             : "### oc describe node ${node} ###"
             oc describe node "${node}" || true
         done || true
 
         : "# Abnormal ClusterOperators"
-        oc get co -o json | jq -r '.items[] | select(
-            (.status.conditions[] | select(.type=="Available")).status != "True" or
-            (.status.conditions[] | select(.type=="Progressing")).status != "False" or
-            (.status.conditions[] | select(.type=="Degraded")).status != "False"
-        ) | .metadata.name' | while read -r co; do
+        oc get co -o go-template='{{range .items}}{{$avail := ""}}{{$prog := ""}}{{$deg := ""}}{{range .status.conditions}}{{if eq .type "Available"}}{{$avail = .status}}{{end}}{{if eq .type "Progressing"}}{{$prog = .status}}{{end}}{{if eq .type "Degraded"}}{{$deg = .status}}{{end}}{{end}}{{if or (ne $avail "True") (ne $prog "False") (ne $deg "False")}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | while read -r co; do
             : "### oc describe co ${co} ###"
             oc describe co "${co}" || true
         done || true
 
         : "# Abnormal MachineConfigPools"
-        oc get machineconfigpools -o json | jq -r '.items[] | select(
-            (.status.conditions[] | select(.type=="Updated")).status != "True" or
-            (.status.conditions[] | select(.type=="Updating")).status != "False" or
-            (.status.conditions[] | select(.type=="Degraded")).status != "False"
-        ) | .metadata.name' | while read -r mcp; do
+        oc get machineconfigpools -o go-template='{{range .items}}{{$upd := ""}}{{$upting := ""}}{{$deg := ""}}{{range .status.conditions}}{{if eq .type "Updated"}}{{$upd = .status}}{{end}}{{if eq .type "Updating"}}{{$upting = .status}}{{end}}{{if eq .type "Degraded"}}{{$deg = .status}}{{end}}{{end}}{{if or (ne $upd "True") (ne $upting "False") (ne $deg "False")}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | while read -r mcp; do
             : "### oc describe mcp ${mcp} ###"
             oc describe mcp "${mcp}" || true
         done || true
@@ -88,7 +80,7 @@ CheckSigned() {
     if [[ "${payload}" =~ "@sha256:" ]]; then
         digest="$(echo "${payload}" | cut -f2 -d@)"
     else
-        digest="$(oc image info "${payload}" -o json | jq -r '.digest')"
+        digest="$(oc image info "${payload}" -o json | awk -F'"' '/"digest"/{print $4; exit}')"
     fi
     : "Image digest: ${digest}"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
@@ -122,8 +114,8 @@ AdminAck() {
     fi
 
     typeset gates=""
-    gates="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r '.data')" || true
-    if [[ -z "${gates}" || "${gates}" == "null" ]]; then
+    gates="$(oc -n openshift-config-managed get configmap admin-gates -o go-template='{{range $k, $v := .data}}{{$k}}{{"\n"}}{{end}}')" || true
+    if [[ -z "${gates}" ]]; then
         : "No admin gates found"
         return 0
     fi
@@ -136,7 +128,7 @@ AdminAck() {
 
     : "Patching admin acks for 4.${srcMinor} -> 4.${tgtMinor}"
     typeset ackKeys=""
-    ackKeys="$(echo "${gates}" | jq -r 'keys[]')"
+    ackKeys="${gates}"
     typeset ack=""
     for ack in ${ackKeys}; do
         if [[ "${ack}" == *"ack-4.${srcMinor}"* ]]; then
@@ -309,11 +301,7 @@ ValidatePlatformHealth() {
     : "CVO: Available=True, Progressing=False, Degraded=False"
 
     typeset unhealthyCo=""
-    unhealthyCo="$(oc get co -o json | jq -r '.items[] | select(
-        (.status.conditions[] | select(.type=="Available")).status != "True" or
-        (.status.conditions[] | select(.type=="Progressing")).status != "False" or
-        (.status.conditions[] | select(.type=="Degraded")).status != "False"
-    ) | .metadata.name')"
+    unhealthyCo="$(oc get co -o go-template='{{range .items}}{{$avail := ""}}{{$prog := ""}}{{$deg := ""}}{{range .status.conditions}}{{if eq .type "Available"}}{{$avail = .status}}{{end}}{{if eq .type "Progressing"}}{{$prog = .status}}{{end}}{{if eq .type "Degraded"}}{{$deg = .status}}{{end}}{{end}}{{if or (ne $avail "True") (ne $prog "False") (ne $deg "False")}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}')"
     if [[ -n "${unhealthyCo}" ]]; then
         : "Unhealthy ClusterOperators: ${unhealthyCo}"
         return 1
@@ -321,7 +309,7 @@ ValidatePlatformHealth() {
     : "All ClusterOperators healthy"
 
     typeset unreadyNodes=""
-    unreadyNodes="$(oc get node -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status!="True")) | .metadata.name')"
+    unreadyNodes="$(oc get node -o go-template='{{range .items}}{{$ready := ""}}{{range .status.conditions}}{{if eq .type "Ready"}}{{$ready = .status}}{{end}}{{end}}{{if ne $ready "True"}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}')"
     if [[ -n "${unreadyNodes}" ]]; then
         : "Not-Ready nodes: ${unreadyNodes}"
         return 1
@@ -329,11 +317,7 @@ ValidatePlatformHealth() {
     : "All nodes Ready"
 
     typeset mcpIssues=""
-    mcpIssues="$(oc get machineconfigpools -o json | jq -r '.items[] | select(
-        (.status.conditions[] | select(.type=="Updated")).status != "True" or
-        (.status.conditions[] | select(.type=="Updating")).status != "False" or
-        (.status.conditions[] | select(.type=="Degraded")).status != "False"
-    ) | .metadata.name')"
+    mcpIssues="$(oc get machineconfigpools -o go-template='{{range .items}}{{$upd := ""}}{{$upting := ""}}{{$deg := ""}}{{range .status.conditions}}{{if eq .type "Updated"}}{{$upd = .status}}{{end}}{{if eq .type "Updating"}}{{$upting = .status}}{{end}}{{if eq .type "Degraded"}}{{$deg = .status}}{{end}}{{end}}{{if or (ne $upd "True") (ne $upting "False") (ne $deg "False")}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}')"
     if [[ -n "${mcpIssues}" ]]; then
         : "Unhealthy MachineConfigPools: ${mcpIssues}"
         return 1
@@ -352,14 +336,14 @@ ValidateOppOperators() {
 
     typeset allCsvsJson=""
     typeset -i failCount=0
-    allCsvsJson="$(oc get csv -A -o json)" || {
+    allCsvsJson="$(oc get csv -A -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}')" || {
         : "Failed to retrieve CSVs"
         return 1
     }
 
     typeset phase=""
     for op in "${operatorsArr[@]}"; do
-        phase="$(echo "${allCsvsJson}" | jq -r --arg op "${op}" '[.items[] | select(.metadata.name | contains($op))][0].status.phase // empty')" || true
+        phase="$(echo "${allCsvsJson}" | awk -F'\t' -v op="${op}" 'index($2, op) > 0 {print $3; exit}')" || true
         if [[ -z "${phase}" ]]; then
             : "CSV not found for operator: ${op}"
             (( failCount += 1 ))
@@ -376,13 +360,13 @@ ValidateOppOperators() {
     if (( failCount > 0 )); then
         : "${failCount} OPP operator(s) not healthy after upgrade"
         : "Full CSV listing:"
-        echo "${allCsvsJson}" | jq -r '.items[] | "\(.metadata.namespace)\t\(.metadata.name)\t\(.status.phase)"'
+        echo "${allCsvsJson}"
         return 1
     fi
 
     : "Checking pod readiness for OPP operator namespaces"
     typeset oppNamespaces=""
-    oppNamespaces="$(echo "${allCsvsJson}" | jq -r --arg ops "${OPP_OPERATORS}" '($ops | split(",")) as $opArr | [.items[] | select(.metadata.name as $n | $opArr | any(. as $op | $n | contains($op))) | .metadata.namespace] | unique | .[]')"
+    oppNamespaces="$(echo "${allCsvsJson}" | awk -F'\t' -v ops="${OPP_OPERATORS}" 'BEGIN{n=split(ops,arr,",")} {for(i=1;i<=n;i++) if(index($2,arr[i])>0){ns[$1]=1;break}} END{for(k in ns) print k}')"
     typeset notReady="" ns=""
     for ns in ${oppNamespaces}; do
         notReady="$(oc get pods -n "${ns}" --no-headers | grep -v 'Completed' | grep -v 'Running' | grep -v 'Succeeded')" || true
@@ -411,7 +395,7 @@ Main() {
 
     ResolveTargetImage
 
-    targetVersion="$(oc adm release info "${upgradeTarget}" --output=json | jq -r '.metadata.version')"
+    targetVersion="$(oc adm release info "${upgradeTarget}" --output=json | awk -F'"' '/"version"/{print $4; exit}')"
     targetMinorVersion="$(echo "${targetVersion}" | cut -f2 -d.)"
     export targetVersion targetMinorVersion
     : "Target release: ${targetVersion} (minor: ${targetMinorVersion})"
