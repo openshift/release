@@ -51,9 +51,29 @@ ref:
         dependencies:
           - name: cert-manager
             version: v1.20.0
+  - name: ROSA_REGIONAL_EXTRA_COMPONENTS
+    default: ""
+    documentation: |-
+      YAML list of additional components to override in the ephemeral
+      environment. Each entry has 'target' (helm values file path in
+      the repo), 'override' (YAML content to deep-merge), and
+      optionally 'repo' (quay.io repository — also used by the
+      image-push step). IMAGE_REPO and IMAGE_TAG placeholders are
+      substituted from the entry's 'repo' and the CI tag respectively.
+      Example:
+        - env: CI_OPERATOR_IMAGE
+          repo: quay.io/rrp-dev-ci/hyperfleet-operator
+          target: argocd/config/regional-cluster/hyperfleet-operator/values.yaml
+          override:
+            hyperfleetOperator:
+              image:
+                repository: IMAGE_REPO
+                tag: IMAGE_TAG
   documentation: |-
     Provisions an ephemeral rosa-hyperfleet environment. If
     ROSA_REGIONAL_HELM_OVERRIDE_YAML is set, it is written to a file with
     IMAGE_REPO/IMAGE_TAG placeholders replaced (if an image override exists),
     then passed to the ephemeral provider via --provision-override-file for
-    deep merge into the target file.
+    deep merge into the target file. Additional components listed in
+    ROSA_REGIONAL_EXTRA_COMPONENTS are also overridden with IMAGE_REPO/IMAGE_TAG
+    substitution.

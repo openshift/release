@@ -20,10 +20,28 @@ ref:
   - name: ROSA_REGIONAL_QUAY_DEST_REPO
     default: ""
     documentation: |-
-      Quay.io destination repository for the component image
-       (e.g., quay.io/rrp-dev-ci/rosa-hyperfleet-api).
+      Quay.io destination repository for the primary component image
+      (e.g., quay.io/rrp-dev-ci/platform-api).
+  - name: ROSA_REGIONAL_EXTRA_COMPONENTS
+    default: ""
+    documentation: |-
+      YAML list of additional component images to push. Each entry
+      has 'env' (CI dependency env var holding the source image) and
+      'repo' (quay.io destination). All images share the same CI tag.
+      The same env var is read by the provision step for helm overrides.
+      Example:
+        - env: CI_OPERATOR_IMAGE
+          repo: quay.io/rrp-dev-ci/hyperfleet-operator
+          target: argocd/config/regional-cluster/hyperfleet-operator/values.yaml
+          override:
+            hyperfleetOperator:
+              image:
+                repository: IMAGE_REPO
+                tag: IMAGE_TAG
   documentation: |-
-    Copies a CI-built component image to a public quay.io repository so that
-    ephemeral EKS clusters can pull it without CI registry credentials.
-    Writes the pushed image reference to SHARED_DIR/component-image-override
-    for downstream steps to consume.
+    Copies CI-built component images to public quay.io repositories so
+    that ephemeral EKS clusters can pull them without CI registry
+    credentials. Always pushes CI_COMPONENT_IMAGE to
+    ROSA_REGIONAL_QUAY_DEST_REPO and writes the reference to
+    SHARED_DIR/component-image-override. Additional images listed in
+    ROSA_REGIONAL_EXTRA_COMPONENTS are also pushed with the same tag.
