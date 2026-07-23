@@ -9,6 +9,10 @@ POLL_INTERVAL="${POLL_INTERVAL:-60}"
 STALL_WINDOW="${STALL_WINDOW:-10}"
 OPP_OPERATORS="${OPP_OPERATORS:-advanced-cluster-management,rhacs-operator,odf-operator,quay-operator}"
 
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman
@@ -359,7 +363,7 @@ ValidateOppOperators() {
 
     typeset phase=""
     for op in "${operatorsArr[@]}"; do
-        phase="$(echo "${allCsvsJson}" | jq -r --arg op "${op}" '[.items[] | select(.metadata.name | contains($op))][0].status.phase // empty')" || true
+        phase="$(echo "${allCsvsJson}" | jq -r --arg op "${op}" '[.items[] | select(.metadata.name | startswith($op))][0].status.phase // empty')" || true
         if [[ -z "${phase}" ]]; then
             : "CSV not found for operator: ${op}"
             (( failCount += 1 ))
