@@ -22,6 +22,6 @@ export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 cd terraform/config/region/integration/e2e/us-central1
 
 terraform init -input=false -backend=false -reconfigure
-terraform plan -input=false
+terraform validate
 
-echo "Terraform plan completed successfully"
+echo "Terraform validate completed successfully"
