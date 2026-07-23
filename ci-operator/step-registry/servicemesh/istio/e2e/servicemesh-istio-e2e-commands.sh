@@ -72,10 +72,10 @@ spec:
     image: ${MAISTRA_BUILDER_IMAGE}
     resources:
       requests:
-        cpu: "2"
+        cpu: "1"
         memory: 8Gi
       limits:
-        memory: 14Gi
+        memory: 10Gi
     securityContext:
       capabilities:
         add: ["IPC_LOCK","SYS_ADMIN"]
