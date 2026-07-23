@@ -131,7 +131,7 @@ done
 if [[ " ${devices[*]} " == *" eth2.br-int "* ]]; then
   echo "Launching IPv6 DHCP client for eth2..."
   nsenter -m -u -n -i -p -t "$CONTAINER_PID" \
-    /sbin/dhclient -6 -N -v \
+    /sbin/dhclient -6 -v \
     -cf /dev/null \
     -pf "/etc/haproxy/dhclient.eth2.v6.pid" \
     -lf "/etc/haproxy/dhclient.eth2.v6.lease" eth2 201>&-
