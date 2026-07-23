@@ -124,6 +124,86 @@ tests:
     - ref: openshift-qe-installer-bm-deploy
     - ref: openshift-qe-cluster-health
     - ref: openshift-qe-egressip
+- as: evpn
+  capabilities:
+  - intranet
+  cron: 0 17 * * 4
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      ENABLE_TECHPREVIEW: "false"
+      EXTERNAL_WEBSERVER_IP: 172.27.187.82
+      EXTRA_FLAGS: --external-webserver-ip=172.27.187.82 --external-webserver-port=80
+        --log-level=debug
+      ITERATIONS: "5"
+      L2VNI_START: "20000"
+      L3VNI_START: "100"
+      NUM_CUDN: "5"
+      NUM_NODES: "6"
+      NUM_WORKER_NODES: "2"
+      PUBLIC_VLAN: "false"
+      SCENARIO: east-west
+      STARTING_NODE: "4"
+      TYPE: mno
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-poweroff
+    - ref: openshift-qe-installer-bm-foreman
+    - ref: openshift-qe-installer-bm-prereqs
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-cluster-health
+    - ref: openshift-qe-evpn
+- always_run: false
+  as: evpn-selfsched
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-selfsched
+    env:
+      ENABLE_TECHPREVIEW: "false"
+      EXTERNAL_WEBSERVER_IP: 172.27.187.82
+      EXTRA_FLAGS: --external-webserver-ip=172.27.187.82 --external-webserver-port=80
+        --log-level=debug
+      ITERATIONS: "5"
+      L2VNI_START: "20000"
+      L3VNI_START: "100"
+      MODEL: R640
+      NUM_CUDN: "5"
+      NUM_SERVERS: "6"
+      NUM_WORKER_NODES: "2"
+      PRE_PXE_LOADER: "false"
+      PUBLIC_VLAN: "false"
+      SCENARIO: east-west
+      TYPE: mno
+    pre:
+    - ref: openshift-qe-installer-bm-self-sched
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-prereqs
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-evpn
 zz_generated_metadata:
   branch: main
   org: openshift-eng

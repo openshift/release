@@ -1,0 +1,88 @@
+ref:
+  as: openshift-qe-evpn
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e-benchmarking version. Use "default" for the latest tag.
+  - name: SCENARIO
+    default: "east-west"
+    documentation: |-
+      EVPN test scenario to run. Passed to the workload to select the test configuration.
+  - name: ITERATIONS
+    default: ""
+    documentation: |-
+      Override the iteration count. When empty, iterations are calculated from worker count and ITERATION_MULTIPLIER.
+  - name: ITERATION_MULTIPLIER
+    default: "5"
+    documentation: |-
+      Number of iterations per worker node. Used to calculate total iterations when ITERATIONS is not set.
+  - name: FRR_IMAGE
+    default: "quay.io/frrouting/frr:10.4.1"
+    documentation: |-
+      FRR container image for upgrading frr-k8s daemonset
+  - name: NUM_CUDN
+    default: "72"
+    documentation: |-
+      Number of CUDNs for external FRR VRF setup on bastion
+  - name: EXTERNAL_WEBSERVER_IP
+    default: "172.27.187.82"
+    documentation: |-
+      External webserver anycast IP for external FRR VRF setup on bastion
+  - name: L3VNI_START
+    default: "100"
+    documentation: |-
+      Starting L3 VNI for external FRR VRF setup on bastion
+  - name: L2VNI_START
+    default: "20000"
+    documentation: |-
+      Starting L2 VNI for external FRR VRF setup on bastion
+  - name: VTEP_CIDR
+    default: "198.18.0.0/24"
+    documentation: |-
+      CIDR for the EVPN VTEP resource
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Additional flags to pass to the workload run script
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: GC
+    default: "true"
+    documentation: |-
+      Clean up the resources created by the workload after the run
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path
+  - name: ADDITIONAL_PARAMS
+    default: '{}'
+    documentation: |-
+      JSON value to upload additional metadata to the fingerprint
+  commands: openshift-qe-evpn-commands.sh
+  timeout: 6h
+  credentials:
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale EVPN e2e test using e2e-benchmarking.
+    Use the SCENARIO env var to select different EVPN test scenarios from the CI config.
