@@ -212,10 +212,16 @@ function update_node_ip {
   # bridge.  Dev-scripts provisions a single interface; destroying br-ex
   # would force OVN to rebuild from scratch, which fails without a second
   # pre-provisioned NIC.
-  local cidr
+  local cidr default_gw
   cidr=\$(ip -o addr show br-ex | awk '/inet / {print \$4}' | cut -d/ -f2)
+  default_gw=\$(ip route show default dev br-ex 2>/dev/null | awk '{print \$3}' | head -1)
   ip addr del "${SINGLE_NODE_IP}/\${cidr}" dev br-ex 2>/dev/null || true
   ip addr add "${ADDITIONAL_NODE_IP}/\${cidr}" dev br-ex
+  # Deleting the old IP removes routes that used it as source — restore the
+  # default route so external connectivity survives the swap.
+  if [[ -n "\${default_gw}" ]]; then
+    ip route add default via "\${default_gw}" dev br-ex src "${ADDITIONAL_NODE_IP}" 2>/dev/null || true
+  fi
 
   echo "KUBELET_NODEIP_HINT=${ADDITIONAL_NODE_NETWORK_PREFIX}" | sudo tee /etc/default/nodeip-configuration
   systemctl restart nodeip-configuration.service
