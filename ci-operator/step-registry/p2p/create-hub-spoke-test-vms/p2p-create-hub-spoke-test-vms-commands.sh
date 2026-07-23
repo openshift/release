@@ -126,7 +126,7 @@ ApplyCirrosDataVolume() {
     typeset ns="${4:?}"
     typeset sc="${5:?}"
 
-    DV_NAME="${dvName}" VM_NS="${ns}" VM_SC="${sc}" yq e '
+    vmName="${vmName}" DV_NAME="${dvName}" VM_NS="${ns}" VM_SC="${sc}" yq e '
         .metadata.name                              = strenv(DV_NAME) |
         .metadata.namespace                         = strenv(VM_NS) |
         .metadata.labels["app.kubernetes.io/name"]  = strenv(vmName) |
@@ -172,7 +172,7 @@ ApplyRhelDataVolume() {
     oc --kubeconfig="${kc}" get "datasource/${dsName}" -n "${dsNs}" 1>/dev/null
     EnsureStorageProfileCloneStrategyCopy "${kc}" "${sc}"
 
-    DV_NAME="${dvName}" VM_NS="${ns}" VM_SC="${sc}" \
+    vmName="${vmName}" DV_NAME="${dvName}" VM_NS="${ns}" VM_SC="${sc}" \
     DS_NAME="${dsName}" DS_NS="${dsNs}" \
     yq e '
         .metadata.name                              = strenv(DV_NAME) |
@@ -216,7 +216,7 @@ ApplyCirrosVirtualMachine() {
     typeset dvName="${3:?}"
     typeset ns="${4:?}"
 
-    DV_NAME="${dvName}" VM_NS="${ns}" yq e '
+    vmName="${vmName}" DV_NAME="${dvName}" VM_NS="${ns}" yq e '
         .metadata.name                                        = strenv(vmName) |
         .metadata.namespace                                   = strenv(VM_NS) |
         .metadata.labels["app.kubernetes.io/name"]            = strenv(vmName) |
@@ -267,6 +267,9 @@ spec:
       terminationGracePeriodSeconds: 180
       evictionStrategy: LiveMigrate
 YAML
+    # oc apply exits 0 even for certain client-side validation errors (e.g. empty name).
+    # Verify the VirtualMachine CR actually exists after apply to catch silent failures.
+    oc --kubeconfig="${kc}" get "virtualmachine/${vmName}" -n "${ns}" > /dev/null
 }
 
 # ApplyRhelVirtualMachine — RHEL VM with cloud-init (password not logged).
@@ -282,7 +285,7 @@ ApplyRhelVirtualMachine() {
     _userData="$(printf '#cloud-config\nuser: cloud-user\npassword: migration123\nchpasswd:\n  expire: false\nssh_pwauth: true\nruncmd:\n- echo "VM %s is ready for migration testing" > /tmp/vm-ready.txt\n' \
         "${vmName}")"
 
-    DV_NAME="${dvName}" VM_NS="${ns}" \
+    vmName="${vmName}" DV_NAME="${dvName}" VM_NS="${ns}" \
     CLOUD_INIT_USERDATA="${_userData}" \
     yq e '
         .metadata.name                                        = strenv(vmName) |
@@ -347,6 +350,9 @@ spec:
       evictionStrategy: LiveMigrate
 YAML
     [[ "${_wasTracing}" == "true" ]] && set -x
+    # oc apply exits 0 even for certain client-side validation errors (e.g. empty name).
+    # Verify the VirtualMachine CR actually exists after apply to catch silent failures.
+    oc --kubeconfig="${kc}" get "virtualmachine/${vmName}" -n "${ns}" > /dev/null
 }
 
 # WaitVmiRunning — wait for VMI object to exist then Running phase.
@@ -465,6 +471,10 @@ trap - ERR
 
 typeset -i cclmStepRc=0
 (
+    # set -E (errtrace): ERR trap is inherited by functions, command substitutions and
+    # subshells so OnError fires on any failure inside nested calls, not just at the
+    # top level of this subshell.
+    set -E
     trap OnError ERR
 
     [[ "${P2P_HS_VM_IMAGE_TYPE}" == "cirros" || "${P2P_HS_VM_IMAGE_TYPE}" == "rhel" ]]
