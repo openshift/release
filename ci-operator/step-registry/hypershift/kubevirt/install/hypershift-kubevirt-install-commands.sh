@@ -5,9 +5,9 @@ set -ex
 function ocp_version() {
     oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
 }
-if [[ ! "${CNV_SUBSCRIPTION_SOURCE}" =~ ^(cnv-prerelease-catalog-source|redhat-operators)$ ]]
+if [[ ! "${CNV_SUBSCRIPTION_SOURCE}" =~ ^(cnv-prerelease-catalog-source|redhat-operators(-.*)?)$ ]]
 then
-    echo "CNV_SUBSCRIPTION_SOURCE environment variable value '${CNV_SUBSCRIPTION_SOURCE}' not allowed, allowed values are 'redhat-operators' or 'cnv-prerelease-catalog-source'"
+    echo "CNV_SUBSCRIPTION_SOURCE environment variable value '${CNV_SUBSCRIPTION_SOURCE}' not allowed, allowed values are 'redhat-operators', 'redhat-operators-<variant>' or 'cnv-prerelease-catalog-source'"
     exit 1
 fi
 
@@ -40,7 +40,7 @@ CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?pro
 CNV_SUBSCRIPTION_CHANNEL=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
   ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_CHANNEL") | .value')
 
-if [ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]
+if [[ "${CNV_SUBSCRIPTION_SOURCE}" =~ ^redhat-operators ]]
 then
   CNV_RELEASE_CHANNEL=stable
 elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]
@@ -49,6 +49,48 @@ then
 else
   CNV_RELEASE_CHANNEL=nightly-$(ocp_version)
   CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:$(ocp_version)
+fi
+
+# For versioned redhat-operators sources (e.g., redhat-operators-v4-20),
+# create the CatalogSource if it doesn't already exist.
+if [[ "${CNV_SUBSCRIPTION_SOURCE}" =~ ^redhat-operators-v ]]
+then
+  if ! oc get catalogsource "${CNV_SUBSCRIPTION_SOURCE}" -n openshift-marketplace &>/dev/null; then
+    # Derive index tag: redhat-operators-v4-20 -> v4.20
+    INDEX_TAG=$(echo "${CNV_SUBSCRIPTION_SOURCE}" | sed 's/redhat-operators-//' | sed 's/-/./g')
+    echo "Creating CatalogSource ${CNV_SUBSCRIPTION_SOURCE} from registry.redhat.io/redhat/redhat-operator-index:${INDEX_TAG}"
+    cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${CNV_SUBSCRIPTION_SOURCE}
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  image: registry.redhat.io/redhat/redhat-operator-index:${INDEX_TAG}
+  displayName: Red Hat Operators ${INDEX_TAG}
+  publisher: Red Hat
+  updateStrategy:
+    registryPoll:
+      interval: 10m
+EOF
+    echo "Waiting for CatalogSource ${CNV_SUBSCRIPTION_SOURCE} to become ready..."
+    for i in $(seq 1 60); do
+      state=$(oc get catalogsource "${CNV_SUBSCRIPTION_SOURCE}" -n openshift-marketplace -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)
+      if [ "$state" == "READY" ]; then
+        echo "CatalogSource ${CNV_SUBSCRIPTION_SOURCE} is ready"
+        break
+      fi
+      echo "Try ${i}/60: CatalogSource not ready yet (state: ${state}). Checking in 10 seconds..."
+      sleep 10
+    done
+    if [ "$state" != "READY" ]; then
+      echo "Error: CatalogSource ${CNV_SUBSCRIPTION_SOURCE} failed to become ready"
+      exit 1
+    fi
+  else
+    echo "CatalogSource ${CNV_SUBSCRIPTION_SOURCE} already exists"
+  fi
 fi
 
 # The kubevirt tests require wildcard routes to be allowed
