@@ -101,6 +101,12 @@ set -euoE pipefail
 
 on_error() {
   echo "An error occurred on line \${BASH_LINENO[0]}: \${BASH_COMMAND}"
+  echo "--- crio.service journal (last 50 lines) ---"
+  journalctl -u crio.service --no-pager -n 50 2>/dev/null || true
+  echo "--- br-ex state at error ---"
+  ip -o addr show br-ex 2>/dev/null || true
+  ip route show default 2>/dev/null || true
+  echo "---"
   touch /var/recert.failed
 }
 
@@ -249,12 +255,22 @@ function update_node_ip {
     nmcli con mod "\${br_ex_con}" ipv4.addresses "${ADDITIONAL_NODE_IP}/\${cidr}" 2>/dev/null || true
   fi
 
+  # Force NM to re-read the modified profile from disk before
+  # ovs-configuration queries it.
+  nmcli con reload 2>/dev/null || true
+
   echo "KUBELET_NODEIP_HINT=${ADDITIONAL_NODE_NETWORK_PREFIX}" | sudo tee /etc/default/nodeip-configuration
   systemctl restart nodeip-configuration.service
-  # Do NOT restart ovs-configuration.service here.  Unlike assisted-test-infra
-  # (which deleted and recreated br-ex), we did an in-place IP swap.
-  # Restarting ovs-configuration would re-read the NM profile and could
-  # revert the IP before NM fully applies the profile update above.
+  # Restart ovs-configuration so OVS/OVN picks up the new IP from the updated
+  # NM profile above.  Without this restart, CRI-O hangs on startup (~16m)
+  # because the OVN/OVS datapath still references the old IP.  In run 8 this
+  # restart reverted the IP because the NM profile was stale; now the profile
+  # is updated first so ovs-configuration reads the correct IP.
+  systemctl restart ovs-configuration.service
+
+  echo "br-ex state after ovs-configuration restart:"
+  ip -o addr show br-ex 2>/dev/null || true
+  ip route show default dev br-ex 2>/dev/null || true
   echo "node IP updated"
 }
 
