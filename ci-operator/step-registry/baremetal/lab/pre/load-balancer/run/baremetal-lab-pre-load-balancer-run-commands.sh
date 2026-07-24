@@ -39,7 +39,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-timeout -s 9 12m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+timeout -s 9 21m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" "${DISCONNECTED}" "'${HAPROXY}'"  "'${DHCLIENT}'"  << 'EOF'
 set -o nounset
 set -o errexit
@@ -89,9 +89,9 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-echo "Acquiring network lock $LOCK_FD ($LOCK) (waiting up to 10 minutes)"
-if ! flock -w 600 "$LOCK_FD"; then
-    echo "Error: Failed to acquire network lock within 10 minutes."
+echo "Acquiring network lock $LOCK_FD ($LOCK) (waiting up to 20 minutes)"
+if ! flock -w 1200 "$LOCK_FD"; then
+    echo "Error: Failed to acquire network lock within 20 minutes."
     exit 1
 fi
 echo "Network lock acquired"
@@ -131,7 +131,8 @@ done
 if [[ " ${devices[*]} " == *" eth2.br-int "* ]]; then
   echo "Launching IPv6 DHCP client for eth2..."
   nsenter -m -u -n -i -p -t "$CONTAINER_PID" \
-    /sbin/dhclient -6 -N -v \
+    /sbin/dhclient -6 -v \
+    -cf /dev/null \
     -pf "/etc/haproxy/dhclient.eth2.v6.pid" \
     -lf "/etc/haproxy/dhclient.eth2.v6.lease" eth2 201>&-
   sleep 5
