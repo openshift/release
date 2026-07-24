@@ -16,6 +16,10 @@ JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
 
 git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
 
+# --- Source claude-helpers for agentic-ci OTEL collection ---
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/claude-helpers.sh"
+
 # --- Find PR number ---
 if [[ -f "${SHARED_DIR}/pr-number" ]]; then
     PR_NUM=$(cat "${SHARED_DIR}/pr-number")
@@ -259,12 +263,7 @@ while true; do
             FAILING_CHECKS_BODY=$(echo "${failing_checks}" | jq -r '.[] | "- \(.name) (\(.state))"' 2>/dev/null || echo "")
         fi
 
-        timeout 1800 claude \
-            --model "${CLAUDE_MODEL}" \
-            --allowedTools "${ALLOWED_TOOLS}" \
-            --output-format stream-json \
-            --append-system-prompt-file "${FOLLOWUP_PROMPT}" \
-            -p "Address the review comments and fix any failing CI checks for ${JIRA_ISSUE_KEY}. The PR is #${PR_NUM} on ${UPSTREAM_REPO}.
+        REVIEW_PROMPT="Address the review comments and fix any failing CI checks for ${JIRA_ISSUE_KEY}. The PR is #${PR_NUM} on ${UPSTREAM_REPO}.
 
 Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login.
 
@@ -288,8 +287,33 @@ PR conversation comments:
 ${PR_COMMENTS_BODY}
 
 Failing CI checks:
-${FAILING_CHECKS_BODY}" \
-            --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
+${FAILING_CHECKS_BODY}"
+
+        export AGENTIC_WORKDIR=/workspace
+        REVIEW_OUTPUT="/workspace/artifacts/claude-review-${iteration}.json"
+
+        cat > /tmp/run-review.sh << REVIEW_SCRIPT
+#!/bin/bash
+set -euo pipefail
+source "\${SHARED_DIR}/claude-helpers.sh"
+export AGENTIC_WORKDIR=/workspace
+run_claude "review-${iteration}" "${JIRA_ISSUE_KEY}" \
+    "${REVIEW_PROMPT}" \
+    "${REVIEW_OUTPUT}" \
+    --allowedTools "${ALLOWED_TOOLS}" \
+    --append-system-prompt-file "${FOLLOWUP_PROMPT}"
+REVIEW_SCRIPT
+        chmod +x /tmp/run-review.sh
+
+        timeout 1800 /tmp/run-review.sh || true
+
+        cat "/tmp/claude-${JIRA_ISSUE_KEY}-review-${iteration}.log" >> /workspace/artifacts/claude-output.log 2>/dev/null || true
+
+        extract_claude_outputs "$REVIEW_OUTPUT" "${JIRA_ISSUE_KEY}" "review-${iteration}"
+        extract_claude_tokens "$REVIEW_OUTPUT" "${JIRA_ISSUE_KEY}" "review-${iteration}"
+        extract_session_metrics "${JIRA_ISSUE_KEY}" "review-${iteration}"
+        review_session_id=$(get_session_id "$REVIEW_OUTPUT")
+        generate_autodl "${JIRA_ISSUE_KEY}" "review-${iteration}" "success" "" "$review_session_id"
 
     else
         idle_streak=$(( idle_streak + 1 ))

@@ -22,6 +22,10 @@ git config --global credential.helper '!f() { echo username=x-access-token; echo
 
 echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
 
+# --- Source claude-helpers for agentic-ci OTEL collection ---
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/claude-helpers.sh"
+
 # --- Workspace setup ---
 cd /workspace
 git config user.name "openshift-trt"
@@ -110,14 +114,33 @@ fi
 # --- Run Claude ---
 echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
 
-CLAUDE_EXIT=0
-timeout 5400 claude \
-    --model "${CLAUDE_MODEL}" \
+export AGENTIC_WORKDIR=/workspace
+SOLVE_OUTPUT="/workspace/artifacts/claude-solve.json"
+
+cat > /tmp/run-solve.sh << SOLVE_SCRIPT
+#!/bin/bash
+set -euo pipefail
+source "\${SHARED_DIR}/claude-helpers.sh"
+export AGENTIC_WORKDIR=/workspace
+run_claude "solve" "${JIRA_ISSUE_KEY}" \
+    "Solve Jira issue ${JIRA_ISSUE_KEY}" \
+    "${SOLVE_OUTPUT}" \
     --allowedTools "${ALLOWED_TOOLS}" \
-    --output-format stream-json \
-    --append-system-prompt-file "${SOLVE_PROMPT}" \
-    -p "Solve Jira issue ${JIRA_ISSUE_KEY}" \
-    --verbose 2>&1 | tee /workspace/artifacts/claude-output.log || CLAUDE_EXIT=$?
+    --append-system-prompt-file "${SOLVE_PROMPT}"
+SOLVE_SCRIPT
+chmod +x /tmp/run-solve.sh
+
+CLAUDE_EXIT=0
+timeout 5400 /tmp/run-solve.sh || CLAUDE_EXIT=$?
+
+cp "/tmp/claude-${JIRA_ISSUE_KEY}-solve.log" /workspace/artifacts/claude-output.log 2>/dev/null || true
+
+extract_claude_outputs "$SOLVE_OUTPUT" "${JIRA_ISSUE_KEY}" "output"
+extract_claude_tokens "$SOLVE_OUTPUT" "${JIRA_ISSUE_KEY}" "solve"
+extract_session_metrics "${JIRA_ISSUE_KEY}" "solve"
+SOLVE_SESSION_ID=$(get_session_id "$SOLVE_OUTPUT")
+generate_autodl "${JIRA_ISSUE_KEY}" "solve" \
+    "$([ $CLAUDE_EXIT -eq 0 ] && echo success || echo failed)" "" "$SOLVE_SESSION_ID"
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo "Claude timed out. Nudging to wrap up..."
