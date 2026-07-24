@@ -13,13 +13,19 @@
 
 set -euo pipefail
 
+LOG="${ARTIFACT_DIR}/wif-smoke-test.log"
+
+log() {
+  echo "$@" | tee -a "${LOG}"
+}
+
 if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
-  echo "ERROR: ${SHARED_DIR}/wif-cred.json not found — wif-auth step must run first"
+  log "ERROR: ${SHARED_DIR}/wif-cred.json not found — wif-auth step must run first"
   exit 1
 fi
 
 if [[ ! -f "${CLUSTER_PROFILE_DIR}/ci-folder-id" ]]; then
-  echo "ERROR: ${CLUSTER_PROFILE_DIR}/ci-folder-id not found in cluster profile"
+  log "ERROR: ${CLUSTER_PROFILE_DIR}/ci-folder-id not found in cluster profile"
   exit 1
 fi
 
@@ -35,7 +41,7 @@ SA_EMAIL=$(echo "${SA_IMPERSONATION_URL}" | grep -oP 'serviceAccounts/\K[^:]+')
 # Step 1: Exchange the pod's projected K8s SA token for a GCP federated token
 # via the Security Token Service (STS). This proves the build cluster's OIDC
 # issuer is trusted by our WIF pool.
-echo "Step 1/3: Exchanging SA token for GCP federated token..."
+log "Step 1/3: Exchanging SA token for GCP federated token..."
 STS_RESPONSE=$(curl -sf -X POST "https://sts.googleapis.com/v1/token" \
   -H "Content-Type: application/json" \
   -d "{
@@ -45,37 +51,37 @@ STS_RESPONSE=$(curl -sf -X POST "https://sts.googleapis.com/v1/token" \
     \"requested_token_type\": \"urn:ietf:params:oauth:token-type:access_token\",
     \"subject_token_type\": \"urn:ietf:params:oauth:token-type:jwt\",
     \"subject_token\": \"$(cat ${SA_TOKEN_FILE})\"
-  }") || { echo "ERROR: STS token exchange failed"; exit 1; }
+  }") || { log "ERROR: STS token exchange failed"; exit 1; }
 
 FED_TOKEN=$(echo "${STS_RESPONSE}" | jq -r '.access_token')
-echo "  OK"
+log "  OK"
 
 # Step 2: Use the federated token to impersonate the platform-ci SA.
 # This proves the IAM binding (workloadIdentityUser) is correctly configured.
-echo "Step 2/3: Impersonating ${SA_EMAIL}..."
+log "Step 2/3: Impersonating ${SA_EMAIL}..."
 ACCESS_TOKEN_RESPONSE=$(curl -sf -X POST "${SA_IMPERSONATION_URL}" \
   -H "Authorization: Bearer ${FED_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d "{\"scope\": [\"https://www.googleapis.com/auth/cloud-platform\"]}") || { echo "ERROR: SA impersonation failed"; exit 1; }
+  -d "{\"scope\": [\"https://www.googleapis.com/auth/cloud-platform\"]}") || { log "ERROR: SA impersonation failed"; exit 1; }
 
 ACCESS_TOKEN=$(echo "${ACCESS_TOKEN_RESPONSE}" | jq -r '.accessToken')
-echo "  OK"
+log "  OK"
 
 # Step 3: Make a real GCP API call to verify the access token works.
 # Lists projects in the CI folder — the SA has this permission via
 # roles/resourcemanager.projectCreator on the folder.
-echo "Step 3/3: Listing projects in CI folder ${CI_FOLDER_ID}..."
+log "Step 3/3: Listing projects in CI folder ${CI_FOLDER_ID}..."
 PROJECTS_RESPONSE=$(curl -sf \
   "https://cloudresourcemanager.googleapis.com/v1/projects?filter=parent.id%3A${CI_FOLDER_ID}" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}") || { echo "ERROR: GCP API call failed"; exit 1; }
+  -H "Authorization: Bearer ${ACCESS_TOKEN}") || { log "ERROR: GCP API call failed"; exit 1; }
 
 PROJECT_ID=$(echo "${PROJECTS_RESPONSE}" | jq -r '.projects[0].projectId // empty')
-echo "  OK"
+log "  OK"
 
-echo ""
-echo "=== WIF Smoke Test Passed ==="
-echo "  SA:      ${SA_EMAIL}"
-echo "  Folder:  ${CI_FOLDER_ID}"
-echo "  Project: ${PROJECT_ID}"
-echo ""
-echo "WIF authentication verified end-to-end"
+log ""
+log "=== WIF Smoke Test Passed ==="
+log "  SA:      ${SA_EMAIL}"
+log "  Folder:  ${CI_FOLDER_ID}"
+log "  Project: ${PROJECT_ID}"
+log ""
+log "WIF authentication verified end-to-end"
