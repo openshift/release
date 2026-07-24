@@ -82,18 +82,18 @@ collect_rbd_diagnostics() {
   echo "--- VolumeAttachments ---"
   oc get volumeattachment 2>&1 || true
 
-  echo "--- CSI RBD attacher pods ---"
-  oc get pods -n openshift-storage -l app=csi-rbdplugin-provisioner -o wide 2>&1 || true
+  echo "--- All pods in openshift-storage ---"
+  oc get pods -n openshift-storage -o wide 2>&1 || true
 
-  echo "--- CSI RBD attacher logs (last 50 lines) ---"
-  for pod in $(oc get pods -n openshift-storage -l app=csi-rbdplugin-provisioner \
-      --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
-    echo "--- ${pod} / csi-attacher ---"
+  echo "--- CSI attacher logs (last 50 lines per csi-rbdplugin container) ---"
+  for pod in $(oc get pods -n openshift-storage \
+      --no-headers -o custom-columns=':metadata.name' 2>/dev/null | grep csi-rbdplugin || true); do
+    echo "--- ${pod} ---"
     oc logs "${pod}" -n openshift-storage -c csi-attacher --tail=50 2>&1 || true
   done
 
-  echo "--- CSI RBD node plugin pods ---"
-  oc get pods -n openshift-storage -l app=csi-rbdplugin -o wide 2>&1 || true
+  echo "--- rook-ceph-operator logs (last 80 lines) ---"
+  oc logs -n openshift-storage -l app=rook-ceph-operator --tail=80 2>&1 || true
 
   echo "=== End RBD/Ceph Diagnostics (${label}) ==="
   echo ""
