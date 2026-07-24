@@ -206,7 +206,7 @@ worker_3 = { count = "0", profile = "cx2-8x16", "zone" = "${VPC_REGION}-3" }
 powervs_bastion_ip         = "${BASTION_PUBLIC_IP}"
 powervs_bastion_private_ip = "${BASTION_PRIVATE_IP}"
 powervs_machine_cidr = "192.168.100.0/24"
-vpc_skip_ssh_key_create = true
+vpc_skip_ssh_key_create = false
 skip_route_creation = false
 skip_create_security_group = false
 skip_image_creation = true
