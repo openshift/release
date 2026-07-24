@@ -10,22 +10,61 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 function collect_artifacts {
   echo "Collecting systemd recert.service log and redacted recert summary to CI artifacts..."
-  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/{recert.log,recert_summary_clean.yaml}" "${ARTIFACT_DIR}"
+  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/recert.log" "${ARTIFACT_DIR}" 2>/dev/null || true
+  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/recert_summary_clean.yaml" "${ARTIFACT_DIR}" 2>/dev/null || true
 }
 trap collect_artifacts EXIT TERM
 
 cat >"${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-step.sh <<"EOF"
 #!/usr/bin/env bash
 
-export PREVIOUS_CLUSTER_NAME="${PREVIOUS_CLUSTER_NAME:-ostest}"
-export PREVIOUS_BASE_DOMAIN="${PREVIOUS_BASE_DOMAIN:-redhat.com}"
+# --- Discover dev-scripts environment ---
+cd /root/dev-scripts
+source common.sh
+source ocp_install_env.sh
+export KUBECONFIG=$(ls -d /root/dev-scripts/ocp/*/auth/kubeconfig 2>/dev/null | head -1)
+if [[ -z "${KUBECONFIG}" || ! -f "${KUBECONFIG}" ]]; then
+  echo "ERROR: could not locate a unique kubeconfig under /root/dev-scripts/ocp/*/auth/kubeconfig" >&2
+  exit 1
+fi
+cd /
+
+# Discover the SNO node IP from the libvirt DHCP reservation by hostname
+MASTER_HOSTNAME=$(printf "${MASTER_HOSTNAME_FORMAT}" 0)
+DISCOVERED_IP=$(virsh net-dumpxml "${BAREMETAL_NETWORK_NAME}" | \
+  xmllint --xpath "string(//host[@name='${MASTER_HOSTNAME}']/@ip)" -)
+if [[ -z "${DISCOVERED_IP}" ]]; then
+  echo "ERROR: could not discover SNO node IP from network ${BAREMETAL_NETWORK_NAME} for host ${MASTER_HOSTNAME}" >&2
+  virsh net-dumpxml "${BAREMETAL_NETWORK_NAME}" >&2
+  exit 1
+fi
+
+# Compute a different IP on the same subnet for the IP-change test
+ORIGINAL_LAST_OCTET=$(echo "${DISCOVERED_IP}" | cut -d. -f4)
+NEW_LAST_OCTET=$(( (ORIGINAL_LAST_OCTET + 99) % 253 + 2 ))
+SUBNET_PREFIX=$(echo "${DISCOVERED_IP}" | cut -d. -f1-3)
+COMPUTED_ADDITIONAL_IP="${SUBNET_PREFIX}.${NEW_LAST_OCTET}"
+
+export PREVIOUS_CLUSTER_NAME="${PREVIOUS_CLUSTER_NAME:-${CLUSTER_NAME:-ostest}}"
+export PREVIOUS_BASE_DOMAIN="${PREVIOUS_BASE_DOMAIN:-${BASE_DOMAIN:-test.metalkube.org}}"
+export PREVIOUS_HOSTNAME="${PREVIOUS_HOSTNAME:-${MASTER_HOSTNAME}}"
 export NEW_CLUSTER_NAME="${NEW_CLUSTER_NAME:-another-name}"
 export NEW_BASE_DOMAIN="${NEW_BASE_DOMAIN:-another.domain}"
 export NEW_HOSTNAME="${NEW_HOSTNAME:-another-hostname}"
-export SINGLE_NODE_IP="${SINGLE_NODE_IP:-192.168.127.10}"
-export ADDITIONAL_NODE_IP="${ADDITIONAL_NODE_IP:-192.168.145.10}"
+export SINGLE_NODE_IP="${SINGLE_NODE_IP:-${DISCOVERED_IP}}"
+export ADDITIONAL_NODE_IP="${ADDITIONAL_NODE_IP:-${COMPUTED_ADDITIONAL_IP}}"
 export SINGLE_NODE_NETWORK_PREFIX="$(echo ${SINGLE_NODE_IP} | cut -d '.' -f 1,2,3).0"
 export ADDITIONAL_NODE_NETWORK_PREFIX="$(echo ${ADDITIONAL_NODE_IP} | cut -d '.' -f 1,2,3).0"
+
+echo "=== Recert rename configuration ==="
+echo "SINGLE_NODE_IP=${SINGLE_NODE_IP}"
+echo "ADDITIONAL_NODE_IP=${ADDITIONAL_NODE_IP}"
+echo "PREVIOUS_CLUSTER_NAME=${PREVIOUS_CLUSTER_NAME}"
+echo "PREVIOUS_BASE_DOMAIN=${PREVIOUS_BASE_DOMAIN}"
+echo "PREVIOUS_HOSTNAME=${PREVIOUS_HOSTNAME}"
+echo "NEW_CLUSTER_NAME=${NEW_CLUSTER_NAME}"
+echo "NEW_BASE_DOMAIN=${NEW_BASE_DOMAIN}"
+echo "NEW_HOSTNAME=${NEW_HOSTNAME}"
 
 export SSH_OPTS=(-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2)
 
@@ -34,22 +73,24 @@ function info {
 }
 
 function gather_recert_logs {
+  # After recert the node may be on either IP
+  local log_ip="${ADDITIONAL_NODE_IP}"
+  if ! ssh ${SSH_OPTS[@]} core@${log_ip} true 2>/dev/null; then
+    log_ip="${SINGLE_NODE_IP}"
+  fi
+
   info "Saving systemd recert.service log to /tmp/recert.log..."
-  ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "journalctl -u recert.service > /tmp/recert.log"
+  ssh ${SSH_OPTS[@]} core@${log_ip} "journalctl -u recert.service > /tmp/recert.log"
 
   info "Adding systemd recert.service log to CI artifacts..."
-  scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/tmp/recert.log /tmp/artifacts
+  scp ${SSH_OPTS[@]} core@${log_ip}:/tmp/recert.log /tmp/artifacts
 
   info "Adding recert_summary_clean.yaml to CI artifacts..."
-  scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/etc/kubernetes/recert_summary_clean.yaml /tmp/artifacts
+  scp ${SSH_OPTS[@]} core@${log_ip}:/etc/kubernetes/recert_summary_clean.yaml /tmp/artifacts
 }
 trap gather_recert_logs EXIT TERM
 
-# assisted-test-infra sets up 2 network interfaces that compete with each other
-# when setting the NODE_IP and KUBELET_NODEIP. Use KUBELET_NODEIP_HINT to
-# ensure the correct interface is chosen.
-#
-# https://access.redhat.com/articles/6956852
+# Set KUBELET_NODEIP_HINT so kubelet selects the correct node IP.
 ssh ${SSH_OPTS[@]} "core@${SINGLE_NODE_IP}" \
   "echo KUBELET_NODEIP_HINT=${SINGLE_NODE_NETWORK_PREFIX} | sudo tee /etc/default/nodeip-configuration"
 
@@ -59,13 +100,83 @@ recert_script=$(cat <<IEOF
 set -euoE pipefail
 
 on_error() {
-  echo "An error occurred..."
+  echo "An error occurred on line \${BASH_LINENO[0]}: \${BASH_COMMAND}"
+  echo "--- crio.service journal (last 50 lines) ---"
+  journalctl -u crio.service --no-pager -n 50 2>/dev/null || true
+  echo "--- br-ex state at error ---"
+  ip -o addr show br-ex 2>/dev/null || true
+  ip route show default 2>/dev/null || true
+  echo "---"
   touch /var/recert.failed
 }
 
 trap on_error ERR
 
 export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost.kubeconfig
+
+# On dev-scripts SNO, image-registry is permanently Degraded+Progressing due to
+# pod anti-affinity rules that cannot be satisfied on a single node.  Exclude it
+# so wait-for-stable-cluster does not time out needlessly.
+EXCLUDED_OPERATORS="image-registry"
+function wait_for_stable_cluster {
+  local timeout_minutes=\${1:-30}
+  local stable_period_minutes=\${2:-2}
+  local deadline=\$(( \$(date +%s) + timeout_minutes * 60 ))
+  local stable_since=""
+  echo "Waiting for cluster operators to stabilize (timeout=\${timeout_minutes}m, stable-period=\${stable_period_minutes}m, excluding: \${EXCLUDED_OPERATORS})..."
+  while true; do
+    local now=\$(date +%s)
+    if (( now >= deadline )); then
+      echo "ERROR: timed out waiting for cluster operators to stabilize after \${timeout_minutes}m"
+      oc get co 2>/dev/null || true
+      return 1
+    fi
+    local unstable
+    unstable=\$(oc get co -o json 2>/dev/null | jq -r --arg excluded "\${EXCLUDED_OPERATORS}" '
+      (\$excluded | split(",")) as \$excl |
+      [.items[] |
+        select((.metadata.name as \$n | \$excl | index(\$n) | not)) |
+        select(
+          (.status.conditions // [] | map(select(.type == "Available" and .status != "True")) | length > 0) or
+          (.status.conditions // [] | map(select(.type == "Progressing" and .status == "True")) | length > 0) or
+          (.status.conditions // [] | map(select(.type == "Degraded" and .status == "True")) | length > 0)
+        ) | .metadata.name
+      ] | join(",")
+    ' 2>/dev/null || echo "QUERY_FAILED")
+    if [[ "\${unstable}" == "QUERY_FAILED" ]]; then
+      echo "  Could not query cluster operators, retrying..."
+      stable_since=""
+    elif [[ -n "\${unstable}" ]]; then
+      echo "  Unstable operators: \${unstable}"
+      # Print condition details for each unstable operator (first occurrence only per operator)
+      if [[ -z "\${stable_since}" ]]; then
+        oc get co -o json 2>/dev/null | jq -r --arg names "\${unstable}" '
+          (\$names | split(",")) as \$ns |
+          .items[] | select(.metadata.name as \$n | \$ns | index(\$n)) |
+          "    " + .metadata.name + ": " +
+            ([.status.conditions[] |
+              select((.type == "Available" and .status != "True") or
+                     (.type == "Progressing" and .status == "True") or
+                     (.type == "Degraded" and .status == "True")) |
+              .type + "=" + .status + " (" + (.message // "no message" | .[0:120]) + ")"
+            ] | join("; "))
+        ' 2>/dev/null || true
+      fi
+      stable_since=""
+    else
+      if [[ -z "\${stable_since}" ]]; then
+        stable_since=\${now}
+        echo "  All monitored operators are stable, waiting for \${stable_period_minutes}m stable period..."
+      fi
+      local elapsed=\$(( now - stable_since ))
+      if (( elapsed >= stable_period_minutes * 60 )); then
+        echo "Cluster operators have been stable for \${stable_period_minutes}m"
+        return 0
+      fi
+    fi
+    sleep 30
+  done
+}
 function fetch_crts_keys {
   mkdir -p /tmp/certs /tmp/keys
 
@@ -116,10 +227,50 @@ function update_node_ip {
   echo "Update node IP"
   find /etc/kubernetes/ -type f -print0 | xargs -0 sed -i "s/${SINGLE_NODE_IP}/${ADDITIONAL_NODE_IP}/g"
   rm -rf /var/run/nodeip-configuration/primary-ip
+
+  # Swap the IP on br-ex in place instead of deleting and recreating the
+  # bridge.  Dev-scripts provisions a single interface; destroying br-ex
+  # would force OVN to rebuild from scratch, which fails without a second
+  # pre-provisioned NIC.
+  local cidr default_gw
+  cidr=\$(ip -o addr show br-ex | awk '/inet / {print \$4}' | cut -d/ -f2)
+  default_gw=\$(ip route show default dev br-ex 2>/dev/null | awk '{print \$3}' | head -1)
+  ip addr del "${SINGLE_NODE_IP}/\${cidr}" dev br-ex 2>/dev/null || true
+  ip addr add "${ADDITIONAL_NODE_IP}/\${cidr}" dev br-ex
+  # Deleting the old IP removes routes that used it as source — restore the
+  # default route so external connectivity survives the swap.
+  if [[ -n "\${default_gw}" ]]; then
+    ip route add default via "\${default_gw}" dev br-ex src "${ADDITIONAL_NODE_IP}" 2>/dev/null || true
+  fi
+
+  # Update the NM connection profile for br-ex so NetworkManager does not
+  # revert the IP swap when ovs-configuration or any NM event re-applies the
+  # profile.  On assisted-test-infra the profile was deleted entirely
+  # (nmcli connection delete br-ex), but on dev-scripts we must keep it —
+  # OVN cannot rebuild br-ex from scratch without a secondary NIC.
+  local br_ex_con
+  br_ex_con=\$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | awk -F: '/br-ex\$/{print \$1; exit}')
+  if [[ -n "\${br_ex_con}" ]]; then
+    echo "Updating NM profile '\${br_ex_con}' for br-ex: ${SINGLE_NODE_IP} -> ${ADDITIONAL_NODE_IP}"
+    nmcli con mod "\${br_ex_con}" ipv4.addresses "${ADDITIONAL_NODE_IP}/\${cidr}" 2>/dev/null || true
+  fi
+
+  # Force NM to re-read the modified profile from disk before
+  # ovs-configuration queries it.
+  nmcli con reload 2>/dev/null || true
+
   echo "KUBELET_NODEIP_HINT=${ADDITIONAL_NODE_NETWORK_PREFIX}" | sudo tee /etc/default/nodeip-configuration
   systemctl restart nodeip-configuration.service
-  nmcli connection delete br-ex
+  # Restart ovs-configuration so OVS/OVN picks up the new IP from the updated
+  # NM profile above.  Without this restart, CRI-O hangs on startup (~16m)
+  # because the OVN/OVS datapath still references the old IP.  In run 8 this
+  # restart reverted the IP because the NM profile was stale; now the profile
+  # is updated first so ovs-configuration reads the correct IP.
   systemctl restart ovs-configuration.service
+
+  echo "br-ex state after ovs-configuration restart:"
+  ip -o addr show br-ex 2>/dev/null || true
+  ip route show default dev br-ex 2>/dev/null || true
   echo "node IP updated"
 }
 
@@ -127,14 +278,14 @@ function recert {
   local etcd_image="\${ETCD_IMAGE}"
   local recert_image="${RECERT_IMAGE:-quay.io/edge-infrastructure/recert:latest}"
   echo "recert image: \${recert_image}"
-  local previous_base_domain="${PREVIOUS_BASE_DOMAIN:-redhat.com}"
-  local previous_cluster_name="${PREVIOUS_CLUSTER_NAME:-ostest}"
-  local new_base_domain="${NEW_BASE_DOMAIN:-another.domain}"
-  local new_cluster_name="${NEW_CLUSTER_NAME:-another-name}"
-  local previous_hostname="${PREVIOUS_HOSTNAME:-ostest-master-0}"
-  local new_hostname="${NEW_HOSTNAME:-another-hostname}"
-  local old_ip="${SINGLE_NODE_IP:-192.168.127.10}"
-  local new_ip="${ADDITIONAL_NODE_IP:-192.168.145.10}"
+  local previous_base_domain="${PREVIOUS_BASE_DOMAIN}"
+  local previous_cluster_name="${PREVIOUS_CLUSTER_NAME}"
+  local new_base_domain="${NEW_BASE_DOMAIN}"
+  local new_cluster_name="${NEW_CLUSTER_NAME}"
+  local previous_hostname="${PREVIOUS_HOSTNAME}"
+  local new_hostname="${NEW_HOSTNAME}"
+  local old_ip="${SINGLE_NODE_IP}"
+  local new_ip="${ADDITIONAL_NODE_IP}"
 
 
   podman run --authfile=/var/lib/kubelet/config.json \
@@ -190,16 +341,18 @@ function recert {
 function start_containers {
   echo "Starting crio.service..."
   systemctl start crio.service
+  echo "crio.service started"
 
   echo "Starting kubelet.service..."
   systemctl start kubelet.service
+  echo "kubelet.service started"
 }
 
 function delete_crts_keys {
   rm -rf /tmp/certs /tmp/keys
 }
 
-oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m
+wait_for_stable_cluster 30 2
 
 if [[ "\$(hostname)" != "${NEW_HOSTNAME}" ]]
 then
@@ -235,7 +388,7 @@ then
   stable_period_minutes=5
   start=\$(date +%s)
   start_containers
-  oc adm wait-for-stable-cluster --minimum-stable-period="\${stable_period_minutes}m" --timeout=30m
+  wait_for_stable_cluster 120 \${stable_period_minutes}
   end=\$(date +%s)
 
   runtime=\$((end-start-(stable_period_minutes*60)))
@@ -295,7 +448,7 @@ IEOF
 function generate_forcedns {
   cat <<IEOF
 #!/bin/bash
-export IP="${ADDITIONAL_NODE_IP}"
+export IP="127.0.0.1"
 export BASE_RESOLV_CONF=/run/NetworkManager/resolv.conf
 if [ "\${2}" = "dhcp4-change" ] || [ "\${2}" = "dhcp6-change" ] || [ "\${2}" = "up" ] || [ "\${2}" = "connectivity-change" ]; then
     export TMP_FILE=\$(mktemp /etc/forcedns_resolv.conf.XXXXXX)
@@ -367,37 +520,66 @@ info "Waiting for master MachineConfigPool to have condition=updating..."
 oc wait --for=condition=updating machineconfigpools master --timeout 10m
 
 info "Waiting for recert to be completed..."
+# After the MachineConfig triggers a reboot and recert runs update_node_ip,
+# the node switches from SINGLE_NODE_IP to ADDITIONAL_NODE_IP. Poll both.
+RECERT_RESULT=""
 while true; do
-  if ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} test -e /var/recert.done; then
-    info "Recert completed successfully"
-    break
-  elif ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} test -e /var/recert.failed; then
-    info "Recert failed"
-    break
-  else
-    info "Waiting for recert to be completed..."
-    sleep 5
-  fi
+  for poll_ip in "${SINGLE_NODE_IP}" "${ADDITIONAL_NODE_IP}"; do
+    # Check recert.failed BEFORE recert.done — recert.done is created before
+    # start_containers/wait_for_stable_cluster, so both files can coexist if
+    # the post-recert phase fails.
+    if ssh ${SSH_OPTS[@]} core@${poll_ip} test -e /var/recert.failed 2>/dev/null; then
+      info "Recert FAILED (reached via ${poll_ip})"
+      RECERT_RESULT="failed"
+      break 2
+    elif ssh ${SSH_OPTS[@]} core@${poll_ip} test -e /var/recert.done 2>/dev/null; then
+      info "Recert completed successfully (reached via ${poll_ip})"
+      RECERT_RESULT="done"
+      break 2
+    fi
+  done
+  info "Waiting for recert to be completed..."
+  sleep 5
 done
+
+if [[ "${RECERT_RESULT}" == "failed" ]]; then
+  info "Recert failed on the node — collecting logs and exiting with error."
+  gather_recert_logs || true
+  exit 1
+fi
 
 sed -i -e "s/${PREVIOUS_CLUSTER_NAME}/${NEW_CLUSTER_NAME}/g" -e "s/${PREVIOUS_BASE_DOMAIN}/${NEW_BASE_DOMAIN}/g" ${KUBECONFIG}
 echo "${ADDITIONAL_NODE_IP} api.${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}" | tee --append /etc/hosts
 info "Replaced server field in ${KUBECONFIG} to reflect recert cluster rename and base domain changes"
 
 info "Waiting for master MachineConfigPool to have condition=updated..."
+MCP_DEADLINE=$((SECONDS + 1800))
 until oc wait --for=condition=updated machineconfigpools master --timeout=2m &> /dev/null
 do
+  if (( SECONDS >= MCP_DEADLINE )); then
+    info "ERROR: timed out waiting for MCP condition=updated after 30m"
+    oc get mcp master -o yaml 2>/dev/null || true
+    exit 1
+  fi
   info "Waiting for master MachineConfigPool to have condition=updated..."
   sleep 5
 done
 
 info "Waiting for OCP stabilization..."
-until ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt" &> /dev/null
+RECERT_NODE_IP="${ADDITIONAL_NODE_IP}"
+OCP_STAB_DEADLINE=$((SECONDS + 7200))
+until ssh ${SSH_OPTS[@]} core@${RECERT_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt" &> /dev/null
 do
+  if (( SECONDS >= OCP_STAB_DEADLINE )); then
+    info "ERROR: timed out waiting for OCP stabilization after 2h"
+    info "Checking if recert.failed exists on the node..."
+    ssh ${SSH_OPTS[@]} core@${RECERT_NODE_IP} "test -e /var/recert.failed && echo 'recert.failed EXISTS' || echo 'recert.failed does not exist'" 2>/dev/null || true
+    exit 1
+  fi
   info "Waiting for OCP stabilization..."
   sleep 5
 done
-info $(ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt")
+info $(ssh ${SSH_OPTS[@]} core@${RECERT_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt")
 
 info "Checking for etcd, kube-apiserver, kube-controller-manager and kube-scheduler revision triggers in the respective cluster operator logs..."
 declare -a components=(
@@ -427,8 +609,8 @@ scp "${SSHOPTS[@]}" "${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-st
 
 timeout \
   --kill-after 5s \
-  61m \
+  121m \
   ssh \
   "${SSHOPTS[@]}" \
   "root@${IP}" \
-  RECERT_IMAGE="${RECERT_IMAGE}" timeout --kill-after 5s 60m /usr/local/bin/run-recert-cluster-rename-hostname-change-step.sh
+  RECERT_IMAGE="${RECERT_IMAGE}" timeout --kill-after 5s 120m /usr/local/bin/run-recert-cluster-rename-hostname-change-step.sh
