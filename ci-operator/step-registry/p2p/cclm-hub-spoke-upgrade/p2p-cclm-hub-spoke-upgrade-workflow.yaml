@@ -1,0 +1,90 @@
+workflow:
+  as: p2p-cclm-hub-spoke-upgrade
+  steps:
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: p2p-install-odf-hub
+    - ref: acm-interop-p2p-cluster-install
+    - ref: acm-fetch-managed-clusters
+    - ref: p2p-install-cnv-hub
+    - ref: p2p-acm-cnv-install-policy
+    - ref: p2p-install-odf-spokes
+    - chain: acm-interop-p2p-submariner-install
+    - ref: p2p-mtv-additional-config
+    - ref: p2p-mtv-register-providers
+    - chain: p2p-cclm-hub-spoke-migration-test
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: acm-inspector
+    - ref: gather-aws-console
+    - ref: acm-interop-p2p-cluster-uninstall
+    - chain: ipi-deprovision
+    - ref: firewatch-report-issues
+  documentation: |-
+    End-to-end workflow for hub-spoke CCLM validation with a mid-flow spoke OCP upgrade.
+
+    This workflow validates that cross-cluster live migration (CCLM) continues to work
+    correctly after the spoke cluster has been upgraded to a new OCP version. The test
+    validates both migration directions with a version differential:
+      - First pass:  hub→spoke   (spoke is at initial GA version, e.g. 4.22)
+      - Upgrade:     spoke 4.22 → 4.23 nightly via ACM ManifestWork
+      - Second pass: spoke→hub   (spoke is now at upgraded version, e.g. 4.23)
+
+    Infrastructure provisioned:
+      - Hub cluster:    IPI on AWS at OCP 4.23 nightly (initial + latest releases)
+      - Spoke cluster:  Hive/ACM-provisioned at OCP 4.22 GA (no custom ClusterImageSet needed)
+
+    Pre phase (hub cluster provisioning):
+      ipi-conf → ipi-conf-aws → ipi-install-monitoringpvc → ipi-install
+
+    Test phase (in order):
+       1. cucushift-installer-check-cluster-health  — hub baseline health
+       2. install-operators                         — ACM + MTV via OLM on hub
+       3. acm-mch                                   — ACM MultiClusterHub Available
+       4. p2p-install-odf-hub                       — ODF on hub (RWX storage for hub VMs)
+       5. acm-interop-p2p-cluster-install           — provision spoke at 4.22 GA via Hive
+                                                      (ACM_SPOKE_CLUSTER_INITIAL_VERSION=4.22;
+                                                       GA ClusterImageSet; no imageset step needed)
+       6. acm-fetch-managed-clusters                — populate SHARED_DIR spoke kubeconfigs
+       7. p2p-install-cnv-hub                       — CNV on hub via ACM local-cluster policy
+       8. p2p-acm-cnv-install-policy                — CNV on spoke via ACM ConfigurationPolicy
+       9. p2p-install-odf-spokes                    — ODF on spoke
+      10. acm-interop-p2p-submariner-install        — Submariner via ACM ManagedClusterAddon
+                                                      (hub + spoke enrolled; GlobalNet=false)
+      11. p2p-mtv-additional-config                 — ForkliftController with CCLM feature gate
+      12. p2p-mtv-register-providers                — spoke as MTV Provider via ManifestWork RBAC
+      13. p2p-cclm-hub-spoke-upgrade-migration-test chain:
+          a. p2p-create-hub-spoke-test-vms          — ODF-backed VMs on hub + spoke
+          b. p2p-mtv-create-hub-spoke-maps          — NetworkMap + StorageMap hub↔spoke
+          c. p2p-mtv-execute-hub-spoke-migration    — hub→spoke CCLM only
+                                                      (P2P_MIGRATION_DIRECTION=hub-to-spoke)
+          d. acm-interop-p2p-spoke-upgrade-prehealthcheck — spoke health before upgrade
+          e. acm-interop-p2p-spoke-upgrade          — spoke 4.22→4.23 via ManifestWork
+                                                      (OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+                                                       = release:target = 4.23 nightly)
+          f. acm-interop-p2p-spoke-upgrade-healthcheck    — spoke health after upgrade
+          g. p2p-mtv-spoke-to-hub-migration         — spoke→hub CCLM (post-upgrade reverse)
+                                                      (direction hardcoded in step script)
+
+    Post phase (always runs):
+      acm-fetch-operator-versions → acm-must-gather → acm-inspector →
+      gather-aws-console → acm-interop-p2p-cluster-uninstall → ipi-deprovision →
+      firewatch-report-issues
+
+    Key differences from p2p-cclm-hub-spoke workflow:
+      - No p2p-create-spoke-imageset step (spoke uses 4.22 GA ClusterImageSet)
+      - Default ACM_SPOKE_PULL_SECRET_FILE=config.json (GA images from quay.io, no CI creds needed)
+      - Uses p2p-cclm-hub-spoke-upgrade-migration-test chain instead of p2p-cclm-hub-spoke-migration-test
+      - Requires releases.target in CI config for spoke upgrade image
+      - P2P_MIGRATION_DIRECTION=hub-to-spoke in CI config env (step 13c runs hub→spoke only;
+        step 13g (p2p-mtv-spoke-to-hub-migration) always runs spoke→hub regardless)

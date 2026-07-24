@@ -1,0 +1,58 @@
+chain:
+  as: p2p-cclm-hub-spoke-upgrade-migration-test
+  steps:
+  - ref: p2p-create-hub-spoke-test-vms
+  - ref: p2p-mtv-create-hub-spoke-maps
+  - ref: p2p-mtv-execute-hub-spoke-migration
+  - ref: acm-interop-p2p-spoke-upgrade-prehealthcheck
+  - ref: acm-interop-p2p-spoke-upgrade
+  - ref: acm-interop-p2p-spoke-upgrade-healthcheck
+  - ref: p2p-mtv-spoke-to-hub-migration
+  documentation: |-
+    Sequential chain for the hub-spoke CCLM test with a mid-flow spoke OCP upgrade.
+
+    This chain implements the full upgrade+migration validation sequence:
+
+      1. p2p-create-hub-spoke-test-vms
+           Create ODF-backed RWX VMs on both hub and spoke clusters (P2P_HS_VM_COUNT per side).
+           Hub VMs: ${MTV_HS_HUB_VM_PREFIX}-1..N in namespace ${MTV_HS_HUB_VM_NAMESPACE}.
+           Spoke VMs: ${MTV_HS_SPOKE_VM_PREFIX}-1..N in namespace ${MTV_HS_SPOKE_VM_NAMESPACE}.
+
+      2. p2p-mtv-create-hub-spoke-maps
+           Create MTV NetworkMap and StorageMap CRs on the hub for both hub→spoke and
+           spoke→hub directions and wait for them to be Ready.
+
+      3. p2p-mtv-execute-hub-spoke-migration  [hub→spoke only]
+           Migrate hub VMs to the spoke cluster via CCLM. Set P2P_MIGRATION_DIRECTION=hub-to-spoke
+           in the CI config env so only the first direction runs. Full CCLM preflights included.
+
+      4. acm-interop-p2p-spoke-upgrade-prehealthcheck
+           Verify spoke cluster health (MachineConfigPool, ClusterOperators, Nodes Ready) before
+           triggering the OCP upgrade. Runs on the spoke kubeconfig from SHARED_DIR.
+
+      5. acm-interop-p2p-spoke-upgrade
+           Upgrade the spoke cluster from its initial OCP version to OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+           (release:target in the CI config, typically 4.23 nightly). Uses ACM ManifestWork
+           to push ClusterVersion desiredUpdate to the spoke via the hub.
+
+      6. acm-interop-p2p-spoke-upgrade-healthcheck
+           Verify spoke cluster health after the OCP upgrade completes:
+           MCPs converged, all ClusterOperators Available, all Nodes Ready.
+
+      7. p2p-mtv-spoke-to-hub-migration
+           Migrate spoke VMs back to the hub cluster (reverse/post-upgrade direction). The
+           direction is hardcoded to spoke→hub in this step's script, ensuring it always
+           runs the reverse direction regardless of P2P_MIGRATION_DIRECTION in the job env.
+           This validates that CCLM still works correctly on the upgraded spoke.
+
+    Prerequisites (set up by the workflow before this chain):
+      - CNV + ODF installed on hub (p2p-install-cnv-hub, p2p-install-odf-hub).
+      - CNV + ODF installed on spoke (p2p-acm-cnv-install-policy, p2p-install-odf-spokes).
+      - Submariner via ACM ManagedClusterAddon (acm-interop-p2p-submariner-install).
+      - MTV ForkliftController with CCLM feature gate (p2p-mtv-additional-config).
+      - Spoke registered as MTV Provider (p2p-mtv-register-providers).
+
+    Required CI config env:
+      P2P_MIGRATION_DIRECTION: "hub-to-spoke"   # step 3 runs hub→spoke only
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target  # step 5 upgrade target
+      SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL: candidate-4.23      # step 5 channel
