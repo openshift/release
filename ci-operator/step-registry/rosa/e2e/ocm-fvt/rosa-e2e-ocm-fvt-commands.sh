@@ -44,6 +44,26 @@ if [[ -n "${OCM_FVT_EXTRA_ENVS:-}" ]]; then
   done <<< "${OCM_FVT_EXTRA_ENVS}"
 fi
 
+osdfm_qe_creds_dir=/usr/local/osdfm-qe-credentials
+aao_kubeconfig_env=()
+if [[ -f "${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig" ]]; then
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
+  aao_kubeconfig_env=("-e" "AWS_ACCOUNT_OPERATOR_KUBECONFIG=$(<"${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig")")
+  $WAS_TRACING && set -x
+fi
+
+# DR_AWS_CREDENTIALS lets DR-account validation tests (e.g. OSDFM disaster_recovery_test.go,
+# oadp_v2_mc_backup_test.go) use a static, single-region AWS credentials file instead of fetching
+# per-region creds live from Hive (build farm has no network route to Hive, see ROSAENG-60596).
+dr_aws_creds_env=()
+if [[ -f "${osdfm_qe_creds_dir}/aws_dr_cred" ]]; then
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
+  dr_aws_creds_env=("-e" "DR_AWS_CREDENTIALS=$(<"${osdfm_qe_creds_dir}/aws_dr_cred")")
+  $WAS_TRACING && set -x
+fi
+
 cred_sources='source /usr/local/cs-qe-credentials/ocm-tokens'
 if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
   cred_sources="${cred_sources}; source /usr/local/cs-qe-credentials/jira-cred"
@@ -89,15 +109,27 @@ echo "=========================="
 
 echo "Running ocmtest: ${ocmtest_args[*]}"
 exit_code=0
+# aao_kubeconfig_env / dr_aws_creds_env may hold raw secret contents as literal
+# "-e KEY=VALUE" args; keep xtrace off while they are expanded so the values
+# are never printed to the (public) build log.
+[[ $- == *x* ]] && WAS_TRACING_RUN=true || WAS_TRACING_RUN=false
+set +x
 podman run \
   "${podman_args[@]}" \
+  "${aao_kubeconfig_env[@]}" \
+  "${dr_aws_creds_env[@]}" \
   quay.io/redhat-services-prod/ocmci/ocmci:latest \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
+$WAS_TRACING_RUN && set -x
 
 # Copy only the merged report.xml to avoid inflated test counts from
 # per-phase XMLs that include all Ginkgo specs (including skipped).
 find "${ocm_fvt_output}" -type f -name 'report.xml' -print0 | while IFS= read -r -d '' xml_file; do
   cp "${xml_file}" "${ARTIFACT_DIR}/junit-ocm-fvt-report.xml"
 done
+
+# Record the test result so post steps (e.g. stage promotion) can tell
+# whether it is safe to act on this run instead of always running.
+echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code" 2>/dev/null || true
 
 exit "${exit_code}"
