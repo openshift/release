@@ -21,12 +21,12 @@ echo "Orion Regulus - Dynamic Regression Detection"
 echo "=================================="
 echo ""
 
-python3 --version
+python --version
 pushd /tmp
 
 # ── Set up Python virtual environment ─────────────────────────────────────────
 echo "Setting up Python virtual environment..."
-python3 -m venv ./venv_orion_regulus
+python -m virtualenv ./venv_orion_regulus
 source ./venv_orion_regulus/bin/activate
 
 # ── Clone and install Orion CLI ───────────────────────────────────────────────
