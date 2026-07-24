@@ -213,9 +213,9 @@ if [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" || "
   echo "⚠️  PR #${PR_NUM} held for manual resolution"
   exit 1
 else
-  echo "💬 Posting /ok-to-test and payload commands…"
+  echo "💬 Posting payload commands and pipeline required…"
   curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST \
-       -d "{\"body\":\"/ok-to-test\n/payload ${RELEASE} ci blocking\n/payload ${RELEASE} nightly blocking\"}" \
+       -d "{\"body\":\"/payload ${RELEASE} ci blocking\n/payload ${RELEASE} nightly blocking\n/pipeline required\"}" \
        "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
 fi
 
