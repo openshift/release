@@ -85,6 +85,48 @@ for rg in "${SVC_RESOURCEGROUP}" "${MGMT_RESOURCEGROUP}" "${REGIONAL_RESOURCEGRO
         --query "[?properties.provisioningState!='Succeeded'].{State:properties.provisioningState, Target:properties.targetResource.resourceName, Type:properties.targetResource.resourceType, Status:properties.statusMessage}"
     done
   fi
+
+  # Gather deployment script logs for failed deployment scripts
+  echo -e "\nDeployment Script Logs in $rg:"
+  FAILED_DEPLOYMENT_SCRIPTS=$(az resource list --resource-group "$rg" \
+    --resource-type "Microsoft.Resources/deploymentScripts" \
+    --query "[?provisioningState!='Succeeded'].name" -o tsv 2>/dev/null || echo "")
+
+  if [[ -z "$FAILED_DEPLOYMENT_SCRIPTS" ]]; then
+    echo "No failed deployment scripts found"
+  else
+    for script_name in $FAILED_DEPLOYMENT_SCRIPTS; do
+      echo -e "\n=== Failed Deployment Script: $script_name ==="
+
+      # Get the script provisioning state and status
+      SCRIPT_INFO=$(az resource show --resource-group "$rg" \
+        --resource-type "Microsoft.Resources/deploymentScripts" \
+        --name "$script_name" \
+        --query "{ProvisioningState:properties.provisioningState, Status:properties.status}" \
+        -o json 2>/dev/null || echo "")
+
+      if [[ -n "$SCRIPT_INFO" ]]; then
+        echo "Script Info: $SCRIPT_INFO"
+      fi
+
+      # Get the deployment script logs
+      echo -e "\nRetrieving logs for failed deployment script: $script_name"
+      if az deployment-scripts show-log \
+        --resource-group "$rg" \
+        --name "$script_name" 2>&1; then
+        echo -e "\nSuccessfully retrieved logs for $script_name"
+      else
+        echo -e "\nFailed to retrieve logs for $script_name (script may not have started or logs may not be available)"
+      fi
+
+      # Get the full deployment script resource details including container settings and error info
+      echo -e "\nFull deployment script details for $script_name:"
+      az resource show --resource-group "$rg" \
+        --resource-type "Microsoft.Resources/deploymentScripts" \
+        --name "$script_name" \
+        --output json 2>/dev/null || echo "Failed to get script details"
+    done
+  fi
 done
 
 # If we've gotten to this part, let's make sure this step is noticed by failing it
