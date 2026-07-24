@@ -19,6 +19,10 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 canonical_go_repository: github.com/kedacore/keda-olm-operator
@@ -99,12 +103,25 @@ tests:
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      E2E_INSTALL_KEDA: "false"
+      E2E_TEST_CONFIG: openshift-e2e.yaml
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-keda
+      SCANNER_CPU: 500m
+      SCANNER_MEMORY: 1Gi
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
     test:
-    - chain: keda-e2e-cma
+    - ref: keda-e2e-cma-install
+    - ref: keda-e2e-cma-apply-kc
+    - ref: keda-e2e-setup
+    - ref: keda-e2e-run
+    - ref: tls-scanner-run
+    - ref: keda-e2e-clean
+    - ref: keda-e2e-cma-teardown
 - as: cma-e2e-gcp-ovn
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
