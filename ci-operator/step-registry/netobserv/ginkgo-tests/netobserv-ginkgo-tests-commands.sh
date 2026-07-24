@@ -69,7 +69,7 @@ fi
 
 # skip tests with ginkgo args if they're going to be skipped in generic all tests jobs
 if [[ "${JOB_NAME_SAFE}" != *"ipv6"* && "${JOB_NAME_SAFE}" != *"virt"* && "${JOB_NAME_SAFE}" != *"vsphere"* ]]; then
-  SPECIALIZED_SKIP="82637|77894|with VMs|53844"
+  SPECIALIZED_SKIP="82637|77894|with VMs|53844|83022"
   if [[ -n "${GINKGO_SKIP_FILTER}" ]]; then
     GINKGO_SKIP_FILTER="${GINKGO_SKIP_FILTER}|${SPECIALIZED_SKIP}"
   else
