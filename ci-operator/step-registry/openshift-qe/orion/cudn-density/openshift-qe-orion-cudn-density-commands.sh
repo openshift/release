@@ -97,6 +97,19 @@ if ! curl -fsSL --fail --retry 8 --retry-all-errors https://github.com/cloud-bul
 fi
 chmod +x ocp-metadata
 CLUSTER_METADATA=$(./ocp-metadata)
+
+# HCP clusters have no visible master nodes, so ocp-metadata omits masterNodesType
+# and masterNodesCount. Inject defaults so Orion Jinja templates don't fail.
+if ! echo "${CLUSTER_METADATA}" | python -c "import sys,json; d=json.load(sys.stdin); d['masterNodesType']" 2>/dev/null; then
+    CLUSTER_METADATA=$(echo "${CLUSTER_METADATA}" | python -c "
+import sys, json
+d = json.load(sys.stdin)
+d.setdefault('masterNodesType', 'N/A')
+d.setdefault('masterNodesCount', 0)
+json.dump(d, sys.stdout)
+")
+fi
+
 EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 
 # Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
