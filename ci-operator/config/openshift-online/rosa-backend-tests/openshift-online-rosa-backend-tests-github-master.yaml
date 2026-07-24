@@ -9,7 +9,7 @@ prowgen:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -19,12 +19,8 @@ tests:
     unset GOFLAGS
     export HOME=/tmp
     git config --global url."https://$(cat /usr/local/ocm-github-credentials/token)@github.com/".insteadOf "https://github.com/"
-
-    echo "=== Testing go mod download with 2min timeout ==="
-    timeout 120 go mod download || echo "ERROR: go mod download timed out after 2min"
-
-    echo "=== Running make lint with 5min timeout ==="
-    timeout 300 make lint || echo "ERROR: make lint timed out after 5min"
+    go mod download
+    make lint
   container:
     from: src
   secrets:
