@@ -12,6 +12,86 @@ cd /tmp || exit 1
 # can reference it.
 PP_CONFIGM_PATH="${SHARED_DIR:-$(pwd)}/peerpods-param-cm.yaml"
 
+# Create an IRSA role for the OSC operator service account in AWS STS mode.
+# The role ARN and policy ARN are saved to SHARED_DIR for cleanup in the post step.
+create_osc_irsa_role() {
+    local CLUSTER_ID OIDC_PROVIDER AWS_ACCOUNT_ID ROLE_NAME ROLE_ARN POLICY_ARN
+
+    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
+    AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+    CLUSTER_ID=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')
+    OIDC_PROVIDER=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}' \
+        | sed -e "s|^https://||")
+    ROLE_NAME="${CLUSTER_ID}-osc-irsa-role"
+
+    echo "Creating IRSA role ${ROLE_NAME} for OSC operator (OIDC provider: ${OIDC_PROVIDER})"
+
+    cat > "${SHARED_DIR}/osc-irsa-trust.json" <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {
+      "Federated": "arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_PROVIDER}"
+    },
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": {
+        "${OIDC_PROVIDER}:sub": "system:serviceaccount:openshift-sandboxed-containers-operator:default"
+      }
+    }
+  }]
+}
+EOF
+
+    cat > "${SHARED_DIR}/osc-irsa-policy.json" <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": [
+      "ec2:RunInstances",
+      "ec2:TerminateInstances",
+      "ec2:DescribeInstances",
+      "ec2:DescribeInstanceTypes",
+      "ec2:DescribeImages",
+      "ec2:DescribeSubnets",
+      "ec2:DescribeVpcs",
+      "ec2:DescribeSecurityGroups",
+      "ec2:CreateNetworkInterface",
+      "ec2:DeleteNetworkInterface",
+      "ec2:DescribeNetworkInterfaces",
+      "ec2:CreateTags"
+    ],
+    "Resource": "*"
+  }]
+}
+EOF
+
+    ROLE_ARN=$(aws iam create-role \
+        --role-name "${ROLE_NAME}" \
+        --assume-role-policy-document "file://${SHARED_DIR}/osc-irsa-trust.json" \
+        --tags "Key=kubernetes.io/cluster/${CLUSTER_ID},Value=owned" \
+        --query "Role.Arn" --output text)
+    echo "Created IRSA role: ${ROLE_ARN}"
+
+    POLICY_ARN=$(aws iam create-policy \
+        --policy-name "${CLUSTER_ID}-osc-irsa-policy" \
+        --policy-document "file://${SHARED_DIR}/osc-irsa-policy.json" \
+        --tags "Key=kubernetes.io/cluster/${CLUSTER_ID},Value=owned" \
+        --query "Policy.Arn" --output text)
+    echo "Created IRSA policy: ${POLICY_ARN}"
+
+    aws iam attach-role-policy --role-name "${ROLE_NAME}" --policy-arn "${POLICY_ARN}"
+
+    # Save for cleanup in the post step
+    echo "${ROLE_ARN}" > "${SHARED_DIR}/osc-irsa-role-arn"
+    echo "${POLICY_ARN}" > "${SHARED_DIR}/osc-irsa-policy-arn"
+
+    echo "STS identity setup complete for OSC operator"
+}
+
 handle_aws() {
     local AWS_REGION
     local AWS_SG_IDS
@@ -19,14 +99,22 @@ handle_aws() {
     local AWS_VPC_ID
     local INSTANCE_ID
 
-    oc -n kube-system get secret aws-creds -o json > aws-creds.json
+    case "${IDENTITY_MODE:-cco}" in
+        sts)
+            echo "STS mode - creating IRSA role for OSC operator"
+            export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+            create_osc_irsa_role
+            ;;
+        *)
+            echo "CCO/manual mode - creating peerpods-param-secret from static credentials"
+            oc -n kube-system get secret aws-creds -o json > aws-creds.json
 
-    AWS_ACCESS_KEY_ID="$(jq -r .data.aws_access_key_id aws-creds.json | base64 -d)"
-    export AWS_ACCESS_KEY_ID
-    AWS_SECRET_ACCESS_KEY="$(jq -r .data.aws_secret_access_key aws-creds.json | base64 -d)"
-    export AWS_SECRET_ACCESS_KEY
+            AWS_ACCESS_KEY_ID="$(jq -r .data.aws_access_key_id aws-creds.json | base64 -d)"
+            export AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY="$(jq -r .data.aws_secret_access_key aws-creds.json | base64 -d)"
+            export AWS_SECRET_ACCESS_KEY
 
-    cat<<-EOF > ./auth.json
+            cat<<-EOF > ./auth.json
     {
       "aws": {
         "aws_access_key_id": "${AWS_ACCESS_KEY_ID}",
@@ -35,7 +123,9 @@ handle_aws() {
     }
 EOF
 
-    oc create secret generic peerpods-param-secret --from-file=./auth.json -n default
+            oc create secret generic peerpods-param-secret --from-file=./auth.json -n default
+            ;;
+    esac
 
     INSTANCE_ID=$(oc get nodes -l 'node-role.kubernetes.io/worker' -o jsonpath='{.items[0].spec.providerID}' | sed 's#[^ ]*/##g')
     AWS_REGION=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.aws.region}')
@@ -98,6 +188,101 @@ create_ssh_key() {
     export PP_SSH_KEY_PUB
 }
 
+# Create OSC operator managed identity and federated credential for STS mode
+# This function is called only when IDENTITY_MODE=sts
+create_osc_managed_identity() {
+    local OSC_IDENTITY_NAME="osc-${AZURE_RESOURCE_GROUP}"
+    local OSC_IDENTITY_PRINCIPAL_ID
+    local OSC_CLIENT_ID
+    local SUBSCRIPTION_SCOPE="/subscriptions/${AZURE_SUBSCRIPTION_ID}"
+    local ISSUER_URL
+    local retry_count=0
+
+    echo "Creating managed identity for OSC operator: ${OSC_IDENTITY_NAME}"
+
+    # Create managed identity
+    az identity create \
+        --name "${OSC_IDENTITY_NAME}" \
+        --resource-group "${AZURE_RESOURCE_GROUP}" \
+        --location "${AZURE_REGION}"
+
+    # Wait for identity to propagate in Azure (can take up to 15 seconds)
+    echo "Waiting for managed identity to propagate in Azure..."
+    while [ $retry_count -lt 6 ]; do
+        OSC_IDENTITY_PRINCIPAL_ID=$(az identity show \
+            --name "${OSC_IDENTITY_NAME}" \
+            --resource-group "${AZURE_RESOURCE_GROUP}" \
+            --query principalId -o tsv 2>/dev/null || echo "")
+
+        if [[ -n "${OSC_IDENTITY_PRINCIPAL_ID}" ]]; then
+            echo "Identity propagated successfully"
+            break
+        fi
+
+        echo "Identity not ready yet, waiting 5 seconds... (attempt $((retry_count+1))/6)"
+        sleep 5
+        ((retry_count++))
+    done
+
+    if [[ -z "${OSC_IDENTITY_PRINCIPAL_ID}" ]]; then
+        echo "ERROR: Failed to get principal ID after 30 seconds - identity not propagated"
+        exit 1
+    fi
+
+    echo "Managed identity principal ID: ${OSC_IDENTITY_PRINCIPAL_ID}"
+
+    # Get clientId (should be available now that principalId is)
+    OSC_CLIENT_ID=$(az identity show \
+        --name "${OSC_IDENTITY_NAME}" \
+        --resource-group "${AZURE_RESOURCE_GROUP}" \
+        --query clientId -o tsv)
+
+    if [[ -z "${OSC_CLIENT_ID}" ]]; then
+        echo "ERROR: Failed to get clientId from managed identity"
+        exit 1
+    fi
+
+    echo "OSC operator managed identity clientId: ${OSC_CLIENT_ID}"
+
+    # Assign required roles (matching Jenkins implementation)
+    echo "Assigning roles to managed identity..."
+    for ROLE in "Reader" "Virtual Machine Contributor" "Network Contributor" "Storage Account Contributor" "Compute Gallery Artifacts Publisher"; do
+        echo "Assigning role: ${ROLE}"
+        az role assignment create \
+            --role "${ROLE}" \
+            --assignee "${OSC_IDENTITY_PRINCIPAL_ID}" \
+            --scope "${SUBSCRIPTION_SCOPE}"
+    done
+
+    # Get OIDC issuer URL from cluster
+    ISSUER_URL=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')
+    if [[ -z "${ISSUER_URL}" ]]; then
+        echo "ERROR: Failed to get OIDC issuer URL from cluster"
+        exit 1
+    fi
+    echo "OIDC Issuer URL: ${ISSUER_URL}"
+
+    # Create federated identity credential
+    echo "Creating federated identity credential..."
+    az identity federated-credential create \
+        --name "${OSC_IDENTITY_NAME}-federation" \
+        --identity-name "${OSC_IDENTITY_NAME}" \
+        --resource-group "${AZURE_RESOURCE_GROUP}" \
+        --issuer "${ISSUER_URL}" \
+        --subject "system:serviceaccount:openshift-sandboxed-containers-operator:default" \
+        --audiences "openshift"
+
+    # Create osc-identity ConfigMap
+    echo "Creating osc-identity ConfigMap..."
+    oc create configmap osc-identity \
+        --from-literal=subscriptionId="${AZURE_SUBSCRIPTION_ID}" \
+        --from-literal=clientId="${OSC_CLIENT_ID}" \
+        --from-literal=tenantId="${AZURE_TENANT_ID}" \
+        -n default
+
+    echo "STS identity setup complete for OSC operator"
+}
+
 handle_azure() {
     local IS_ARO
     local AZURE_RESOURCE_GROUP
@@ -148,7 +333,24 @@ handle_azure() {
     # Login to Azure for NAT gateway creation
     az login --service-principal --username "${AZURE_CLIENT_ID}" --password "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
     az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
-    AZURE_RESOURCE_GROUP=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
+
+    # Get resource group based on identity mode
+    if [[ "${IDENTITY_MODE:-cco}" == "sts" ]]; then
+        # STS mode - resource group created by ccoctl
+        if [[ -s "${SHARED_DIR}/resourcegroup_cluster" ]]; then
+            AZURE_RESOURCE_GROUP=$(cat "${SHARED_DIR}/resourcegroup_cluster")
+            echo "STS mode - using resource group from ccoctl: ${AZURE_RESOURCE_GROUP}"
+        else
+            echo "ERROR: STS mode enabled but resourcegroup_cluster not found in ${SHARED_DIR}"
+            echo "This file should be created by ipi-conf-azure-oidc-creds-provision step"
+            exit 1
+        fi
+    else
+        # CCO/Manual mode - get from cluster infrastructure
+        AZURE_RESOURCE_GROUP=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
+        echo "CCO/Manual mode - using resource group from cluster: ${AZURE_RESOURCE_GROUP}"
+    fi
+
     AZURE_REGION=$(az group show --resource-group "${AZURE_RESOURCE_GROUP}" --query "{Location:location}" --output tsv)
 
     if [[ "${IS_ARO}" == "true" ]]; then
@@ -227,13 +429,29 @@ handle_azure() {
       PROXY_TIMEOUT: "30m"
 EOF
 
-    if [[ -z "${AZURE_AUTH_LOCATION}" ]]; then
-        AZURE_AUTH_LOCATION="${PWD}/osServicePrincipal.json"
-        echo "{ \"clientId\": \"$AZURE_CLIENT_ID\", \"clientSecret\": \"$AZURE_CLIENT_SECRET\", \"tenantId\": \"$AZURE_TENANT_ID\" }" | \
-            jq > "${AZURE_AUTH_LOCATION}"
-    fi
-    # Creating peerpods-param-secret with the keys needed for test case execution
-    oc create secret generic peerpods-param-secret --from-file="${AZURE_AUTH_LOCATION}" -n default
+    # Handle identity mode - create managed identity for STS or secret for manual mode
+    case "${IDENTITY_MODE:-cco}" in
+        sts)
+            echo "STS mode - creating OSC operator managed identity and osc-identity ConfigMap"
+            create_osc_managed_identity
+            ;;
+        manual)
+            echo "Manual mode - creating peerpods-param-secret"
+            if [[ -z "${AZURE_AUTH_LOCATION}" ]]; then
+                AZURE_AUTH_LOCATION="${PWD}/osServicePrincipal.json"
+                echo "{ \"clientId\": \"$AZURE_CLIENT_ID\", \"clientSecret\": \"$AZURE_CLIENT_SECRET\", \"tenantId\": \"$AZURE_TENANT_ID\" }" | \
+                    jq > "${AZURE_AUTH_LOCATION}"
+            fi
+            oc create secret generic peerpods-param-secret --from-file="${AZURE_AUTH_LOCATION}" -n default
+            ;;
+        cco)
+            echo "CCO mode - no secret or managed identity needed (CCO manages credentials)"
+            ;;
+        *)
+            echo "ERROR: Invalid IDENTITY_MODE='${IDENTITY_MODE}'. Supported values: cco, manual, sts"
+            exit 1
+            ;;
+    esac
 }
 
 provider="$(oc get infrastructure -n cluster -o json | jq '.items[].status.platformStatus.type'  | awk '{print tolower($0)}' | tr -d '"')"
