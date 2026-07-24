@@ -801,3 +801,133 @@ periodics:
         requests:
           cpu: 100m
           memory: 100Mi
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  interval: 15m
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-hypershift-deprovision-aws-konflux-stg
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@aws-ci-admin Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
+  spec:
+    containers:
+    - command:
+      - ./core-services/ipi-deprovision/aws.sh
+      env:
+      - name: HOME
+        value: /tmp
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /aws/.awscred
+      - name: CLUSTER_TTL
+        value: 30 minutes ago
+      - name: HYPERSHIFT_BASE_DOMAIN
+        value: stg.konflux-ocp-ci.dev
+      - name: HYPERSHIFT_CLUSTER_PROFILE_FILTER
+        value: aws-konflux-stg
+      - name: HYPERSHIFT_PRUNER
+        value: "true"
+      - name: KUBECONFIG
+        value: /kubeconfig/kubeconfig
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ipi-deprovision_latest
+      imagePullPolicy: Always
+      name: ipi-deprovision
+      resources:
+        requests:
+          cpu: "1"
+          memory: 300Mi
+      volumeMounts:
+      - mountPath: /aws
+        name: cluster-secrets-aws
+      - mountPath: /kubeconfig
+        name: kubeconfig
+    serviceAccountName: ipi-deprovisioner
+    volumes:
+    - name: cluster-secrets-aws
+      secret:
+        items:
+        - key: .awscred
+          path: .awscred
+        secretName: cluster-secrets-aws-konflux-stg
+    - name: kubeconfig
+      secret:
+        secretName: hypershift-workload-credentials
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  interval: 15m
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-hypershift-deprovision-aws-konflux-prod
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@aws-ci-admin Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
+  spec:
+    containers:
+    - command:
+      - ./core-services/ipi-deprovision/aws.sh
+      env:
+      - name: HOME
+        value: /tmp
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /aws/.awscred
+      - name: CLUSTER_TTL
+        value: 30 minutes ago
+      - name: HYPERSHIFT_BASE_DOMAIN
+        value: prod.konflux-ocp-ci.dev
+      - name: HYPERSHIFT_CLUSTER_PROFILE_FILTER
+        value: aws-konflux-prod
+      - name: HYPERSHIFT_PRUNER
+        value: "true"
+      - name: KUBECONFIG
+        value: /kubeconfig/kubeconfig
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ipi-deprovision_latest
+      imagePullPolicy: Always
+      name: ipi-deprovision
+      resources:
+        requests:
+          cpu: "1"
+          memory: 300Mi
+      volumeMounts:
+      - mountPath: /aws
+        name: cluster-secrets-aws
+      - mountPath: /kubeconfig
+        name: kubeconfig
+    serviceAccountName: ipi-deprovisioner
+    volumes:
+    - name: cluster-secrets-aws
+      secret:
+        items:
+        - key: .awscred
+          path: .awscred
+        secretName: cluster-secrets-aws-konflux-prod
+    - name: kubeconfig
+      secret:
+        secretName: hypershift-workload-credentials
