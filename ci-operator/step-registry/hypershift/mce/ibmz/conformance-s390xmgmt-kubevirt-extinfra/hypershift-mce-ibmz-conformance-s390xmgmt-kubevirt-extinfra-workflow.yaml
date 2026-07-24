@@ -1,0 +1,35 @@
+workflow:
+  as: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra
+  documentation: |-
+    Phase 1 workflow that provisions two ephemeral OpenShift clusters on libvirt:
+    a management cluster and an external infrastructure (infra) cluster. This is the
+    foundation for HyperShift KubeVirt on external infrastructure testing.
+  steps:
+    allow_best_effort_post_steps: true
+    leases:
+    - resource_type: libvirt-s390x-vpn-quota-slice
+      env: LEASED_RESOURCE_INFRA    # second host for infra cluster
+    env:
+      CONTROL_COUNT: "1"
+      COMPUTE_COUNT: "0"
+    pre:
+    # ── Management cluster (SNO: 1 control, 0 compute) ───────────────────
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+
+    # ── Infra cluster (compact: 3 control, 0 compute) ────────────────────
+    - ref: upi-libvirt-infra-cleanup-pre
+    - chain: upi-libvirt-infra-conf
+    - ref: upi-libvirt-infra-debug-static-pod
+    - ref: upi-libvirt-infra-conf-etcd-ramfs
+    - chain: upi-libvirt-infra-install
+    test:
+    - ref: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra-test-print
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+    - ref: upi-libvirt-infra-cleanup-post
