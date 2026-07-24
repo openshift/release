@@ -216,13 +216,18 @@ esac
 mkdir -p /tmp/output
 cd /tmp/output
 
-if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64"  ]]; then
+if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64" ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-468.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-468.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+    UNIVERSE_DOMAIN=$(jq -r ".universe_domain // empty" "${GCP_SHARED_CREDENTIALS_FILE}" 2>/dev/null)
+    if [[ -n "${UNIVERSE_DOMAIN}" ]]; then
+      export GOOGLE_CLOUD_UNIVERSE_DOMAIN="${UNIVERSE_DOMAIN}"
+      gcloud config set universe_domain "${UNIVERSE_DOMAIN}"
+    fi
     gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
     gcloud config set project "${PROJECT}"
     popd
