@@ -1,4 +1,8 @@
 base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -21,11 +25,12 @@ operator:
   bundles:
   - as: ingress-node-firewall-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
-  - pullspec: quay.io/openshift/origin-ingress-node-firewall:4.13
+  - pullspec: quay.io/openshift/origin-ingress-node-firewall:latest
     with: pipeline:ingress-node-firewall
-  - pullspec: quay.io/openshift/origin-ingress-node-firewall-daemon:4.13
-    with: pipeline:ingress-node-firewall
+  - pullspec: quay.io/openshift/origin-ingress-node-firewall-daemon:latest
+    with: pipeline:ingress-node-firewall-daemon
 promotion:
   to:
   - name: "5.0"
@@ -73,6 +78,24 @@ tests:
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-ingress-node-firewall-e2e
+- always_run: false
+  as: e2e-aws-ovn-infw-extension
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      OO_BUNDLE: ingress-node-firewall-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-ingress-node-firewall
+      OO_SECURITY_CONTEXT: restricted
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: infw-extension
+    workflow: openshift-e2e-aws-ovn
 - as: verify-deps
   steps:
     env:
