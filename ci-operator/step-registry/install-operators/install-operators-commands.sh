@@ -83,6 +83,10 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
             set -x
             oc get packagemanifest "${operator_name}" || \
               echo "There is not any available packagemanifest for '${operator_name}' operator"
+            if [[ "${operator_skip_checking}" == "true" ]]; then
+                echo "skip_checking is set, skipping '${operator_name}' operator installation."
+                continue
+            fi
             exit 1
         else
             echo "INFO: Default channel is ${operator_channel}"
