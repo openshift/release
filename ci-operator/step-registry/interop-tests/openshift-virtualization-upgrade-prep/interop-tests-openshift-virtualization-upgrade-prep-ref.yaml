@@ -20,15 +20,22 @@ ref:
   - name: CNV_TARGET_MAJOR_MINOR
     default: "4.21"
     documentation: |-
-      When set, resolves the latest available patch version (e.g. 4.21.0) from the spoke
-      packagemanifest on CNV_CHANNEL and sets CNV_TARGET_VERSION. Leave empty to use
+      When set, resolves the actual upgrade target version from OLM's pending install plan
+      for the hco-operatorhub subscription on the spoke and sets CNV_TARGET_VERSION. This
+      reflects the real OLM upgrade graph (replaces/skipRange edges) rather than the lowest
+      catalog entry, so it correctly handles cases where OLM skips z-stream versions via
+      skipRange (e.g. v4.21.z -> v4.22.2 directly). The plan is left unapproved so the
+      upgrade-tests step controls when the actual upgrade happens. Leave empty to use
       CNV_TARGET_VERSION as-is.
   - name: CNV_TARGET_VERSION
     default: "4.21.0"
     documentation: Target CNV version for the upgrade. Overridden when CNV_TARGET_MAJOR_MINOR is set.
   - name: CNV_CHANNEL
     default: "stable"
-    documentation: CNV subscription channel for upgrade (stable, candidate, nightly).
+    documentation: |-
+      Kept for backwards compatibility. No longer used by the upgrade-prep step itself;
+      the target version is now resolved from OLM's actual pending install plan.
+      Previously used to filter packagemanifest entries by channel name.
   - name: CNV_TARGET_STORAGE_CLASS
     default: "ocs-storagecluster-ceph-rbd-virtualization"
     documentation: |-

@@ -15,6 +15,10 @@ base_images:
     name: cli-jq
     namespace: ocp
     tag: latest
+  console-e2e:
+    name: main
+    namespace: acm-qe
+    tag: console-e2e
   fetch-managed-clusters:
     name: autotest
     namespace: acm-qe
@@ -63,15 +67,10 @@ releases:
       channel: stable
       version: "4.21"
   latest:
-    release:
-      channel: stable
-      version: "4.21"
-  target:
-    prerelease:
+    candidate:
       product: ocp
-      version_bounds:
-        lower: 4.22.0-rc.0
-        upper: 4.22.0-rc.20
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -84,23 +83,23 @@ tests:
     cluster_profile: aws-cspi-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ACM_CLUSTER_UPGRADE_TARGET_CHANNEL: candidate-4.22
       ACM_SPOKE_CLUSTER_COUNT: "1"
       ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.21"
       ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
       ACM_SPOKE_CP_TYPE: m6a.2xlarge
-      ACM_SPOKE_WORKER_TYPE: c5n.metal
+      ACM_SPOKE_WORKER_TYPE: m8i.8xlarge
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       CLOUD_PROVIDER: ipi-aws
       CNV_CHANNEL: stable
       CNV_ENABLE_CCLM: "false"
       CNV_POLICY_CHANNEL: stable
-      CNV_POLICY_INSTALL_MAJOR_MINOR: "4.20"
+      CNV_POLICY_INSTALL_MAJOR_MINOR: "4.21"
       CNV_POLICY_UPGRADE_APPROVAL: Manual
       CNV_SOURCE: production
-      CNV_TARGET_MAJOR_MINOR: "4.21"
+      CNV_TARGET_MAJOR_MINOR: "4.22"
       COMPUTE_NODE_TYPE: m6a.4xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIREWATCH_CONFIG: |
@@ -180,12 +179,12 @@ tests:
     - ref: cucushift-upgrade-healthcheck
     - ref: acm-interop-p2p-spoke-upgrade-prehealthcheck
     - ref: acm-interop-p2p-spoke-upgrade
-    - ref: acm-interop-p2p-spoke-upgrade-healthcheck
-    - ref: interop-tests-openshift-virtualization-upgrade-prep
-    - ref: interop-tests-openshift-virtualization-upgrade-tests
     - ref: acm-tests-observability
     - ref: acm-tests-grc
     - ref: acm-tests-alc
+    - ref: acm-interop-p2p-spoke-upgrade-healthcheck
+    - ref: interop-tests-openshift-virtualization-upgrade-prep
+    - ref: interop-tests-openshift-virtualization-upgrade-tests
   timeout: 20h0m0s
 zz_generated_metadata:
   branch: master

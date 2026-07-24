@@ -22,20 +22,52 @@ eval "$(
     "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq yq
 
-# Resolve the FIRST (lowest) kubevirt-hyperconverged x.y.z for major.minor from the spoke catalog.
-# Used for one-hop upgrade tests where the target is the initial z-stream entry point for the minor
-# (e.g. 4.21.0). OLM's upgrade graph provides a direct 'replaces' edge from the latest 4.20.z to
-# the first 4.21.z, making this a single-hop upgrade.
-ResolveCnvFirstVersion() {
-    typeset majorMinor="${1:?}" channel="${2:?}"
-    oc get packagemanifest kubevirt-hyperconverged -n openshift-marketplace -o json \
-        | jq -r --arg ch "${channel}" --arg prefix "${majorMinor}." '
-            .status.channels[]
-            | select(.name == $ch)
-            | .entries[]
-            | select(.version | startswith($prefix))
-            | .version' \
-        | sort -V | head -n1
+# Resolve the CNV upgrade target version from OLM's actual pending install plan.
+# The pending plan is the ground truth: it reflects the real upgrade graph edges
+# (replaces/skipRange) rather than just what versions exist in the catalog.
+# OLM may skip z-stream versions entirely via skipRange (e.g. jump from v4.21.z
+# directly to v4.22.2 bypassing v4.22.0 and v4.22.1), so reading the lowest
+# catalog entry would give a version OLM will never produce an install plan for.
+# This function waits for the pending install plan to appear, reads the resolved
+# CSV, and validates it matches the expected major.minor before returning the
+# version string. The plan is intentionally left unapproved so that
+# PrepareCnvOlmForUpgradeTest can find it in RequiresApproval state and the
+# upgrade-tests step can control when the upgrade actually happens.
+ResolveCnvVersionFromPendingPlan() {
+    typeset expectedMajorMinor="${1:?}"
+    typeset ns="openshift-cnv"
+    typeset -r subApi="subscription.operators.coreos.com/hco-operatorhub"
+    typeset -i waitMax=600
+    typeset -i pollInt=10
+    typeset subIp="" ipCsv="" ipVersion=""
+    (
+        SECONDS=0
+        until [[ -n "${subIp}" ]]; do
+            subIp="$(oc get "${subApi}" -n "${ns}" \
+                -o jsonpath='{.status.installplan.name}' || true)"
+            [[ -n "${subIp}" ]] && break
+            (( SECONDS >= waitMax )) && {
+                : "No pending OLM install plan for ${ns}/hco-operatorhub after ${waitMax}s"
+                exit 1
+            }
+            : "Waiting for OLM install plan (${SECONDS}/${waitMax}s)"
+            sleep "${pollInt}"
+        done
+        ipCsv="$(oc get "installplan/${subIp}" -n "${ns}" \
+            -o jsonpath='{.spec.clusterServiceVersionNames[0]}' || true)"
+        [[ -n "${ipCsv}" ]] || {
+            : "Install plan ${subIp} has no clusterServiceVersionNames"
+            exit 1
+        }
+        # CSV name format: kubevirt-hyperconverged-operator.vX.Y.Z
+        ipVersion="${ipCsv#kubevirt-hyperconverged-operator.v}"
+        [[ "${ipVersion}" == "${expectedMajorMinor}."* ]] || {
+            : "Pending plan CSV ${ipCsv} (version ${ipVersion}) does not match expected major.minor ${expectedMajorMinor}"
+            exit 1
+        }
+        printf '%s' "${ipVersion}"
+        true
+    )
 }
 
 Retry() {
@@ -575,10 +607,10 @@ trap '
 
 if [[ -n "${CNV_TARGET_MAJOR_MINOR}" ]]; then
     typeset resolvedCnvVersion
-    resolvedCnvVersion="$(ResolveCnvFirstVersion "${CNV_TARGET_MAJOR_MINOR}" "${CNV_CHANNEL}")"
+    resolvedCnvVersion="$(ResolveCnvVersionFromPendingPlan "${CNV_TARGET_MAJOR_MINOR}")"
     [[ -n "${resolvedCnvVersion}" ]]
     export CNV_TARGET_VERSION="${resolvedCnvVersion}"
-    : "Resolved CNV ${CNV_TARGET_MAJOR_MINOR}.x -> ${CNV_TARGET_VERSION} (first z-stream) from packagemanifest/${CNV_CHANNEL}"
+    : "Resolved CNV ${CNV_TARGET_MAJOR_MINOR}.x -> ${CNV_TARGET_VERSION} (from OLM pending install plan)"
 fi
 
 printf '%s\n' "${CNV_TARGET_VERSION}" > "${SHARED_DIR}/cnv-target-version"
@@ -587,7 +619,7 @@ printf '%s\n' "${CNV_TARGET_VERSION}" > "${SHARED_DIR}/cnv-target-version"
 oc whoami --show-console
 oc get "subscription.operators.coreos.com/hco-operatorhub" -n openshift-cnv
 
-: "CNV upgrade prep on spoke: target ${CNV_TARGET_VERSION} via ${CNV_CHANNEL}"
+: "CNV upgrade prep on spoke: target ${CNV_TARGET_VERSION}"
 
 oc get sc
 SetDefaultStorageClassForCnv "${CNV_TARGET_STORAGE_CLASS}"
