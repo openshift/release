@@ -36,7 +36,7 @@ STS_RESPONSE=$(curl -s -X POST "https://sts.googleapis.com/v1/token" \
 FED_TOKEN=$(echo "${STS_RESPONSE}" | jq -r '.access_token // empty')
 if [[ -z "${FED_TOKEN}" ]]; then
   echo "ERROR: STS token exchange failed"
-  echo "${STS_RESPONSE}" | jq .
+  echo "${STS_RESPONSE}" | jq . 2>/dev/null || echo "${STS_RESPONSE}"
   exit 1
 fi
 echo "STS token exchange succeeded"
@@ -50,22 +50,24 @@ ACCESS_TOKEN_RESPONSE=$(curl -s -X POST "${SA_IMPERSONATION_URL}" \
 ACCESS_TOKEN=$(echo "${ACCESS_TOKEN_RESPONSE}" | jq -r '.accessToken // empty')
 if [[ -z "${ACCESS_TOKEN}" ]]; then
   echo "ERROR: SA impersonation failed"
-  echo "${ACCESS_TOKEN_RESPONSE}" | jq .
+  echo "${ACCESS_TOKEN_RESPONSE}" | jq . 2>/dev/null || echo "${ACCESS_TOKEN_RESPONSE}"
   exit 1
 fi
 echo "SA impersonation succeeded"
 
 echo "Verifying GCP API access (listing projects in CI folder)..."
-SEARCH_RESPONSE=$(curl -s -X POST \
+HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
   "https://cloudresourcemanager.googleapis.com/v3/projects:search" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{\"query\": \"parent:folders/${CI_FOLDER_ID}\"}")
 
-PROJECT_COUNT=$(echo "${SEARCH_RESPONSE}" | jq '.projects | length // 0')
-if echo "${SEARCH_RESPONSE}" | jq -e '.error' > /dev/null 2>&1; then
-  echo "ERROR: GCP API call failed"
-  echo "${SEARCH_RESPONSE}" | jq .
+HTTP_STATUS=$(echo "${HTTP_RESPONSE}" | tail -1)
+RESPONSE_BODY=$(echo "${HTTP_RESPONSE}" | sed '$d')
+
+if [[ "${HTTP_STATUS}" != "200" ]]; then
+  echo "ERROR: GCP API call failed (HTTP ${HTTP_STATUS})"
+  echo "${RESPONSE_BODY}" | jq . 2>/dev/null || echo "${RESPONSE_BODY}"
   exit 1
 fi
 
@@ -73,6 +75,6 @@ echo ""
 echo "=== WIF Smoke Test Passed ==="
 echo "  SA:      ${SA_EMAIL}"
 echo "  Folder:  ${CI_FOLDER_ID}"
-echo "  Projects in folder: ${PROJECT_COUNT}"
+echo "  HTTP:    ${HTTP_STATUS}"
 echo ""
 echo "WIF authentication verified end-to-end"
