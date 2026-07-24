@@ -47,7 +47,6 @@ trap 'rm -rf "${workdir}"' EXIT
 tarball="${workdir}/ocm-backend-tests-${OCM_BACKEND_TESTS_REF}.tar.gz"
 wget -q \
   "https://gitlab.cee.redhat.com/service/ocm-backend-tests/-/archive/${OCM_BACKEND_TESTS_REF}/ocm-backend-tests-${OCM_BACKEND_TESTS_REF}.tar.gz" \
-  --no-check-certificate \
   -O "${tarball}"
 
 $WAS_TRACING && set -x

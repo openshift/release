@@ -12,7 +12,12 @@ images:
   items:
   - dockerfile_literal: |
       FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-4.23
-      RUN dnf install -y python3-pip && python3 -m pip install yamlpath
+      RUN dnf install -y python3-pip jq && python3 -m pip install yamlpath
+      RUN curl https://certs.corp.redhat.com/certs/Current-IT-Root-CAs.pem \
+            -o /etc/pki/ca-trust/source/anchors/Current-IT-Root-CAs.pem && \
+          update-ca-trust
+      RUN git config --system user.name "OpenShift CI" && \
+          git config --system user.email "openshift-ci@redhat.com"
     to: osdfm-release-tools
 releases:
   latest:
