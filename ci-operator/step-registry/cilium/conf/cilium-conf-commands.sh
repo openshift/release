@@ -5,8 +5,13 @@ set -o errexit
 set -o pipefail
 set -x
 
-cilium_olm_rev="main"
-cv="$CILIUM_VERSION"
+CILIUM_VERSION="${CILIUM_VERSION:-1.19.4}"
+CILIUM_REPOSITORY="${CILIUM_REPOSITORY:-oci://quay.io/cilium/charts/cilium}"
+CILIUM_CLI_VERSION="${CILIUM_CLI_VERSION:-0.19.2}"
+ENDPOINT_ROUTES="${ENDPOINT_ROUTES:-true}"
+HUBBLE="${HUBBLE:-true}"
+TUNNEL_PORT="${TUNNEL_PORT:-4790}"
+SHARED_DIR="${SHARED_DIR:-/tmp/shared_dir}"
 
 if [[ -f "${SHARED_DIR}/install-config.yaml" ]]; then
   sed -i "s/networkType: .*/networkType: Cilium/" "${SHARED_DIR}/install-config.yaml"
@@ -26,60 +31,23 @@ spec:
   - 172.30.0.0/16
 EOF
 
-# OLD -- Include all Cilium OLM manifest from https://github.com/cilium/cilium-olm/tree/${cilium_olm_rev}/manifests/cilium.v${cv}
-# New -- Migrating to new OLM ( https://github.com/isovalent/olm-for-cilium )
+mkdir -p /tmp/bin
+curl --fail --retry 3 -sS -L \
+  "https://github.com/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz" \
+  | tar -xzC /tmp/bin/
+chmod +x /tmp/bin/cilium
+export PATH=/tmp/bin:$PATH
 
-OLM_URL="https://github.com/isovalent/olm-for-cilium"
-
-curl --silent --location --fail --show-error "${OLM_URL}/archive/${cilium_olm_rev}.tar.gz" --output /tmp/cilium-olm.tgz
-tar -C /tmp -xf /tmp/cilium-olm.tgz
-
-cd "/tmp/olm-for-cilium-${cilium_olm_rev}/manifests/cilium.v${cv}"
-# Overwrite the CiliumConfig
-cat > cluster-network-07-cilium-ciliumconfig.yaml << EOF
-apiVersion: cilium.io/v1alpha1
-kind: CiliumConfig
+cat > "${SHARED_DIR}/manifest_cilium-00-namespace.yaml" <<EOF
+apiVersion: v1
+kind: Namespace
 metadata:
   name: cilium
-  namespace: cilium
-spec:
-  cni:
-    binPath: /var/lib/cni/bin
-    confPath: /var/run/multus/cni/net.d
-  endpointRoutes:
-    enabled: ${ENDPOINT_ROUTES}
-  hubble:
-    enabled: ${HUBBLE}
-  ipam:
-    mode: cluster-pool
-    operator:
-      clusterPoolIPv4MaskSize: "23"
-      clusterPoolIPv4PodCIDRList:
-      - 10.128.0.0/14
-  kubeProxyReplacement: disabled
-  nativeRoutingCIDR: 10.128.0.0/14
-  operator:
-    prometheus:
-      enabled: true
-      serviceMonitor:
-        enabled: true
-  prometheus:
-    enabled: true
-    serviceMonitor:
-      enabled: true
-  securityContext:
-    privileged: true
-  sessionAffinity: true
-  clusterHealthPort: 9940
-  tunnelPort: 4789
 EOF
-for manifest in *.yaml ; do
-  cp "${manifest}" "${SHARED_DIR}/manifest_${manifest}"
-done
 
 # Workaround for OCPBUGS-85607: Apply Cilium NetworkPolicy to allow DNS pods to reach kube-apiserver
 # This needs to be applied on the management cluster for Hypershift Cilium jobs
-cat > "${SHARED_DIR}/manifest_cilium-network-policy-dns.yaml" <<EOF
+cat > "${SHARED_DIR}/manifest_cilium-00-network-policy-dns.yaml" <<EOF
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -94,3 +62,71 @@ spec:
     - host
     - kube-apiserver
 EOF
+
+cat > "${SHARED_DIR}/manifest_cilium-00-scc-privileged.yaml" <<EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cilium-scc-privileged
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+- kind: ServiceAccount
+  name: cilium
+  namespace: cilium
+- kind: ServiceAccount
+  name: cilium-operator
+  namespace: cilium
+- kind: ServiceAccount
+  name: cilium-envoy
+  namespace: cilium
+EOF
+
+WORKDIR=$(mktemp -d)
+
+# Note: In order to test with a development version, use:
+# --repository oci://quay.io/cilium-charts-dev/cilium --version <version>
+# where <version> is a tag from https://quay.io/repository/cilium-charts-dev/cilium
+cilium install \
+    --dry-run \
+    --namespace cilium \
+    --repository "${CILIUM_REPOSITORY}" \
+    --version "${CILIUM_VERSION}" \
+    --set debug.enabled=true \
+    --set k8s.requireIPv4PodCIDR=true \
+    --set logSystemLoad=true \
+    --set ipv6.enabled=false \
+    --set identityChangeGracePeriod=0s \
+    --set ipam.mode=cluster-pool \
+    --set "ipam.operator.clusterPoolIPv4PodCIDRList={10.128.0.0/14}" \
+    --set ipam.operator.clusterPoolIPv4MaskSize=23 \
+    --set ipv4NativeRoutingCIDR=10.128.0.0/14 \
+    --set cni.binPath=/var/lib/cni/bin \
+    --set cni.confPath=/var/run/multus/cni/net.d \
+    --set sessionAffinity=true \
+    --set endpointRoutes.enabled="${ENDPOINT_ROUTES}" \
+    --set hubble.enabled="${HUBBLE}" \
+    --set tunnelPort="${TUNNEL_PORT}" \
+    --set clusterHealthPort=9940 \
+    --set socketLB.enabled=true \
+    --set cni.readCniConf=/etc/cilium-cni/cilium-override.conf \
+    --set extraVolumes[0].name=cni-override \
+    --set extraVolumes[0].configMap.name=cilium-cni-override \
+    --set extraVolumeMounts[0].name=cni-override \
+    --set extraVolumeMounts[0].mountPath=/etc/cilium-cni \
+    > "${WORKDIR}/cilium-install-all.yaml"
+
+# Split the multi-document YAML into individual manifest files
+csplit -z -f "${WORKDIR}/cilium-part-" -b '%02d.yaml' "${WORKDIR}/cilium-install-all.yaml" '/^---$/' '{*}'
+INDEX=1
+for f in "${WORKDIR}"/cilium-part-*.yaml; do
+  sed -i '/^---$/d' "$f"
+  [[ ! -s "$f" ]] && rm -f "$f" && continue
+  PADDED=$(printf "%02d" "$INDEX")
+  KIND=$(grep '^kind:' "$f" | head -1 | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
+  NAME=$(grep '^  name:' "$f" | head -1 | awk '{print $2}' | tr -d '"')
+  mv "$f" "${SHARED_DIR}/manifest_cilium-${PADDED}-${KIND}-${NAME}.yaml"
+  INDEX=$((INDEX + 1))
+done
