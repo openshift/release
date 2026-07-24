@@ -1,15 +1,8 @@
 #!/bin/bash
-set -euxo pipefail
-shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-
-# cd to writeable directory
 cd /tmp/
-
 git clone https://github.com/stolostron/policy-collection.git
-
-sleep 60
 
 cd policy-collection/deploy/
 
@@ -25,60 +18,62 @@ if [[ -n "${QUAY_OPERATOR_CHANNEL}" ]]; then
 fi
 echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
 
-sleep 120
+typeset -i pollDeadline=$((SECONDS + 600))
+until (($(oc get policies -n policies -o name 2>/dev/null | wc -l))); do
+  ((SECONDS > pollDeadline)) && { : "Error: no policies appeared after 10 minutes"; exit 1; }
+  sleep 5
+done
 
-# Wait for policies to be compliant
-# NOTE: IGNORE_SECONDARY_POLICIES is set via step config YAML (naming deviates from OPP__ convention)
-typeset -i retries=40
-typeset results=""
-typeset notready=""
-typeset candidates=""
-typeset try=""
-typeset -i policyCount=0
-for try in $(seq "${retries}"); do
-  if ! results=$(oc get policies -n policies); then
-    if [ "${try}" -eq "${retries}" ]; then
-      : "Error: API request failed on final attempt (${retries} retries exhausted)"
-      exit 1
-    fi
-    : "Try ${try}/${retries}: API request failed, retrying in 30 seconds"
-    sleep 30
-    continue
-  fi
-  policyCount=0
-  if [[ -n "${results}" ]]; then
-    policyCount=$(echo "${results}" | grep -c -v '^NAME' || true)
-  fi
-  if (( policyCount == 0 )); then
-    if [ "${try}" -eq "${retries}" ]; then
-      : "Error: no policies found after ${retries} attempts"
-      exit 1
-    fi
-    : "Try ${try}/${retries}: No policies found yet. Checking again in 30 seconds"
-    sleep 30
-    continue
-  fi
-  notready=$(echo "${results}" | grep -E 'NonCompliant|Pending' || true)
-  if [ "${notready}" == "" ]; then
-    : "OPP policyset is applied and compliant"
+# Wait for Quay registry to be ready (checks operator-deployed Quay)
+typeset -a quayNamespacesArr=(quay openshift-quay quay-enterprise)
+typeset quayFound=false
+for ns in "${quayNamespacesArr[@]}"; do
+  if (($(oc get quayregistry -n "${ns}" -o name 2>/dev/null | wc -l))); then
+    : "Found Quay Operator deployment in namespace ${ns}, waiting for ready condition"
+    oc wait quayregistry --all -n "${ns}" \
+      --for condition=Available=True \
+      --timeout=10m || true
+    quayFound=true
     break
-  else
-    if [ "${try}" -eq "${retries}" ]; then
-      if [ "${IGNORE_SECONDARY_POLICIES}" == "true" ]; then
-        candidates=$(echo "${notready}" | grep -v policy-acs | grep -v policy-advanced-managed-cluster-status | grep -v policy-hub-quay-bridge | grep -v policy-quay-status || true)
-        if [ -z "${candidates}" ]; then
-          : "Warning: Proceeding with OPP QE tests with some policy failures"
-          exit 0
-        else
-          : "Error: policies failed to become compliant in allotted time, even considering the ignore list."
-          exit 1
-        fi
-      else
-        : "Error: policies failed to become compliant in allotted time."
-        exit 1
-      fi
-    fi
-    : "Try ${try}/${retries}: Policies are not compliant. Checking again in 30 seconds"
-    sleep 30
   fi
 done
+[[ "${quayFound}" == "false" ]] && : "Warning: no QuayRegistry found in namespaces: ${quayNamespacesArr[*]}"
+
+typeset -a secondaryPoliciesArr=(
+  policy-acs
+  policy-advanced-managed-cluster-status
+  policy-hub-quay-bridge
+  policy-quay-status
+)
+
+if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+  typeset criticalPolicies=''
+  criticalPolicies=$(oc get policies -n policies -o name | grep -Ev "$(IFS='|'; echo "${secondaryPoliciesArr[*]}")" || true)
+
+  if [[ -n "${criticalPolicies}" ]]; then
+    {
+      echo "${criticalPolicies}" |
+      xargs oc wait -n policies \
+        --for jsonpath='{.status.compliant}'=Compliant \
+        --timeout=40m
+    } || {
+      : "Critical policies failed to become compliant:"
+      oc get policies -n policies | grep -Ev "$(IFS='|'; echo "${secondaryPoliciesArr[*]}")" || true
+      exit 1
+    }
+  else
+    : "All policies are secondary (ignored), no critical policies to wait for"
+  fi
+else
+  {
+    oc wait policies --all -n policies \
+      --for jsonpath='{.status.compliant}'=Compliant \
+      --timeout=40m
+  } || {
+    : "Policies failed to become compliant:"
+    oc get policies -n policies
+    exit 1
+  }
+fi
+
+true
