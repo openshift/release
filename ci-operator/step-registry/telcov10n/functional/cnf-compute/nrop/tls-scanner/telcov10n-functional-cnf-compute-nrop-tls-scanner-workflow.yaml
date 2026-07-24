@@ -1,0 +1,27 @@
+workflow:
+  as: telcov10n-functional-cnf-compute-nrop-tls-scanner
+  steps:
+    pre:
+    - ref: telcov10n-functional-cnf-compute-nrop-process-inventory
+    - ref: telcov10n-functional-cnf-compute-nrop-ocp-deploy
+    - ref: telcov10n-functional-cnf-compute-nrop-ocp-operators
+    - ref: telcov10n-functional-cnf-compute-nrop-configure
+    test:
+    - ref: tls-scanner-run
+      env:
+      - name: KUBECONFIG
+        default: "/tmp/shared/kubeconfig"
+      - name: TLS_SCANNER_PQC_PASS
+        default: "true"
+    post:
+    - ref: telcov10n-verify-junit-reports
+  documentation: |-
+    NROP TLS scanner workflow for ML-KEM (Post-Quantum Cryptography) validation.
+
+    Deploys OCP cluster, installs and configures NROP operator, then runs TLS scanner
+    with TLS_SCANNER_PQC_PASS=true to validate ML-KEM support. Does NOT run functional tests.
+
+    TLS scanner results are automatically saved to ARTIFACT_DIR as JUnit XML and
+    rendered by Spyglass. Job pass/fail is determined by the scanner pod exit code.
+
+    For full e2e testing with functional tests, use telcov10n-functional-cnf-compute-nrop-testing.
