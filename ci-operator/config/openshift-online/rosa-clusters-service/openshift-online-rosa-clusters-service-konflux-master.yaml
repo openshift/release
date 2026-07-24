@@ -52,6 +52,30 @@ tests:
   commands: unset GOFLAGS && make test
   container:
     from: src
+- as: check-hive-api
+  capabilities:
+  - nested-podman
+  commands: |
+    source prow/load_prow_secrets.sh
+    prow/check_hive_api.sh
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - mount_path: /usr/local/rosa-clusters-service-sandbox
+    name: rosa-clusters-service-sandbox
+- as: check-bastion-hive
+  capabilities:
+  - nested-podman
+  commands: |
+    source prow/load_prow_secrets.sh
+    prow/connect_bastion.sh
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - mount_path: /usr/local/rosa-clusters-service-sandbox
+    name: rosa-clusters-service-sandbox
 - always_run: false
   as: pr-check-rosa-hcp
   capabilities:
