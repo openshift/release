@@ -166,11 +166,38 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
+  as: e2e-aws-ovn-upgrade-haproxy28-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      HAPROXY_VERSION: "2.8"
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-upgrade-aws
+- always_run: false
   as: e2e-aws-ovn-serial
   pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-serial
+- always_run: false
+  as: e2e-aws-ovn-serial-haproxy28-techpreview
+  optional: true
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      HAPROXY_VERSION: "2.8"
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-ovn-single-node
@@ -293,6 +320,19 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - always_run: false
+  as: e2e-aws-ovn-haproxy28-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      HAPROXY_VERSION: "2.8"
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-e2e-aws
+- always_run: false
   as: e2e-ibmcloud-operator
   optional: true
   steps:
@@ -313,6 +353,27 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-operator-haproxy28-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      HAPROXY_VERSION: "2.8"
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
     test:
     - as: test
       cli: latest

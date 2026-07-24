@@ -7,6 +7,10 @@ base_images:
     name: "5.1"
     namespace: ocp-priv
     tag: rhel-coreos
+  rhel-coreos-base-10:
+    name: "5.1"
+    namespace: ocp-priv
+    tag: rhel-coreos-10
 build_root:
   image_stream_tag:
     name: release
@@ -41,12 +45,30 @@ images:
         as:
         - registry.ci.openshift.org/rhcos-devel/rhel-coreos
     to: rhel-coreos
+  - dockerfile_literal: |
+      FROM quay.io/centos/centos:stream9 as build
+      # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
+      # in a container https://github.com/coreos/rpm-ostree/issues/4034
+      RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download cri-o
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
+      COPY --from=build /*.rpm /
+      # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
+      RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+    inputs:
+      base-machine-with-rpms:
+        as:
+        - quay.io/centos/centos:stream9
+      rhel-coreos-base-10:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
+    to: rhel-coreos-10
 promotion:
   to:
   - additional_images:
       cri-o-rpms: rpms
     excluded_images:
     - rhel-coreos
+    - rhel-coreos-10
     name: "5.1"
     namespace: ocp-priv
 prowgen:
