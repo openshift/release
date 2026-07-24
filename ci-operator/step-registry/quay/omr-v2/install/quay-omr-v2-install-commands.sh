@@ -7,7 +7,7 @@ set -o pipefail
 umask 077
 EXIT_CODE=100
 work_dir=""
-pipeline_archive="${SHARED_DIR}/omr_v2_pipeline_archive.tar.gz"
+pipeline_image_file="${SHARED_DIR}/omr_v2_pipeline_image"
 published=false
 declare -a ssh_options=()
 declare -a runtime_files=(
@@ -33,7 +33,7 @@ cleanup() {
     if [[ -n "${work_dir}" && -d "${work_dir}" ]]; then
         rm -rf -- "${work_dir}"
     fi
-    rm -f -- "${pipeline_archive}"
+    rm -f -- "${pipeline_image_file}"
     exit "${status}"
 }
 
@@ -47,7 +47,11 @@ trap terminate TERM
 mkdir -p "${ARTIFACT_DIR}"
 rm -f -- "${runtime_files[@]}"
 
-for command in scp ssh; do
+required_commands=(scp ssh)
+if [[ -s "${pipeline_image_file}" ]]; then
+    required_commands+=(awk grep oc sha256sum tar)
+fi
+for command in "${required_commands[@]}"; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         echo "Required command ${command} is unavailable in the OMR v2 install step image." >&2
         exit 1
@@ -66,13 +70,13 @@ for required_file in \
 done
 
 safe_download_url_re='^https://[A-Za-z0-9./_?&=%:+-]+$'
-if [[ ! -e "${pipeline_archive}" &&
+if [[ ! -e "${pipeline_image_file}" &&
       ! "${OMR_V2_DOWNLOAD_URL}" =~ ${safe_download_url_re} ]]; then
     echo "OMR_V2_DOWNLOAD_URL must be a safely quoted HTTPS URL." >&2
     exit 1
 fi
-if [[ -e "${pipeline_archive}" && ! -s "${pipeline_archive}" ]]; then
-    echo "The PR-built OMR v2 archive is empty." >&2
+if [[ -e "${pipeline_image_file}" && ! -s "${pipeline_image_file}" ]]; then
+    echo "The PR-built OMR v2 pipeline image reference is empty." >&2
     exit 1
 fi
 
@@ -106,6 +110,51 @@ remote="${host_user}@${host_public}"
 remote_work_dir="/home/${host_user}/omr-v2-artifact"
 work_dir=$(mktemp -d /tmp/quay-omr-v2-install.XXXXXX)
 chmod 0700 "${work_dir}"
+pipeline_archive=""
+if [[ -s "${pipeline_image_file}" ]]; then
+    if [[ "$(wc -l < "${pipeline_image_file}")" -ne 1 ]]; then
+        echo "The PR-built OMR v2 pipeline image reference must contain one line." >&2
+        exit 1
+    fi
+    pipeline_image=$(tr -d '\r\n' < "${pipeline_image_file}")
+    if [[ ! "${pipeline_image}" =~ ^[A-Za-z0-9._/@:-]+$ ]]; then
+        echo "The PR-built OMR v2 pipeline image pullspec is invalid." >&2
+        exit 1
+    fi
+
+    auth_file="${work_dir}/registry-auth.json"
+    pipeline_extract_dir="${work_dir}/pipeline-extract"
+    pipeline_archive_listing="${work_dir}/pipeline-archive-listing.txt"
+    mkdir -p "${pipeline_extract_dir}"
+
+    # Log in to the CI build registry without using an in-cluster kubeconfig.
+    unset KUBECONFIG
+    oc registry login --to="${auth_file}"
+    chmod 0600 "${auth_file}"
+    oc image extract "${pipeline_image}" \
+        --registry-config="${auth_file}" \
+        --path="/mirror-registry.tar.gz:${pipeline_extract_dir}"
+    pipeline_archive="${pipeline_extract_dir}/mirror-registry.tar.gz"
+    if [[ ! -s "${pipeline_archive}" ]]; then
+        echo "The PR-built OMR v2 image does not contain /mirror-registry.tar.gz." >&2
+        exit 1
+    fi
+
+    tar -tzf "${pipeline_archive}" > "${pipeline_archive_listing}"
+    for required_entry in \
+        mirror-registry \
+        image-archive.tar \
+        execution-environment.tar; do
+        if ! grep -Fxq "${required_entry}" "${pipeline_archive_listing}"; then
+            echo "The PR-built OMR v2 archive is missing ${required_entry}." >&2
+            exit 1
+        fi
+    done
+    printf '%s\n' "${pipeline_image}" > \
+        "${ARTIFACT_DIR}/mirror-registry-pipeline-image.txt"
+    sha256sum "${pipeline_archive}" | awk '{print $1}' > \
+        "${ARTIFACT_DIR}/mirror-registry-pipeline-sha256.txt"
+fi
 
 cat > "${work_dir}/install-omr-v2" <<'EOF'
 #!/bin/bash
