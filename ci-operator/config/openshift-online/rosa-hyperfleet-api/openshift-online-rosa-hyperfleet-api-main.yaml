@@ -3,8 +3,10 @@ build_root:
     dockerfile_path: ci/Containerfile
 images:
   items:
-  - dockerfile_path: Dockerfile
-    to: rosa-regional-platform-api
+  - dockerfile_path: platform-api/Dockerfile
+    to: platform-api
+  - dockerfile_path: hyperfleet-operator/Dockerfile
+    to: hyperfleet-operator
 resources:
   '*':
     limits:
@@ -31,20 +33,30 @@ tests:
   commands: ./ci/verify.sh
   container:
     from: src
-- as: push-image
+- as: push-api-image
   postsubmit: true
   steps:
     dependencies:
-      CI_COMPONENT_IMAGE: rosa-regional-platform-api
+      CI_COMPONENT_IMAGE: platform-api
     env:
-      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/rosa-regional-platform-api-release
+      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/platform-api-release
+    test:
+    - ref: rosa-hyperfleet-image-push
+- as: push-operator-image
+  postsubmit: true
+  steps:
+    dependencies:
+      CI_COMPONENT_IMAGE: hyperfleet-operator
+    env:
+      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/hyperfleet-operator-release
     test:
     - ref: rosa-hyperfleet-image-push
 - always_run: false
-  as: rosa-regionality-compatibility-e2e
+  as: on-demand-e2e
   steps:
     dependencies:
-      CI_COMPONENT_IMAGE: rosa-regional-platform-api
+      CI_COMPONENT_IMAGE: platform-api
+      CI_OPERATOR_IMAGE: hyperfleet-operator
     env:
       ROSA_REGIONAL_COMPONENT_NAME: platform-api
       ROSA_REGIONAL_HELM_OVERRIDE_YAML: |
@@ -54,7 +66,16 @@ tests:
               repository: IMAGE_REPO
               tag: IMAGE_TAG
       ROSA_REGIONAL_HELM_VALUES_FILE: argocd/config/regional-cluster/platform-api/values.yaml
-      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/rosa-regional-platform-api
+      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/platform-api
+      ROSA_REGIONAL_EXTRA_COMPONENTS: |
+        - env: CI_OPERATOR_IMAGE
+          repo: quay.io/rrp-dev-ci/hyperfleet-operator
+          target: argocd/config/regional-cluster/hyperfleet-operator/values.yaml
+          override:
+            hyperfleetOperator:
+              image:
+                repository: IMAGE_REPO
+                tag: IMAGE_TAG
     workflow: rosa-hyperfleet-ephemeral-e2e
 zz_generated_metadata:
   branch: main
