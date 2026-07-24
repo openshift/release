@@ -352,6 +352,15 @@ function mirror_test_images {
 	done
 
 	echo "Successfully mirrored support-tools image to ${MIRROR_REGISTRY_HOST}"
+
+	local index_image="${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
+	echo "Mirroring LVMS catalog images from ${index_image} to ${MIRROR_REGISTRY_HOST}"
+	oc adm catalog mirror "${index_image}" "${MIRROR_REGISTRY_HOST}" \
+		--insecure=true -a "${new_pull_secret}" \
+		--index-filter-by-os='.*' || {
+		echo "WARNING: Failed to mirror LVMS catalog images, operator dependencies may fail to pull"
+	}
+
 	rm -f "${new_pull_secret}"
 	return 0
 }
