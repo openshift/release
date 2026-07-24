@@ -18,10 +18,17 @@ git clone https://github.com/openshift-online/rosa-hyperfleet.git "${WORK_DIR}/p
 cd "${WORK_DIR}/platform"
 git checkout "${CLONE_REF}"
 
+TEARDOWN_ARGS=()
 if [[ "${ROSA_REGIONAL_TEARDOWN_FIRE_AND_FORGET:-true}" == "true" ]]; then
   echo "Starting ephemeral teardown (fire-and-forget)..."
-  uv run --no-cache ci/ephemeral-provider/main.py --teardown-fire-and-forget
+  TEARDOWN_ARGS+=(--teardown-fire-and-forget)
 else
   echo "Starting ephemeral teardown (synchronous)..."
-  uv run --no-cache ci/ephemeral-provider/main.py --teardown
+  TEARDOWN_ARGS+=(--teardown)
+  if [[ "${ROSA_REGIONAL_TEARDOWN_NO_WAIT:-false}" == "true" ]]; then
+    echo "  --no-wait: skipping pipeline completion wait"
+    TEARDOWN_ARGS+=(--no-wait)
+  fi
 fi
+
+uv run --no-cache ci/ephemeral-provider/main.py "${TEARDOWN_ARGS[@]}"
