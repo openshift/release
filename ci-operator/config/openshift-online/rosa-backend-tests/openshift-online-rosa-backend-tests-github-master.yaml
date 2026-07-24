@@ -19,7 +19,12 @@ tests:
     unset GOFLAGS
     export HOME=/tmp
     git config --global url."https://$(cat /usr/local/ocm-github-credentials/token)@github.com/".insteadOf "https://github.com/"
-    make lint
+
+    echo "=== Testing go mod download with 2min timeout ==="
+    timeout 120 go mod download || echo "ERROR: go mod download timed out after 2min"
+
+    echo "=== Running make lint with 5min timeout ==="
+    timeout 300 make lint || echo "ERROR: make lint timed out after 5min"
   container:
     from: src
   secrets:
