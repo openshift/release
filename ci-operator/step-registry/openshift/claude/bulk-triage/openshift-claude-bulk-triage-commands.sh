@@ -35,7 +35,9 @@ if [[ -n "${AI_HELPERS_REPO:-}" ]]; then
         exit 1
     fi
     find /opt/ai-helpers -mindepth 1 -delete
-    cp -a "${CUSTOM_DIR}/." /opt/ai-helpers/
+    # No -a/--preserve: /opt/ai-helpers itself is owned by another UID (we
+    # only have group-write), so preserving ownership/times on it fails.
+    cp -r --no-preserve=mode,ownership,timestamps "${CUSTOM_DIR}/." /opt/ai-helpers/
     rm -rf "${CUSTOM_DIR}"
     echo "Replaced /opt/ai-helpers with ${AI_HELPERS_REPO}@${AI_HELPERS_REF} ($(git -C /opt/ai-helpers rev-parse --short HEAD 2>/dev/null || echo 'unknown rev'))"
 fi
