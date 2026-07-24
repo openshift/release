@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-e2e-libvirt-vpn-ipi-fips
+  steps:
+    env:
+      IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH: "true"
+      LIBVIRT_POOL_NAME: multiarch-ci-pool
+      LIBVIRT_IMAGE_PATH: "/home/libvirt/openshift-images"
+      WORKER_REPLICAS: "0"
+      COMPUTE_COUNT: "2"
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: ipi-libvirt-pre
+    - ref: fips-check
+    - ref: ipi-install-libvirt-virsh-workers
+    test:
+    - chain: openshift-e2e-libvirt-test
+    post:
+    - chain: ipi-libvirt-post
+  documentation: |-
+    FIPS variant of openshift-e2e-libvirt-vpn-ipi hybrid (terraform masters + virsh workers).
+    fips-check runs after install and before virsh workers so the API is up for the check.

@@ -1,0 +1,373 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# After IPI terraform brings up masters (WORKER_REPLICAS=0), create workers the UPI way
+# (import RHCOS volume + ignition disk) so s390x avoids machine-api/libvirt ACPI domain XML.
+#
+# ocp/4.16+: libvirt-installer ships virt-install (MULTIARCH-4111). ocp/4.15: does not —
+# fall back to virsh define with a minimal domain XML (no <acpi/>).
+
+# libvirt-installer image sets PATH=/bin; tools and injected oc (cli: latest) live under /usr/bin.
+export PATH="/usr/bin:/bin:${PATH:-}"
+
+if [[ -z "${LEASED_RESOURCE:-}" ]]; then
+  echo "Failed to acquire lease"
+  exit 1
+fi
+if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
+  echo "Couldn't find lease config file"
+  exit 1
+fi
+if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
+  echo "Missing ${SHARED_DIR}/kubeconfig; IPI install must succeed before this step"
+  exit 1
+fi
+if [[ ! -f "${SHARED_DIR}/metadata.json" ]]; then
+  echo "Missing ${SHARED_DIR}/metadata.json; need infraID for base volume and network name"
+  exit 1
+fi
+
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+if ! command -v oc >/dev/null 2>&1; then
+  echo "ERROR: oc not found in PATH=${PATH}"
+  exit 1
+fi
+
+# mikefarah/yq v4: "yq-v4" uses legacy CLI ("yq-v4 -o=y ..."). Images that only ship "yq"
+# require the v4 syntax: "yq eval -o=y ..." (plain "yq -o=y" treats the expression as a subcommand).
+# ocp/4.15:libvirt-installer has yq-v4 but not jq — never fall back to bare "yq eval" when yq-v4 exists.
+if ! command -v yq-v4 >/dev/null 2>&1 && ! command -v yq >/dev/null 2>&1 && ! command -v jq >/dev/null 2>&1; then
+  echo "Neither yq-v4, yq, nor jq found in PATH"
+  exit 1
+fi
+
+leaseLookup() {
+  local lookup
+  local leases="${CLUSTER_PROFILE_DIR}/leases"
+  if command -v yq-v4 >/dev/null 2>&1; then
+    lookup=$(yq-v4 -oy ".[\"${LEASED_RESOURCE}\"].${1}" "${leases}")
+  else
+    lookup=$(yq eval -o=y ".[\"${LEASED_RESOURCE}\"].${1}" "${leases}")
+  fi
+  if [[ -z "${lookup}" || "${lookup}" == "null" ]]; then
+    echo "Couldn't find ${1} in lease config"
+    exit 1
+  fi
+  echo "${lookup}"
+}
+
+HOSTNAME="$(leaseLookup 'hostname')"
+# Prefer workflow LIBVIRT_POOL_NAME (same pool as IPI install) over step POOL_NAME default.
+POOL_NAME="${LIBVIRT_POOL_NAME:-${POOL_NAME:-multiarch-ci-pool}}"
+COMPUTE_COUNT="${COMPUTE_COUNT:-2}"
+# IPI jobs already set WORKER_MEMORY; prefer that over DOMAIN_MEMORY default.
+DOMAIN_MEMORY="${WORKER_MEMORY:-${DOMAIN_MEMORY:-16384}}"
+DOMAIN_VCPUS="${DOMAIN_VCPUS:-6}"
+VIRT_INSTALL_OSINFO="${VIRT_INSTALL_OSINFO:-rhel9-unknown}"
+
+if command -v jq >/dev/null 2>&1; then
+  INFRA_ID=$(jq -r '.infraID // empty' "${SHARED_DIR}/metadata.json")
+elif command -v yq-v4 >/dev/null 2>&1; then
+  INFRA_ID=$(yq-v4 -oy '.infraID // ""' "${SHARED_DIR}/metadata.json")
+else
+  INFRA_ID=$(yq eval -o=y '.infraID // ""' "${SHARED_DIR}/metadata.json")
+fi
+if [[ -z "${INFRA_ID}" || "${INFRA_ID}" == "null" ]]; then
+  echo "Could not determine infraID from metadata.json"
+  exit 1
+fi
+
+# IPI terraform names the libvirt network after infraID (cluster_id).
+NETWORK_NAME="${INFRA_ID}"
+BASE_VOLUME="${INFRA_ID}-base"
+
+LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
+VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
+
+echo "Creating ${COMPUTE_COUNT} virsh workers on ${HOSTNAME}"
+echo "  pool=${POOL_NAME} network=${NETWORK_NAME} base_volume=${BASE_VOLUME}"
+echo "  memory=${DOMAIN_MEMORY}MiB vcpus=${DOMAIN_VCPUS}"
+
+if ! ${VIRSH} pool-list --name | grep -qx "${POOL_NAME}"; then
+  echo "ERROR: storage pool ${POOL_NAME} is not active"
+  ${VIRSH} pool-list --all
+  exit 1
+fi
+if ! ${VIRSH} vol-list --pool "${POOL_NAME}" | awk '{print $1}' | grep -qx "${BASE_VOLUME}"; then
+  echo "ERROR: RHCOS base volume ${BASE_VOLUME} not found in pool ${POOL_NAME}"
+  ${VIRSH} vol-list --pool "${POOL_NAME}"
+  exit 1
+fi
+if ! ${VIRSH} net-list --name | grep -qx "${NETWORK_NAME}"; then
+  echo "ERROR: libvirt network ${NETWORK_NAME} not found (IPI terraform network)"
+  ${VIRSH} net-list --all
+  exit 1
+fi
+
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "${WORKDIR}"' EXIT
+
+# Prefer ignition saved by the install step; otherwise pull live worker userdata from the cluster.
+echo "Extracting worker ignition..."
+WORKER_IGN="${WORKDIR}/worker.ign"
+if [[ -s "${SHARED_DIR}/worker.ign" ]]; then
+  echo "Using ${SHARED_DIR}/worker.ign from install step"
+  cp "${SHARED_DIR}/worker.ign" "${WORKER_IGN}"
+else
+  set +e
+  for secret in worker-user-data worker-user-data-managed; do
+    echo "Trying secret/${secret} in openshift-machine-api..."
+    if oc -n openshift-machine-api extract "secret/${secret}" --keys=userData --to=- > "${WORKER_IGN}" 2>"${WORKDIR}/extract.err"; then
+      if [[ -s "${WORKER_IGN}" ]]; then
+        echo "Extracted worker ignition from secret/${secret}"
+        break
+      fi
+    fi
+    cat "${WORKDIR}/extract.err" >&2 || true
+  done
+  set -e
+fi
+if [[ ! -s "${WORKER_IGN}" ]]; then
+  echo "ERROR: could not extract worker ignition (SHARED_DIR/worker.ign or worker-user-data(-managed))"
+  oc -n openshift-machine-api get secrets 2>&1 | head -50 || true
+  exit 1
+fi
+
+# Shared worker.ign has no per-node hostname; without /etc/hostname both guests become
+# localhost.localdomain and only one can join the cluster. Inject a unique hostname per VM.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: python3 required to inject /etc/hostname into worker ignition"
+  exit 1
+fi
+
+inject_hostname_ignition() {
+  local src=$1
+  local hostname=$2
+  local dest=$3
+  python3 - "${src}" "${hostname}" "${dest}" <<'PY'
+import json, sys, urllib.parse
+
+src, hostname, dest = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(src, encoding="utf-8") as f:
+    ign = json.load(f)
+files = [f for f in ign.setdefault("storage", {}).setdefault("files", []) if f.get("path") != "/etc/hostname"]
+files.append(
+    {
+        "path": "/etc/hostname",
+        "mode": 420,
+        "overwrite": True,
+        "contents": {
+            "source": "data:text/plain;charset=utf-8,"
+            + urllib.parse.quote(hostname + "\n", safe="")
+        },
+    }
+)
+ign["storage"]["files"] = files
+with open(dest, "w", encoding="utf-8") as f:
+    json.dump(ign, f, separators=(",", ":"))
+PY
+}
+
+upload_ignition_volume() {
+  local vol=$1
+  local file=$2
+  ${VIRSH} vol-delete --pool "${POOL_NAME}" "${vol}" || true
+  ${VIRSH} vol-create-as \
+    --name "${vol}" \
+    --pool "${POOL_NAME}" \
+    --format raw \
+    --capacity "$(wc -c < "${file}")"
+  ${VIRSH} vol-upload \
+    --vol "${vol}" \
+    --pool "${POOL_NAME}" \
+    --file "${file}"
+}
+
+clone_volume() {
+  local newname=$1
+  ${VIRSH} vol-delete --pool "${POOL_NAME}" "${newname}" || true
+  ${VIRSH} vol-clone \
+    --pool "${POOL_NAME}" \
+    --vol "${BASE_VOLUME}" \
+    --newname "${newname}"
+}
+
+# Domain XML equivalent of virt-install --import + ignition disk (UPI default path).
+# Intentionally omits <features><acpi/> — RHEL 9 QEMU rejects ACPI on s390-ccw-virtio.
+write_worker_domain_xml() {
+  local name=$1
+  local mac=$2
+  local ign_vol=$3
+  local xml=$4
+  local arch_attr machine console_target uuid
+
+  case "${ARCH:-s390x}" in
+    s390x)
+      arch_attr="s390x"
+      machine="s390-ccw-virtio"
+      console_target="sclp"
+      ;;
+    ppc64le)
+      arch_attr="ppc64le"
+      machine="pseries"
+      console_target="serial"
+      ;;
+    *)
+      arch_attr="x86_64"
+      machine="q35"
+      console_target="serial"
+      ;;
+  esac
+
+  if [[ -r /proc/sys/kernel/random/uuid ]]; then
+    uuid=$(cat /proc/sys/kernel/random/uuid)
+  else
+    uuid=$(python3 -c 'import uuid; print(uuid.uuid4())')
+  fi
+
+  {
+    echo "<domain type='kvm'>"
+    echo "  <name>${name}</name>"
+    echo "  <uuid>${uuid}</uuid>"
+    echo "  <memory unit='MiB'>${DOMAIN_MEMORY}</memory>"
+    echo "  <currentMemory unit='MiB'>${DOMAIN_MEMORY}</currentMemory>"
+    echo "  <vcpu placement='static'>${DOMAIN_VCPUS}</vcpu>"
+    echo "  <os>"
+    echo "    <type arch='${arch_attr}' machine='${machine}'>hvm</type>"
+    echo "    <boot dev='hd'/>"
+    echo "  </os>"
+    echo "  <clock offset='utc'/>"
+    echo "  <on_poweroff>destroy</on_poweroff>"
+    echo "  <on_reboot>restart</on_reboot>"
+    echo "  <on_crash>destroy</on_crash>"
+    echo "  <devices>"
+    echo "    <disk type='volume' device='disk'>"
+    echo "      <driver name='qemu' type='qcow2'/>"
+    echo "      <source pool='${POOL_NAME}' volume='${name}-volume'/>"
+    echo "      <target dev='vda' bus='virtio'/>"
+    echo "    </disk>"
+    echo "    <disk type='volume' device='disk'>"
+    echo "      <driver name='qemu' type='raw'/>"
+    echo "      <source pool='${POOL_NAME}' volume='${ign_vol}'/>"
+    echo "      <target dev='vdb' bus='virtio'/>"
+    echo "      <readonly/>"
+    echo "      <serial>ignition</serial>"
+    echo "      <startupPolicy>optional</startupPolicy>"
+    echo "    </disk>"
+    echo "    <interface type='network'>"
+    echo "      <mac address='${mac}'/>"
+    echo "      <source network='${NETWORK_NAME}'/>"
+    echo "      <model type='virtio'/>"
+    echo "    </interface>"
+    echo "    <console type='pty'>"
+    echo "      <target type='${console_target}' port='0'/>"
+    echo "    </console>"
+    echo "  </devices>"
+    echo "</domain>"
+  } > "${xml}"
+}
+
+create_worker() {
+  local name=$1
+  local mac=$2
+  local ign_vol="${name}-ignition-volume"
+  local node_ign="${WORKDIR}/${name}.ign"
+  local xml
+
+  echo "Creating worker ${name} (mac=${mac}, hostname=${name})..."
+  inject_hostname_ignition "${WORKER_IGN}" "${name}" "${node_ign}"
+  upload_ignition_volume "${ign_vol}" "${node_ign}"
+  clone_volume "${name}-volume"
+
+  # Match UPI: call virt-install directly (not via mock-nss.sh). Available on 4.16+ images.
+  if command -v virt-install >/dev/null 2>&1; then
+    echo "Using virt-install"
+    virt-install \
+      --connect "${LIBVIRT_CONNECTION}" \
+      --name "${name}" \
+      --memory "${DOMAIN_MEMORY}" \
+      --vcpus "${DOMAIN_VCPUS}" \
+      --network "network=${NETWORK_NAME},mac=${mac}" \
+      --disk="vol=${POOL_NAME}/${name}-volume" \
+      --osinfo "${VIRT_INSTALL_OSINFO}" \
+      --graphics=none \
+      --import \
+      --noautoconsole \
+      --disk "vol=${POOL_NAME}/${ign_vol},format=raw,readonly=on,serial=ignition,startup_policy=optional"
+    return
+  fi
+
+  echo "virt-install not in image; defining ${name} with virsh (4.15 libvirt-installer fallback)"
+  xml="${WORKDIR}/${name}.xml"
+  write_worker_domain_xml "${name}" "${mac}" "${ign_vol}" "${xml}"
+  echo "Domain XML:"
+  cat "${xml}"
+  ${VIRSH} define "${xml}"
+  ${VIRSH} start "${name}"
+}
+
+for ((i = 0; i < COMPUTE_COUNT; i++)); do
+  NODE="${LEASED_RESOURCE}-compute-${i}"
+  MAC_ADDRESS=$(leaseLookup "compute[$i].mac")
+  # Remove leftovers from prior failed runs
+  ${VIRSH} destroy "${NODE}" || true
+  ${VIRSH} undefine "${NODE}" || true
+  create_worker "${NODE}" "${MAC_ADDRESS}"
+done
+
+# Keep worker MachineSet at 0 so machine-api does not also try to spawn ACPI-broken domains.
+if oc get machineset -n openshift-machine-api -o name 2>/dev/null | grep -q worker; then
+  echo "Ensuring worker MachineSets stay scaled to 0..."
+  oc get machineset -n openshift-machine-api -o name | grep worker | xargs -r oc scale -n openshift-machine-api --replicas=0 || true
+fi
+
+echo "Approving CSRs until workers are Ready..."
+approve_done="${WORKDIR}/approve-done"
+rm -f "${approve_done}"
+(
+  set +e
+  while [[ ! -f "${approve_done}" ]]; do
+    if command -v jq >/dev/null 2>&1; then
+      oc get csr -ojson 2>/dev/null \
+        | jq -r '.items[] | select((.status.conditions // []) | length == 0) | .metadata.name' \
+        | xargs --no-run-if-empty oc adm certificate approve || true
+    elif command -v yq-v4 >/dev/null 2>&1; then
+      oc get csr -ojson 2>/dev/null \
+        | yq-v4 -oy '.items[] | select(.status | length == 0) | .metadata.name' \
+        | xargs --no-run-if-empty oc adm certificate approve || true
+    else
+      oc get csr --no-headers 2>/dev/null | awk '/Pending/ {print $1}' \
+        | xargs --no-run-if-empty oc adm certificate approve || true
+    fi
+    sleep 15
+  done
+) &
+APPROVE_PID=$!
+
+deadline=$((SECONDS + 45 * 60))
+while true; do
+  ready=$(oc get nodes --no-headers 2>/dev/null | awk '$3 !~ /master/ && $2 == "Ready" {c++} END{print c+0}')
+  echo "Ready worker nodes: ${ready}/${COMPUTE_COUNT}"
+  if [[ "${ready}" -ge "${COMPUTE_COUNT}" ]]; then
+    break
+  fi
+  if (( SECONDS >= deadline )); then
+    echo "ERROR: timed out waiting for ${COMPUTE_COUNT} Ready workers"
+    oc get nodes -o wide || true
+    oc get csr || true
+    touch "${approve_done}"
+    wait "${APPROVE_PID}" || true
+    exit 1
+  fi
+  sleep 30
+done
+
+touch "${approve_done}"
+wait "${APPROVE_PID}" || true
+
+echo "Virsh workers are Ready."
+oc get nodes -o wide

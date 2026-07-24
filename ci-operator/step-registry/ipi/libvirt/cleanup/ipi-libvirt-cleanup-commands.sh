@@ -1,5 +1,22 @@
 #!/bin/bash
 
+# mikefarah/yq v4: "yq-v4" uses legacy CLI ("yq-v4 -o=y ..."). Images that only ship "yq" (e.g. OCP 4.8)
+# require the v4 syntax: "yq eval -o=y ..." (plain "yq -o=y" treats the expression as a subcommand).
+if ! command -v yq-v4 >/dev/null 2>&1 && ! command -v yq >/dev/null 2>&1; then
+  echo "Neither yq-v4 nor yq found in PATH"
+  exit 1
+fi
+
+yq_libvirt_get() {
+  local field=$1
+  local leases="${CLUSTER_PROFILE_DIR}/leases"
+  if command -v yq-v4 >/dev/null 2>&1; then
+    yq-v4 -oy ".[\"${LEASED_RESOURCE}\"].${field}" "${leases}"
+  else
+    yq eval -o=y ".[\"${LEASED_RESOURCE}\"].${field}" "${leases}"
+  fi
+}
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
@@ -13,7 +30,7 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
 fi
 
 # ensure hostname can be found
-HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
+HOSTNAME="$(yq_libvirt_get hostname)"
 if [[ -z "${HOSTNAME}" ]]; then
   echo "Couldn't retrieve hostname from lease config"
   exit 1
@@ -54,6 +71,16 @@ do
   mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" net-destroy "${NET}"
   mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" net-undefine "${NET}"
 done
+
+# Remove lease-prefixed volumes from the shared UPI/IPI pool (virsh workers, leftover qcow2).
+SHARED_POOL="${LIBVIRT_POOL_NAME:-multiarch-ci-pool}"
+if mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" pool-list --all --name | grep -qx "${SHARED_POOL}"; then
+  echo "Removing stale volumes for ${LEASED_RESOURCE} from pool ${SHARED_POOL}..."
+  for VOLUME in $(mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" vol-list --pool "${SHARED_POOL}" 2>/dev/null | awk '{print $1}' | grep -E "^${LEASED_RESOURCE}-" || true)
+  do
+    mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" vol-delete --pool "${SHARED_POOL}" "${VOLUME}" || true
+  done
+fi
 
 # Detect conflicts
 CONFLICTING_DOMAINS=$(mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" list --all --name | grep "${LEASED_RESOURCE}")

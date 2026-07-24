@@ -1,0 +1,31 @@
+workflow:
+  as: openshift-e2e-libvirt-vpn-ipi
+  steps:
+    env:
+      IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH: "true"
+      LIBVIRT_POOL_NAME: multiarch-ci-pool
+      LIBVIRT_IMAGE_PATH: "/home/libvirt/openshift-images"
+      # Masters via IPI terraform; workers via virt-install or virsh define (no ACPI)
+      # Keep MachineSet replicas at 0 so machine-api does not create guests.
+      WORKER_REPLICAS: "0"
+      COMPUTE_COUNT: "2"
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: ipi-libvirt-pre
+    - ref: ipi-install-libvirt-virsh-workers
+    test:
+    - chain: openshift-e2e-libvirt-test
+    post:
+    - chain: ipi-libvirt-post
+  documentation: |-
+    IBM Z VPN (phc-cicd) hybrid IPI: terraform masters + virsh/virt-install workers.
+
+    Storage: LIBVIRT_POOL_NAME=multiarch-ci-pool on /home (2TB OZ hosts).
+
+    Workers: WORKER_REPLICAS=0 so machine-api does not create guests (s390x QEMU rejects
+    ACPI in provider domain XML). After install, ipi-install-libvirt-virsh-workers clones
+    the IPI RHCOS base volume and creates ${lease}-compute-* with virt-install (4.16+)
+    or virsh define + ACPI-free domain XML (4.15), attaching the worker ignition disk.
+
+    Masters still use IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH for terraform domains.

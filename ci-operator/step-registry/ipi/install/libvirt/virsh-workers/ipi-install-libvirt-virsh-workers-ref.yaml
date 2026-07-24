@@ -1,0 +1,52 @@
+ref:
+  as: ipi-install-libvirt-virsh-workers
+  from: libvirt-installer
+  # Inject oc from the amd64 latest release (test pod arch); libvirt-installer has no oc.
+  cli: latest
+  grace_period: 30m
+  timeout: 1h30m
+  commands: ipi-install-libvirt-virsh-workers-commands.sh
+  env:
+  - name: ARCH
+  - name: BRANCH
+  - name: COMPUTE_COUNT
+    default: "2"
+    documentation: Number of worker VMs to create (must match lease compute entries).
+  - name: DOMAIN_MEMORY
+    default: "16384"
+    documentation: Memory MiB for each virsh worker (overridden by WORKER_MEMORY when set by the job).
+  - name: WORKER_MEMORY
+    default: "16384"
+    documentation: Preferred memory MiB when set by IPI job env.
+  - name: DOMAIN_VCPUS
+    default: "6"
+    documentation: vCPUs for each virsh worker.
+  - name: LIBVIRT_POOL_NAME
+    default: ""
+    documentation: |-
+      When set (e.g. by the VPN IPI workflow), use this shared pool instead of POOL_NAME.
+      Must match the pool used by ipi-install-libvirt-install.
+  - name: POOL_NAME
+    default: "multiarch-ci-pool"
+    documentation: Fallback pool name when LIBVIRT_POOL_NAME is unset.
+  - name: VIRT_INSTALL_OSINFO
+    default: "rhel9-unknown"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      memory: 6Gi
+  dnsConfig:
+    nameservers:
+    - 172.30.38.188
+    searches:
+    - "bastion-z.svc.cluster.local"
+    - "bastion-ppc64le-libvirt.svc.cluster.local"
+  documentation: |-
+    Day-2 workers for libvirt IPI after a master-only install (WORKER_REPLICAS=0).
+    Clones the IPI RHCOS base volume from POOL_NAME, builds a per-node worker ignition
+    (unique /etc/hostname) from SHARED_DIR/worker.ign or worker-user-data, and creates
+    guests via virt-install when present (4.16+) or virsh define + domain XML otherwise
+    (4.15). Domain XML omits ACPI so s390x RHEL 9 QEMU accepts the guests.
+    Requires lease compute MAC entries and an active IPI libvirt network named infraID.
