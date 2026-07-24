@@ -241,11 +241,31 @@ if not os.path.exists(state_file):
     sys.exit(0)
 
 issues = [l.strip().split()[0] for l in open(state_file) if l.strip()]
-sections = []
-total_cost = 0
+
+STYLE = """
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 1100px; margin: 0 auto; padding: 2em; background: #f5f5f5; color: #333; }
+h1 { border-bottom: 2px solid #333; padding-bottom: 0.3em; }
+h2 { margin-top: 2em; }
+details { margin: 0.5em 0; }
+details summary { cursor: pointer; font-weight: 600; color: #555; padding: 0.5em 0; font-size: 1.05em; }
+details[open] summary { margin-bottom: 0.5em; }
+.phase { border-left: 2px solid #ddd; padding-left: 1em; margin-left: 0.5em; }
+.msg { margin: 0.4em 0; padding: 0.6em; border-radius: 6px; }
+.msg .label { font-size: 0.7em; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 0.2em; }
+.msg pre, .msg code { margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 0.82em; }
+.msg pre { max-height: 250px; overflow-y: auto; }
+.a { background: #e8f4fd; border-left: 3px solid #0366d6; }
+.t { background: #f6f8fa; border-left: 3px solid #6f42c1; }
+.r { background: #f6f8fa; border-left: 3px solid #28a745; }
+.e { background: #fff5f5; border-left: 3px solid #cb2431; }
+"""
+
+back_link = f'<p><a href="../../{report_step}/artifacts/jira-agent-report.html">Back to summary report</a></p>'
+written = 0
 
 for issue_key in issues:
     issue_sections = []
+    issue_cost = 0
     for phase_key, phase_label in PHASES:
         stream_file = f"/tmp/claude-{issue_key}-{phase_key}.json"
         if not os.path.exists(stream_file):
@@ -253,7 +273,7 @@ for issue_key in issues:
         blocks, stats = parse_stream_json(stream_file)
         if not blocks:
             continue
-        total_cost += stats["cost"]
+        issue_cost += stats["cost"]
         dur_s = stats["duration"] // 1000
         dur_str = f"{dur_s // 60}m {dur_s % 60}s" if dur_s >= 60 else f"{dur_s}s"
         is_open = "open" if phase_key == "output" else ""
@@ -262,43 +282,27 @@ for issue_key in issues:
 <summary>{phase_label} — {stats["turns"]} turns, ${stats["cost"]:.4f}, {dur_str}</summary>
 <div class="phase">{render_blocks(blocks)}</div>
 </details>''')
-    if issue_sections:
-        sections.append(f'<div class="issue"><h2>{issue_key}</h2>{"".join(issue_sections)}</div>')
-
-back_link = f'<p><a href="../../{report_step}/artifacts/jira-agent-report.html">Back to summary report</a></p>'
-
-with open(output_file, "w") as f:
-    f.write(f'''<!DOCTYPE html>
+    if not issue_sections:
+        continue
+    issue_file = os.path.join(artifact_dir, f"jira-agent-transcript-{issue_key}.html")
+    with open(issue_file, "w") as f:
+        f.write(f'''<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Jira Agent Transcript</title>
-<style>
-body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 1100px; margin: 0 auto; padding: 2em; background: #f5f5f5; color: #333; }}
-h1 {{ border-bottom: 2px solid #333; padding-bottom: 0.3em; }}
-h2 {{ margin-top: 2em; }}
-details {{ margin: 0.5em 0; }}
-details summary {{ cursor: pointer; font-weight: 600; color: #555; padding: 0.5em 0; font-size: 1.05em; }}
-details[open] summary {{ margin-bottom: 0.5em; }}
-.phase {{ border-left: 2px solid #ddd; padding-left: 1em; margin-left: 0.5em; }}
-.msg {{ margin: 0.4em 0; padding: 0.6em; border-radius: 6px; }}
-.msg .label {{ font-size: 0.7em; font-weight: 600; color: #666; text-transform: uppercase; margin-bottom: 0.2em; }}
-.msg pre, .msg code {{ margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 0.82em; }}
-.msg pre {{ max-height: 250px; overflow-y: auto; }}
-.a {{ background: #e8f4fd; border-left: 3px solid #0366d6; }}
-.t {{ background: #f6f8fa; border-left: 3px solid #6f42c1; }}
-.r {{ background: #f6f8fa; border-left: 3px solid #28a745; }}
-.e {{ background: #fff5f5; border-left: 3px solid #cb2431; }}
-</style>
+<title>Transcript: {issue_key}</title>
+<style>{STYLE}</style>
 </head>
 <body>
 {back_link}
-<h1>Conversation Transcript</h1>
-<p style="color:#666">Total cost: ${total_cost:.4f}</p>
-{"".join(sections) if sections else "<p>No transcript data available.</p>"}
+<h1>Transcript: {issue_key}</h1>
+<p style="color:#666">Cost: ${issue_cost:.4f}</p>
+{"".join(issue_sections)}
 </body>
 </html>''')
-print(f"Transcript written: {len(sections)} issue(s)")
+    written += 1
+
+print(f"Transcripts written: {written} issue(s)")
 TRANSCRIPT_PY
 
 echo ""

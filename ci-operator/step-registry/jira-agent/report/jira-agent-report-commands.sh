@@ -258,7 +258,8 @@ while IFS= read -r line; do
   fi
 
   # Summary table row
-  SUMMARY_ROWS="${SUMMARY_ROWS}<tr><td><a href=\"${JIRA_BASE_URL}/browse/${ISSUE_KEY}\">${ISSUE_KEY}</a></td><td>${ISSUE_TIMESTAMP}</td><td><span class=\"status ${STATUS_CLASS}\">${STATUS_LABEL}</span></td><td>${PR_LINK}</td><td>${ISSUE_COST}</td></tr>"
+  TRANSCRIPT_LINK="../../${JIRA_AGENT_PROCESS_STEP:-jira-agent-process}/artifacts/jira-agent-transcript-${ISSUE_KEY}.html"
+  SUMMARY_ROWS="${SUMMARY_ROWS}<tr><td><a href=\"${JIRA_BASE_URL}/browse/${ISSUE_KEY}\">${ISSUE_KEY}</a></td><td>${ISSUE_TIMESTAMP}</td><td><span class=\"status ${STATUS_CLASS}\">${STATUS_LABEL}</span></td><td>${PR_LINK}</td><td>${ISSUE_COST}</td><td><a href=\"${TRANSCRIPT_LINK}\">transcript</a></td></tr>"
 
   DETAIL_SECTIONS="${DETAIL_SECTIONS}
 <div class=\"issue-card\">
@@ -344,13 +345,11 @@ cat > "$REPORT_FILE" <<EOF
 
 <h2>Summary</h2>
 <table>
-<thead><tr><th>Issue</th><th>Timestamp</th><th>Status</th><th>Pull Request</th><th>Cost</th></tr></thead>
+<thead><tr><th>Issue</th><th>Timestamp</th><th>Status</th><th>Pull Request</th><th>Cost</th><th>Transcript</th></tr></thead>
 <tbody>
 ${SUMMARY_ROWS}
 </tbody>
 </table>
-
-<p><a href="../../${JIRA_AGENT_PROCESS_STEP:-jira-agent-process}/artifacts/jira-agent-transcript.html">View full conversation transcript</a></p>
 
 <h2>Details</h2>
 ${DETAIL_SECTIONS}
