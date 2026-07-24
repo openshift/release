@@ -1,7 +1,7 @@
 ref:
   as: sandboxed-containers-operator-install-trustee-operator
   from_image:
-    name: rhdh-e2e-runner
+    name: rhdh-e2e-runner # provides helm, oc, git, jq
     namespace: ci
     tag: main
   grace_period: 10m
@@ -15,6 +15,7 @@ ref:
     default: "false"
     documentation: |-
       Whether to install the trustee operator. Set to "true" to enable installation.
+      If not true, the step is skipped and no further actions are taken.
   - name: TRUSTEE_NAMESPACE
     default: "trustee-operator-system"
     documentation: |-
@@ -26,7 +27,6 @@ ref:
       If empty (default), uses existing "redhat-operators" catalog.
       If set, helm chart creates a new CatalogSource named "trustee-operator-dev-catalog" with this image.
       Note: The CatalogSource name is hardcoded in the helm chart and cannot be overridden.
-      Example: "quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656"
   - name: TRUSTEE_CHARTS_REPO
     default: "https://github.com/confidential-devhub/charts.git"
     documentation: |-
@@ -36,18 +36,15 @@ ref:
     documentation: |-
       The git ref (branch/tag/commit) to use from the charts repository
   - name: KBS_CLIENT_TAG
-    default: ""
+    default: "v0.19.0"
     documentation: |-
-      The kbs-client image tag to use for connectivity testing. If empty, maps from
-      the installed trustee operator version. Override to pin a specific version
-      (e.g., "v0.17.0"). Fallback is v0.19.0 if version mapping fails.
+      The kbs-client image tag to use the connectivity test.
   documentation: |-
-    Installs the trustee operator and operands on the cluster using helm charts.
-    Charts are cloned from TRUSTEE_CHARTS_REPO (defaults to internal GitLab).
-    Uses ci/rhdh-e2e-runner image which has helm pre-installed.
+    If TRUSTEE_INSTALL=true, installs the trustee operator and operands on the cluster using helm charts.
+    If TRUSTEE_INSTALL=false, the step is skipped and no further actions are taken.
 
-    After installation, retrieves the Trustee KBS service URL and saves it to
-    ${SHARED_DIR}/TRUSTEE_URL, ${SHARED_DIR}/TRUSTEE_HOST, and ${SHARED_DIR}/TRUSTEE_PORT.
-    Also creates INITDATA for confidential containers and saves to ${SHARED_DIR}.
-    When TRUSTEE_INSTALL=true, updates the osc-config ConfigMap with the generated
-    TRUSTEE_URL and INITDATA values.
+    Charts are cloned from TRUSTEE_CHARTS_REPO and helm is used to install the operator and operands.
+    After installation, retrieves the Trustee KBS service URL and tests the connectivity.
+
+    INITDATA is created for confidential containers and saved to ${SHARED_DIR}.
+    osc-config ConfigMap is updated with the generated TRUSTEE_URL and INITDATA values.

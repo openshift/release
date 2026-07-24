@@ -3,8 +3,8 @@
 # Install Trustee Operator for Confidential Containers (CoCo)
 #
 # This script installs and configures the Trustee operator and operands using
-# helm charts cloned from TRUSTEE_CHARTS_REPO (defaults to internal GitLab).
-# Requires ci/rhdh-e2e-runner base image (provides helm, oc, git, jq, curl).
+# helm charts cloned from TRUSTEE_CHARTS_REPO
+# Requires ci/rhdh-e2e-runner base image (provides helm, oc, git, jq).
 #
 # Environment Variables:
 #   TRUSTEE_INSTALL               - "true" to install, "false" to skip (default: false)
@@ -13,7 +13,7 @@
 #                                   NOTE: CatalogSource name is hardcoded to "trustee-operator-dev-catalog"
 #                                   in the helm chart and cannot be overridden
 
-#   TRUSTEE_CHARTS_REPO           - Charts repo URL (default: internal GitLab)
+#   TRUSTEE_CHARTS_REPO           - Charts repo URL
 #   TRUSTEE_CHARTS_REF            - Charts git ref (default: main)
 #   KBS_CLIENT_TAG                - kbs-client version override (optional)
 #
@@ -37,7 +37,7 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 TRUSTEE_INSTALL=${TRUSTEE_INSTALL:-false}
 TRUSTEE_NAMESPACE=${TRUSTEE_NAMESPACE:-trustee-operator-system}
 TRUSTEE_CATALOG_SOURCE_IMAGE=${TRUSTEE_CATALOG_SOURCE_IMAGE:-}
-TRUSTEE_CHARTS_REPO=${TRUSTEE_CHARTS_REPO:-https://gitlab.cee.redhat.com/osc/midstream/charts.git}
+TRUSTEE_CHARTS_REPO=${TRUSTEE_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 TRUSTEE_CHARTS_REF=${TRUSTEE_CHARTS_REF:-main}
 
 # Early exit if installation disabled
@@ -137,23 +137,13 @@ function fetch_trustee_charts() {
   echo ">>> Fetching trustee charts from: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})" >&2
 
   mkdir -p "${charts_dir}"
-  if command -v git &> /dev/null; then
-    echo ">>> Cloning charts via git" >&2
-    rm -rf "${charts_dir}"
-    GIT_SSL_NO_VERIFY=true git clone --depth 1 --branch "${TRUSTEE_CHARTS_REF}" "${TRUSTEE_CHARTS_REPO}" "${charts_dir}"
-  else
-    local archive_url="${TRUSTEE_CHARTS_REPO%.git}/-/archive/${TRUSTEE_CHARTS_REF}/charts-${TRUSTEE_CHARTS_REF}.tar.gz"
-    echo ">>> Downloading chart archive: ${archive_url}" >&2
-    if ! curl --noproxy '*' -skL "${archive_url}" | tar xz -C "${charts_dir}" --strip-components=1; then
-      echo ">>> ERROR: Neither git clone nor curl archive download worked" >&2
-      return 1
-    fi
-    echo ">>> Charts downloaded via curl" >&2
-  fi
+  echo ">>> Cloning charts via git" >&2
+  rm -rf "${charts_dir}"
+  git clone --depth 1 --branch "${TRUSTEE_CHARTS_REF}" "${TRUSTEE_CHARTS_REPO}" "${charts_dir}"
 
   if [[ ! -d "${charts_dir}" ]]; then
     echo ">>> ERROR: Failed to clone charts repository" >&2
-    return 1
+    exit 1
   fi
 
   echo ">>> Charts fetched" >&2
@@ -162,8 +152,9 @@ function fetch_trustee_charts() {
     echo "${charts_dir}/charts"
   else
     echo "${charts_dir}"
-    return 0
   fi
+  return 0
+
 }
 
 # Get cluster domain from ingress config, console route, or console URL
@@ -821,69 +812,11 @@ function map_trustee_to_kbs_client_version() {
   esac
 }
 
-# Determine kbs-client image tag (from KBS_CLIENT_TAG, trustee CSV, or auto-discover)
-function get_kbs_client_tag() {
-  # 1. Use explicit override if provided
-  if [[ -n "${KBS_CLIENT_TAG:-}" ]]; then
-    echo ">>> kbs-client tag (from KBS_CLIENT_TAG): ${KBS_CLIENT_TAG}" >&2
-    echo "${KBS_CLIENT_TAG}"
-    return 0
-  fi
-
-  # 2. Try to map from trustee operator CSV version
-  if [[ -n "${TRUSTEE_CSV_NAME:-}" ]]; then
-    # Extract version from CSV name (e.g., "trustee-operator.v1.10.0" -> "1.10.0")
-    local trustee_version
-    trustee_version="${TRUSTEE_CSV_NAME#trustee-operator.v}"
-
-    if [[ -n "${trustee_version}" ]]; then
-      # Try major.minor mapping first (e.g., "1.10.0" -> "1.10")
-      local trustee_minor="${trustee_version%.*}"
-      local mapped_tag
-      mapped_tag=$(map_trustee_to_kbs_client_version "${trustee_minor}")
-
-      if [[ -n "${mapped_tag}" ]]; then
-        echo ">>> kbs-client tag (mapped from trustee ${trustee_version}): ${mapped_tag}" >&2
-        echo "${mapped_tag}"
-        return 0
-      fi
-
-      # Try full version mapping if minor didn't match
-      mapped_tag=$(map_trustee_to_kbs_client_version "${trustee_version}")
-      if [[ -n "${mapped_tag}" ]]; then
-        echo ">>> kbs-client tag (mapped from trustee ${trustee_version}): ${mapped_tag}" >&2
-        echo "${mapped_tag}"
-        return 0
-      fi
-    fi
-  fi
-
-  # 3. Auto-discover latest semver tag from registry
-  local latest_tag=""
-  latest_tag=$(skopeo list-tags docker://quay.io/confidential-containers/kbs-client 2>/dev/null | \
-    jq -r '.Tags[]' | \
-    grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | \
-    sort -V | \
-    tail -1 || echo "")
-
-  if [[ -n "${latest_tag}" ]]; then
-    echo ">>> kbs-client tag (auto-discovered latest semver): ${latest_tag}" >&2
-    echo "${latest_tag}"
-    return 0
-  fi
-
-  # 4. Fallback to known-good version
-  echo ">>> WARN: Could not determine kbs-client tag, using fallback: v0.19.0" >&2
-  echo "v0.19.0"
-}
-
 # Verify Trustee KBS connectivity using kbs-client test pod
 function verify_trustee_connectivity() {
   local kbs_client_pod="kbs-client-test"
   local kbs_client_namespace="${TRUSTEE_NAMESPACE}"
-  local kbs_client_tag
-  kbs_client_tag=$(get_kbs_client_tag)
-  local kbs_client_image="quay.io/confidential-containers/kbs-client:${kbs_client_tag}"
+  local kbs_client_image="quay.io/confidential-containers/kbs-client:${KBS_CLIENT_TAG}"
 
   echo ">>> Creating kbs-client test pod (image: ${kbs_client_image})"
   get_kbs_client_manifest | \
@@ -895,7 +828,14 @@ function verify_trustee_connectivity() {
   # Wait for pod to become ready
   if ! wait_until "kbs-client pod Ready" 150 15 \
     "oc get pod/${kbs_client_pod} -n ${kbs_client_namespace} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q 'True'"; then
-    echo ">>> ERROR: kbs-client pod not ready" >&2
+    local wait_reason
+    wait_reason=$(oc get "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" \
+      -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}' 2>/dev/null || echo "")
+    if [[ "${wait_reason}" == "ErrImagePull" || "${wait_reason}" == "ImagePullBackOff" || "${wait_reason}" == "InvalidImageName" ]]; then
+      echo ">>> ERROR: kbs-client image not found: ${kbs_client_image}" >&2
+    else
+      echo ">>> ERROR: kbs-client pod not ready" >&2
+    fi
     oc describe "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" || true
     oc logs "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" || true
     oc delete "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" --ignore-not-found=true
