@@ -7,10 +7,37 @@ set -o pipefail
 CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 export CLAUDE_CONFIG_DIR
 
-# --- Gangway override ---
+# --- Gangway overrides ---
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_TRIAGE_VIEW:-}" ]]; then
     echo "Applying Gangway override: TRIAGE_VIEW=${MULTISTAGE_PARAM_OVERRIDE_TRIAGE_VIEW}"
     TRIAGE_VIEW="${MULTISTAGE_PARAM_OVERRIDE_TRIAGE_VIEW}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_AI_HELPERS_REPO:-}" ]]; then
+    echo "Applying Gangway override: AI_HELPERS_REPO=${MULTISTAGE_PARAM_OVERRIDE_AI_HELPERS_REPO}"
+    AI_HELPERS_REPO="${MULTISTAGE_PARAM_OVERRIDE_AI_HELPERS_REPO}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_AI_HELPERS_REF:-}" ]]; then
+    echo "Applying Gangway override: AI_HELPERS_REF=${MULTISTAGE_PARAM_OVERRIDE_AI_HELPERS_REF}"
+    AI_HELPERS_REF="${MULTISTAGE_PARAM_OVERRIDE_AI_HELPERS_REF}"
+fi
+
+# --- Optional: replace the baked-in ai-helpers with a custom repo/branch ---
+# The image's Claude plugin marketplace points at the /opt/ai-helpers
+# directory (group-writable), so replacing its contents is sufficient.
+if [[ -n "${AI_HELPERS_REPO:-}" ]]; then
+    echo "Using custom ai-helpers: ${AI_HELPERS_REPO}@${AI_HELPERS_REF}"
+    CUSTOM_DIR=$(mktemp -d /tmp/ai-helpers-custom-XXXXXX)
+    git clone --depth 1 --branch "${AI_HELPERS_REF}" \
+        "https://github.com/${AI_HELPERS_REPO}.git" "${CUSTOM_DIR}" \
+        || { echo "ERROR: Failed to clone ${AI_HELPERS_REPO}@${AI_HELPERS_REF}"; exit 1; }
+    if [[ ! -f "${CUSTOM_DIR}/.claude-plugin/marketplace.json" ]]; then
+        echo "ERROR: ${AI_HELPERS_REPO}@${AI_HELPERS_REF} does not look like an ai-helpers checkout (missing .claude-plugin/marketplace.json)."
+        exit 1
+    fi
+    find /opt/ai-helpers -mindepth 1 -delete
+    cp -a "${CUSTOM_DIR}/." /opt/ai-helpers/
+    rm -rf "${CUSTOM_DIR}"
+    echo "Replaced /opt/ai-helpers with ${AI_HELPERS_REPO}@${AI_HELPERS_REF} ($(git -C /opt/ai-helpers rev-parse --short HEAD 2>/dev/null || echo 'unknown rev'))"
 fi
 
 if [[ -z "${TRIAGE_VIEW:-}" ]]; then
