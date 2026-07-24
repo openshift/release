@@ -82,15 +82,25 @@ load_jira_credentials() {
 }
 
 # Load Slack webhook URL for notifications.
+# The key name in the credential secret is configurable via JIRA_AGENT_SLACK_WEBHOOK_KEY
+# (default: "slack-webhook-url"). Teams can add their own webhook URL as a separate key
+# in the shared credential secret and point to it from their workflow env.
 # Sets: SLACK_WEBHOOK_URL (exported)
 load_slack_credentials() {
-  local webhook_file="${JIRA_CREDS_DIR}/slack-webhook-url"
+  local webhook_key="${JIRA_AGENT_SLACK_WEBHOOK_KEY:-slack-webhook-url}"
+  if [[ ! "$webhook_key" =~ ^[A-Za-z0-9._-]+$ ||
+        "$webhook_key" == "." || "$webhook_key" == ".." ]]; then
+    echo "Error: invalid Slack webhook credential key: ${webhook_key}"
+    export SLACK_WEBHOOK_URL=""
+    return 0
+  fi
+  local webhook_file="${JIRA_CREDS_DIR}/${webhook_key}"
   [[ $- == *x* ]] && local _was_tracing=true || local _was_tracing=false
   set +x
   if [ -f "$webhook_file" ]; then
     export SLACK_WEBHOOK_URL
     SLACK_WEBHOOK_URL=$(cat "$webhook_file")
-    echo "Slack webhook URL loaded"
+    echo "Slack webhook URL loaded (key: ${webhook_key})"
   else
     echo "Warning: Slack webhook URL not found at $webhook_file"
     echo "Slack notifications will be skipped"
