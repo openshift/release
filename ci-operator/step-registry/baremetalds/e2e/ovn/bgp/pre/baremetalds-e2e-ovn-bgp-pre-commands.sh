@@ -5,7 +5,7 @@ set -o pipefail
 
 # Fetch packet basic configuration
 source "${SHARED_DIR}/packet-conf.sh"
-ssh "${SSHOPTS[@]}" "root@${IP}" "FRR_IMAGE='$FRR_IMAGE'" bash -x - << 'EOFTOP'
+ssh "${SSHOPTS[@]}" "root@${IP}" "FRR_IMAGE='$FRR_IMAGE' ADVERTISE_DEFAULT_NETWORK='${ADVERTISE_DEFAULT_NETWORK:-true}'" bash -x - << 'EOFTOP'
 #!/bin/bash
 set -o nounset
 set -o errexit
@@ -235,12 +235,27 @@ if [ "$local_gateway_mode" = "true" ]; then
         fi
         sleep 10
       done
+      echo "Waiting for all MachineConfigPools to finish updating (ensures all pending node reboots complete, including those from prior steps)..."
+      oc wait mcp master worker --for condition=Updated --timeout=25m
     fi
 fi
 
 # we will potentially deploy multiple networks, each on its own VRF
 declare -A vrf_neighbors
-vrf_neighbors["default"]=$($KCLI get nodes -o jsonpath={.items[*].status.addresses[?\(@.type==\"InternalIP\"\)].address})
+
+# Optionally advertise the default/pod network. When disabled, only extra networks (e.g. extranet)
+# get external FRR peering, FRRConfiguration, and RouteAdvertisements.
+if [ "${ADVERTISE_DEFAULT_NETWORK:-true}" = "true" ]; then
+  # Collect IPs for the default VRF from both current cluster nodes and any spare baremetal hosts
+  # pre-configured in the ostestbm network (via virsh DHCP entries). This ensures nodes provisioned
+  # dynamically during tests (e.g. via MachineSet scaling) are already known to the external FRR,
+  # preventing BGP session rejections that cause frr-status container crashes on new nodes.
+  node_ips=$($KCLI get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')
+  spare_ips=$(sudo virsh net-dumpxml ostestbm | xmllint --xpath '/network//host/@ip' - | cut -d '=' -f2 | tr -d \" | xargs 2>/dev/null || true)
+  vrf_neighbors["default"]=$(echo "$node_ips $spare_ips" | tr ' ' '\n' | sort -u | xargs)
+else
+  echo "ADVERTISE_DEFAULT_NETWORK=false: skipping default network BGP peering and RouteAdvertisements"
+fi
 
 # deploy an agnhost container isolated on a macvlan network
 deploy_agnhost_container agnhost
@@ -284,6 +299,32 @@ echo "Waiting for all deployments in openshift-frr-k8s namespace to be created..
 until oc wait -n openshift-frr-k8s deployment --all --for condition=Available --timeout 2m &> /dev/null; do
   sleep 5
 done
+
+# Workaround: Kubernetes >=1.36 rejects CRDs that declare format:int32 with
+# maximum:4294967295 (above signed int32 max). That makes *any* FRRConfiguration
+# apply fail with "Maximum boundary value must be of type integer with format int32"
+# even when the ASN value itself is valid. Upstream fix uses format:int64:
+# https://github.com/metallb/frr-k8s/commit/7c71d152be3b2383350f475b951ceab0a4323624
+# https://github.com/metallb/metallb/issues/3034
+echo "Patching FRRConfiguration CRD ASN fields to format int64 (K8s 1.36+ validation)..."
+oc get crd frrconfigurations.frrk8s.metallb.io -o json | python3 -c '
+import json, sys
+crd = json.load(sys.stdin)
+for v in crd.get("spec", {}).get("versions", []):
+    schema = v.get("schema", {}).get("openAPIV3Schema", {})
+    try:
+        routers = schema["properties"]["spec"]["properties"]["bgp"]["properties"]["routers"]["items"]["properties"]
+    except KeyError:
+        continue
+    if "asn" in routers:
+        routers["asn"]["format"] = "int64"
+    neighbors = routers.get("neighbors", {}).get("items", {}).get("properties", {})
+    if "asn" in neighbors:
+        neighbors["asn"]["format"] = "int64"
+    if "localASN" in neighbors:
+        neighbors["localASN"]["format"] = "int64"
+json.dump(crd, sys.stdout)
+' | oc replace -f -
 
 # Override FRR-K8s frr and reloader containers only (CNO uses one image for all containers;
 # upstream FRR image works only for frr/reloader). Make CNO Unmanaged and set those images.
@@ -391,15 +432,18 @@ ${network_selector}
 EOF
 done
 
-CLUSTER_NETWORK_V4="10.128.0.0/14"
-$IP route add $CLUSTER_NETWORK_V4 via 192.168.111.3 dev ostestbm || true
-$IPTABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V4} -i ostestbm -j ACCEPT
-$IPTABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V4} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-$IPTABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V4} ! -d 192.168.111.1/24 -j MASQUERADE
+# Host routes for the advertised default pod network via the external FRR container.
+if [ "${ADVERTISE_DEFAULT_NETWORK:-true}" = "true" ]; then
+  CLUSTER_NETWORK_V4="10.128.0.0/14"
+  $IP route add $CLUSTER_NETWORK_V4 via 192.168.111.3 dev ostestbm || true
+  $IPTABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V4} -i ostestbm -j ACCEPT
+  $IPTABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V4} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  $IPTABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V4} ! -d 192.168.111.1/24 -j MASQUERADE
 
-CLUSTER_NETWORK_V6="fd01::/48"
-$IP -6 route add $CLUSTER_NETWORK_V6 via fd2e:6f44:5dd8:c956::3 dev ostestbm || true
-$IP6TABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V6} -i ostestbm -j ACCEPT
-$IP6TABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V6} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-$IP6TABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V6} ! -d fd2e:6f44:5dd8:c956::1 -j MASQUERADE
+  CLUSTER_NETWORK_V6="fd01::/48"
+  $IP -6 route add $CLUSTER_NETWORK_V6 via fd2e:6f44:5dd8:c956::3 dev ostestbm || true
+  $IP6TABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V6} -i ostestbm -j ACCEPT
+  $IP6TABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V6} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  $IP6TABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V6} ! -d fd2e:6f44:5dd8:c956::1 -j MASQUERADE
+fi
 EOFTOP
