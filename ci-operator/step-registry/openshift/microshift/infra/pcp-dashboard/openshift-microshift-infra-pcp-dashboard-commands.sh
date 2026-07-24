@@ -11,12 +11,18 @@ PCP_SCRIPTS="${EDGE_TOOLING_DIR}/plugins/microshift-ci/scripts/pcp-graphs"
 REMOTE_SCENARIO_DIR="/home/${HOST_USER}/microshift/_output/test-images/scenario-info"
 LOCAL_ARTIFACTS=$(mktemp -d)
 
-# Selectively copy PCP archives and junit.xml from the hypervisor
-echo "Copying PCP archives and junit.xml from ${INSTANCE_PREFIX}..."
-ssh "${INSTANCE_PREFIX}" \
-    "cd ${REMOTE_SCENARIO_DIR} && \
-     find -L . \( -name 'pcp-archives.tar' -o -name 'junit.xml' \) -print0 | \
-     tar cf - --null -T - -h" | tar xf - -C "${LOCAL_ARTIFACTS}/"
+# Collect VM PCP archives and junit.xml
+# Prefer the shared artifacts volume (written by the metal-tests step), fall back to SSH
+if [ -d "${ARTIFACT_DIR}/scenario-info" ]; then
+    echo "Using scenario-info from metal-tests artifacts..."
+    ln -s "${ARTIFACT_DIR}/scenario-info/"* "${LOCAL_ARTIFACTS}/" 2>/dev/null || true
+else
+    echo "Copying PCP archives and junit.xml from ${INSTANCE_PREFIX}..."
+    ssh "${INSTANCE_PREFIX}" \
+        "cd ${REMOTE_SCENARIO_DIR} && \
+         find -L . \( -name 'pcp-archives.tar' -o -name 'junit.xml' \) -print0 | \
+         tar cf - --null -T - -h" | tar xf - -C "${LOCAL_ARTIFACTS}/"
+fi
 
 # Copy hypervisor PCP logs if available
 PMLOGS_DIR=/var/log/pcp/pmlogger
