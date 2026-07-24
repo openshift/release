@@ -133,6 +133,20 @@ tests:
       GITHUB_REPOS: openshift/origin,openshift-eng/two-node-toolbox,openshift/microshift,openshift-eng/edge-tooling,openshift/enhancements,openshift/lvm-operator
       REQUIRED_LABELS: lgtm,approved,verified
     workflow: openshift-edge-tooling-gh-notifier
+- as: edge-cve-investigator
+  cron: 0 8 * * 1
+  reporter_config:
+    channel: '#team-ocp-edge-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |-
+      :robot_face: *CVE Investigator* ended with *{{.Status.State}}*.{{"\n"}}
+      {{- $ab := printf "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/%s/%s/artifacts/cve-investigator/openshift-edge-tooling-cve-agent/artifacts/" .Spec.Job .Status.BuildID -}}
+      {{- $rp := printf "%s%s" $ab "report-cve-investigation.html" -}}
+      | <{{$rp}}|Report> | <{{.Status.URL}}|Logs> |
+  steps:
+    workflow: openshift-edge-tooling-cve-agent
 zz_generated_metadata:
   branch: main
   org: openshift-eng
