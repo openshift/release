@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
+#
+# WIF Authentication Smoke Test
+#
+# Temporary validation step that proves Workload Identity Federation works
+# end-to-end from Prow build clusters. This will be replaced by actual
+# terraform apply/plan steps once TF Cloud integration is implemented (GCP-919).
+#
+# The test performs three GCP API calls using only curl:
+#   1. STS token exchange (K8s SA token → federated token)
+#   2. SA impersonation (federated token → platform-ci SA access token)
+#   3. Projects list (verifies the SA can access the CI folder)
 
 set -euo pipefail
 
 if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
-  echo "ERROR: ${SHARED_DIR}/wif-cred.json not found — hypershift-gcp-wif-auth step must run first"
+  echo "ERROR: ${SHARED_DIR}/wif-cred.json not found — wif-auth step must run first"
   exit 1
 fi
 
@@ -21,6 +32,9 @@ AUDIENCE=$(jq -r '.audience' "${CRED_CONFIG}")
 SA_IMPERSONATION_URL=$(jq -r '.service_account_impersonation_url' "${CRED_CONFIG}")
 SA_EMAIL=$(echo "${SA_IMPERSONATION_URL}" | grep -oP 'serviceAccounts/\K[^:]+')
 
+# Step 1: Exchange the pod's projected K8s SA token for a GCP federated token
+# via the Security Token Service (STS). This proves the build cluster's OIDC
+# issuer is trusted by our WIF pool.
 echo "Step 1/3: Exchanging SA token for GCP federated token..."
 STS_RESPONSE=$(curl -sf -X POST "https://sts.googleapis.com/v1/token" \
   -H "Content-Type: application/json" \
@@ -36,6 +50,8 @@ STS_RESPONSE=$(curl -sf -X POST "https://sts.googleapis.com/v1/token" \
 FED_TOKEN=$(echo "${STS_RESPONSE}" | jq -r '.access_token')
 echo "  OK"
 
+# Step 2: Use the federated token to impersonate the platform-ci SA.
+# This proves the IAM binding (workloadIdentityUser) is correctly configured.
 echo "Step 2/3: Impersonating ${SA_EMAIL}..."
 ACCESS_TOKEN_RESPONSE=$(curl -sf -X POST "${SA_IMPERSONATION_URL}" \
   -H "Authorization: Bearer ${FED_TOKEN}" \
@@ -45,6 +61,9 @@ ACCESS_TOKEN_RESPONSE=$(curl -sf -X POST "${SA_IMPERSONATION_URL}" \
 ACCESS_TOKEN=$(echo "${ACCESS_TOKEN_RESPONSE}" | jq -r '.accessToken')
 echo "  OK"
 
+# Step 3: Make a real GCP API call to verify the access token works.
+# Lists projects in the CI folder — the SA has this permission via
+# roles/resourcemanager.projectCreator on the folder.
 echo "Step 3/3: Listing projects in CI folder ${CI_FOLDER_ID}..."
 PROJECTS_RESPONSE=$(curl -sf \
   "https://cloudresourcemanager.googleapis.com/v1/projects?filter=parent.id%3A${CI_FOLDER_ID}" \
