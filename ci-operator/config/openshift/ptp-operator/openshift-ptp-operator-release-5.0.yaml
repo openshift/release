@@ -7,6 +7,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: must-gather
+  tls-scanner-tool:
+    name: "5.0"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -81,6 +85,11 @@ tests:
       OO_INSTALL_NAMESPACE: openshift-ptp
       OO_PACKAGE: ptp-operator
       OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-ptp
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     test:
     - as: e2e
       commands: make test-validation-only
@@ -89,6 +98,8 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - ref: tls-13
+    - ref: tls-scanner-run
     workflow: optional-operators-ci-aws
 - as: security
   optional: true
