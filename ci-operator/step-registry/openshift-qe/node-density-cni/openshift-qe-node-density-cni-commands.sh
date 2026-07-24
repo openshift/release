@@ -43,7 +43,7 @@ cd -
 # Create tarball and override KUBE_BURNER_URL
 KB_TARBALL="/tmp/kube-burner-ocp-custom.tar.gz"
 tar -czf "$KB_TARBALL" -C "$KB_OCP_SRC/bin/amd64" kube-burner-ocp
-export KUBE_BURNER_URL="$KB_TARBALL"
+export KUBE_BURNER_URL="file://${KB_TARBALL}"
 # --- END PERFSCALE-5323 ---
 
 cat /etc/os-release
