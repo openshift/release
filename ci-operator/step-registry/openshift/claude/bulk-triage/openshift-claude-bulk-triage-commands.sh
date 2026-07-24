@@ -211,10 +211,39 @@ fi
 # Extract session metrics (cost, tokens, duration) for BigQuery
 METRICS_CASE=""
 METRICS_TEST_COUNT=0
+METRICS_FILE="${ARTIFACT_DIR}/claude-session-metrics-autodl.json"
 if [[ -f "${EXTRACT_METRICS}" ]] && [[ -f "${OTEL_LOG}" ]]; then
     METRICS_TEST_COUNT=1
-    if python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json"; then
+    if python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${METRICS_FILE}"; then
         METRICS_CASE="  <testcase name=\"${PHASE_PREFIX} Session metrics extraction\" time=\"0\"/>"
+
+        # Append authoritative session usage to the markdown report. This must
+        # happen post-session: the model cannot observe its own final token
+        # totals while the session is still running.
+        if [[ -s "${WORKDIR}/${REPORT_FILE}" ]]; then
+            jq -r '.rows[0] | "
+---
+
+## Session usage
+
+_Appended by the CI harness after the analysis session (extracted from OTEL telemetry)._
+
+| Metric | Value |
+|---|---|
+| Model | \(.model) |
+| Turns | \(.num_turns) |
+| Tool calls | \(.total_tool_calls) |
+| Subagents | \(.num_subagents) |
+| Input tokens | \(.input_tokens) |
+| Output tokens | \(.output_tokens) |
+| Cache read tokens | \(.cache_read_input_tokens) |
+| Cache creation tokens | \(.cache_creation_input_tokens) |
+| Cache hit rate | \(.cache_hit_rate_pct)% |
+| Total cost (USD) | \(.total_cost_usd) |
+| Duration | \((.duration_ms | tonumber / 60000 * 10 | round / 10)) min |
+"' "${METRICS_FILE}" >> "${WORKDIR}/${REPORT_FILE}" \
+                || echo "Warning: failed to append session usage to the report."
+        fi
     else
         FAILURE_COUNT=$((FAILURE_COUNT + 1))
         METRICS_CASE="  <testcase name=\"${PHASE_PREFIX} Session metrics extraction\" time=\"0\">
