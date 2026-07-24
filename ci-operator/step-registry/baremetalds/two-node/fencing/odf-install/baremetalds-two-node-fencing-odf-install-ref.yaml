@@ -1,0 +1,31 @@
+ref:
+  as: baremetalds-two-node-fencing-odf-install
+  from: dev-scripts
+  cli: latest
+  commands: baremetalds-two-node-fencing-odf-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: ODF_OPERATOR_CHANNEL
+    default: "stable-4.22"
+    documentation: ODF operator subscription channel
+  - name: OSD_DISK_SERIAL
+    default: "osd-disk"
+    documentation: Serial number to assign to the OSD extra disk (vda) on each VM
+  - name: MON_DISK_SERIAL
+    default: "mon-disk"
+    documentation: Serial number to assign to the MON/DRBD extra disk (vdb) on each VM
+  - name: MON_DISK_SIZE
+    default: "30G"
+    documentation: Size to truncate the MON/DRBD disk image to on the hypervisor
+  timeout: 120m0s
+  documentation: |-
+    Install ODF on a 2-node TNF cluster with DRBD floating monitor.
+    First configures VM disks on the hypervisor: shuts down VMs, truncates
+    the mon disk to MON_DISK_SIZE, assigns serial numbers to extra disks
+    for stable /dev/disk/by-id paths, and restarts VMs.
+    Then creates manual local-storage SC and PVs, installs ODF operator,
+    runs DRBD setup for Ceph mon replication, and creates a 2-node
+    StorageCluster with flexibleScaling and replica 2.
