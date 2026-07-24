@@ -43,6 +43,37 @@ function setup_ibmcloud_cli() {
 function login_ibmcloud() {
     echo "IC: Logging into the cloud"
     ibmcloud login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROUP}" -r "${REGION}"
+    local LOGIN_RC=$?
+
+    # DEBUG-1: IBM Cloud login diagnostics
+    echo "DEBUG[login] exit_code=${LOGIN_RC}"
+    if [ "${LOGIN_RC}" -ne 0 ]; then
+        echo "DEBUG[login] WARN: ibmcloud login failed"
+        # Do not exit here; let ibmcloud target expose the full error state.
+    fi
+    echo "DEBUG[login] --- ibmcloud target output ---"
+    ibmcloud target 2>&1 | sed \
+        -e 's/\(API Key.*\)/\1[REDACTED]/' \
+        -e 's/\(apikey.*\)/\1[REDACTED]/'
+    echo "DEBUG[login] --- end ibmcloud target ---"
+
+    # Extract and print non-secret fields individually so each line is unambiguous.
+    local TARGET_JSON
+    TARGET_JSON=$(ibmcloud target --output json 2>/dev/null || echo '{}')
+    local ACCOUNT_NAME ACCOUNT_ID REGION_VAL RG_VAL
+    ACCOUNT_NAME=$(echo "${TARGET_JSON}" | jq -r '.account.name // "MISSING"')
+    ACCOUNT_ID=$(echo   "${TARGET_JSON}" | jq -r '.account.guid // "MISSING"')
+    REGION_VAL=$(echo   "${TARGET_JSON}" | jq -r '.region.name  // "MISSING"')
+    RG_VAL=$(echo       "${TARGET_JSON}" | jq -r '.resource_group.name // "MISSING"')
+    echo "DEBUG[login] account_name=${ACCOUNT_NAME}"
+    echo "DEBUG[login] account_id=${ACCOUNT_ID}"
+    echo "DEBUG[login] active_region=${REGION_VAL}"
+    echo "DEBUG[login] active_resource_group=${RG_VAL}"
+
+    # Cross-check: the region we asked for must match the active region.
+    if [ "${REGION_VAL}" != "${REGION}" ]; then
+        echo "DEBUG[login] WARN: requested region '${REGION}' != active region '${REGION_VAL}'"
+    fi
 }
 
 # Download automation code
@@ -139,6 +170,7 @@ function configure_automation() {
 
     # create workspace for powervs from cli
     echo "Display all the variable values:"
+
     POWERVS_REGION=$(bash "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
     echo "${POWERVS_REGION}" > "${SHARED_DIR}"/POWERVS_REGION
 
@@ -146,10 +178,55 @@ function configure_automation() {
     echo "PowerVS region is ${POWERVS_REGION}"
     echo "Resource Group is ${RESOURCE_GROUP}"
 
-    # Use existing pvs workspace.
-    # Process the CRN into a variable
-    CRN=$(ibmcloud pi workspace ls --json 2> /dev/null | jq -r --arg name "multi-arch-x-px-${POWERVS_REGION}-1" '.Payload.workspaces[] | select(.name == $name).details.crn')
+    local EXPECTED_WS_NAME="multi-arch-x-px-${POWERVS_REGION}-1"
+    echo "DEBUG[workspace] expected_workspace_name=${EXPECTED_WS_NAME}"
+
+    # --- mktemp diagnostics ---
+    local _DBG_DIR _DBG_DIR_RC
+    _DBG_DIR=$(mktemp -d 2>/tmp/_dbg_mktemp_err_$$)
+    _DBG_DIR_RC=$?
+    echo "DEBUG[workspace] mktemp_exit_code=${_DBG_DIR_RC}"
+    echo "DEBUG[workspace] mktemp_stderr=$(cat /tmp/_dbg_mktemp_err_$$ 2>/dev/null || true)"
+    echo "DEBUG[workspace] mktemp_dir=${_DBG_DIR:-(empty)}"
+    rm -f /tmp/_dbg_mktemp_err_$$ 2>/dev/null || true
+    if [ "${_DBG_DIR_RC}" -ne 0 ] || [ -z "${_DBG_DIR}" ]; then
+        echo "DEBUG[workspace] ERROR: mktemp -d failed"
+        exit "${_DBG_DIR_RC:-1}"
+    fi
+
+    # --- ibmcloud pi workspace ls --json diagnostics ---
+    local WS_STDOUT WS_RC
+    echo "DEBUG[workspace] running: ibmcloud pi workspace ls --json"
+    WS_STDOUT=$(ibmcloud pi workspace ls --json 2>"${_DBG_DIR}/ws_stderr")
+    WS_RC=$?
+    echo "DEBUG[workspace] ibmcloud_exit_code=${WS_RC}"
+    echo "DEBUG[workspace] ibmcloud_stderr=$(cat "${_DBG_DIR}/ws_stderr" 2>/dev/null || true)"
+    echo "DEBUG[workspace] ibmcloud_stdout=${WS_STDOUT:-(empty)}"
+    if [ "${WS_RC}" -ne 0 ]; then
+        echo "DEBUG[workspace] ERROR: ibmcloud pi workspace ls --json failed."
+        rm -rf "${_DBG_DIR}"
+        exit "${WS_RC}"
+    fi
+
+    # --- production CRN jq extraction ---
+    local CRN_JQ_RC CRN_JQ_STDERR
+    CRN=$(echo "${WS_STDOUT}" | jq -r --arg name "${EXPECTED_WS_NAME}" \
+        '.Payload.workspaces[]? | select(.name == $name).details.crn // empty' \
+        2>"${_DBG_DIR}/jq_crn_err")
+    CRN_JQ_RC=$?
+    CRN_JQ_STDERR=$(cat "${_DBG_DIR}/jq_crn_err" 2>/dev/null || true)
+    rm -rf "${_DBG_DIR}"
+    echo "DEBUG[workspace] CRN_assign jq exit_code=${CRN_JQ_RC}"
+    echo "DEBUG[workspace] CRN_assign jq stderr=${CRN_JQ_STDERR}"
+    echo "DEBUG[workspace] parsed_CRN='${CRN}'"
+
     export CRN
+    if [ -z "${CRN}" ]; then
+        echo "DEBUG[workspace] ERROR: CRN is empty."
+        echo "DEBUG[workspace] workspace lookup did not return a matching CRN."
+        exit 1
+    fi
+
     echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
     POWERVS_SERVICE_INSTANCE_ID="${CRN}"
     export POWERVS_SERVICE_INSTANCE_ID
