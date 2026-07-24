@@ -6,13 +6,13 @@ build_root:
 images:
   items:
   - dockerfile_literal: |
-      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22 AS builder
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.22 AS builder
       WORKDIR /go/src/github.com/openshift-online/ocm-cli
       COPY . .
       ENV GOFLAGS=-buildvcs=false
       RUN make install
 
-      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.22
       COPY --from=builder /go/bin/ocm /usr/bin/
       RUN yum -y install --setopt=skip_missing_names_on_install=False \
       jq \
