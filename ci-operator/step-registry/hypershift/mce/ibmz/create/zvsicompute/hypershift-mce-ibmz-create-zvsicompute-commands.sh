@@ -14,8 +14,10 @@ hcp_ns=$HC_NS-$HC_NAME
 export hcp_ns
 hcp_domain="$job_id-$HYPERSHIFT_BASEDOMAIN"
 export hcp_domain
+set +x
 IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
+set -x
 
 # Installing CLI tools
 set -e

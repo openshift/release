@@ -14,8 +14,10 @@ hcp_ns=$HC_NS-$HC_NAME
 export hcp_ns
 hcp_domain="$job_id-$HYPERSHIFT_BASEDOMAIN"
 export hcp_domain
+set +x
 IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
+set -x
 
 MGMT_CLUSTER_NAME=$(cat "$SHARED_DIR/mgmt_cluster_name")
 export MGMT_CLUSTER_NAME
@@ -60,8 +62,10 @@ fi
 # Login to the IBM Cloud
 set -e
 echo "Logging into IBM Cloud by targetting the $IC_REGION region"
+set +x
 ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
 ibmcloud login --apikey $IC_API_KEY -r $IC_REGION
+set -x
 set +e
 echo "Installing the required ibmcloud plugins if not present."
 for plugin in "${plugins_list[@]}"; do  
@@ -156,7 +160,14 @@ create_vsi() {
     fi
 
     if ! resource_exists "instance" $VSI_NAME; then
-        ibmcloud is instance-create "$VSI_NAME" "$VPC_NAME" "$ZONE" "$PROFILE" "$SUBNET_NAME" --image "$IMAGE_NAME" --keys "$SSH_KEY_NAME" --pnac-vni "$VSI_NAME-vni"
+        local -a extra_vol_args=()
+        if [[ "$VSI_NAME" == *"-compute-"* ]]; then
+            extra_vol_args=(
+                --volume-attach
+                "[{\"name\":\"${VSI_NAME}-data\",\"volume\":{\"name\":\"${VSI_NAME}-datavol\",\"capacity\":${ZVSI_DISK_SIZE:-120},\"profile\":{\"name\":\"general-purpose\"}}}]"
+            )
+        fi
+        ibmcloud is instance-create "$VSI_NAME" "$VPC_NAME" "$ZONE" "$PROFILE" "$SUBNET_NAME" --image "$IMAGE_NAME" --keys "$SSH_KEY_NAME" --pnac-vni "$VSI_NAME-vni" "${extra_vol_args[@]}"
         echo "Waiting for the $VSI_NAME VSI to be ready under 2 minutes ⏳..."
         for i in {1..13}; do
             state=$(ibmcloud is instance $VSI_NAME --output JSON | jq -r '.status')
@@ -274,19 +285,99 @@ create_sg_rule() {
     fi
 }
 
+patch_nested_kubeconfig_for_ci() {
+    local hosted_kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+    local nodeport="${API_NODEPORT:-}"
+
+    if [[ -z "${nodeport}" ]]; then
+        nodeport=$(oc get svc kube-apiserver -n "${hcp_ns}" \
+            -o jsonpath="{.spec.ports[?(@.port==6443)].nodePort}" 2>/dev/null || true)
+    fi
+    if [[ -z "${nodeport}" ]]; then
+        nodeport=$(grep -E 'server:' "${hosted_kubeconfig}" | sed -n 's/.*:\([0-9]*\)".*/\1/p' | head -1)
+    fi
+    if [[ -z "${nodeport}" ]]; then
+        echo "ERROR: could not determine kube-apiserver NodePort"
+        exit 1
+    fi
+
+    local cluster_name
+    cluster_name=$(oc --kubeconfig "${hosted_kubeconfig}" config view -o jsonpath='{.clusters[0].name}')
+    oc --kubeconfig "${hosted_kubeconfig}" config set-cluster "${cluster_name}" \
+        --server="https://${BASTION_FIP}:${nodeport}"
+    oc --kubeconfig "${hosted_kubeconfig}" config set-cluster "${cluster_name}" \
+        --insecure-skip-tls-verify=true
+    echo "Updated nested_kubeconfig server to https://${BASTION_FIP}:${nodeport}"
+}
+
+configure_bastion_squid_proxy() {
+    local mgmt_api_host mgmt_domain no_proxy_list
+
+    mgmt_api_host=$(oc whoami --show-server | sed 's|https://||; s|:.*||')
+    mgmt_domain=$(echo "${mgmt_api_host}" | awk -F'.' '{print $(NF-1)"."$NF}')
+    no_proxy_list="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,nip.io,${mgmt_domain},${mgmt_api_host},${hcp_domain},${HYPERSHIFT_BASEDOMAIN},${BASTION_FIP},${BASTION_RIP},cluster.local,.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,localhost,127.0.0.1"
+
+    echo "Configuring squid proxy on Ubuntu bastion"
+    ssh "${ssh_options[@]}" root@$BASTION_FIP bash -s <<'EOF'
+set -euo pipefail
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y squid
+cat > /etc/squid/squid.conf <<'SQUID'
+acl SSL_ports port 443
+acl Safe_ports port 80
+acl Safe_ports port 443
+acl Safe_ports port 1025-65535
+acl CONNECT method CONNECT
+acl localnet src 10.0.0.0/8
+acl localnet src 172.16.0.0/12
+acl localnet src 192.168.0.0/16
+http_port 3128
+http_access allow CONNECT SSL_ports localnet
+http_access allow CONNECT SSL_ports localhost
+http_access allow localnet
+http_access allow localhost
+http_access deny all
+SQUID
+systemctl enable squid
+systemctl restart squid
+systemctl is-active --quiet squid
+EOF
+
+    ssh "${ssh_options[@]}" root@$BASTION_FIP "ss -lntp | grep ':3128 '"
+    if [ $? -ne 0 ]; then
+        echo "Squid proxy failed to listen on port 3128"
+        ssh "${ssh_options[@]}" root@$BASTION_FIP "journalctl -u squid --no-pager -n 50"
+        exit 1
+    fi
+    echo "Squid proxy is running on bastion ${BASTION_FIP}:3128"
+
+    cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
+export HTTP_PROXY=http://${BASTION_FIP}:3128/
+export HTTPS_PROXY=http://${BASTION_FIP}:3128/
+export NO_PROXY="${no_proxy_list}"
+export http_proxy=http://${BASTION_FIP}:3128/
+export https_proxy=http://${BASTION_FIP}:3128/
+export no_proxy="${no_proxy_list}"
+EOF
+}
+
 # Create security group rules to open the port range 30000-33000 for TCP traffic
 sg_name="$MGMT_CLUSTER_NAME-sg"
 create_sg_rule $sg_name inbound tcp 30000 33000
 create_sg_rule $sg_name inbound tcp 3128 3128
+create_sg_rule $sg_name inbound tcp 6443 6443
+create_sg_rule $sg_name inbound tcp 80 80
+create_sg_rule $sg_name inbound tcp 443 443
 
 # Create Bastion Node
 create_vsi "$infra_name-bastion" "$IC_REGION-2" "bz2-2x8" "$MGMT_CLUSTER_NAME-sn-2" "ubuntu-s390x-image" "hcp-prow-ci-dnd-key" "$sg_name"
 
-# Create Compute Nodes
-
+# Create Compute Nodes across zones (mgmt VPC has sn-1 / sn-2)
 for i in $(seq 1 $HYPERSHIFT_NODE_COUNT); do
-    ZONE="$IC_REGION-2"
-    SUBNET_NAME="$MGMT_CLUSTER_NAME-sn-2"
+    zone_num=$(( ((i - 1) % 2) + 1 ))
+    ZONE="$IC_REGION-${zone_num}"
+    SUBNET_NAME="$MGMT_CLUSTER_NAME-sn-${zone_num}"
+    echo "Placing compute-$i in zone $ZONE (subnet $SUBNET_NAME)"
     create_vsi "$infra_name-compute-$i" "$ZONE" "$ZVSI_PROFILE" "$SUBNET_NAME" "$ZVSI_IMAGE" "hcp-prow-ci-dnd-key" "$sg_name"
 done
 
@@ -316,15 +407,16 @@ done
 ssh "${ssh_options[@]}" root@$BASTION_FIP '
   apt-get update &&
   apt-get install -y apache2 &&
-  systemctl enable apache2 &&
-  systemctl start apache2 &&
   echo "Configuring Web server with custom listeners on bastion" &&
-  if ! grep -q "8080" "/etc/apache2/ports.conf"; then
-     echo "Listen 8080" >> /etc/apache2/ports.conf
-  fi &&
-  if ! grep -q "8443" "/etc/apache2/ports.conf"; then
+  # Move apache2 off ports 80/443 so HAProxy can bind them (same intent as RHEL httpd sed).
+  sed -i "s/^Listen 80$/Listen 8080/" /etc/apache2/ports.conf &&
+  sed -i "s/^Listen 443$/Listen 8443/" /etc/apache2/ports.conf &&
+  if ! grep -q "^Listen 8443$" /etc/apache2/ports.conf; then
      echo "Listen 8443" >> /etc/apache2/ports.conf
   fi &&
+  sed -i "s/<VirtualHost \*:80>/<VirtualHost *:8080>/" /etc/apache2/sites-enabled/000-default.conf &&
+  a2dissite default-ssl 2>/dev/null || true &&
+  systemctl enable apache2 &&
   systemctl restart apache2 &&
   systemctl status apache2 --no-pager
 '
@@ -343,7 +435,26 @@ ssh "${ssh_options[@]}" root@$BASTION_FIP "apt-get install -y haproxy ; systemct
 
 # Configiring HAProxy on Bastion
 echo "Configuring HAProxy on Bastion"
+API_NODEPORT=$(oc get svc kube-apiserver -n "${hcp_ns}" \
+  -o jsonpath="{.spec.ports[?(@.port==6443)].nodePort}" 2>/dev/null || true)
+if [[ -z "${API_NODEPORT}" ]]; then
+  echo "ERROR: kube-apiserver NodePort not found in namespace ${hcp_ns}"
+  exit 1
+fi
+echo "Hosted cluster kube-apiserver NodePort: ${API_NODEPORT}"
+
 cat <<HAPROXY_CFG > haproxy.cfg
+global
+   daemon
+   maxconn 4096
+
+defaults
+   log global
+   mode tcp
+   timeout connect 5000ms
+   timeout client 50000ms
+   timeout server 50000ms
+
 listen stats
    bind :9000
    mode http
@@ -367,6 +478,22 @@ for i in $(seq 1 "$HUB_COMPUTE_COUNT"); do
 done
 
 cat <<HAPROXY_CFG >> haproxy.cfg
+frontend hcp-api-6443
+   mode tcp
+   option tcplog
+   bind ${BASTION_RIP}:6443
+   default_backend hub-api-server-nodeport
+backend hub-api-server-nodeport
+   mode tcp
+   balance source
+HAPROXY_CFG
+
+for i in $(seq 1 "$HUB_COMPUTE_COUNT"); do
+  index=$((i - 1))
+  echo "   server ${MGMT_CLUSTER_NAME}-compute-${i} ${HUB_COMPUTE_RIPS[$index]}:${API_NODEPORT}" >> haproxy.cfg
+done
+
+cat <<HAPROXY_CFG >> haproxy.cfg
 listen hcp-console
     mode tcp
     bind ${BASTION_RIP}:443
@@ -376,16 +503,17 @@ HAPROXY_CFG
 # Append hypershift nodes
 for i in $(seq 1 ${HYPERSHIFT_NODE_COUNT}); do
   index=$((i - 1))
-  echo "   server ${HC_NAME}-compute-${i} ${ZVSI_COMPUTE_RIP[$index]}" >> haproxy.cfg
+  echo "   server ${HC_NAME}-compute-${i} ${ZVSI_COMPUTE_RIP[$index]}:80" >> haproxy.cfg
 done
 
 
 # Sending haproxy file to bastion and restarting the service
 scp "${ssh_options[@]}" haproxy.cfg root@$BASTION_FIP:/etc/haproxy/haproxy.cfg
-ssh "${ssh_options[@]}" root@$BASTION_FIP "systemctl restart haproxy"
+ssh "${ssh_options[@]}" root@$BASTION_FIP "haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl restart haproxy"
 ssh "${ssh_options[@]}" root@$BASTION_FIP "systemctl is-active --quiet haproxy"
 if [ $? -ne 0 ]; then
   echo 'HAProxy configuration failed, haproxy serivce not running'
+  ssh "${ssh_options[@]}" root@$BASTION_FIP "journalctl -u haproxy --no-pager -n 50"
   exit 1
 else
   echo 'HAProxy configuration succeeded'
@@ -426,6 +554,9 @@ else
   echo "DNS zone $hcp_domain is in the ACTIVE state."
 fi
 
+# Agents need outbound proxy and API access during install; configure squid before pxeboot.
+configure_bastion_squid_proxy
+
 
 
 # Booting Agents 
@@ -437,10 +568,9 @@ export kernel_url
 rootfs_url=$(oc get infraenv/${HC_NAME} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.rootfs')
 export rootfs_url
 
-echo "Downloading the rootfs image locally and transferring to HTTPD server"
-curl -k -L --output $HOME/rootfs.img "$rootfs_url"
-scp "${ssh_options[@]}" $HOME/rootfs.img root@$BASTION_FIP:/var/www/html/rootfs.img 
-ssh "${ssh_options[@]}" root@$BASTION_FIP "chmod 644 /var/www/html/rootfs.img"
+echo "Downloading the rootfs image directly on the bastion httpd server"
+ssh "${ssh_options[@]}" root@$BASTION_FIP \
+  "curl -k -L -o /var/www/html/rootfs.img '${rootfs_url}' && chmod 644 /var/www/html/rootfs.img"
 
 # Downloading the script to trigger pxeboot of agents
 echo "Downloading the setup script for pxeboot of agents"
@@ -491,7 +621,7 @@ for ((i=50; i>=1; i--)); do
   sleep 25
 done
 
-# Approve agents 
+# Approve agents (same flow as main: approve, then scale nodepool)
 echo "$(date) Patching the agents to the hosted control plane"
 agents=$(oc get agents -n $hcp_ns --no-headers | awk '{print $1}')
 agents=$(echo "$agents" | tr '\n' ' ')
@@ -501,55 +631,46 @@ for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
 done
 
 # Scaling up nodepool
+echo "$(date) Scaling up nodepool to ${HYPERSHIFT_NODE_COUNT}"
 oc -n $HC_NS scale nodepool $HC_NAME --replicas $HYPERSHIFT_NODE_COUNT
 
 # Waiting for compute nodes to get ready
+set -e
 echo "$(date) Patched the agents, waiting for the installation to get completed on them"
-oc wait --all=true agent -n $hcp_ns --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=45m
+if ! oc wait --all=true agent -n $hcp_ns --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=55m; then
+  echo "$(date) ERROR: agents did not reach added-to-existing-cluster state within 45m"
+  echo "--- oc get agents (wide) ---"
+  oc get agents -n $hcp_ns -o wide || true
+  echo "--- oc get agents (state + conditions) ---"
+  oc get agents -n $hcp_ns -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.debugInfo.state}{"\t"}{.status.conditions[*].message}{"\n"}{end}' || true
+  echo "--- oc describe agents ---"
+  oc describe agents -n $hcp_ns || true
+  echo "--- oc get agentmachines ---"
+  oc get agentmachines -n $hcp_ns -o wide || true
+  echo "--- oc describe agentmachines ---"
+  oc describe agentmachines -n $hcp_ns || true
+  echo "--- oc get machines ---"
+  oc get machines -n $hcp_ns -o wide || true
+  echo "--- oc describe machines ---"
+  oc describe machines -n $hcp_ns || true
+  exit 1
+fi
 echo "$(date) All the agents are attached as compute nodes to the hosted control plane"
+
+# CI pods use cluster DNS and cannot resolve IBM Cloud private DNS for the hosted cluster API.
+patch_nested_kubeconfig_for_ci
 
 # Verifying the compute nodes status
 echo "$(date) Checking the compute nodes in the hosted control plane"
 oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
-oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
-
-# Configuring proxy server on bastion 
-echo "Getting management cluster basedomain to allow traffic to proxy server"
-mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
-
-echo "Getting the proxy setup script"
-cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
-
-sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
-sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
-chmod 700 $HOME/setup_proxy.sh
-
-echo "Transferring the setup script to Bastion"
-scp "${ssh_options[@]}" $HOME/setup_proxy.sh root@$BASTION_FIP:/root/setup_proxy.sh
-echo "Triggering the proxy server setup on Bastion"
-ssh "${ssh_options[@]}" root@$BASTION_FIP "/root/setup_proxy.sh"
-
-cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
-export HTTP_PROXY=http://${BASTION_FIP}:3128/
-export HTTPS_PROXY=http://${BASTION_FIP}:3128/
-export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
-export http_proxy=http://${BASTION_FIP}:3128/
-export https_proxy=http://${BASTION_FIP}:3128/
-export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
-EOF
-
-
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=60m
 
 # Sourcing the proxy settings for the next steps
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-
-
-# Verifying the compute nodes status
-echo "$(date) Checking the compute nodes in the hosted control plane"
-oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
-oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
+echo "Verifying management cluster API is reachable with proxy settings"
+oc whoami --show-server >/dev/null
 
 echo "$(date) Successfully completed the e2e creation chain"
