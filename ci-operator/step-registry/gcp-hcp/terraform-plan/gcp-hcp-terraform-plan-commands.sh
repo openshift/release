@@ -72,7 +72,7 @@ log "  OK"
 # roles/resourcemanager.projectCreator on the folder.
 log "Step 3/3: Listing projects in CI folder ${CI_FOLDER_ID}..."
 PROJECTS_RESPONSE=$(curl -sf \
-  "https://cloudresourcemanager.googleapis.com/v1/projects?filter=parent.id%3A${CI_FOLDER_ID}" \
+  "https://cloudresourcemanager.googleapis.com/v1/projects?filter=parent.type%3Afolder%20parent.id%3A${CI_FOLDER_ID}" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}") || { log "ERROR: GCP API call failed"; exit 1; }
 
 PROJECT_ID=$(echo "${PROJECTS_RESPONSE}" | jq -r '.projects[0].projectId // empty')
