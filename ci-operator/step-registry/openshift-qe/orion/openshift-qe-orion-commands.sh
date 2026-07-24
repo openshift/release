@@ -52,12 +52,24 @@ case "$ES_TYPE" in
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
     if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_TYPE}" == "periodic" ]] && [[ "${JOB_NAME}" == *"payload"* ]] && [[ -z "${PULL_NUMBER}" ]]; then
-        JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
-        JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
-        JIRA_URL=https://redhat.atlassian.net/
-        export JIRA_TOKEN JIRA_EMAIL JIRA_URL
-        # We use orion's default JIRA project and components
-        ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
+        IS_PR_PAYLOAD=false
+        if [[ -n "${BUILD_ID:-}" ]]; then
+            PROWJOB_URL="https://storage.googleapis.com/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+            if curl -fsSL --retry 3 "$PROWJOB_URL" -o /tmp/prowjob.json 2>/dev/null; then
+                if jq -e '.metadata.labels["prow.k8s.io/refs.pull"]' /tmp/prowjob.json >/dev/null 2>&1; then
+                    IS_PR_PAYLOAD=true
+                elif jq -e '.spec.extra_refs[]?.pulls[]?.number' /tmp/prowjob.json >/dev/null 2>&1; then
+                    IS_PR_PAYLOAD=true
+                fi
+            fi
+        fi
+        if [[ "${IS_PR_PAYLOAD}" == "false" ]]; then
+            JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
+            JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
+            JIRA_URL=https://redhat.atlassian.net/
+            export JIRA_TOKEN JIRA_EMAIL JIRA_URL
+            ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
+        fi
     fi
     ;;
   quay-qe)
@@ -96,8 +108,7 @@ if ! curl -fsSL --fail --retry 8 --retry-all-errors https://github.com/cloud-bul
     exit 1
 fi
 chmod +x ocp-metadata
-CLUSTER_METADATA=$(./ocp-metadata)
-EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
+CLUSTER_METADATA=$(./ocp-metadata | jq -c .)
 
 # Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
@@ -180,6 +191,11 @@ if [[ "${JOB_TYPE}" == "periodic" ]]; then
     else
         job_type="periodic"
     fi
+elif [[ "${JOB_TYPE}" == "presubmit" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+    pull_number="${PULL_NUMBER}"
+    job_type="pull"
+    CLUSTER_METADATA=$(echo "${CLUSTER_METADATA}" | python -c "import sys,json; d=json.load(sys.stdin); d['organization']='${REPO_OWNER}'; d['repository']='${REPO_NAME}'; print(json.dumps(d,separators=(',',':')))")
+    EXTRA_FLAGS+=" --pr-analysis"
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
     # Indicates a ci test triggered in PR against a pull request
     pull_number="(${PULL_NUMBER} OR 0)"
@@ -192,6 +208,8 @@ elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
     # Indicates a rehearsal in PR against openshift/release repo
     job_type="(periodic OR rehearse)"
 fi
+
+EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 
 set +e
 set -o pipefail
