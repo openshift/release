@@ -1,0 +1,34 @@
+workflow:
+  as: telcov10n-system-telco-kpis-deploy-ztp-infra
+  steps:
+    env:
+      INFRA_SETTINGS: |-
+        {
+          "deploy_vm_bastion": {
+            "skip": false,
+            "debug_on_fail": true
+          },
+          "deploy_sno_hub": {
+            "skip": false,
+            "debug_on_fail": true,
+            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
+          },
+          "install_hub_operators": {
+            "skip": false,
+            "debug_on_fail": true,
+            "hub_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json"
+          },
+          "hub_config": {
+            "skip": false,
+            "debug_on_fail": true,
+            "debug_timeout": "+11 min"
+          }
+        }
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    - ref: telcov10n-system-telco-kpis-deploy-vm-bastion
+    - chain: telcov10n-system-telco-kpis-hub-deployment
+  documentation: |-
+    Deploys the ZTP infrastructure required for telco-kpis testing.
+    Sets up a VM-based bastion host and deploys an OpenShift hub cluster.
+    Hub-only deployment — spoke deployment is handled separately by test jobs.

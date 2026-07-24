@@ -1,0 +1,167 @@
+ref:
+  as: telcov10n-system-telco-kpis-spoke-deployment-deploy-spoke-ztp
+  from: root
+  commands: telcov10n-system-telco-kpis-spoke-deployment-deploy-spoke-ztp-commands.sh
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: SPOKE_CLUSTER
+      default: "spree-02"
+      documentation: Spoke cluster to deploy via ZTP
+    - name: HUB_CLUSTER
+      default: "kni-qe-71"
+      documentation: Hub cluster managing ZTP deployment
+    - name: INFRA_SETTINGS
+      default: '{}'
+      documentation: >-
+        JSON object for per-step infrastructure configuration overrides from CI config.
+        Values here take precedence over INFRA_SETTINGS_DEFAULTS.
+    - name: INFRA_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "deploy_spoke_ztp": {
+            "skip": false,
+            "debug_on_fail": false,
+            "debug_timeout": "+10 min",
+            "version": "4.22",
+            "ocp_release_image": "",
+            "lockdown_uri": "",
+            "ztp_git_repo": "https://gitlab.cee.redhat.com/ocp-edge-qe/ztp-site-configs.git",
+            "ztp_git_branch": "",
+            "ztp_clusters_path": "siteconfig",
+            "ztp_policies_path": "policygentemplates",
+            "force_cleanup": true,
+            "debug": false
+          }
+        }
+      documentation: >-
+        JSON object for per-step infrastructure configuration. The "deploy_spoke_ztp" key supports:
+        skip (bool) - when true, skip this step entirely and exit 0;
+        version (str) - OpenShift version to deploy on spoke (e.g. "4.22"). Used only when
+        neither ocp_release_image nor lockdown_uri are provided;
+        ocp_release_image (str) - explicit OCP release image for ClusterImageSet. Accepts tag
+        or digest format; tags are resolved to digest via skopeo. Takes precedence over
+        lockdown_uri. Examples:
+        tag: quay.io/openshift-release-dev/ocp-release:4.22.0-x86_64,
+        digest: quay.io/openshift-release-dev/ocp-release@sha256:abc123...;
+        lockdown_uri (str) - URL to a hub or spoke lockdown JSON file. The OCP release image
+        is extracted automatically (hub format: hub.ocp.pull_spec.digest, spoke format:
+        deployment.ocp_pull_spec). Supports GitLab symlinks. Only used when ocp_release_image
+        is empty. Examples:
+        version-pinned: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-4.22-x86_64.json,
+        baseline: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-4.22-x86_64-baseline.json;
+        ztp_git_repo (str) - ZTP site configurations repository URL;
+        ztp_git_branch (str) - ZTP branch (empty to auto-generate as ${SPOKE_CLUSTER}-kpi-${VERSION});
+        ztp_clusters_path (str) - path to cluster configurations in ZTP repository;
+        ztp_policies_path (str) - path to policy templates in ZTP repository;
+        force_cleanup (bool) - force cleanup of spoke resources on hub before deployment;
+        debug (bool) - when true, enables Ansible -vvv verbose output.
+        Release image resolution precedence: ocp_release_image > lockdown_uri > hub clusterversion.
+        Values are exported as uppercase env vars.
+  credentials:
+    # Common hypervisor (shared across all spokes)
+    - namespace: test-credentials
+      name: telcov10n-ansible-hypervisors-hv6
+      mount_path: /var/host_variables/common/hypervisor
+
+    # Common group variables
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-all
+      mount_path: /var/group_variables/common/all
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-bastions
+      mount_path: /var/group_variables/common/bastions
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-hypervisors
+      mount_path: /var/group_variables/common/hypervisors
+
+    # Spoke spree-01 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-01-master0
+      mount_path: /var/host_variables/spree-01/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-01-masters
+      mount_path: /var/group_variables/spree-01/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-01-nodes
+      mount_path: /var/group_variables/spree-01/nodes
+
+    # Spoke spree-02 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-02-master0
+      mount_path: /var/host_variables/spree-02/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-02-masters
+      mount_path: /var/group_variables/spree-02/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-02-nodes
+      mount_path: /var/group_variables/spree-02/nodes
+
+    # Spoke spree-03 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-03-master0
+      mount_path: /var/host_variables/spree-03/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-03-masters
+      mount_path: /var/group_variables/spree-03/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-03-nodes
+      mount_path: /var/group_variables/spree-03/nodes
+
+    # Spoke spree-04 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-04-master0
+      mount_path: /var/host_variables/spree-04/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-04-masters
+      mount_path: /var/group_variables/spree-04/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-04-nodes
+      mount_path: /var/group_variables/spree-04/nodes
+
+    # Spoke cnfdg46 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-cnfdg46-master0
+      mount_path: /var/host_variables/cnfdg46/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-cnfdg46-masters
+      mount_path: /var/group_variables/cnfdg46/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-cnfdg46-nodes
+      mount_path: /var/group_variables/cnfdg46/nodes
+
+    # Hub kni-qe-70 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-70-bastion
+      mount_path: /var/host_variables/kni-qe-70/bastion
+
+    # Hub kni-qe-71 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-71-bastion
+      mount_path: /var/host_variables/kni-qe-71/bastion
+
+    # Hub dev-kpi-01 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-01-bastion
+      mount_path: /var/host_variables/dev-kpi-01/bastion
+
+    # Hub dev-kpi-02 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-02-bastion
+      mount_path: /var/host_variables/dev-kpi-02/bastion
+
+    # Hub dev-kpi-03 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-03-bastion
+      mount_path: /var/host_variables/dev-kpi-03/bastion
+
+    # Hub dev-kpi-04 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-04-bastion
+      mount_path: /var/host_variables/dev-kpi-04/bastion
+  documentation: |-
+    Deploy spoke cluster using Zero Touch Provisioning (ZTP) via hub cluster.
+    Creates SiteConfig, applies policies, and waits for cluster to be ready.

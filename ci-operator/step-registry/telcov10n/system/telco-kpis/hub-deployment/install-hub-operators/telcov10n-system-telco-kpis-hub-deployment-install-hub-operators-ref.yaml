@@ -1,0 +1,165 @@
+ref:
+  as: telcov10n-system-telco-kpis-hub-deployment-install-hub-operators
+  from: root
+  commands: telcov10n-system-telco-kpis-hub-deployment-install-hub-operators-commands.sh
+  timeout: 1h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: HUB_CLUSTER
+      default: "kni-qe-70"
+      documentation: Hub cluster name where operators will be installed
+    - name: INFRA_SETTINGS
+      default: '{}'
+      documentation: >-
+        JSON object for per-step infrastructure configuration overrides from CI config.
+        Values here take precedence over INFRA_SETTINGS_DEFAULTS.
+    - name: INFRA_SETTINGS_DEFAULTS
+      default: |-
+        {
+          "install_hub_operators": {
+            "skip": false,
+            "debug_on_fail": false,
+            "debug_timeout": "+10 min",
+            "version": "4.22",
+            "hub_lockdown_uri": "",
+            "generate_hub_lockdown": false,
+            "architecture": "x86_64",
+            "debug": false
+          }
+        }
+      documentation: >-
+        JSON object for per-step infrastructure configuration. The "install_hub_operators" key supports:
+        skip (bool) - when true, skip this step entirely and exit 0;
+        version (str) - OpenShift version for operator catalog resolution (e.g., "4.22").
+        Used as fallback when no lockdown URI is provided. When lockdown is provided,
+        the playbook extracts version from the lockdown JSON automatically;
+        hub_lockdown_uri (str) - optional URL to hub lockdown JSON. When provided, the wrapper
+        playbook downloads and parses the lockdown on bastion, extracting both operators list
+        and OCP version. Operators are installed using exact CSVs from the lockdown.
+        Recommended defaults (symlinks to latest verified lockdowns):
+        x86_64: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-x86_64.json
+        arm64: https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/hub/defaults/lockdown-hub-arm64.json
+        Version-specific URLs are also available (e.g. lockdown-hub-4.22-x86_64.json).
+        Empty string skips lockdown;
+        generate_hub_lockdown (bool) - generate hub lockdown JSON after operator installation;
+        architecture (str) - target architecture (x86_64 or arm64);
+        debug (bool) - when true, enables Ansible -vvv verbose output.
+        Values are exported as uppercase env vars.
+  credentials:
+    # Common hypervisor (shared across all spokes)
+    - namespace: test-credentials
+      name: telcov10n-ansible-hypervisors-hv6
+      mount_path: /var/host_variables/common/hypervisor
+
+    # Common group variables
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-all
+      mount_path: /var/group_variables/common/all
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-bastions
+      mount_path: /var/group_variables/common/bastions
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-hypervisors
+      mount_path: /var/group_variables/common/hypervisors
+
+    # Spoke spree-01 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-01-master0
+      mount_path: /var/host_variables/spree-01/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-01-masters
+      mount_path: /var/group_variables/spree-01/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-01-nodes
+      mount_path: /var/group_variables/spree-01/nodes
+
+    # Spoke spree-02 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-02-master0
+      mount_path: /var/host_variables/spree-02/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-02-masters
+      mount_path: /var/group_variables/spree-02/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-02-nodes
+      mount_path: /var/group_variables/spree-02/nodes
+
+    # Spoke spree-03 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-03-master0
+      mount_path: /var/host_variables/spree-03/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-03-masters
+      mount_path: /var/group_variables/spree-03/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-03-nodes
+      mount_path: /var/group_variables/spree-03/nodes
+
+    # Spoke spree-04 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-spree-04-master0
+      mount_path: /var/host_variables/spree-04/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-04-masters
+      mount_path: /var/group_variables/spree-04/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-spree-04-nodes
+      mount_path: /var/group_variables/spree-04/nodes
+
+    # Spoke cnfdg46 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-cnfdg46-master0
+      mount_path: /var/host_variables/cnfdg46/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-cnfdg46-masters
+      mount_path: /var/group_variables/cnfdg46/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-cnfdg46-nodes
+      mount_path: /var/group_variables/cnfdg46/nodes
+
+    # Hub kni-qe-70 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-70-bastion
+      mount_path: /var/host_variables/kni-qe-70/bastion
+
+    # Hub kni-qe-71 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-71-bastion
+      mount_path: /var/host_variables/kni-qe-71/bastion
+
+    # Hub dev-kpi-01 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-01-bastion
+      mount_path: /var/host_variables/dev-kpi-01/bastion
+
+    # Hub dev-kpi-02 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-02-bastion
+      mount_path: /var/host_variables/dev-kpi-02/bastion
+
+    # Hub dev-kpi-03 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-03-bastion
+      mount_path: /var/host_variables/dev-kpi-03/bastion
+
+    # Hub dev-kpi-04 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-04-bastion
+      mount_path: /var/host_variables/dev-kpi-04/bastion
+  documentation: |-
+    Mirror and install hub operators (ACM, MCE, GitOps, TALM, local-storage,
+    cluster-logging) for ZTP and spoke management.
+
+    Uses the wrapper playbook telco-kpis/deploy-ocp-operators.yml which:
+    1. Parses hub lockdown on bastion if hub_lockdown_uri provided (extracts
+       operators list and OCP version via the lockdowns Ansible role)
+    2. Calls upstream deploy-ocp-operators.yml for operator mirroring and install
+    3. Captures hub lockdown if generate_hub_lockdown requested
+
+    When no lockdown URI, operators are built from defaults in the playbook
+    and version is used for catalog resolution.
+
+    Jenkins equivalent: telco-kpis-install-hub-operators job

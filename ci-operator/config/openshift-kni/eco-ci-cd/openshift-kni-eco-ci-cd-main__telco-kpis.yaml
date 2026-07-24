@@ -1,0 +1,516 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM quay.io/ccardenosa/eco-ci-cd:latest
+      RUN chmod -R g+w /eco-ci-cd/inventories
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 300Mi
+tests:
+- as: dev-kpi-01-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: dev-kpi-01
+      SPOKE_CLUSTER: spree-04
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: dev-kpi-02-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: dev-kpi-02
+      SPOKE_CLUSTER: spree-03
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: dev-kpi-03-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: dev-kpi-03
+      SPOKE_CLUSTER: kni-qe-100
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: dev-kpi-04-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: dev-kpi-04
+      SPOKE_CLUSTER: cnfdg46
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: kni-qe-70-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: kni-qe-70
+      SPOKE_CLUSTER: spree-01
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: kni-qe-71-ztp-infra
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: kni-qe-71
+      SPOKE_CLUSTER: spree-02
+    workflow: telcov10n-system-telco-kpis-deploy-ztp-infra
+- as: run-1hr-baselines
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: kni-qe-71
+      INFRA_SETTINGS: |-
+        {
+          "mirror_spoke_operators": {
+            "skip": false,
+            "debug_on_fail": true,
+            "spoke_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64-baseline.json"
+          },
+          "mirror_ran_test_images": {
+            "skip": false,
+            "debug_on_fail": true,
+            "ran_images": {
+              "images": [
+                "quay.io/telcov10n-ci/oslat:latest",
+                "quay.io/telcov10n-ci/cyclictest:latest",
+                "quay.io/telcov10n-ci/cnf-tests:4.8",
+                "quay.io/telcov10n-ci/stress-ng:latest",
+                "quay.io/telcov10n-ci/cnf-gotests-client:latest",
+                "quay.io/telcov10n-ci/dpdk-testpmd:latest",
+                "quay.io/telcov10n-ci/process-exporter:ppid-2",
+                "quay.io/telcov10n-ci/fedora-stress-ng:latest",
+                "quay.io/telcov10n-ci/curl:latest",
+                "quay.io/telcov10n-ci/sampleapp:latest",
+                "quay.io/telcov10n-ci/kubectl:latest",
+                "quay.io/telcov10n-ci/rtla:latest",
+                "quay.io/telcov10n-ci/oran-subscriber:latest"
+              ]
+            }
+          },
+          "deploy_spoke_ztp": {
+            "skip": false,
+            "debug_on_fail": true,
+            "lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64-baseline.json",
+            "ztp_git_branch": "spree-02-kpi-4.21-prow"
+          }
+        }
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false,
+            "development_mode": true
+          }
+        }
+      SPOKE_CLUSTER: spree-02
+      TEST_SETTINGS: |-
+        {
+          "collect_node_info": {
+            "skip": false
+          },
+          "bios_validation": {
+            "skip": false,
+            "continue_on_fail": true
+          },
+          "cpu_util": {
+            "skip": false,
+            "baseline": false,
+            "duration": "1h"
+          }
+        }
+    workflow: telcov10n-system-telco-kpis-baseline-tests
+- as: run-1hr-tests
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: kni-qe-71
+      INFRA_SETTINGS: |-
+        {
+          "mirror_spoke_operators": {
+            "skip": false,
+            "debug_on_fail": true,
+            "spoke_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json"
+          },
+          "mirror_ran_test_images": {
+            "skip": false,
+            "debug_on_fail": true,
+            "ran_images": {
+              "images": [
+                "quay.io/telcov10n-ci/oslat:latest",
+                "quay.io/telcov10n-ci/cyclictest:latest",
+                "quay.io/telcov10n-ci/cnf-tests:4.8",
+                "quay.io/telcov10n-ci/stress-ng:latest",
+                "quay.io/telcov10n-ci/cnf-gotests-client:latest",
+                "quay.io/telcov10n-ci/dpdk-testpmd:latest",
+                "quay.io/telcov10n-ci/process-exporter:ppid-2",
+                "quay.io/telcov10n-ci/fedora-stress-ng:latest",
+                "quay.io/telcov10n-ci/curl:latest",
+                "quay.io/telcov10n-ci/sampleapp:latest",
+                "quay.io/telcov10n-ci/kubectl:latest",
+                "quay.io/telcov10n-ci/rtla:latest",
+                "quay.io/telcov10n-ci/oran-subscriber:latest"
+              ]
+            }
+          },
+          "deploy_spoke_ztp": {
+            "skip": false,
+            "debug_on_fail": true,
+            "lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json",
+            "ztp_git_branch": "spree-02-kpi-4.22-prow"
+          }
+        }
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false,
+            "development_mode": true
+          }
+        }
+      SPOKE_CLUSTER: spree-02
+      TEST_SETTINGS: |-
+        {
+          "collect_node_info": {
+            "skip": false
+          },
+          "bios_validation": {
+            "skip": false,
+            "continue_on_fail": true,
+            "bios_profile_url": "https://gitlab.cee.redhat.com/ocp-edge-qe/ztp-site-configs/-/raw/spree-02-kpi-4.22/siteconfig/bios/kpi.profile"
+          },
+          "oslat": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "cyclictest": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "ptp": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "cpu_util": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "rfc2544": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "reboot": {
+            "skip": false,
+            "reboot_count": "6"
+          },
+          "rds_compare": {
+            "skip": false,
+            "continue_on_fail": true
+          }
+        }
+    workflow: telcov10n-system-telco-kpis-candidate-tests
+- as: run-1hr-powersave-tests
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: dev-kpi-02
+      INFRA_SETTINGS: |-
+        {
+          "mirror_spoke_operators": {
+            "skip": false,
+            "debug_on_fail": true,
+            "spoke_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json"
+          },
+          "mirror_ran_test_images": {
+            "skip": false,
+            "debug_on_fail": true,
+            "ran_images": {
+              "images": [
+                "quay.io/telcov10n-ci/oslat:latest",
+                "quay.io/telcov10n-ci/cyclictest:latest",
+                "quay.io/telcov10n-ci/cnf-tests:4.8",
+                "quay.io/telcov10n-ci/stress-ng:latest",
+                "quay.io/telcov10n-ci/cnf-gotests-client:latest",
+                "quay.io/telcov10n-ci/dpdk-testpmd:latest",
+                "quay.io/telcov10n-ci/process-exporter:ppid-2",
+                "quay.io/telcov10n-ci/fedora-stress-ng:latest",
+                "quay.io/telcov10n-ci/curl:latest",
+                "quay.io/telcov10n-ci/sampleapp:latest",
+                "quay.io/telcov10n-ci/kubectl:latest",
+                "quay.io/telcov10n-ci/rtla:latest",
+                "quay.io/telcov10n-ci/oran-subscriber:latest"
+              ]
+            }
+          },
+          "deploy_spoke_ztp": {
+            "skip": false,
+            "debug_on_fail": true,
+            "lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json",
+            "ztp_git_branch": "spree-03-kpi-4.22_powersave-prow"
+          }
+        }
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false,
+            "development_mode": true
+          }
+        }
+      SPOKE_CLUSTER: spree-03
+      TEST_SETTINGS: |-
+        {
+          "collect_node_info": {
+            "skip": false
+          },
+          "bios_validation": {
+            "skip": false,
+            "continue_on_fail": true
+          },
+          "oslat": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "cyclictest": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "ptp": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "cpu_util": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "rfc2544": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "reboot": {
+            "skip": false,
+            "reboot_count": "6"
+          },
+          "rds_compare": {
+            "skip": false,
+            "continue_on_fail": true
+          }
+        }
+    workflow: telcov10n-system-telco-kpis-candidate-tests
+- as: run-1hr-stdkernel-tests
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: dev-kpi-01
+      INFRA_SETTINGS: |-
+        {
+          "mirror_spoke_operators": {
+            "skip": false,
+            "debug_on_fail": true,
+            "spoke_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json"
+          },
+          "mirror_ran_test_images": {
+            "skip": false,
+            "debug_on_fail": true,
+            "ran_images": {
+              "images": [
+                "quay.io/telcov10n-ci/oslat:latest",
+                "quay.io/telcov10n-ci/cyclictest:latest",
+                "quay.io/telcov10n-ci/cnf-tests:4.8",
+                "quay.io/telcov10n-ci/stress-ng:latest",
+                "quay.io/telcov10n-ci/cnf-gotests-client:latest",
+                "quay.io/telcov10n-ci/dpdk-testpmd:latest",
+                "quay.io/telcov10n-ci/process-exporter:ppid-2",
+                "quay.io/telcov10n-ci/fedora-stress-ng:latest",
+                "quay.io/telcov10n-ci/curl:latest",
+                "quay.io/telcov10n-ci/sampleapp:latest",
+                "quay.io/telcov10n-ci/kubectl:latest",
+                "quay.io/telcov10n-ci/rtla:latest",
+                "quay.io/telcov10n-ci/oran-subscriber:latest"
+              ]
+            }
+          },
+          "deploy_spoke_ztp": {
+            "skip": false,
+            "debug_on_fail": true,
+            "lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64.json",
+            "ztp_git_branch": "spree-04-kpi-4.22_stdkernel-prow"
+          }
+        }
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false,
+            "development_mode": true
+          }
+        }
+      SPOKE_CLUSTER: spree-04
+      TEST_SETTINGS: |-
+        {
+          "collect_node_info": {
+            "skip": false
+          },
+          "bios_validation": {
+            "skip": false,
+            "continue_on_fail": true
+          },
+          "oslat": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "cyclictest": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "ptp": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "cpu_util": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "rfc2544": {
+            "skip": false,
+            "duration": "1h"
+          },
+          "reboot": {
+            "skip": false,
+            "reboot_count": "6"
+          },
+          "rds_compare": {
+            "skip": false,
+            "continue_on_fail": true
+          }
+        }
+    workflow: telcov10n-system-telco-kpis-candidate-tests
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: telco-kpis

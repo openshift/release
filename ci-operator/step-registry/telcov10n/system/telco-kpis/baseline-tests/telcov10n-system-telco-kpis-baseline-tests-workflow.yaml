@@ -1,0 +1,22 @@
+workflow:
+  as: telcov10n-system-telco-kpis-baseline-tests
+  steps:
+    pre:
+    - ref: telcov10n-system-telco-kpis-common-functions-generator
+    - chain: telcov10n-system-telco-kpis-spoke-deployment
+    - ref: telcov10n-system-telco-kpis-mirror-ran-test-images
+    test:
+    - ref: telcov10n-system-telco-kpis-collect-node-info
+    - ref: telcov10n-system-telco-kpis-tests-run-ztp-ai-deployment-time-test
+    - ref: telcov10n-system-telco-kpis-tests-run-bios-validation-test
+    - ref: telcov10n-system-telco-kpis-tests-run-cpu-util-test
+    post:
+    - chain: telcov10n-system-telco-kpis-reporting
+  documentation: |-
+    Runs the full telco-kpis baseline test pipeline. Assumes hub cluster is
+    already deployed by a separate infra job. Deploys spoke cluster via ZTP,
+    mirrors RAN test images, then executes baseline KPI tests: node-info
+    collection, ZTP AI deployment time validation, BIOS validation, and CPU
+    utilization baseline. Post-test reporting uploads to Polarion/TestRail.
+    Per-job INFRA_SETTINGS must provide spoke_lockdown_uri, lockdown_uri,
+    and ztp_git_branch.
