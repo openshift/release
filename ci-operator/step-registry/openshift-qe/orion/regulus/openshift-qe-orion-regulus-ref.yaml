@@ -1,0 +1,51 @@
+ref:
+  as: openshift-qe-orion-regulus
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: REGULUS_REPO
+    default: "https://github.com/redhat-performance/regulus.git"
+    documentation: Regulus repo to clone (uses ORION/ subdirectory)
+  - name: REGULUS_BRANCH
+    default: "cpt"
+    documentation: Branch/tag of Regulus repo to use
+  - name: ORION_REPO
+    default: "https://github.com/cloud-bulldozer/orion.git"
+    documentation: Orion repo to clone
+  - name: ORION_TAG
+    default: "latest"
+    documentation: Branch/tag of orion
+  - name: BATCH_ID
+    default: ""
+    documentation: Specific batch ID to analyze. If empty, auto-discovers latest batch
+  - name: MATCH
+    default: ""
+    documentation: Filter to specific tests within batch (e.g., "threads=128")
+  - name: IGNORE
+    default: ""
+    documentation: Fields to exclude from fingerprint for cross-version analysis (e.g., "rcos kernel")
+  - name: ES_BENCHMARK_INDEX
+    default: "regulus-results-*"
+    documentation: Elasticsearch index pattern containing Regulus benchmark results
+  - name: LOOKBACK
+    default: "90d"
+    documentation: Lookback period for historical data (e.g., 90d, 1y)
+  - name: DEBUG
+    default: "false"
+    documentation: Enable debug output in analyze-batch.py
+  commands: openshift-qe-orion-regulus-commands.sh
+  timeout: 6h
+  credentials:
+  - namespace: test-credentials
+    name: ocp-perfscale-prod-es-creds
+    mount_path: /secret/perfscale-prod
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs Orion change point detection on regulus benchmark results
+
