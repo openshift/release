@@ -59,6 +59,9 @@ images:
       RUN yum install -y jq && yum clean all
     from: hypershift-operator
     to: hypershift-cli
+  - dockerfile_literal: |
+      FROM quay.io/dmace/hypershift-tests:ote
+    to: hypershift-tests-ote
 promotion:
   to:
   - excluded_images:
@@ -66,6 +69,7 @@ promotion:
     - hypershift-cli
     - hypershift-operator
     - hypershift-tests
+    - hypershift-tests-ote
     name: "5.0"
     namespace: ocp
   - additional_images:
@@ -311,6 +315,24 @@ tests:
       HYPERSHIFT_AZURE_LOCATION: centralus
       NODEPOOL_N1_VERSION: "4.22"
     workflow: hypershift-azure-e2e-v2-self-managed
+- always_run: false
+  as: e2e-v2-ote-azure-self-managed
+  optional: true
+  steps:
+    cluster_profile: hypershift-azure
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      NODEPOOL_N1_VERSION: "4.22"
+    workflow: hypershift-e2e-v2-ote-azure-self-managed
+- always_run: false
+  as: e2e-v2-ote-aws
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-e2e-v2-ote-aws
 - always_run: false
   as: e2e-aws-minimal
   optional: true

@@ -1,0 +1,20 @@
+chain:
+  as: hypershift-aws-dump-guests
+  steps:
+  - as: dump
+    cli: latest
+    env:
+    - name: HYPERSHIFT_PLATFORM
+      default: ""
+      documentation: "The cloud platform for the clusters (e.g. aws). Set in the workflow env block."
+    commands: |-
+      set -xuo pipefail
+      export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+      /hypershift/bin/dump-guests --hypershift-binary=/hypershift/bin/hypershift
+    from: hypershift-tests-ote
+    resources:
+      requests:
+        cpu: 100m
+    timeout: 15m0s
+  - ref: hypershift-debug
+  - ref: hypershift-k8sgpt
