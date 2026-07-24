@@ -3,11 +3,8 @@
 # Install Trustee Operator for Confidential Containers (CoCo)
 #
 # This script installs and configures the Trustee operator and operands using
-# helm charts from https://github.com/confidential-devhub/charts
-#
-# NETWORK ACCESS:
-#   Uses HELM_CHART_IMAGE (pre-built image with helm and charts)
-#   Works with restrict_network_access: true for rehearsals
+# helm charts cloned from TRUSTEE_CHARTS_REPO (defaults to internal GitLab).
+# Requires ci/rhdh-e2e-runner base image (provides helm, oc, git, jq, curl).
 #
 # Environment Variables:
 #   TRUSTEE_INSTALL               - "true" to install, "false" to skip (default: false)
@@ -15,7 +12,9 @@
 #   TRUSTEE_CATALOG_SOURCE_IMAGE  - Custom catalog image (optional)
 #                                   NOTE: CatalogSource name is hardcoded to "trustee-operator-dev-catalog"
 #                                   in the helm chart and cannot be overridden
-#   HELM_CHART_IMAGE              - Pre-built image with helm and charts at /charts/ (required)
+
+#   TRUSTEE_CHARTS_REPO           - Charts repo URL (default: internal GitLab)
+#   TRUSTEE_CHARTS_REF            - Charts git ref (default: main)
 #   KBS_CLIENT_TAG                - kbs-client version override (optional)
 #
 # Outputs to SHARED_DIR:
@@ -38,6 +37,8 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 TRUSTEE_INSTALL=${TRUSTEE_INSTALL:-false}
 TRUSTEE_NAMESPACE=${TRUSTEE_NAMESPACE:-trustee-operator-system}
 TRUSTEE_CATALOG_SOURCE_IMAGE=${TRUSTEE_CATALOG_SOURCE_IMAGE:-}
+TRUSTEE_CHARTS_REPO=${TRUSTEE_CHARTS_REPO:-https://gitlab.cee.redhat.com/osc/midstream/charts.git}
+TRUSTEE_CHARTS_REF=${TRUSTEE_CHARTS_REF:-main}
 
 # Early exit if installation disabled
 if [[ "${TRUSTEE_INSTALL}" != "true" ]]; then
@@ -45,13 +46,14 @@ if [[ "${TRUSTEE_INSTALL}" != "true" ]]; then
   exit 0
 fi
 
-if [[ -z "${HELM_CHART_IMAGE:-}" ]]; then
-  echo ">>> ERROR: HELM_CHART_IMAGE is required but not set" >&2
+# Verify helm is available (pre-installed in base image)
+if ! command -v helm &> /dev/null; then
+  echo ">>> ERROR: helm not found in base image"
   exit 1
 fi
 
 # Show configuration
-echo ">>> Trustee charts image: ${HELM_CHART_IMAGE}"
+echo ">>> Trustee charts: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})"
 if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
   echo ">>> Trustee catalog source: trustee-operator-dev-catalog (image: ${TRUSTEE_CATALOG_SOURCE_IMAGE})"
 else
@@ -128,50 +130,40 @@ function wait_until() {
   return 1
 }
 
-# Extract trustee helm charts and helm binary from pre-built container image.
-# The returned directory contains trustee-operator/ and trustee-operands/ subdirectories.
-# Also extracts helm to ${SCRATCH}/bin/ and adds it to PATH.
+# Fetch trustee helm charts (from git repository)
 function fetch_trustee_charts() {
   local charts_dir="${SCRATCH}/charts"
-  local bin_dir="${SCRATCH}/bin"
 
+  echo ">>> Fetching trustee charts from: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})" >&2
 
-
-  echo ">>> Extracting charts and helm from image: ${HELM_CHART_IMAGE}" >&2
-
-  mkdir -p "${charts_dir}" "${bin_dir}"
-  local extract_output
-  local lib_dir="${SCRATCH}/lib"
-  mkdir -p "${lib_dir}"
-  if extract_output=$(oc image extract "${HELM_CHART_IMAGE}" \
-    --path "/charts/:${charts_dir}/" \
-    --path "/usr/local/bin/helm:${bin_dir}/" \
-    --path "/usr/bin/jq:${bin_dir}/" \
-    --path "/usr/local/lib/libjq.so.1:${lib_dir}/" \
-    --path "/usr/local/lib/libonig.so.5:${lib_dir}/" 2>&1); then
-    echo ">>> Extracted from image" >&2
-    echo ">>> Chart files:" >&2
-    find "${charts_dir}" -type f | head -50 >&2
-
-    if [[ -f "${bin_dir}/helm" ]]; then
-      chmod +x "${bin_dir}/helm"
-      [[ -f "${bin_dir}/jq" ]] && chmod +x "${bin_dir}/jq"
-      export PATH="${bin_dir}:${PATH}"
-      export LD_LIBRARY_PATH="${lib_dir}:${LD_LIBRARY_PATH:-}"
-      echo ">>> helm version: $(helm version --short 2>/dev/null)" >&2
-      echo ">>> jq version: $(jq --version 2>/dev/null || echo 'not found')" >&2
-    else
-      echo ">>> ERROR: helm binary not found in image at /usr/local/bin/helm" >&2
+  mkdir -p "${charts_dir}"
+  if command -v git &> /dev/null; then
+    echo ">>> Cloning charts via git" >&2
+    rm -rf "${charts_dir}"
+    GIT_SSL_NO_VERIFY=true git clone --depth 1 --branch "${TRUSTEE_CHARTS_REF}" "${TRUSTEE_CHARTS_REPO}" "${charts_dir}"
+  else
+    local archive_url="${TRUSTEE_CHARTS_REPO%.git}/-/archive/${TRUSTEE_CHARTS_REF}/charts-${TRUSTEE_CHARTS_REF}.tar.gz"
+    echo ">>> Downloading chart archive: ${archive_url}" >&2
+    if ! curl --noproxy '*' -skL "${archive_url}" | tar xz -C "${charts_dir}" --strip-components=1; then
+      echo ">>> ERROR: Neither git clone nor curl archive download worked" >&2
       return 1
     fi
+    echo ">>> Charts downloaded via curl" >&2
+  fi
 
+  if [[ ! -d "${charts_dir}" ]]; then
+    echo ">>> ERROR: Failed to clone charts repository" >&2
+    return 1
+  fi
+
+  echo ">>> Charts fetched" >&2
+  # charts are under charts/ subdirectory
+  if [[ -d "${charts_dir}/charts" ]]; then
+    echo "${charts_dir}/charts"
+  else
     echo "${charts_dir}"
     return 0
   fi
-
-  echo ">>> ERROR: Failed to extract from image" >&2
-  echo "$extract_output" >&2
-  return 1
 }
 
 # Get cluster domain from ingress config, console route, or console URL
@@ -881,8 +873,8 @@ function get_kbs_client_tag() {
   fi
 
   # 4. Fallback to known-good version
-  echo ">>> WARN: Could not determine kbs-client tag, using fallback: v0.17.0" >&2
-  echo "v0.17.0"
+  echo ">>> WARN: Could not determine kbs-client tag, using fallback: v0.19.0" >&2
+  echo "v0.19.0"
 }
 
 # Verify Trustee KBS connectivity using kbs-client test pod
