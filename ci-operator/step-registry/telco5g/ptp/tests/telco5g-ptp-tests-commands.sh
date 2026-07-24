@@ -14,6 +14,19 @@ get_ci_images() {
     release_image=$(oc get clusterversion version -o jsonpath='{.status.desired.image}')
   fi
 
+  # Dependency injection uses an ephemeral build-farm import
+  # (registry.buildN.ci.openshift.org/ci-op-*/release@sha256:...). Rewrite to the
+  # public CI release registry (same digest) so the lab pull-secret can authenticate,
+  # matching telco5g-jobs-router / origin-tests.
+  if [[ "${release_image}" =~ registry\.build[0-9]+\.ci\.openshift\.org/ci-op-.+@sha256: ]]; then
+    local digest="${release_image##*@}"
+    local release_repo="release"
+    if [[ "${T5CI_VERSION:-}" == 5* ]]; then
+      release_repo="release-5"
+    fi
+    release_image="registry.ci.openshift.org/ocp/${release_repo}@${digest}"
+  fi
+
   # Same pattern as telco5g-origin-tests: cluster pull-secret has CI registry auth.
   local pull_secret
   pull_secret="$(mktemp)"
