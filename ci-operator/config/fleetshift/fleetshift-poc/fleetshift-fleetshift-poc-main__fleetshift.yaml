@@ -7,15 +7,58 @@ images:
   items:
   - additional_architectures:
     - arm64
+    dockerfile_path: Dockerfile
+    to: fleetshift-server
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.local
+    from: fleetshift-server
+    to: fleetshift-server-local
+  - additional_architectures:
+    - arm64
+    context_dir: fleetshift-ui
+    dockerfile_path: Dockerfile.web
+    to: fleetshift-web
+  - additional_architectures:
+    - arm64
     dockerfile_path: Dockerfile.fleetshift
+    from: fleetshift-server-local
+    inputs:
+      fleetshift-web:
+        as:
+        - quay.io/stolostron/fleetshift-web:latest
     to: fleetshift
-  run_if_changed: ^Dockerfile\.fleetshift$
+  run_if_changed: ^Dockerfile(\.local|\.fleetshift)?$|^deploy/scripts/|^fleetshift-server/|^fleetshift-cli/|^fleetshift-ui/
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: pr-image-mirror
+  capabilities:
+  - arm64
+  run_if_changed: ^Dockerfile(\.local|\.fleetshift)?$|^deploy/scripts/|^fleetshift-server/|^fleetshift-cli/|^fleetshift-ui/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift
+    env:
+      IMAGE_REPO: fleetshift
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+- as: pr-merge-image-mirror
+  capabilities:
+  - arm64
+  postsubmit: true
+  run_if_changed: ^Dockerfile(\.local|\.fleetshift)?$|^deploy/scripts/|^fleetshift-server/|^fleetshift-cli/|^fleetshift-ui/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift
+    env:
+      ALSO_TAG_LATEST: "true"
+      IMAGE_REPO: fleetshift
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
 - as: republish-latest
   capabilities:
   - arm64
