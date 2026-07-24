@@ -513,7 +513,7 @@ Username: XXX
 Password: YYY
 Login Succeeded!
 # Pull the contianer
-podman pull registry.ci.openshift.org/ci/tests-private:latest
+podman pull quay-proxy.ci.openshift.org/openshift/ci:ci_tests-private_latest
 ```
 
 Unless you're looking for an updated version you don't need to re-login again
@@ -562,7 +562,7 @@ metadata:
 spec:
   containers:
   - name: test
-    image: registry.ci.openshift.org/ci/tests-private:latest
+    image: quay-proxy.ci.openshift.org/openshift/ci:ci_tests-private_latest
     command: ["bash"]
     stdin: true
     tty: true

@@ -94,7 +94,7 @@ validation-gcp:
   hyperfleetApi:
     baseUrl: http://hyperfleet-api.$NAMESPACE_NAME.svc.cluster.local:8000
   validation:
-    statusReporterImage: "registry.ci.openshift.org/ci/status-reporter:latest"
+    statusReporterImage: "quay-proxy.ci.openshift.org/openshift/ci:ci_status-reporter_latest"
     dummy:
       simulateResult: "success"
       resultsPath: "/results/adapter-result.json"
