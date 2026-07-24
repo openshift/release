@@ -14,7 +14,7 @@ presubmits:
       - web/playwright/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-quay-quay-master-images
     rerun_command: /test images
@@ -211,7 +211,7 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build01
-    context: ci/prow/playwright-e2e
+    context: ci/prow/pr-smoke
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -222,10 +222,12 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-quay-quay-master-playwright-e2e
-    rerun_command: /test playwright-e2e
+    name: pull-ci-quay-quay-master-pr-smoke
+    optional: true
+    rerun_command: /test pr-smoke
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
     spec:
       containers:
       - args:
@@ -234,7 +236,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=playwright-e2e
+        - --target=pr-smoke
         command:
         - ci-operator
         env:
@@ -290,4 +292,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(playwright-e2e|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )pr-smoke,?($|\s.*)

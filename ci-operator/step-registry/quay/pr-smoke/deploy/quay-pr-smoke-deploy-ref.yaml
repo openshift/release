@@ -1,0 +1,25 @@
+ref:
+  as: quay-pr-smoke-deploy
+  from: cli
+  commands: quay-pr-smoke-deploy-commands.sh
+  dependencies:
+  - name: quay-operator-bundle
+    env: QUAY_OPERATOR_BUNDLE
+  - name: pipeline:quay-server
+    env: QUAY_IMAGE
+  - name: pipeline:quay-playwright-runner
+    env: QUAY_PLAYWRIGHT_IMAGE
+  credentials:
+  - namespace: test-credentials
+    name: quay-qe-aws-secret
+    mount_path: /var/run/quay-qe-aws-secret
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  timeout: 40m0s
+  grace_period: 1m0s
+  documentation: |-
+    Configures the installed Quay Operator to reconcile the pull-request Quay
+    image and deploys Quay with operator-managed PostgreSQL and the ephemeral
+    AWS S3 bucket.
