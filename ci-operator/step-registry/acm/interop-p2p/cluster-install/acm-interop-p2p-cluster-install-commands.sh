@@ -600,6 +600,42 @@ ocEOF
 }
 
 #=====================
+# Function: WaitForManagedClusterAvailable
+#=====================
+# Waits for a ManagedCluster to reach ManagedClusterConditionAvailable=True.
+#
+# This is a separate gate from ClusterDeployment.Provisioned=True (Hive side).
+# After Hive marks a cluster Provisioned, the ACM klusterlet agent on the spoke
+# must boot, connect back to the hub, and update the ManagedCluster status.
+# On bare-metal worker nodes (e.g. c5n.metal) this can take significantly
+# longer than on virtual instances (e.g. m8i.8xlarge) due to slower boot times.
+# Without this wait, subsequent steps that query ACM for available clusters
+# (e.g. acm-fetch-managed-clusters) may find no clusters and fail.
+#
+# Arguments:
+#   $1 - clusterName: Name of the ManagedCluster to wait for
+#   $2 - clusterIdx:  Index number of the cluster (1-based)
+#
+WaitForManagedClusterAvailable() {
+    typeset clusterName="$1"
+    typeset clusterIdx="$2"
+
+    : "Waiting for ManagedCluster '${clusterName}' to reach Available=True in ACM (timeout=30m)"
+
+    if oc wait managedcluster "${clusterName}" \
+            --for='condition=ManagedClusterConditionAvailable' \
+            --timeout=30m; then
+        : "ManagedCluster ${clusterIdx} (${clusterName}) - Available=True"
+    else
+        : "Timed out waiting for ManagedCluster '${clusterName}' Available=True — current conditions:"
+        oc get managedcluster "${clusterName}" \
+            -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}' \
+            2>/dev/null || true
+        return 1
+    fi
+}
+
+#=====================
 # Function: WaitForClusterProvisioned
 #=====================
 # Waits for a ClusterDeployment to reach Provisioned=True status.
@@ -778,6 +814,19 @@ done
 for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     idx=$((i + 1))
     ExtractClusterCredentials "${clusterNamesArr[i]}" "${idx}"
+done
+
+: "All credentials extracted. Waiting for ACM klusterlet agents to become Available..."
+
+# Phase 4: Wait for each ManagedCluster to show Available=True in ACM.
+# ClusterDeployment.Provisioned=True (Phase 2) only confirms the OCP bootstrap
+# completed. The ACM klusterlet agent on the spoke still needs to boot and
+# connect back to the hub. On bare-metal workers this can take significantly
+# longer than on virtual instances, so steps that query ACM availability
+# (e.g. acm-fetch-managed-clusters) must not run until this gate passes.
+for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
+    idx=$((i + 1))
+    WaitForManagedClusterAvailable "${clusterNamesArr[i]}" "${idx}"
 done
 
 # Create symlinks for backward compatibility with single-cluster workflows
