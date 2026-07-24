@@ -282,6 +282,27 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: openshift-kubernetes-e2e-aws-serial
 - always_run: false
+  as: k8s-e2e-aws-ovn-dra
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - ref: dra-example-driver-install
+    - as: k8s-dra-e2e
+      commands: |
+        export ARTIFACTS="${ARTIFACT_DIR}"
+        export KUBE_E2E_TEST_ARGS="-focus=DRA|DynamicResourceAllocation -skip=v1beta"
+        export TEST_SUITE=serial
+        test-kubernetes-e2e.sh
+      from: kubernetes-tests
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 600Mi
+    workflow: openshift-e2e-aws-ovn
+- always_run: false
   as: e2e-aws
   optional: true
   steps:
