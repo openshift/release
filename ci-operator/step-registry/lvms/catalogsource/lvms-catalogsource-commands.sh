@@ -293,6 +293,9 @@ spec:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog
     source: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}/openshift4/ose-kube-rbac-proxy
+    source: registry.redhat.io/openshift4/ose-kube-rbac-proxy
 EOF
 
 	if [ $? -ne 0 ]; then
