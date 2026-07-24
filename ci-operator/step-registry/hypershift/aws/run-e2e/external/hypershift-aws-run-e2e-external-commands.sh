@@ -98,6 +98,11 @@ if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
   esac
 fi
 
+CPO_IMAGE_PARAM=""
+if [[ -n "${CONTROL_PLANE_OPERATOR_IMAGE:-}" ]]; then
+  CPO_IMAGE_PARAM="--e2e.control-plane-operator-image=${CONTROL_PLANE_OPERATOR_IMAGE}"
+fi
+
 export EVENTUALLY_VERBOSE="false"
 
 hack/ci-test-e2e.sh -test.v \
@@ -121,5 +126,6 @@ hack/ci-test-e2e.sh -test.v \
   ${AWS_MULTI_ARCH_PARAMS:-} \
   ${REQUEST_SERVING_COMPONENT_PARAMS:-} \
   ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
-  ${ADDITIONAL_PULL_SECRET_PARAMS:-} &
+  ${ADDITIONAL_PULL_SECRET_PARAMS:-} \
+  ${CPO_IMAGE_PARAM:-} &
 wait $!
