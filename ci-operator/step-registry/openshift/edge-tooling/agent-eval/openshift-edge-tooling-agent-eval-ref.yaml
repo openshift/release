@@ -1,7 +1,10 @@
 ref:
-  as: openshift-claude-agent-eval
-  from: claude-ai-helpers
-  commands: openshift-claude-agent-eval-commands.sh
+  as: openshift-edge-tooling-agent-eval
+  from_image:
+    namespace: ci
+    name: edge-tooling-ai-helpers
+    tag: latest
+  commands: openshift-edge-tooling-agent-eval-commands.sh
   credentials:
   - namespace: test-credentials
     name: sa-claude-openshift-ci
@@ -36,11 +39,7 @@ ref:
   - name: EVAL_DISCOVER
     default: ""
   - name: EVAL_WORKDIR
-    default: ""
-    documentation: |-
-      Working directory for eval discovery and execution. Defaults to
-      /opt/ai-helpers when unset. Override for repos that layer content
-      onto the claude-ai-helpers image at a different path.
+    default: "/opt/app-root/src/edge-tooling"
   - name: EVAL_MAX_TURNS
     default: "100"
   - name: CLAUDE_MODEL
@@ -62,7 +61,6 @@ ref:
   timeout: 3h0m0s
   grace_period: 1m0s
   documentation: |-
-    Runs skill evaluations using the agent-eval-harness. Installs the
-    eval harness plugin, runs /eval-run with the specified config and
-    model, and produces JUnit XML + artifacts. Eval traces and reports
-    are archived for download.
+    Runs skill evaluations for edge-tooling using the agent-eval-harness.
+    Uses the edge-tooling-ai-helpers image which layers edge-tooling
+    plugins and evals onto the claude-ai-helpers base.

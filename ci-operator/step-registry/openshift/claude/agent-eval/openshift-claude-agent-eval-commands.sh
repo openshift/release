@@ -38,8 +38,7 @@ else
     echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH:-<unset>}. gh CLI will run unauthenticated."
 fi
 
-# The repo is at /opt/ai-helpers; WORKDIR is /workspace
-cd /opt/ai-helpers
+cd "${EVAL_WORKDIR:-/opt/ai-helpers}"
 
 echo "Skill model: ${EVAL_MODEL}"
 
