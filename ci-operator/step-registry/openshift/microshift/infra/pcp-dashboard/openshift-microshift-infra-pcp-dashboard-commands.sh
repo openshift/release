@@ -15,8 +15,8 @@ LOCAL_ARTIFACTS=$(mktemp -d)
 echo "Copying PCP archives and junit.xml from ${INSTANCE_PREFIX}..."
 ssh "${INSTANCE_PREFIX}" \
     "cd ${REMOTE_SCENARIO_DIR} && \
-     find . \( -name 'pcp-archives.tar' -o -name 'junit.xml' \) -print0 | \
-     tar cf - --null -T -" | tar xf - -C "${LOCAL_ARTIFACTS}/"
+     find -L . \( -name 'pcp-archives.tar' -o -name 'junit.xml' \) -print0 | \
+     tar cf - --null -T - -h" | tar xf - -C "${LOCAL_ARTIFACTS}/"
 
 # Copy hypervisor PCP logs if available
 PMLOGS_DIR=/var/log/pcp/pmlogger
