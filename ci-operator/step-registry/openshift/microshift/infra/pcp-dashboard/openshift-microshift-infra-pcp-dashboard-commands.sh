@@ -1,0 +1,42 @@
+#!/bin/bash
+set -xeuo pipefail
+
+# shellcheck disable=SC1091
+source "${SHARED_DIR}/ci-functions.sh"
+ci_script_prologue
+trap_subprocesses_on_term
+
+EDGE_TOOLING_DIR="${EDGE_TOOLING_DIR:-/opt/app-root/src/edge-tooling}"
+PCP_SCRIPTS="${EDGE_TOOLING_DIR}/plugins/microshift-ci/scripts/pcp-graphs"
+REMOTE_SCENARIO_DIR="/home/${HOST_USER}/microshift/_output/test-images/scenario-info"
+LOCAL_ARTIFACTS=$(mktemp -d)
+
+# Collect VM PCP archives and junit.xml
+# Prefer the shared artifacts volume (written by the metal-tests step), fall back to SSH
+if [ -d "${ARTIFACT_DIR}/scenario-info" ]; then
+    echo "Using scenario-info from metal-tests artifacts..."
+    ln -s "${ARTIFACT_DIR}/scenario-info/"* "${LOCAL_ARTIFACTS}/" 2>/dev/null || true
+else
+    echo "Copying PCP archives and junit.xml from ${INSTANCE_PREFIX}..."
+    ssh "${INSTANCE_PREFIX}" \
+        "cd ${REMOTE_SCENARIO_DIR} && \
+         find -L . \( -name 'pcp-archives.tar' -o -name 'junit.xml' \) -print0 | \
+         tar cf - --null -T - -h" | tar xf - -C "${LOCAL_ARTIFACTS}/"
+fi
+
+# Copy hypervisor PCP logs if available
+PMLOGS_DIR=/var/log/pcp/pmlogger
+if ssh "${INSTANCE_PREFIX}" "[ -d \"${PMLOGS_DIR}\" ]" ; then
+    mkdir -p "${LOCAL_ARTIFACTS}/pmlogs"
+    if ! scp -r "${INSTANCE_PREFIX}:${PMLOGS_DIR}/"* "${LOCAL_ARTIFACTS}/pmlogs/" ; then
+        echo "WARNING: failed to copy hypervisor pmlogger data, skipping"
+    fi
+fi
+
+# Generate the interactive PCP dashboard
+echo "Generating PCP dashboard..."
+bash "${PCP_SCRIPTS}/generate-dashboard.sh" \
+    --local "${LOCAL_ARTIFACTS}" \
+    --output "${ARTIFACT_DIR}/custom-link-pcp.html"
+
+rm -rf "${LOCAL_ARTIFACTS}"
