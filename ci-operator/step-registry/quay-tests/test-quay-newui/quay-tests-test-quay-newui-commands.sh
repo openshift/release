@@ -138,3 +138,6 @@ yarn run jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_tes
 
 reformat_report "quay_new_ui_testing_report.xml" "Quay New UI Testing" ||true
 
+echo "Debug sleep 3h for investigation"
+sleep 10800
+
