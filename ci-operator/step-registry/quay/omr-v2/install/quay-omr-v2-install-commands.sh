@@ -7,6 +7,7 @@ set -o pipefail
 umask 077
 EXIT_CODE=100
 work_dir=""
+pipeline_archive="${SHARED_DIR}/omr_v2_pipeline_archive.tar.gz"
 published=false
 declare -a ssh_options=()
 declare -a runtime_files=(
@@ -32,6 +33,7 @@ cleanup() {
     if [[ -n "${work_dir}" && -d "${work_dir}" ]]; then
         rm -rf -- "${work_dir}"
     fi
+    rm -f -- "${pipeline_archive}"
     exit "${status}"
 }
 
@@ -64,8 +66,13 @@ for required_file in \
 done
 
 safe_download_url_re='^https://[A-Za-z0-9./_?&=%:+-]+$'
-if [[ ! "${OMR_V2_DOWNLOAD_URL}" =~ ${safe_download_url_re} ]]; then
+if [[ ! -e "${pipeline_archive}" &&
+      ! "${OMR_V2_DOWNLOAD_URL}" =~ ${safe_download_url_re} ]]; then
     echo "OMR_V2_DOWNLOAD_URL must be a safely quoted HTTPS URL." >&2
+    exit 1
+fi
+if [[ -e "${pipeline_archive}" && ! -s "${pipeline_archive}" ]]; then
+    echo "The PR-built OMR v2 archive is empty." >&2
     exit 1
 fi
 
@@ -107,9 +114,10 @@ set -o errexit
 set -o pipefail
 umask 077
 
-download_url="$1"
-registry_hostname="$2"
-work_dir="$3"
+source_type="$1"
+artifact_source="$2"
+registry_hostname="$3"
+work_dir="$4"
 quay_root="/home/$(id -un)/quay-install"
 quay_storage="${quay_root}/quay-storage"
 sqlite_storage="${quay_root}/sqlite-storage"
@@ -117,8 +125,23 @@ archive="${work_dir}/mirror-registry-amd64.tar.gz"
 
 rm -rf -- "${work_dir}"
 install -d -m 0700 "${work_dir}"
-curl --fail --location --retry 5 --connect-timeout 30 \
-    --output "${archive}" "${download_url}"
+case "${source_type}" in
+    download)
+        curl --fail --location --retry 5 --connect-timeout 30 \
+            --output "${archive}" "${artifact_source}"
+        ;;
+    pipeline)
+        if [[ ! -s "${artifact_source}" ]]; then
+            echo "The transferred PR-built OMR v2 archive is missing or empty." >&2
+            exit 1
+        fi
+        install -m 0600 -- "${artifact_source}" "${archive}"
+        ;;
+    *)
+        echo "Unsupported OMR v2 artifact source type: ${source_type}" >&2
+        exit 1
+        ;;
+esac
 sha256sum "${archive}" | awk '{print $1}' > "${work_dir}/sha256"
 tar -xzf "${archive}" -C "${work_dir}"
 if [[ ! -x "${work_dir}/mirror-registry" ]]; then
@@ -131,7 +154,7 @@ printf '%s\n' "${version_output}" > "${work_dir}/version-output"
 version=$(printf '%s\n' "${version_output}" | grep -Eo 'v?2\.[0-9]+\.[0-9]+' | \
     head -n 1 | sed 's/^v//' || true)
 if [[ -z "${version}" || "${version%%.*}" != 2 ]]; then
-    echo "The floating mirror-registry artifact is not an identifiable v2 release." >&2
+    echo "The mirror-registry artifact is not an identifiable v2 build." >&2
     exit 1
 fi
 printf '%s\n' "${version}" > "${work_dir}/version"
@@ -183,12 +206,45 @@ rm -f -- "${archive}"
 EOF
 chmod 0755 "${work_dir}/install-omr-v2"
 
+artifact_source_type=download
+artifact_source="${OMR_V2_DOWNLOAD_URL}"
+expected_pipeline_sha=""
+remote_pipeline_archive=""
+if [[ -s "${pipeline_archive}" ]]; then
+    if ! command -v sha256sum >/dev/null 2>&1; then
+        echo "Required command sha256sum is unavailable for the PR-built OMR v2 archive." >&2
+        exit 1
+    fi
+    artifact_source_type=pipeline
+    expected_pipeline_sha=$(sha256sum "${pipeline_archive}" | awk '{print $1}')
+    remote_pipeline_archive="/home/${host_user}/mirror-registry-pr.tar.gz"
+    scp "${ssh_options[@]}" "${pipeline_archive}" \
+        "${remote}:${remote_pipeline_archive}"
+    ssh "${ssh_options[@]}" "${remote}" \
+        "chmod 0600 '${remote_pipeline_archive}'"
+    remote_pipeline_sha=$(ssh "${ssh_options[@]}" "${remote}" \
+        "sha256sum '${remote_pipeline_archive}' | awk '{print \$1}'")
+    if [[ ! "${remote_pipeline_sha}" =~ ^[a-f0-9]{64}$ ||
+          "${remote_pipeline_sha}" != "${expected_pipeline_sha}" ]]; then
+        ssh "${ssh_options[@]}" "${remote}" \
+            "rm -f -- '${remote_pipeline_archive}'" >/dev/null 2>&1 || true
+        echo "The transferred OMR v2 archive does not match the PR-built pipeline artifact." >&2
+        exit 1
+    fi
+    artifact_source="${remote_pipeline_archive}"
+fi
+
 scp "${ssh_options[@]}" "${work_dir}/install-omr-v2" \
     "${remote}:/home/${host_user}/install-omr-v2"
 install_status=0
 ssh "${ssh_options[@]}" "${remote}" \
     "chmod 0755 '/home/${host_user}/install-omr-v2' &&
-     '/home/${host_user}/install-omr-v2' '${OMR_V2_DOWNLOAD_URL}' '${host_private}' '${remote_work_dir}'" || install_status=$?
+     '/home/${host_user}/install-omr-v2' '${artifact_source_type}' '${artifact_source}' '${host_private}' '${remote_work_dir}'" || install_status=$?
+if [[ -n "${remote_pipeline_archive}" ]]; then
+    ssh "${ssh_options[@]}" "${remote}" \
+        "rm -f -- '${remote_pipeline_archive}'" >/dev/null 2>&1 || \
+        echo "Failed to remove the transferred OMR v2 archive from the host." >&2
+fi
 scp "${ssh_options[@]}" "${remote}:${remote_work_dir}/install-sanitized.log" \
     "${ARTIFACT_DIR}/mirror-registry-install.log" 2>/dev/null || true
 scp "${ssh_options[@]}" "${remote}:${remote_work_dir}/version-output" \
@@ -215,6 +271,11 @@ if [[ ! "${version}" =~ ^2\.[0-9]+\.[0-9]+$ ]] ||
    [[ ! "${archive_sha}" =~ ^[a-f0-9]{64}$ ]] ||
    [[ -z "${admin_password}" ]]; then
     echo "OMR v2 runtime metadata failed validation." >&2
+    exit 1
+fi
+if [[ -n "${expected_pipeline_sha}" &&
+      "${archive_sha}" != "${expected_pipeline_sha}" ]]; then
+    echo "The installed OMR v2 archive does not match the PR-built pipeline artifact." >&2
     exit 1
 fi
 if ! grep -q '^-----BEGIN CERTIFICATE-----$' "${work_dir}/rootCA.pem" ||

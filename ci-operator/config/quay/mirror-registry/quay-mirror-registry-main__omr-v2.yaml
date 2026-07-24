@@ -1,0 +1,80 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - build_args:
+    - name: EE_BASE_IMAGE
+      value: registry.redhat.io/ansible-automation-platform-25/ee-minimal-rhel8:2.0
+    - name: EE_BUILDER_IMAGE
+      value: registry.redhat.io/ansible-automation-platform-25/ansible-builder-rhel8:3.1.1
+    - name: EE_IMAGE
+      value: quay.io/quay/mirror-registry-ee:latest
+    - name: PAUSE_IMAGE
+      value: registry.access.redhat.com/ubi8/pause:8.10-5
+    - name: QUAY_IMAGE
+      value: registry.redhat.io/quay/quay-rhel8:v3.12.18
+    - name: REDIS_IMAGE
+      value: registry.redhat.io/rhel8/redis-6:1-1766406130
+    - name: RELEASE_VERSION
+      value: 2.0.0-ci
+    - name: SQLITE_IMAGE
+      value: quay.io/projectquay/sqlite-cli:latest
+    dockerfile_path: Dockerfile
+    optional: true
+    to: mirror-registry
+prowgen:
+  disable_sparse_checkout: true
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: disconnected-install
+  optional: true
+  run_if_changed: ^(ansible-runner/.*|cmd/.*|.*\.go$|go\.(mod|sum)$|Dockerfile$|\.dockerignore$|\.env$)
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-quay-qe
+    dependencies:
+      OMR_V2_IMAGE: pipeline:mirror-registry
+    env:
+      ADD_INGRESS_RECORDS_MANUALLY: "yes"
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.xlarge
+      PUBLISH: Internal
+    post:
+    - ref: quay-omr-v3-gather
+    - chain: ipi-aws-post-disconnected
+    pre:
+    - chain: quay-aws-ipi-disconnected-omr-v2-provision
+    test:
+    - ref: quay-omr-v2-validate
+  timeout: 10h0m0s
+zz_generated_metadata:
+  branch: main
+  org: quay
+  repo: mirror-registry
+  variant: omr-v2
