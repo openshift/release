@@ -3,9 +3,25 @@
 set -euo pipefail
 
 SCRIPT_EXIT_CODE=0
+USE_SHARED_DIR=false
 
-# SSH setup for direct cluster access
-if [[ -s /secret/cluster_address ]] && [[ -s /secret/provision_private_key ]]; then
+# Cluster access: ci-operator kubeconfig > SHARED_DIR SSH > Vault SSH > Vault bastion
+if [[ -s "${KUBECONFIG:-}" ]]; then
+  USE_SHARED_DIR=true
+  if [[ -s "${KUBEADMIN_PASSWORD_FILE:-}" ]]; then
+    KUBEADMIN_PASSWORD=$(<"${KUBEADMIN_PASSWORD_FILE}")
+    KUBEADMIN_PASSWORD="${KUBEADMIN_PASSWORD%$'\n'}"
+    export KUBEADMIN_PASSWORD
+  fi
+  echo "Using kubeconfig from ci-operator"
+elif [[ -s "${SHARED_DIR:-}/cluster_address" ]] && [[ -s "${SHARED_DIR:-}/provision_private_key" ]]; then
+  CLUSTER_IP=$(<"${SHARED_DIR}/cluster_address")
+  CLUSTER_IP="${CLUSTER_IP%$'\n'}"
+  cp "${SHARED_DIR}/provision_private_key" /tmp/cluster_key
+  chmod 600 /tmp/cluster_key
+  SSH_ARGS="-i /tmp/cluster_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+  echo "Using cluster credentials from SHARED_DIR"
+elif [[ -s /secret/cluster_address ]] && [[ -s /secret/provision_private_key ]]; then
   CLUSTER_IP=$(<"/secret/cluster_address")
   CLUSTER_IP="${CLUSTER_IP%$'\n'}"
   cp /secret/provision_private_key /tmp/cluster_key
@@ -19,14 +35,9 @@ elif [[ -s /secret/bastion_address ]] && [[ -s /secret/jh_priv_ssh_key ]]; then
   SSH_ARGS="-i /tmp/cluster_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 fi
 
-# Cluster credentials: live from cluster via SSH → Vault fallback
 if [[ -n "${CLUSTER_IP:-}" ]]; then
   KUBEADMIN_PASSWORD=$(ssh ${SSH_ARGS} root@"${CLUSTER_IP}" "cat /root/.kube/kubeadmin-password 2>/dev/null" || true)
   KUBEADMIN_PASSWORD="${KUBEADMIN_PASSWORD%$'\n'}"
-  if [[ -z "${KUBEADMIN_PASSWORD}" ]] && [[ -s /secret/kubeadmin_password ]]; then
-    KUBEADMIN_PASSWORD=$(<"/secret/kubeadmin_password")
-    KUBEADMIN_PASSWORD="${KUBEADMIN_PASSWORD%$'\n'}"
-  fi
   export KUBEADMIN_PASSWORD
 
   CLUSTER_API=$(ssh ${SSH_ARGS} root@"${CLUSTER_IP}" "grep server /root/.kube/config 2>/dev/null | head -1 | awk '{print \$2}'" || true)
@@ -41,16 +52,11 @@ if [[ -n "${CLUSTER_IP:-}" ]]; then
     CLUSTER_NAME=$(oc config view --kubeconfig=/tmp/kubeconfig --minify -o jsonpath='{.clusters[0].name}' 2>/dev/null || true)
     [[ -n "${CLUSTER_NAME}" ]] && oc config set-cluster "${CLUSTER_NAME}" --insecure-skip-tls-verify=true --kubeconfig=/tmp/kubeconfig >/dev/null
     echo "Fetched fresh kubeconfig from cluster at runtime"
-  elif [[ -s /secret/kubeconfig ]]; then
-    cp /secret/kubeconfig /tmp/kubeconfig
-    export KUBECONFIG=/tmp/kubeconfig
-    echo "Using kubeconfig from Vault fallback"
   else
-    echo "ERROR: could not fetch kubeconfig" >&2
+    echo "ERROR: could not fetch kubeconfig via SCP" >&2
     exit 1
   fi
 
-  # SOCKS proxy through cluster for private DNS resolution
   SOCKS_PORT=$((RANDOM % 55536 + 10000))
   ssh ${SSH_ARGS} root@"${CLUSTER_IP}" -fNT -D "${SOCKS_PORT}"
   sleep 3
@@ -58,38 +64,39 @@ if [[ -n "${CLUSTER_IP:-}" ]]; then
   export https_proxy="socks5h://localhost:${SOCKS_PORT}"
   export NO_PROXY="cloud-object-storage.appdomain.cloud,pypi.org,quay.io,github.com"
   export no_proxy="${NO_PROXY}"
-  # Direct ES access (port 9200 open via ACL)
-  export ELASTICSEARCH="${CLUSTER_IP}"
-  export ELASTICSEARCH_PORT=9200
-  echo "SOCKS proxy on port ${SOCKS_PORT}, direct ES available"
-elif [[ -s /secret/kubeconfig ]]; then
-  if [[ -s /secret/kubeadmin_password ]]; then
-    KUBEADMIN_PASSWORD=$(<"/secret/kubeadmin_password")
-    KUBEADMIN_PASSWORD="${KUBEADMIN_PASSWORD%$'\n'}"
-    export KUBEADMIN_PASSWORD
-  fi
-  cp /secret/kubeconfig /tmp/kubeconfig
-  export KUBECONFIG=/tmp/kubeconfig
-  echo "Using kubeconfig from Vault secret"
-else
+  echo "SOCKS proxy on port ${SOCKS_PORT} for DNS resolution"
+elif [[ "${USE_SHARED_DIR}" == "false" ]]; then
   echo "ERROR: no cluster access available" >&2
   exit 1
 fi
 
-# Vault secrets
-if [[ -d /secret ]]; then
-  for key in base_domain elasticsearch elasticsearch_port lso_disk_id worker_disk_ids \
-             redis threads_limit lso_node worker_disk_prefix scale_nodes windows_url \
-             winmssql_url windows_server_2022_url windows_server_2025_url \
-             pin_node0 pin_node1 pin_node2 bastion_address; do
-    upper_key=$(echo "$key" | tr '[:lower:]' '[:upper:]')
-    if [[ -s "/secret/${key}" ]] && [[ -z "${!upper_key:-}" ]]; then
+# Config keys: env vars > SHARED_DIR > /secret/ (see ref YAML for full documentation)
+# If any SHARED_DIR config exists, skips /secret/ fallback, and then collaborators owns the config
+CONFIG_KEYS=(base_domain elasticsearch elasticsearch_port elasticsearch_user elasticsearch_password
+             elasticsearch_url_protocol lso_disk_id worker_disk_ids threads_limit lso_node
+             worker_disk_prefix scale_nodes windows_url winmssql_url
+             windows_server_2022_url windows_server_2025_url
+             pin_node0 pin_node1 pin_node2 bastion_address)
+
+SHARED_DIR_HAS_CONFIG=false
+for key in "${CONFIG_KEYS[@]}"; do
+  [[ -f "${SHARED_DIR:-}/${key}" ]] && SHARED_DIR_HAS_CONFIG=true && break
+done
+
+for key in "${CONFIG_KEYS[@]}"; do
+  upper_key=$(echo "$key" | tr '[:lower:]' '[:upper:]')
+  if [[ -z "${!upper_key:-}" ]]; then
+    if [[ -s "${SHARED_DIR:-}/${key}" ]]; then
+      val=$(<"${SHARED_DIR}/${key}")
+    elif [[ "${SHARED_DIR_HAS_CONFIG}" == "false" ]] && [[ -s "/secret/${key}" ]]; then
       val=$(<"/secret/${key}")
-      val="${val%$'\n'}"
-      export "${upper_key}=${val}"
+    else
+      continue
     fi
-  done
-fi
+    val="${val%$'\n'}"
+    export "${upper_key}=${val}"
+  fi
+done
 
 # Debug on exit
 benchmark_runner_debug() {
