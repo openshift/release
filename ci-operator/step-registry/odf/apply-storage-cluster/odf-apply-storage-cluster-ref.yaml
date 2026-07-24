@@ -5,18 +5,31 @@ ref:
     name: cli-jq
     tag: latest
   commands: odf-apply-storage-cluster-commands.sh
+  grace_period: 10m
   resources:
     requests:
       cpu: 10m
       memory: 100Mi
   env:
-    - name: ODF_INSTALL_NAMESPACE
+    - name: ODF__INSTALL_NAMESPACE
       default: openshift-storage
-    - name: ODF_STORAGE_CLASS
+    - name: ODF__OCS_OPERATOR_WAIT_TIMEOUT
+      default: "5m"
+      documentation: Timeout for the ocs-operator Deployment to be created and Available.
+    - name: ODF__CRD_WAIT_TIMEOUT
+      default: "5m"
+      documentation: Timeout for the StorageCluster CRD to be created and Established.
+    - name: ODF__STORAGE_CLASS
       default: gp3-csi
-    - name: ODF_STORAGE_CLAIM
+    - name: ODF__STORAGE_CLAIM
       default: 100Gi
-    - name: TEST_PLATFORM
-      default: aws
+    - name: ODF__TEST_PLATFORM
+      default: "aws"
+    - name: ODF__STORAGE_CLUSTER_WAIT_TIMEOUT
+      default: "15m"
+      documentation: Timeout for StorageCluster to reach Available condition.
   documentation: |-
-    Apply Storage Cluster in order to complete ODF operator installation
+    Apply Storage Cluster in order to complete ODF operator installation.
+    Waits for the StorageCluster CRD (registered by ocs-operator),
+    applies the StorageCluster, waits until Available, then sets ocs-storagecluster-ceph-rbd
+    as the default StorageClass.
