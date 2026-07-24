@@ -912,4 +912,13 @@ if test "${ret}" -eq 0 ; then
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 fi
 
+if test "${ret}" -ne 0 ; then
+  echo "Install failed with exit code ${ret}, waiting for debug..."
+  export PATH=/tmp/:$PATH
+  while [ ! -f "/tmp/continue" ]
+  do
+      sleep 10
+  done
+fi
+
 exit "$ret"
