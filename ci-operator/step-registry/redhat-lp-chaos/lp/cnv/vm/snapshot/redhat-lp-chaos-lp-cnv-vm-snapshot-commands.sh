@@ -15,7 +15,7 @@ eval "$(
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/TestReport--JUnit.sh
 )"
 
-typeset startTime="${SECONDS}"
+typeset -i startTime="${SECONDS}"
 
 typeset tcMsg='-Unknown Error'
 
@@ -32,7 +32,7 @@ function UpdJUnit() {
     esac
 
     TestReport--JUnit--AddTC \
-        "${ARTIFACT_DIR}/junit--${stepId}--${LPC_LP_CNV__VM__SNAPSHOT__OPERATION:-unknown}.xml" \
+        "${ARTIFACT_DIR}/junit--${stepId}--${LPC_LP_CNV__VM__SNAPSHOT__OPERATION}.xml" \
         "${LPC_LP_CNV__RPT_NAME}" \
         "${LPC_LP_CNV__TS_NAME}" \
         "${LPC_LP_CNV__TC_NAME}" \
