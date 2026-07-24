@@ -73,6 +73,7 @@ OPP_COMPAT["19"]="advanced-cluster-management:2.13 rhacs-operator:4.8 odf-operat
 OPP_COMPAT["20"]="advanced-cluster-management:2.14 rhacs-operator:4.9 odf-operator:4.20 quay-operator:3.15"
 OPP_COMPAT["21"]="advanced-cluster-management:2.15 rhacs-operator:4.10 odf-operator:4.21 quay-operator:3.15"
 OPP_COMPAT["22"]="advanced-cluster-management:2.16 rhacs-operator:4.11 odf-operator:4.22 quay-operator:3.16"
+OPP_COMPAT["0"]="advanced-cluster-management:2.17 quay-operator:3.17"
 
 # ──────────────────────────────────────────────────────────────────────
 #  Utility: append a check result to the JSON report
