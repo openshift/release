@@ -67,6 +67,23 @@ run_tests() {
   echo "[debug] SKIP_PARSER_SKIP_TESTS: ${SKIP_PARSER_SKIP_TESTS}"
   echo "[debug] SKIP_PARSER_SKIP_SUBSUITES: ${SKIP_PARSER_SKIP_SUBSUITES}"
 
+  local SKIP_BUILD_ENV_EXPORT=""
+  if [ "${SKIP_BUILD:-false}" == "true" ]; then
+    local _TAG
+    if [ -n "${PULL_PULL_SHA:-}" ]; then
+      _TAG="${PULL_PULL_SHA}"
+    elif [ -n "${BUILD_ID:-}" ]; then
+      _TAG="${BUILD_ID}"
+    else
+      echo "ERROR: Neither PULL_PULL_SHA nor BUILD_ID is set. Cannot derive image tag." >&2
+      exit 1
+    fi
+    SKIP_BUILD_ENV_EXPORT="
+    export SKIP_SETUP=true
+    export TAG=\"${_TAG}\"
+    export TEST_HUB=\"${TEST_HUB}\""
+  fi
+
   oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
     sh -c '
     export KUBECONFIG=/work/ci-kubeconfig
@@ -79,6 +96,7 @@ run_tests() {
     export AMBIENT="'"${AMBIENT}"'"
     '"${AMBIENT_ENV_VAR_EXPORT:-}"'
     '"${HELM_ENV_VAR_EXPORT:-}"'
+    '"${SKIP_BUILD_ENV_EXPORT:-}"'
     oc version
     cd /work
     entrypoint \
