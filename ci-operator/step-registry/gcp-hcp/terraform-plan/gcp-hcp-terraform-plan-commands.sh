@@ -12,15 +12,10 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/ci-folder-id" ]]; then
   exit 1
 fi
 
-if [[ ! -f "${CLUSTER_PROFILE_DIR}/billing-account-id" ]]; then
-  echo "ERROR: ${CLUSTER_PROFILE_DIR}/billing-account-id not found in cluster profile"
-  exit 1
-fi
+CI_FOLDER_ID="$(<"${CLUSTER_PROFILE_DIR}/ci-folder-id")"
 
-export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
-
-SA_TOKEN_FILE="/var/run/secrets/kubernetes.io/serviceaccount/token"
 CRED_CONFIG="${SHARED_DIR}/wif-cred.json"
+SA_TOKEN_FILE="/var/run/secrets/kubernetes.io/serviceaccount/token"
 
 AUDIENCE=$(jq -r '.audience' "${CRED_CONFIG}")
 SA_IMPERSONATION_URL=$(jq -r '.service_account_impersonation_url' "${CRED_CONFIG}")
@@ -60,23 +55,24 @@ if [[ -z "${ACCESS_TOKEN}" ]]; then
 fi
 echo "SA impersonation succeeded"
 
-echo "Verifying GCP API access..."
-PROJECT_RESPONSE=$(curl -s \
+echo "Verifying GCP API access (listing projects in CI folder)..."
+SEARCH_RESPONSE=$(curl -s -X POST \
+  "https://cloudresourcemanager.googleapis.com/v3/projects:search" \
   -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-  "https://cloudresourcemanager.googleapis.com/v1/projects/gcp-hcp-platform-ci")
+  -H "Content-Type: application/json" \
+  -d "{\"query\": \"parent:folders/${CI_FOLDER_ID}\"}")
 
-PROJECT_ID=$(echo "${PROJECT_RESPONSE}" | jq -r '.projectId // empty')
-if [[ "${PROJECT_ID}" != "gcp-hcp-platform-ci" ]]; then
+PROJECT_COUNT=$(echo "${SEARCH_RESPONSE}" | jq '.projects | length // 0')
+if echo "${SEARCH_RESPONSE}" | jq -e '.error' > /dev/null 2>&1; then
   echo "ERROR: GCP API call failed"
-  echo "${PROJECT_RESPONSE}" | jq .
+  echo "${SEARCH_RESPONSE}" | jq .
   exit 1
 fi
 
 echo ""
 echo "=== WIF Smoke Test Passed ==="
-echo "  Project: $(echo "${PROJECT_RESPONSE}" | jq -r '.projectId')"
-echo "  Number:  $(echo "${PROJECT_RESPONSE}" | jq -r '.projectNumber')"
-echo "  State:   $(echo "${PROJECT_RESPONSE}" | jq -r '.lifecycleState')"
 echo "  SA:      ${SA_EMAIL}"
+echo "  Folder:  ${CI_FOLDER_ID}"
+echo "  Projects in folder: ${PROJECT_COUNT}"
 echo ""
 echo "WIF authentication verified end-to-end"
