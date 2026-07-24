@@ -3,8 +3,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^github-master$
+    - ^github-master-
     cluster: build03
     context: ci/prow/lint
     decorate: true
@@ -13,7 +13,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-online-rosa-backend-tests-master-lint
+    name: pull-ci-openshift-online-rosa-backend-tests-github-master-lint
     rerun_command: /test lint
     spec:
       containers:
@@ -22,6 +22,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ocm-github-credentials
         - --target=lint
         command:
         - ci-operator
@@ -49,6 +50,9 @@ presubmits:
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
+        - mountPath: /secrets/ocm-github-credentials
+          name: ocm-github-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -63,6 +67,9 @@ presubmits:
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
+      - name: ocm-github-credentials
+        secret:
+          secretName: ocm-github-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
