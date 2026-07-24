@@ -30,9 +30,9 @@ operator:
   - as: operator-bundle
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
-  substitutions:
-  - pullspec: quay.io/openshift-kni/oran-o2ims-operator:.*
-    with: pipeline:oran-o2ims-operator
+    substitutions:
+    - pullspec: quay.io/openshift-kni/oran-o2ims-operator:.*
+      with: pipeline:oran-o2ims-operator
 promotion:
   to:
   - name: "5.0"
@@ -112,6 +112,77 @@ tests:
       SCAN_NAMESPACE: oran-o2ims
     test:
     - ref: optional-operators-operator-sdk
+    - as: wait-for-server-pods
+      cli: latest
+      commands: |
+        NAMESPACE=oran-o2ims
+        echo "Waiting for Inventory CR to be auto-created..."
+        for i in $(seq 1 60); do
+          if oc get inventory default -n "$NAMESPACE" &>/dev/null; then
+            echo "Inventory CR 'default' found."
+            break
+          fi
+          echo "  attempt $i/60..."
+          sleep 5
+        done
+
+        echo ""
+        echo "Discovering services with TLS serving certs..."
+        TLS_SERVICES=$(oc get services -n "$NAMESPACE" \
+          -o jsonpath='{range .items[?(@.metadata.annotations.service\.beta\.openshift\.io/serving-cert-secret-name)]}{.metadata.name}{"\n"}{end}')
+
+        echo "TLS services found:"
+        echo "$TLS_SERVICES" | while read -r svc; do
+          [ -z "$svc" ] && continue
+          SECRET=$(oc get service "$svc" -n "$NAMESPACE" \
+            -o jsonpath='{.metadata.annotations.service\.beta\.openshift\.io/serving-cert-secret-name}')
+          echo "  $svc -> secret: $SECRET"
+        done
+
+        echo ""
+        echo "Waiting for TLS service pods to be ready..."
+        echo "$TLS_SERVICES" | while read -r svc; do
+          [ -z "$svc" ] && continue
+          SELECTOR=$(oc get service "$svc" -n "$NAMESPACE" \
+            -o go-template='{{range $k,$v := .spec.selector}}{{$k}}={{$v}},{{end}}' | sed 's/,$//')
+          if [ -z "$SELECTOR" ]; then
+            echo "  SKIP: $svc has no selector"
+            continue
+          fi
+          echo "  $svc (selector: $SELECTOR)..."
+          if ! oc wait pods -l "$SELECTOR" -n "$NAMESPACE" \
+            --for=condition=Ready --timeout=5m; then
+            echo "  WARNING: pods for $svc did not become ready within 5m"
+            echo "  Pod status:"
+            oc get pods -l "$SELECTOR" -n "$NAMESPACE" --no-headers | sed 's/^/    /'
+            echo "  Recent events:"
+            oc get events -n "$NAMESPACE" --field-selector reason!=Pulling,reason!=Pulled \
+              --sort-by='.lastTimestamp' 2>/dev/null | grep "$svc" | tail -5 | sed 's/^/    /' \
+              || echo "    (no events found)"
+          fi
+        done
+
+        echo ""
+        echo "Verifying TLS secrets from service-ca..."
+        echo "$TLS_SERVICES" | while read -r svc; do
+          [ -z "$svc" ] && continue
+          SECRET=$(oc get service "$svc" -n "$NAMESPACE" \
+            -o jsonpath='{.metadata.annotations.service\.beta\.openshift\.io/serving-cert-secret-name}')
+          if oc get secret "$SECRET" -n "$NAMESPACE" &>/dev/null; then
+            echo "  $SECRET exists"
+          else
+            echo "  WARNING: $SECRET not found"
+          fi
+        done
+
+        echo ""
+        echo "Final pod status in $NAMESPACE:"
+        oc get pods -n "$NAMESPACE"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - ref: tls-scanner-run
     workflow: ipi-aws
 - always_run: false
