@@ -8,20 +8,30 @@ trap_subprocesses_on_term
 
 EDGE_TOOLING_DIR="${EDGE_TOOLING_DIR:-/opt/app-root/src/edge-tooling}"
 PCP_SCRIPTS="${EDGE_TOOLING_DIR}/plugins/microshift-ci/scripts/pcp-graphs"
-REMOTE_SCENARIO_DIR="/home/${HOST_USER}/microshift/_output/test-images/scenario-info"
 LOCAL_ARTIFACTS=$(mktemp -d)
 
-# Collect VM PCP archives and junit.xml
-# Prefer the shared artifacts volume (written by the metal-tests step), fall back to SSH
-if [ -d "${ARTIFACT_DIR}/scenario-info" ]; then
-    echo "Using scenario-info from metal-tests artifacts..."
-    ln -s "${ARTIFACT_DIR}/scenario-info/"* "${LOCAL_ARTIFACTS}/" 2>/dev/null || true
+# Construct GCS path to the metal-tests step's scenario-info.
+# The metal-tests step uploads scenario-info (including pcp-archives.tar) to GCS,
+# but these files are no longer on the hypervisor by the time this post step runs.
+if [ "${JOB_TYPE}" == "presubmit" ]; then
+    GCS_JOB_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
 else
-    echo "Copying PCP archives and junit.xml from ${INSTANCE_PREFIX}..."
-    ssh "${INSTANCE_PREFIX}" \
-        "cd ${REMOTE_SCENARIO_DIR} && \
-         find -L . \( -name 'pcp-archives.tar' -o -name 'junit.xml' \) -print0 | \
-         tar cf - --null -T - -h" | tar xf - -C "${LOCAL_ARTIFACTS}/"
+    GCS_JOB_PATH="logs/${JOB_NAME}/${BUILD_ID}"
+fi
+GCS_BASE="gs://test-platform-results/${GCS_JOB_PATH}"
+
+# Find scenario-info path (wildcard handles different workflow names)
+SCENARIO_GCS=$(gsutil ls -d "${GCS_BASE}/artifacts/*/openshift-microshift-e2e-metal-tests/artifacts/scenario-info/" 2>/dev/null | head -1)
+
+if [ -n "${SCENARIO_GCS}" ]; then
+    echo "Downloading VM PCP archives from GCS..."
+    while IFS= read -r gcs_file; do
+        rel="${gcs_file#"${SCENARIO_GCS}"}"
+        mkdir -p "${LOCAL_ARTIFACTS}/$(dirname "${rel}")"
+        gsutil -q cp "${gcs_file}" "${LOCAL_ARTIFACTS}/${rel}"
+    done < <(gsutil ls -r "${SCENARIO_GCS}" 2>/dev/null | grep -E '(pcp-archives\.tar|junit\.xml)$')
+else
+    echo "WARNING: could not find scenario-info in GCS at ${GCS_BASE}"
 fi
 
 # Copy hypervisor PCP logs if available
