@@ -7,6 +7,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: base-rhel9
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -51,7 +55,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
     test:
     - as: lvms-sno-integration-test
@@ -74,7 +78,7 @@ tests:
     env:
       COMPUTE_NODE_TYPE: m6g.4xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.4xlarge
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       OCP_ARCH: arm64
     test:
@@ -94,7 +98,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
     test:
     - as: lvms-mno-integration-test
@@ -117,7 +121,7 @@ tests:
     env:
       COMPUTE_NODE_TYPE: m6g.4xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.4xlarge
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       OCP_ARCH: arm64
     test:
@@ -132,6 +136,74 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+- as: e2e-aws-disc-sno-qe-integration-tests
+  cron: 0 8 * * 1
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
+    env:
+      CONTROL_PLANE_INSTANCE_TYPE: m5d.2xlarge
+      DISCONNECTED: "true"
+      EXTRA_DISKS_COUNT: "2"
+      EXTRACT_MANIFEST_INCLUDED: "false"
+      LVM_CLUSTER_AUTO_SELECT_AVAILABLE_DEVICES: "true"
+      LVM_CLUSTER_TOLERATE_MASTER: "true"
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      PERSISTENT_MONITORING: "false"
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-disconnected-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno-provision
+    - ref: storage-create-aws-extra-disks
+    - chain: storage-conf-csi-optional-topolvm
+    test:
+    - as: lvms-sno-integration-test
+      cli: latest
+      commands: |
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+- as: e2e-aws-disc-mno-qe-integration-tests
+  cron: 0 8 * * 1
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
+    env:
+      DISCONNECTED: "true"
+      EXTRA_DISKS_COUNT: "2"
+      EXTRACT_MANIFEST_INCLUDED: "false"
+      LVM_CLUSTER_AUTO_SELECT_AVAILABLE_DEVICES: "true"
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      PERSISTENT_MONITORING: "false"
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-disconnected-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-disconnected-private-provision
+    - ref: storage-create-aws-extra-disks
+    - chain: storage-conf-csi-optional-topolvm
+    test:
+    - as: lvms-mno-integration-test
+      cli: latest
+      commands: |
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
 - as: e2e-baremetalds-sno-dualstack-qe-integration-tests
   capabilities:
   - intranet
@@ -140,7 +212,7 @@ tests:
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       RESERVE_BOOTSTRAP: "false"
       architecture: amd64
@@ -162,7 +234,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
     test:
     - as: lvms-mno-integration-test
