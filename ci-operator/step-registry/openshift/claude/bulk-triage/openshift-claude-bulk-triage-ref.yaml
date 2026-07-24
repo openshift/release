@@ -1,0 +1,81 @@
+ref:
+  as: openshift-claude-bulk-triage
+  from: claude-ai-helpers
+  commands: openshift-claude-bulk-triage-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: sa-claude-openshift-ci
+    mount_path: /var/run/claude-code-service-account
+  env:
+  - name: TRIAGE_VIEW
+    default: ""
+    documentation: |-
+      Component Readiness view to triage (e.g. "5.0-main"). When empty,
+      the latest OCP version is auto-detected from Sippy and "<version>-main"
+      is used.
+  - name: MULTISTAGE_PARAM_OVERRIDE_TRIAGE_VIEW
+    default: ""
+    documentation: |-
+      Gangway API override for TRIAGE_VIEW. When triggering via
+      Gangway, pass as pod_spec_options.envs.
+  - name: TRIAGE_COMPONENTS
+    default: "Installer Unknown"
+    documentation: |-
+      Space-separated component filters passed to the
+      bulk-triage-regressions skill.
+  - name: AI_HELPERS_REPO
+    default: "mkowalski/openshift-ai-helpers"
+    documentation: |-
+      Optional GitHub repository (org/repo, e.g. "myfork/ai-helpers") to
+      use instead of the ai-helpers copy baked into the image. When set,
+      it is cloned and replaces /opt/ai-helpers before the skill runs.
+      Useful for testing unmerged skill changes.
+      TODO: reset default to "" (baked-in image copy) once
+      openshift-eng/ai-helpers#635 merges.
+  - name: AI_HELPERS_REF
+    default: "triage-component-regressions"
+    documentation: |-
+      Git branch, tag, or commit to check out from AI_HELPERS_REPO.
+      Ignored when AI_HELPERS_REPO is empty.
+      TODO: reset default to "main" once openshift-eng/ai-helpers#635
+      merges.
+  - name: MULTISTAGE_PARAM_OVERRIDE_AI_HELPERS_REPO
+    default: ""
+    documentation: |-
+      Gangway API override for AI_HELPERS_REPO. When triggering via
+      Gangway, pass as pod_spec_options.envs.
+  - name: MULTISTAGE_PARAM_OVERRIDE_AI_HELPERS_REF
+    default: ""
+    documentation: |-
+      Gangway API override for AI_HELPERS_REF. When triggering via
+      Gangway, pass as pod_spec_options.envs.
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "global"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/token"
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+    documentation: |-
+      Claude model used for the triage analysis.
+  - name: MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL
+    default: ""
+    documentation: |-
+      Gangway API override for CLAUDE_MODEL. When triggering via
+      Gangway, pass as pod_spec_options.envs.
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 4h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Runs the ai-helpers bulk-triage-regressions skill in dry-run
+    (read-only) mode for a Component Readiness view: lists untriaged
+    regressions, clusters them into root-cause buckets, deep-dives
+    artifacts, and writes a markdown duty report with recommended
+    triage actions to the artifacts directory. No triage records,
+    JIRA issues, or Sippy labels are created.
