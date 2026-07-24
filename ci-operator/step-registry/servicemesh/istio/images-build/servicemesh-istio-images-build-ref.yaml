@@ -1,0 +1,37 @@
+ref:
+  as: servicemesh-istio-images-build
+  from: cli
+  commands: servicemesh-istio-images-build-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 1h0m0s
+  credentials:
+  - mount_path: /tmp/secrets
+    name: quay-sail
+    namespace: test-credentials
+  env:
+  - name: MAISTRA_NAMESPACE
+    default: "maistra-e2e-test"
+    documentation: |-
+      Namespace where the privileged builder pod is running.
+  - name: MAISTRA_SC_POD
+    default: "maistra-e2e-test-sc-pod"
+    documentation: |-
+      Name of the privileged builder pod that runs docker build + push.
+  - name: INSTALL_SAIL_OPERATOR
+    default: "false"
+    documentation: |-
+      Set to true to also deploy the Sail Operator during the setup phase.
+  - name: QUAY_HUB
+    default: "quay.io/sail-dev"
+    documentation: |-
+      Quay registry destination for the built images. The image tag is derived
+      automatically from PULL_PULL_SHA (PRs) or BUILD_ID (postsubmit).
+  documentation: |-
+    Builds all Istio container images (pilot, proxyv2, install-cni, app, ext-authz,
+    ztunnel) and pushes them to quay.io/sail-dev/istio-testing with a unique tag
+    derived from the PR commit SHA or build ID.
+
+    This step must run before servicemesh-istio-int-tests.
