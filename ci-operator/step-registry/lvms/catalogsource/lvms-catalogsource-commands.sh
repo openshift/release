@@ -159,6 +159,7 @@ if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
 		echo "ERROR: ZSTREAM_VERSION is set but PULL_NUMBER is not available"
 		exit 1
 	fi
+	PULL_NUMBER=2547
 	echo "Resolving z-stream catalog image for version ${ZSTREAM_VERSION} from PR #${PULL_NUMBER}"
 
 	catalog_prefix="lvm-operator-catalog-$(echo "${ZSTREAM_VERSION}" | tr '.' '-')"
