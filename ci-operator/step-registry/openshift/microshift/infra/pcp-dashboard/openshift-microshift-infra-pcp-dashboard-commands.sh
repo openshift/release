@@ -21,7 +21,7 @@ fi
 GCS_BASE="gs://test-platform-results/${GCS_JOB_PATH}"
 
 # Find scenario-info path (wildcard handles different workflow names)
-SCENARIO_GCS=$(gsutil ls -d "${GCS_BASE}/artifacts/*/openshift-microshift-e2e-metal-tests/artifacts/scenario-info/" 2>/dev/null | head -1)
+SCENARIO_GCS=$(gsutil ls -d "${GCS_BASE}/artifacts/*/openshift-microshift-e2e-metal-tests/artifacts/scenario-info/" 2>/dev/null | head -1 || true)
 
 if [ -n "${SCENARIO_GCS}" ]; then
     echo "Downloading VM PCP archives from GCS..."
