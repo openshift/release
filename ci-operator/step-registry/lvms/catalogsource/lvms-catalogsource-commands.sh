@@ -159,6 +159,7 @@ if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
 		echo "ERROR: ZSTREAM_VERSION is set but PULL_NUMBER is not available"
 		exit 1
 	fi
+	PULL_NUMBER=2547
 	echo "Resolving z-stream catalog image for version ${ZSTREAM_VERSION} from PR #${PULL_NUMBER}"
 
 	catalog_prefix="lvm-operator-catalog-$(echo "${ZSTREAM_VERSION}" | tr '.' '-')"
@@ -576,6 +577,14 @@ function main {
 
 	# Support hypershift config guest cluster's idms
 	oc get ImageDigestMirrorSet -oyaml >/tmp/mgmt_idms.yaml && yq-go r /tmp/mgmt_idms.yaml 'items[*].spec.imageDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml
+
+	# Extract source commit from catalog image for integration test builds.
+	# Use '// empty' to avoid writing literal "null" when the label is missing.
+	local commit
+	commit=$(oc image info --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+		| jq -r '.config.config.Labels["vcs-ref"] // empty' 2>/dev/null || true)
+	echo -n "${commit}" > "${SHARED_DIR}/lvm_source_commit"
+
 	return 0
 }
 
