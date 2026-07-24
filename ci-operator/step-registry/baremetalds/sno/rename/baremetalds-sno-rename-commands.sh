@@ -100,7 +100,7 @@ recert_script=$(cat <<IEOF
 set -euoE pipefail
 
 on_error() {
-  echo "An error occurred..."
+  echo "An error occurred on line \${BASH_LINENO[0]}: \${BASH_COMMAND}"
   touch /var/recert.failed
 }
 
@@ -325,9 +325,11 @@ function recert {
 function start_containers {
   echo "Starting crio.service..."
   systemctl start crio.service
+  echo "crio.service started"
 
   echo "Starting kubelet.service..."
   systemctl start kubelet.service
+  echo "kubelet.service started"
 }
 
 function delete_crts_keys {
@@ -507,13 +509,16 @@ info "Waiting for recert to be completed..."
 RECERT_RESULT=""
 while true; do
   for poll_ip in "${SINGLE_NODE_IP}" "${ADDITIONAL_NODE_IP}"; do
-    if ssh ${SSH_OPTS[@]} core@${poll_ip} test -e /var/recert.done 2>/dev/null; then
-      info "Recert completed successfully (reached via ${poll_ip})"
-      RECERT_RESULT="done"
-      break 2
-    elif ssh ${SSH_OPTS[@]} core@${poll_ip} test -e /var/recert.failed 2>/dev/null; then
+    # Check recert.failed BEFORE recert.done — recert.done is created before
+    # start_containers/wait_for_stable_cluster, so both files can coexist if
+    # the post-recert phase fails.
+    if ssh ${SSH_OPTS[@]} core@${poll_ip} test -e /var/recert.failed 2>/dev/null; then
       info "Recert FAILED (reached via ${poll_ip})"
       RECERT_RESULT="failed"
+      break 2
+    elif ssh ${SSH_OPTS[@]} core@${poll_ip} test -e /var/recert.done 2>/dev/null; then
+      info "Recert completed successfully (reached via ${poll_ip})"
+      RECERT_RESULT="done"
       break 2
     fi
   done
@@ -532,16 +537,29 @@ echo "${ADDITIONAL_NODE_IP} api.${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}" | tee --
 info "Replaced server field in ${KUBECONFIG} to reflect recert cluster rename and base domain changes"
 
 info "Waiting for master MachineConfigPool to have condition=updated..."
+MCP_DEADLINE=$((SECONDS + 1800))
 until oc wait --for=condition=updated machineconfigpools master --timeout=2m &> /dev/null
 do
+  if (( SECONDS >= MCP_DEADLINE )); then
+    info "ERROR: timed out waiting for MCP condition=updated after 30m"
+    oc get mcp master -o yaml 2>/dev/null || true
+    exit 1
+  fi
   info "Waiting for master MachineConfigPool to have condition=updated..."
   sleep 5
 done
 
 info "Waiting for OCP stabilization..."
 RECERT_NODE_IP="${ADDITIONAL_NODE_IP}"
+OCP_STAB_DEADLINE=$((SECONDS + 7200))
 until ssh ${SSH_OPTS[@]} core@${RECERT_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt" &> /dev/null
 do
+  if (( SECONDS >= OCP_STAB_DEADLINE )); then
+    info "ERROR: timed out waiting for OCP stabilization after 2h"
+    info "Checking if recert.failed exists on the node..."
+    ssh ${SSH_OPTS[@]} core@${RECERT_NODE_IP} "test -e /var/recert.failed && echo 'recert.failed EXISTS' || echo 'recert.failed does not exist'" 2>/dev/null || true
+    exit 1
+  fi
   info "Waiting for OCP stabilization..."
   sleep 5
 done
