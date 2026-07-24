@@ -1,0 +1,78 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  libvirt-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: libvirt-installer
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM quay.io/kuadrant/testsuite:latest
+    to: kuadrant-testsuite
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-s390x
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.22"
+      COMPUTE_COUNT: "2"
+      CONTROL_COUNT: "3"
+      COREDNS_LB_HOST: "241"
+      COREDNS_ZONE: k.example.com
+      ETCD_DISK_SPEED: slow
+      ISTIO_CONTROL_NAMESPACE: openshift-operators
+      ISTIO_VERSION: v1.28-latest
+      KUADRANT_CATALOG_SOURCE_IMAGE: quay.io/kuadrant/kuadrant-operator-catalog:v1.5.0
+      KUADRANT_CHANNEL: stable
+      KUADRANT_OPERATOR_IMAGE: quay.io/vray_rh/kuadrant:init-observability-skipped
+      NODE_TUNING: "true"
+      OSSM_STARTING_CSV: servicemeshoperator3.v3.4.0
+      PYTEST_FLAGS: -n1
+      RELATED_IMAGE_WASMSHIM: oci://quay.io/vray_rh/wasm-shim:init-observability-skipped
+      RUN_KUADRANT: "false"
+      RUN_SMOKE: "true"
+      USE_EXTERNAL_DNS: "true"
+    workflow: kuadrant-s390x
+zz_generated_metadata:
+  branch: main
+  org: Kuadrant
+  repo: testsuite
