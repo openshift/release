@@ -1,0 +1,65 @@
+base_images:
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.22
+images:
+  items:
+  - build_args:
+    - name: EE_BASE_IMAGE
+      value: registry.redhat.io/ansible-automation-platform-25/ee-minimal-rhel8:2.0
+    - name: EE_BUILDER_IMAGE
+      value: registry.redhat.io/ansible-automation-platform-25/ansible-builder-rhel8:3.1.1
+    - name: EE_IMAGE
+      value: quay.io/quay/mirror-registry-ee:latest
+    - name: PAUSE_IMAGE
+      value: registry.access.redhat.com/ubi8/pause:8.10-5
+    - name: QUAY_IMAGE
+      value: registry.redhat.io/quay/quay-rhel8:v3.12.18
+    - name: REDIS_IMAGE
+      value: registry.redhat.io/rhel8/redis-6:1-1766406130
+    - name: RELEASE_VERSION
+      value: dev
+    - name: SQLITE_IMAGE
+      value: quay.io/projectquay/sqlite-cli:latest
+    dockerfile_path: Dockerfile
+    to: mirror-registry
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: ci
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: omr-v2-e2e-offline
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      ADD_INGRESS_RECORDS_MANUALLY: "yes"
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      OMR_FROM_SOURCE: "true"
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: "true"
+      ZONES_COUNT: "2"
+    post:
+    - chain: quay-tests-aws-ipi-disconnected-private-deprovision
+    test:
+    - chain: quay-tests-aws-ipi-disconnected-private-provision
+zz_generated_metadata:
+  branch: main
+  org: quay
+  repo: mirror-registry
+  variant: ocp422

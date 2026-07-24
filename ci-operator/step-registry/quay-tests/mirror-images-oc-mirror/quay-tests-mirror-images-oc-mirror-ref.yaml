@@ -1,0 +1,25 @@
+ref:
+  as: quay-tests-mirror-images-oc-mirror
+  from: upi-installer
+  cli: latest
+  commands: quay-tests-mirror-images-oc-mirror-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 240m0s
+  grace_period: 10m
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  - namespace: test-credentials
+    name: registry-pull-credentials
+    mount_path: /var/run/ci-credentials/registry
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    Mirror OCP release image to Quay OMR using oc-mirror v2.
+    Generates IDMS manifests and install-config patches for disconnected installs.
+    For OCP 4.22+, oc-mirror v2 properly handles sigstore signature mirroring.

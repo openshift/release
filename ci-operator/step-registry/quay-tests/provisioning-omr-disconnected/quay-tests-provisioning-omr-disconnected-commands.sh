@@ -9,7 +9,7 @@ podman -v
 skopeo -v
 HOME_PATH=$(pwd) && echo $HOME_PATH
 
-#Create new AWS EC2 Instatnce to deploy Quay OMR
+#Create new AWS EC2 Instance to deploy Quay OMR
 OMR_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-omr-secret/access_key)
 OMR_AWS_SECRET_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key)
 
@@ -97,6 +97,95 @@ variable "quay_build_instance_name" {
 }
 EOF
 
+# ─── Build-from-source path: extract mirror-registry.tar.gz from CI-built image ───
+if [ "${OMR_FROM_SOURCE:-false}" = "true" ]; then
+  echo "=== OMR build-from-source: extracting mirror-registry from CI pipeline image ==="
+
+  # Extract mirror-registry.tar.gz from CI-built pipeline image
+  MIRROR_REGISTRY_PULLSPEC=$(oc get istag pipeline:mirror-registry -o jsonpath='{.image.dockerImageReference}')
+  echo "Resolved pipeline image: ${MIRROR_REGISTRY_PULLSPEC}"
+  oc image extract "${MIRROR_REGISTRY_PULLSPEC}" \
+    --path /mirror-registry.tar.gz:/tmp \
+    --confirm --insecure \
+    --registry-config="/var/run/ci-credentials/registry/.dockerconfigjson"
+  ls -lh /tmp/mirror-registry.tar.gz
+
+  # The EC2 provisioner will use a file provisioner to upload and install the tarball
+  OMR_TARBALL_LOCAL="/tmp/mirror-registry.tar.gz"
+
+  cat >>create_aws_ec2.tf <<EOF
+provider "aws" {
+  region = "${REGION}"
+  access_key = "${OMR_AWS_ACCESS_KEY}"
+  secret_key = "${OMR_AWS_SECRET_KEY}"
+}
+resource "aws_key_pair" "quaybuilder0710" {
+  key_name   = var.quay_build_worker_key
+  public_key = file("./quaybuilder.pub")
+}
+resource "aws_security_group" "quaybuilder" {
+  name        = var.quay_build_worker_security_group
+  description = "Allow all inbound traffic"
+  vpc_id      = "${VpcId}"
+  ingress {
+    description = "traffic into quaybuilder VPC"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+resource "aws_instance" "quaybuilder" {
+  key_name      = aws_key_pair.quaybuilder0710.key_name
+  ami           = "${ami_id}"
+  instance_type = "m6i.2xlarge"
+  associate_public_ip_address = true
+  vpc_security_group_ids = [aws_security_group.quaybuilder.id]
+  subnet_id = "${PublicSubnet}"
+
+  root_block_device {
+    volume_size = 200
+  }
+  provisioner "file" {
+    source      = "${OMR_TARBALL_LOCAL}"
+    destination = "/home/ec2-user/mirror-registry.tar.gz"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "sudo yum install podman openssl -y",
+      "cd /home/ec2-user",
+      "tar -xzvf mirror-registry.tar.gz",
+      "./mirror-registry --version",
+      "./mirror-registry install --quayHostname \${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
+    ]
+  }
+EOF
+
+  cat >>create_aws_ec2.tf <<'TFEOF'
+  connection {
+    type        = "ssh"
+    host        = self.public_ip
+    user        = "ec2-user"
+    private_key = file("./quaybuilder")
+  }
+  tags = {
+    Name = var.quay_build_instance_name
+  }
+}
+output "instance_public_dns" {
+  value = aws_instance.quaybuilder.public_dns
+}
+TFEOF
+
+# ─── Legacy path: pull OMR image from brew/released tarball on the EC2 ───
+else
+
 cat >>create_aws_ec2.tf <<EOF
 provider "aws" {
   region = "${REGION}"
@@ -132,9 +221,8 @@ resource "aws_instance" "quaybuilder" {
   associate_public_ip_address = true
   vpc_security_group_ids = [aws_security_group.quaybuilder.id]
   subnet_id = "${PublicSubnet}"
-  
-  ebs_block_device {
-    device_name = "/dev/sda1"
+
+  root_block_device {
     volume_size = 200
   }
   provisioner "remote-exec" {
@@ -150,6 +238,9 @@ resource "aws_instance" "quaybuilder" {
       "./mirror-registry install --quayHostname \${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
     ]
   }
+EOF
+
+cat >>create_aws_ec2.tf <<'TFEOF'
   connection {
     type        = "ssh"
     host        = self.public_ip
@@ -163,7 +254,9 @@ resource "aws_instance" "quaybuilder" {
 output "instance_public_dns" {
   value = aws_instance.quaybuilder.public_dns
 }
-EOF
+TFEOF
+
+fi
 
 cp /var/run/quay-qe-omr-secret/quaybuilder . && cp /var/run/quay-qe-omr-secret/quaybuilder.pub .
 chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >>quaybuilder
