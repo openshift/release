@@ -19,7 +19,7 @@ fi
 
 export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 
-cd terraform/config/region/integration/e2e/us-central1
+cd terraform/config/e2e-smoke
 
 terraform init -input=false
 terraform plan -input=false
