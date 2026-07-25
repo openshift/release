@@ -160,13 +160,22 @@ function hypershift_force_cleanup() {
 function hypershift_pruner() {
 	local had_failure=0
 	local failed_clusters=()
+	local profile_filter="${HYPERSHIFT_CLUSTER_PROFILE_FILTER:-}"
+
+	local oc_ns_flag=( -n clusters )
+	if [[ -n ${HYPERSHIFT_PRUNER_ALL_NAMESPACES:-} ]]; then
+		oc_ns_flag=( -A )
+	fi
 
 	local hostedclusters
-	if [[ -n ${HYPERSHIFT_PRUNER_ALL_NAMESPACES:-} ]]; then
-		hostedclusters="$(oc get hostedcluster -A -o json | jq -r --argjson timestamp 14400 '.items[] | select (.metadata.creationTimestamp | sub("\\..*";"Z") | sub("\\s";"T") | fromdate < now - $timestamp) | .metadata.namespace + "/" + .metadata.name')"
-	else
-		hostedclusters="$(oc get hostedcluster -n clusters -o json | jq -r --argjson timestamp 14400 '.items[] | select (.metadata.creationTimestamp | sub("\\..*";"Z") | sub("\\s";"T") | fromdate < now - $timestamp).metadata.name')"
-	fi
+	hostedclusters="$(oc get hostedcluster "${oc_ns_flag[@]}" -o json \
+		| jq -r \
+			--argjson timestamp 14400 \
+			--arg profile "${profile_filter}" \
+			'.items[]
+			| select(.metadata.creationTimestamp | sub("\\..*";"Z") | sub("\\s";"T") | fromdate < now - $timestamp)
+			| select($profile == "" or .metadata.annotations["cluster-profile"] == $profile)
+			| .metadata.namespace + "/" + .metadata.name')"
 
 	if [[ -z "${hostedclusters}" ]]; then
 		echo "No stale HostedClusters found."
@@ -174,14 +183,8 @@ function hypershift_pruner() {
 	fi
 
 	for hostedcluster in ${hostedclusters}; do
-		local hc_ns hc_name
-		if [[ -n ${HYPERSHIFT_PRUNER_ALL_NAMESPACES:-} ]]; then
-			hc_ns="${hostedcluster%%/*}"
-			hc_name="${hostedcluster##*/}"
-		else
-			hc_ns="clusters"
-			hc_name="${hostedcluster}"
-		fi
+		local hc_ns="${hostedcluster%%/*}"
+		local hc_name="${hostedcluster##*/}"
 
 		local hc_infra_id hc_region
 		hc_infra_id="$(oc get hostedcluster "${hc_name}" -n "${hc_ns}" -o jsonpath='{.spec.infraID}' 2>/dev/null || echo "")"
