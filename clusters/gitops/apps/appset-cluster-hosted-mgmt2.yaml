@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: appset-cluster-hypershift-konflux
+  name: appset-cluster-hosted-mgmt2
   namespace: openshift-gitops
 spec:
   goTemplate: true
@@ -9,18 +9,18 @@ spec:
   generators:
   - git:
       directories:
-      - path: clusters/hypershift-konflux/*
+      - path: clusters/hosted-mgmt2/*
       - path: clusters/build-clusters/build-shared/managed
       - path: clusters/build-clusters/build-shared/ocp
       repoURL: https://github.com/openshift/release.git
       revision: main
   template:
     metadata:
-      name: 'hypershift-konflux-{{.path.basename}}'
+      name: 'hosted-mgmt2-{{.path.basename}}'
       namespace: openshift-gitops
     spec:
       destination:
-        name: hypershift-konflux
+        name: hosted-mgmt2
         namespace: openshift-gitops
       ignoreDifferences:
         - group: hive.openshift.io
@@ -36,7 +36,7 @@ spec:
           kind: MachineSet
           jqPathExpressions:
             - .spec.template.spec.providerSpec.value.ami
-      project: hypershift-konflux
+      project: hosted-mgmt2
       source:
         directory:
           exclude: '{OWNERS,*.md}'
