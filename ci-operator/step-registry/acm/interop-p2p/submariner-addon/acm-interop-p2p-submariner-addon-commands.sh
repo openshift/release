@@ -215,6 +215,51 @@ AssertGlobalnetDisabled() {
     : "Globalnet disabled on '${clusterName}' (globalnetEnabled=${globalnetEnabled:-false})"
 }
 
+# ResolveClusterKubeconfig — return kubeconfig path for a cluster by its index in clusterNamesArr.
+# Index 0 = hub (local-cluster) → ${KUBECONFIG} set by ci-operator.
+# Index 1..N = spoke N → ${SHARED_DIR}/managed-cluster-kubeconfig-N (from acm-fetch-managed-clusters).
+ResolveClusterKubeconfig() {
+    typeset -i idx="${1:?}"
+    if (( idx == 0 )); then
+        printf '%s' "${KUBECONFIG}"
+        return 0
+    fi
+    typeset kcFile="${SHARED_DIR}/managed-cluster-kubeconfig-${idx}"
+    [[ -r "${kcFile}" ]] || {
+        : "Spoke kubeconfig not found at ${kcFile} (cluster index ${idx})" >&2
+        return 1
+    }
+    printf '%s' "${kcFile}"
+}
+
+# WaitSubmarinerComponentsReady — wait for Submariner data-plane components to be Ready.
+# ManagedClusterAddon Available fires when ACM dispatches the addon manifests via ManifestWork.
+# It does NOT mean the gateway MachineSet has provisioned an EC2 node, or that the
+# submariner-gateway and submariner-routeagent DaemonSets have rolled out. Without this
+# deeper wait the verify step will probe connectivity before the IPsec tunnel can establish.
+WaitSubmarinerComponentsReady() {
+    typeset kc="${1:?}"
+    typeset clusterName="${2:?}"
+
+    : "Waiting for submariner-operator deployment Available on '${clusterName}'"
+    oc --kubeconfig="${kc}" wait deployment/submariner-operator \
+        -n submariner-operator --for=condition=Available --timeout=10m 1>/dev/null
+
+    : "Waiting for submariner-gateway DaemonSet to be created on '${clusterName}'"
+    oc --kubeconfig="${kc}" wait --for=create \
+        daemonset/submariner-gateway -n submariner-operator --timeout=15m 1>/dev/null
+    oc --kubeconfig="${kc}" rollout status daemonset/submariner-gateway \
+        -n submariner-operator --timeout=15m 1>/dev/null
+
+    : "Waiting for submariner-routeagent DaemonSet to be created on '${clusterName}'"
+    oc --kubeconfig="${kc}" wait --for=create \
+        daemonset/submariner-routeagent -n submariner-operator --timeout=15m 1>/dev/null
+    oc --kubeconfig="${kc}" rollout status daemonset/submariner-routeagent \
+        -n submariner-operator --timeout=20m 1>/dev/null
+
+    : "Submariner data-plane components ready on '${clusterName}'"
+}
+
 # --- Main ---
 
 trap DumpDiagnostics ERR
@@ -252,6 +297,16 @@ done
 # Sequential to give clear per-cluster status in CI logs.
 for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     WaitAddonAvailable "${clusterNsArr[i]}" "${clusterNamesArr[i]}"
+done
+
+# Phase 2b: wait for actual Submariner data-plane components on all clusters.
+# ManagedClusterAddon Available only confirms ACM dispatched the addon manifests. The
+# gateway MachineSet must still provision an EC2 instance and submariner-gateway /
+# submariner-routeagent DaemonSets must roll out before the IPsec tunnel can establish.
+for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
+    typeset clusterKc
+    clusterKc="$(ResolveClusterKubeconfig "${i}")"
+    WaitSubmarinerComponentsReady "${clusterKc}" "${clusterNamesArr[i]}"
 done
 
 # Phase 3: assert Globalnet is disabled on all clusters.

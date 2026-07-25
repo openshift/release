@@ -126,6 +126,29 @@ WaitForConnectionsEstablished() {
                 fi
             done
 
+            # Also check hub gateway when it is enrolled in the Submariner mesh.
+            # Hub is a full Submariner participant in hub-spoke topologies so its
+            # gateway must show connections to all spokes before probing CCLM sync.
+            if [[ "${verifyHubSpoke}" == "true" ]]; then
+                typeset -i hubNonConnected hubTotalConnections
+                hubNonConnected="$(
+                    oc get gateways.submariner.io \
+                        -n submariner-operator \
+                        -o 'jsonpath-as-json={.items[?(@.status.haStatus=="active")].status.connections[*].status}' |
+                    jq '[.[] | select(. != "connected")] | length'
+                )"
+                hubTotalConnections="$(
+                    oc get gateways.submariner.io \
+                        -n submariner-operator \
+                        -o 'jsonpath-as-json={.items[?(@.status.haStatus=="active")].status.connections[*].status}' |
+                    jq 'length'
+                )"
+                : "hub: ${hubTotalConnections} connection(s), ${hubNonConnected} not yet connected (${SECONDS}/${timeoutSecs}s)"
+                if (( hubNonConnected > 0 || hubTotalConnections == 0 )); then
+                    allConnected=0
+                fi
+            fi
+
             if (( allConnected )); then
                 : "All Submariner tunnels are connected"
                 exit 0
@@ -134,12 +157,13 @@ WaitForConnectionsEstablished() {
             sleep "${interval}"
         done
 
-        : "Submariner tunnels did not reach 'connected' on all spokes within ${timeoutSecs}s"
+        : "Submariner tunnels did not reach 'connected' on all clusters within ${timeoutSecs}s"
         typeset -i i
         for ((i = 0; i < spokeCount; i++)); do
             : "Connection status on '${spokeNamesArr[i]}'"
             KUBECONFIG="${spokeKubeconfigsArr[i]}" "${subctlBin}" show connections || true
         done
+        [[ "${verifyHubSpoke}" == "true" ]] && "${subctlBin}" show connections || true
         exit 1
     )
     true
@@ -321,6 +345,10 @@ GetSyncControllerPodIp() {
 }
 
 # ── ProbeCclmSyncPort — TCP probe to sync-controller pod IP:8443 from a spoke ─
+# Does NOT use `oc run -i` (interactive attach) because `-i` can mask non-zero container
+# exit codes in some oc versions — the pod terminates with Error but oc returns 0.
+# Instead: creates the pod without --rm, waits for it to reach a terminal phase via
+# `oc wait --for=jsonpath`, then reads exit code from pod status before cleanup.
 ProbeCclmSyncPort() {
     typeset srcKubeconfig="${1:?}"; (($#)) && shift
     typeset destIp="${1:?}"; (($#)) && shift
@@ -332,17 +360,47 @@ ProbeCclmSyncPort() {
     KUBECONFIG="${srcKubeconfig}" oc create namespace "${probeNs}" \
         --dry-run=client -o yaml --save-config | KUBECONFIG="${srcKubeconfig}" oc apply -f - 1>/dev/null
 
+    # Remove any stale pod from a prior run.
+    KUBECONFIG="${srcKubeconfig}" oc delete pod "${probePod}" \
+        -n "${probeNs}" --ignore-not-found --wait=true --timeout=30s 1>/dev/null 2>&1 || true
+
+    # Create probe pod without --rm so we can read its exit code from status.
     # bash ships in ubi9-minimal; no extra package install needed.
     KUBECONFIG="${srcKubeconfig}" oc run "${probePod}" \
         -n "${probeNs}" \
-        --rm -i --restart=Never \
+        --restart=Never \
         --image=registry.redhat.io/ubi9/ubi-minimal:latest \
         --command -- \
-        timeout "${SUBMARINER_CCLM_SYNC_PROBE_TIMEOUT}" bash -c "echo >/dev/tcp/${destIp}/${SUBMARINER_CCLM_SYNC_PORT}" \
+        timeout "${SUBMARINER_CCLM_SYNC_PROBE_TIMEOUT}" bash -c \
+            "echo >/dev/tcp/${destIp}/${SUBMARINER_CCLM_SYNC_PORT}" \
         1>/dev/null
 
+    # Wait for pod to reach Succeeded (probe timeout + 60s scheduling buffer).
+    typeset -i waitSecs=$(( SUBMARINER_CCLM_SYNC_PROBE_TIMEOUT + 60 ))
+    KUBECONFIG="${srcKubeconfig}" oc wait "pod/${probePod}" \
+        -n "${probeNs}" \
+        --for=jsonpath='{.status.phase}'=Succeeded \
+        --timeout="${waitSecs}s" 1>/dev/null 2>&1 || true
+
+    # Read pod phase and container exit code — reliable regardless of oc run behaviour.
+    typeset phase exitCode
+    phase="$(KUBECONFIG="${srcKubeconfig}" oc get "pod/${probePod}" \
+        -n "${probeNs}" \
+        -o jsonpath='{.status.phase}' 2>/dev/null || echo 'Unknown')"
+    exitCode="$(KUBECONFIG="${srcKubeconfig}" oc get "pod/${probePod}" \
+        -n "${probeNs}" \
+        -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' \
+        2>/dev/null || echo '1')"
+
+    KUBECONFIG="${srcKubeconfig}" oc delete pod "${probePod}" \
+        -n "${probeNs}" --ignore-not-found --wait=false 1>/dev/null &
     KUBECONFIG="${srcKubeconfig}" oc delete namespace "${probeNs}" \
         --ignore-not-found --wait=false 1>/dev/null &
+
+    if [[ "${phase}" != "Succeeded" || "${exitCode}" != "0" ]]; then
+        : "CCLM sync probe FAILED → ${destIp}:${SUBMARINER_CCLM_SYNC_PORT} (phase=${phase}, exitCode=${exitCode:-unknown})" >&2
+        return 1
+    fi
     true
 }
 
