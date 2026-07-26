@@ -87,16 +87,19 @@ create_registries_conf() {
     gitlab_fetch "$idms_url" "$idms_file" || exit 1
 
     awk '
-        /^[[:space:]]*- mirrors:/ { in_mirrors=1; got_mirror=0 }
-        in_mirrors && /^[[:space:]]*- quay\.io/ && !got_mirror {
-            gsub(/^[[:space:]]*- /, "", $0); mirror=$0; got_mirror=1
+        /^[[:space:]]*- mirrors:/ { in_mirrors=1; mc=0 }
+        in_mirrors && /^[[:space:]]*- quay\.io/ {
+            gsub(/^[[:space:]]*- /, "", $0); m[mc++]=$0
         }
         /^[[:space:]]*source:/ {
             source=$NF; in_mirrors=0
-            if (mirror != "" && source != "") {
-                printf "[[registry]]\n  location = \"%s\"\n  insecure = true\n  blocked = false\n  mirror-by-digest-only = false\n  [[registry.mirror]]\n      location = \"%s\"\n      insecure = true\n\n", source, mirror
+            if (mc > 0 && source != "") {
+                printf "[[registry]]\n  location = \"%s\"\n  insecure = true\n  blocked = false\n  mirror-by-digest-only = false\n", source
+                for (i=0; i<mc; i++)
+                    printf "  [[registry.mirror]]\n      location = \"%s\"\n      insecure = true\n", m[i]
+                printf "\n"
             }
-            mirror=""
+            mc=0
         }
     ' "$idms_file" > "$registries_conf"
 
