@@ -232,32 +232,72 @@ ResolveClusterKubeconfig() {
     printf '%s' "${kcFile}"
 }
 
-# WaitSubmarinerComponentsReady — wait for Submariner data-plane components to be Ready.
-# ManagedClusterAddon Available fires when ACM dispatches the addon manifests via ManifestWork.
-# It does NOT mean the gateway MachineSet has provisioned an EC2 node, or that the
-# submariner-gateway and submariner-routeagent DaemonSets have rolled out. Without this
-# deeper wait the verify step will probe connectivity before the IPsec tunnel can establish.
+# WaitSubmarinerComponentsReady — wait for all Submariner components to be Ready.
+#
+# This mirrors the old acm-interop-p2p-submariner-broker-join WaitSubmarinerReady function
+# which waited for: submariner-operator, submariner-gateway, submariner-routeagent,
+# submariner-lighthouse-agent, and submariner-lighthouse-coredns.
+#
+# Key difference vs. the old approach: subctl join was synchronous — resources existed by
+# the time WaitSubmarinerReady was called. With the addon, ManagedClusterAddon Available
+# fires when ACM *dispatches* the ManifestWork, not when the ManifestWork has finished
+# syncing to the target cluster. The submariner-operator namespace and deployment may not
+# yet exist. We therefore poll for the namespace first, then use oc wait --for=create
+# before each --for=condition=Available / rollout status check.
 WaitSubmarinerComponentsReady() {
     typeset kc="${1:?}"
     typeset clusterName="${2:?}"
 
+    # Poll until the namespace exists — ManifestWork sync is async after addon Available.
+    : "Waiting for submariner-operator namespace on '${clusterName}'"
+    (
+        typeset -i wInt=15
+        SECONDS=0
+        until oc --kubeconfig="${kc}" get namespace submariner-operator 1>/dev/null 2>&1; do
+            (( SECONDS < 600 )) || {
+                : "Timeout: submariner-operator namespace not created on '${clusterName}' within 600s" >&2
+                exit 1
+            }
+            sleep "${wInt}"
+        done
+    )
+
+    # OLM creates this deployment from the Submariner CSV. Must poll for creation
+    # (--for=create) because OLM processes the Subscription asynchronously.
     : "Waiting for submariner-operator deployment Available on '${clusterName}'"
+    oc --kubeconfig="${kc}" wait --for=create \
+        deployment/submariner-operator -n submariner-operator --timeout=10m 1>/dev/null
     oc --kubeconfig="${kc}" wait deployment/submariner-operator \
         -n submariner-operator --for=condition=Available --timeout=10m 1>/dev/null
 
-    : "Waiting for submariner-gateway DaemonSet to be created on '${clusterName}'"
+    # Gateway DaemonSet — only created after cloud-prep provisions the gateway EC2 instance.
+    : "Waiting for submariner-gateway DaemonSet on '${clusterName}'"
     oc --kubeconfig="${kc}" wait --for=create \
         daemonset/submariner-gateway -n submariner-operator --timeout=15m 1>/dev/null
     oc --kubeconfig="${kc}" rollout status daemonset/submariner-gateway \
         -n submariner-operator --timeout=15m 1>/dev/null
 
-    : "Waiting for submariner-routeagent DaemonSet to be created on '${clusterName}'"
+    # RouteAgent DaemonSet — runs on every node to program pod-CIDR routes through gateway.
+    : "Waiting for submariner-routeagent DaemonSet on '${clusterName}'"
     oc --kubeconfig="${kc}" wait --for=create \
         daemonset/submariner-routeagent -n submariner-operator --timeout=15m 1>/dev/null
     oc --kubeconfig="${kc}" rollout status daemonset/submariner-routeagent \
         -n submariner-operator --timeout=20m 1>/dev/null
 
-    : "Submariner data-plane components ready on '${clusterName}'"
+    # Lighthouse agent and CoreDNS — required for .clusterset.local service discovery.
+    : "Waiting for submariner-lighthouse-agent deployment on '${clusterName}'"
+    oc --kubeconfig="${kc}" wait --for=create \
+        deployment/submariner-lighthouse-agent -n submariner-operator --timeout=10m 1>/dev/null
+    oc --kubeconfig="${kc}" rollout status deployment/submariner-lighthouse-agent \
+        -n submariner-operator --timeout=10m 1>/dev/null
+
+    : "Waiting for submariner-lighthouse-coredns deployment on '${clusterName}'"
+    oc --kubeconfig="${kc}" wait --for=create \
+        deployment/submariner-lighthouse-coredns -n submariner-operator --timeout=10m 1>/dev/null
+    oc --kubeconfig="${kc}" rollout status deployment/submariner-lighthouse-coredns \
+        -n submariner-operator --timeout=10m 1>/dev/null
+
+    : "All Submariner components ready on '${clusterName}'"
 }
 
 # --- Main ---
