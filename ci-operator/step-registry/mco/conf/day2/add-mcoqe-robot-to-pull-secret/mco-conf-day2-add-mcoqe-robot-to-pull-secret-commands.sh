@@ -9,6 +9,12 @@ cluster_pull_secret_file="$TMP_DIR/cluster-pull-secret.json"
 mcoqe_pull_secret_file="$TMP_DIR/mcoqe-pull-secret.json"
 merged_pull_secret_file="$TMP_DIR/merged-pull-secret.json"
 
+# setup proxy for disconnected environments
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 if oc get secret pull-secret -n openshift-config; then
   echo "Adding mcoqe robot account to the global clutser pull secret"
 else 
