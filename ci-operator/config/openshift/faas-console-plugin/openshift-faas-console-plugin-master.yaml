@@ -1,9 +1,8 @@
 build_root:
   from_repository: true
 images:
-  items:
-  - dockerfile_path: Dockerfile
-    to: faas-console-plugin
+- dockerfile_path: Dockerfile
+  to: faas-console-plugin
 promotion:
   to:
   - name: "5.0"
@@ -45,11 +44,10 @@ tests:
 - as: e2e-aws
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      OPERATORS: '[{"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group": "openshift-serverless"}, {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}]'
     pre:
     - ref: install-operators
-      env:
-      - name: OPERATORS
-        default: '[{"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group": "openshift-serverless"}, {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}]'
     test:
     - as: e2e
       cli: latest
