@@ -27,7 +27,7 @@ main() {
         -e "hub_name=${HUB_CLUSTER}" \
         -e "hypervisor=hypervisor" \
         -e "hub_kubeconfig=${hub_kubeconfig}" \
-        -e "action=${ACTION}" \
+        -e "connectivity_action=${ACTION}" \
         -e "update_dns=${UPDATE_DNS}" \
         -e "update_provisioning_cr=${UPDATE_PROVISIONING_CR}" \
         ${DEBUG_FLAG}
