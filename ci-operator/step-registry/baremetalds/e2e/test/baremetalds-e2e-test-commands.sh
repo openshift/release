@@ -67,6 +67,9 @@ declare -a MIRRORED_IMAGES=(
   "registry.k8s.io/e2e-test-images/sample-device-plugin:1.7 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-registry-k8s-io-e2e-test-images-sample-device-plugin-1-7-ULwza-sZKxhdAQs1"
   # nginx is switching indices in 1.35 - remove after origin 1.35 bump
   "registry.k8s.io/e2e-test-images/nginx:1.14-4 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-18-registry-k8s-io-e2e-test-images-nginx-1-14-4-20h7A1tgJp0m0c1_"
+  # agnhost:2.59 is not available in "openshift-tests images" command output, so we need to mirror it from source to avoid test failures
+  # remove after image is available in "openshift-tests images" command output
+  "quay.io/openshift/community-e2e-images:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-59-l6lMl0FrhVtCSA-8 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-59-l6lMl0FrhVtCSA-8"
 )
 
 function run-oc-image-mirror() {
