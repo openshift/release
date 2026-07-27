@@ -166,7 +166,7 @@ WaitForConnectionsEstablished() {
         [[ "${verifyHubSpoke}" == "true" ]] && "${subctlBin}" show connections || true
         exit 1
     )
-    true
+    # No trailing `true`: function exit code = inner subshell exit code (0=connected, 1=timeout).
 }
 
 # ── WarmUpServiceDiscovery — prime Lighthouse before verify (no Globalnet) ────
@@ -300,9 +300,13 @@ EOF
 
 # ── AssertNoGlobalnetSubnets — fail if Globalnet 242.x routes are advertised ──
 # Uses oc to read gateway endpoint subnets — no subctl needed.
+# Uses _gnFailed tracking: `false` inside an `if` block does not propagate when
+# set -e is suppressed (( ) || ... context). Explicit tracking + (( _gnFailed == 0 ))
+# as the last command ensures the caller sees a non-zero exit on Globalnet detection.
 AssertNoGlobalnetSubnets() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset clusterName="${1:?}"; (($#)) && shift
+    typeset -i _gnFailed=0
 
     typeset remoteSubnets
     remoteSubnets="$(
@@ -313,7 +317,7 @@ AssertNoGlobalnetSubnets() {
 
     if grep -E '^242\.' <<< "${remoteSubnets}"; then
         : "Globalnet subnets (242.x.x.x) in gateway connections on '${clusterName}' — incompatible with CCLM"
-        false
+        _gnFailed=1
     fi
 
     # Also check via subctl if available (provides richer output).
@@ -322,12 +326,14 @@ AssertNoGlobalnetSubnets() {
         connOutput="$(KUBECONFIG="${kubeconfig}" "${subctlBin}" show connections || true)"
         if grep -E '242\.[0-9]+\.[0-9]+\.[0-9]+' <<< "${connOutput}"; then
             : "Globalnet subnets (242.x.x.x) via subctl on '${clusterName}' — incompatible with CCLM"
-            false
+            _gnFailed=1
         fi
     fi
 
-    : "No Globalnet subnets on '${clusterName}'"
-    true
+    if (( _gnFailed == 0 )); then
+        : "No Globalnet subnets on '${clusterName}'"
+    fi
+    (( _gnFailed == 0 ))
 }
 
 # ── GetSyncControllerPodIp — first Running virt-synchronization-controller pod IP ─
@@ -427,13 +433,21 @@ VerifyCclmSyncPath() {
         false
     }
 
+    # Use explicit failure tracking: bash set -e is suppressed within compound
+    # commands (for/if inside a subshell || construct), so `return 1` from
+    # ProbeCclmSyncPort does NOT propagate via set -e here. Track failures
+    # explicitly and fail at the end so both probes always run for diagnostics.
+    typeset -i _probesFailed=0
+
     : "CCLM sync probe ${srcName} -> ${tgtName} (${tgtSyncIp}:${SUBMARINER_CCLM_SYNC_PORT})"
-    ProbeCclmSyncPort "${kcSource}" "${tgtSyncIp}" "${srcName}-to-${tgtName}"
+    ProbeCclmSyncPort "${kcSource}" "${tgtSyncIp}" "${srcName}-to-${tgtName}" \
+        || _probesFailed=1
 
     : "CCLM sync probe ${tgtName} -> ${srcName} (${srcSyncIp}:${SUBMARINER_CCLM_SYNC_PORT})"
-    ProbeCclmSyncPort "${kcTarget}" "${srcSyncIp}" "${tgtName}-to-${srcName}"
+    ProbeCclmSyncPort "${kcTarget}" "${srcSyncIp}" "${tgtName}-to-${srcName}" \
+        || _probesFailed=1
 
-    true
+    (( _probesFailed == 0 ))
 }
 
 # ── VerifyConnectivity — run subctl verify between two clusters (opt-in) ──────
@@ -510,6 +524,12 @@ InstallSubctl
 typeset -i submarinerStepRc=0
 (
     typeset -i i j
+    # bash set -e is suppressed for all commands inside ( ... ) || ... (the left
+    # side of || runs in an "errexit-ignored" context per POSIX/bash).  Functions
+    # returning non-zero do NOT abort the subshell automatically. Use explicit
+    # || _stepFailed=1 on every critical call and make (( _stepFailed == 0 )) the
+    # LAST command so the subshell exit code accurately reflects any failure.
+    typeset -i _stepFailed=0
 
     # Show initial gateway status — works without subctl via oc.
     for ((i = 0; i < spokeCount; i++)); do
@@ -519,15 +539,16 @@ typeset -i submarinerStepRc=0
         ShowConnections "${KUBECONFIG}" "hub"
     fi
 
-    WaitForConnectionsEstablished 600
+    WaitForConnectionsEstablished 600 || _stepFailed=1
 
     for ((i = 0; i < spokeCount; i++)); do
         AssertNoGlobalnetSubnets \
             "${spokeKubeconfigsArr[i]}" \
-            "${spokeNamesArr[i]}"
+            "${spokeNamesArr[i]}" \
+            || _stepFailed=1
     done
     if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
-        AssertNoGlobalnetSubnets "${KUBECONFIG}" "hub"
+        AssertNoGlobalnetSubnets "${KUBECONFIG}" "hub" || _stepFailed=1
     fi
 
     # Service-discovery warmup and subctl verify — spoke↔spoke pairs.
@@ -547,7 +568,8 @@ typeset -i submarinerStepRc=0
                 "${spokeKubeconfigsArr[i]}" \
                 "${spokeKubeconfigsArr[j]}" \
                 "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}"
+                "${spokeNamesArr[j]}" \
+                || _stepFailed=1
         done
     done
 
@@ -558,7 +580,8 @@ typeset -i submarinerStepRc=0
                 "${spokeKubeconfigsArr[i]}" \
                 "${spokeKubeconfigsArr[j]}" \
                 "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}"
+                "${spokeNamesArr[j]}" \
+                || _stepFailed=1
         done
     done
 
@@ -571,7 +594,8 @@ typeset -i submarinerStepRc=0
                 "${KUBECONFIG}" \
                 "${spokeKubeconfigsArr[i]}" \
                 "hub" \
-                "${spokeNamesArr[i]}"
+                "${spokeNamesArr[i]}" \
+                || _stepFailed=1
         done
     fi
 
@@ -582,7 +606,12 @@ typeset -i submarinerStepRc=0
     if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
         ShowConnections "${KUBECONFIG}" "hub"
     fi
-    true
+
+    # LAST command: propagate any failure as the subshell exit code.
+    # set -e is suppressed inside ( ) || ... but the subshell exit code IS the
+    # exit code of the last command executed — (( _stepFailed == 0 )) returns 1
+    # when any tracked call failed, causing submarinerStepRc to be non-zero.
+    (( _stepFailed == 0 ))
 ) || submarinerStepRc=$?
 
 if (( submarinerStepRc != 0 )); then
