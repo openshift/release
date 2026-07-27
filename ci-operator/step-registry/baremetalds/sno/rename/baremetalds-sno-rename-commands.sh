@@ -34,14 +34,19 @@ function info {
 }
 
 function gather_recert_logs {
+  local node_ip="${SINGLE_NODE_IP}"
+  if ! ssh ${SSH_OPTS[@]} core@${node_ip} true 2>/dev/null; then
+    node_ip="${ADDITIONAL_NODE_IP}"
+  fi
+
   info "Saving systemd recert.service log to /tmp/recert.log..."
-  ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "journalctl -u recert.service > /tmp/recert.log"
+  ssh ${SSH_OPTS[@]} core@${node_ip} "journalctl -u recert.service > /tmp/recert.log"
 
   info "Adding systemd recert.service log to CI artifacts..."
-  scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/tmp/recert.log /tmp/artifacts
+  scp ${SSH_OPTS[@]} core@${node_ip}:/tmp/recert.log /tmp/artifacts
 
   info "Adding recert_summary_clean.yaml to CI artifacts..."
-  scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/etc/kubernetes/recert_summary_clean.yaml /tmp/artifacts
+  scp ${SSH_OPTS[@]} core@${node_ip}:/etc/kubernetes/recert_summary_clean.yaml /tmp/artifacts
 }
 trap gather_recert_logs EXIT TERM
 
@@ -367,17 +372,26 @@ info "Waiting for master MachineConfigPool to have condition=updating..."
 oc wait --for=condition=updating machineconfigpools master --timeout 10m
 
 info "Waiting for recert to be completed..."
+# Poll both the original and new node IPs. The recert process changes the
+# node IP from SINGLE_NODE_IP to ADDITIONAL_NODE_IP partway through, so the
+# original IP becomes unreachable after the IP change.
 while true; do
-  if ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} test -e /var/recert.done; then
-    info "Recert completed successfully"
-    break
-  elif ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} test -e /var/recert.failed; then
-    info "Recert failed"
-    break
-  else
-    info "Waiting for recert to be completed..."
-    sleep 5
-  fi
+  for ip in "${SINGLE_NODE_IP}" "${ADDITIONAL_NODE_IP}"; do
+    status=$(ssh ${SSH_OPTS[@]} core@${ip} '
+      if [ -e /var/recert.done ]; then echo done;
+      elif [ -e /var/recert.failed ]; then echo failed; fi
+    ' 2>/dev/null) || true
+
+    if [ "$status" = "done" ]; then
+      info "Recert completed successfully"
+      break 2
+    elif [ "$status" = "failed" ]; then
+      info "Recert failed"
+      break 2
+    fi
+  done
+  info "Waiting for recert to be completed..."
+  sleep 5
 done
 
 sed -i -e "s/${PREVIOUS_CLUSTER_NAME}/${NEW_CLUSTER_NAME}/g" -e "s/${PREVIOUS_BASE_DOMAIN}/${NEW_BASE_DOMAIN}/g" ${KUBECONFIG}
@@ -392,12 +406,12 @@ do
 done
 
 info "Waiting for OCP stabilization..."
-until ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt" &> /dev/null
+until ssh ${SSH_OPTS[@]} core@${ADDITIONAL_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt" &> /dev/null
 do
   info "Waiting for OCP stabilization..."
   sleep 5
 done
-info $(ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt")
+info "$(ssh ${SSH_OPTS[@]} core@${ADDITIONAL_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt")"
 
 info "Checking for etcd, kube-apiserver, kube-controller-manager and kube-scheduler revision triggers in the respective cluster operator logs..."
 declare -a components=(
