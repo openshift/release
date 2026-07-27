@@ -1,12 +1,8 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: tectonic-console-builder-v29
+  from_repository: true
 images:
-  items:
-  - dockerfile_path: Dockerfile
-    to: faas-console-plugin
+- dockerfile_path: Dockerfile
+  to: faas-console-plugin
 promotion:
   to:
   - name: "5.0"
@@ -29,26 +25,36 @@ resources:
       cpu: 1000m
       memory: 6Gi
 tests:
-- as: lint
+- as: frontend
+  commands: |
+    yarn install --immutable
+    yarn lint
+    yarn test
+  container:
+    from: src
+- as: e2e-aws
   steps:
+    cluster_profile: openshift-org-aws
+    pre:
+    - ref: install-operators
+      env:
+      - name: OPERATORS
+        default: '[{"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group": "openshift-serverless"}, {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}]'
     test:
-    - as: lint
-      commands: yarn install && yarn run lint && yarn run build
+    - as: e2e
+      cli: latest
+      commands: ./test-prow-e2e.sh
+      dependencies:
+      - env: PLUGIN_PULL_SPEC
+        name: faas-console-plugin
       from: src
+      grace_period: 30m0s
       resources:
         requests:
-          cpu: 200m
-          memory: 300Mi
-- as: unit
-  steps:
-    test:
-    - as: unit
-      commands: yarn install && yarn run test
-      from: src
-      resources:
-        requests:
-          cpu: 200m
-          memory: 300Mi
+          cpu: 100m
+          memory: 12Gi
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift
