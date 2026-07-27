@@ -2,15 +2,22 @@ workflow:
   as: openshift-e2e-libvirt-vpn-ipi
   steps:
     env:
+      # IBM Z VPN (phc-cicd) install-config: baseDomain phc-cicd.cis.ibm.net, bridge ocp<subnet>.
+      # Matches upi-conf-libvirt naming so DNS/VPN leases resolve correctly on OZ hosts.
+      USE_EXTERNAL_DNS: "true"
+      # Masters: terraform-provider-libvirt always emits <acpi/>; RHEL 9 s390x QEMU rejects it.
+      # Install step wraps terraform and injects XSLT to strip ACPI from master domains only.
       IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH: "true"
+      # OZ hypervisors have a large shared pool on /home; avoid per-cluster pools on root FS.
       LIBVIRT_POOL_NAME: multiarch-ci-pool
       LIBVIRT_IMAGE_PATH: "/home/libvirt/openshift-images"
-      # Masters via IPI terraform; workers via virt-install or virsh define (no ACPI)
-      # Keep MachineSet replicas at 0 so machine-api does not create guests.
+      # Workers: machine-api/libvirt provider also emits ACPI, so do not let it create guests.
+      # Keep MachineSet replicas at 0; day-2 step creates ACPI-free virsh/virt-install workers.
       WORKER_REPLICAS: "0"
       COMPUTE_COUNT: "2"
     allow_best_effort_post_steps: true
     pre:
+    # UPI-style pre-clean removes leftover lease domains/volumes on the shared VPN pool.
     - ref: upi-libvirt-cleanup-pre
     - chain: ipi-libvirt-pre
     - ref: ipi-install-libvirt-virsh-workers
@@ -19,13 +26,13 @@ workflow:
     post:
     - chain: ipi-libvirt-post
   documentation: |-
-    IBM Z VPN (phc-cicd) hybrid IPI: terraform masters + virsh/virt-install workers.
+    IBM Z VPN (phc-cicd) hybrid IPI for s390x OZ leases (libvirt-s390x-vpn-oz).
 
-    Storage: LIBVIRT_POOL_NAME=multiarch-ci-pool on /home (2TB OZ hosts).
+    Why hybrid (not plain IPI): on RHEL 9 s390x QEMU, domains with ACPI fail. The
+    libvirt machine provider always enables ACPI, so worker Machines cannot boot.
+    Masters are created via IPI terraform with IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH;
+    workers use WORKER_REPLICAS=0 + ipi-install-libvirt-virsh-workers (virt-install
+    on 4.16+, or virsh define + ACPI-free XML on 4.15).
 
-    Workers: WORKER_REPLICAS=0 so machine-api does not create guests (s390x QEMU rejects
-    ACPI in provider domain XML). After install, ipi-install-libvirt-virsh-workers clones
-    the IPI RHCOS base volume and creates ${lease}-compute-* with virt-install (4.16+)
-    or virsh define + ACPI-free domain XML (4.15), attaching the worker ignition disk.
-
-    Masters still use IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH for terraform domains.
+    Storage: LIBVIRT_POOL_NAME=multiarch-ci-pool under /home/libvirt/openshift-images
+    (2TB on OZ). Do not use this workflow on Power s2s or non-VPN libvirt profiles.

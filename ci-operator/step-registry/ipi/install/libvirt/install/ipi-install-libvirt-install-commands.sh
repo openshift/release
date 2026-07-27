@@ -463,7 +463,11 @@ sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
 # default domain XML (domain_def.go). The provider supports xml.xslt on libvirt_domain.
 # unpackAndInit() writes modules and runs terraform init in the same Go routine with no gap, so a
 # parallel poller cannot patch .tf in time. We wrap ${dir}/terraform/bin/terraform (after UnpackTerraform
-# drops the real binary, before the first init) to patch $(pwd) before each init/apply (fragile).
+# drops the real binary, before the first init) to patch $(pwd) before each init/apply.
+#
+# Wrap must be race-safe: wait for a complete ELF binary, cp -a to terraform.real, write the
+# shell wrapper to a temp file with +x, then mv -f over terraform. A naive mv+cat left a
+# non-executable path and failed create with "fork/exec .../terraform: permission denied".
 
 # Bump the libvirt masters memory to 16GB
 export TF_VAR_libvirt_master_memory=${MASTER_MEMORY}
@@ -674,19 +678,44 @@ PATCH_EOF
 		set +o errexit
 		tfbin="${dir}/terraform/bin/terraform"
 		deadline=$((SECONDS + 7200))
-		# Wait for installer to create terraform bundle, then wrap before the first terraform init.
+		# Wait for installer to unpack terraform, then wrap before the first init.
+		# Avoid the previous race: mv + cat >tfbin left a non-executable path (or a
+		# non-executable .real copied mid-unpack) so openshift-install hit
+		# "fork/exec .../terraform: permission denied".
 		while [[ ! -d "${dir}/terraform/bin" ]]; do
-			if (( SECONDS >= deadline )); then exit 0; fi
+			if (( SECONDS >= deadline )); then
+				echo "WARNING: terraform wrap timed out waiting for ${dir}/terraform/bin" >&2
+				exit 0
+			fi
 			sleep 0.05
 		done
-		while [[ ! -f "${tfbin}" || ! -s "${tfbin}" ]]; do
-			if (( SECONDS >= deadline )); then exit 0; fi
+		# Wait until the terraform binary is fully written. Prefer ELF+stable size so we
+		# do not wrap a partial unpack; chmod +x ourselves (installer may race chmod vs exec).
+		while true; do
+			if (( SECONDS >= deadline )); then
+				echo "WARNING: terraform wrap timed out waiting for ${tfbin}" >&2
+				exit 0
+			fi
+			if [[ -f "${tfbin}" && -s "${tfbin}" ]]; then
+				# Skip if we already wrapped (idempotent / late rewrite).
+				if head -c 64 "${tfbin}" 2>/dev/null | grep -q 'ipi-libvirt-terraform-wrap'; then
+					exit 0
+				fi
+				magic="$(head -c 4 "${tfbin}" 2>/dev/null || true)"
+				if [[ "${magic}" == $'\x7fELF' ]]; then
+					sz1=$(wc -c <"${tfbin}" 2>/dev/null || echo 0)
+					sleep 0.02
+					sz2=$(wc -c <"${tfbin}" 2>/dev/null || echo 0)
+					magic2="$(head -c 4 "${tfbin}" 2>/dev/null || true)"
+					if [[ "${sz1}" == "${sz2}" && "${sz1}" -gt 0 && "${magic2}" == $'\x7fELF' ]]; then
+						chmod +x "${tfbin}" 2>/dev/null || true
+						break
+					fi
+				fi
+			fi
 			sleep 0.001 2>/dev/null || sleep 0
 		done
 		if [[ -f "${tfbin}.real" ]]; then
-			exit 0
-		fi
-		if ! mv "${tfbin}" "${tfbin}.real" 2>/dev/null; then
 			exit 0
 		fi
 		xsl_arg=""
@@ -694,19 +723,36 @@ PATCH_EOF
 			xsl_arg="${xsl}"
 		fi
 		pool_arg="${LIBVIRT_POOL_NAME:-}"
-		cat >"${tfbin}" <<EOF
+		# Keep original path executable until the wrapper is ready, then atomically replace.
+		if ! cp -a "${tfbin}" "${tfbin}.real" 2>/dev/null; then
+			echo "WARNING: terraform wrap could not copy ${tfbin} -> ${tfbin}.real" >&2
+			exit 0
+		fi
+		chmod +x "${tfbin}.real" 2>/dev/null || true
+		wrap_tmp="${tfbin}.wrap.$$"
+		cat >"${wrap_tmp}" <<EOF
 #!/bin/bash
+# ipi-libvirt-terraform-wrap: patch .tf before init/plan/apply, then run real terraform.
 set -euo pipefail
 REAL="${tfbin}.real"
 PATCH="${patch_tf}"
 XSL="${xsl_arg}"
 POOL="${pool_arg}"
-if [[ "\$1" == "init" || "\$1" == "plan" || "\$1" == "apply" ]]; then
+chmod +x "\${REAL}" 2>/dev/null || true
+if [[ "\${1:-}" == "init" || "\${1:-}" == "plan" || "\${1:-}" == "apply" ]]; then
 	bash "\${PATCH}" "\$(pwd)" "\${XSL}" "\${POOL}"
 fi
 exec "\${REAL}" "\$@"
 EOF
-		chmod +x "${tfbin}"
+		chmod +x "${wrap_tmp}"
+		if ! mv -f "${wrap_tmp}" "${tfbin}"; then
+			echo "WARNING: terraform wrap atomic replace failed; restoring ${tfbin}" >&2
+			mv -f "${tfbin}.real" "${tfbin}" 2>/dev/null || true
+			rm -f "${wrap_tmp}"
+			exit 0
+		fi
+		chmod +x "${tfbin}" "${tfbin}.real" 2>/dev/null || true
+		echo "INFO: wrapped terraform ${tfbin} -> ${tfbin}.real (acpi=${NEED_ACPI_PATCH} pool=${pool_arg:-none})"
 	) &
 	IPI_ACPI_PATCHER_PID=$!
 fi
@@ -739,27 +785,33 @@ fi
 
 if [ ${ret} -gt 0 ]
 then
-	# Add a step to wait for installation to complete, in case the cluster takes longer to create than the default time of 30 minutes.
-	RCFILE=$(mktemp)
-	{
-		set +e
-		mock-nss.sh openshift-install --dir=${dir} --log-level=debug wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
-		# We need to save the individual return codes for the pipes
-		printf "RC0=%s\nRC1=%s\n" "${PIPESTATUS[0]}" "${PIPESTATUS[1]}" > ${RCFILE}
-	} &
-	wait "$!"
+	# Only wait-for when create progressed far enough to produce a kubeconfig.
+	# Otherwise (e.g. terraform permission denied / init failure) this burns ~40m on API EOF.
+	if [[ -f "${dir}/auth/kubeconfig" ]]; then
+		# Cluster may still be initializing past create's default timeout.
+		RCFILE=$(mktemp)
+		{
+			set +e
+			mock-nss.sh openshift-install --dir=${dir} --log-level=debug wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
+			# We need to save the individual return codes for the pipes
+			printf "RC0=%s\nRC1=%s\n" "${PIPESTATUS[0]}" "${PIPESTATUS[1]}" > ${RCFILE}
+		} &
+		wait "$!"
 
-	# shellcheck source=/dev/null
-	source ${RCFILE}
-	echo "RC0=${RC0}"
-	echo "RC1=${RC1}"
-	rm ${RCFILE}
-	ret=${RC0}
+		# shellcheck source=/dev/null
+		source ${RCFILE}
+		echo "RC0=${RC0}"
+		echo "RC1=${RC1}"
+		rm ${RCFILE}
+		ret=${RC0}
 
-	if [ ${ret} -gt 0 ] || [ -n "${OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP}" ]
-	then
-		collect_bootstrap 2
-		collect_control_plane_logs "${dir}" 2
+		if [ ${ret} -gt 0 ] || [ -n "${OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP}" ]
+		then
+			collect_bootstrap 2
+			collect_control_plane_logs "${dir}" 2
+		fi
+	else
+		echo "Skipping wait-for install-complete: ${dir}/auth/kubeconfig missing (create did not progress)"
 	fi
 fi
 
