@@ -352,6 +352,9 @@ process_single_issue() {
     return 1
   fi
 
+  # Phase 1 can take 35-43 min; refresh token before push (tokens expire after 60 min)
+  refresh_fork_token
+
   check_branch_changes
 
   if [ "$HAS_CODE_CHANGES" != true ]; then

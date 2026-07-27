@@ -191,7 +191,7 @@ in 3.11).''')
         'kind': 'RoleBinding',
         'metadata': {
             'name': 'art-publish',
-            'namespace': 'ocp-private'
+            'namespace': 'ocp-priv'
         },
         'roleRef': {
             'apiGroup': 'rbac.authorization.k8s.io',
@@ -203,14 +203,14 @@ in 3.11).''')
             'name': 'art-publish',
             'namespace': 'ocp'
         }]
-    }, comment='Allow ART to mirror images to the ocp-private namespace so 4.x:base images can be pushed')
+    }, comment='Allow ART to mirror images to the ocp-priv namespace so 4.x:base images can be pushed')
 
     gendoc.append({
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'art-publish-modify-release',
-            'namespace': 'ocp-private'
+            'namespace': 'ocp-priv'
         },
         'rules': [
             {
@@ -236,7 +236,7 @@ in 3.11).''')
         'kind': 'RoleBinding',
         'metadata': {
             'name': 'art-publish-modify-release',
-            'namespace': 'ocp-private'
+            'namespace': 'ocp-priv'
         },
         'roleRef': {
             'apiGroup': 'rbac.authorization.k8s.io',

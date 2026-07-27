@@ -1,0 +1,42 @@
+workflow:
+  as: hypershift-aws-conformance-calico-private
+  documentation: |-
+    The HyperShift AWS conformance Calico private workflow executes conformance tests
+    against an ephemeral private HyperShift cluster with Tigera Calico CNI installed.
+  steps:
+    env:
+      HYPERSHIFT_NETWORK_TYPE: "Other"
+      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
+      CNI_PROVIDER: "calico"
+      # NLB tests: DNS resolution failure for VPC endpoints in HyperShift (OCPBUGS-74537)
+      # CCO tests: broken test binary missing testdata/credentials_request.yaml (OCPBUGS-84630)
+      TEST_SKIPS: The default cluster RBAC policy should have correct RBAC rules\|
+        balancer healthcheck port and path should be 10256/healthz\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should
+        provide named network metrics\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with UDP\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with UDP\| pod should not start for sysctls not on whitelist \[apigroup:k8s.cni.cncf.io\]
+        net.ipv4.conf.IFNAME.arp_filter\| pod should not start for sysctls not on
+        whitelist \[apigroup:k8s.cni.cncf.io\] net.ipv4.conf.all.send_redirects\|
+        sysctl allowlist update should start a pod with custom sysctl only when the
+        sysctl is added to whitelist\|Ensure HTTPRoute object is created\|
+        loadbalancer NLB internal should be reachable with hairpinning traffic\|
+        loadbalancer NLB should be reachable with target-node-labels\|
+        Critical-CCO-based flow for olm managed operators and AWS STS\|
+        The HAProxy router should pass the http2 tests\|
+        \[ovn-kubernetes-ote\]
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-provision
+    - ref: cucushift-hypershift-extended-calico
+    - ref: cucushift-hypershift-extended-calico-health-check
+    - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+    - ref: cucushift-hypershift-extended-enable-guest
+    - ref: cucushift-installer-reportportal-marker
+    test:
+    - chain: hypershift-conformance
+    post:
+    - ref: cucushift-hypershift-extended-disable-guest
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-deprovision
+    - ref: send-results-to-reportportal

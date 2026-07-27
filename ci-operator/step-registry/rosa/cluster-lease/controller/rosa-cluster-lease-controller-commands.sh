@@ -426,31 +426,85 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
     HOLDER=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/holder"] // ""')
     ACQUIRED_AT=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/acquired-at"] // ""')
 
-    # Stale lease recovery
-    if [[ "${STATUS}" == "in-use" && -n "${ACQUIRED_AT}" ]]; then
-        ACQUIRED_EPOCH=$(date -d "${ACQUIRED_AT}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "${ACQUIRED_AT}" +%s 2>/dev/null || echo "0")
-        LEASE_AGE=$(( NOW_EPOCH - ACQUIRED_EPOCH ))
+    # Stale lease recovery (per-operator and legacy)
+    if [[ "${STATUS}" == "in-use" ]]; then
+        OPERATORS_ANNOTATION=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/operators"] // ""')
 
-        if [[ ${LEASE_AGE} -gt ${STALE_THRESHOLD} ]]; then
-            LEASE_HOURS=$(( LEASE_AGE / 3600 ))
-            log "STALE LEASE: ${CM_NAME} held by ${HOLDER} for ${LEASE_HOURS}h"
+        if [[ -n "${OPERATORS_ANNOTATION}" ]]; then
+            # Per-operator mode: check each operator's timestamp for staleness
+            STALE_OPS=""
+            LIVE_OPS=""
+            IFS=',' read -ra OP_LIST <<< "${OPERATORS_ANNOTATION}"
+            for op_entry in "${OP_LIST[@]}"; do
+                [[ -z "${op_entry}" ]] && continue
+                OP_NAME=$(echo "${op_entry}" | cut -d: -f1)
+                OP_EPOCH=$(echo "${op_entry}" | cut -d: -f2)
+                OP_AGE=$(( NOW_EPOCH - OP_EPOCH ))
+                if [[ ${OP_AGE} -gt ${STALE_THRESHOLD} ]]; then
+                    OP_HOURS=$(( OP_AGE / 3600 ))
+                    log "STALE OPERATOR: ${OP_NAME} on ${CM_NAME} for ${OP_HOURS}h"
+                    STALE_OPS="${STALE_OPS:+${STALE_OPS},}${OP_NAME}"
+                else
+                    LIVE_OPS="${LIVE_OPS:+${LIVE_OPS},}${op_entry}"
+                fi
+            done
 
-            if ! dry_run_guard "Would release stale lease on ${CM_NAME}"; then
-                lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
-                    "metadata": {
-                        "labels": { "rosa-cluster-lease/status": "available" },
-                        "annotations": {
-                            "rosa-cluster-lease/holder": "",
-                            "rosa-cluster-lease/build-id": "",
-                            "rosa-cluster-lease/released-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",
-                            "rosa-cluster-lease/recovered-by": "controller"
-                        }
-                    }
-                }' || true
+            if [[ -n "${STALE_OPS}" ]]; then
+                if [[ -z "${LIVE_OPS}" ]]; then
+                    # All operators stale, release the whole cluster
+                    if ! dry_run_guard "Would release all stale operators on ${CM_NAME}"; then
+                        RECOVERED_CM=$(echo "${CM}" | jq '
+                            .metadata.labels["rosa-cluster-lease/status"] = "available" |
+                            .metadata.annotations["rosa-cluster-lease/operators"] = "" |
+                            .metadata.annotations["rosa-cluster-lease/holder"] = "" |
+                            .metadata.annotations["rosa-cluster-lease/build-id"] = "" |
+                            .metadata.annotations["rosa-cluster-lease/released-at"] = "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" |
+                            .metadata.annotations["rosa-cluster-lease/recovered-by"] = "controller"
+                        ')
+                        echo "${RECOVERED_CM}" | lease_oc replace -n "${LEASE_NAMESPACE}" -f - || true
+                    fi
+                    echo "RECOVERED: ${CM_NAME} (all operators stale: ${STALE_OPS})" >> "${REPORT}"
+                else
+                    # Some operators stale, remove just those
+                    if ! dry_run_guard "Would remove stale operators ${STALE_OPS} from ${CM_NAME}"; then
+                        RECOVERED_CM=$(echo "${CM}" | jq '
+                            .metadata.annotations["rosa-cluster-lease/operators"] = "'"${LIVE_OPS}"'" |
+                            .metadata.annotations["rosa-cluster-lease/released-at"] = "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" |
+                            .metadata.annotations["rosa-cluster-lease/recovered-by"] = "controller"
+                        ')
+                        echo "${RECOVERED_CM}" | lease_oc replace -n "${LEASE_NAMESPACE}" -f - || true
+                    fi
+                    echo "RECOVERED: ${CM_NAME} (stale operators: ${STALE_OPS}, remaining: ${LIVE_OPS})" >> "${REPORT}"
+                fi
+                RECOVERED=$((RECOVERED + 1))
+                continue
             fi
-            RECOVERED=$((RECOVERED + 1))
-            echo "RECOVERED: ${CM_NAME} (stale ${LEASE_HOURS}h)" >> "${REPORT}"
-            continue
+        elif [[ -n "${ACQUIRED_AT}" ]]; then
+            # Legacy exclusive mode: check acquired-at timestamp
+            ACQUIRED_EPOCH=$(date -d "${ACQUIRED_AT}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "${ACQUIRED_AT}" +%s 2>/dev/null || echo "0")
+            LEASE_AGE=$(( NOW_EPOCH - ACQUIRED_EPOCH ))
+
+            if [[ ${LEASE_AGE} -gt ${STALE_THRESHOLD} ]]; then
+                LEASE_HOURS=$(( LEASE_AGE / 3600 ))
+                log "STALE LEASE: ${CM_NAME} held by ${HOLDER} for ${LEASE_HOURS}h"
+
+                if ! dry_run_guard "Would release stale lease on ${CM_NAME}"; then
+                    lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                        "metadata": {
+                            "labels": { "rosa-cluster-lease/status": "available" },
+                            "annotations": {
+                                "rosa-cluster-lease/holder": "",
+                                "rosa-cluster-lease/build-id": "",
+                                "rosa-cluster-lease/released-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",
+                                "rosa-cluster-lease/recovered-by": "controller"
+                            }
+                        }
+                    }' || true
+                fi
+                RECOVERED=$((RECOVERED + 1))
+                echo "RECOVERED: ${CM_NAME} (stale ${LEASE_HOURS}h)" >> "${REPORT}"
+                continue
+            fi
         fi
     fi
 

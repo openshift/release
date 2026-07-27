@@ -8,6 +8,10 @@ if [ -z "$PR_NUMBER" ]; then
   echo "ERROR: PULL_NUMBER not set. This step must run as a presubmit."
   exit 1
 fi
+if [ -z "${REVIEW_AGENT_UPSTREAM_REPO:-}" ]; then
+  echo "ERROR: REVIEW_AGENT_UPSTREAM_REPO is required (e.g. openshift/hypershift)"
+  exit 1
+fi
 echo "Triggering review agent for PR #$PR_NUMBER"
 
 CREDS_DIR="/var/run/claude-code-service-account"
@@ -123,7 +127,7 @@ if [ -f "$APP_ID_FILE" ] && [ -f "$INSTALLATION_ID_UPSTREAM_FILE" ] && [ -f "$PR
     curl -s -X POST \
       -H "Authorization: token ${GITHUB_TOKEN}" \
       -H "Accept: application/vnd.github+json" \
-      "https://api.github.com/repos/openshift/hypershift/issues/${PR_NUMBER}/comments" \
+      "https://api.github.com/repos/${REVIEW_AGENT_UPSTREAM_REPO}/issues/${PR_NUMBER}/comments" \
       -d "$(jq -n --arg body "$COMMENT_BODY" '{body: $body}')" > /dev/null
     set -x
     echo "Comment posted on PR #$PR_NUMBER"

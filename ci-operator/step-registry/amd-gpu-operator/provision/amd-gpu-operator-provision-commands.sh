@@ -60,6 +60,13 @@ build_pci_devices_yaml() {
 
 PCI_DEVICES_YAML=$(build_pci_devices_yaml)
 
+# Create helper variable for useSourceImage to be used in the config file below
+if [[ -n "${USE_SOURCE_IMAGE:-}" ]]; then
+    USE_SOURCE_IMAGE_STR="use_source_image: ${USE_SOURCE_IMAGE}"
+else
+    USE_SOURCE_IMAGE_STR=""
+fi
+
 # Generate cluster config file from environment variables
 CONFIG_FILE=/tmp/cluster-config.yaml
 cat > "${CONFIG_FILE}" <<EOF
@@ -106,6 +113,7 @@ operators:
   machine_config_role: worker
   driver_version: "30.20.1"
   enable_metrics: true
+  ${USE_SOURCE_IMAGE_STR}
 EOF
 
 echo "Generated cluster config:"

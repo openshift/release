@@ -106,6 +106,12 @@ VERSION=$(echo "${PAYLOAD_TAG}" | grep -oP '^\d+\.\d+')
 STREAM_NAME=$(echo "${PAYLOAD_TAG}" | sed 's/-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[0-9]\{6\}$//')
 STREAM=$(echo "${STREAM_NAME}" | sed 's/^[0-9]*\.[0-9]*\.[0-9]*-[0-9]*\.//')
 
+# Map OKD stream names to canonical types for BigQuery (must be "nightly" or "ci")
+case "${STREAM}" in
+    okd-scos-nightly) STREAM="nightly" ;;
+    okd-scos)         STREAM="ci" ;;
+esac
+
 RELEASE_CONTROLLER_URL="${RELEASE_CONTROLLER_URL:-https://amd64.ocp.releases.ci.openshift.org}"
 API_URL="${RELEASE_CONTROLLER_URL}/api/v1/releasestream/${STREAM_NAME}/release/${PAYLOAD_TAG}"
 PAYLOAD_URL="${RELEASE_CONTROLLER_URL}/releasestream/${STREAM_NAME}/release/${PAYLOAD_TAG}"

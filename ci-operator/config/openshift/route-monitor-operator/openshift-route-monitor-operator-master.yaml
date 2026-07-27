@@ -10,9 +10,8 @@ images:
   - dockerfile_path: Dockerfile
     to: route-monitor-operator
   - dockerfile_literal: |
-      FROM src
-      RUN cp -r deploy_pko /package
-    from: src
+      FROM scratch
+      COPY deploy_pko/ /package/
     to: operator-pko
   - dockerfile_literal: |
       FROM src
@@ -28,7 +27,7 @@ releases:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 6Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -71,8 +70,6 @@ tests:
   container:
     from: src
 - as: rosa-sts-e2e
-  optional: true
-  run_if_changed: ^(test/e2e/.*|pkg/.*|api/.*|cmd/.*|deploy/.*|go\.mod|go\.sum)$
   steps:
     cluster_profile: rosa-e2e-01
     dependencies:

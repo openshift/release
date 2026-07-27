@@ -317,12 +317,6 @@ CONFIG = {
     'aro-hcp-dev-quota-slice': {
         'default': 14,
     },
-    'aro-hcp-dev-global-pipeline-quota-slice': {
-        'default': 1,
-    },
-    'aro-hcp-dev-cspr-pipeline-quota-slice': {
-        'default': 1,
-    },
     'aro-hcp-dev-image-push-quota-slice': {
         'default': 1,
     },
@@ -339,6 +333,7 @@ CONFIG = {
     'aro-hcp-int-shard0-slot': {},
     'aro-hcp-prod-shard0-slot': {},
     'aro-hcp-prod-shard1-slot': {},
+    'aro-hcp-prod-testtenant-slot': {},
     'aro-hcp-stg-shard0-slot': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
@@ -497,6 +492,9 @@ CONFIG = {
     'hypershift-gcp-quota-slice': {
         'default': 10,
     },
+    'platform-gcp-quota-slice': {
+        'default': 3,
+    },
     'powervc-1-quota-slice': {
         'default': 4,
     },
@@ -517,6 +515,7 @@ CONFIG = {
     'powervs-7-quota-slice': {},
     'powervs-8-quota-slice': {},
     'powervs-9-quota-slice': {},
+    'powervs-10-quota-slice': {},
     'powervs-sno-quota-slice': {
         'dal14': 2,
     },
@@ -795,6 +794,9 @@ for i in range(4):
 for i in range(2):
     CONFIG['powervs-9-quota-slice']['sao04-powervs-9-quota-slice-{}'.format(i)] = 1
 
+for i in range(4):
+    CONFIG['powervs-10-quota-slice']['dal14-powervs-10-quota-slice-{}'.format(i)] = 1
+
 for i in range(300):
     CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
 for i in range(150):
@@ -819,6 +821,8 @@ for i in range(3):
     CONFIG['aro-hcp-prod-shard0-slot']['aro-hcp-prod-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(3):
     CONFIG['aro-hcp-prod-shard1-slot']['aro-hcp-prod-shard1-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(4):
+    CONFIG['aro-hcp-prod-testtenant-slot']['aro-hcp-prod-testtenant-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES

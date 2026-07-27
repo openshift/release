@@ -1,9 +1,31 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.23
+images:
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src
+      WORKDIR /opt/app-root/src/rosa-clusters-service
+      USER root
+      RUN dnf install -y git go make jq python3 python3-pip skopeo
+      RUN dnf clean all
+      RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xzf - -C /usr/local/bin oc
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-online/rosa-clusters-service
+    to: golang-plus
 prowgen:
   expose: true
   private: true
@@ -32,60 +54,75 @@ tests:
     from: src
 - always_run: false
   as: pr-check-rosa-hcp
+  capabilities:
+  - nested-podman
   commands: |
     source prow/load_prow_secrets.sh
     set -x
     ./pr_check.sh --rosa-hcp
   container:
-    from: src
+    from: golang-plus
+  nested_podman: true
   optional: true
   secrets:
   - mount_path: /usr/local/rosa-clusters-service-sandbox
     name: rosa-clusters-service-sandbox
 - always_run: false
   as: pr-check-aws
+  capabilities:
+  - nested-podman
   commands: |
     source prow/load_prow_secrets.sh
     set -x
     ./pr_check.sh --aws
   container:
-    from: src
+    from: golang-plus
+  nested_podman: true
   optional: true
   secrets:
   - mount_path: /usr/local/rosa-clusters-service-sandbox
     name: rosa-clusters-service-sandbox
 - always_run: false
   as: pr-check-gcp
+  capabilities:
+  - nested-podman
   commands: |
     source prow/load_prow_secrets.sh
     set -x
     ./pr_check.sh --gcp
   container:
-    from: src
+    from: golang-plus
+  nested_podman: true
   optional: true
   secrets:
   - mount_path: /usr/local/rosa-clusters-service-sandbox
     name: rosa-clusters-service-sandbox
 - always_run: false
   as: pr-check-rosa-classic
+  capabilities:
+  - nested-podman
   commands: |
     source prow/load_prow_secrets.sh
     set -x
     ./pr_check.sh --rosa-classic
   container:
-    from: src
+    from: golang-plus
+  nested_podman: true
   optional: true
   secrets:
   - mount_path: /usr/local/rosa-clusters-service-sandbox
     name: rosa-clusters-service-sandbox
 - always_run: false
   as: pr-check-core
+  capabilities:
+  - nested-podman
   commands: |
     source prow/load_prow_secrets.sh
     set -x
     ./pr_check.sh --core
   container:
-    from: src
+    from: golang-plus
+  nested_podman: true
   optional: true
   secrets:
   - mount_path: /usr/local/rosa-clusters-service-sandbox
