@@ -109,7 +109,9 @@ ${DNS_BLOCK}
     query_url: "${JAEGER_QUERY_URL}"
   mockserver:
     image: "${MOCKSERVER_IMAGE}"
-    url: "${MOCKSERVER_URL}"
+    # NOTE: mockserver.url removed - when set, testsuite creates Deployment
+    # but mockserver-config ConfigMap is not created, causing 404 responses.
+    # Without url, testsuite should create full MockserverBackend with config.
   llm_sim:
     image: "${LLM_SIM_IMAGE}"
   spicedb:
