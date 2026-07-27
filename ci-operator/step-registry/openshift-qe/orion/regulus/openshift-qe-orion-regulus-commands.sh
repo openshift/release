@@ -22,7 +22,7 @@ echo "=================================="
 echo ""
 
 python --version
-pushd /tmp
+pushd /tmp || exit 1
 
 # ── Set up Python virtual environment ─────────────────────────────────────────
 echo "Setting up Python virtual environment..."
@@ -51,10 +51,10 @@ for attempt in $(seq 1 "$MAX_RETRIES"); do
   sleep 10
 done
 
-pushd orion
+pushd orion || exit 1
 pip install -q --retries "$MAX_RETRIES" -r requirements.txt
 pip install -q --retries "$MAX_RETRIES" .
-popd
+popd || exit 1
 
 # ── Clone Regulus repo ──────────────────────────────────────────────
 echo "Cloning Regulus from ${REGULUS_REPO} (branch: ${REGULUS_BRANCH})..."
@@ -73,7 +73,7 @@ for attempt in $(seq 1 "$MAX_RETRIES"); do
 done
 
 # ── Install ORION dependencies ────────────────────────────────────
-pushd regulus/ORION
+pushd regulus/ORION || exit 1
 pip install -q --retries "$MAX_RETRIES" requests pyyaml
 echo "✅ Dependencies installed"
 
@@ -87,7 +87,7 @@ echo ""
 ./scripts/prow-entry.sh
 analysis_exit_status=$?
 
-popd
-popd
+popd || true
+popd || true
 
 exit $analysis_exit_status
