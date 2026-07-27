@@ -88,6 +88,12 @@ releases:
       relative: 1
       stream: ci
       version: "5.0"
+  initial-420:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.20"
   initial-422:
     candidate:
       product: ocp
@@ -99,6 +105,11 @@ releases:
       include_built_images: true
       name: "5.0"
       namespace: ocp
+  latest-420:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.20"
   latest-421:
     candidate:
       product: ocp
@@ -181,7 +192,6 @@ tests:
       NODEPOOL_N1_VERSION: "4.22"
       NODEPOOL_N2_VERSION: "4.21"
       NODEPOOL_N3_VERSION: "4.20"
-      NODEPOOL_N4_VERSION: "4.19"
     post:
     - ref: hypershift-analyze-e2e-failure
     - chain: cucushift-installer-rehearse-azure-aks-deprovision
@@ -200,8 +210,20 @@ tests:
       HYPERSHIFT_AZURE_LOCATION: centralus
       NODEPOOL_N1_VERSION: "4.21"
       NODEPOOL_N2_VERSION: "4.20"
-      NODEPOOL_N3_VERSION: "4.19"
-      NODEPOOL_N4_VERSION: "4.18"
+    workflow: hypershift-azure-aks-e2e
+- always_run: false
+  as: e2e-aks-4-20
+  pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
+  steps:
+    cluster_profile: hypershift-aks
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest-420
+      OCP_IMAGE_N1: release:latest-420
+      OCP_IMAGE_PREVIOUS: release:initial-420
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
 - always_run: false
   as: e2e-aro-hcp
