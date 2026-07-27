@@ -50,7 +50,7 @@ function run_cmd_with_retries_save_output()
 
 function create_role_definition_json() {
 
-    local role_name=$1 permissions=$2 role_definition_file=$3
+    local role_name=$1 permissions=$2 role_definition_file=$3 data_permissions=${4:-}
 
     role_description="the custom role ${role_name} with minimal permissions for cluster ${CLUSTER_NAME}"
     assignable_scopes="""
@@ -62,7 +62,8 @@ function create_role_definition_json() {
        --arg role_name "${role_name}" \
        --arg description "${role_description}" \
        --argjson assignable_scopes "[ ${assignable_scopes} ]" \
-       --argjson permission_list "[ ${permissions} ]" '
+       --argjson permission_list "[ ${permissions} ]" \
+       --argjson data_permission_list "[ ${data_permissions:-} ]" '
 {
   "Name": $role_name,
   "IsCustom": true,
@@ -70,7 +71,7 @@ function create_role_definition_json() {
   "assignableScopes": $assignable_scopes,
   "Actions": $permission_list,
   "notActions": [],
-  "dataActions": [],
+  "dataActions": $data_permission_list,
   "notDataActions": []
 }' > "${role_definition_file}"
 }
@@ -223,6 +224,7 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 \"Microsoft.Storage/storageAccounts/fileServices/shares/read\",
 \"Microsoft.Storage/storageAccounts/fileServices/shares/write\",
 \"Microsoft.Storage/storageAccounts/fileServices/shares/delete\",
+\"Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action\",
 \"Microsoft.Storage/storageAccounts/listKeys/action\",
 \"Microsoft.Storage/storageAccounts/read\",
 \"Microsoft.Storage/storageAccounts/write\",
@@ -434,7 +436,12 @@ ${required_permissions}
 
     fi
 
-    create_role_definition_json "${CUSTOM_ROLE_NAME}" "${required_permissions}" "${ROLE_DEFINITION}"
+    required_data_permissions="""
+\"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read\",
+\"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write\"
+"""
+
+    create_role_definition_json "${CUSTOM_ROLE_NAME}" "${required_permissions}" "${ROLE_DEFINITION}" "${required_data_permissions}"
     echo "Creating custom role..."
     create_custom_role "${ROLE_DEFINITION}"
     # for destroy
