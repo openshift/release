@@ -43,10 +43,47 @@ if ssh "${INSTANCE_PREFIX}" "[ -d \"${PMLOGS_DIR}\" ]" ; then
     fi
 fi
 
-# Generate the interactive PCP dashboard
+# Generate the interactive PCP dashboard (stored as a regular artifact)
 echo "Generating PCP dashboard..."
 bash "${PCP_SCRIPTS}/generate-dashboard.sh" \
     --local "${LOCAL_ARTIFACTS}" \
-    --output "${ARTIFACT_DIR}/custom-link-pcp.html"
+    --output "${ARTIFACT_DIR}/pcp-dashboard.html"
 
 rm -rf "${LOCAL_ARTIFACTS}"
+
+# Build a gcsweb link to the interactive dashboard.
+# Spyglass does not execute JavaScript in custom-link HTML, so the toggle
+# provides a link to the full interactive dashboard instead.
+STEP_NAME="openshift-microshift-infra-pcp-dashboard"
+GCSWEB_BASE="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+
+WORKFLOW_NAME=""
+if [ -n "${SCENARIO_GCS}" ]; then
+    WORKFLOW_NAME=$(echo "${SCENARIO_GCS}" | sed -nE 's|.*/artifacts/([^/]+)/openshift-microshift-e2e-metal-tests/.*|\1|p')
+fi
+if [ -z "${WORKFLOW_NAME}" ]; then
+    WORKFLOW_NAME=$(gsutil ls -d "${GCS_BASE}/artifacts/*/" 2>/dev/null | head -1 | sed -nE 's|.*/artifacts/([^/]+)/.*|\1|p' || true)
+fi
+
+if [ -n "${WORKFLOW_NAME}" ]; then
+    DASHBOARD_URL="${GCSWEB_BASE}/${GCS_JOB_PATH}/artifacts/${WORKFLOW_NAME}/${STEP_NAME}/artifacts/pcp-dashboard.html"
+else
+    DASHBOARD_URL="${GCSWEB_BASE}/${GCS_JOB_PATH}"
+fi
+
+cat > "${ARTIFACT_DIR}/custom-link-pcp.html" <<LINKEOF
+<html>
+<head>
+  <title>PCP Performance Dashboard</title>
+  <style>
+    body { background-color: #303030; color: #fff; font-family: "Roboto", "Helvetica", "Arial", sans-serif; padding: 16px; margin: 0; }
+    a { color: #4fc3f7; font-size: 1.1em; }
+    p { color: #bbb; margin-top: 8px; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <a href="${DASHBOARD_URL}" target="_blank">Open Interactive PCP Performance Dashboard</a>
+  <p>Interactive charts require JavaScript, which is not available in Spyglass view.</p>
+</body>
+</html>
+LINKEOF
