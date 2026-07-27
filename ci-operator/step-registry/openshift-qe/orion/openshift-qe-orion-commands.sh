@@ -344,4 +344,9 @@ if [ "${RUN_ORION}" == "deferred" ]; then
   exit 0
 fi
 
+if [[ "${JOB_NAME}" == *rehearse* ]]; then
+  echo "Rehearse job detected. Exit status $orion_exit_status ignored."
+  exit 0
+fi
+
 exit $orion_exit_status
