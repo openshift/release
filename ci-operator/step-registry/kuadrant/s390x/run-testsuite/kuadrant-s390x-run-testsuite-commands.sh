@@ -343,9 +343,10 @@ def log_diagnostics(phase):
         print(f"[DIAGNOSTIC {datetime.utcnow().strftime('%H:%M:%S')}] {phase}", file=sys.stderr)
         print(f"{'='*80}", file=sys.stderr)
 
-        # Critical resources - backends, Deployments, and routing
+        # Critical resources - backends, Deployments, ConfigMaps, and routing
         print(safe_capture("Backend Pods (kuadrant)", "get pods -n kuadrant -l app=backend -o wide"), file=sys.stderr)
         print(safe_capture("Backend Deployments (kuadrant)", "get deploy -n kuadrant -o wide"), file=sys.stderr)
+        print(safe_capture("Backend ConfigMaps (kuadrant)", "get cm -n kuadrant"), file=sys.stderr)
         print(safe_capture("HTTPRoutes (kuadrant)", "get httproute -n kuadrant -o wide"), file=sys.stderr)
         print(safe_capture("Services (kuadrant)", "get svc -n kuadrant"), file=sys.stderr)
 
@@ -382,9 +383,17 @@ def pytest_sessionfinish(session, exitstatus):
     print("Expected: Service pointing to backend pods", file=sys.stderr)
     print("\nActual findings:", file=sys.stderr)
 
-    # Check Deployments (the critical missing piece)
+    # Check Deployments
     print("\n--- Deployments ---", file=sys.stderr)
     print(check_deployments(), file=sys.stderr)
+
+    # Check ConfigMaps (CRITICAL - determines if expectations are loaded)
+    print("\n--- ConfigMaps ---", file=sys.stderr)
+    cms = run_oc_safe("get cm -n kuadrant -o name", timeout=5)
+    print(cms if cms else "No ConfigMaps", file=sys.stderr)
+    if "mockserver" in (cms or "").lower():
+        details = run_oc_safe("get cm -n kuadrant -o yaml | grep -A 20 'echo_expectation\\|mockserver'", timeout=5)
+        print(f"MockServer ConfigMap details:\n{details}", file=sys.stderr)
 
     # Check Pods
     print("\n--- Pods ---", file=sys.stderr)
