@@ -72,14 +72,29 @@ echo "Pushing control-plane-operator: ${HYPERSHIFT_CPO_IMAGE} -> ${CPO_ACR_REF}"
 retry oc image mirror "${HYPERSHIFT_CPO_IMAGE}" "${CPO_ACR_REF}"
 
 # Resolve digests from ACR for the pushed images.
-# Use `az acr manifest list-metadata` which reliably returns digests,
-# matching the pattern used by the aro-hcp-hypershift-deploy step.
-HO_DIGEST=$(az acr manifest list-metadata "${SVC_ACR_URL}/hypershift-operator" \
-    --query "[?tags[0]=='${IMAGE_TAG}'].digest" -o tsv)
+# ACR metadata can lag behind a successful push, so retry the query.
+resolve_digest() {
+    local acr_url="$1" repo="$2" tag="$3"
+    local digest=""
+    for attempt in 1 2 3 4 5; do
+        digest=$(az acr manifest list-metadata "${acr_url}/${repo}" \
+            --query "[?contains(tags, '${tag}')].digest" -o tsv 2>/dev/null || true)
+        if [[ -n "${digest}" ]]; then
+            echo "${digest}"
+            return 0
+        fi
+        if (( attempt < 5 )); then
+            echo "Digest not yet available for ${repo}:${tag} from ${acr_url} (attempt ${attempt}/5), retrying in 15s..." >&2
+            sleep 15
+        fi
+    done
+    return 1
+}
+
+HO_DIGEST=$(resolve_digest "${SVC_ACR_URL}" "hypershift-operator" "${IMAGE_TAG}")
 echo "HO digest: ${HO_DIGEST}"
 
-CPO_DIGEST=$(az acr manifest list-metadata "${OCP_ACR_URL}/hypershift" \
-    --query "[?tags[0]=='${IMAGE_TAG}'].digest" -o tsv)
+CPO_DIGEST=$(resolve_digest "${OCP_ACR_URL}" "hypershift" "${IMAGE_TAG}")
 echo "CPO digest: ${CPO_DIGEST}"
 
 if [[ -z "${HO_DIGEST}" ]]; then
