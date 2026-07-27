@@ -379,19 +379,19 @@ poetry run python -c \"from importlib.metadata import version; print('protobuf',
 
 echo '=== Testsuite configuration verification ==='
 poetry run python -c \"
-from dynaconf import Dynaconf
-settings = Dynaconf(
-    settings_files=['/config/secrets.yaml'],
-    environments=True,
-    env_switcher='ENV_FOR_DYNACONF',
-    load_dotenv=False,
-)
-print('Configuration loaded from:', settings.settings_files)
-print('mockserver.image:', getattr(settings, 'mockserver', {}).get('image', 'NOT SET'))
-print('httpbin.image:', getattr(settings, 'httpbin', {}).get('image', 'NOT SET'))
-print('service_protection.project:', getattr(settings, 'service_protection', {}).get('project', 'NOT SET'))
-print('control_plane.provider_secret:', getattr(settings, 'control_plane', {}).get('provider_secret', 'NOT SET'))
-\" || echo 'Config verification failed (non-fatal)'
+import os
+os.environ['SECRETS_FOR_DYNACONF'] = '/config/secrets.yaml'
+from testsuite.config import testsuite_property
+# Import triggers config load via SECRETS_FOR_DYNACONF
+from testsuite import settings
+print('===== DYNACONF SETTINGS LOADED =====')
+print('mockserver.image:', settings.get('mockserver', {}).get('image', 'NOT SET'))
+print('httpbin.image:', settings.get('httpbin', {}).get('image', 'NOT SET'))
+print('service_protection.project:', settings.get('service_protection', {}).get('project', 'NOT SET'))
+print('control_plane.provider_secret:', settings.get('control_plane', {}).get('provider_secret', 'NOT SET'))
+print('default_exposer:', settings.get('default_exposer', 'NOT SET'))
+print('====================================')
+\" 2>&1 || echo 'Config verification failed (non-fatal, but indicates config load issue!)'
 "
 if [[ "${RUN_SMOKE}" == "true" ]]; then
   CONTAINER_SCRIPT+="echo '=== make smoke ==='
