@@ -7,6 +7,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.39.2
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make go-build
 build_root:
   from_repository: true
@@ -15,6 +19,8 @@ images:
   - dockerfile_path: Dockerfile.openshift
     from: base-rhel9
     to: must-gather-operator
+  - dockerfile_path: images/ci/Dockerfile.coverage
+    to: must-gather-operator-coverage
 operator:
   bundles:
   - as: must-gather-operator-bundle
@@ -121,6 +127,132 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
+- always_run: false
+  as: e2e-operator-coverage
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  steps:
+    post:
+    - as: collect-coverage
+      best_effort: true
+      cli: latest
+      commands: hack/e2e-coverage.sh collect
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/ci-secrets
+        name: must-gather-operator-codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    - chain: gather
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace must-gather-operator
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n must-gather-operator "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n must-gather-operator deployment must-gather-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: must-gather-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: setup-coverage
+      cli: latest
+      commands: hack/e2e-coverage.sh setup
+      dependencies:
+      - env: COVERAGE_IMAGE
+        name: must-gather-operator-coverage
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: publish-e2e-coverage
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  postsubmit: true
+  steps:
+    post:
+    - as: collect-coverage
+      best_effort: true
+      cli: latest
+      commands: hack/e2e-coverage.sh collect
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/ci-secrets
+        name: must-gather-operator-codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    - chain: gather
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace must-gather-operator
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n must-gather-operator "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n must-gather-operator deployment must-gather-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: must-gather-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: setup-coverage
+      cli: latest
+      commands: hack/e2e-coverage.sh setup
+      dependencies:
+      - env: COVERAGE_IMAGE
+        name: must-gather-operator-coverage
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 - always_run: false
   as: e2e-gcp-operator-rhcos10-fips
   optional: true
