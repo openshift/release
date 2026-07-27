@@ -64,6 +64,32 @@ collect() {
     fi
     echo ""
 
+    echo "=== Worker Node maxPods (capacity.pods) ==="
+    EXPECTED_MAX_PODS="${MAX_PODS:-500}"
+    for WORKER in $(oc get nodes -l node-role.kubernetes.io/worker= \
+        -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+        CAPACITY=$(oc get node "${WORKER}" -o jsonpath='{.status.capacity.pods}' 2>/dev/null || echo "unknown")
+        echo "  ${WORKER}: capacity.pods = ${CAPACITY} (expected ${EXPECTED_MAX_PODS})"
+    done
+    echo ""
+
+    # Wait for MCP rollout if maxPods hasn't taken effect
+    FIRST_WORKER=$(oc get nodes -l node-role.kubernetes.io/worker= \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    CURRENT_MAX=$(oc get node "${FIRST_WORKER}" -o jsonpath='{.status.capacity.pods}' 2>/dev/null || echo "250")
+    if [ "${CURRENT_MAX}" -lt "${EXPECTED_MAX_PODS}" ] 2>/dev/null; then
+        echo "=== maxPods not yet applied (${CURRENT_MAX} < ${EXPECTED_MAX_PODS}), waiting for MCP rollout ==="
+        oc wait mcp/worker --for=condition=Updated=True --timeout=20m 2>/dev/null || true
+        sleep 30
+        echo "=== Worker Node maxPods (after MCP wait) ==="
+        for WORKER in $(oc get nodes -l node-role.kubernetes.io/worker= \
+            -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+            CAPACITY=$(oc get node "${WORKER}" -o jsonpath='{.status.capacity.pods}' 2>/dev/null || echo "unknown")
+            echo "  ${WORKER}: capacity.pods = ${CAPACITY}"
+        done
+        echo ""
+    fi
+
     echo "=== ovs-vsctl process baseline (all workers) ==="
     for WORKER in $(oc get nodes -l node-role.kubernetes.io/worker= \
         -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
