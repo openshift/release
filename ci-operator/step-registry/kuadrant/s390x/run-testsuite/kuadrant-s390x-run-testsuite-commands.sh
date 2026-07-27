@@ -109,6 +109,7 @@ ${DNS_BLOCK}
     query_url: "${JAEGER_QUERY_URL}"
   mockserver:
     image: "${MOCKSERVER_IMAGE}"
+    url: "${MOCKSERVER_URL}"
   llm_sim:
     image: "${LLM_SIM_IMAGE}"
   spicedb:
@@ -315,6 +316,24 @@ def safe_capture(label, cmd):
     except Exception:
         return f"\n--- {label} ---\nCAPTURE_FAILED\n"
 
+def check_deployments():
+    """Check for Deployment resources that might exist without pods."""
+    try:
+        # Check if Deployments exist
+        deps = run_oc_safe("get deploy -n kuadrant -o wide", timeout=5)
+        if deps and "No resources found" not in deps:
+            # Get detailed status
+            dep_names = run_oc_safe("get deploy -n kuadrant -o name", timeout=5)
+            details = []
+            for dep_name in dep_names.strip().split('\n'):
+                if dep_name:
+                    desc = run_oc_safe(f"describe {dep_name} -n kuadrant | grep -A 10 'Replicas\\|Events'", timeout=5)
+                    details.append(f"\n{dep_name}:\n{desc}")
+            return f"Deployments found:\n{deps}\n{''.join(details)}"
+        return "No Deployments in kuadrant namespace"
+    except Exception:
+        return "Failed to check Deployments"
+
 def log_diagnostics(phase):
     """Capture critical state only, maximum 60s total."""
     try:
@@ -322,9 +341,9 @@ def log_diagnostics(phase):
         print(f"[DIAGNOSTIC {datetime.utcnow().strftime('%H:%M:%S')}] {phase}", file=sys.stderr)
         print(f"{'='*80}", file=sys.stderr)
 
-        # Only capture critical resources - backends and HTTPRoutes
-        print(safe_capture("Backends (kuadrant)", "get pods -n kuadrant -l app=backend -o wide"), file=sys.stderr)
-        print(safe_capture("Backends (kuadrant2)", "get pods -n kuadrant2 -l app=backend -o wide"), file=sys.stderr)
+        # Critical resources - backends, Deployments, and routing
+        print(safe_capture("Backend Pods (kuadrant)", "get pods -n kuadrant -l app=backend -o wide"), file=sys.stderr)
+        print(safe_capture("Backend Deployments (kuadrant)", "get deploy -n kuadrant -o wide"), file=sys.stderr)
         print(safe_capture("HTTPRoutes (kuadrant)", "get httproute -n kuadrant -o wide"), file=sys.stderr)
         print(safe_capture("Services (kuadrant)", "get svc -n kuadrant"), file=sys.stderr)
 
@@ -357,13 +376,26 @@ def pytest_sessionfinish(session, exitstatus):
     print("\n" + "="*80, file=sys.stderr)
     print("[DIAGNOSTIC] BACKEND DEPLOYMENT SUMMARY", file=sys.stderr)
     print("="*80, file=sys.stderr)
-    print("Expected: MockServer backend pods in 'kuadrant' namespace", file=sys.stderr)
-    print("Expected: Service name contains 'backend' or 'mockserver'", file=sys.stderr)
-    print("Expected: HTTPRoutes pointing to backend services", file=sys.stderr)
+    print("Expected: MockServer Deployment + Pods in 'kuadrant' namespace", file=sys.stderr)
+    print("Expected: Service pointing to backend pods", file=sys.stderr)
     print("\nActual findings:", file=sys.stderr)
-    print(run_oc_safe("get pods -n kuadrant -l app=backend -o name", timeout=5), file=sys.stderr)
-    print(run_oc_safe("get pods -n kuadrant -l app=mockserver -o name", timeout=5), file=sys.stderr)
-    print(run_oc_safe("get svc -n kuadrant | grep -i backend || echo 'No backend services'", timeout=5), file=sys.stderr)
+
+    # Check Deployments (the critical missing piece)
+    print("\n--- Deployments ---", file=sys.stderr)
+    print(check_deployments(), file=sys.stderr)
+
+    # Check Pods
+    print("\n--- Pods ---", file=sys.stderr)
+    pods = run_oc_safe("get pods -n kuadrant -l app=backend -o wide", timeout=5)
+    if not pods or "No resources found" in pods:
+        pods = run_oc_safe("get pods -n kuadrant | grep -i mockserv || echo 'No mockserver pods'", timeout=5)
+    print(pods, file=sys.stderr)
+
+    # Check Services
+    print("\n--- Services ---", file=sys.stderr)
+    svcs = run_oc_safe("get svc -n kuadrant | grep -i mockserv || echo 'No mockserver services'", timeout=5)
+    print(svcs, file=sys.stderr)
+
     print("="*80 + "\n", file=sys.stderr)
 DIAGPY
 
@@ -778,19 +810,26 @@ if [[ -n "${RUNNER_POD}" ]]; then
       sleep 30
       iteration=$((iteration + 1))
       echo "=== Backend Monitor Snapshot ${iteration} at $(date -u +%H:%M:%S) ==="
+
+      echo "--- Backend Deployments ---"
+      oc get deploy -n kuadrant -o wide 2>&1 || echo "No deployments"
+      # Show Deployment status (critical for diagnosing why pods don't exist)
+      for deploy in $(oc get deploy -n kuadrant -o name 2>/dev/null | grep -i mockserv); do
+        deploy_name=$(basename "${deploy}")
+        echo "  Deployment ${deploy_name}:"
+        echo "    Replicas: $(oc get deploy -n kuadrant "${deploy_name}" -o jsonpath='{.status.replicas}/{.spec.replicas}' 2>&1 || echo 'N/A')"
+        echo "    Ready: $(oc get deploy -n kuadrant "${deploy_name}" -o jsonpath='{.status.readyReplicas}' 2>&1 || echo '0')"
+        echo "    Image: $(oc get deploy -n kuadrant "${deploy_name}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>&1 || echo 'N/A')"
+      done
+
       echo "--- Backend pods ---"
       oc get pods -n kuadrant -l app=backend -o wide 2>&1 || echo "No backend pods"
-      # Show pod readiness and age
-      for pod in $(oc get pods -n kuadrant -l app=backend -o name 2>/dev/null); do
-        pod_name=$(basename "${pod}")
-        echo "  Pod ${pod_name}:"
-        echo "    Status: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.phase}' 2>&1 || echo 'N/A')"
-        echo "    Ready: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>&1 || echo 'N/A')"
-        echo "    Image: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.spec.containers[0].image}' 2>&1 || echo 'N/A')"
-        echo "    Restarts: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>&1 || echo 'N/A')"
-      done
+      # Also check for any mockserver pods (might not have backend label)
+      oc get pods -n kuadrant 2>&1 | grep -i mockserv || true
+
       echo "--- Backend services ---"
-      oc get svc -n kuadrant -l app=backend -o wide 2>&1 || echo "No backend services"
+      oc get svc -n kuadrant 2>&1 | grep -i mockserv || echo "No mockserver services"
+
       echo "--- HTTPRoutes ---"
       oc get httproutes -n kuadrant -o name 2>&1 | head -5 || echo "No HTTPRoutes"
     done
