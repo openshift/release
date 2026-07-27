@@ -7,6 +7,7 @@ set -o pipefail
 umask 077
 EXIT_CODE=100
 work_dir=""
+pipeline_image_file="${SHARED_DIR}/omr_v2_pipeline_image"
 published=false
 declare -a ssh_options=()
 declare -a runtime_files=(
@@ -32,6 +33,7 @@ cleanup() {
     if [[ -n "${work_dir}" && -d "${work_dir}" ]]; then
         rm -rf -- "${work_dir}"
     fi
+    rm -f -- "${pipeline_image_file}"
     exit "${status}"
 }
 
@@ -45,7 +47,11 @@ trap terminate TERM
 mkdir -p "${ARTIFACT_DIR}"
 rm -f -- "${runtime_files[@]}"
 
-for command in scp ssh; do
+required_commands=(scp ssh)
+if [[ -s "${pipeline_image_file}" ]]; then
+    required_commands+=(awk grep oc sha256sum tar)
+fi
+for command in "${required_commands[@]}"; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         echo "Required command ${command} is unavailable in the OMR v2 install step image." >&2
         exit 1
@@ -64,8 +70,13 @@ for required_file in \
 done
 
 safe_download_url_re='^https://[A-Za-z0-9./_?&=%:+-]+$'
-if [[ ! "${OMR_V2_DOWNLOAD_URL}" =~ ${safe_download_url_re} ]]; then
+if [[ ! -e "${pipeline_image_file}" &&
+      ! "${OMR_V2_DOWNLOAD_URL}" =~ ${safe_download_url_re} ]]; then
     echo "OMR_V2_DOWNLOAD_URL must be a safely quoted HTTPS URL." >&2
+    exit 1
+fi
+if [[ -e "${pipeline_image_file}" && ! -s "${pipeline_image_file}" ]]; then
+    echo "The PR-built OMR v2 pipeline image reference is empty." >&2
     exit 1
 fi
 
@@ -99,6 +110,51 @@ remote="${host_user}@${host_public}"
 remote_work_dir="/home/${host_user}/omr-v2-artifact"
 work_dir=$(mktemp -d /tmp/quay-omr-v2-install.XXXXXX)
 chmod 0700 "${work_dir}"
+pipeline_archive=""
+if [[ -s "${pipeline_image_file}" ]]; then
+    if [[ "$(wc -l < "${pipeline_image_file}")" -ne 1 ]]; then
+        echo "The PR-built OMR v2 pipeline image reference must contain one line." >&2
+        exit 1
+    fi
+    pipeline_image=$(tr -d '\r\n' < "${pipeline_image_file}")
+    if [[ ! "${pipeline_image}" =~ ^[A-Za-z0-9._/@:-]+$ ]]; then
+        echo "The PR-built OMR v2 pipeline image pullspec is invalid." >&2
+        exit 1
+    fi
+
+    auth_file="${work_dir}/registry-auth.json"
+    pipeline_extract_dir="${work_dir}/pipeline-extract"
+    pipeline_archive_listing="${work_dir}/pipeline-archive-listing.txt"
+    mkdir -p "${pipeline_extract_dir}"
+
+    # Log in to the CI build registry without using an in-cluster kubeconfig.
+    unset KUBECONFIG
+    oc registry login --to="${auth_file}"
+    chmod 0600 "${auth_file}"
+    oc image extract "${pipeline_image}" \
+        --registry-config="${auth_file}" \
+        --path="/mirror-registry.tar.gz:${pipeline_extract_dir}"
+    pipeline_archive="${pipeline_extract_dir}/mirror-registry.tar.gz"
+    if [[ ! -s "${pipeline_archive}" ]]; then
+        echo "The PR-built OMR v2 image does not contain /mirror-registry.tar.gz." >&2
+        exit 1
+    fi
+
+    tar -tzf "${pipeline_archive}" > "${pipeline_archive_listing}"
+    for required_entry in \
+        mirror-registry \
+        image-archive.tar \
+        execution-environment.tar; do
+        if ! grep -Fxq "${required_entry}" "${pipeline_archive_listing}"; then
+            echo "The PR-built OMR v2 archive is missing ${required_entry}." >&2
+            exit 1
+        fi
+    done
+    printf '%s\n' "${pipeline_image}" > \
+        "${ARTIFACT_DIR}/mirror-registry-pipeline-image.txt"
+    sha256sum "${pipeline_archive}" | awk '{print $1}' > \
+        "${ARTIFACT_DIR}/mirror-registry-pipeline-sha256.txt"
+fi
 
 cat > "${work_dir}/install-omr-v2" <<'EOF'
 #!/bin/bash
@@ -107,9 +163,10 @@ set -o errexit
 set -o pipefail
 umask 077
 
-download_url="$1"
-registry_hostname="$2"
-work_dir="$3"
+source_type="$1"
+artifact_source="$2"
+registry_hostname="$3"
+work_dir="$4"
 quay_root="/home/$(id -un)/quay-install"
 quay_storage="${quay_root}/quay-storage"
 sqlite_storage="${quay_root}/sqlite-storage"
@@ -117,8 +174,23 @@ archive="${work_dir}/mirror-registry-amd64.tar.gz"
 
 rm -rf -- "${work_dir}"
 install -d -m 0700 "${work_dir}"
-curl --fail --location --retry 5 --connect-timeout 30 \
-    --output "${archive}" "${download_url}"
+case "${source_type}" in
+    download)
+        curl --fail --location --retry 5 --connect-timeout 30 \
+            --output "${archive}" "${artifact_source}"
+        ;;
+    pipeline)
+        if [[ ! -s "${artifact_source}" ]]; then
+            echo "The transferred PR-built OMR v2 archive is missing or empty." >&2
+            exit 1
+        fi
+        install -m 0600 -- "${artifact_source}" "${archive}"
+        ;;
+    *)
+        echo "Unsupported OMR v2 artifact source type: ${source_type}" >&2
+        exit 1
+        ;;
+esac
 sha256sum "${archive}" | awk '{print $1}' > "${work_dir}/sha256"
 tar -xzf "${archive}" -C "${work_dir}"
 if [[ ! -x "${work_dir}/mirror-registry" ]]; then
@@ -131,7 +203,7 @@ printf '%s\n' "${version_output}" > "${work_dir}/version-output"
 version=$(printf '%s\n' "${version_output}" | grep -Eo 'v?2\.[0-9]+\.[0-9]+' | \
     head -n 1 | sed 's/^v//' || true)
 if [[ -z "${version}" || "${version%%.*}" != 2 ]]; then
-    echo "The floating mirror-registry artifact is not an identifiable v2 release." >&2
+    echo "The mirror-registry artifact is not an identifiable v2 build." >&2
     exit 1
 fi
 printf '%s\n' "${version}" > "${work_dir}/version"
@@ -183,12 +255,45 @@ rm -f -- "${archive}"
 EOF
 chmod 0755 "${work_dir}/install-omr-v2"
 
+artifact_source_type=download
+artifact_source="${OMR_V2_DOWNLOAD_URL}"
+expected_pipeline_sha=""
+remote_pipeline_archive=""
+if [[ -s "${pipeline_archive}" ]]; then
+    if ! command -v sha256sum >/dev/null 2>&1; then
+        echo "Required command sha256sum is unavailable for the PR-built OMR v2 archive." >&2
+        exit 1
+    fi
+    artifact_source_type=pipeline
+    expected_pipeline_sha=$(sha256sum "${pipeline_archive}" | awk '{print $1}')
+    remote_pipeline_archive="/home/${host_user}/mirror-registry-pr.tar.gz"
+    scp "${ssh_options[@]}" "${pipeline_archive}" \
+        "${remote}:${remote_pipeline_archive}"
+    ssh "${ssh_options[@]}" "${remote}" \
+        "chmod 0600 '${remote_pipeline_archive}'"
+    remote_pipeline_sha=$(ssh "${ssh_options[@]}" "${remote}" \
+        "sha256sum '${remote_pipeline_archive}' | awk '{print \$1}'")
+    if [[ ! "${remote_pipeline_sha}" =~ ^[a-f0-9]{64}$ ||
+          "${remote_pipeline_sha}" != "${expected_pipeline_sha}" ]]; then
+        ssh "${ssh_options[@]}" "${remote}" \
+            "rm -f -- '${remote_pipeline_archive}'" >/dev/null 2>&1 || true
+        echo "The transferred OMR v2 archive does not match the PR-built pipeline artifact." >&2
+        exit 1
+    fi
+    artifact_source="${remote_pipeline_archive}"
+fi
+
 scp "${ssh_options[@]}" "${work_dir}/install-omr-v2" \
     "${remote}:/home/${host_user}/install-omr-v2"
 install_status=0
 ssh "${ssh_options[@]}" "${remote}" \
     "chmod 0755 '/home/${host_user}/install-omr-v2' &&
-     '/home/${host_user}/install-omr-v2' '${OMR_V2_DOWNLOAD_URL}' '${host_private}' '${remote_work_dir}'" || install_status=$?
+     '/home/${host_user}/install-omr-v2' '${artifact_source_type}' '${artifact_source}' '${host_private}' '${remote_work_dir}'" || install_status=$?
+if [[ -n "${remote_pipeline_archive}" ]]; then
+    ssh "${ssh_options[@]}" "${remote}" \
+        "rm -f -- '${remote_pipeline_archive}'" >/dev/null 2>&1 || \
+        echo "Failed to remove the transferred OMR v2 archive from the host." >&2
+fi
 scp "${ssh_options[@]}" "${remote}:${remote_work_dir}/install-sanitized.log" \
     "${ARTIFACT_DIR}/mirror-registry-install.log" 2>/dev/null || true
 scp "${ssh_options[@]}" "${remote}:${remote_work_dir}/version-output" \
@@ -215,6 +320,11 @@ if [[ ! "${version}" =~ ^2\.[0-9]+\.[0-9]+$ ]] ||
    [[ ! "${archive_sha}" =~ ^[a-f0-9]{64}$ ]] ||
    [[ -z "${admin_password}" ]]; then
     echo "OMR v2 runtime metadata failed validation." >&2
+    exit 1
+fi
+if [[ -n "${expected_pipeline_sha}" &&
+      "${archive_sha}" != "${expected_pipeline_sha}" ]]; then
+    echo "The installed OMR v2 archive does not match the PR-built pipeline artifact." >&2
     exit 1
 fi
 if ! grep -q '^-----BEGIN CERTIFICATE-----$' "${work_dir}/rootCA.pem" ||
