@@ -80,7 +80,7 @@ tests:
     - as: validate
       cli: latest
       commands: |
-        set -e
+        set -euo pipefail
         # CI-specific exclusions (these checks detect real issues on customer clusters):
         # 11-host-network: nmstate operator is not deployed on CI clusters
         # 20-bare-metal: CI clusters are cloud-hosted, bare-metal detection always fails
@@ -88,10 +88,81 @@ tests:
         # 75-snapshots: CI StorageClass has no VolumeSnapshotClass configured
         # 80-high-performance: CI nodes lack dedicated CPU manager configuration
         SKIP_CHECKS="11-host-network,20-bare-metal,70-live-migration,75-snapshots,80-high-performance"
+        DEBUG_DIR="${ARTIFACT_DIR}/vcv-download-debug"
+        diagnose_vcv_downloads() {
+          local cluster_domain oauth_issuer
+
+          mkdir -p "${DEBUG_DIR}"
+          cluster_domain="$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}' 2>/dev/null || true)"
+          if [[ -z "${cluster_domain}" ]]; then
+            oauth_issuer="$(oc get --raw /.well-known/oauth-authorization-server 2>/dev/null | python3 -c "import json, sys; print(json.load(sys.stdin).get('issuer', ''))" || true)"
+            if [[ -n "${oauth_issuer}" ]]; then
+              cluster_domain="${oauth_issuer#https://oauth-openshift.apps.}"
+            fi
+          fi
+
+          {
+            echo "cluster_domain=${cluster_domain:-<unknown>}"
+            echo "vcv_image=${VCV_IMAGE}"
+            echo "skip_checks=${SKIP_CHECKS}"
+          } > "${DEBUG_DIR}/summary.txt"
+
+          {
+            echo "== openshift-cnv routes =="
+            oc get route -n openshift-cnv -o wide 2>&1 || true
+            echo
+            echo "== openshift-cnv services =="
+            oc get svc -n openshift-cnv -o wide 2>&1 || true
+            echo
+            echo "== openshift-cnv pods =="
+            oc get pods -n openshift-cnv -o wide 2>&1 || true
+            echo
+            echo "== kubevirt-hyperconverged routes =="
+            oc get route -n kubevirt-hyperconverged -o wide 2>&1 || true
+            echo
+            echo "== kubevirt-hyperconverged services =="
+            oc get svc -n kubevirt-hyperconverged -o wide 2>&1 || true
+            echo
+            echo "== kubevirt-hyperconverged pods =="
+            oc get pods -n kubevirt-hyperconverged -o wide 2>&1 || true
+          } > "${DEBUG_DIR}/cluster-state.txt"
+
+          if [[ -z "${cluster_domain}" ]]; then
+            echo "unable to determine cluster domain" >> "${DEBUG_DIR}/summary.txt"
+            return 0
+          fi
+
+          inspect_url() {
+            local label="$1"
+            local url="$2"
+            local tar_mode="$3"
+            local prefix="${DEBUG_DIR}/${label}"
+
+            echo "checking ${url}" >> "${DEBUG_DIR}/summary.txt"
+            if curl -ksSL --connect-timeout 15 --max-time 60 -D "${prefix}.headers" -o "${prefix}.body" "${url}"; then
+              python3 -c "import pathlib, sys; path = pathlib.Path(sys.argv[1]); print(f'size={path.stat().st_size}'); print(f'magic={path.open(\"rb\").read(16).hex()}')" "${prefix}.body" > "${prefix}.body-meta" || true
+              file "${prefix}.body" > "${prefix}.file" 2>&1 || true
+              if [[ "${tar_mode}" == "gz" ]]; then
+                tar -tzf "${prefix}.body" > "${prefix}.tar-list" 2>&1 || true
+              else
+                tar -tf "${prefix}.body" > "${prefix}.tar-list" 2>&1 || true
+              fi
+            else
+              echo "curl failed for ${url}" > "${prefix}.curl-error"
+            fi
+          }
+
+          inspect_url "oc" "https://downloads-openshift-console.apps.${cluster_domain}/amd64/linux/oc.rhel9.tar" "plain"
+          inspect_url "virtctl-downstream" "https://hyperconverged-cluster-cli-download-openshift-cnv.apps.${cluster_domain}/amd64/linux/virtctl.tar.gz" "gz"
+          inspect_url "virtctl-upstream" "https://hyperconverged-cluster-cli-download-kubevirt-hyperconverged.apps.${cluster_domain}/amd64/linux/virtctl.tar.gz" "gz"
+        }
+        diagnose_vcv_downloads
         oc adm must-gather --image="${VCV_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- SKIP_CHECKS=${SKIP_CHECKS} /usr/bin/gather
-        MG_SUBDIR=$(find ${ARTIFACT_DIR}/must-gather-output -path "*/virt-cluster-validate" -type d | head -1)
+        MG_SUBDIR=$(find "${ARTIFACT_DIR}/must-gather-output" -path "*/virt-cluster-validate" -type d -print -quit)
         if [[ -z "${MG_SUBDIR}" ]]; then
           echo "ERROR: virt-cluster-validate output directory not found in must-gather output"
+          diagnose_vcv_downloads
+          find "${ARTIFACT_DIR}/must-gather-output" -maxdepth 4 > "${DEBUG_DIR}/must-gather-tree.txt" 2>&1 || true
           exit 1
         fi
         cp "${MG_SUBDIR}/ctrf-results.json" ${ARTIFACT_DIR}/
@@ -160,7 +231,7 @@ tests:
     - as: validate
       cli: latest
       commands: |
-        set -e
+        set -euo pipefail
         # CI-specific exclusions (these checks detect real issues on customer clusters):
         # 11-host-network: nmstate operator is not deployed on CI clusters
         # 20-bare-metal: CI clusters are cloud-hosted, bare-metal detection always fails
@@ -168,10 +239,81 @@ tests:
         # 75-snapshots: CI StorageClass has no VolumeSnapshotClass configured
         # 80-high-performance: CI nodes lack dedicated CPU manager configuration
         SKIP_CHECKS="11-host-network,20-bare-metal,70-live-migration,75-snapshots,80-high-performance"
+        DEBUG_DIR="${ARTIFACT_DIR}/vcv-download-debug"
+        diagnose_vcv_downloads() {
+          local cluster_domain oauth_issuer
+
+          mkdir -p "${DEBUG_DIR}"
+          cluster_domain="$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}' 2>/dev/null || true)"
+          if [[ -z "${cluster_domain}" ]]; then
+            oauth_issuer="$(oc get --raw /.well-known/oauth-authorization-server 2>/dev/null | python3 -c "import json, sys; print(json.load(sys.stdin).get('issuer', ''))" || true)"
+            if [[ -n "${oauth_issuer}" ]]; then
+              cluster_domain="${oauth_issuer#https://oauth-openshift.apps.}"
+            fi
+          fi
+
+          {
+            echo "cluster_domain=${cluster_domain:-<unknown>}"
+            echo "vcv_image=${VCV_IMAGE}"
+            echo "skip_checks=${SKIP_CHECKS}"
+          } > "${DEBUG_DIR}/summary.txt"
+
+          {
+            echo "== openshift-cnv routes =="
+            oc get route -n openshift-cnv -o wide 2>&1 || true
+            echo
+            echo "== openshift-cnv services =="
+            oc get svc -n openshift-cnv -o wide 2>&1 || true
+            echo
+            echo "== openshift-cnv pods =="
+            oc get pods -n openshift-cnv -o wide 2>&1 || true
+            echo
+            echo "== kubevirt-hyperconverged routes =="
+            oc get route -n kubevirt-hyperconverged -o wide 2>&1 || true
+            echo
+            echo "== kubevirt-hyperconverged services =="
+            oc get svc -n kubevirt-hyperconverged -o wide 2>&1 || true
+            echo
+            echo "== kubevirt-hyperconverged pods =="
+            oc get pods -n kubevirt-hyperconverged -o wide 2>&1 || true
+          } > "${DEBUG_DIR}/cluster-state.txt"
+
+          if [[ -z "${cluster_domain}" ]]; then
+            echo "unable to determine cluster domain" >> "${DEBUG_DIR}/summary.txt"
+            return 0
+          fi
+
+          inspect_url() {
+            local label="$1"
+            local url="$2"
+            local tar_mode="$3"
+            local prefix="${DEBUG_DIR}/${label}"
+
+            echo "checking ${url}" >> "${DEBUG_DIR}/summary.txt"
+            if curl -ksSL --connect-timeout 15 --max-time 60 -D "${prefix}.headers" -o "${prefix}.body" "${url}"; then
+              python3 -c "import pathlib, sys; path = pathlib.Path(sys.argv[1]); print(f'size={path.stat().st_size}'); print(f'magic={path.open(\"rb\").read(16).hex()}')" "${prefix}.body" > "${prefix}.body-meta" || true
+              file "${prefix}.body" > "${prefix}.file" 2>&1 || true
+              if [[ "${tar_mode}" == "gz" ]]; then
+                tar -tzf "${prefix}.body" > "${prefix}.tar-list" 2>&1 || true
+              else
+                tar -tf "${prefix}.body" > "${prefix}.tar-list" 2>&1 || true
+              fi
+            else
+              echo "curl failed for ${url}" > "${prefix}.curl-error"
+            fi
+          }
+
+          inspect_url "oc" "https://downloads-openshift-console.apps.${cluster_domain}/amd64/linux/oc.rhel9.tar" "plain"
+          inspect_url "virtctl-downstream" "https://hyperconverged-cluster-cli-download-openshift-cnv.apps.${cluster_domain}/amd64/linux/virtctl.tar.gz" "gz"
+          inspect_url "virtctl-upstream" "https://hyperconverged-cluster-cli-download-kubevirt-hyperconverged.apps.${cluster_domain}/amd64/linux/virtctl.tar.gz" "gz"
+        }
+        diagnose_vcv_downloads
         oc adm must-gather --image="${VCV_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- SKIP_CHECKS=${SKIP_CHECKS} /usr/bin/gather
-        MG_SUBDIR=$(find ${ARTIFACT_DIR}/must-gather-output -path "*/virt-cluster-validate" -type d | head -1)
+        MG_SUBDIR=$(find "${ARTIFACT_DIR}/must-gather-output" -path "*/virt-cluster-validate" -type d -print -quit)
         if [[ -z "${MG_SUBDIR}" ]]; then
           echo "ERROR: virt-cluster-validate output directory not found in must-gather output"
+          diagnose_vcv_downloads
+          find "${ARTIFACT_DIR}/must-gather-output" -maxdepth 4 > "${DEBUG_DIR}/must-gather-tree.txt" 2>&1 || true
           exit 1
         fi
         cp "${MG_SUBDIR}/ctrf-results.json" ${ARTIFACT_DIR}/
