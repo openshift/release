@@ -5,14 +5,23 @@
 # Responsibilities:
 #   - Install subctl to /tmp/bin/ (step-local; NOT in SHARED_DIR)
 #   - Deploy the Submariner broker on the hub cluster
+#   - Join the HUB cluster itself to the broker (subctl join) so hub pods
+#     gain pod-IP routing to spoke pods — required for hub↔spoke CCLM sync
 #   - Join each spoke cluster to the broker (subctl join)
 #   - broker-info.subm is kept in /tmp and removed on EXIT via trap
 #   - Wait (in order) for: submariner-operator, gateway, routeagent,
-#     lighthouse-agent, and lighthouse-coredns to be fully ready on each spoke
+#     lighthouse-agent, and lighthouse-coredns to be fully ready on hub + spokes
 #
-# Globalnet is intentionally NOT enabled: spokes use non-overlapping pod CIDRs
-# (ResolveSpokeCidrs in cluster-install) and KubeVirt CCLM requires direct
-# cross-cluster reachability to raw pod IPs (sync controller port 8443).
+# WHY the hub is joined:
+#   KubeVirt CCLM uses raw pod-IP routing (port 8443) for virt-synchronization-
+#   controller sync. Both source and destination clusters must be Submariner
+#   participants for cross-cluster pod-IP routing to work. The hub's gateway
+#   node was already prepared by the cloud-prepare step using the hub kubeconfig
+#   and ${SHARED_DIR}/metadata.json.
+#
+# Globalnet is intentionally NOT enabled: hub and spokes use non-overlapping
+# pod CIDRs (ResolveSpokeCidrs in cluster-install) and KubeVirt CCLM requires
+# direct cross-cluster reachability to raw pod IPs (sync controller port 8443).
 #   - Wait for OpenShift CoreDNS to include Lighthouse DNS forwarding
 #
 # WHY subctl is downloaded here (not read from SHARED_DIR):
@@ -373,6 +382,8 @@ eval "$(
     "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq yq
 
+[[ -n "${KUBECONFIG}" && -r "${KUBECONFIG}" ]]
+
 LoadSpokeConfig
 InstallSubctl
 
@@ -380,18 +391,29 @@ typeset -i submarinerStepRc=0
 (
     EnsureBrokerNoGlobalnet
 
+    # Join hub first — its gateway was prepared by cloud-prepare using hub
+    # kubeconfig + ${SHARED_DIR}/metadata.json. Hub must be a Submariner
+    # participant for hub↔spoke pod-IP routing (CCLM sync port 8443).
+    JoinCluster "${KUBECONFIG}" "hub"
+
     typeset -i i
     for ((i = 0; i < spokeCount; i++)); do
         JoinCluster "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
     done
 
+    WaitSubmarinerReady "${KUBECONFIG}" "hub"
+
     for ((i = 0; i < spokeCount; i++)); do
         WaitSubmarinerReady "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
     done
 
+    WaitForDnsForwardingConfigured "${KUBECONFIG}" "hub"
+
     for ((i = 0; i < spokeCount; i++)); do
         WaitForDnsForwardingConfigured "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
     done
+
+    AssertNoGlobalnetSubnets "${KUBECONFIG}" "hub"
 
     for ((i = 0; i < spokeCount; i++)); do
         AssertNoGlobalnetSubnets \
