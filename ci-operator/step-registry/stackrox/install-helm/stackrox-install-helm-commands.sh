@@ -328,3 +328,12 @@ fi
 
 kubectl get nodes -o wide
 kubectl get pods -o wide --namespace stackrox
+
+echo '>>> Resource requests, limits, and scaling for stackrox deployments/daemonsets'
+echo '--- Deployments ---'
+kubectl get deployments -n stackrox -o json | jq '[.items[] | {name: .metadata.name, replicas: .spec.replicas, containers: [.spec.template.spec.containers[] | {name: .name, requests: .resources.requests, limits: .resources.limits}]}]'
+echo '--- HorizontalPodAutoscalers ---'
+kubectl get hpa -n stackrox -o json | jq '[.items[] | {name: .metadata.name, minReplicas: .spec.minReplicas, maxReplicas: .spec.maxReplicas, currentReplicas: .status.currentReplicas}]'
+echo '--- DaemonSets ---'
+kubectl get daemonsets -n stackrox -o json | jq '[.items[] | {name: .metadata.name, containers: [.spec.template.spec.containers[] | {name: .name, requests: .resources.requests, limits: .resources.limits}]}]'
+echo '--- End resource dump ---'
