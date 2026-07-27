@@ -6,19 +6,22 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/fleetshift-images
+    context: ci/prow/aio-images
     decorate: true
     decoration_config:
       sparse_checkout_files:
+      - Dockerfile
       - Dockerfile.fleetshift
+      - Dockerfile.local
+      - fleetshift-ui/Dockerfile.web
     labels:
       capability/arm64: arm64
-      ci-operator.openshift.io/variant: fleetshift
+      ci-operator.openshift.io/variant: aio
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-fleetshift-fleetshift-poc-main-fleetshift-images
-    rerun_command: /test fleetshift-images
-    run_if_changed: ^Dockerfile\.fleetshift$
+    name: pull-ci-fleetshift-fleetshift-poc-main-aio-images
+    rerun_command: /test aio-images
+    run_if_changed: ^Dockerfile(\.local|\.fleetshift)?$|^deploy/scripts/|^fleetshift-server/|^fleetshift-cli/|^fleetshift-ui/
     spec:
       containers:
       - args:
@@ -26,7 +29,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=fleetshift
+        - --variant=aio
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -59,83 +62,29 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )fleetshift-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )aio-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/images
+    context: ci/prow/aio-pr-image-mirror
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - Dockerfile.fleetshift
       - Dockerfile.local
+      - fleetshift-ui/Dockerfile.web
     labels:
       capability/arm64: arm64
+      ci-operator.openshift.io/variant: aio
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-fleetshift-fleetshift-poc-main-images
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
-    context: ci/prow/pr-image-mirror
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - Dockerfile
-      - Dockerfile.local
-    labels:
-      capability/arm64: arm64
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-fleetshift-fleetshift-poc-main-pr-image-mirror
-    rerun_command: /test pr-image-mirror
+    name: pull-ci-fleetshift-fleetshift-poc-main-aio-pr-image-mirror
+    rerun_command: /test aio-pr-image-mirror
+    run_if_changed: ^Dockerfile(\.local|\.fleetshift)?$|^deploy/scripts/|^fleetshift-server/|^fleetshift-cli/|^fleetshift-ui/
     spec:
       containers:
       - args:
@@ -144,6 +93,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=pr-image-mirror
+        - --variant=aio
         command:
         - ci-operator
         env:
@@ -193,14 +143,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
+    trigger: (?m)^/test( | .* )aio-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/pr-image-mirror-local
+    context: ci/prow/server-images
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -208,10 +158,152 @@ presubmits:
       - Dockerfile.local
     labels:
       capability/arm64: arm64
+      ci-operator.openshift.io/variant: server
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-fleetshift-fleetshift-poc-main-pr-image-mirror-local
-    rerun_command: /test pr-image-mirror-local
+    name: pull-ci-fleetshift-fleetshift-poc-main-server-images
+    rerun_command: /test server-images
+    skip_if_only_changed: ^fleetshift-ui/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=server
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )server-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/server-pr-image-mirror
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile
+      - Dockerfile.local
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: server
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-fleetshift-fleetshift-poc-main-server-pr-image-mirror
+    rerun_command: /test server-pr-image-mirror
+    skip_if_only_changed: ^fleetshift-ui/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=pr-image-mirror
+        - --variant=server
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )server-pr-image-mirror,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/server-pr-image-mirror-local
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile
+      - Dockerfile.local
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: server
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-fleetshift-fleetshift-poc-main-server-pr-image-mirror-local
+    rerun_command: /test server-pr-image-mirror-local
+    skip_if_only_changed: ^fleetshift-ui/
     spec:
       containers:
       - args:
@@ -220,6 +312,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=pr-image-mirror-local
+        - --variant=server
         command:
         - ci-operator
         env:
@@ -269,4 +362,142 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pr-image-mirror-local,?($|\s.*)
+    trigger: (?m)^/test( | .* )server-pr-image-mirror-local,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/ui-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - fleetshift-ui/Dockerfile.web
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: ui
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-fleetshift-fleetshift-poc-main-ui-images
+    rerun_command: /test ui-images
+    run_if_changed: ^fleetshift-ui/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=ui
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ui-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/ui-pr-image-mirror
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - fleetshift-ui/Dockerfile.web
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: ui
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-fleetshift-fleetshift-poc-main-ui-pr-image-mirror
+    rerun_command: /test ui-pr-image-mirror
+    run_if_changed: ^fleetshift-ui/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=pr-image-mirror
+        - --variant=ui
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ui-pr-image-mirror,?($|\s.*)
