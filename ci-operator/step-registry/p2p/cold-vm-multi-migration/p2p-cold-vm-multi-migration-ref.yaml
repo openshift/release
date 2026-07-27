@@ -1,0 +1,114 @@
+ref:
+  as: p2p-cold-vm-multi-migration
+  from: cli
+  commands: p2p-cold-vm-multi-migration-commands.sh
+  timeout: 5h0m0s
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Cold VM migration POC: create N cirros VMs on spoke-1, stop them, then
+    cold-migrate all in a single MTV Plan (type=cold) to spoke-2.
+
+    VMs are named <MTV_COLD_VM_BASE_NAME>-1 through <MTV_COLD_VM_BASE_NAME>-N.
+    All share the same namespace (MTV_TEST_VM_NAMESPACE) and ODF StorageClass.
+    A single Plan referencing all N VMs is created on the hub, followed by one
+    Migration. All N VMs are verified Running on the destination spoke after
+    migration completes.
+
+    Requires p2p-mtv-mig-config (ForkliftController, providers, network/storage maps)
+    and p2p-install-odf-spokes before this step. Submariner is NOT required (cold
+    migration does not use cross-cluster pod connectivity).
+
+    Writes ${ARTIFACT_DIR}/cold-multi-migration-status.txt and JUnit XML
+    ${ARTIFACT_DIR}/junit_cold_vm_multi_migration.xml; diagnostics on failure
+    under ${ARTIFACT_DIR}/cold-multi-migration-diagnostics/.
+
+    NOTE: This step is a POC and is designed to be combined with the live migration
+    chain (p2p-cclm-migration-test) in a single job once cold migration is validated.
+  env:
+  - name: MTV_COLD_VM_COUNT
+    default: "3"
+    documentation: Number of VMs to create and cold-migrate in one Plan.
+  - name: MTV_COLD_VM_BASE_NAME
+    default: "cold-vm"
+    documentation: Base name for test VMs; VMs are named <base>-1 through <base>-N.
+  - name: MTV_TEST_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Source namespace for test VMs and DataVolumes.
+  - name: MTV_TEST_VM_TARGET_NAMESPACE
+    default: ""
+    documentation: Destination namespace on spoke-2. Empty uses MTV_TEST_VM_NAMESPACE.
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV Plan and Migration CRs are created.
+  - name: MTV_SOURCE_PROVIDER
+    default: "spoke-1"
+    documentation: MTV source Provider CR name (migration origin).
+  - name: MTV_DESTINATION_PROVIDER
+    default: "spoke-2"
+    documentation: MTV destination Provider CR name (migration target).
+  - name: MTV_PLAN_NAME
+    default: "cold-multi-plan"
+    documentation: Plan metadata.name on the hub.
+  - name: MTV_MIGRATION_NAME
+    default: "cold-multi-run-1"
+    documentation: Migration metadata.name on the hub.
+  - name: MTV_NETWORK_MAP_NAME
+    default: "spoke-network-map"
+    documentation: NetworkMap referenced by the Plan.
+  - name: MTV_STORAGE_MAP_NAME
+    default: "spoke-storage-map"
+    documentation: StorageMap referenced by the Plan.
+  - name: MTV_PLAN_READY_TIMEOUT
+    default: "15m"
+    documentation: Timeout for Plan Ready wait.
+  - name: MTV_MIGRATION_TIMEOUT
+    default: "3h"
+    documentation: Max duration to wait for Migration Succeeded (longer for N VMs).
+  - name: MTV_MIGRATION_POLL_INTERVAL_SECONDS
+    default: "30"
+    documentation: Sleep between Migration status polls.
+  - name: MTV_SOURCE_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional source spoke kubeconfig path. Defaults to SHARED_DIR index 1.
+  - name: MTV_DEST_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional destination spoke kubeconfig path. Defaults to SHARED_DIR index 2.
+  - name: MTV_SOURCE_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based SHARED_DIR kubeconfig index for the source spoke.
+  - name: MTV_DEST_SPOKE_INDEX
+    default: "2"
+    documentation: 1-based SHARED_DIR kubeconfig index for the destination spoke.
+  - name: CNV_TEST_VM_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: ODF StorageClass for root disks (must be ReadWriteMany).
+  - name: CNV_TEST_VM_DISK_SIZE
+    default: "1Gi"
+    documentation: Root disk size per VM. 1Gi is sufficient for cirros.
+  - name: CNV_TEST_VM_MEMORY
+    default: "256Mi"
+    documentation: Guest memory per VM.
+  - name: CNV_TEST_VM_CPUS
+    default: "1"
+    documentation: CPU cores per VM.
+  - name: CNV_TEST_VM_CIRROS_IMAGE_URL
+    default: "https://download.cirros-cloud.net/0.6.3/cirros-0.6.3-x86_64-disk.img"
+    documentation: HTTP URL for cirros image import.
+  - name: CNV_TEST_VM_DATAVOLUME_WAIT_TIMEOUT
+    default: "30m"
+    documentation: oc wait timeout for each DataVolume Ready condition.
+  - name: CNV_TEST_VM_VMI_WAIT_TIMEOUT
+    default: "10m"
+    documentation: oc wait timeout for each VMI Running phase.
+  - name: CNV_TEST_VM_STOP_TIMEOUT
+    default: "10m"
+    documentation: oc wait --for=delete timeout per VMI after patching runStrategy=Halted.
+  - name: P2P_CCLM_DEBUG_MODE
+    default: "false"
+    documentation: |-
+      When true, log failures and exit 0 so downstream debug steps can run.
+      Set P2P_CCLM_DEBUG_MODE=true in the job env during investigation.
