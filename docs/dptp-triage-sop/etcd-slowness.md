@@ -59,24 +59,31 @@ the value of `--command-timeout` to `300s` or even higher if you receive `contex
 In case you already know what you are doing, is easier to execute this on a single batch:
 
 ```bash
-read -r -d '' defrag_commands <<'EOF'
-unset ETCDCTL_ENDPOINTS
-REVISION=$(etcdctl endpoint status --write-out fields | sed -nE 's,"Revision" : ([0-9]+),\1,p')
-etcdctl compact $REVISION # needed only a single time on any member
-etcdctl defrag --command-timeout=120s
-EOF
+defrag_cmd='unset ETCDCTL_ENDPOINTS; etcdctl defrag --command-timeout=120s'
+leader_cmd='unset ETCDCTL_ENDPOINTS; etcdctl endpoint status --write-out=json | jq ".[].Status.header.member_id == .[].Status.leader"'
+compact_cmd="unset ETCDCTL_ENDPOINTS
+REVISION=\$(etcdctl endpoint status --write-out=json | jq .[].Status.header.revision)
+etcdctl compact \$REVISION # needed only a single time on any member"
+endpoint_cmd='etcdctl endpoint status --write-out=table'
+compacted=false
 
 for pod in $(oc get pods -n openshift-etcd -l app=etcd --no-headers | cut -d' ' -f1); do
-        is_leader=$(oc --as system:admin -n openshift-etcd exec -i $pod -c etcdctl -- sh -c 'unset ETCDCTL_ENDPOINTS; etcdctl endpoint status | awk -F, "{print \$9}"')
-        if [[ $is_leader == *true* ]]; then
+        is_leader=$(oc --as system:admin -n openshift-etcd exec -i $pod -c etcdctl -- sh -c "$leader_cmd")
+        if [[ $compacted == false ]]; then
+                oc --as system:admin -n openshift-etcd exec -i $pod -c etcdctl -- sh -c "$endpoint_cmd"
+                oc --as system:admin -n openshift-etcd exec -i $pod -c etcdctl -- sh -c "$compact_cmd"
+                compacted=true
+        fi  
+        if [[ $is_leader == true ]]; then
                 leader=$pod
                 continue
         fi
-        oc --as system:admin -n openshift-etcd exec -i $pod -c etcdctl -- sh <<<$defrag_commands
+        oc --as system:admin -n openshift-etcd exec -i $pod -c etcdctl -- sh -c "$defrag_cmd"
         sleep 60
 done
 
-oc --as system:admin -n openshift-etcd exec -i $leader -c etcdctl -- sh <<<$defrag_commands
+oc --as system:admin -n openshift-etcd exec -i $leader -c etcdctl -- sh -c "$defrag_cmd"
+oc --as system:admin -n openshift-etcd exec -i $leader -c etcdctl -- sh -c "$endpoint_cmd"
 ```
 
 Procedure without cluster API
@@ -128,7 +135,7 @@ We should execute these commands very carefully, but in a case where you want to
 ETCD=`crictl ps --label io.kubernetes.container.name=etcd --quiet`
 crictl exec $ETCD sh -c "etcdctl endpoint status --write-out=table"
 REV=`crictl exec $ETCD sh -c "unset ETCDCTL_ENDPOINTS && etcdctl endpoint status --write-out fields" | sed -nE 's,"Revision" : ([0-9]+),\1,p'`
-crictl exec $ETCD sh -c "unset ETCDCTL_ENDPOINTS && etcdctl compact $REV"
+crictl exec $ETCD sh -c "unset ETCDCTL_ENDPOINTS && etcdctl compact $REV" # execute only once
 crictl exec $ETCD sh -c "unset ETCDCTL_ENDPOINTS && etcdctl defrag --command-timeout 120s"
 crictl exec $ETCD sh -c "etcdctl endpoint status --write-out=table"
 ```
