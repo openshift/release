@@ -6,7 +6,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/fleetshift-images
+    context: ci/prow/aio-images
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -16,11 +16,11 @@ presubmits:
       - fleetshift-ui/Dockerfile.web
     labels:
       capability/arm64: arm64
-      ci-operator.openshift.io/variant: fleetshift
+      ci-operator.openshift.io/variant: aio
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-fleetshift-fleetshift-poc-main-fleetshift-images
-    rerun_command: /test fleetshift-images
+    name: pull-ci-fleetshift-fleetshift-poc-main-aio-images
+    rerun_command: /test aio-images
     run_if_changed: ^Dockerfile(\.local|\.fleetshift)?$|^deploy/scripts/|^fleetshift-server/|^fleetshift-cli/|^fleetshift-ui/
     spec:
       containers:
@@ -29,7 +29,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=fleetshift
+        - --variant=aio
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -62,14 +62,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )fleetshift-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )aio-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/fleetshift-pr-image-mirror
+    context: ci/prow/aio-pr-image-mirror
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -79,11 +79,11 @@ presubmits:
       - fleetshift-ui/Dockerfile.web
     labels:
       capability/arm64: arm64
-      ci-operator.openshift.io/variant: fleetshift
+      ci-operator.openshift.io/variant: aio
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-fleetshift-fleetshift-poc-main-fleetshift-pr-image-mirror
-    rerun_command: /test fleetshift-pr-image-mirror
+    name: pull-ci-fleetshift-fleetshift-poc-main-aio-pr-image-mirror
+    rerun_command: /test aio-pr-image-mirror
     run_if_changed: ^Dockerfile(\.local|\.fleetshift)?$|^deploy/scripts/|^fleetshift-server/|^fleetshift-cli/|^fleetshift-ui/
     spec:
       containers:
@@ -93,7 +93,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=pr-image-mirror
-        - --variant=fleetshift
+        - --variant=aio
         command:
         - ci-operator
         env:
@@ -143,14 +143,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )fleetshift-pr-image-mirror,?($|\s.*)
+    trigger: (?m)^/test( | .* )aio-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/images
+    context: ci/prow/server-images
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -158,10 +158,11 @@ presubmits:
       - Dockerfile.local
     labels:
       capability/arm64: arm64
+      ci-operator.openshift.io/variant: server
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-fleetshift-fleetshift-poc-main-images
-    rerun_command: /test images
+    name: pull-ci-fleetshift-fleetshift-poc-main-server-images
+    rerun_command: /test server-images
     skip_if_only_changed: ^fleetshift-ui/
     spec:
       containers:
@@ -170,6 +171,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=server
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -202,14 +204,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )server-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/pr-image-mirror
+    context: ci/prow/server-pr-image-mirror
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -217,10 +219,11 @@ presubmits:
       - Dockerfile.local
     labels:
       capability/arm64: arm64
+      ci-operator.openshift.io/variant: server
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-fleetshift-fleetshift-poc-main-pr-image-mirror
-    rerun_command: /test pr-image-mirror
+    name: pull-ci-fleetshift-fleetshift-poc-main-server-pr-image-mirror
+    rerun_command: /test server-pr-image-mirror
     skip_if_only_changed: ^fleetshift-ui/
     spec:
       containers:
@@ -230,6 +233,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=pr-image-mirror
+        - --variant=server
         command:
         - ci-operator
         env:
@@ -279,14 +283,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
+    trigger: (?m)^/test( | .* )server-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/pr-image-mirror-local
+    context: ci/prow/server-pr-image-mirror-local
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -294,10 +298,11 @@ presubmits:
       - Dockerfile.local
     labels:
       capability/arm64: arm64
+      ci-operator.openshift.io/variant: server
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-fleetshift-fleetshift-poc-main-pr-image-mirror-local
-    rerun_command: /test pr-image-mirror-local
+    name: pull-ci-fleetshift-fleetshift-poc-main-server-pr-image-mirror-local
+    rerun_command: /test server-pr-image-mirror-local
     skip_if_only_changed: ^fleetshift-ui/
     spec:
       containers:
@@ -307,6 +312,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=pr-image-mirror-local
+        - --variant=server
         command:
         - ci-operator
         env:
@@ -356,7 +362,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pr-image-mirror-local,?($|\s.*)
+    trigger: (?m)^/test( | .* )server-pr-image-mirror-local,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
