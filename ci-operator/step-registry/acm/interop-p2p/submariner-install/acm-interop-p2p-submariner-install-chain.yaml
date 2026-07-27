@@ -1,45 +1,47 @@
 chain:
   as: acm-interop-p2p-submariner-install
   steps:
-    - ref: acm-interop-p2p-submariner-addon
+    - ref: acm-interop-p2p-submariner-cloud-prepare
+    - ref: acm-interop-p2p-submariner-broker-join
     - ref: acm-interop-p2p-submariner-verify
   documentation: |-
     Installs and verifies Submariner for a 1-hub + N-spoke cluster topology
-    without Globalnet (non-overlapping pod CIDRs per spoke) using ACM's native
-    ManagedClusterAddon and SubmarinerConfig CRs. No subctl required for installation.
+    without Globalnet (non-overlapping pod CIDRs per spoke) using subctl.
+    The ACM hub is enrolled as a full Submariner participant alongside spokes,
+    enabling hub↔spoke pod-IP routing required for KubeVirt CCLM sync.
 
-    This chain sequences two steps:
+    This chain sequences three steps:
 
-      1. acm-interop-p2p-submariner-addon (replaces cloud-prepare + broker-join)
-         Creates AWS credentials Secrets, SubmarinerConfig (globalnetEnabled=false,
-         gateways=1, libreswan), and ManagedClusterAddon/submariner in each managed
-         cluster namespace on the hub — including local-cluster (hub itself).
-         ACM's Submariner addon controller handles automatically:
-           - Cloud preparation (AWS security groups, dedicated gateway MachineSet)
-           - Submariner broker deployment on the hub
-           - Cluster join for each enrolled cluster (hub + all spokes)
-           - submariner-operator, gateway, routeagent, lighthouse, coredns install
-         Waits for ManagedClusterAddon/submariner Available on all clusters.
-         Asserts globalnetEnabled=false on all SubmarinerConfig CRs.
+      1. acm-interop-p2p-submariner-cloud-prepare
+         Installs subctl locally, prepares AWS security groups on the HUB AND
+         each spoke using 'subctl cloud prepare aws' with dedicated gateway nodes
+         (--gateways 1) and opens required IPsec/NAT-T firewall ports.
+         Hub metadata is read from ${SHARED_DIR}/metadata.json (IPI artifact).
+         Waits for hub and spoke gateway-labeled nodes before proceeding.
 
-         Key improvement over subctl approach:
-           The ACM hub (local-cluster) is enrolled as a Submariner participant —
-           enabling hub↔spoke pod-to-pod connectivity for CCLM migration.
-           The former subctl broker-join only joined spokes, leaving the hub
-           without direct pod network connectivity to any spoke.
+      2. acm-interop-p2p-submariner-broker-join
+         Deploys the Submariner broker on the hub cluster (no --globalnet),
+         joins the HUB itself with 'subctl join --globalnet=false', then joins
+         each spoke. If a previous Globalnet deployment is detected, uninstalls
+         and redeploys. After all joins, waits on HUB + each spoke for:
+           - submariner-operator Deployment Available
+           - submariner-gateway DaemonSet rollout
+           - submariner-routeagent DaemonSet rollout (all-nodes routing)
+           - submariner-lighthouse-agent Deployment rollout
+           - submariner-lighthouse-coredns Deployment rollout
+         Hub CoreDNS Lighthouse stub zone is also waited and verified.
 
-      2. acm-interop-p2p-submariner-verify
-         Waits for IPsec tunnels to reach connected state (oc-native gateway CRs),
+      3. acm-interop-p2p-submariner-verify
+         Waits for IPsec tunnels to reach connected state on hub AND spokes,
          asserts no Globalnet subnets (242.x) on all clusters including hub,
          pre-warms Lighthouse service discovery between spoke pairs,
          optionally runs subctl verify (SUBMARINER_RUN_SUBCTL_VERIFY=true), and
-         probes CCLM sync TCP between virt-synchronization-controller pod IPs on
-         spoke↔spoke and hub↔spoke pairs (SUBMARINER_VERIFY_HUB_SPOKE=true).
+         probes bidirectional CCLM sync TCP paths when
+         SUBMARINER_VERIFY_HUB_SPOKE=true (hub↔spoke pairs).
 
     Requires acm-interop-p2p-cluster-install ResolveSpokeCidrs so each spoke
     has unique pod/machine/service CIDRs — required for KubeVirt CCLM sync on
-    raw pod IPs.
+    raw pod IPs (port 8443).
 
-    The legacy subctl-based steps (acm-interop-p2p-submariner-cloud-prepare and
-    acm-interop-p2p-submariner-broker-join) are preserved as individual refs for
-    workflows that still use the subctl path.
+    broker-info.subm is written to /tmp (never to SHARED_DIR) and removed
+    via a trap on EXIT after all 'subctl join' calls complete.

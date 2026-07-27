@@ -4,10 +4,18 @@
 #
 # Responsibilities:
 #   - Install subctl to /tmp/bin/ (step-local; NOT in SHARED_DIR)
-#   - Run 'subctl cloud prepare aws' on each spoke to open firewall ports
-#     and deploy a dedicated gateway node (--gateways 1)
+#   - Run 'subctl cloud prepare aws' on the hub AND each spoke to open firewall
+#     ports and deploy a dedicated gateway node (--gateways 1)
 #   - Wait for the dedicated gateway MachineSet node to be Ready and labeled
-#     before the broker-join step (avoids interactive gateway selection in CI)
+#     on ALL clusters before the broker-join step (avoids interactive gateway
+#     selection in CI)
+#
+# WHY the hub is also prepared:
+#   KubeVirt CCLM sync uses raw pod-IP routing (port 8443) between the
+#   virt-synchronization-controller on source and destination clusters.
+#   The hub must participate in the Submariner mesh as a full gateway cluster
+#   so its pods can route to spoke pod IPs and vice versa.
+#   Hub metadata is read from ${SHARED_DIR}/metadata.json (standard IPI artifact).
 #
 # WHY binaries are NOT stored in SHARED_DIR:
 #   After each step the CI operator serialises SHARED_DIR into a Kubernetes
@@ -214,6 +222,14 @@ WaitForGatewayNode() {
 command -v oc 1>/dev/null
 command -v curl 1>/dev/null
 
+[[ -n "${KUBECONFIG}" && -r "${KUBECONFIG}" ]]
+
+typeset hubMetadataFile="${SHARED_DIR}/metadata.json"
+[[ -f "${hubMetadataFile}" ]] || {
+    : "Hub metadata file not found at ${hubMetadataFile} — required for hub cloud prepare" >&2
+    exit 1
+}
+
 LoadSpokeConfig
 InstallSubctl
 SetAwsCredentials
@@ -221,12 +237,25 @@ SetAwsCredentials
 typeset -i submarinerStepRc=0
 (
     typeset -i i
+
+    # Prepare hub first so its gateway MachineSet provision runs in parallel
+    # with spoke prepares (all are async; we wait for all below).
+    PrepareAwsCluster \
+        "${KUBECONFIG}" \
+        "${hubMetadataFile}" \
+        "hub"
+
     for ((i = 0; i < spokeCount; i++)); do
         PrepareAwsCluster \
             "${spokeKubeconfigsArr[i]}" \
             "${spokeMetadataFilesArr[i]}" \
             "${spokeNamesArr[i]}"
     done
+
+    # Wait for hub gateway node before broker-join attempts to use it.
+    WaitForGatewayNode \
+        "${KUBECONFIG}" \
+        "hub"
 
     for ((i = 0; i < spokeCount; i++)); do
         WaitForGatewayNode \

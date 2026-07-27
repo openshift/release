@@ -9,6 +9,26 @@
 #   - Cluster join for each enrolled cluster
 #   - submariner-operator, gateway, routeagent, lighthouse-agent, coredns install
 #
+# CRITICAL PREREQUISITE — shared ClusterSet:
+#   The ACM Submariner addon creates ONE broker per ManagedClusterSet. Hub and all
+#   spokes MUST be in the SAME ClusterSet so they share a single broker. If they are in
+#   different ClusterSets the SubmarinerBrokerController sets up separate broker namespaces
+#   and the SubmarinerAgentController emits 'BrokerConfigMissing' indefinitely for each
+#   cluster because the Submariner broker CR (brokers.submariner.io/submariner-broker)
+#   never appears (the hub addon agent cannot create it in the cross-ClusterSet context).
+#
+#   Phase 0 of this script reads the hub's ClusterSet label and moves every spoke into
+#   that same ClusterSet before applying any addon resources.
+#
+# BROKER CR TIMING:
+#   The hub's local submariner-addon agent (deployment/submariner-addon in
+#   submariner-operator ns on hub) creates the brokers.submariner.io/submariner-broker CR
+#   AFTER: (a) ManagedClusterAddon is applied, (b) ACM provisions the hub's SA+RB in the
+#   broker namespace, and (c) the addon agent receives its SA token. This takes 5–20 min.
+#   Phase 2.5 waits for this CR before checking for deployment/submariner-operator, which
+#   is only created after SubmarinerAgentController reads the broker and dispatches the
+#   OLM Subscription ManifestWork.
+#
 # The hub cluster (local-cluster ManagedCluster, default ClusterSet) is ALSO enrolled
 # so that hub↔spoke pod-to-pod connectivity works for CCLM. The subctl-based
 # broker-join step only joined spokes; this step closes that gap by also enrolling
@@ -43,6 +63,8 @@ typeset -i addonWaitSeconds=$(( SUBMARINER_ADDON_WAIT_TIMEOUT_MINUTES * 60 ))
 
 typeset -a clusterNamesArr=()    # Parallel: index 0 = hub (local-cluster), 1..N = spokes
 typeset -a clusterNsArr=()       # Namespace on hub for each cluster's ACM resources
+typeset    hubClusterSet=""      # Set by DetermineHubClusterSet
+typeset    submarinerBrokerNs="" # Set by DetermineHubClusterSet: "${hubClusterSet}-broker"
 
 # DumpDiagnostics — write addon and submariner resources to ARTIFACT_DIR on failure.
 DumpDiagnostics() {
@@ -54,6 +76,18 @@ DumpDiagnostics() {
         > "${diagDir}/managed-cluster-addons.txt" 2>&1 || true
     oc get submarinerconfig --all-namespaces -o wide \
         > "${diagDir}/submariner-configs.txt" 2>&1 || true
+    oc get managedcluster -o wide \
+        > "${diagDir}/managed-clusters.txt" 2>&1 || true
+    oc get managedclusterset \
+        > "${diagDir}/managed-cluster-sets.txt" 2>&1 || true
+
+    # Broker CR diagnostics — key indicator of addon health.
+    if [[ -n "${submarinerBrokerNs}" ]]; then
+        oc get brokers.submariner.io --all-namespaces -o wide \
+            > "${diagDir}/submariner-brokers.txt" 2>&1 || true
+        oc get all -n "${submarinerBrokerNs}" \
+            > "${diagDir}/broker-namespace-resources.txt" 2>&1 || true
+    fi
 
     typeset -i i
     for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
@@ -91,6 +125,93 @@ LoadClusterList() {
             clusterNsArr+=("${spkName}")
         done
     fi
+}
+
+# DetermineHubClusterSet — read hub's ClusterSet label and derive the broker namespace.
+# Sets globals: hubClusterSet and submarinerBrokerNs.
+DetermineHubClusterSet() {
+    hubClusterSet="$(oc get managedcluster local-cluster \
+        -o jsonpath='{.metadata.labels.cluster\.open-cluster-management\.io/clusterset}' \
+        2>/dev/null || true)"
+    [[ -n "${hubClusterSet}" ]] || {
+        : "WARN: local-cluster has no clusterset label — defaulting to 'default'" >&2
+        hubClusterSet="default"
+    }
+    submarinerBrokerNs="${hubClusterSet}-broker"
+    : "Hub ClusterSet='${hubClusterSet}' — Submariner broker namespace='${submarinerBrokerNs}'"
+}
+
+# EnsureSpokesInHubClusterSet — move every spoke into the hub's ClusterSet.
+#
+# ACM's SubmarinerBrokerController creates ONE broker per ManagedClusterSet. If hub and
+# spokes are in different ClusterSets, SubmarinerAgentController looks for a broker in
+# separate namespaces (default-broker vs <spoke>-set-broker) and never finds one because
+# each cluster's hub addon agent creates the broker only for its own ClusterSet. Moving
+# all spokes to the hub's ClusterSet guarantees one shared broker and is safe: ODF/CNV
+# are already installed by the time this step runs and ACM won't uninstall them.
+EnsureSpokesInHubClusterSet() {
+    typeset -i i
+    for ((i = 1; i < ${#clusterNamesArr[@]}; i++)); do
+        typeset spokeName="${clusterNamesArr[i]}"
+        typeset spokeNs="${clusterNsArr[i]}"
+
+        typeset currentSet
+        currentSet="$(oc get managedcluster "${spokeName}" \
+            -o jsonpath='{.metadata.labels.cluster\.open-cluster-management\.io/clusterset}' \
+            2>/dev/null || true)"
+
+        if [[ "${currentSet}" == "${hubClusterSet}" ]]; then
+            : "Spoke '${spokeName}' already in ClusterSet '${hubClusterSet}' — skipping"
+        else
+            : "Moving spoke '${spokeName}' from ClusterSet '${currentSet:-<none>}' to '${hubClusterSet}'"
+            oc label managedcluster "${spokeName}" \
+                "cluster.open-cluster-management.io/clusterset=${hubClusterSet}" \
+                --overwrite 1>/dev/null
+            : "Spoke '${spokeName}' label updated to ClusterSet '${hubClusterSet}'"
+        fi
+
+        # Ensure the spoke's hub namespace is bound to the shared ClusterSet so that
+        # placement and addon resources in that namespace can reference the ClusterSet.
+        oc create -f - --dry-run=client -o yaml --save-config <<EOF | oc apply -f -
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: ${hubClusterSet}
+  namespace: ${spokeNs}
+spec:
+  clusterSet: ${hubClusterSet}
+EOF
+        : "ManagedClusterSetBinding '${hubClusterSet}' ensured in namespace '${spokeNs}'"
+    done
+}
+
+# WaitForSubmarinerBroker — wait for brokers.submariner.io/submariner-broker to appear.
+#
+# The hub cluster's submariner-addon agent creates this CR after:
+#   1. ManagedClusterAddon/submariner is applied for local-cluster.
+#   2. SubmarinerAgentController provisions the hub's ServiceAccount+RoleBinding in the
+#      broker namespace.
+#   3. The addon registration controller delivers the SA token to the hub agent.
+# Until this CR exists, SubmarinerAgentController emits 'BrokerConfigMissing' and will
+# NOT create the ManifestWork that triggers OLM to install deployment/submariner-operator.
+WaitForSubmarinerBroker() {
+    : "Waiting for brokers.submariner.io/submariner-broker in '${submarinerBrokerNs}' (timeout=1800s)"
+    (
+        typeset -i wInt=20
+        SECONDS=0
+        until oc get brokers.submariner.io/submariner-broker \
+                -n "${submarinerBrokerNs}" 1>/dev/null 2>&1; do
+            (( SECONDS < 1800 )) || {
+                : "Timeout: brokers.submariner.io/submariner-broker not created in '${submarinerBrokerNs}' within 1800s" >&2
+                oc get brokers.submariner.io --all-namespaces -o wide 2>&1 || true
+                oc get managedclusteraddon --all-namespaces -o wide 2>&1 || true
+                exit 1
+            }
+            : "Broker CR not yet present (${SECONDS}s elapsed) — retrying in ${wInt}s"
+            sleep "${wInt}"
+        done
+    )
+    : "brokers.submariner.io/submariner-broker found in '${submarinerBrokerNs}' — SubmarinerAgentController can now proceed"
 }
 
 # EnsureAwsCredsSecret — create AWS credentials Secret in a managed cluster namespace.
@@ -308,7 +429,7 @@ LoadClusterList
 
 : "Enrolling ${#clusterNamesArr[@]} clusters in Submariner mesh: ${clusterNamesArr[*]}"
 
-# Wait for the ManagedClusterAddon CRD to be Established before Phase 1.
+# Wait for the ManagedClusterAddon CRD to be Established before Phase 0.
 # The MCE addon manager registers managedclusteraddons.addon.open-cluster-management.io
 # asynchronously after the MultiClusterHub becomes Available.  If we call
 # `oc create --dry-run=client -o yaml` while the CRD is still being created, oc's
@@ -319,7 +440,14 @@ LoadClusterList
 oc wait --for=condition=Established \
     crd/managedclusteraddons.addon.open-cluster-management.io \
     --timeout=300s 1>/dev/null
-: "ManagedClusterAddon CRD is Established — proceeding with addon configuration"
+: "ManagedClusterAddon CRD is Established"
+
+# Phase 0: align all clusters to the hub's ManagedClusterSet.
+# ACM Submariner addon creates ONE broker per ClusterSet; all participating clusters
+# MUST be in the same ClusterSet or the SubmarinerAgentController loops indefinitely on
+# 'BrokerConfigMissing' and never dispatches the ManifestWork that installs submariner-operator.
+DetermineHubClusterSet
+EnsureSpokesInHubClusterSet
 
 # Phase 1: apply credentials, SubmarinerConfig, and ManagedClusterAddon for all clusters.
 typeset -i i
@@ -338,6 +466,14 @@ done
 for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     WaitAddonAvailable "${clusterNsArr[i]}" "${clusterNamesArr[i]}"
 done
+
+# Phase 2.5: wait for the Submariner broker CR.
+# The hub addon agent (deployment/submariner-addon in submariner-operator ns on hub) creates
+# brokers.submariner.io/submariner-broker in the broker namespace after its addon
+# registration completes and it receives its SA token.  SubmarinerAgentController is
+# blocked until this CR appears — it cannot dispatch the OLM Subscription ManifestWork
+# that installs deployment/submariner-operator on each cluster until the broker exists.
+WaitForSubmarinerBroker
 
 # Phase 2b: wait for actual Submariner data-plane components on all clusters.
 # ManagedClusterAddon Available only confirms ACM dispatched the addon manifests. The
