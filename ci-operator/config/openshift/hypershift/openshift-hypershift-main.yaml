@@ -353,6 +353,21 @@ tests:
       INSTALL_FROM_LATEST: "true"
       RUN_UPGRADE_TEST: "true"
     workflow: hypershift-aws-e2e-nested
+- as: e2e-aws-capi-storage-migration
+  capabilities:
+  - build-tmpfs
+  cron: 0 4 * * 1-5
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      INSTALL_FROM_LATEST: "true"
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-destroy-nested-management-cluster
+    workflow: hypershift-aws-e2e-nested-capi-migration
 - as: e2e-aws-override
   capabilities:
   - build-tmpfs
