@@ -16,13 +16,13 @@ images:
     - name: NUM_WORKERS
       value: "4"
     - name: OS_VERSION
-      value: "2025.2"
+      value: "2026.1"
     - name: BUILD_UPSTREAM_DOCS
       value: "true"
     - name: BUILD_OPERATORS_DOCS
       value: "false"
     - name: INDEX_NAME
-      value: os-docs-2025.2
+      value: os-docs-2026.1
     - name: VECTOR_DB_TYPE
       value: faiss
     - name: BUILD_OCP_DOCS
@@ -70,6 +70,21 @@ resources:
     requests:
       cpu: "4"
       memory: 8Gi
+tests:
+- as: periodic-promote-rag-content
+  cron: 0 2 * * *
+  steps:
+    test:
+    - as: promote
+      commands: echo "Image promoted via dependency build"
+      dependencies:
+      - env: RAG_CONTENT_IMAGE
+        name: rag-content-openstack
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openstack-lightspeed
