@@ -36,6 +36,29 @@ python3 .claude/scripts/scaffold_step_registry.py --name <step-name> --subdir <p
 python3 .claude/scripts/scaffold_step_registry.py --name my-step --subdir myorg/action --write
 ```
 
+### effective_plugins.py
+
+Resolve the effective set of enabled Prow plugins for an org or org/repo,
+merging the `core-services/prow/02_config/` fragment hierarchy (global →
+org → repo) with provenance for each enabled plugin.
+
+**Used by**: `prow-plugins` skill (`.claude/skills/prow-plugins/`)
+
+**Usage**:
+```bash
+python3 .claude/scripts/effective_plugins.py <org>[/<repo>]
+```
+
+**Example**:
+```bash
+python3 .claude/scripts/effective_plugins.py openshift/hypershift
+python3 .claude/scripts/effective_plugins.py openshift
+```
+
+**Output**: JSON with `enabled_plugins` / `enabled_external_plugins` (each
+mapped to `source_level`, `source_file`), `excluded_from_org_defaults`, and
+`warnings` for likely misconfigurations.
+
 ### migrate_periodic_file.py
 
 Migrates a periodic configuration file from one OpenShift release version to another.
