@@ -194,7 +194,7 @@ EOF
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 
 # Use '/auths/ s/.*/' instead of 's/.*auths.*/' to avoid regex backtracking on long log lines
-timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e '/auths/ s/.*/*** PULL_SECRET ***/'
+timeout -s 9 ${DEVSCRIPTS_TIMEOUT:-175m} ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e '/auths/ s/.*/*** PULL_SECRET ***/'
 
 set -xeuo pipefail
 
@@ -437,7 +437,7 @@ fi
 echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root/.bashrc
 
 set +e
-timeout -s 9 130m make ${DEVSCRIPTS_TARGET}
+timeout -s 9 ${DEVSCRIPTS_TARGET_TIMEOUT:-130m} make ${DEVSCRIPTS_TARGET}
 rv=\$?
 
 # squid needs to be restarted after network changes
