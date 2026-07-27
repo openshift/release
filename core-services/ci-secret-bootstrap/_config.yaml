@@ -36,6 +36,7 @@ cluster_groups:
   - build13
   - core-ci
   - hosted-mgmt
+  - hosted-mgmt2
   non_app_ci:
   - build01
   - build02
@@ -68,6 +69,7 @@ cluster_groups:
   - build13
   - core-ci
   - hosted-mgmt
+  - hosted-mgmt2
   - vsphere02
 secret_configs:
 - from:
@@ -3992,6 +3994,12 @@ secret_configs:
     sa.prow-controller-manager.hosted-mgmt.token.txt:
       field: sa.prow-controller-manager.hosted-mgmt.token.txt
       item: build_farm
+    sa.prow-controller-manager.hosted-mgmt2.config:
+      field: sa.prow-controller-manager.hosted-mgmt2.config
+      item: build_farm
+    sa.prow-controller-manager.hosted-mgmt2.token.txt:
+      field: sa.prow-controller-manager.hosted-mgmt2.token.txt
+      item: build_farm
     sa.prow-controller-manager.vsphere02.config:
       field: sa.prow-controller-manager.vsphere02.config
       item: build_farm
@@ -4447,6 +4455,12 @@ secret_configs:
     sa.hypershift-workload.hosted-mgmt.token.txt:
       field: sa.hypershift-workload.hosted-mgmt.token.txt
       item: build_farm
+    sa.hypershift-workload.hosted-mgmt2.config:
+      field: sa.hypershift-workload.hosted-mgmt2.config
+      item: build_farm
+    sa.hypershift-workload.hosted-mgmt2.token.txt:
+      field: sa.hypershift-workload.hosted-mgmt2.token.txt
+      item: build_farm
   to:
   - cluster: app.ci
     name: ci-chat-bot-kubeconfigs
@@ -4541,6 +4555,12 @@ secret_configs:
       item: build_farm
     sa.github-ldap-user-group-creator.hosted-mgmt.token.txt:
       field: sa.github-ldap-user-group-creator.hosted-mgmt.token.txt
+      item: build_farm
+    sa.github-ldap-user-group-creator.hosted-mgmt2.config:
+      field: sa.github-ldap-user-group-creator.hosted-mgmt2.config
+      item: build_farm
+    sa.github-ldap-user-group-creator.hosted-mgmt2.token.txt:
+      field: sa.github-ldap-user-group-creator.hosted-mgmt2.token.txt
       item: build_farm
     sa.github-ldap-user-group-creator.vsphere02.config:
       field: sa.github-ldap-user-group-creator.vsphere02.config
@@ -4927,6 +4947,23 @@ secret_configs:
     name: hosted-mgmt-dex-oidc
     namespace: ci
 - from:
+    hosted-mgmt2-id:
+      field: hosted-mgmt2-id
+      item: dex
+    hosted-mgmt2-secret:
+      field: hosted-mgmt2-secret
+      item: dex
+  to:
+  - cluster: app.ci
+    name: hosted-mgmt2-secret
+    namespace: dex
+  - cluster: app.ci
+    name: hosted-mgmt2-dex-oidc
+    namespace: ci
+  - cluster: core-ci
+    name: hosted-mgmt2-dex-oidc
+    namespace: ci
+- from:
     art-id:
       field: art-id
       item: dex
@@ -4970,6 +5007,14 @@ secret_configs:
       item: dex
   to:
   - cluster: hosted-mgmt
+    name: dex-rh-sso
+    namespace: openshift-config
+- from:
+    clientSecret:
+      field: hosted-mgmt2-secret
+      item: dex
+  to:
+  - cluster: hosted-mgmt2
     name: dex-rh-sso
     namespace: openshift-config
 - from:
@@ -5601,6 +5646,12 @@ secret_configs:
       item: build_farm
     sa.cluster-display.hosted-mgmt.token.txt:
       field: sa.cluster-display.hosted-mgmt.token.txt
+      item: build_farm
+    sa.cluster-display.hosted-mgmt2.config:
+      field: sa.cluster-display.hosted-mgmt2.config
+      item: build_farm
+    sa.cluster-display.hosted-mgmt2.token.txt:
+      field: sa.cluster-display.hosted-mgmt2.token.txt
       item: build_farm
     sa.cluster-display.vsphere02.config:
       field: sa.cluster-display.vsphere02.config
@@ -6320,6 +6371,9 @@ secret_configs:
   - cluster: hosted-mgmt
     name: splunk-receiver-token
     namespace: log-forwarding
+  - cluster: hosted-mgmt2
+    name: splunk-receiver-token
+    namespace: log-forwarding
 - from:
     .awscred:
       field: .awscred
@@ -6511,6 +6565,9 @@ secret_configs:
       item: openshift-monitoring-credentials
     OPENSHIFT_MONITORING_CI_TOKEN_ON_HOSTED_MGMT:
       field: sa.ci-monitoring.hosted-mgmt.token.txt
+      item: openshift-monitoring-credentials
+    OPENSHIFT_MONITORING_CI_TOKEN_ON_HOSTED_MGMT2:
+      field: sa.ci-monitoring.hosted-mgmt2.token.txt
       item: openshift-monitoring-credentials
   to:
   - cluster: app.ci
@@ -7728,5 +7785,6 @@ user_secrets_target_clusters:
 - build13
 - core-ci
 - hosted-mgmt
+- hosted-mgmt2
 - vsphere02
 vault_dptp_prefix: dptp
