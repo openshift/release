@@ -2,7 +2,9 @@ workflow:
   as: baremetalds-e2e-serial-ovn-ipv4
   steps:
     pre:
+      - ref: baremetalds-devscripts-conf-extranetwork
       - chain: baremetalds-ofcir-pre
+      - ref: deploy-konflux-operator
     test:
       - ref: baremetalds-e2e-test
     post:
@@ -15,5 +17,9 @@ workflow:
         NETWORK_TYPE=OVNKubernetes
         NUM_EXTRA_WORKERS=1
         APPLY_EXTRA_WORKERS=true
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="extranet"
+        EXTRANET_NETWORK_SUBNET_V4='192.168.221.0/24'
+      KONFLUX_TARGET_OPERATORS: nmstate
   documentation: |-
     This workflow executes the ipv4 end-to-end serial test suite on a cluster provisioned by running dev-scripts on a packet server.
