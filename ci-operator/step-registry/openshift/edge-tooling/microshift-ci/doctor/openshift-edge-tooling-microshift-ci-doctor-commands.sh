@@ -261,17 +261,17 @@ echo "Running automatic closing of duplicate rebase PRs..."
     --filter 'NO-ISSUE: rebase-release'
 echo "Automatic closing of duplicate rebase PRs completed"
 
-# Run analysis on all releases and open rebase PRs (45m and 100 turns).
+# Run analysis on all releases and open rebase PRs (60m and 100 turns).
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
 CLAUDE_RC=0
-timeout 2700 claude \
+timeout 3600 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 100 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
     --verbose &> "${CLAUDE_DOCTOR_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "doctor" 45
+check_claude_rc "${CLAUDE_RC}" "doctor" 60
 
 # DISABLED: Automatic bug creation is turned off - bugs are filed manually
 # via the "Create Bug in JIRA" buttons in the HTML report. 
