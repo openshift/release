@@ -10,8 +10,28 @@ ref:
       name: qe-rhel-jetson-jetson-ssh
       mount_path: /var/run/secrets/jetson-ssh
   env:
+    - name: JUMPSTARTER_DEVICE_NAME
+      default: ""
+      documentation: >-
+        Name of the Jumpstarter exporter/device to lease (e.g.
+        nvidia-jetson-nx-orin-01). Mutually exclusive with
+        JUMPSTARTER_SELECTOR. If both are empty, JUMPSTARTER_LEASE_NAME
+        must be set to a pre-reserved lease.
+    - name: JUMPSTARTER_SELECTOR
+      default: ""
+      documentation: >-
+        Label selector for Jumpstarter device acquisition
+        (e.g. board-type=orin-nx). Used when JUMPSTARTER_DEVICE_NAME is
+        not set. Mutually exclusive with JUMPSTARTER_DEVICE_NAME.
     - name: JUMPSTARTER_LEASE_NAME
-      documentation: Name of the pre-reserved Jumpstarter lease for the Jetson device
+      default: ""
+      documentation: >-
+        Name of a pre-reserved Jumpstarter lease. Used only when neither
+        JUMPSTARTER_DEVICE_NAME nor JUMPSTARTER_SELECTOR is set
+        (backward-compatible mode).
+    - name: LEASE_DURATION
+      default: "3h"
+      documentation: How long to hold the Jumpstarter lease (e.g. 1h, 3h, 1d).
     - name: TEST_SUITE
       default: tests_suites/
       documentation: pytest test path or suite directory to run
@@ -29,11 +49,10 @@ ref:
   documentation: |-
     Run the qe-rhel-jetson test suite on a physical NVIDIA Jetson device via Jumpstarter.
 
-    Uses the Jumpstarter framework to acquire a hardware lease, flash a RHEL image to the
-    device, and run pytest test suites over SSH through a Jumpstarter TCP port-forward tunnel.
+    The step creates a Jumpstarter lease automatically (and releases it on exit) when
+    JUMPSTARTER_DEVICE_NAME or JUMPSTARTER_SELECTOR is set. For pre-reserved leases
+    set JUMPSTARTER_LEASE_NAME instead (backward-compatible).
 
     Required secrets in test-credentials namespace:
       - qe-rhel-jetson-jumpstarter: Jumpstarter client config (key: config)
       - qe-rhel-jetson-jetson-ssh: Jetson SSH credentials (keys: username, password)
-
-    The JUMPSTARTER_LEASE_NAME env var must be set to the name of the leased Jetson device.
