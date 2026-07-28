@@ -32,7 +32,7 @@ if [[ -z "${LEASE:-}" ]]; then
     LEASE=$(jmp create lease "${LEASE_ACQUIRE_ARGS[@]}" -o name)
     echo "[jumpstarter-test] Lease acquired: ${LEASE}"
     # Release the lease when the step exits (success or failure)
-    trap "echo '[jumpstarter-test] Releasing lease ${LEASE}'; jmp delete lease '${LEASE}'" EXIT
+    trap 'echo "[jumpstarter-test] Releasing lease ${LEASE}"; jmp delete lease "${LEASE}"' EXIT
 fi
 
 cd /opt/qe-rhel-jetson-jumpstarter
