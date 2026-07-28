@@ -1,4 +1,9 @@
 base_images:
+  # Needed: ref kubevirt-libvirt-vpn uses `from: libvirt-installer` (#72780).
+  libvirt-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: libvirt-installer
   metrics-linter:
     name: prom-metrics-linter
     namespace: ci
@@ -137,6 +142,24 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp-single-node
+# Draft connectivity validation for SSP s390x orange-zone VPN (libvirt-s390x-vpn-virt).
+# Depends on Boskos leases (#82263) and secret bootstrap (#82292) being merged + synced.
+# Pattern: multiarch PR #72780.
+- as: e2e-s390x-vpn-connectivity
+  capabilities:
+  - intranet # needed: schedule on intranet-capable build clusters for VPN
+  # #NEED? cron for draft? Fine for draft PR; could be manual-only until infra lands.
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: libvirt-s390x-vpn-virt # needed: mounts secret + triggers VPN sidecar
+    dependencies:
+      # #NEED? Copied from #72780; unused by connectivity script.
+      OPENSHIFT_INSTALL_TARGET: release:latest
+    env:
+      # #NEED? Required by ref env list; unused by script.
+      ARCH: s390x
+      BRANCH: "4.19"
+    workflow: kubevirt-libvirt-vpn
 zz_generated_metadata:
   branch: main
   org: kubevirt
