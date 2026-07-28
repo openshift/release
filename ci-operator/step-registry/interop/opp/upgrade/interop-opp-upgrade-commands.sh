@@ -386,7 +386,7 @@ ValidateOppOperators() {
 
     : "Checking pod readiness for OPP operator namespaces"
     typeset oppNamespaces=""
-    oppNamespaces="$(echo "${allCsvsJson}" | jq -r --arg ops "${OPP_OPERATORS}" '($ops | split(",")) as $opArr | [.items[] | select(.metadata.name as $n | $opArr | any(. as $op | $n | contains($op))) | .metadata.namespace] | unique | .[]')"
+    oppNamespaces="$(echo "${allCsvsJson}" | jq -r --arg ops "${OPP_OPERATORS}" '($ops | split(",")) as $opArr | [.items[] | select(.metadata.name as $n | $opArr | any(. as $op | $n | startswith($op))) | .metadata.namespace] | unique | .[]')"
     typeset notReady="" ns=""
     for ns in ${oppNamespaces}; do
         notReady="$(oc get pods -n "${ns}" --no-headers | grep -v 'Completed' | grep -v 'Running' | grep -v 'Succeeded')" || true

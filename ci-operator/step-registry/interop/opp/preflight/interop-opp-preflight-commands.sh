@@ -60,20 +60,20 @@ REMOVED_APIS["18"]="flowcontrol.apiserver.k8s.io/v1beta3/FlowSchema flowcontrol.
 
 # ──────────────────────────────────────────────────────────────────────
 #  OPP operator compatibility matrix.
-#  Maps OCP minor version to minimum required operator major.minor.
+#  Maps OCP major.minor version to minimum required operator major.minor.
 #  Format: "operator_csv_prefix:min_major.min_minor"
 # ──────────────────────────────────────────────────────────────────────
 declare -A OPP_COMPAT
-OPP_COMPAT["14"]="advanced-cluster-management:2.9 rhacs-operator:4.3 odf-operator:4.14 quay-operator:3.10"
-OPP_COMPAT["15"]="advanced-cluster-management:2.10 rhacs-operator:4.4 odf-operator:4.15 quay-operator:3.11"
-OPP_COMPAT["16"]="advanced-cluster-management:2.11 rhacs-operator:4.5 odf-operator:4.16 quay-operator:3.12"
-OPP_COMPAT["17"]="advanced-cluster-management:2.12 rhacs-operator:4.6 odf-operator:4.17 quay-operator:3.13"
-OPP_COMPAT["18"]="advanced-cluster-management:2.13 rhacs-operator:4.7 odf-operator:4.18 quay-operator:3.14"
-OPP_COMPAT["19"]="advanced-cluster-management:2.13 rhacs-operator:4.8 odf-operator:4.19 quay-operator:3.14"
-OPP_COMPAT["20"]="advanced-cluster-management:2.14 rhacs-operator:4.9 odf-operator:4.20 quay-operator:3.15"
-OPP_COMPAT["21"]="advanced-cluster-management:2.15 rhacs-operator:4.10 odf-operator:4.21 quay-operator:3.15"
-OPP_COMPAT["22"]="advanced-cluster-management:2.16 rhacs-operator:4.11 odf-operator:4.22 quay-operator:3.16"
-OPP_COMPAT["0"]="advanced-cluster-management:2.17 quay-operator:3.17"
+OPP_COMPAT["4.14"]="advanced-cluster-management:2.9 rhacs-operator:4.3 odf-operator:4.14 quay-operator:3.10"
+OPP_COMPAT["4.15"]="advanced-cluster-management:2.10 rhacs-operator:4.4 odf-operator:4.15 quay-operator:3.11"
+OPP_COMPAT["4.16"]="advanced-cluster-management:2.11 rhacs-operator:4.5 odf-operator:4.16 quay-operator:3.12"
+OPP_COMPAT["4.17"]="advanced-cluster-management:2.12 rhacs-operator:4.6 odf-operator:4.17 quay-operator:3.13"
+OPP_COMPAT["4.18"]="advanced-cluster-management:2.13 rhacs-operator:4.7 odf-operator:4.18 quay-operator:3.14"
+OPP_COMPAT["4.19"]="advanced-cluster-management:2.13 rhacs-operator:4.8 odf-operator:4.19 quay-operator:3.14"
+OPP_COMPAT["4.20"]="advanced-cluster-management:2.14 rhacs-operator:4.9 odf-operator:4.20 quay-operator:3.15"
+OPP_COMPAT["4.21"]="advanced-cluster-management:2.15 rhacs-operator:4.10 odf-operator:4.21 quay-operator:3.15"
+OPP_COMPAT["4.22"]="advanced-cluster-management:2.16 rhacs-operator:4.11 odf-operator:4.22 quay-operator:3.16"
+OPP_COMPAT["5.0"]="advanced-cluster-management:2.17 quay-operator:3.17"
 
 # ──────────────────────────────────────────────────────────────────────
 #  Utility: append a check result to the JSON report
@@ -128,7 +128,7 @@ check_api_deprecations() {
                     local opp_usage
                     opp_usage="$(oc get "${api_kind}" -A --no-headers 2>/dev/null | head -5)" || true
                     if [[ -n "${opp_usage}" ]]; then
-                        flagged="${flagged}  - ${api_version}/${api_kind} (removed in 4.${minor})\n"
+                        flagged="${flagged}  - ${api_version}/${api_kind} (removed in ${target_major}.${minor})\n"
                         (( found_count += 1 ))
                     fi
                 fi
@@ -141,7 +141,7 @@ check_api_deprecations() {
         append_check "api_deprecation_scan" "warn" "Found ${found_count} deprecated API(s) in use: ${flagged}"
     else
         echo "No deprecated APIs detected for target version ${target_major}.${target_minor}"
-        append_check "api_deprecation_scan" "pass" "No deprecated APIs detected"
+        append_check "api_deprecation_scan" "pass" "No deprecated APIs detected for ${target_major}.${target_minor}"
     fi
 }
 
@@ -153,7 +153,8 @@ check_opp_compatibility() {
 
     local target_minor="${1}"
     local target_major="${2:-4}"
-    local compat_spec="${OPP_COMPAT[${target_minor}]:-}"
+    local compat_key="${target_major}.${target_minor}"
+    local compat_spec="${OPP_COMPAT[${compat_key}]:-}"
     local all_csvs failed=0
 
     all_csvs="$(oc get csv -A --no-headers 2>/dev/null)" || {
@@ -164,7 +165,7 @@ check_opp_compatibility() {
     }
 
     if [[ -z "${compat_spec}" ]]; then
-        echo "No compatibility matrix entry for target minor ${target_minor}; skipping version check"
+        echo "No compatibility matrix entry for target ${compat_key}; skipping version check"
         append_check "opp_compatibility_matrix" "skip" "No matrix entry for OCP ${target_major}.${target_minor}"
         return 0
     fi
