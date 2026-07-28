@@ -14,8 +14,7 @@ eval "$(
     "${_fURL[@]}" \
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/TestReport--JUnit.sh
 )"
-
-typeset startTime="${SECONDS}"
+typeset -i startTime="${SECONDS}"
 typeset tcMsg='-Unknown Error'
 
 function UpdJUnit() {
