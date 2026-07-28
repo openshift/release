@@ -37,6 +37,6 @@ echo "Done running the test!"
 echo "Return code: $rc"
 
 if [[ $CAPTURE_METRICS == "True" ]]; then 
-  cp /home/krkn/kraken/config/metrics-report.yaml ${ARTIFACT_DIR}/metrics-report.yaml
+  cp $METRICS_PATH ${ARTIFACT_DIR}/metrics-report.yaml
 fi
 exit $rc
