@@ -100,13 +100,16 @@ run_tls_scan() {
       oc delete pod/tls-scanner -n "${NAMESPACE}" --ignore-not-found --wait=true --timeout=60s || true
   fi
 
-  # Cleanup on exit
+  # Snapshot locals into global variables so the EXIT trap can reference them
+  # after run_tls_scan returns and locals go out of scope.
+  _CLEANUP_NAMESPACE="${NAMESPACE}"
+  _CLEANUP_OWNS_NAMESPACE="${OWNS_NAMESPACE}"
   cleanup() {
       echo "Cleaning up..."
-      if [[ "${OWNS_NAMESPACE}" == "true" ]]; then
-          oc delete namespace "${NAMESPACE}" --ignore-not-found --wait=false || true
+      if [[ "${_CLEANUP_OWNS_NAMESPACE}" == "true" ]]; then
+          oc delete namespace "${_CLEANUP_NAMESPACE}" --ignore-not-found --wait=false || true
       else
-          oc delete pod/tls-scanner -n "${NAMESPACE}" --ignore-not-found --wait=false || true
+          oc delete pod/tls-scanner -n "${_CLEANUP_NAMESPACE}" --ignore-not-found --wait=false || true
       fi
   }
   trap cleanup EXIT
@@ -251,17 +254,53 @@ EOF
 
   wait $LOGS_PID 2>/dev/null || true
 
-  if [[ "$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null)" == "Failed" ]]; then
-      echo "Scanner pod failed"
-      oc describe pod/tls-scanner -n "${NAMESPACE}"
-      exit 1
-  fi
+  # Check final pod status. The scanner exits non-zero when TLS findings are
+  # detected — this is expected and not an infrastructure failure. Propagate
+  # the scanner's exit code so CI marks the job accordingly, but do not treat
+  # it as a timeout or describe the pod as failed when artifacts were collected.
+  local pod_phase
+  pod_phase="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")"
+  local pod_exit_code
+  pod_exit_code="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo "")"
 
-  oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/tls-scanner -n "${NAMESPACE}" --timeout=10m || {
-      echo "Scanner did not complete successfully - timeout exceeded"
-      oc describe pod/tls-scanner -n "${NAMESPACE}"
-      exit 1
-  }
+  if [[ "${pod_phase}" == "Failed" ]]; then
+      echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code}"
+      if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
+          echo "Artifacts were collected — scanner found TLS compliance issues."
+      else
+          echo "No artifacts found — scanner may have crashed."
+          oc describe pod/tls-scanner -n "${NAMESPACE}"
+      fi
+      exit "${pod_exit_code:-1}"
+  elif [[ "${pod_phase}" != "Succeeded" ]]; then
+      local poll_timeout=600
+      local poll_interval=10
+      echo "Scanner pod in unexpected phase: ${pod_phase} — polling until terminal (up to $((poll_timeout/60))m)"
+      local wait_elapsed=0
+      while (( wait_elapsed < poll_timeout )); do
+          pod_phase="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")"
+          if [[ "${pod_phase}" == "Succeeded" || "${pod_phase}" == "Failed" ]]; then
+              break
+          fi
+          sleep "${poll_interval}"
+          (( wait_elapsed += poll_interval )) || true
+      done
+      if [[ "${pod_phase}" == "Failed" ]]; then
+          pod_exit_code="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo "")"
+          echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code}"
+          if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
+              echo "Artifacts were collected — scanner found TLS compliance issues."
+          else
+              echo "No artifacts found — scanner may have crashed."
+              oc describe pod/tls-scanner -n "${NAMESPACE}"
+          fi
+          exit "${pod_exit_code:-1}"
+      elif [[ "${pod_phase}" != "Succeeded" ]]; then
+          echo "Scanner did not complete successfully - timeout exceeded (phase: ${pod_phase})"
+          oc describe pod/tls-scanner -n "${NAMESPACE}"
+          exit 1
+      fi
+  fi
 
   echo "=== TLS Scanner Complete ==="
   echo "Artifacts saved to: ${SCANNER_ARTIFACT_DIR}"
