@@ -330,7 +330,8 @@ function mirror_test_images {
 	echo "Pre-mirroring test dependency images to mirror registry (port 5000)"
 
 	local new_pull_secret="/tmp/mirror-pull-secret.json"
-	cp /tmp/new-dockerconfigjson "${new_pull_secret}"
+	jq -s '.[0] * {auths: (.[0].auths * .[1].auths)}' \
+		"${CLUSTER_PROFILE_DIR}/pull-secret" /tmp/new-dockerconfigjson > "${new_pull_secret}"
 
 	local image="registry.redhat.io/rhel8/support-tools:latest=${MIRROR_REGISTRY_HOST}/rhel8/support-tools:latest"
 	local retries=0
