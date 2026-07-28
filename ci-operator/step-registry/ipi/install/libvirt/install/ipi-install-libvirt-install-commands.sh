@@ -307,13 +307,20 @@ function ipi_install_xsltproc_user_local_stream9() {
 			echo "WARN: ${label}: failed to fetch BaseOS Packages/x/ index" >&2
 			continue
 		}
-		xsl_html="$(ipi_fetch_index "${app_l}")" || {
-			echo "WARN: ${label}: failed to fetch AppStream Packages/l/ index" >&2
-			continue
-		}
+		# AppStream may be empty/unneeded on Rocky 8 (libxslt is in BaseOS there).
+		xsl_html="$(ipi_fetch_index "${app_l}")" || xsl_html=""
+		if [[ -z "${xsl_html}" ]]; then
+			echo "WARN: ${label}: AppStream Packages/l/ unavailable; will look for libxslt in BaseOS" >&2
+		fi
 
 		xml_rpm="$(ipi_el_pick_latest_rpm libxml2 "${base_html}" "${arch}")"
+		# Rocky 9: libxslt in AppStream. Rocky 8: libxslt lives in BaseOS with libxml2.
 		xsl_rpm="$(ipi_el_pick_latest_rpm libxslt "${xsl_html}" "${arch}")"
+		local xsl_url_prefix="${app_l}"
+		if [[ -z "${xsl_rpm}" ]]; then
+			xsl_rpm="$(ipi_el_pick_latest_rpm libxslt "${base_html}" "${arch}")"
+			xsl_url_prefix="${base_l}"
+		fi
 		xz_rpm="$(ipi_el_pick_latest_rpm xz-libs "${base_x_html}" "${arch}")"
 		gcrypt_rpm="$(ipi_el_pick_latest_rpm libgcrypt "${base_html}" "${arch}")"
 		gpgerr_rpm="$(ipi_el_pick_latest_rpm libgpg-error "${base_html}" "${arch}")"
@@ -327,7 +334,7 @@ function ipi_install_xsltproc_user_local_stream9() {
 
 		local -a downloads=(
 			"${base_l}${xml_rpm}|${tmpd}/rpms/${xml_rpm}"
-			"${app_l}${xsl_rpm}|${tmpd}/rpms/${xsl_rpm}"
+			"${xsl_url_prefix}${xsl_rpm}|${tmpd}/rpms/${xsl_rpm}"
 		)
 		[[ -n "${xz_rpm}" ]] && downloads+=("${base_x}${xz_rpm}|${tmpd}/rpms/${xz_rpm}")
 		[[ -n "${gcrypt_rpm}" ]] && downloads+=("${base_l}${gcrypt_rpm}|${tmpd}/rpms/${gcrypt_rpm}")
