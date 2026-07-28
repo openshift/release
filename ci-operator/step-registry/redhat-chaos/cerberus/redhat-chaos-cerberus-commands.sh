@@ -87,4 +87,3 @@ while [[ -z $(cat $cerberus_logs | grep "signal=terminated") ]]; do
   sleep 10
   date
 done
-

@@ -52,6 +52,10 @@ if [[ -f final_cerberus_info.json ]]; then
 else
     replaced_str=1
 fi
+
+if [[ $CAPTURE_METRICS == "True" ]]; then 
+  cp /home/krkn/kraken/config/metrics-report.yaml ${ARTIFACT_DIR}/metrics-report.yaml
+fi
 date
 echo "Finished running cerberus scenarios with status: $replaced_str"
 exit $replaced_str

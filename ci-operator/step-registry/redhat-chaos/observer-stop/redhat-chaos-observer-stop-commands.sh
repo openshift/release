@@ -29,4 +29,5 @@ echo "$status_bool staus bool "
 
 replaced_str=$(echo $status_bool | sed "s/True/0/g" | sed "s/False/1/g" )
 echo "$replaced_str replaced str"
+
 exit $((replaced_str))

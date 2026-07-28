@@ -47,5 +47,9 @@ if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
     cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 fi
 
+if [[ $CAPTURE_METRICS == "True" ]]; then 
+  cp /home/krkn/kraken/config/metrics-report.yaml ${ARTIFACT_DIR}/metrics-report.yaml
+fi
+
 echo "Finished running time scenario"
 echo "Return code: $rc"
