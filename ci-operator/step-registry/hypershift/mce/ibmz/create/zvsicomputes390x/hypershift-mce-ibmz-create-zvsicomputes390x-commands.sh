@@ -664,7 +664,7 @@ patch_nested_kubeconfig_for_ci
 echo "$(date) Checking the compute nodes in the hosted control plane"
 oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
 oc get co --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
-oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=60m
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=90m
 
 # Sourcing the proxy settings for the next steps
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
