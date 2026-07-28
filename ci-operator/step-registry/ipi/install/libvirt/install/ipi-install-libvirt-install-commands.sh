@@ -99,16 +99,23 @@ EOF
 }
 
 # libvirt-installer runs as non-root (UID 1000); microdnf/yum cannot install packages. When we need
-# xsltproc for the s390x ACPI terraform workaround, unpack EL9 libxml2/libxslt RPMs (RHEL9-compatible
-# with the CentOS Stream 9-based image) into /tmp and prepend PATH/LD_LIBRARY_PATH.
-# CentOS Stream mirror "Packages/" pages are no longer plain directory indexes; use Rocky 9
-# BaseOS (libxml2) + AppStream (libxslt) letter buckets, which still expose href="*.rpm".
-function ipi_el9_pick_latest_rpm() {
+# xsltproc for the s390x ACPI terraform workaround, unpack Rocky libxml2/libxslt (+deps) RPMs into
+# /tmp and prepend PATH/LD_LIBRARY_PATH.
+# - ocp/4.15+ libvirt-installer is EL9-based (GLIBC 2.34+) → Rocky 9 RPMs
+# - ocp/4.14 libvirt-installer is older (GLIBC < 2.34) → Rocky 9 binaries fail; use Rocky 8
+# CentOS Stream "Packages/" pages are no longer plain indexes; Rocky letter buckets expose href="*.rpm".
+function ipi_el_pick_latest_rpm() {
 	local pkg="$1"
 	local html="$2"
 	local arch="$3"
 	echo "${html}" | grep -oE "href=\"${pkg}-[0-9][^\"]*\\.${arch}\\.rpm\"" | sed 's/href="//;s/"$//' \
 		| grep -Ev -- '-(devel|static)' | LC_ALL=C sort -V | tail -n1
+}
+
+# True when the installer image can run EL9 (Rocky 9) userspace binaries.
+function ipi_host_has_glibc_2_34() {
+	grep -aob 'GLIBC_2\.34' /lib64/libc.so.6 >/dev/null 2>&1 || \
+		grep -aob 'GLIBC_2\.34' /usr/lib64/libc.so.6 >/dev/null 2>&1
 }
 
 # EL9 libvirt-installer image has rpm2cpio but often no cpio(1); unpack newc cpio from rpm2cpio stdout.
@@ -209,7 +216,7 @@ function ipi_install_xsltproc_user_local_stream9() {
 	command -v mktemp >/dev/null 2>&1 || { echo "ERROR: mktemp not found" >&2; return 1; }
 	if ! command -v cpio >/dev/null 2>&1; then
 		command -v python3 >/dev/null 2>&1 || {
-			echo "ERROR: cpio and python3 both missing; cannot unpack EL9 libxslt RPMs" >&2
+			echo "ERROR: cpio and python3 both missing; cannot unpack libxslt RPMs" >&2
 			return 1
 		}
 	fi
@@ -239,14 +246,26 @@ function ipi_install_xsltproc_user_local_stream9() {
 
 	local unpack_mode=python3
 	command -v cpio >/dev/null 2>&1 && unpack_mode=cpio
-	echo "INFO: Attempting to install xsltproc for ${arch} (unpack: ${unpack_mode})" >&2
 
-	# Rocky 9: libxml2/libxslt (+ runtime deps older libvirt-installer images lack, e.g. ocp/4.14).
-	# BaseOS letter buckets still expose href="*.rpm". AppStream holds libxslt.
-	local mirror_rows=(
-		"rocky|https://download.rockylinux.org/pub/rocky/9/BaseOS/${arch}/os/Packages|https://download.rockylinux.org/pub/rocky/9/AppStream/${arch}/os/Packages"
-		"rocky-dl|https://dl.rockylinux.org/pub/rocky/9/BaseOS/${arch}/os/Packages|https://dl.rockylinux.org/pub/rocky/9/AppStream/${arch}/os/Packages"
+	# Prefer RPMs that match host glibc. ocp/4.14 libvirt-installer lacks GLIBC_2.34 so
+	# Rocky 9 xsltproc fails with "version GLIBC_2.34 not found"; Rocky 8 works there.
+	# 4.15+ images have newer glibc and use Rocky 9 (same as the installer base).
+	local -a mirror_rows=()
+	local rocky8_rows=(
+		"rocky8|https://download.rockylinux.org/pub/rocky/8/BaseOS/${arch}/os/Packages|https://download.rockylinux.org/pub/rocky/8/AppStream/${arch}/os/Packages"
+		"rocky8-dl|https://dl.rockylinux.org/pub/rocky/8/BaseOS/${arch}/os/Packages|https://dl.rockylinux.org/pub/rocky/8/AppStream/${arch}/os/Packages"
 	)
+	local rocky9_rows=(
+		"rocky9|https://download.rockylinux.org/pub/rocky/9/BaseOS/${arch}/os/Packages|https://download.rockylinux.org/pub/rocky/9/AppStream/${arch}/os/Packages"
+		"rocky9-dl|https://dl.rockylinux.org/pub/rocky/9/BaseOS/${arch}/os/Packages|https://dl.rockylinux.org/pub/rocky/9/AppStream/${arch}/os/Packages"
+	)
+	if ipi_host_has_glibc_2_34; then
+		echo "INFO: Attempting to install xsltproc for ${arch} (unpack: ${unpack_mode}, glibc>=2.34 → Rocky 9 then 8)" >&2
+		mirror_rows+=("${rocky9_rows[@]}" "${rocky8_rows[@]}")
+	else
+		echo "INFO: Attempting to install xsltproc for ${arch} (unpack: ${unpack_mode}, glibc<2.34 → Rocky 8 then 9)" >&2
+		mirror_rows+=("${rocky8_rows[@]}" "${rocky9_rows[@]}")
+	fi
 
 	ipi_fetch_index() {
 		local url="$1"
@@ -275,6 +294,10 @@ function ipi_install_xsltproc_user_local_stream9() {
 		local app_l="${xsl_base}/l/"
 		echo "INFO: Trying mirror set ${label}: base=${xml_base} app=${xsl_base}" >&2
 
+		# Fresh download dir per mirror so Rocky 8/9 RPMs with different NEVRAs do not collide.
+		rm -rf "${tmpd}/rpms"
+		mkdir -p "${tmpd}/rpms"
+
 		base_html="$(ipi_fetch_index "${base_l}")" || {
 			echo "WARN: ${label}: failed to fetch BaseOS Packages/l/ index" >&2
 			continue
@@ -289,11 +312,11 @@ function ipi_install_xsltproc_user_local_stream9() {
 			continue
 		}
 
-		xml_rpm="$(ipi_el9_pick_latest_rpm libxml2 "${base_html}" "${arch}")"
-		xsl_rpm="$(ipi_el9_pick_latest_rpm libxslt "${xsl_html}" "${arch}")"
-		xz_rpm="$(ipi_el9_pick_latest_rpm xz-libs "${base_x_html}" "${arch}")"
-		gcrypt_rpm="$(ipi_el9_pick_latest_rpm libgcrypt "${base_html}" "${arch}")"
-		gpgerr_rpm="$(ipi_el9_pick_latest_rpm libgpg-error "${base_html}" "${arch}")"
+		xml_rpm="$(ipi_el_pick_latest_rpm libxml2 "${base_html}" "${arch}")"
+		xsl_rpm="$(ipi_el_pick_latest_rpm libxslt "${xsl_html}" "${arch}")"
+		xz_rpm="$(ipi_el_pick_latest_rpm xz-libs "${base_x_html}" "${arch}")"
+		gcrypt_rpm="$(ipi_el_pick_latest_rpm libgcrypt "${base_html}" "${arch}")"
+		gpgerr_rpm="$(ipi_el_pick_latest_rpm libgpg-error "${base_html}" "${arch}")"
 
 		if [[ -z "${xml_rpm}" || -z "${xsl_rpm}" ]]; then
 			echo "WARN: ${label}: could not parse libxml2/libxslt ${arch} RPM names from indexes" >&2
@@ -303,12 +326,12 @@ function ipi_install_xsltproc_user_local_stream9() {
 		echo "INFO: ${label}: picked ${xml_rpm}, ${xsl_rpm}, ${xz_rpm:-none}, ${gcrypt_rpm:-none}, ${gpgerr_rpm:-none}" >&2
 
 		local -a downloads=(
-			"${base_l}${xml_rpm}|${tmpd}/${xml_rpm}"
-			"${app_l}${xsl_rpm}|${tmpd}/${xsl_rpm}"
+			"${base_l}${xml_rpm}|${tmpd}/rpms/${xml_rpm}"
+			"${app_l}${xsl_rpm}|${tmpd}/rpms/${xsl_rpm}"
 		)
-		[[ -n "${xz_rpm}" ]] && downloads+=("${base_x}${xz_rpm}|${tmpd}/${xz_rpm}")
-		[[ -n "${gcrypt_rpm}" ]] && downloads+=("${base_l}${gcrypt_rpm}|${tmpd}/${gcrypt_rpm}")
-		[[ -n "${gpgerr_rpm}" ]] && downloads+=("${base_l}${gpgerr_rpm}|${tmpd}/${gpgerr_rpm}")
+		[[ -n "${xz_rpm}" ]] && downloads+=("${base_x}${xz_rpm}|${tmpd}/rpms/${xz_rpm}")
+		[[ -n "${gcrypt_rpm}" ]] && downloads+=("${base_l}${gcrypt_rpm}|${tmpd}/rpms/${gcrypt_rpm}")
+		[[ -n "${gpgerr_rpm}" ]] && downloads+=("${base_l}${gpgerr_rpm}|${tmpd}/rpms/${gpgerr_rpm}")
 
 		download_success=true
 		for spec in "${downloads[@]}"; do
@@ -324,10 +347,10 @@ function ipi_install_xsltproc_user_local_stream9() {
 		fi
 
 		echo "INFO: Extracting RPM packages" >&2
-		local -a rpm_files=("${tmpd}/${xml_rpm}" "${tmpd}/${xsl_rpm}")
-		[[ -n "${xz_rpm}" ]] && rpm_files+=("${tmpd}/${xz_rpm}")
-		[[ -n "${gcrypt_rpm}" ]] && rpm_files+=("${tmpd}/${gcrypt_rpm}")
-		[[ -n "${gpgerr_rpm}" ]] && rpm_files+=("${tmpd}/${gpgerr_rpm}")
+		local -a rpm_files=("${tmpd}/rpms/${xml_rpm}" "${tmpd}/rpms/${xsl_rpm}")
+		[[ -n "${xz_rpm}" ]] && rpm_files+=("${tmpd}/rpms/${xz_rpm}")
+		[[ -n "${gcrypt_rpm}" ]] && rpm_files+=("${tmpd}/rpms/${gcrypt_rpm}")
+		[[ -n "${gpgerr_rpm}" ]] && rpm_files+=("${tmpd}/rpms/${gpgerr_rpm}")
 		extract_ok=true
 		for rpmfile in "${rpm_files[@]}"; do
 			if ! ipi_extract_rpm_contents "${rpmfile}" "${root}" "${unpack_py}"; then
@@ -344,11 +367,11 @@ function ipi_install_xsltproc_user_local_stream9() {
 			hash -r 2>/dev/null || true
 
 			if xsltproc --version >/dev/null 2>&1; then
-				echo "INFO: xsltproc successfully installed and verified" >&2
+				echo "INFO: xsltproc successfully installed and verified (${label})" >&2
 				rm -rf "${tmpd}"
 				return 0
 			fi
-			echo "WARN: xsltproc extracted but not functional (missing shared libs?)" >&2
+			echo "WARN: xsltproc extracted but not functional (glibc/shared libs mismatch?)" >&2
 			if command -v ldd >/dev/null 2>&1 && [[ -x "${root}/usr/bin/xsltproc" ]]; then
 				echo "WARN: ldd ${root}/usr/bin/xsltproc:" >&2
 				ldd "${root}/usr/bin/xsltproc" >&2 || true
@@ -365,7 +388,7 @@ function ipi_install_xsltproc_user_local_stream9() {
 		mkdir -p "${root}"
 	done
 
-	echo "ERROR: All mirror attempts failed" >&2
+	echo "ERROR: All mirror attempts failed (tried Rocky 8 and 9; host glibc must match RPM generation)" >&2
 	export PATH="/usr/bin:/bin"
 	unset LD_LIBRARY_PATH
 	hash -r 2>/dev/null || true
