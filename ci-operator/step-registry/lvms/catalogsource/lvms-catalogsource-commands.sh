@@ -356,7 +356,7 @@ function mirror_test_images {
 	echo "Mirroring LVMS catalog images from ${index_image} to ${MIRROR_REGISTRY_HOST}"
 	oc adm catalog mirror "${index_image}" "${MIRROR_REGISTRY_HOST}" \
 		--insecure=true -a "${new_pull_secret}" \
-		--index-filter-by-os='linux/amd64' \
+		--index-filter-by-os="linux/${OCP_ARCH:-amd64}" \
 		--manifests-only=false \
 		--to-manifests="${manifests_dir}" || {
 		echo "WARNING: Failed to mirror LVMS catalog images, operator dependencies may fail to pull"
