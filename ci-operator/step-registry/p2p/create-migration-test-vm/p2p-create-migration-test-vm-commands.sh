@@ -67,6 +67,52 @@ OnError() {
     exit "${ec}"
 }
 
+# WaitForVirtApiReady — wait for virt-api Deployment to have all replicas ready.
+# CNV admission webhooks (DataVolume, VirtualMachine, VMI mutators) are served by
+# virt-api pods. If a pod is restarting or OOMKilled, webhook calls time out (10s)
+# and `oc apply` returns InternalError. Waiting for all replicas before creating
+# resources avoids this race.
+WaitForVirtApiReady() {
+    typeset cnvNs="${CNV_VIRT_API_NAMESPACE:-openshift-cnv}"
+    typeset timeout="${CNV_VIRT_API_WAIT_TIMEOUT:-5m}"
+
+    : "Waiting for virt-api deployment to be fully ready in '${cnvNs}' (timeout=${timeout})"
+    SpokeOc rollout status deployment/virt-api -n "${cnvNs}" --timeout="${timeout}" 1>/dev/null
+}
+
+# SpokeApplyWithRetry — drain stdin to a temp file then retry SpokeOc apply up to
+# CNV_APPLY_MAX_RETRIES (default 3) times. Between attempts, wait for virt-api to
+# recover in case the admission webhook was temporarily overloaded.
+# WHY temp file: stdin from a pipe can only be read once; the retry loop needs to
+# replay the same manifest bytes on each attempt.
+SpokeApplyWithRetry() {
+    typeset -i maxRetries="${CNV_APPLY_MAX_RETRIES:-3}"
+    typeset tmpManifest
+    tmpManifest="$(mktemp /tmp/manifest-XXXXXX.yaml)"
+    cat > "${tmpManifest}"
+
+    typeset -i attempt=0
+    typeset -i applyRc=0
+    while (( attempt < maxRetries )); do
+        (( attempt++ ))
+        applyRc=0
+        SpokeOc apply -f "${tmpManifest}" || applyRc=$?
+        if (( applyRc == 0 )); then
+            rm -f "${tmpManifest}"
+            return 0
+        fi
+        if (( attempt < maxRetries )); then
+            : "SpokeApplyWithRetry: attempt ${attempt}/${maxRetries} failed (rc=${applyRc}) — waiting for virt-api before retry"
+            WaitForVirtApiReady || true
+            sleep 10
+        fi
+    done
+
+    rm -f "${tmpManifest}"
+    : "SpokeApplyWithRetry: all ${maxRetries} attempts failed (last rc=${applyRc})" >&2
+    return "${applyRc}"
+}
+
 # EnsureStorageProfileCloneStrategyCopy — ODF virt SC needs host-assisted copy for RHEL clones.
 EnsureStorageProfileCloneStrategyCopy() {
     typeset spName profileCloneStrategy
@@ -122,7 +168,7 @@ ApplyCirrosDataVolume() {
         .spec.source.http.url                       = strenv(CNV_TEST_VM_CIRROS_IMAGE_URL) |
         .spec.storage.resources.requests.storage    = strenv(CNV_TEST_VM_DISK_SIZE) |
         .spec.storage.storageClassName               = strenv(CNV_TEST_VM_STORAGE_CLASS)
-    ' - <<'YAML' | SpokeOc apply -f -
+    ' - <<'YAML' | SpokeApplyWithRetry
 apiVersion: cdi.kubevirt.io/v1beta1
 kind: DataVolume
 metadata:
@@ -161,7 +207,7 @@ ApplyRhelDataVolume() {
         .spec.sourceRef.namespace                   = strenv(CNV_TEST_VM_DATA_SOURCE_NAMESPACE) |
         .spec.storage.resources.requests.storage    = strenv(CNV_TEST_VM_DISK_SIZE) |
         .spec.storage.storageClassName               = strenv(CNV_TEST_VM_STORAGE_CLASS)
-    ' - <<'YAML' | SpokeOc apply -f -
+    ' - <<'YAML' | SpokeApplyWithRetry
 apiVersion: cdi.kubevirt.io/v1beta1
 kind: DataVolume
 metadata:
@@ -205,7 +251,7 @@ ApplyCirrosVirtualMachine() {
         .spec.template.spec.domain.cpu.cores                  = (strenv(CNV_TEST_VM_CPUS) | tonumber) |
         .spec.template.spec.domain.memory.guest               = strenv(CNV_TEST_VM_MEMORY) |
         .spec.template.spec.volumes[0].dataVolume.name        = strenv(DV_NAME)
-    ' - <<'YAML' | SpokeOc apply -f -
+    ' - <<'YAML' | SpokeApplyWithRetry
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
@@ -271,7 +317,7 @@ ApplyRhelVirtualMachine() {
         .spec.template.spec.domain.memory.guest               = strenv(CNV_TEST_VM_MEMORY) |
         .spec.template.spec.volumes[0].dataVolume.name        = strenv(DV_NAME) |
         .spec.template.spec.volumes[1].cloudInitNoCloud.userData = strenv(CLOUD_INIT_USERDATA)
-    ' - <<'YAML' | SpokeOc apply -f -
+    ' - <<'YAML' | SpokeApplyWithRetry
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
@@ -327,17 +373,25 @@ YAML
 }
 
 # WaitVmiRunning — wait for VMI object then Running phase.
+# Uses a flag-based loop instead of an inner-subshell exit so that failures
+# propagate correctly through `set -e` / `inherit_errexit` even when the
+# function is called inside a `( ... ) || rc=$?` compound command.
 WaitVmiRunning() {
-    (
-        SECONDS=0
-        while (( SECONDS < 120 )); do
-            SpokeOc get "virtualmachineinstance/${CNV_TEST_VM_NAME}" \
-                -n "${CNV_TEST_VM_NAMESPACE}" 1>/dev/null && exit 0
-            sleep 2
-        done
+    typeset -i _vmiFound=0
+    SECONDS=0
+    while (( SECONDS < 120 )); do
+        if SpokeOc get "virtualmachineinstance/${CNV_TEST_VM_NAME}" \
+                -n "${CNV_TEST_VM_NAMESPACE}" 1>/dev/null 2>/dev/null; then
+            _vmiFound=1
+            break
+        fi
+        sleep 2
+    done
+
+    if (( !_vmiFound )); then
         : "VMI ${CNV_TEST_VM_NAME} not found in ${CNV_TEST_VM_NAMESPACE} after 120s" >&2
-        exit 1
-    )
+        return 1
+    fi
 
     SpokeOc wait "virtualmachineinstance/${CNV_TEST_VM_NAME}" -n "${CNV_TEST_VM_NAMESPACE}" \
         --for=jsonpath='{.status.phase}'=Running --timeout="${CNV_TEST_VM_VMI_WAIT_TIMEOUT}"
@@ -347,19 +401,26 @@ trap - ERR
 
 typeset -i cclmStepRc=0
 (
+    # bash set -e is suppressed for all commands inside ( ... ) || cclmStepRc=$?
+    # (the left side of || runs in an "errexit-ignored" context per POSIX/bash).
+    # Functions returning non-zero do NOT abort the subshell automatically. Use
+    # explicit || _vmFailed=1 on every critical call and make (( _vmFailed == 0 ))
+    # the LAST command so the subshell exit code reflects any failure.
+    typeset -i _vmFailed=0
+
     trap OnError ERR
 
-    ResolveSpokeKubeconfig
+    ResolveSpokeKubeconfig || _vmFailed=1
 
     case "${CNV_TEST_VM_IMAGE_TYPE}" in
         cirros|rhel) ;;
-        *) false ;;
+        *) _vmFailed=1 ;;
     esac
 
-    SpokeOc get crd virtualmachines.kubevirt.io 1>/dev/null
-    SpokeOc get "storageclass/${CNV_TEST_VM_STORAGE_CLASS}" 1>/dev/null
+    SpokeOc get crd virtualmachines.kubevirt.io 1>/dev/null || _vmFailed=1
+    SpokeOc get "storageclass/${CNV_TEST_VM_STORAGE_CLASS}" 1>/dev/null || _vmFailed=1
 
-    yq e '.metadata.name = strenv(CNV_TEST_VM_NAMESPACE)' - <<'YAML' | SpokeOc apply -f -
+    yq e '.metadata.name = strenv(CNV_TEST_VM_NAMESPACE)' - <<'YAML' | SpokeOc apply -f - || _vmFailed=1
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -371,22 +432,37 @@ YAML
     if [[ "${CNV_TEST_VM_CLEAN}" == "true" ]] \
         || SpokeOc get "datavolume/${dvName}" -n "${CNV_TEST_VM_NAMESPACE}" \
             -o jsonpath='{.status.phase}' | grep -qE 'Failed|Lost'; then
-        CleanupPriorResources
+        CleanupPriorResources || _vmFailed=1
     fi
 
+    # Ensure virt-api is fully ready before creating CNV resources.  All CNV
+    # admission webhooks (DataVolume, VirtualMachine mutators) are served by
+    # virt-api pods; an overloaded or restarting virt-api causes webhook timeouts
+    # that make `oc apply` fail with InternalError. SpokeApplyWithRetry will
+    # additionally retry and re-check readiness on each webhook error.
+    WaitForVirtApiReady || _vmFailed=1
+
     case "${CNV_TEST_VM_IMAGE_TYPE}" in
-        cirros) ApplyCirrosDataVolume ;;
-        rhel)   ApplyRhelDataVolume ;;
+        cirros) ApplyCirrosDataVolume || _vmFailed=1 ;;
+        rhel)   ApplyRhelDataVolume   || _vmFailed=1 ;;
     esac
+    # Verify the DataVolume object was actually created.  Some CNV admission
+    # webhooks use failurePolicy:Ignore and return exit 0 from `oc apply`
+    # even when mutation failed, so the object may not exist after apply.
+    SpokeOc get "datavolume/${dvName}" -n "${CNV_TEST_VM_NAMESPACE}" 1>/dev/null \
+        || _vmFailed=1
 
-    WaitDataVolumeReady
+    WaitDataVolumeReady || _vmFailed=1
 
     case "${CNV_TEST_VM_IMAGE_TYPE}" in
-        cirros) ApplyCirrosVirtualMachine ;;
-        rhel)   ApplyRhelVirtualMachine ;;
+        cirros) ApplyCirrosVirtualMachine || _vmFailed=1 ;;
+        rhel)   ApplyRhelVirtualMachine   || _vmFailed=1 ;;
     esac
+    # Verify the VirtualMachine object was actually created (same webhook risk).
+    SpokeOc get "virtualmachine/${CNV_TEST_VM_NAME}" -n "${CNV_TEST_VM_NAMESPACE}" 1>/dev/null \
+        || _vmFailed=1
 
-    WaitVmiRunning
+    WaitVmiRunning || _vmFailed=1
 
     if [[ -n "${ARTIFACT_DIR}" ]]; then
         mkdir -p "${ARTIFACT_DIR}"
@@ -398,9 +474,12 @@ YAML
             SpokeOc get "virtualmachine/${CNV_TEST_VM_NAME}" "virtualmachineinstance/${CNV_TEST_VM_NAME}" \
                 "datavolume/${dvName}" "persistentvolumeclaim/${dvName}" \
                 -n "${CNV_TEST_VM_NAMESPACE}" -o wide
-        } > "${ARTIFACT_DIR}/migration-test-vm-status.txt"
+        } > "${ARTIFACT_DIR}/migration-test-vm-status.txt" || true
     fi
-    true
+    # LAST command: propagate any critical failure as the subshell exit code.
+    # No trailing `true` — the old trailing `true` silently overrode all failures
+    # above (set -e is suppressed inside ( ) || rc=$? left-hand-side).
+    (( _vmFailed == 0 ))
 ) || cclmStepRc=$?
 
 if (( cclmStepRc != 0 )); then
