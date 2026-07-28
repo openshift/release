@@ -18,8 +18,13 @@ fi
 echo "Is multiarch image: ${MULTI_ARCH_IMAGE}"
 
 echo "Set KUBECONFIG to management cluster"
-export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
-cp "$KUBECONFIG" "${SHARED_DIR}/mgmt_kubeconfig" # idp-htpasswd step needs
+if [[ $HOSTED_MANAGEMENT_CLUSTER == "hosted-mgmt2" ]]; then
+	MGMT_KUBECONFIG=/var/run/hypershift-workload-credentials-hosted-mgmt2/kubeconfig
+else
+	MGMT_KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
+fi
+export KUBECONFIG=$MGMT_KUBECONFIG
+cp "$MGMT_KUBECONFIG" "${SHARED_DIR}/mgmt_kubeconfig" # idp-htpasswd step needs
 
 # Copy token file if kubeconfig references one
 CURRENT_CONTEXT=$(oc config current-context)
@@ -320,4 +325,4 @@ fi
 set +x # Always disable tracing due to below lines printing cluster urls, in case this script happens to enable tracing again in future
 echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 $WAS_TRACING && set -x
-KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "created-at=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
+oc --kubeconfig=$MGMT_KUBECONFIG annotate -n clusters hostedcluster ${CLUSTER_NAME} "created-at=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
