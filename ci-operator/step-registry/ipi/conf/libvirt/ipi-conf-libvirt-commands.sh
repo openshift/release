@@ -31,6 +31,7 @@ if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
   exit 1
 fi
+sleep 30s
 
 echo "Installing from initial release ${RELEASE_IMAGE_LATEST}"
 openshift-install version
