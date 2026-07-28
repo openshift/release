@@ -587,13 +587,13 @@ function main {
 		return 1
 	}
 
-	# Support hypershift config guest cluster's idms
-	oc get ImageDigestMirrorSet -oyaml >/tmp/mgmt_idms.yaml && yq-go r /tmp/mgmt_idms.yaml 'items[*].spec.imageDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml
+	# Support hypershift config guest cluster's idms (non-fatal if yq-go is unavailable)
+	oc get ImageDigestMirrorSet -oyaml >/tmp/mgmt_idms.yaml && yq-go r /tmp/mgmt_idms.yaml 'items[*].spec.imageDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml || true
 
 	# Extract source commit from catalog image for integration test builds.
 	# Fail hard if vcs-ref label is missing — wrong commit means meaningless test results.
 	local commit
-	commit=$(oc image info --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+	commit=$(oc image info --insecure --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
 		| jq -r '.config.config.Labels["vcs-ref"]')
 	if [[ -z "${commit}" || "${commit}" == "null" ]]; then
 		echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
