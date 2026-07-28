@@ -2,17 +2,27 @@ workflow:
   as: sandboxed-containers-operator-e2e-azure-sts
   steps:
     env:
-      IDENTITY_MODE: "sts"
-      SLEEP_DURATION: 3h
-      TEST_PARALLEL: 1
-      FORCE_SUCCESS_EXIT: no
-      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
-      MUST_GATHER_TIMEOUT: "35m"
+      COMPUTE_NODE_REPLICAS: "2"
+      CUSTOM_AZURE_REGION: eastus
       ENABLE_MUST_GATHER: "true"
+      FORCE_SUCCESS_EXIT: "no"
+      IDENTITY_MODE: "sts"
+      LOKI_ENABLED: "false"
+      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
       MUST_GATHER_ON_FAILURE_ONLY: "true"
+      MUST_GATHER_TIMEOUT: "35m"
+      SLEEP_DURATION: 3h
+      SPOT_INSTANCES: "false"
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_PARALLEL: 1
     pre:
-    - chain: sandboxed-containers-operator-ipi-azure-sts-pre
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-custom-region
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-azure-oidc-creds-provision
+    - ref: ipi-conf-azure-provisioned-resourcegroup
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
     - chain: sandboxed-containers-operator-pre
     post:
     - ref: cucushift-installer-wait

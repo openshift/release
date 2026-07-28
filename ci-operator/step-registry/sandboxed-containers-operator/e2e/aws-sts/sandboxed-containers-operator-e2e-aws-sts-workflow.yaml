@@ -2,20 +2,28 @@ workflow:
   as: sandboxed-containers-operator-e2e-aws-sts
   steps:
     env:
-      IDENTITY_MODE: "sts"
-      TEST_PARALLEL: 1
+      AWS_CCOCTL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_REGION_OVERRIDE: "us-east-2"
+      COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: "t3a.xlarge"
       CONTROL_PLANE_INSTANCE_TYPE: "t3a.xlarge"
       CONTROL_PLANE_REPLICAS: 3
-      SPOT_INSTANCES: "false"
-      FORCE_SUCCESS_EXIT: "no"
-      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
-      MUST_GATHER_TIMEOUT: "35m"
       ENABLE_MUST_GATHER: "true"
+      FORCE_SUCCESS_EXIT: "no"
+      IDENTITY_MODE: "sts"
+      LOKI_ENABLED: "false"
+      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
       MUST_GATHER_ON_FAILURE_ONLY: "true"
+      MUST_GATHER_TIMEOUT: "35m"
+      SPOT_INSTANCES: "false"
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_PARALLEL: 1
     pre:
-    - chain: sandboxed-containers-operator-ipi-aws-sts-pre
+    - chain: ipi-conf-aws
+    - ref: sandboxed-containers-operator-aws-region-override
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-aws-oidc-creds-provision
+    - chain: ipi-install
     - chain: sandboxed-containers-operator-pre
     test:
     - ref: openshift-extended-test
