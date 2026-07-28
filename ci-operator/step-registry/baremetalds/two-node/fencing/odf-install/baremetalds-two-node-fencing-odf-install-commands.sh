@@ -93,9 +93,20 @@ echo "[hypervisor] ${VM} started"
 HYPERVISOR_EOF
 
   echo "Waiting for ${vm} to rejoin the cluster..."
-  sleep 60
-  oc wait nodes --all --for=condition=Ready --timeout=10m
-  echo "All nodes Ready after ${vm} reconfiguration"
+  sleep 120
+  for attempt in {1..20}; do
+    if oc wait nodes --all --for=condition=Ready --timeout=60s 2>&1; then
+      echo "All nodes Ready after ${vm} reconfiguration"
+      break
+    fi
+    echo "Attempt ${attempt}/20: API or nodes not ready yet, retrying in 30s..."
+    sleep 30
+  done
+  if ! oc wait nodes --all --for=condition=Ready --timeout=60s 2>&1; then
+    echo "ERROR: Nodes did not become Ready after ${vm} reconfiguration"
+    oc get nodes -o wide 2>&1 || true
+    exit 1
+  fi
 done
 
 OSD_DISK_PATH="/dev/disk/by-id/virtio-${OSD_DISK_SERIAL}"
