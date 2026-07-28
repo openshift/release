@@ -92,19 +92,21 @@ echo "Creating ${COMPUTE_COUNT} virsh workers on ${HOSTNAME}"
 echo "  pool=${POOL_NAME} network=${NETWORK_NAME} base_volume=${BASE_VOLUME}"
 echo "  memory=${DOMAIN_MEMORY}MiB vcpus=${DOMAIN_VCPUS}"
 
-if ! ${VIRSH} pool-list --name | grep -qx "${POOL_NAME}"; then
+# Active-pool / network checks: avoid "pool-list --name | grep -qx" (older libvirt + pipefail
+# can miss an active pool; install step hit the same on multiarch-ci-pool). Match UPI-style.
+if ! ${VIRSH} pool-list 2>/dev/null | grep -q "${POOL_NAME}"; then
   echo "ERROR: storage pool ${POOL_NAME} is not active"
-  ${VIRSH} pool-list --all
+  ${VIRSH} pool-list --all || true
   exit 1
 fi
-if ! ${VIRSH} vol-list --pool "${POOL_NAME}" | awk '{print $1}' | grep -qx "${BASE_VOLUME}"; then
+if ! ${VIRSH} vol-list --pool "${POOL_NAME}" 2>/dev/null | awk '{print $1}' | grep -q "${BASE_VOLUME}"; then
   echo "ERROR: RHCOS base volume ${BASE_VOLUME} not found in pool ${POOL_NAME}"
-  ${VIRSH} vol-list --pool "${POOL_NAME}"
+  ${VIRSH} vol-list --pool "${POOL_NAME}" || true
   exit 1
 fi
-if ! ${VIRSH} net-list --name | grep -qx "${NETWORK_NAME}"; then
+if ! ${VIRSH} net-list 2>/dev/null | grep -q "${NETWORK_NAME}"; then
   echo "ERROR: libvirt network ${NETWORK_NAME} not found (IPI terraform network)"
-  ${VIRSH} net-list --all
+  ${VIRSH} net-list --all || true
   exit 1
 fi
 
