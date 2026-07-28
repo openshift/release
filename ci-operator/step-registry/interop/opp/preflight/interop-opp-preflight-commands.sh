@@ -102,6 +102,7 @@ check_api_deprecations() {
     echo "=== Check 1: API deprecation scan ==="
 
     local target_minor="${1}"
+    local target_major="${2:-4}"
     local flagged="" found_count=0
 
     # Collect available API resources on the cluster
@@ -139,7 +140,7 @@ check_api_deprecations() {
         echo -e "WARNING: Found ${found_count} deprecated API(s) still in use:\n${flagged}"
         append_check "api_deprecation_scan" "warn" "Found ${found_count} deprecated API(s) in use: ${flagged}"
     else
-        echo "No deprecated APIs detected for target version 4.${target_minor}"
+        echo "No deprecated APIs detected for target version ${target_major}.${target_minor}"
         append_check "api_deprecation_scan" "pass" "No deprecated APIs detected"
     fi
 }
@@ -151,6 +152,7 @@ check_opp_compatibility() {
     echo -e "\n=== Check 2: OPP operator compatibility matrix ==="
 
     local target_minor="${1}"
+    local target_major="${2:-4}"
     local compat_spec="${OPP_COMPAT[${target_minor}]:-}"
     local all_csvs failed=0
 
@@ -163,7 +165,7 @@ check_opp_compatibility() {
 
     if [[ -z "${compat_spec}" ]]; then
         echo "No compatibility matrix entry for target minor ${target_minor}; skipping version check"
-        append_check "opp_compatibility_matrix" "skip" "No matrix entry for OCP 4.${target_minor}"
+        append_check "opp_compatibility_matrix" "skip" "No matrix entry for OCP ${target_major}.${target_minor}"
         return 0
     fi
 
@@ -189,8 +191,9 @@ check_opp_compatibility() {
         # Extract version: strip operator name prefix, keep digits
         installed_version="$(echo "${csv_name}" | grep -oE '[0-9]+\.[0-9]+' | head -1)" || true
         if [[ -z "${installed_version}" ]]; then
-            echo "WARNING: Could not parse version from CSV ${csv_name}"
+            echo >&2 "Operator ${op_prefix}: could not parse version from CSV ${csv_name}"
             details="${details}${op_prefix}: version unparseable from ${csv_name}; "
+            (( failed += 1 ))
             continue
         fi
 
@@ -199,7 +202,7 @@ check_opp_compatibility() {
         inst_minor="${installed_version##*.}"
 
         if (( inst_major < min_major || (inst_major == min_major && inst_minor < min_minor) )); then
-            echo >&2 "Operator ${op_prefix} version ${installed_version} is below minimum ${min_version} for OCP 4.${target_minor}"
+            echo >&2 "Operator ${op_prefix} version ${installed_version} is below minimum ${min_version} for OCP ${target_major}.${target_minor}"
             details="${details}${op_prefix}: ${installed_version} < ${min_version} (INCOMPATIBLE); "
             (( failed += 1 ))
         else
@@ -213,7 +216,7 @@ check_opp_compatibility() {
         append_check "opp_compatibility_matrix" "fail" "${details}"
         (( CHECKS_FAILED += 1 ))
     else
-        echo "All OPP operators are compatible with OCP 4.${target_minor}"
+        echo "All OPP operators are compatible with OCP ${target_major}.${target_minor}"
         append_check "opp_compatibility_matrix" "pass" "${details}"
     fi
 }
@@ -380,10 +383,11 @@ main() {
 
     KUBECONFIG="" oc registry login
 
-    local target_version target_minor
+    local target_version target_major target_minor
     target_version="$(oc adm release info "${target}" --output=json | jq -r '.metadata.version')"
+    target_major="$(echo "${target_version}" | cut -f1 -d.)"
     target_minor="$(echo "${target_version}" | cut -f2 -d.)"
-    echo "Target OCP version: ${target_version} (minor: ${target_minor})"
+    echo "Target OCP version: ${target_version} (major: ${target_major}, minor: ${target_minor})"
 
     local source_version
     source_version="$(oc get clusterversion --no-headers | awk '{print $2}')"
@@ -400,8 +404,8 @@ main() {
         '. + {"target_version": $tv, "source_version": $sv, "target_image": $ti, "timestamp": now | tostring}' \
         "${REPORT_FILE}" > "${tmp}" && mv "${tmp}" "${REPORT_FILE}"
 
-    check_api_deprecations "${target_minor}"
-    check_opp_compatibility "${target_minor}"
+    check_api_deprecations "${target_minor}" "${target_major}"
+    check_opp_compatibility "${target_minor}" "${target_major}"
     check_cluster_health
     check_mcp_readiness
 
