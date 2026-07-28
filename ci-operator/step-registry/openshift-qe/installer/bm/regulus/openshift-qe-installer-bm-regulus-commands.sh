@@ -161,10 +161,11 @@ install-regulus
 # ─────────────────────────────────────────────────────────────────────────────
 # Read ES credentials from mounted secret (optional - will be empty if not present)
 # ─────────────────────────────────────────────────────────────────────────────
-export ES_PASSWORD=$(cat "/secret/perfscale-prod/password" 2>/dev/null || echo "")
-export ES_USER=$(cat "/secret/perfscale-prod/username" 2>/dev/null || echo "")
-export ES_HOST=$(cat "/secret/perfscale-prod/host" 2>/dev/null || echo "")
-export ES_PROTOCOL="https"
+ES_PASSWORD=$(cat "/secret/perfscale-prod/password" 2>/dev/null || echo "")
+ES_USER=$(cat "/secret/perfscale-prod/username" 2>/dev/null || echo "")
+ES_HOST=$(cat "/secret/perfscale-prod/host" 2>/dev/null || echo "")
+ES_PROTOCOL="https"
+export ES_PASSWORD ES_USER ES_HOST ES_PROTOCOL
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Generate Regulus lab.config
