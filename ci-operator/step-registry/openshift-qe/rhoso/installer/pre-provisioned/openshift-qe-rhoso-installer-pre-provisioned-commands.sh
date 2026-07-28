@@ -6,21 +6,37 @@ set -x
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
-bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion 2>/dev/null || cat ${SHARED_DIR}/bastion)
 
 lab=$(cat ${CLUSTER_PROFILE_DIR}/lab)
-lab_cloud=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
+lab_cloud=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud 2>/dev/null || cat ${SHARED_DIR}/lab_cloud)
 compute_count=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".compute_count")
 ctlplane_start_ip=$(cat ${CLUSTER_PROFILE_DIR}/ctlplane_start_ip)
 kubeconfig=$(cat ${CLUSTER_PROFILE_DIR}/kubeconfig)
 username=$(cat ${CLUSTER_PROFILE_DIR}/username)
 password=$(cat ${CLUSTER_PROFILE_DIR}/login)
 ssh_key_file=$(cat ${CLUSTER_PROFILE_DIR}/ssh_key_path)
+ssh_key_dir=$(dirname "${ssh_key_file}")
 nova_migration_key=$(cat ${CLUSTER_PROFILE_DIR}/nova_migration_key)
 amphora_container_image=$(cat ${CLUSTER_PROFILE_DIR}/amphora_container_image)
 
 ceph_backend=$(cat ${CLUSTER_PROFILE_DIR}/ceph_backend)
 ceph_admin_node=$(cat ${CLUSTER_PROFILE_DIR}/ceph_admin_node)
+
+bootstrap_jumphost_cmds=""
+bootstrap_bastion_cmds=""
+if [[ -f "${SHARED_DIR}/assignment_id" ]]; then
+  echo "Self-sched assignment: copying jumphost SSH keys to bastion at ${ssh_key_file}"
+  bootstrap_jumphost_cmds="
+ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} 'mkdir -p ${ssh_key_dir}'
+scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null ~/.ssh/id_rsa root@${bastion}:${ssh_key_file}
+scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null ~/.ssh/id_rsa.pub root@${bastion}:${ssh_key_file}.pub
+"
+  bootstrap_bastion_cmds="
+  chmod 600 ${ssh_key_file}
+  chmod 644 ${ssh_key_file}.pub
+"
+fi
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -49,24 +65,27 @@ cat /tmp/all-updated.yml
 
 scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${jumphost}:/tmp/rhoso_all.yml
 
-
 cat > /tmp/deployment_script.sh <<EOF
 #!/bin/bash
 set -o errexit
 set -o nounset
 set -o pipefail
 set -x
-jumphost="${jumphost}"
 bastion="${bastion}"
 
-ssh root@${bastion} "
+scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /tmp/rhoso_all.yml root@${bastion}:/tmp/rhoso_all.yml
+${bootstrap_jumphost_cmds}
+ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
   set -o errexit
   set -o pipefail
+${bootstrap_bastion_cmds}
   echo 'Hostname: \$(hostname)'
+  dnf install -y git ansible-core python3-pip
+  pip3 install ansible
   rm -rf JetBrew
   git clone https://github.com/redhat-performance/JetBrew.git
   cd JetBrew/ansible
-  scp root@${jumphost}:/tmp/rhoso_all.yml group_vars/all.yml
+  cp /tmp/rhoso_all.yml group_vars/all.yml
   ansible-playbook -vvv main.yml 2>&1 | tee log
 "
 EOF

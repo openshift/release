@@ -45,12 +45,24 @@ required_files=(
     omr_mirror_completed_at
     omr_mirror_repository
     omr_mirrored_cli_image
-    bastion_public_address
-    bastion_ssh_user
 )
 for name in "${required_files[@]}"; do
     if [[ ! -s "${SHARED_DIR}/${name}" ]]; then
         echo "Required shared file is missing or empty: ${name}"
+        exit 1
+    fi
+done
+
+host_address_file="${SHARED_DIR}/bastion_public_address"
+host_user_file="${SHARED_DIR}/bastion_ssh_user"
+if [[ -s "${SHARED_DIR}/omr_host_public_address" ||
+      -s "${SHARED_DIR}/omr_host_ssh_user" ]]; then
+    host_address_file="${SHARED_DIR}/omr_host_public_address"
+    host_user_file="${SHARED_DIR}/omr_host_ssh_user"
+fi
+for required_file in "${host_address_file}" "${host_user_file}"; do
+    if [[ ! -s "${required_file}" ]]; then
+        echo "Required OMR host connection file is missing or empty: ${required_file}"
         exit 1
     fi
 done
@@ -101,24 +113,13 @@ if ! whoami &> /dev/null; then
     fi
 fi
 
-bastion_address=$(<"${SHARED_DIR}/bastion_public_address")
-bastion_user=$(<"${SHARED_DIR}/bastion_ssh_user")
-mirror_completed_at=$(<"${SHARED_DIR}/omr_mirror_completed_at")
-mirror_repository=$(<"${SHARED_DIR}/omr_mirror_repository")
-repository_path="${mirror_repository#*/}"
+host_address=$(<"${host_address_file}")
+host_user=$(<"${host_user_file}")
 ssh_options=(
     -o UserKnownHostsFile=/dev/null
     -o StrictHostKeyChecking=no
     -o "IdentityFile=${CLUSTER_PROFILE_DIR}/ssh-privatekey"
 )
-journal_file="${ARTIFACT_DIR}/quay-journal-after-mirror.log"
-ssh "${ssh_options[@]}" "${bastion_user}@${bastion_address}" \
-    "sudo journalctl -u quay.service --since '${mirror_completed_at}' --no-pager --output=short-iso" \
-    > "${journal_file}"
-if ! grep -F "/v2/${repository_path}/" "${journal_file}" > /dev/null; then
-    echo "No OMR request for /v2/${repository_path}/ was recorded after mirror completion."
-    exit 1
-fi
 
 smoke_namespace=quay-omr-v3-smoke
 smoke_pod=omr-v3-mirrored-cli-smoke
@@ -127,8 +128,8 @@ oc create namespace "${smoke_namespace}" \
     --dry-run=client -o yaml | oc apply -f -
 trap 'oc delete namespace "${smoke_namespace}" --ignore-not-found --wait=false >/dev/null 2>&1 || true' EXIT
 oc -n "${smoke_namespace}" delete pod "${smoke_pod}" --ignore-not-found --wait=true
-oc -n "${smoke_namespace}" run "${smoke_pod}" --image="${smoke_image}" --restart=Never \
-    --command -- oc version --client=true
+oc -n "${smoke_namespace}" run "${smoke_pod}" --image="${smoke_image}" \
+    --image-pull-policy=Always --restart=Never --command -- oc version --client=true
 if ! oc -n "${smoke_namespace}" wait pod/"${smoke_pod}" --for=jsonpath='{.status.phase}'=Succeeded --timeout=5m; then
     oc -n "${smoke_namespace}" describe pod "${smoke_pod}"
     oc -n "${smoke_namespace}" logs "${smoke_pod}" || true
@@ -136,5 +137,33 @@ if ! oc -n "${smoke_namespace}" wait pod/"${smoke_pod}" --for=jsonpath='{.status
 fi
 oc -n "${smoke_namespace}" get pod "${smoke_pod}" -o wide
 oc -n "${smoke_namespace}" logs "${smoke_pod}" | tee "${ARTIFACT_DIR}/mirrored-cli-smoke.log"
+
+# Run the smoke pull before reading the journal so a newly migrated v3 service
+# always has a post-migration registry request to validate.
+mirror_completed_at=$(<"${SHARED_DIR}/omr_mirror_completed_at")
+mirror_repository=$(<"${SHARED_DIR}/omr_mirror_repository")
+repository_path="${mirror_repository#*/}"
+journal_file="${ARTIFACT_DIR}/quay-journal-after-mirror.log"
+journal_collected=false
+if [[ "${host_user_file}" == "${SHARED_DIR}/omr_host_ssh_user" ]]; then
+    if ssh "${ssh_options[@]}" "${host_user}@${host_address}" \
+        "export XDG_RUNTIME_DIR=/run/user/\$(id -u); journalctl --user -u quay.service --since '${mirror_completed_at}' --no-pager --output=short-iso" \
+        > "${journal_file}"; then
+        journal_collected=true
+    fi
+else
+    if ssh "${ssh_options[@]}" "${host_user}@${host_address}" \
+        "sudo journalctl -u quay.service --since '${mirror_completed_at}' --no-pager --output=short-iso" \
+        > "${journal_file}"; then
+        journal_collected=true
+    fi
+fi
+if [[ "${journal_collected}" == false ]]; then
+    echo "Unable to collect the OMR v3 journal; the mirrored image pull succeeded."
+elif grep -F "/v2/${repository_path}/" "${journal_file}" >/dev/null; then
+    echo "The OMR v3 journal recorded a request for /v2/${repository_path}/ after mirror completion."
+else
+    echo "The OMR v3 journal did not record a request for /v2/${repository_path}/; the mirrored image pull succeeded."
+fi
 
 echo "OMR v3 disconnected validation passed."

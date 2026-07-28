@@ -1,0 +1,33 @@
+ref:
+  as: installer-review-agent-trigger
+  from: claude-ai-helpers
+  commands: installer-review-agent-trigger-commands.sh
+  env:
+  - name: GANGWAY_API
+    default: "https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
+    documentation: |-
+      Gangway API endpoint for triggering periodic jobs.
+  - name: PERIODIC_JOB_NAME
+    default: "periodic-ci-openshift-installer-main-periodic-review-agent"
+    documentation: |-
+      Name of the periodic job to trigger via gangway.
+  - name: REVIEW_AGENT_UPSTREAM_REPO
+    default: "openshift/installer"
+    documentation: |-
+      Upstream repo for posting PR comments.
+  - name: REVIEW_AGENT_PAT_KEY
+    default: "gh-pat"
+    documentation: |-
+      Key name in the credential secret for the GitHub PAT.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  documentation: |-
+    Trigger step for the Installer Review Agent.
+    Uses PAT auth to post a PR comment. Triggers the periodic review-agent
+    job via gangway instead of running inline (avoids presubmit abort on push).

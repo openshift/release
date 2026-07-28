@@ -32,6 +32,7 @@ tests:
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
     cp /opt/app-root/ams-secrets/rbac.key secrets/rbac.key
+    cp /opt/app-root/ams-secrets/kafka.json secrets/kafka.json
     make db/setup
     sleep 5
     make test
@@ -50,6 +51,7 @@ tests:
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
     cp /opt/app-root/ams-secrets/rbac.key secrets/rbac.key
+    cp /opt/app-root/ams-secrets/kafka.json secrets/kafka.json
     make db/setup
     sleep 5
     make test-fedramp
@@ -68,6 +70,7 @@ tests:
     cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
     cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
     cp /opt/app-root/ams-secrets/rbac.key secrets/rbac.key
+    cp /opt/app-root/ams-secrets/kafka.json secrets/kafka.json
     make db/setup
     sleep 5
     make test-xcm
@@ -89,6 +92,7 @@ tests:
     cp /opt/app-root/ams-secrets/ams-service.clientSecret.integration secrets/ams-service.clientSecret
     cp /opt/app-root/ams-secrets/ams-service.clientId.integration secrets/ams-service.clientId
     cp /opt/app-root/ams-secrets/quay.token secrets/quay.token
+    cp /opt/app-root/ams-secrets/kafka.json secrets/kafka.json
     make db/setup
     sleep 5
     make test-integration-shard-0
@@ -110,6 +114,7 @@ tests:
     cp /opt/app-root/ams-secrets/ams-service.clientSecret.integration secrets/ams-service.clientSecret
     cp /opt/app-root/ams-secrets/ams-service.clientId.integration secrets/ams-service.clientId
     cp /opt/app-root/ams-secrets/quay.token secrets/quay.token
+    cp /opt/app-root/ams-secrets/kafka.json secrets/kafka.json
     make db/setup
     sleep 5
     make test-integration-shard-1
@@ -131,6 +136,7 @@ tests:
     cp /opt/app-root/ams-secrets/ams-service.clientSecret.integration secrets/ams-service.clientSecret
     cp /opt/app-root/ams-secrets/ams-service.clientId.integration secrets/ams-service.clientId
     cp /opt/app-root/ams-secrets/quay.token secrets/quay.token
+    cp /opt/app-root/ams-secrets/kafka.json secrets/kafka.json
     make db/setup
     sleep 5
     make test-integration-shard-2
@@ -152,6 +158,7 @@ tests:
     cp /opt/app-root/ams-secrets/ams-service.clientSecret.integration secrets/ams-service.clientSecret
     cp /opt/app-root/ams-secrets/ams-service.clientId.integration secrets/ams-service.clientId
     cp /opt/app-root/ams-secrets/quay.token secrets/quay.token
+    cp /opt/app-root/ams-secrets/kafka.json secrets/kafka.json
     make db/setup
     sleep 5
     make test-integration-shard-3
@@ -173,6 +180,7 @@ tests:
     cp /opt/app-root/ams-secrets/ams-service.clientSecret.integration secrets/ams-service.clientSecret
     cp /opt/app-root/ams-secrets/ams-service.clientId.integration secrets/ams-service.clientId
     cp /opt/app-root/ams-secrets/quay.token secrets/quay.token
+    cp /opt/app-root/ams-secrets/kafka.json secrets/kafka.json
     make db/setup
     sleep 5
     make test-integration-shard-4
@@ -194,6 +202,7 @@ tests:
     cp /opt/app-root/ams-secrets/ams-service.clientSecret.integration secrets/ams-service.clientSecret
     cp /opt/app-root/ams-secrets/ams-service.clientId.integration secrets/ams-service.clientId
     cp /opt/app-root/ams-secrets/quay.token secrets/quay.token
+    cp /opt/app-root/ams-secrets/kafka.json secrets/kafka.json
     make db/setup
     sleep 5
     make test-integration-shard-5
@@ -203,6 +212,51 @@ tests:
   secrets:
   - mount_path: /opt/app-root/ams-secrets
     name: openshift-online-ams-secrets
+- as: coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
+    cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
+    cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
+    cp /opt/app-root/ams-secrets/rbac.key secrets/rbac.key
+    cp /opt/app-root/ams-secrets/kafka.json secrets/kafka.json
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: src
+  nested_podman: true
+  secrets:
+  - mount_path: /opt/app-root/ams-secrets
+    name: openshift-online-ams-secrets
+  - mount_path: /var/run/codecov-secret
+    name: rosa-account-manager-service-codecov
+- as: publish-coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    cp /opt/app-root/ams-secrets/rhsm.crt secrets/rhsm.crt
+    cp /opt/app-root/ams-secrets/rbac.crt secrets/rbac.crt
+    cp /opt/app-root/ams-secrets/rhsm.key secrets/rhsm.key
+    cp /opt/app-root/ams-secrets/rbac.key secrets/rbac.key
+    cp /opt/app-root/ams-secrets/kafka.json secrets/kafka.json
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: src
+  nested_podman: true
+  postsubmit: true
+  secrets:
+  - mount_path: /opt/app-root/ams-secrets
+    name: openshift-online-ams-secrets
+  - mount_path: /var/run/codecov-secret
+    name: rosa-account-manager-service-codecov
 zz_generated_metadata:
   branch: master
   org: openshift-online

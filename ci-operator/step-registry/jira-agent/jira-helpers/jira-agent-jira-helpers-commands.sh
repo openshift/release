@@ -9,6 +9,7 @@ cat > "${SHARED_DIR}/jira-helpers.sh" << 'HEREDOC_EOF'
 #   source "${SHARED_DIR}/jira-helpers.sh"
 #
 # Functions:
+#   curl_with_retry          - Retry curl with exponential backoff on 429/5xx
 #   load_jira_credentials    - Load Jira email + API token, set JIRA_AUTH
 #   load_slack_credentials   - Load Slack webhook URL
 #   load_github_slack_map    - Load GitHub-to-Slack user ID mapping
@@ -18,6 +19,46 @@ cat > "${SHARED_DIR}/jira-helpers.sh" << 'HEREDOC_EOF'
 #   postprocess_jira_issue   - Label, transition, and assign after processing
 
 JIRA_CREDS_DIR="/var/run/claude-code-service-account"
+
+# Retry a curl command with exponential backoff on transient failures (429/5xx).
+# Also validates that successful responses contain valid JSON.
+# Usage: curl_with_retry [curl args...]
+# Returns: sets CURL_BODY and CURL_HTTP_CODE
+curl_with_retry() {
+  local max_retries=3 retry_delay=5
+  for attempt in $(seq 1 "$max_retries"); do
+    local response curl_rc=0
+    response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" "$@") || curl_rc=$?
+    if [ "$curl_rc" -ne 0 ]; then
+      CURL_HTTP_CODE="000"
+      CURL_BODY=""
+      echo "Warning: curl failed (exit $curl_rc, attempt $attempt/$max_retries), retrying in ${retry_delay}s..."
+      sleep "$retry_delay"
+      retry_delay=$((retry_delay * 2))
+      continue
+    fi
+    CURL_HTTP_CODE=$(echo "$response" | tail -1)
+    CURL_BODY=$(echo "$response" | sed '$d')
+
+    if [ "$CURL_HTTP_CODE" = "200" ]; then
+      if ! echo "$CURL_BODY" | jq empty 2>/dev/null; then
+        echo "Warning: Got HTTP 200 but non-JSON response (attempt $attempt/$max_retries), retrying in ${retry_delay}s..."
+        sleep "$retry_delay"
+        retry_delay=$((retry_delay * 2))
+        continue
+      fi
+      return 0
+    fi
+    if [ "$CURL_HTTP_CODE" = "429" ] || [ "$CURL_HTTP_CODE" -ge 500 ] 2>/dev/null; then
+      echo "Warning: API returned HTTP $CURL_HTTP_CODE (attempt $attempt/$max_retries), retrying in ${retry_delay}s..."
+      sleep "$retry_delay"
+      retry_delay=$((retry_delay * 2))
+      continue
+    fi
+    return 1
+  done
+  return 1
+}
 
 # Load Jira API credentials (Basic Auth: email:api-token).
 # Sets: JIRA_TOKEN, JIRA_EMAIL, JIRA_AUTH
@@ -84,20 +125,16 @@ load_github_slack_map() {
 transition_issue() {
   local issue_key=$1 target_status=$2
 
-  local transitions transition_id http_code raw_response
-  raw_response=$(curl -s -w "\n%{http_code}" \
+  local transition_id
+  if ! curl_with_retry \
     "${JIRA_BASE_URL}/rest/api/3/issue/${issue_key}/transitions" \
     -H "Authorization: Basic $JIRA_AUTH" \
-    -H "Content-Type: application/json")
-  http_code=$(echo "$raw_response" | tail -1)
-  transitions=$(echo "$raw_response" | sed '$d')
-
-  if [ "$http_code" != "200" ]; then
-    echo "   Warning: Jira transitions API returned HTTP $http_code"
+    -H "Content-Type: application/json"; then
+    echo "   Warning: Jira transitions API returned HTTP $CURL_HTTP_CODE"
     return 1
   fi
 
-  transition_id=$(echo "$transitions" | jq -r --arg status "$target_status" \
+  transition_id=$(echo "$CURL_BODY" | jq -r --arg status "$target_status" \
     '.transitions[] | select(.name == $status) | .id' | head -1)
 
   if [ -n "$transition_id" ] && [ "$transition_id" != "null" ]; then
@@ -133,7 +170,7 @@ set_assignee() {
 # Sets: ISSUES (multi-line "KEY SUMMARY" pairs)
 # Requires: JIRA_AGENT_ISSUE_KEY or JIRA_AGENT_JQL, MAX_ISSUES, JIRA_BASE_URL, JIRA_AUTH
 query_jira_issues() {
-  local jql search_payload search_response search_http_code search_body total_results
+  local jql search_payload search_body total_results
 
   echo "Querying Jira for issues..."
   if [ -n "${JIRA_AGENT_ISSUE_KEY:-}" ]; then
@@ -145,19 +182,17 @@ query_jira_issues() {
 
   search_payload=$(jq -n --arg jql "$jql" --argjson max "$MAX_ISSUES" \
     '{jql: $jql, fields: ["key", "summary"], maxResults: $max}')
-  search_response=$(curl -s -w "\n%{http_code}" "${JIRA_BASE_URL}/rest/api/3/search/jql" \
+
+  if ! curl_with_retry "${JIRA_BASE_URL}/rest/api/3/search/jql" \
     -X POST \
     -H "Authorization: Basic $JIRA_AUTH" \
     -H "Content-Type: application/json" \
-    -d "$search_payload")
-  search_http_code=$(echo "$search_response" | tail -1)
-  search_body=$(echo "$search_response" | sed '$d')
-
-  if [ "$search_http_code" != "200" ]; then
-    echo "ERROR: Jira search failed (HTTP $search_http_code)"
-    echo "Response: $search_body"
+    -d "$search_payload"; then
+    echo "ERROR: Jira search failed (HTTP $CURL_HTTP_CODE)"
+    echo "Response: $CURL_BODY"
     exit 1
   fi
+  search_body="$CURL_BODY"
 
   total_results=$(echo "$search_body" | jq -r '.total // 0')
   echo "Jira search returned $total_results result(s)"
@@ -214,27 +249,25 @@ postprocess_jira_issue() {
 
   if [ -n "${JIRA_AGENT_ASSIGNEE:-}" ]; then
     echo "Looking up accountId for '${JIRA_AGENT_ASSIGNEE}'..."
-    local assignee_account_id assignee_response raw_response
-    raw_response=$(curl -s -w "\n%{http_code}" -G \
+    local assignee_account_id assignee_response
+    if ! curl_with_retry -G \
       "${JIRA_BASE_URL}/rest/api/3/user/search" \
       -H "Authorization: Basic $JIRA_AUTH" \
-      --data-urlencode "query=${JIRA_AGENT_ASSIGNEE}")
-    http_code=$(echo "$raw_response" | tail -1)
-    if [ "$http_code" != "200" ]; then
-      echo "   Warning: Jira user search API returned HTTP $http_code, skipping assignee"
-      assignee_account_id=""
-    else
-      assignee_account_id=$(echo "$raw_response" | sed '$d' \
-        | jq -r '[.[] | select(.displayName | test("'"${JIRA_AGENT_ASSIGNEE}"'"; "i"))] | .[0].accountId // empty')
+      --data-urlencode "query=${JIRA_AGENT_ASSIGNEE}"; then
+      echo "   Warning: Jira user search API returned HTTP $CURL_HTTP_CODE, skipping assignee"
+      return 0
     fi
-    if [ -n "$assignee_account_id" ]; then
-      echo "Setting assignee to account ID '${assignee_account_id}'..."
-      assignee_response=$(set_assignee "$issue_key" "$assignee_account_id")
-    else
-      echo "   Warning: Could not find accountId for '${JIRA_AGENT_ASSIGNEE}', skipping assignee"
-      assignee_response="skipped
-200"
+    assignee_account_id=$(echo "$CURL_BODY" \
+      | jq -r --arg name "$JIRA_AGENT_ASSIGNEE" '[.[] | select(.displayName | test($name; "i"))] | .[0].accountId // empty')
+    if [ -z "$assignee_account_id" ]; then
+      assignee_account_id=$(echo "$CURL_BODY" | jq -r '.[0].accountId // empty')
     fi
+    if [ -z "$assignee_account_id" ]; then
+      echo "   Warning: No Jira user found for '${JIRA_AGENT_ASSIGNEE}', skipping assignee"
+      return 0
+    fi
+    echo "Setting assignee to account ID '${assignee_account_id}'..."
+    assignee_response=$(set_assignee "$issue_key" "$assignee_account_id")
     http_code=$(echo "$assignee_response" | tail -1)
     if [ "$http_code" = "204" ] || [ "$http_code" = "200" ]; then
       echo "   Assignee set successfully"

@@ -86,7 +86,7 @@ def load_config():
             file=sys.stderr,
         )
         sys.exit(2)
-    allowed_priv = f"{allowed}-priv"
+    allowed_priv = allowed
     return allowed, allowed_priv, source_file
 
 
@@ -163,7 +163,7 @@ def main():
                             continue
                         if namespace == "ocp" and name != allowed_ocp:
                             violations.append((str(rel_path), f"promotes to {namespace}/{name} (main/master must only promote to {allowed_ocp})"))
-                        if namespace == "ocp-private" and name != allowed_priv:
+                        if namespace == "ocp-priv" and name != allowed_priv:
                             violations.append((str(rel_path), f"promotes to {namespace}/{name} (main/master must only promote to {allowed_priv})"))
                     continue
                 if in_scope_prow and any(f.endswith(s) for s in release_branch_suffixes):
@@ -175,7 +175,7 @@ def main():
 
     if violations:
         print(f"ERROR: Main/master must promote to current release only; release-{allowed_ocp} configs must have promotion disabled.", file=sys.stderr)
-        print(f"      main/master -> ocp/{allowed_ocp}, ocp-private/{allowed_priv}. release-{allowed_ocp} / openshift-{allowed_ocp} -> promotion disabled.", file=sys.stderr)
+        print(f"      main/master -> ocp/{allowed_ocp}, ocp-priv/{allowed_priv}. release-{allowed_ocp} / openshift-{allowed_ocp} -> promotion disabled.", file=sys.stderr)
         rel = source_file.relative_to(REPO_ROOT)
         print(f"      Current release from {rel}. Main/master: all repos in ci-operator/config (same as config-brancher). Release-X disabled: only when _prowconfig has openshift-{allowed_ocp} or release-{allowed_ocp} in includedBranches.", file=sys.stderr)
         print("", file=sys.stderr)

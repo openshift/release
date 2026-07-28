@@ -102,11 +102,6 @@ tests:
         if ! which kubectl; then
           ln -s "$(which oc)" ${HOME}/kubectl
         fi
-        # patch as Downstream to scrape metrics
-        echo "====> Patching CSV to scrape metrics"
-        CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
-        ENV_INDEX=$(oc get csv/$CSV -n openshift-netobserv-operator -o json | jq '.spec.install.spec.deployments[0].spec.template.spec.containers[0].env | map(.name) | index("DOWNSTREAM_DEPLOYMENT")')
-        oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/${ENV_INDEX}/value\", \"value\": \"true\"}]"
 
         export NAMESPACE=netobserv
         PORT_FWD=false make deploy-loki
@@ -229,10 +224,6 @@ tests:
       cli: latest
       commands: |
         oc wait deployment --for condition=Available --timeout=120s netobserv-controller-manager -n openshift-netobserv-operator
-        echo "====> Patching CSV to scrape metrics"
-        CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
-        ENV_INDEX=$(oc get csv/$CSV -n openshift-netobserv-operator -o json | jq '.spec.install.spec.deployments[0].spec.template.spec.containers[0].env | map(.name) | index("DOWNSTREAM_DEPLOYMENT")')
-        oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/${ENV_INDEX}/value\", \"value\": \"true\"}]"
       from: src
       resources:
         requests:

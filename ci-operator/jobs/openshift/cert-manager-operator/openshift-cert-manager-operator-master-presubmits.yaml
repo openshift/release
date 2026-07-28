@@ -12,6 +12,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -73,6 +74,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -167,6 +169,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -256,6 +259,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -345,6 +349,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -434,6 +439,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -523,6 +529,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -605,6 +612,100 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build08
+    context: ci/prow/e2e-operator-coverage
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
+      - images/ci/certmanager.Dockerfile
+      - images/ci/istiocsr.Dockerfile
+      - images/ci/trustmanager.Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cert-manager-operator-master-e2e-operator-coverage
+    rerun_command: /test e2e-operator-coverage
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-operator-coverage
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(e2e-operator-coverage|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: build13
     context: ci/prow/e2e-operator-gcp-ovn
     decorate: true
@@ -612,6 +713,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -701,6 +803,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -790,6 +893,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -880,6 +984,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -966,6 +1071,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -1052,6 +1158,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -1138,6 +1245,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -1224,6 +1332,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -1285,6 +1394,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile
@@ -1354,6 +1464,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - images/ci/Dockerfile
+      - images/ci/Dockerfile.coverage
       - images/ci/certmanager.Dockerfile
       - images/ci/istiocsr.Dockerfile
       - images/ci/trustmanager.Dockerfile

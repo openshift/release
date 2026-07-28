@@ -76,7 +76,7 @@ run_testing_steps () {
   # Execute the day1-post running cmd combined with focus
   eval "${cmd}" || true
 
-  upload_junit_result $JUNIT_XML $SHARED_DIR ${ARTIFACT_DIR}
+  cp "${JUNIT_XML}" "${ARTIFACT_DIR}/"
   log "[CI] Testing is finished and uploaded."
 }
 

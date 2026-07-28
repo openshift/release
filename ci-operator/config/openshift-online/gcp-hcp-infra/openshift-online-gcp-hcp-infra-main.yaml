@@ -8,6 +8,11 @@ build_root:
 prowgen:
   expose: true
   private: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -17,13 +22,55 @@ resources:
       memory: 4Gi
 tests:
 - as: terraform-validate
-  commands: make terraform-validate
-  container:
-    from: src
+  steps:
+    test:
+    - as: validate
+      commands: |
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(cat /etc/github-private/oauth)"; }; f'
+        cat > "$HOME/.terraformrc" <<TFRC
+        credentials "app.terraform.io" {
+          token = "$(cat /etc/terraform-cloud/token)"
+        }
+        TFRC
+        make terraform-validate
+      credentials:
+      - mount_path: /etc/github-private
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        namespace: ci
+      - mount_path: /etc/terraform-cloud
+        name: tfcloud-ci-secret
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: "8"
+          memory: 4Gi
 - as: terraform-test
-  commands: make terraform-test
-  container:
-    from: src
+  steps:
+    test:
+    - as: test
+      commands: |
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(cat /etc/github-private/oauth)"; }; f'
+        cat > "$HOME/.terraformrc" <<TFRC
+        credentials "app.terraform.io" {
+          token = "$(cat /etc/terraform-cloud/token)"
+        }
+        TFRC
+        make terraform-test
+      credentials:
+      - mount_path: /etc/github-private
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        namespace: ci
+      - mount_path: /etc/terraform-cloud
+        name: tfcloud-ci-secret
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: "8"
+          memory: 4Gi
 - as: check-orphan-modules
   commands: make check-orphan-modules
   container:
@@ -33,6 +80,11 @@ tests:
     UV_NO_PROGRESS=true && make check-generated-files
   container:
     from: src
+- always_run: false
+  as: e2e-platform
+  steps:
+    cluster_profile: platform-gcp
+    workflow: gcp-hcp-e2e
 - as: generate-bin
   commands: make terraform-init
   container:

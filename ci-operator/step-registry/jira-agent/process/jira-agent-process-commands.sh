@@ -10,12 +10,44 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_JIRA_AGENT_ISSUE_KEY:-}" ]]; then
   export JIRA_AGENT_ISSUE_KEY="${MULTISTAGE_PARAM_OVERRIDE_JIRA_AGENT_ISSUE_KEY}"
 fi
 
-for required_var in JIRA_AGENT_FORK_REPO JIRA_AGENT_UPSTREAM_REPO; do
-  if [ -z "${!required_var:-}" ]; then
-    echo "ERROR: Required env var $required_var is not set"
+export JIRA_AGENT_AUTH_MODE="${JIRA_AGENT_AUTH_MODE:-app}"
+export JIRA_AGENT_FORK_ORG="${JIRA_AGENT_FORK_ORG:-}"
+export JIRA_AGENT_PAT_KEY="${JIRA_AGENT_PAT_KEY:-gh-pat}"
+export JIRA_AGENT_COMPONENT_REPO_MAP="${JIRA_AGENT_COMPONENT_REPO_MAP:-}"
+
+# When a component-repo map is set, UPSTREAM_REPO is resolved per-issue from the Jira component.
+# Otherwise it must be set statically.
+DYNAMIC_REPO=false
+if [ -n "$JIRA_AGENT_COMPONENT_REPO_MAP" ]; then
+  DYNAMIC_REPO=true
+  echo "Dynamic repo mode: upstream repo will be resolved per-issue from Jira component"
+  # Set a placeholder so downstream exports don't fail; resolved before each issue
+  : "${JIRA_AGENT_UPSTREAM_REPO:=pending-resolution}"
+elif [ -z "${JIRA_AGENT_UPSTREAM_REPO:-}" ]; then
+  echo "ERROR: Required env var JIRA_AGENT_UPSTREAM_REPO is not set"
+  exit 1
+fi
+
+# JIRA_AGENT_FORK_REPO is required in App mode, optional in PAT mode (derived from FORK_ORG)
+if [ "$JIRA_AGENT_AUTH_MODE" = "app" ]; then
+  if [ "$DYNAMIC_REPO" = false ] && [ -z "${JIRA_AGENT_FORK_REPO:-}" ]; then
+    echo "ERROR: Required env var JIRA_AGENT_FORK_REPO is not set (required in App auth mode)"
     exit 1
   fi
-done
+elif [ "$JIRA_AGENT_AUTH_MODE" = "pat" ]; then
+  if [ -z "$JIRA_AGENT_FORK_ORG" ]; then
+    echo "ERROR: JIRA_AGENT_FORK_ORG is required in PAT auth mode"
+    exit 1
+  fi
+  # Derive FORK_REPO from FORK_ORG + upstream repo name if not explicitly set
+  if [ "$DYNAMIC_REPO" = false ] && [ -z "${JIRA_AGENT_FORK_REPO:-}" ]; then
+    JIRA_AGENT_FORK_REPO="${JIRA_AGENT_FORK_ORG}/${JIRA_AGENT_UPSTREAM_REPO#*/}"
+  fi
+else
+  echo "ERROR: Unknown JIRA_AGENT_AUTH_MODE: ${JIRA_AGENT_AUTH_MODE} (expected 'app' or 'pat')"
+  exit 1
+fi
+
 if [ -z "${JIRA_AGENT_ISSUE_KEY:-}" ] && [ -z "${JIRA_AGENT_JQL:-}" ]; then
   echo "ERROR: JIRA_AGENT_JQL must be set when JIRA_AGENT_ISSUE_KEY is not provided"
   exit 1
@@ -37,7 +69,7 @@ export SECURITY_PROMPT="SECURITY: Do NOT run commands that reveal git credential
 export BASH_DEFAULT_TIMEOUT_MS=1200000
 export BASH_MAX_TIMEOUT_MS=1200000
 
-echo "Configuration: MAX_ISSUES=$MAX_ISSUES"
+echo "Configuration: AUTH_MODE=$JIRA_AGENT_AUTH_MODE MAX_ISSUES=$MAX_ISSUES"
 
 # ── Source libraries ───────────────────────────────────────────────────────────
 
@@ -50,6 +82,10 @@ source "${SHARED_DIR}/git-helpers.sh"
 # ── Setup ──────────────────────────────────────────────────────────────────────
 
 git config --global url."https://github.com/".insteadOf "git@github.com:"
+mkdir -p ~/.ssh
+if ! ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>&1; then
+  echo "Warning: ssh-keyscan failed — SSH host key verification may fail later"
+fi
 
 echo "Installing Claude Code plugins..."
 claude plugin marketplace add openshift-eng/ai-helpers
@@ -57,8 +93,12 @@ claude plugin marketplace add RedHatProductSecurity/prodsec-skills
 claude plugin install openshift-developer@ai-helpers
 claude plugin install prow-agent@ai-helpers
 
-echo "Cloning ${JIRA_AGENT_FORK_REPO}..."
-git clone "https://github.com/${JIRA_AGENT_FORK_REPO}" /tmp/project-repo
+# ── Credentials ───────────────────────────────────────────────────────────────
+
+load_credentials
+load_jira_credentials
+load_slack_credentials
+load_github_slack_map
 
 if [ -n "${JIRA_AGENT_TOOL_SETUP_SCRIPT:-}" ]; then
   echo "Running project-specific tool setup..."
@@ -66,18 +106,20 @@ if [ -n "${JIRA_AGENT_TOOL_SETUP_SCRIPT:-}" ]; then
 fi
 export PATH="${GOPATH:-$HOME/go}/bin:$HOME/.local/bin:$PATH"
 
-cd /tmp/project-repo
+# ── Clone, fork, sync ────────────────────────────────────────────────────────
+# In static mode: clone once before the issue loop.
+# In dynamic mode: deferred to per-issue (repo changes based on Jira component).
 
-validate_jira_plugin
+if [ "$DYNAMIC_REPO" = false ]; then
+  ensure_fork_exists
 
-# ── Credentials & sync ────────────────────────────────────────────────────────
+  echo "Cloning ${JIRA_AGENT_FORK_REPO}..."
+  git clone "https://github.com/${JIRA_AGENT_FORK_REPO}" /tmp/project-repo
+  cd /tmp/project-repo
 
-load_github_app_credentials
-generate_and_configure_tokens
-load_jira_credentials
-load_slack_credentials
-load_github_slack_map
-sync_fork_with_upstream
+  validate_jira_plugin
+  sync_fork_with_upstream
+fi
 
 # ── Query Jira ─────────────────────────────────────────────────────────────────
 
@@ -97,6 +139,14 @@ while IFS= read -r line; do
 
   issue_key=$(echo "$line" | awk '{print $1}')
   issue_summary=$(echo "$line" | cut -d' ' -f2-)
+
+  # In dynamic mode, resolve the upstream repo from the issue's Jira component
+  # and set up a fresh clone/fork/sync for each issue
+  if [ "$DYNAMIC_REPO" = true ]; then
+    resolve_upstream_repo "$issue_key"
+    setup_repo
+    validate_jira_plugin
+  fi
 
   if process_single_issue "$issue_key" "$issue_summary"; then
     PROCESSED_COUNT=$((PROCESSED_COUNT + 1))

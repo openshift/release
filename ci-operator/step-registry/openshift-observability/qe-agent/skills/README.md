@@ -94,6 +94,14 @@ Minimal test fix, copy changed files to `${ARTIFACT_DIR}/test-fixes/` preserving
 
 Write `${ARTIFACT_DIR}/bug-report.md` with the required template (Summary, Affected component, Reproduction, Observed/Expected behavior, Evidence with operator logs + cluster events + JUnit failure, Suggested severity).
 
+Also write `${ARTIFACT_DIR}/jira-payload.json` for automated Jira filing. This JSON file contains:
+- `summary` — one-line summary prefixed with `[qe-agent]`, max 255 characters
+- `description` — the full bug report converted to Jira wiki notation
+
+The skill must include the wiki notation conversion rules (markdown headings → `h1.`/`h2.`/`h3.`, `**bold**` → `*bold*`, `` `code` `` → `{{code}}`, fenced code blocks → `{code}...{code}`, `- item` → `* item`, `> quote` → `bq. quote`). The agent writes this file using `jq -n` with `--arg` for safe JSON escaping. Credentials, tokens, passwords, and SHA-256 digests must be redacted with `[REDACTED]` before writing.
+
+The wrapper script reads this file after Claude exits and POSTs it to Jira (if `JIRA_PROJECT` is configured). The agent never calls Jira APIs directly.
+
 ### Step 5c — If FLAKY: Fix and Export
 
 Fix the race condition or timing issue. Include framework-specific examples (chainsaw `wait` steps, Cypress `cy.intercept`/`cy.wait`). Copy changed files and write `CHANGES.md` with the pass/fail pattern as evidence.
@@ -120,6 +128,8 @@ Must state:
 - `$KUBECONFIG` is set; list available CLI tools (oc, kubectl, chainsaw/npx/etc.)
 - All output goes to `$ARTIFACT_DIR` or `$SHARED_DIR`
 - The step runs `best_effort: true` — always exit 0
+- The agent must not call external APIs (Jira, GitHub API, Slack, etc.) — external integrations are handled by the wrapper script after the agent exits
+- **Namespace restriction**: The agent MUST NOT access, read, list, or modify any resources in the `kube-system` namespace — this namespace contains cloud provider credentials. All skills must include this constraint in their Notes section
 
 ---
 

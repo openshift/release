@@ -1,8 +1,6 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  annotations:
-    argocd.argoproj.io/manifest-generate-paths: .
   name: appset-cluster-app-ci
   namespace: openshift-gitops
 spec:
@@ -16,8 +14,6 @@ spec:
       revision: main
   template:
     metadata:
-      annotations:
-        argocd.argoproj.io/manifest-generate-paths: '{{.path.path}}'
       name: 'app-cluster-app.ci-{{.path.basename}}'
       namespace: openshift-gitops
     spec:
@@ -36,10 +32,9 @@ spec:
       syncPolicy:
         automated:
           enabled: true
-          prune: false
+          prune: true
           selfHeal: true
         syncOptions:
-          - ApplyOutOfSyncOnly=true
           - CreateNamespace=true
           - PruneLast=true
           - RespectIgnoreDifferences=true

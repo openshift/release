@@ -16,16 +16,20 @@ PRIVATE_KEY="${CRED_DIR}/private-key"
 
 APP_ID=$(cat "${APP_ID_FILE}")
 
+generate_jwt() {
+    local exp_seconds=${1:-600}
+    local now hdr pay sig
+    now=$(date +%s)
+    hdr=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    pay=$(echo -n "{\"iat\":$((now - 60)),\"exp\":$((now + exp_seconds)),\"iss\":\"${APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    sig=$(echo -n "${hdr}.${pay}" | openssl dgst -sha256 -sign "${PRIVATE_KEY}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+    echo "${hdr}.${pay}.${sig}"
+}
+
 generate_token() {
     local installation_id=$1
-    local now iat exp header payload signature jwt token
-    now=$(date +%s)
-    iat=$((now - 60))
-    exp=$((now + 600))
-    header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-    payload=$(echo -n "{\"iat\":${iat},\"exp\":${exp},\"iss\":\"${APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-    signature=$(echo -n "${header}.${payload}" | openssl dgst -sha256 -sign "${PRIVATE_KEY}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-    jwt="${header}.${payload}.${signature}"
+    local jwt token
+    jwt=$(generate_jwt 600)
 
     token=$(curl -sf --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5 \
         -X POST \
@@ -37,6 +41,16 @@ generate_token() {
     [[ -n "${token}" ]] || return 1
     echo "${token}"
 }
+
+# Resolve app slug (used by review-responder for bot identity)
+APP_SLUG=$(curl -sf --connect-timeout 10 --max-time 15 \
+    -H "Authorization: Bearer $(generate_jwt 120)" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/app" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('slug',''))")
+[[ -n "${APP_SLUG}" ]] || { echo "ERROR: Failed to resolve app slug from /app endpoint."; exit 1; }
+echo "${APP_SLUG}[bot]" > "${SHARED_DIR}/gh-app-bot-login"
+echo "App slug: ${APP_SLUG} (bot login: ${APP_SLUG}[bot])"
 
 IFS=',' read -ra PAIRS <<< "${GITHUB_APP_TOKEN_OUTPUTS}"
 for pair in "${PAIRS[@]}"; do

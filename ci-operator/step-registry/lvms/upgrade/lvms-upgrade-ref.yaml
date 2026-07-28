@@ -1,0 +1,44 @@
+ref:
+  as: lvms-upgrade
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  cli: latest
+  commands: lvms-upgrade-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: TARGET_LVMS_CHANNEL
+    default: ""
+    documentation: |-
+      Target LVMS channel to upgrade to (e.g., "stable-5.0").
+      Required for LVMS upgrade.
+  - name: LVMS_NAMESPACE
+    default: "openshift-lvm-storage"
+    documentation: |-
+      Namespace where LVMS operator is installed.
+  - name: TARGET_LVMS_SOURCE
+    default: "lvm-catalogsource"
+    documentation: |-
+      Target CatalogSource for LVMS upgrade (e.g., "lvm-catalogsource").
+  - name: LVM_CATALOG_SOURCE
+    default: "lvm-catalogsource"
+    documentation: |-
+      Name of the CatalogSource to update with the target index image.
+  - name: TARGET_LVM_INDEX_IMAGE
+    default: ""
+    documentation: |-
+      Target LVMS index image for the upgrade. If empty, auto-detects based on
+      target channel version using Konflux catalog (e.g., stable-5.0 -> v5.0).
+  - name: IDMS_NAME
+    default: "lvm-operator-idms"
+    documentation: |-
+      Name of the ImageDigestMirrorSet to create for LVMS images.
+  documentation: |-
+    This ref upgrades the LVMS operator to a new version.
+    It patches the existing CatalogSource with the target index image,
+    creates the required IDMS, updates the Subscription channel,
+    waits for InstallPlan, approves it, and waits for the upgrade to complete.
