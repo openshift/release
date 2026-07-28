@@ -1,0 +1,45 @@
+base_images:
+  rebasebot:
+    name: rebasebot
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rebasebot
+  cron: 10 12 * * Mon,Thu
+  steps:
+    test:
+    - as: rebasebot
+      commands: |
+        rebasebot --source https://github.com/functions-dev/func-operator:main \
+                  --dest openshift/functions-operator:main \
+                  --rebase openshift/functions-operator:rebase-bot-main \
+                  --github-user-token /secrets/rebasebot/github-token \
+                  --git-username gauron99 \
+                  --git-email fridrich.david19@gmail.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: serverless-rebasebot-credentials
+        namespace: test-credentials
+      from_image:
+        name: rebasebot
+        namespace: ci
+        tag: latest
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: functions-operator
+  variant: periodics
