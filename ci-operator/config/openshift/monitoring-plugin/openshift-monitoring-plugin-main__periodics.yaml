@@ -110,6 +110,8 @@ tests:
       cli: latest
       commands: |
         NAMESPACE="openshift-cluster-observability-operator"
+        # Pin Quay-published bundle (no :latest tag on this repo). References pullable quay.io operator images.
+        OO_BUNDLE="quay.io/rhobs/observability-operator-bundle:1.4.0-260727185408"
         oc create namespace "${NAMESPACE}" || true
         oc label namespace "${NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite
         operator-sdk run bundle \
@@ -118,9 +120,6 @@ tests:
           --namespace "${NAMESPACE}" \
           --verbose \
           "${OO_BUNDLE}"
-      dependencies:
-      - env: OO_BUNDLE
-        name: observability-bundle
       from: operator-sdk
       resources:
         requests:
