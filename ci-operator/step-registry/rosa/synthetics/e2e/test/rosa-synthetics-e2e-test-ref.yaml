@@ -1,0 +1,40 @@
+ref:
+  as: rosa-synthetics-e2e-test
+  from: src
+  grace_period: 5m
+  commands: rosa-synthetics-e2e-test-commands.sh
+  credentials:
+  - namespace: ci
+    name: cluster-secrets-rosa-e2e-01
+    mount_path: /usr/local/rosa-e2e-credentials
+  dependencies:
+  - name: rhobs-synthetics-agent
+    env: AGENT_IMAGE
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 15m0s
+  env:
+  - name: OCM_LOGIN_ENV
+    default: production
+    documentation: OCM environment to login to.
+  - name: RHOBS_CLUSTER_ID
+    default: 2j86vnk0b06v43684hhsdkmkt7aln933
+    documentation: OCM cluster ID for the RHOBS integration cell (rhobsi01uw2).
+  - name: COMPONENT
+    default: agent
+    documentation: |-
+      Which component to test. "agent" deploys the synthetics-agent
+      and verifies Probe CRD creation. "api" deploys the synthetics-api
+      and verifies endpoint responses.
+  - name: API_IMAGE
+    default: quay.io/redhat-services-prod/openshift/rhobs-synthetics-api:latest
+    documentation: |-
+      Image for the synthetics-api deployment. Defaults to the latest
+      production image. Override via ci-operator dependencies when
+      testing from the API repo.
+  documentation: |-
+    Deploys the component under test (agent or api) into the ephemeral
+    namespace created by the setup step, waits for it to reconcile,
+    and verifies the expected resources and endpoints exist.

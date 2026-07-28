@@ -38,21 +38,22 @@ debug_on_exit() {
     echo "--------------------------------------------------------------------------------"
     echo "    😴 😴 😴"
 
-    # Use file flag so loop can be interrupted by removing the file
-    touch "${lockfile}"
-    attempts=120
-    attempt_count=0
-    sleep_time=120
-    set +x
-    while [[ -f "${lockfile}" ]]; do
-        sleep "${sleep_time}"
-        ((attempt_count++))
-        if [[ ${attempt_count} -ge ${attempts} ]]; then
-            echo "Timed out waiting for lockfile to be removed."
-            break
-        fi
-    done
-    set -x
+    ### Disabled for Konflux, until we can make it customizable to only execute for manual rehearsle.
+    # # Use file flag so loop can be interrupted by removing the file
+    # touch "${lockfile}"
+    # attempts=120
+    # attempt_count=0
+    # sleep_time=120
+    # set +x
+    # while [[ -f "${lockfile}" ]]; do
+    #     sleep "${sleep_time}"
+    #     ((attempt_count++))
+    #     if [[ ${attempt_count} -ge ${attempts} ]]; then
+    #         echo "Timed out waiting for lockfile to be removed."
+    #         break
+    #     fi
+    # done
+    # set -x
   fi
 
   # exit with the original exit code.

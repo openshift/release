@@ -61,6 +61,9 @@ LoadModule auth_basic_module modules/mod_auth_basic.so
 LoadModule proxy_module modules/mod_proxy.so
 LoadModule proxy_http_module modules/mod_proxy_http.so
 
+# Preserve the original Host header so sippy's HATEOAS links use the tunnel URL, not localhost:8080
+ProxyPreserveHost On
+
 <Location "/">
   AuthType Basic
   AuthName "Sippy Staging"

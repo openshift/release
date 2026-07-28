@@ -15,6 +15,13 @@ source "${env_file}"
 export LOCATION="${SELECTED_LOCATION:-${LOCATION:-}}"
 : "${LOCATION:?LOCATION must be provided by SELECTED_LOCATION or the legacy runtime slot export file}"
 
+# Source CPO image override if present (set by aro-hcp-hypershift-images-push)
+cpo_env="${SHARED_DIR}/hypershift-cpo-override.env"
+if [[ -f "${cpo_env}" ]]; then
+    # shellcheck disable=SC1090
+    source "${cpo_env}"
+fi
+
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")

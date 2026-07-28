@@ -9,8 +9,16 @@ ref:
       cpu: 100m
       memory: 300Mi
   timeout: 5m0s
+  env:
+  - name: OPERATOR_NAME
+    default: ""
+    documentation: Operator name used as the production ClusterPackage name for CRD ownership reset.
+  - name: OPERATOR_CRDS
+    default: ""
+    documentation: Comma-separated CRDs to clear ownership on after e2e ClusterPackage deletion.
   documentation: |-
-    Removes the test operator ClusterPackage and namespace created by
-    rosa-operator-install. Reads the ClusterPackage name and namespace
-    from SHARED_DIR files written by the install step. Safe to run as
+    Cleans up after operator e2e tests: collects operator logs as
+    artifacts, deletes the test ClusterPackage, removes stale
+    ClusterObjectSets, and clears CRD ownerReferences so the
+    production ClusterPackage can re-adopt them. Safe to run as
     best_effort in post since cleanup failure should not fail the job.

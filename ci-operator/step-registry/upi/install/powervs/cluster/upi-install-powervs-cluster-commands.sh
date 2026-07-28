@@ -19,7 +19,7 @@ NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 export POWERVS_ZONE="${LEASED_RESOURCE}"
 POWERVS_REGION=$(
         case "$POWERVS_ZONE" in
-            ("dal10" | "dal12") echo "dal" ;;
+            ("dal10" | "dal12" | "dal14") echo "dal" ;;
             ("us-south") echo "us-south" ;;
             ("wdc06" | "wdc07") echo "wdc" ;;
             ("us-east") echo "us-east" ;;
@@ -37,7 +37,7 @@ POWERVS_REGION=$(
 export POWERVS_REGION
 VPC_REGION=$(
         case "$POWERVS_ZONE" in
-            ("dal10" | "dal12" | "us-south") echo "us-south" ;;
+            ("dal10" | "dal12" | "dal14" | "us-south") echo "us-south" ;;
             ("wdc06" | "wdc07" | "us-east") echo "us-east" ;;
             ("sao01" | "sao04") echo "br-sao" ;;
             ("tor01") echo "ca-tor" ;;

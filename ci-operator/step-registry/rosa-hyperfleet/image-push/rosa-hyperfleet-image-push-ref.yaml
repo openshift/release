@@ -16,14 +16,39 @@ ref:
   dependencies:
   - name: src
     env: CI_COMPONENT_IMAGE
+  - name: src
+    env: CI_API_IMAGE
+  - name: src
+    env: CI_OPERATOR_IMAGE
   env:
   - name: ROSA_REGIONAL_QUAY_DEST_REPO
     default: ""
     documentation: |-
-      Quay.io destination repository for the component image
-       (e.g., quay.io/rrp-dev-ci/rosa-hyperfleet-api).
+      Quay.io destination repository for the primary component image
+      (e.g., quay.io/rrp-dev-ci/platform-api).
+  - name: ROSA_REGIONAL_EXTRA_COMPONENTS
+    default: ""
+    documentation: |-
+      YAML list of component images to push. Each entry has 'image'
+      (name of the CI dependency env var holding the source pullspec),
+      'repo' (quay.io destination), 'target' (helm values file path),
+      and 'override' (YAML with IMAGE_REPO/IMAGE_TAG placeholders).
+      Per-image tags are written to SHARED_DIR/extra-component-images
+      for the provision step.
+      Example:
+        - image: CI_API_IMAGE
+          repo: quay.io/rrp-dev-ci/platform-api
+          target: argocd/config/regional-cluster/platform-api/values.yaml
+          override:
+            platformApi:
+              app:
+                image:
+                  repository: IMAGE_REPO
+                  tag: IMAGE_TAG
   documentation: |-
-    Copies a CI-built component image to a public quay.io repository so that
-    ephemeral EKS clusters can pull it without CI registry credentials.
-    Writes the pushed image reference to SHARED_DIR/component-image-override
-    for downstream steps to consume.
+    Copies CI-built component images to public quay.io repositories so
+    that ephemeral EKS clusters can pull them without CI registry
+    credentials. Optionally pushes a primary image (CI_COMPONENT_IMAGE
+    to ROSA_REGIONAL_QUAY_DEST_REPO). Images listed in
+    ROSA_REGIONAL_EXTRA_COMPONENTS are pushed with per-image tag
+    tracking via SHARED_DIR/extra-component-images.

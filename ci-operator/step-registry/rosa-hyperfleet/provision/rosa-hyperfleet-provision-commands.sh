@@ -43,6 +43,48 @@ if [[ -n "${ROSA_REGIONAL_HELM_OVERRIDE_YAML:-}" ]] && [[ -n "${ROSA_REGIONAL_HE
   OVERRIDE_ARGS+=(--provision-override-file "${ROSA_REGIONAL_HELM_VALUES_FILE}:${OVERRIDE_YAML}")
 fi
 
+# Process extra components from ROSA_REGIONAL_EXTRA_COMPONENTS (YAML list)
+if [[ -n "${ROSA_REGIONAL_EXTRA_COMPONENTS:-}" ]]; then
+  # Build a map of repo -> tag from pushed extra component images
+  declare -A EXTRA_TAGS=()
+  if [[ -r "${SHARED_DIR}/extra-component-images" ]]; then
+    while IFS= read -r line; do
+      r="${line%%:*}"
+      t="${line##*:}"
+      EXTRA_TAGS["${r}"]="${t}"
+    done < "${SHARED_DIR}/extra-component-images"
+  fi
+
+  python3 << 'PYEOF'
+import yaml, os
+components = yaml.safe_load(os.environ['ROSA_REGIONAL_EXTRA_COMPONENTS'])
+shared = os.environ['SHARED_DIR']
+with open(os.path.join(shared, 'extra-override-args.txt'), 'w') as af:
+    for i, entry in enumerate(components):
+        if 'target' not in entry or 'override' not in entry:
+            continue
+        path = os.path.join(shared, f'extra-override-{i}.yaml')
+        with open(path, 'w') as f:
+            yaml.dump(entry['override'], f, default_flow_style=False)
+        af.write(f"{entry.get('repo', '')}|{entry['target']}:{path}\n")
+        print(f"Extra component {i}: {entry['target']}")
+PYEOF
+
+  while IFS='|' read -r repo target_and_path; do
+    override_file="${target_and_path#*:}"
+    if [[ -n "${repo}" ]]; then
+      sed -i "s|IMAGE_REPO|${repo}|g" "${override_file}"
+      extra_tag="${EXTRA_TAGS[${repo}]:-}"
+      if [[ -n "${extra_tag}" ]]; then
+        sed -i "s|IMAGE_TAG|${extra_tag}|g" "${override_file}"
+      fi
+    fi
+    echo "Extra component override:"
+    cat "${override_file}"
+    OVERRIDE_ARGS+=(--provision-override-file "${target_and_path}")
+  done < "${SHARED_DIR}/extra-override-args.txt"
+fi
+
 echo "Starting ephemeral provisioning..."
 uv run --no-cache ci/ephemeral-provider/main.py \
   --save-regional-state "${SHARED_DIR}/regional-terraform-outputs.json" \

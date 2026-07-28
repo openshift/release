@@ -96,6 +96,45 @@ tests:
   container:
     from: golang-plus
   nested_podman: true
+- as: coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    export DOCKER_PR_CHECK=true
+    export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - mount_path: /var/run/codecov-secret
+    name: osd-fleet-manager-codecov
+- as: publish-coverage
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    export DOCKER_PR_CHECK=true
+    export OCM_ENV=integration
+    make ocm/setup aws/setup setup/secrets/empty
+    mkdir -p bin
+    make db/setup
+    sleep 5
+    make codecov
+  container:
+    from: golang-plus
+  nested_podman: true
+  postsubmit: true
+  secrets:
+  - mount_path: /var/run/codecov-secret
+    name: osd-fleet-manager-codecov
 zz_generated_metadata:
   branch: main
   org: openshift-online

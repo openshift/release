@@ -70,7 +70,11 @@ chain:
         export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
         export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
         export HYPERSHIFT_NAMESPACE="$(oc get hostedclusters -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
-        export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+        if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT}" == "true" ]]; then
+          export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+        else
+          export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+        fi
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
         [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       else
@@ -317,6 +321,9 @@ chain:
       default: "false"
       documentation: |-
         If set to true, the job will ignore empty test skips and return a non-zero exit code.
+    - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+      default: "false"
+      documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
     resources:
       requests:
         cpu: "3"
