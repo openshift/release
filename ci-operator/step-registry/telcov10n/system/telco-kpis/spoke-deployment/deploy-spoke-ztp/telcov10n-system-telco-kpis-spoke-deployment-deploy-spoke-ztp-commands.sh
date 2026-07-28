@@ -30,7 +30,6 @@ main() {
     local extra_vars=(
         -e "kubeconfig=${kubeconfig}"
         -e "spoke_cluster=${SPOKE_CLUSTER}"
-        -e "ocp_version=${VERSION}"
         -e "force_cleanup=${FORCE_CLEANUP:-false}"
         -e "ztp_git_repo_url=${ZTP_GIT_REPO}"
         -e "ztp_git_branch=${ztp_branch}"
@@ -39,6 +38,10 @@ main() {
         -e "masters_secret_name=masters-bmc-secret"
         -e "bmc_secret_name=baremetal-bmc-secret"
     )
+
+    if [[ -z "${LOCKDOWN_URI:-}" && -z "${OCP_RELEASE_IMAGE:-}" ]]; then
+        extra_vars+=(-e "ocp_version=${VERSION}")
+    fi
 
     if [[ -n "${OCP_RELEASE_IMAGE:-}" ]]; then
         if [[ "${OCP_RELEASE_IMAGE}" != *"@sha256:"* ]]; then
