@@ -5,9 +5,6 @@ set -o errexit
 set -o pipefail
 set -o xtrace
 
-# Derive a unique image tag from Prow-injected variables:
-#   - PRs:        PULL_PULL_SHA  (consistent across re-triggers on the same commit)
-#   - Postsubmit: BUILD_ID       (unique per run)
 if [ -n "${PULL_PULL_SHA:-}" ]; then
   export TAG="${PULL_PULL_SHA}"
 elif [ -n "${BUILD_ID:-}" ]; then
@@ -19,19 +16,24 @@ fi
 echo "Building images with TAG: ${TAG}"
 echo "${TAG}" > "${SHARED_DIR}/istio-image-tag"
 
-# Copy credential files into the pod as files so their values never appear in
-# any process command-line argument (oc rsh, sh -c, or docker login).
-oc cp /tmp/secrets/username "${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}":/tmp/quay-username
-oc cp /tmp/secrets/password "${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}":/tmp/quay-password
+# Kubernetes mounts secrets as symlinks; oc cp copies the symlink itself, not the
+# content, so the target path doesn't exist in the pod. Read content in the step
+# container and pipe directly to docker login via stdin to avoid the issue entirely.
+[[ $- == *x* ]] && _WAS_TRACING=true || _WAS_TRACING=false
+set +x
+QUAY_USERNAME=$(cat /tmp/secrets/username)
+QUAY_PASSWORD=$(cat /tmp/secrets/password)
+printf '%s' "${QUAY_PASSWORD}" | \
+  oc exec -i -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -- \
+  docker login -u "${QUAY_USERNAME}" --password-stdin quay.io
+$_WAS_TRACING && set -x
 
 oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
   sh -c "
-  docker login -u=\"\$(cat /tmp/quay-username)\" --password-stdin quay.io < /tmp/quay-password
-  rm -f /tmp/quay-username /tmp/quay-password
   export KUBECONFIG=/work/ci-kubeconfig
   export BUILD_WITH_CONTAINER=\"0\"
   export ENABLE_OVERLAY2_STORAGE_DRIVER=true
-  export HUB=\"${TEST_HUB}\"
+  export HUB=\"${QUAY_HUB}\"
   export TAG=\"${TAG}\"
   export SKIP_TEST_RUN=\"true\"
   export ARTIFACT_DIR=\"${ARTIFACT_DIR}\"
