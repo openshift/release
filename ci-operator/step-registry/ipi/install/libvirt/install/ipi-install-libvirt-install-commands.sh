@@ -200,7 +200,8 @@ function ipi_extract_rpm_contents() {
 }
 
 function ipi_install_xsltproc_user_local_stream9() {
-	local arch xml_base xsl_base xml_html xsl_html tmpd root xml_rpm xsl_rpm curl_bin wget_bin unpack_py label
+	local arch xml_base xsl_base xml_html xsl_html base_html tmpd root xml_rpm xsl_rpm curl_bin wget_bin unpack_py label
+	local xz_rpm gcrypt_rpm gpgerr_rpm
 	# libvirt-installer sets PATH=/bin; common tools live under /usr/bin.
 	export PATH="/usr/bin:/bin:${PATH:-}"
 
@@ -240,83 +241,107 @@ function ipi_install_xsltproc_user_local_stream9() {
 	command -v cpio >/dev/null 2>&1 && unpack_mode=cpio
 	echo "INFO: Attempting to install xsltproc for ${arch} (unpack: ${unpack_mode})" >&2
 
-	# Rocky 9: libxml2 in BaseOS .../Packages/l/, libxslt in AppStream .../Packages/l/
+	# Rocky 9: libxml2/libxslt (+ runtime deps older libvirt-installer images lack, e.g. ocp/4.14).
+	# BaseOS letter buckets still expose href="*.rpm". AppStream holds libxslt.
 	local mirror_rows=(
-		"rocky|https://download.rockylinux.org/pub/rocky/9/BaseOS/${arch}/os/Packages/l/|https://download.rockylinux.org/pub/rocky/9/AppStream/${arch}/os/Packages/l/"
-		"rocky-dl|https://dl.rockylinux.org/pub/rocky/9/BaseOS/${arch}/os/Packages/l/|https://dl.rockylinux.org/pub/rocky/9/AppStream/${arch}/os/Packages/l/"
+		"rocky|https://download.rockylinux.org/pub/rocky/9/BaseOS/${arch}/os/Packages|https://download.rockylinux.org/pub/rocky/9/AppStream/${arch}/os/Packages"
+		"rocky-dl|https://dl.rockylinux.org/pub/rocky/9/BaseOS/${arch}/os/Packages|https://dl.rockylinux.org/pub/rocky/9/AppStream/${arch}/os/Packages"
 	)
+
+	ipi_fetch_index() {
+		local url="$1"
+		if [[ -n "${curl_bin}" ]]; then
+			"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 "${url}" 2>/dev/null
+		else
+			"${wget_bin}" -q -O - --timeout=30 --tries=3 "${url}" 2>/dev/null
+		fi
+	}
+
+	ipi_download_rpm() {
+		local url="$1"
+		local out="$2"
+		if [[ -n "${curl_bin}" ]]; then
+			"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${out}" "${url}" 2>/dev/null
+		else
+			"${wget_bin}" -q --timeout=30 --tries=3 -O "${out}" "${url}" 2>/dev/null
+		fi
+	}
 
 	for row in "${mirror_rows[@]}"; do
 		IFS='|' read -r label xml_base xsl_base <<<"${row}"
-		echo "INFO: Trying mirror set ${label}: xml=${xml_base} xsl=${xsl_base}" >&2
+		# lettered subdirs under Packages/
+		local base_l="${xml_base}/l/"
+		local base_x="${xml_base}/x/"
+		local app_l="${xsl_base}/l/"
+		echo "INFO: Trying mirror set ${label}: base=${xml_base} app=${xsl_base}" >&2
 
-		if [[ -n "${curl_bin}" ]]; then
-			xml_html="$("${curl_bin}" -fsSL --connect-timeout 30 --retry 3 "${xml_base}" 2>/dev/null)" || {
-				echo "WARN: ${label}: failed to fetch libxml2 index" >&2
-				continue
-			}
-			xsl_html="$("${curl_bin}" -fsSL --connect-timeout 30 --retry 3 "${xsl_base}" 2>/dev/null)" || {
-				echo "WARN: ${label}: failed to fetch libxslt index" >&2
-				continue
-			}
-		else
-			xml_html="$("${wget_bin}" -q -O - --timeout=30 --tries=3 "${xml_base}" 2>/dev/null)" || {
-				echo "WARN: ${label}: failed to fetch libxml2 index (wget)" >&2
-				continue
-			}
-			xsl_html="$("${wget_bin}" -q -O - --timeout=30 --tries=3 "${xsl_base}" 2>/dev/null)" || {
-				echo "WARN: ${label}: failed to fetch libxslt index (wget)" >&2
-				continue
-			}
-		fi
+		base_html="$(ipi_fetch_index "${base_l}")" || {
+			echo "WARN: ${label}: failed to fetch BaseOS Packages/l/ index" >&2
+			continue
+		}
+		local base_x_html
+		base_x_html="$(ipi_fetch_index "${base_x}")" || {
+			echo "WARN: ${label}: failed to fetch BaseOS Packages/x/ index" >&2
+			continue
+		}
+		xsl_html="$(ipi_fetch_index "${app_l}")" || {
+			echo "WARN: ${label}: failed to fetch AppStream Packages/l/ index" >&2
+			continue
+		}
 
-		xml_rpm="$(ipi_el9_pick_latest_rpm libxml2 "${xml_html}" "${arch}")"
+		xml_rpm="$(ipi_el9_pick_latest_rpm libxml2 "${base_html}" "${arch}")"
 		xsl_rpm="$(ipi_el9_pick_latest_rpm libxslt "${xsl_html}" "${arch}")"
+		xz_rpm="$(ipi_el9_pick_latest_rpm xz-libs "${base_x_html}" "${arch}")"
+		gcrypt_rpm="$(ipi_el9_pick_latest_rpm libgcrypt "${base_html}" "${arch}")"
+		gpgerr_rpm="$(ipi_el9_pick_latest_rpm libgpg-error "${base_html}" "${arch}")"
 
 		if [[ -z "${xml_rpm}" || -z "${xsl_rpm}" ]]; then
 			echo "WARN: ${label}: could not parse libxml2/libxslt ${arch} RPM names from indexes" >&2
 			continue
 		fi
 
-		echo "INFO: ${label}: picked ${xml_rpm} and ${xsl_rpm}" >&2
+		echo "INFO: ${label}: picked ${xml_rpm}, ${xsl_rpm}, ${xz_rpm:-none}, ${gcrypt_rpm:-none}, ${gpgerr_rpm:-none}" >&2
+
+		local -a downloads=(
+			"${base_l}${xml_rpm}|${tmpd}/${xml_rpm}"
+			"${app_l}${xsl_rpm}|${tmpd}/${xsl_rpm}"
+		)
+		[[ -n "${xz_rpm}" ]] && downloads+=("${base_x}${xz_rpm}|${tmpd}/${xz_rpm}")
+		[[ -n "${gcrypt_rpm}" ]] && downloads+=("${base_l}${gcrypt_rpm}|${tmpd}/${gcrypt_rpm}")
+		[[ -n "${gpgerr_rpm}" ]] && downloads+=("${base_l}${gpgerr_rpm}|${tmpd}/${gpgerr_rpm}")
 
 		download_success=true
-		if [[ -n "${curl_bin}" ]]; then
-			"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xml_rpm}" "${xml_base}${xml_rpm}" 2>/dev/null || {
-				echo "WARN: Failed to download ${xml_rpm}" >&2
+		for spec in "${downloads[@]}"; do
+			IFS='|' read -r url dest <<<"${spec}"
+			if ! ipi_download_rpm "${url}" "${dest}"; then
+				echo "WARN: Failed to download ${url}" >&2
 				download_success=false
-			}
-			if [[ "${download_success}" == "true" ]]; then
-				"${curl_bin}" -fsSL --connect-timeout 30 --retry 3 -o "${tmpd}/${xsl_rpm}" "${xsl_base}${xsl_rpm}" 2>/dev/null || {
-					echo "WARN: Failed to download ${xsl_rpm}" >&2
-					download_success=false
-				}
+				break
 			fi
-		else
-			"${wget_bin}" -q --timeout=30 --tries=3 -O "${tmpd}/${xml_rpm}" "${xml_base}${xml_rpm}" 2>/dev/null || {
-				echo "WARN: Failed to download ${xml_rpm}" >&2
-				download_success=false
-			}
-			if [[ "${download_success}" == "true" ]]; then
-				"${wget_bin}" -q --timeout=30 --tries=3 -O "${tmpd}/${xsl_rpm}" "${xsl_base}${xsl_rpm}" 2>/dev/null || {
-					echo "WARN: Failed to download ${xsl_rpm}" >&2
-					download_success=false
-				}
-			fi
-		fi
-
+		done
 		if [[ "${download_success}" != "true" ]]; then
 			continue
 		fi
 
 		echo "INFO: Extracting RPM packages" >&2
+		local -a rpm_files=("${tmpd}/${xml_rpm}" "${tmpd}/${xsl_rpm}")
+		[[ -n "${xz_rpm}" ]] && rpm_files+=("${tmpd}/${xz_rpm}")
+		[[ -n "${gcrypt_rpm}" ]] && rpm_files+=("${tmpd}/${gcrypt_rpm}")
+		[[ -n "${gpgerr_rpm}" ]] && rpm_files+=("${tmpd}/${gpgerr_rpm}")
+		extract_ok=true
+		for rpmfile in "${rpm_files[@]}"; do
+			if ! ipi_extract_rpm_contents "${rpmfile}" "${root}" "${unpack_py}"; then
+				echo "WARN: Failed to extract ${rpmfile}" >&2
+				extract_ok=false
+				break
+			fi
+		done
 
-		if ipi_extract_rpm_contents "${tmpd}/${xml_rpm}" "${root}" "${unpack_py}" &&
-			ipi_extract_rpm_contents "${tmpd}/${xsl_rpm}" "${root}" "${unpack_py}"
-		then
+		if [[ "${extract_ok}" == "true" ]]; then
 			echo "INFO: RPM extraction successful" >&2
 			export PATH="${root}/usr/bin:${PATH:-}"
-			export LD_LIBRARY_PATH="${root}/usr/lib64:${LD_LIBRARY_PATH:-}"
+			export LD_LIBRARY_PATH="${root}/usr/lib64:${root}/lib64:${LD_LIBRARY_PATH:-}"
+			hash -r 2>/dev/null || true
 
 			if xsltproc --version >/dev/null 2>&1; then
 				echo "INFO: xsltproc successfully installed and verified" >&2
@@ -324,6 +349,14 @@ function ipi_install_xsltproc_user_local_stream9() {
 				return 0
 			fi
 			echo "WARN: xsltproc extracted but not functional (missing shared libs?)" >&2
+			if command -v ldd >/dev/null 2>&1 && [[ -x "${root}/usr/bin/xsltproc" ]]; then
+				echo "WARN: ldd ${root}/usr/bin/xsltproc:" >&2
+				ldd "${root}/usr/bin/xsltproc" >&2 || true
+			fi
+			# Drop broken extract from PATH so a hashed lookup cannot fake success later.
+			export PATH="/usr/bin:/bin"
+			unset LD_LIBRARY_PATH
+			hash -r 2>/dev/null || true
 		else
 			echo "WARN: Failed to extract RPM packages" >&2
 		fi
@@ -333,6 +366,9 @@ function ipi_install_xsltproc_user_local_stream9() {
 	done
 
 	echo "ERROR: All mirror attempts failed" >&2
+	export PATH="/usr/bin:/bin"
+	unset LD_LIBRARY_PATH
+	hash -r 2>/dev/null || true
 	rm -rf "${tmpd}" "${root}"
 	return 1
 }
@@ -531,11 +567,12 @@ fi
 # terraform-provider-libvirt shells out to xsltproc when xml.xslt is set; libvirt-installer image
 # may not ship it. Install before openshift-install runs terraform (s390x ACPI workaround only).
 # The CI image runs as UID 1000, so prefer unpacking EL9 RPMs (Rocky 9 indexes); package managers only work as root.
+# Prefer xsltproc --version over command -v: a broken unpack can leave a non-runnable binary on PATH.
 if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "true" ]]; then
-	if ! command -v xsltproc >/dev/null 2>&1; then
+	if ! xsltproc --version >/dev/null 2>&1; then
 		set +e
 		ipi_install_xsltproc_user_local_stream9
-		if ! command -v xsltproc >/dev/null 2>&1 && [[ "$(id -u)" -eq 0 ]]; then
+		if ! xsltproc --version >/dev/null 2>&1 && [[ "$(id -u)" -eq 0 ]]; then
 			if command -v microdnf >/dev/null 2>&1; then
 				microdnf install -y libxslt
 			elif command -v dnf >/dev/null 2>&1; then
@@ -549,7 +586,7 @@ if [[ "${ARCH:-}" == "s390x" && "${IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH:-}" == "tru
 		fi
 		set -e
 	fi
-	if ! command -v xsltproc >/dev/null 2>&1; then
+	if ! xsltproc --version >/dev/null 2>&1; then
 		echo "ERROR: xsltproc is required when IPI_LIBVIRT_S390X_ACPI_XSLT_PATCH=true but could not be installed (non-root image: unpack libxml2/libxslt RPMs or run as root)." >&2
 		exit 1
 	fi
@@ -574,17 +611,34 @@ if [[ -n "${LIBVIRT_POOL_NAME:-}" ]]; then
 	fi
 	POOL_VIRSH="mock-nss.sh virsh --connect qemu+tcp://${POOL_HOST}/system"
 	echo "Ensuring libvirt pool ${LIBVIRT_POOL_NAME} exists on ${POOL_HOST} (target ${LIBVIRT_IMAGE_PATH})"
-	if ${POOL_VIRSH} pool-list --all --name | grep -qx "${LIBVIRT_POOL_NAME}"; then
+	# Match UPI: looser grep on pool-list (avoid --name; older libvirt + pipefail can miss existing pools).
+	set +e
+	pool_list_all="$(${POOL_VIRSH} pool-list --all 2>/dev/null)"
+	pool_list_rc=$?
+	set -e
+	if [[ ${pool_list_rc} -eq 0 ]] && echo "${pool_list_all}" | grep -q "${LIBVIRT_POOL_NAME}"; then
 		echo "Storage pool ${LIBVIRT_POOL_NAME} already exists. Skipping create."
-		# Start if inactive
-		if ! ${POOL_VIRSH} pool-list --name | grep -qx "${LIBVIRT_POOL_NAME}"; then
-			${POOL_VIRSH} pool-start "${LIBVIRT_POOL_NAME}" || true
-		fi
 	else
 		echo "Creating storage pool ${LIBVIRT_POOL_NAME}..."
-		${POOL_VIRSH} pool-define-as --name "${LIBVIRT_POOL_NAME}" --type dir --target "${LIBVIRT_IMAGE_PATH}"
-		${POOL_VIRSH} pool-autostart "${LIBVIRT_POOL_NAME}"
-		${POOL_VIRSH} pool-start "${LIBVIRT_POOL_NAME}"
+		set +e
+		define_out="$(${POOL_VIRSH} pool-define-as --name "${LIBVIRT_POOL_NAME}" --type dir --target "${LIBVIRT_IMAGE_PATH}" 2>&1)"
+		define_rc=$?
+		set -e
+		if [[ ${define_rc} -ne 0 ]]; then
+			if echo "${define_out}" | grep -qiE 'already exists|pool .* exists'; then
+				echo "Storage pool ${LIBVIRT_POOL_NAME} already exists (define raced). Continuing."
+			else
+				echo "${define_out}" >&2
+				exit "${define_rc}"
+			fi
+		else
+			${POOL_VIRSH} pool-autostart "${LIBVIRT_POOL_NAME}" || true
+		fi
+	fi
+	# Active pools appear in pool-list (without --all); start if inactive.
+	if ! ${POOL_VIRSH} pool-list 2>/dev/null | grep -q "${LIBVIRT_POOL_NAME}"; then
+		echo "Starting storage pool ${LIBVIRT_POOL_NAME}..."
+		${POOL_VIRSH} pool-start "${LIBVIRT_POOL_NAME}" || true
 	fi
 fi
 

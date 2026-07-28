@@ -385,21 +385,16 @@ tests:
   - intranet
   cron: 0 0 * * 5
   steps:
-    # VPN OZ leases (phc-cicd): large /home pool + RHEL9 QEMU. Use hybrid vpn-ipi workflow
-    # (terraform masters + virsh workers) instead of classic openshift-e2e-libvirt.
     cluster_profile: libvirt-s390x-vpn-oz
     dependencies:
-      # nightly-4.15 releases.s390x-latest → OCP 4.15 nightly (not multi/4.22).
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.15"
-      # Higher memory / ramfs / static-pod workaround: VPN OZ install stability on IBM Z.
       MASTER_MEMORY: "40960"
       NODE_TUNING: "true"
       STATIC_POD_CHECK_WORKAROUND: "true"
       TEST_TYPE: conformance-parallel
-      # Redundant with workflow default; kept explicit for job readability.
       USE_EXTERNAL_DNS: "true"
       USE_RAMFS: "true"
       WORKER_MEMORY: "20480"
@@ -426,7 +421,6 @@ tests:
   steps:
     cluster_profile: libvirt-s390x-vpn-oz
     dependencies:
-      # multi-latest is intentional for image-ecosystem (multi-arch payload), still from 4.15 config.
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       ARCH: s390x
