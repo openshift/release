@@ -279,8 +279,9 @@ if [[ -n "${WORKER_COREOS_STREAM:-}" ]]; then
     for ms_file in "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
         ls "${ms_file}"
         echo -e "-xxx---------------------\n$(cat "${ms_file}")\n---------------------xxx-"
-        sed -i "s/coreos.openshift.io\/stream: .*/coreos.openshift.io\/stream: ${esc_stream}/" "${ms_file}"
-        sed -i "s/machineconfiguration.openshift.io\/osstream: .*/machineconfiguration.openshift.io\/osstream: ${esc_stream}/" "${ms_file}"
+        sed -i 's/- rhel-9/- rhel-10/' "${ms_file}"
+#        sed -i "s/coreos.openshift.io\/stream: .*/coreos.openshift.io\/stream: ${esc_stream}/" "${ms_file}"
+#        sed -i "s/machineconfiguration.openshift.io\/osstream: .*/machineconfiguration.openshift.io\/osstream: ${esc_stream}/" "${ms_file}"
         echo -e "-xxx---------------------"
         echo -e "-after update---------------------\n$(cat "${ms_file}")\n---------------------xxx-"
     done
