@@ -203,6 +203,21 @@ tests:
       NODEPOOL_N3_VERSION: "4.19"
       NODEPOOL_N4_VERSION: "4.18"
     workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-capi-storage-migration
+  cron: 0 4 * * 1-5
+  steps:
+    cluster_profile: hypershift-aks
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      INSTALL_FROM_LATEST: "true"
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
+    workflow: hypershift-azure-aks-e2e-capi-migration
 - always_run: false
   as: e2e-aro-hcp
   optional: true
