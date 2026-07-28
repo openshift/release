@@ -79,6 +79,14 @@ chain:
         [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       else
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        # When HOSTED_CP is set, the management cluster kubeconfig is not derived
+        # automatically. Set HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG and
+        # HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE from SHARED_DIR artifacts
+        if [[ -f "${SHARED_DIR}/hs-mc.kubeconfig" && -f "${SHARED_DIR}/cluster-name" ]]; then
+          export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+          ROSA_CLUSTER_NAME="$(cat "${SHARED_DIR}/cluster-name")"
+          export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc --kubeconfig="${HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG}" get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"${ROSA_CLUSTER_NAME}\")].metadata.namespace}")"
+        fi
       fi
 
       if [[ $MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT == "true" ]]; then
