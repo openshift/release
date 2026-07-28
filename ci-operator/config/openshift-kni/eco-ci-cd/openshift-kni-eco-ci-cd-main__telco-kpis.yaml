@@ -213,6 +213,88 @@ tests:
           }
         }
     workflow: telcov10n-system-telco-kpis-baseline-tests
+- as: run-12hr-baselines
+  capabilities:
+  - intranet
+  cron: 0 6 31 2 *
+  reporter_config:
+    channel: '#eco-ci-cd-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      HUB_CLUSTER: kni-qe-71
+      INFRA_SETTINGS: |-
+        {
+          "mirror_spoke_operators": {
+            "skip": false,
+            "debug_on_fail": true,
+            "spoke_lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64-baseline.json"
+          },
+          "mirror_ocp": {
+            "skip": false,
+            "debug_on_fail": true,
+            "lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64-baseline.json"
+          },
+          "mirror_ran_test_images": {
+            "skip": false,
+            "debug_on_fail": true,
+            "ran_images": {
+              "images": [
+                "quay.io/telcov10n-ci/oslat:latest",
+                "quay.io/telcov10n-ci/cyclictest:latest",
+                "quay.io/telcov10n-ci/cnf-tests:4.8",
+                "quay.io/telcov10n-ci/stress-ng:latest",
+                "quay.io/telcov10n-ci/cnf-gotests-client:latest",
+                "quay.io/telcov10n-ci/dpdk-testpmd:latest",
+                "quay.io/telcov10n-ci/process-exporter:ppid-2",
+                "quay.io/telcov10n-ci/fedora-stress-ng:latest",
+                "quay.io/telcov10n-ci/curl:latest",
+                "quay.io/telcov10n-ci/sampleapp:latest",
+                "quay.io/telcov10n-ci/kubectl:latest",
+                "quay.io/telcov10n-ci/rtla:latest",
+                "quay.io/telcov10n-ci/oran-subscriber:latest"
+              ]
+            }
+          },
+          "deploy_spoke_ztp": {
+            "skip": false,
+            "debug_on_fail": true,
+            "lockdown_uri": "https://gitlab.cee.redhat.com/ran/dev-kpi-pipeline/-/raw/prow-lockdowns/spoke/defaults/lockdown-spoke-x86_64-baseline.json",
+            "ztp_git_branch": "spree-02-kpi-4.21-prow"
+          }
+        }
+      REPORTING_SETTINGS: |-
+        {
+          "generate_report": {
+            "skip": false,
+            "development_mode": true
+          }
+        }
+      SPOKE_CLUSTER: spree-02
+      TEST_SETTINGS: |-
+        {
+          "collect_node_info": {
+            "skip": false
+          },
+          "bios_validation": {
+            "skip": false,
+            "continue_on_fail": true
+          },
+          "cpu_util": {
+            "skip": false,
+            "baseline": false,
+            "duration": "12h"
+          }
+        }
+    workflow: telcov10n-system-telco-kpis-baseline-tests
 - as: run-1hr-tests
   capabilities:
   - intranet
