@@ -149,7 +149,7 @@ tests:
       cli: latest
       commands: |-
         export GITHUB_SHA=stable
-        ./test/scripts/openshift-ci/run-e2e-tests.sh graph 6 raw
+        make e2e-graph-ocp RUNNING_LOCAL=false
       dependencies:
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller
@@ -214,16 +214,7 @@ tests:
     test:
     - as: e2e-raw
       cli: latest
-      commands: |-
-        # Run regular raw tests
-        ./test/scripts/openshift-ci/run-e2e-tests.sh raw 6
-        # Patch config for ClusterIP None (headless services)
-        oc patch configmaps -n kserve inferenceservice-config \
-          --patch '{"data":{"service":"{\"serviceClusterIPNone\": true}"}}'
-        # Wait for controller to pick up config change
-        sleep 5
-        # Run rawcipn tests
-        SETUP_E2E=false ./test/scripts/openshift-ci/run-e2e-tests.sh rawcipn 1 raw
+      commands: make e2e-raw-ocp RUNNING_LOCAL=false
       dependencies:
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller
@@ -284,8 +275,7 @@ tests:
     test:
     - as: e2e-predictor
       cli: latest
-      commands: ./test/scripts/openshift-ci/run-e2e-tests.sh "predictor or kserve_on_openshift"
-        6
+      commands: make e2e-predictor-ocp RUNNING_LOCAL=false
       dependencies:
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller
@@ -346,8 +336,7 @@ tests:
     test:
     - as: e2e-llm-inference-service
       cli: latest
-      commands: ./test/scripts/openshift-ci/run-e2e-tests.sh "llmisvc_core and cluster_cpu
-        and not pvc_storage" 2 "llm-d"
+      commands: make e2e-llmisvc-ocp RUNNING_LOCAL=false
       dependencies:
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller
