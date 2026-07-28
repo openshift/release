@@ -161,16 +161,24 @@ WaitForConnectionsEstablished() {
         typeset -i i
         for ((i = 0; i < spokeCount; i++)); do
             : "Connection status on '${spokeNamesArr[i]}'"
-            KUBECONFIG="${spokeKubeconfigsArr[i]}" "${subctlBin}" show connections || true
+            [[ -x "${subctlBin}" ]] && \
+                KUBECONFIG="${spokeKubeconfigsArr[i]}" "${subctlBin}" show connections || true
         done
-        [[ "${verifyHubSpoke}" == "true" ]] && "${subctlBin}" show connections || true
+        [[ "${verifyHubSpoke}" == "true" && -x "${subctlBin}" ]] && \
+            "${subctlBin}" show connections || true
         exit 1
     )
     # No trailing `true`: function exit code = inner subshell exit code (0=connected, 1=timeout).
 }
 
 # ── WarmUpServiceDiscovery — prime Lighthouse before verify (no Globalnet) ────
+# Requires subctl ('subctl export service').  Skip entirely when
+# SUBMARINER_RUN_SUBCTL_VERIFY=false (subctl is not installed in that path)
+# — same guard used by VerifyConnectivity.  Without this guard the function
+# calls /tmp/bin/subctl which does not exist, causing two 300s polling loops
+# (ServiceImport + EndpointSlice) to time out and burn ~10m of step budget.
 WarmUpServiceDiscovery() {
+    [[ "${runSubctlVerify}" == "true" ]] || return 0
     typeset kcSource="${1:?}"; (($#)) && shift
     typeset kcTarget="${1:?}"; (($#)) && shift
     typeset srcName="${1:?}"; (($#)) && shift
@@ -355,16 +363,26 @@ GetSyncControllerPodIp() {
 # exit codes in some oc versions — the pod terminates with Error but oc returns 0.
 # Instead: creates the pod without --rm, waits for it to reach a terminal phase via
 # `oc wait --for=jsonpath`, then reads exit code from pod status before cleanup.
+#
+# NAMESPACE CHOICE — submariner-operator (not a freshly-created namespace):
+#   OVN-K programs cross-cluster policy-based routing (PBR) rules for each namespace's
+#   logical switch port. A brand-new namespace gets PBR rules only after OVN reconciles
+#   the new logical switch, which can take several seconds. Running the probe pod in a
+#   freshly-created namespace can race against this reconciliation, causing the probe
+#   pod's traffic to miss the Submariner gateway route and time out (exit 124) even
+#   though the IPsec tunnel is established and OVN routing works for older namespaces.
+#   Using 'submariner-operator' — an existing namespace created by Submariner itself —
+#   guarantees OVN-K has already programmed the cross-cluster PBR rules for it.
+#   Only the probe pod is deleted afterwards; the namespace is left in place.
 ProbeCclmSyncPort() {
     typeset srcKubeconfig="${1:?}"; (($#)) && shift
     typeset destIp="${1:?}"; (($#)) && shift
     typeset probeLabel="${1:?}"; (($#)) && shift
 
-    typeset -r probeNs="submariner-cclm-probe"
+    # Use the existing submariner-operator namespace so OVN-K cross-cluster PBR rules
+    # are already programmed. Do NOT delete or recreate the namespace.
+    typeset -r probeNs="submariner-operator"
     typeset probePod="cclm-sync-probe-${probeLabel}"
-
-    KUBECONFIG="${srcKubeconfig}" oc create namespace "${probeNs}" \
-        --dry-run=client -o yaml --save-config | KUBECONFIG="${srcKubeconfig}" oc apply -f - 1>/dev/null
 
     # Remove any stale pod from a prior run.
     KUBECONFIG="${srcKubeconfig}" oc delete pod "${probePod}" \
@@ -398,10 +416,9 @@ ProbeCclmSyncPort() {
         -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' \
         2>/dev/null || echo '1')"
 
+    # Delete only the probe pod; leave the submariner-operator namespace untouched.
     KUBECONFIG="${srcKubeconfig}" oc delete pod "${probePod}" \
         -n "${probeNs}" --ignore-not-found --wait=false 1>/dev/null &
-    KUBECONFIG="${srcKubeconfig}" oc delete namespace "${probeNs}" \
-        --ignore-not-found --wait=false 1>/dev/null &
 
     if [[ "${phase}" != "Succeeded" || "${exitCode}" != "0" ]]; then
         : "CCLM sync probe FAILED → ${destIp}:${SUBMARINER_CCLM_SYNC_PORT} (phase=${phase}, exitCode=${exitCode:-unknown})" >&2
@@ -448,6 +465,74 @@ VerifyCclmSyncPath() {
         || _probesFailed=1
 
     (( _probesFailed == 0 ))
+}
+
+# ── AllowCclmSyncIngress — NetworkPolicy: cross-cluster pod CIDRs → CNV port ──
+# Creates (or updates) a NetworkPolicy in the CNV namespace on each cluster so
+# that cross-cluster pod IPs (advertised by the Submariner gateway) are allowed
+# to reach all pods in the namespace on SUBMARINER_CCLM_SYNC_PORT (default 8443).
+#
+# WHY THIS IS CALLED IN VERIFY (not only broker-join):
+#   The broker-join step calls AllowCclmSyncIngress too, but at that point the
+#   IPsec tunnels are not yet established so gateways.submariner.io has no
+#   connection entries and the function silently skips (no remote CIDRs).
+#   By the time the verify step runs, WaitForConnectionsEstablished has confirmed
+#   all tunnels are "connected" and gateways.submariner.io contains full CIDR data.
+#   This is the reliable place to apply the NetworkPolicy.
+#
+# SAFETY: NetworkPolicy rules are additive — this policy does NOT restrict
+#   any traffic that was already permitted by existing policies.
+AllowCclmSyncIngress() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+
+    typeset cnvNs="${SUBMARINER_CCLM_CNV_NAMESPACE:-openshift-cnv}"
+    typeset cclmPort="${SUBMARINER_CCLM_SYNC_PORT:-8443}"
+
+    # Collect remote pod/service CIDRs from active Submariner gateway connections.
+    typeset -a remoteCidrs=()
+    typeset cidr
+    while IFS= read -r cidr; do
+        [[ -n "${cidr}" ]] || continue
+        remoteCidrs+=("${cidr}")
+    done < <(
+        KUBECONFIG="${kubeconfig}" oc get gateways.submariner.io \
+            -n submariner-operator -o json 2>/dev/null \
+            | jq -r '.items[].status.connections[].endpoint.subnets[]?' \
+            || true
+    )
+
+    if (( ${#remoteCidrs[@]} == 0 )); then
+        : "No Submariner remote CIDRs found on '${clusterName}' — skipping CCLM NetworkPolicy"
+        return 0
+    fi
+
+    : "Creating CCLM ingress NetworkPolicy on '${clusterName}' ns='${cnvNs}' port=${cclmPort} cidrs=[${remoteCidrs[*]}]"
+
+    # Use jq to build valid JSON (avoid heredoc YAML indentation pitfalls).
+    # oc apply accepts JSON manifests directly.
+    KUBECONFIG="${kubeconfig}" oc apply -f - < <(
+        jq -n \
+            --arg  ns   "${cnvNs}" \
+            --arg  port "${cclmPort}" \
+            --argjson cidrs "$(printf '%s\n' "${remoteCidrs[@]}" | jq -R . | jq -s .)" \
+            '{
+                apiVersion: "networking.k8s.io/v1",
+                kind: "NetworkPolicy",
+                metadata: {name: "allow-submariner-cclm-sync", namespace: $ns},
+                spec: {
+                    podSelector: {},
+                    policyTypes: ["Ingress"],
+                    ingress: [{
+                        from: ($cidrs | map({ipBlock: {cidr: .}})),
+                        ports: [{protocol: "TCP", port: ($port | tonumber)}]
+                    }]
+                }
+            }'
+    ) || {
+        : "WARNING: could not apply CCLM sync NetworkPolicy on '${clusterName}' (ns may not exist yet)"
+        true
+    }
 }
 
 # ── VerifyConnectivity — run subctl verify between two clusters (opt-in) ──────
@@ -541,6 +626,19 @@ typeset -i submarinerStepRc=0
 
     WaitForConnectionsEstablished 600 || _stepFailed=1
 
+    # Apply the CCLM sync ingress NetworkPolicy NOW that WaitForConnectionsEstablished
+    # has confirmed all IPsec tunnels are connected and gateways.submariner.io contains
+    # full CIDR data.  broker-join also attempts this but the tunnels are not yet
+    # established at that point, so gateways has no entries and it silently skips.
+    # Best-effort: do not track failures — a missing openshift-cnv namespace or a
+    # transient apply error should not block connectivity verification.
+    for ((i = 0; i < spokeCount; i++)); do
+        AllowCclmSyncIngress "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
+    done
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        AllowCclmSyncIngress "${KUBECONFIG}" "hub"
+    fi
+
     for ((i = 0; i < spokeCount; i++)); do
         AssertNoGlobalnetSubnets \
             "${spokeKubeconfigsArr[i]}" \
@@ -572,6 +670,29 @@ typeset -i submarinerStepRc=0
                 || _stepFailed=1
         done
     done
+
+    # Hub↔spoke service-discovery warmup and subctl verify (opt-in via both
+    # SUBMARINER_VERIFY_HUB_SPOKE=true AND SUBMARINER_RUN_SUBCTL_VERIFY=true).
+    # WarmUpServiceDiscovery and VerifyConnectivity both guard on runSubctlVerify
+    # internally, so these calls are no-ops when subctl is not installed.
+    # Running subctl verify hub↔spoke confirms the DATA PLANE is routing cross-cluster
+    # pod traffic (not just the control plane gateway "connected" status), which is
+    # required for KubeVirt CCLM sync to work.
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        for ((i = 0; i < spokeCount; i++)); do
+            WarmUpServiceDiscovery \
+                "${KUBECONFIG}" \
+                "${spokeKubeconfigsArr[i]}" \
+                "hub" \
+                "${spokeNamesArr[i]}"
+            VerifyConnectivity \
+                "${KUBECONFIG}" \
+                "${spokeKubeconfigsArr[i]}" \
+                "hub" \
+                "${spokeNamesArr[i]}" \
+                || _stepFailed=1
+        done
+    fi
 
     # CCLM sync TCP probes — spoke↔spoke pairs.
     for ((i = 0; i < spokeCount; i++)); do

@@ -5,19 +5,19 @@
 # Responsibilities:
 #   - Install subctl to /tmp/bin/ (step-local; NOT in SHARED_DIR)
 #   - Deploy the Submariner broker on the hub cluster
-#   - Join the HUB cluster itself to the broker (subctl join) so hub pods
-#     gain pod-IP routing to spoke pods — required for hub↔spoke CCLM sync
-#   - Join each spoke cluster to the broker (subctl join)
+#   - Join each spoke cluster to the broker (subctl join) — always
+#   - Join the HUB cluster itself to the broker (subctl join) — ONLY when
+#     SUBMARINER_VERIFY_HUB_SPOKE=true (hub↔spoke CCLM jobs only)
 #   - broker-info.subm is kept in /tmp and removed on EXIT via trap
 #   - Wait (in order) for: submariner-operator, gateway, routeagent,
-#     lighthouse-agent, and lighthouse-coredns to be fully ready on hub + spokes
+#     lighthouse-agent, and lighthouse-coredns to be fully ready on all joined clusters
 #
-# WHY the hub is joined:
-#   KubeVirt CCLM uses raw pod-IP routing (port 8443) for virt-synchronization-
-#   controller sync. Both source and destination clusters must be Submariner
-#   participants for cross-cluster pod-IP routing to work. The hub's gateway
-#   node was already prepared by the cloud-prepare step using the hub kubeconfig
-#   and ${SHARED_DIR}/metadata.json.
+# WHY hub join is conditional (SUBMARINER_VERIFY_HUB_SPOKE=true only):
+#   For hub↔spoke CCLM: KubeVirt CCLM uses raw pod-IP routing (port 8443) for
+#   virt-synchronization-controller sync. The hub must be a Submariner participant
+#   for hub↔spoke pod-IP routing to work. Hub gateway was prepared by cloud-prepare.
+#   For spoke↔spoke CCLM: the hub does NOT participate in migrations; joining it
+#   adds ~15 min of unnecessary WaitSubmarinerReady overhead to every spoke job.
 #
 # Globalnet is intentionally NOT enabled: hub and spokes use non-overlapping
 # pod CIDRs (ResolveSpokeCidrs in cluster-install) and KubeVirt CCLM requires
@@ -411,6 +411,29 @@ AssertNoGlobalnetSubnets() {
     fi
 }
 
+# ── RestartRouteAgent — restart routeagent DaemonSet to re-program OVN flows ──
+# WHY THIS IS NEEDED:
+#   The submariner-routeagent starts up during `subctl join` and immediately
+#   tries to program OVN-K policy-based routing entries for remote cluster pod
+#   CIDRs.  However at join time the IPsec tunnel may not yet be fully
+#   established, so the routeagent's initial OVN programming can fail silently
+#   (the pod stays Running/Ready because its readiness probe checks the agent
+#   process, not the OVN entries).  A restart AFTER the tunnel is confirmed
+#   connected and remote CIDRs are known gives the routeagent a clean slate to
+#   re-program the correct OVN flows.  Without this, hub↔spoke pod-IP routing
+#   (required for CCLM sync port 8443) may be missing even though the gateway
+#   shows "connected".
+RestartRouteAgent() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+
+    : "Restarting submariner-routeagent on '${clusterName}' to re-program OVN routing flows"
+    KUBECONFIG="${kubeconfig}" oc rollout restart daemonset/submariner-routeagent \
+        -n submariner-operator 1>/dev/null
+    KUBECONFIG="${kubeconfig}" oc rollout status daemonset/submariner-routeagent \
+        -n submariner-operator --timeout=10m 1>/dev/null
+}
+
 # ── WaitForDnsForwardingConfigured — wait for .clusterset.local stub zone ─────
 WaitForDnsForwardingConfigured() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
@@ -464,6 +487,9 @@ eval "$(
 
 [[ -n "${KUBECONFIG}" && -r "${KUBECONFIG}" ]]
 
+# Hub enrollment is only required for hub↔spoke CCLM jobs.
+typeset enrollHub="${SUBMARINER_VERIFY_HUB_SPOKE:-false}"
+
 LoadSpokeConfig
 InstallSubctl
 
@@ -479,29 +505,37 @@ typeset -i submarinerStepRc=0
 
     EnsureBrokerNoGlobalnet || _brokerFailed=1
 
-    # Join hub first — its gateway was prepared by cloud-prepare using hub
-    # kubeconfig + ${SHARED_DIR}/metadata.json. Hub must be a Submariner
-    # participant for hub↔spoke pod-IP routing (CCLM sync port 8443).
-    JoinCluster "${KUBECONFIG}" "hub" || _brokerFailed=1
+    if [[ "${enrollHub}" == "true" ]]; then
+        # Join hub first — its gateway was prepared by cloud-prepare using hub
+        # kubeconfig + ${SHARED_DIR}/metadata.json. Hub must be a Submariner
+        # participant for hub↔spoke pod-IP routing (CCLM sync port 8443).
+        JoinCluster "${KUBECONFIG}" "hub" || _brokerFailed=1
+    fi
 
     for ((i = 0; i < spokeCount; i++)); do
         JoinCluster "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" || _brokerFailed=1
     done
 
-    WaitSubmarinerReady "${KUBECONFIG}" "hub" || _brokerFailed=1
+    if [[ "${enrollHub}" == "true" ]]; then
+        WaitSubmarinerReady "${KUBECONFIG}" "hub" || _brokerFailed=1
+    fi
 
     for ((i = 0; i < spokeCount; i++)); do
         WaitSubmarinerReady "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" || _brokerFailed=1
     done
 
-    WaitForDnsForwardingConfigured "${KUBECONFIG}" "hub" || _brokerFailed=1
+    if [[ "${enrollHub}" == "true" ]]; then
+        WaitForDnsForwardingConfigured "${KUBECONFIG}" "hub" || _brokerFailed=1
+    fi
 
     for ((i = 0; i < spokeCount; i++)); do
         WaitForDnsForwardingConfigured "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" \
             || _brokerFailed=1
     done
 
-    AssertNoGlobalnetSubnets "${KUBECONFIG}" "hub" || _brokerFailed=1
+    if [[ "${enrollHub}" == "true" ]]; then
+        AssertNoGlobalnetSubnets "${KUBECONFIG}" "hub" || _brokerFailed=1
+    fi
 
     for ((i = 0; i < spokeCount; i++)); do
         AssertNoGlobalnetSubnets \
@@ -510,19 +544,25 @@ typeset -i submarinerStepRc=0
             || _brokerFailed=1
     done
 
-    # Allow cross-cluster pod CIDRs → CNV namespace port 8443 on each cluster.
-    # OVN-K enforces NetworkPolicies at the pod interface; the CNV operator
-    # creates restrictive ingress rules in openshift-cnv that block cross-cluster
-    # pod IPs by default. This NetworkPolicy explicitly permits CCLM sync traffic.
-    # AllowCclmSyncIngress is best-effort — it logs a warning and continues if
-    # openshift-cnv does not yet exist or the apply fails; do not track its failures.
-    AllowCclmSyncIngress "${KUBECONFIG}" "hub"
-
+    # Restart routeagent on all joined clusters now that tunnels are confirmed
+    # connected and remote CIDRs are known.  This forces a fresh OVN routing-flow
+    # programming pass, fixing cases where the initial startup raced against
+    # tunnel establishment and left OVN entries incomplete (leading to pod-IP
+    # routing timeouts even though the gateway shows "connected").
+    if [[ "${enrollHub}" == "true" ]]; then
+        RestartRouteAgent "${KUBECONFIG}" "hub" || _brokerFailed=1
+    fi
     for ((i = 0; i < spokeCount; i++)); do
-        AllowCclmSyncIngress \
-            "${spokeKubeconfigsArr[i]}" \
-            "${spokeNamesArr[i]}"
+        RestartRouteAgent "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" \
+            || _brokerFailed=1
     done
+
+    # NOTE: AllowCclmSyncIngress (NetworkPolicy for CCLM sync ingress) is intentionally
+    # NOT called here.  At this point the IPsec tunnels are not yet established, so
+    # gateways.submariner.io has no connection entries and AllowCclmSyncIngress would
+    # silently skip (no remote CIDRs).  The call is made in the verify step AFTER
+    # WaitForConnectionsEstablished confirms all tunnels are connected and the gateway
+    # CRs contain full CIDR data.
 
     # LAST command: propagate any critical failure as the subshell exit code.
     (( _brokerFailed == 0 ))
