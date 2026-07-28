@@ -84,6 +84,15 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
     oc rollout restart deployment -n openshift-package-operator 2>/dev/null || true
     oc rollout status deployment -n openshift-package-operator --timeout=120s 2>/dev/null || true
     log "PKO restarted with CI pull secret"
+
+    # Add CI pull secret to the operator namespace so operator pods can pull
+    # CI-built images without waiting for MCO to propagate the global secret.
+    oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+    oc create secret docker-registry ci-pull-secret \
+        -n "${OPERATOR_NAMESPACE}" \
+        --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
+        --dry-run=client -o yaml | oc apply -f -
+    log "CI pull secret added to operator namespace ${OPERATOR_NAMESPACE}"
 else
     log "WARNING: Could not get CI registry credentials, PKO may fail to pull images"
 fi
@@ -220,12 +229,42 @@ for i in $(seq 1 30); do
     sleep 10
 done
 
-# Wait for the operator deployment to be available
+# Wait for the operator deployment to be available. During PKO
+# reconciliation the deployment can briefly vanish, so retry oc wait
+# on NotFound instead of failing immediately. Patch the SA with CI
+# pull secret on the first stable sighting of the deployment.
+SA_PATCHED=""
 log "Waiting for deployment ${OPERATOR_DEPLOYMENT_NAME} to be ready..."
-oc wait deployment "${OPERATOR_DEPLOYMENT_NAME}" \
-    -n "${OPERATOR_NAMESPACE}" \
-    --for=condition=Available \
-    --timeout=300s
+for attempt in $(seq 1 30); do
+    if ! oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+        sleep 10
+        continue
+    fi
+
+    if [[ -z "${SA_PATCHED}" ]] && oc get secret ci-pull-secret -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+        SA_NAME=$(oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" \
+            -o jsonpath='{.spec.template.spec.serviceAccountName}' 2>/dev/null || echo "${OPERATOR_NAME}")
+        if oc get sa "${SA_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+            oc patch sa "${SA_NAME}" -n "${OPERATOR_NAMESPACE}" \
+                --type json -p '[{"op":"add","path":"/imagePullSecrets/-","value":{"name":"ci-pull-secret"}}]' 2>/dev/null || true
+            log "CI pull secret added to ServiceAccount ${SA_NAME}"
+            oc delete pods -n "${OPERATOR_NAMESPACE}" -l app="${OPERATOR_DEPLOYMENT_NAME}" 2>/dev/null || true
+            SA_PATCHED=1
+        fi
+    fi
+
+    if oc wait deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" \
+        --for=condition=Available --timeout=30s 2>/dev/null; then
+        break
+    fi
+
+    if [[ ${attempt} -eq 30 ]]; then
+        log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} not ready after 5 minutes"
+        oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
+        oc get pods -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
+        exit 1
+    fi
+done
 
 log "${OPERATOR_NAME} installed and ready in ${OPERATOR_NAMESPACE}"
 
