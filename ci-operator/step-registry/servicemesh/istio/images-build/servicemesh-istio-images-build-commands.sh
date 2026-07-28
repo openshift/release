@@ -33,7 +33,7 @@ oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
   export KUBECONFIG=/work/ci-kubeconfig
   export BUILD_WITH_CONTAINER=\"0\"
   export ENABLE_OVERLAY2_STORAGE_DRIVER=true
-  export HUB=\"${QUAY_HUB}\"
+  export HUB=\"${TEST_HUB}\"
   export TAG=\"${TAG}\"
   export SKIP_TEST_RUN=\"true\"
   export ARTIFACT_DIR=\"${ARTIFACT_DIR}\"
