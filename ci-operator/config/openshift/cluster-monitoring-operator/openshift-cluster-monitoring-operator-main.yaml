@@ -3,6 +3,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -106,8 +110,15 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      ENABLE_USER_WORKLOAD_MONITORING: "true"
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-monitoring,openshift-user-workload-monitoring
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_REQUEST: 1Gi
       TELEMETRY_ENABLED: "true"
+      TLS_PROFILE_TYPE: Intermediate
     test:
+    - ref: tls-scanner-run
     - as: test
       cli: latest
       commands: make test-e2e
