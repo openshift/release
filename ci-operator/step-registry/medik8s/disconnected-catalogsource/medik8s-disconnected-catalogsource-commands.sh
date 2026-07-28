@@ -14,6 +14,12 @@ declare GIT_REF="${GIT_REF:-main}"
 declare FBC_COMMIT_SHA="${FBC_COMMIT_SHA:-}"
 # shellcheck disable=SC2034 # used by medik8s-lib.sh verify_fbc_image()
 declare FBC_SHA_PINNED="${FBC_COMMIT_SHA:+true}"
+if [[ ! -s "${SHARED_DIR}/workload_image" ]]; then
+    echo "ERROR: workload_image not found in SHARED_DIR." >&2
+    echo "Include the medik8s-lib ref before this step." >&2
+    exit 1
+fi
+WORKLOAD_IMAGE=$(sed 's/:[^/]*$//' "${SHARED_DIR}/workload_image")
 declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation}"
 
 collect_artifacts() {
@@ -133,6 +139,8 @@ mirror_catalog_and_operators() {
 apiVersion: mirror.openshift.io/v2alpha1
 kind: ImageSetConfiguration
 mirror:
+  additionalImages:
+  - name: ${WORKLOAD_IMAGE}:latest
   operators:
   - catalog: ${fbc_image}
     packages:
@@ -181,8 +189,8 @@ EOF
     log "Mirroring complete"
 }
 
-create_idms_disconnected() {
-    log "Creating IDMS for disconnected environment..."
+create_mirror_sets_disconnected() {
+    log "Creating image mirror sets for disconnected environment..."
 
     local idms_file="${TMP_DIR}/idms-source.yaml"
     if [[ ! -f "$idms_file" ]]; then
@@ -218,6 +226,25 @@ create_idms_disconnected() {
         log "ERROR: oc-mirror IDMS not found at ${ocmirror_idms}"
         exit 1
     fi
+
+    # Apply ITMS for test workload image (ubi-minimal). The test suite uses
+    # registry.access.redhat.com/ubi9/ubi-minimal as a lightweight workload pod
+    # for eviction verification. On disconnected clusters this registry is
+    # unreachable, so we mirror it (via additionalImages above) and create an
+    # ITMS to redirect pulls to the bastion mirror.
+    # Pattern from kueue-operator/disconnected/install (lines 140-155).
+    log "Applying ITMS for test workload image..."
+    oc apply -f - <<ITMS_EOF
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: medik8s-workload-image
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}/${WORKLOAD_IMAGE#*/}
+    source: ${WORKLOAD_IMAGE}
+ITMS_EOF
 
     # Resume MCPs — single consolidated rollout with only the correct IDMS.
     log "Resuming MCPs to trigger MCO rollout..."
@@ -303,7 +330,7 @@ main() {
     configure_host_pull_secret
     install_oc_mirror
     mirror_catalog_and_operators
-    create_idms_disconnected
+    create_mirror_sets_disconnected
     ensure_marketplace
     create_catalogsource
     # shellcheck disable=SC2034 # used by medik8s-lib.sh wait_for_catalogsource()
