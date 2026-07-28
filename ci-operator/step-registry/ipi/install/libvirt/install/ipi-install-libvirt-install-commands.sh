@@ -207,7 +207,7 @@ function ipi_extract_rpm_contents() {
 }
 
 function ipi_install_xsltproc_user_local_stream9() {
-	local arch xml_base xsl_base xml_html xsl_html base_html tmpd root xml_rpm xsl_rpm curl_bin wget_bin unpack_py label
+	local arch xml_base xsl_base xsl_html base_html tmpd root xml_rpm xsl_rpm curl_bin wget_bin unpack_py label
 	local xz_rpm gcrypt_rpm gpgerr_rpm
 	# libvirt-installer sets PATH=/bin; common tools live under /usr/bin.
 	export PATH="/usr/bin:/bin:${PATH:-}"
