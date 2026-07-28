@@ -1,0 +1,144 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+images:
+  skip_if_only_changed: .*
+  items:
+  - build_args:
+    - name: GIT_URL
+      value: https://github.com/k8snetworkplumbingwg/ptp-operator.git
+    - name: GIT_REF
+      value: main
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.25 AS builder
+      USER root
+      ARG GIT_URL=https://github.com/k8snetworkplumbingwg/ptp-operator.git
+      ARG GIT_REF=main
+      WORKDIR /go/src/github.com/k8snetworkplumbingwg/ptp-operator
+      RUN git clone --depth 1 --branch "${GIT_REF}" "${GIT_URL}" .
+      ENV CGO_ENABLED=0
+      RUN make
+
+      FROM quay.io/centos/centos:stream9
+      COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/build/_output/bin/ptp-operator /usr/local/bin/
+      COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/manifests /manifests
+      COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/bindata /bindata
+
+      LABEL io.k8s.display-name="OpenShift ptp-operator" \
+            io.k8s.description="This is a component that manages cluster PTP configuration." \
+            io.openshift.tags="openshift,ptp" \
+            com.redhat.delivery.appregistry=true \
+            maintainer="PTP Team <ptp-dev@redhat.com>"
+
+      ENTRYPOINT ["/usr/local/bin/ptp-operator"]
+    to: ptp-operator
+  - build_args:
+    - name: GIT_URL
+      value: https://github.com/k8snetworkplumbingwg/linuxptp-daemon.git
+    - name: GIT_REF
+      value: main
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.25 AS builder
+      USER root
+      ARG GIT_URL=https://github.com/k8snetworkplumbingwg/linuxptp-daemon.git
+      ARG GIT_REF=main
+      WORKDIR /go/src/github.com/k8snetworkplumbingwg/linuxptp-daemon
+      RUN git clone --depth 1 --branch "${GIT_REF}" "${GIT_URL}" .
+      RUN go mod download
+      ARG GIT_COMMIT=unknown
+      ENV GIT_COMMIT=${GIT_COMMIT}
+      RUN make
+
+      FROM quay.io/centos/centos:stream9
+
+      RUN yum -y update && yum -y update glibc && yum --setopt=skip_missing_names_on_install=False -y \
+        install \
+        pciutils \
+        linuxptp \
+        ethtool \
+        hwdata \
+        synce4l \
+        iproute \
+        procps-ng \
+        chrony \
+        gpsd-minimal \
+        gpsd-minimal-clients \
+        && yum clean all
+
+      RUN ln -s /usr/bin/gpspipe /usr/local/bin/gpspipe
+      RUN ln -s /usr/sbin/gpsd /usr/local/sbin/gpsd
+      RUN ln -s /usr/bin/ubxtool /usr/local/bin/ubxtool
+
+      COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/linuxptp-daemon/bin/ptp /usr/local/bin/
+
+      CMD ["/usr/local/bin/ptp"]
+    to: ptp
+  - build_args:
+    - name: GIT_URL
+      value: https://github.com/redhat-cne/cloud-event-proxy.git
+    - name: GIT_REF
+      value: main
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.0 AS builder
+      ARG GIT_URL=https://github.com/redhat-cne/cloud-event-proxy.git
+      ARG GIT_REF=main
+      ENV GO111MODULE=off
+      ENV CGO_ENABLED=1
+      ENV COMMON_GO_ARGS=-race
+      ENV GOOS=linux
+      ENV GOPATH=/go
+      WORKDIR /go/src/github.com/redhat-cne/cloud-event-proxy
+      RUN git clone --depth 1 --branch "${GIT_REF}" "${GIT_URL}" .
+      RUN hack/build-go.sh
+
+      FROM registry.ci.openshift.org/ocp/5.0:base-rhel9 AS bin
+      COPY --from=builder /go/src/github.com/redhat-cne/cloud-event-proxy/build/cloud-event-proxy /
+      COPY --from=builder /go/src/github.com/redhat-cne/cloud-event-proxy/plugins/*.so /plugins/
+
+      LABEL io.k8s.display-name="Cloud Event Proxy" \
+            io.k8s.description="This is a component of OpenShift Container Platform and provides a side car to handle cloud events." \
+            io.openshift.tags="openshift" \
+            maintainer="Aneesh Puttur <aputtur@redhat.com>"
+
+      ENTRYPOINT ["./cloud-event-proxy"]
+    to: cloud-event-proxy
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-telco5g-ptp-from-git
+  capabilities:
+  - intranet
+  optional: true
+  restrict_network_access: false
+  steps:
+    dependencies:
+      CLOUD_EVENT_PROXY_IMAGE: pipeline:cloud-event-proxy
+      PTP_DAEMON_IMAGE: pipeline:ptp
+      PTP_OPERATOR_IMAGE: pipeline:ptp-operator
+    env:
+      SKIP_OCP_INSTALL: "true"
+      T5CI_DEPLOY_UPSTREAM: "true"
+      T5CI_JOB_TYPE: ptp
+      T5CI_SIDECAR_FROM_CI: "true"
+      T5CI_VERSION: "5.0"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: telco5g-ptp
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: ptp-git-rehearse
