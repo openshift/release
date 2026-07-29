@@ -55,6 +55,20 @@ do
   mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" net-undefine "${NET}"
 done
 
+# Hybrid VPN IPI only: when LIBVIRT_POOL_NAME is set (openshift-e2e-libvirt-vpn-ipi*),
+# workers live as volumes in the shared pool (e.g. multiarch-ci-pool), not a per-lease pool.
+# Delete lease-prefixed volumes so rehearse/periodic reruns do not collide. Do not default
+# the pool name — that would touch shared pools from unrelated IPI jobs (e.g. ppc64le).
+if [[ -n "${LIBVIRT_POOL_NAME:-}" ]]; then
+  if mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" pool-list --all --name | grep -qx "${LIBVIRT_POOL_NAME}"; then
+    echo "Removing stale volumes for ${LEASED_RESOURCE} from shared pool ${LIBVIRT_POOL_NAME}..."
+    for VOLUME in $(mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" vol-list --pool "${LIBVIRT_POOL_NAME}" 2>/dev/null | awk '{print $1}' | grep -E "^${LEASED_RESOURCE}-" || true)
+    do
+      mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" vol-delete --pool "${LIBVIRT_POOL_NAME}" "${VOLUME}" || true
+    done
+  fi
+fi
+
 # Detect conflicts
 CONFLICTING_DOMAINS=$(mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" list --all --name | grep "${LEASED_RESOURCE}")
 CONFLICTING_POOLS=$(mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" pool-list --all --name | grep "${LEASED_RESOURCE}")

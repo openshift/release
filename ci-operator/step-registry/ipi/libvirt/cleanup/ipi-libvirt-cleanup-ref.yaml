@@ -3,6 +3,12 @@ ref:
   from: libvirt-installer
   grace_period: 10m
   commands: ipi-libvirt-cleanup-commands.sh
+  env:
+  - name: LIBVIRT_POOL_NAME
+    default: ""
+    documentation: |-
+      When set (VPN hybrid IPI workflows), also delete ${LEASED_RESOURCE}-* volumes from this
+      shared pool. Leave empty for default IPI (per-lease pools only; no shared-pool wipe).
   resources:
     requests:
       cpu: 1000m
@@ -16,4 +22,5 @@ ref:
   documentation: |-
     A libvirt specific cleanup step that assumes the lease information will be sufficient to lookup the
     libvirt daemon connection string and that all associated resources will have the lease embedded in
-    their name.
+    their name. When LIBVIRT_POOL_NAME is set, also removes lease-prefixed volumes from that shared pool
+    (used by openshift-e2e-libvirt-vpn-ipi virsh workers).
