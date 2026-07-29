@@ -1,0 +1,61 @@
+ref:
+  as: sandboxed-containers-operator-install-osc-operator
+  from_image:
+    name: rhdh-e2e-runner
+    namespace: ci
+    tag: main
+  grace_period: 10m
+  commands: sandboxed-containers-operator-install-osc-operator-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2000Mi
+  env:
+  - name: OSC_INSTALL
+    default: "false"
+    documentation: |-
+      Whether to install the OSC operator. Set to "true" to enable installation.
+      If not true, the step is skipped and no further actions are taken.
+  - name: OSC_CHARTS_REPO
+    default: "https://github.com/confidential-devhub/charts.git"
+    documentation: |-
+      The git repository URL for OSC Helm charts.
+  - name: OSC_CHARTS_REF
+    default: "main"
+    documentation: |-
+      The git ref (branch/tag/commit) to use from the charts repository.
+  - name: OSC_CATALOG_SOURCE_IMAGE
+    default: ""
+    documentation: |-
+      The container image for a custom OSC operator CatalogSource.
+      If empty (default), uses existing "redhat-operators" catalog.
+      If set, helm chart creates a new CatalogSource named "osc-operator-dev-catalog" with this image.
+  - name: ENABLEPEERPODS
+    default: "false"
+    documentation: |-
+      When "true", enables peer-pods in KataConfig and creates peer-pods-cm
+      ConfigMap with cloud provider configuration. Reads cloud parameters from
+      peerpods-param-cm in the default namespace (created by the peerpods-param-cm step).
+  - name: WORKLOAD_TO_TEST
+    default: "kata"
+    documentation: |-
+      Selects the workload type to configure. Supported values: "kata", "peer-pods", "coco".
+      When "coco", sets confidential mode in feature gates.
+  - name: OSC_NAMESPACE
+    default: "openshift-sandboxed-containers-operator"
+    documentation: |-
+      The namespace where the OSC operator will be installed.
+  documentation: |-
+    If OSC_INSTALL=true, installs the OSC operator and configures the cluster for
+    the target workload (kata, peer-pods, or coco) using Helm charts from OSC_CHARTS_REPO.
+    If OSC_INSTALL=false, the step is skipped and no further actions are taken.
+
+    Charts are cloned from OSC_CHARTS_REPO. Phase 1 installs the operator (namespace,
+    operatorgroup, subscription, optional dev catalog). Phase 2 installs operands
+    (KataConfig, feature gates, peer-pods-cm) and waits for KataConfig readiness.
+
+    For peer-pods and coco workloads, reads cloud config from peerpods-param-cm and
+    creates peer-pods-secret in the operator namespace. For coco, enables confidential
+    mode in osc-feature-gates.
+
+    When complete, patches osc-config ConfigMap so tests can detect the pre-installed operator.
