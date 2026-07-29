@@ -41,16 +41,13 @@ for case_name in "${CASE_LIST[@]}"; do
     BASE_BRANCH=$(yaml_val base_branch "${INPUT_FILE}")
     EXPECTED_BRANCH=$(yaml_val expected_branch "${INPUT_FILE}")
 
-    CASE_SHARED="${SHARED_DIR}/cases/${case_name}"
-    mkdir -p "${CASE_SHARED}"
+    echo "${JIRA_ISSUE_KEY}" > "${SHARED_DIR}/${case_name}.jira-issue-key"
+    cp "${CASE_SRC}/jira-issue.json" "${SHARED_DIR}/${case_name}.jira-issue.json"
+    echo "${BASE_BRANCH}" > "${SHARED_DIR}/${case_name}.eval-base-branch"
+    echo "${EXPECTED_BRANCH}" > "${SHARED_DIR}/${case_name}.eval-expected-branch"
+    echo "${case_name}" > "${SHARED_DIR}/${case_name}.eval-case"
 
-    echo "${JIRA_ISSUE_KEY}" > "${CASE_SHARED}/jira-issue-key"
-    cp "${CASE_SRC}/jira-issue.json" "${CASE_SHARED}/jira-issue.json"
-    echo "${BASE_BRANCH}" > "${CASE_SHARED}/eval-base-branch"
-    echo "${EXPECTED_BRANCH}" > "${CASE_SHARED}/eval-expected-branch"
-    echo "${case_name}" > "${CASE_SHARED}/eval-case"
-
-    SUMMARY=$(jq -r '.fields.summary // .summary // "N/A"' "${CASE_SHARED}/jira-issue.json")
+    SUMMARY=$(jq -r '.fields.summary // .summary // "N/A"' "${SHARED_DIR}/${case_name}.jira-issue.json")
     echo "  ${case_name}: ${JIRA_ISSUE_KEY} - ${SUMMARY}"
 done
 

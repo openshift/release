@@ -25,11 +25,9 @@ mapfile -t CASE_LIST < "${SHARED_DIR}/eval-cases"
 echo "Cleaning up ${#CASE_LIST[@]} cases..."
 
 for case_name in "${CASE_LIST[@]}"; do
-    CASE_SHARED="${SHARED_DIR}/cases/${case_name}"
-
     PR_NUM=""
-    if [[ -f "${CASE_SHARED}/pr-number" ]]; then
-        PR_NUM=$(cat "${CASE_SHARED}/pr-number")
+    if [[ -f "${SHARED_DIR}/${case_name}.pr-number" ]]; then
+        PR_NUM=$(cat "${SHARED_DIR}/${case_name}.pr-number")
     fi
 
     if [[ -n "${PR_NUM}" ]]; then
@@ -37,8 +35,8 @@ for case_name in "${CASE_LIST[@]}"; do
         gh pr close "${PR_NUM}" --repo "${UPSTREAM_REPO}" --delete-branch 2>/dev/null || true
     else
         CLAUDE_BRANCH=""
-        if [[ -f "${CASE_SHARED}/claude-branch" ]]; then
-            CLAUDE_BRANCH=$(cat "${CASE_SHARED}/claude-branch")
+        if [[ -f "${SHARED_DIR}/${case_name}.claude-branch" ]]; then
+            CLAUDE_BRANCH=$(cat "${SHARED_DIR}/${case_name}.claude-branch")
         fi
         if [[ -n "${CLAUDE_BRANCH}" ]]; then
             echo "[${case_name}] No PR found, deleting branch ${CLAUDE_BRANCH}..."

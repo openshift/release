@@ -49,12 +49,10 @@ for case_name in "${CASE_LIST[@]}"; do
     echo "Judging: ${case_name}"
     echo "=========================================="
 
-    CASE_SHARED="${SHARED_DIR}/cases/${case_name}"
-
-    EVAL_CASE=$(cat "${CASE_SHARED}/eval-case")
-    BASE_BRANCH=$(cat "${CASE_SHARED}/eval-base-branch")
-    EXPECTED_BRANCH=$(cat "${CASE_SHARED}/eval-expected-branch")
-    JIRA_ISSUE_KEY=$(cat "${CASE_SHARED}/jira-issue-key")
+    EVAL_CASE=$(cat "${SHARED_DIR}/${case_name}.eval-case")
+    BASE_BRANCH=$(cat "${SHARED_DIR}/${case_name}.eval-base-branch")
+    EXPECTED_BRANCH=$(cat "${SHARED_DIR}/${case_name}.eval-expected-branch")
+    JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/${case_name}.jira-issue-key")
 
     echo "  JIRA: ${JIRA_ISSUE_KEY} | Base: ${BASE_BRANCH} | Expected: ${EXPECTED_BRANCH}"
 
@@ -65,8 +63,8 @@ for case_name in "${CASE_LIST[@]}"; do
 
     # Check out Claude's branch
     CLAUDE_BRANCH=""
-    if [[ -f "${CASE_SHARED}/claude-branch" ]]; then
-        CLAUDE_BRANCH=$(cat "${CASE_SHARED}/claude-branch")
+    if [[ -f "${SHARED_DIR}/${case_name}.claude-branch" ]]; then
+        CLAUDE_BRANCH=$(cat "${SHARED_DIR}/${case_name}.claude-branch")
         git fetch origin "${CLAUDE_BRANCH}"
         git checkout "${CLAUDE_BRANCH}"
     fi
@@ -131,8 +129,8 @@ for case_name in "${CASE_LIST[@]}"; do
 
     # pr_created
     PR_NUM=""
-    if [[ -f "${CASE_SHARED}/pr-number" ]]; then
-        PR_NUM=$(cat "${CASE_SHARED}/pr-number")
+    if [[ -f "${SHARED_DIR}/${case_name}.pr-number" ]]; then
+        PR_NUM=$(cat "${SHARED_DIR}/${case_name}.pr-number")
     fi
     if [[ -n "${PR_NUM}" ]]; then
         record_check "pr_created" "pass"
@@ -149,7 +147,7 @@ for case_name in "${CASE_LIST[@]}"; do
     fi
 
     # pr_description_exists
-    if [[ -s "${CASE_SHARED}/pr-description.md" ]]; then
+    if [[ -s "${SHARED_DIR}/${case_name}.pr-description.md" ]]; then
         record_check "pr_description_exists" "pass"
     else
         record_check "pr_description_exists" "fail"

@@ -61,23 +61,34 @@ mkdir -p "${RESULTS_DIR}"
 RUNNING=0
 
 for case_name in "${CASE_LIST[@]}"; do
-    CASE_SHARED="${REAL_SHARED_DIR}/cases/${case_name}"
     CASE_WORKDIR="/workspace/${case_name}"
-    BASE_BRANCH=$(cat "${CASE_SHARED}/eval-base-branch")
+    BASE_BRANCH=$(cat "${REAL_SHARED_DIR}/${case_name}.eval-base-branch")
 
     (
+        # Build a per-case SHARED_DIR with standard filenames
+        CASE_SHARED=$(mktemp -d)
+        for f in jira-issue-key jira-issue.json eval-base-branch eval-expected-branch eval-case; do
+            cp "${REAL_SHARED_DIR}/${case_name}.${f}" "${CASE_SHARED}/${f}"
+        done
+        cp "${REAL_SHARED_DIR}/gh-fork-token" "${CASE_SHARED}/"
+        cp "${REAL_SHARED_DIR}/gh-upstream-token" "${CASE_SHARED}/"
+
         cp -r "${TEMPLATE_DIR}" "${CASE_WORKDIR}"
         cd "${CASE_WORKDIR}"
         git fetch origin "${BASE_BRANCH}"
         git checkout "${BASE_BRANCH}"
 
-        cp "${REAL_SHARED_DIR}/gh-fork-token" "${CASE_SHARED}/"
-        cp "${REAL_SHARED_DIR}/gh-upstream-token" "${CASE_SHARED}/"
-
         export SHARED_DIR="${CASE_SHARED}"
         export WORKDIR="${CASE_WORKDIR}"
         export SKIP_SHARED_SETUP=true
         /opt/scripts/solve.sh
+
+        # Copy outputs back as flat files for judge/cleanup
+        for f in claude-branch pr-number pr-description.md; do
+            if [[ -f "${CASE_SHARED}/${f}" ]]; then
+                cp "${CASE_SHARED}/${f}" "${REAL_SHARED_DIR}/${case_name}.${f}"
+            fi
+        done
 
         echo "pass" > "${RESULTS_DIR}/${case_name}"
     ) > "${ARTIFACT_DIR}/solve-${case_name}.log" 2>&1 &
