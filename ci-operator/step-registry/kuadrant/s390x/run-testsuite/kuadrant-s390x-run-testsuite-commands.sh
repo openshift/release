@@ -124,7 +124,38 @@ echo "=== Testsuite Configuration (for debugging backend deployment) ==="
 cat "${SECRETS_FILE}" | sed -e "s/${KEYCLOAK_ADMIN_PASSWORD}/REDACTED/g" | tee "${ARTIFACT_DIR}/testsuite-config.yaml"
 
 # ---------------------------------------------------------------------------
-# 2. getaddrinfo plugin → mounted into the Job as a ConfigMap
+# 2a. Velocity MockServer expectations (s390x workaround for testsuite#952)
+#     Mounted into the Job and copied over the upstream JAVASCRIPT file before
+#     make smoke. Proven on rhcl-mc1 with mockserver-s390x-fixed-v10.
+# ---------------------------------------------------------------------------
+ECHO_EXPECTATION_FILE="${WORK_DIR}/echo_expectation.json"
+cat > "${ECHO_EXPECTATION_FILE}" <<'EOF'
+[
+  {
+    "id": "not-found",
+    "httpRequest": {
+      "path": "/unknown-endpoint"
+    },
+    "httpResponse": {
+      "statusCode": 404
+    }
+  },
+  {
+    "id": "echo",
+    "httpRequest": {
+      "path": "/.*"
+    },
+    "httpResponseTemplate": {
+      "templateType": "VELOCITY",
+      "template": "{\"statusCode\": 200, \"headers\": {\"content-type\": [\"application/json\"]}, \"body\": \"{\\\"headers\\\": {}, \\\"method\\\": \\\"$request.method\\\", \\\"url\\\": \\\"$request.path\\\"}\"}"
+    },
+    "priority": -10
+  }
+]
+EOF
+
+# ---------------------------------------------------------------------------
+# 2b. getaddrinfo plugin → mounted into the Job as a ConfigMap
 #    Redirects only *.COREDNS_ZONE lookups to CoreDNS ClusterIP:53.
 # ---------------------------------------------------------------------------
 PLUGIN_FILE="${WORK_DIR}/kuadrant_coredns_resolve.py"
@@ -413,11 +444,17 @@ CONTAINER_SCRIPT="set -o pipefail
 cd /opt/workdir/kuadrant-testsuite
 rc=0
 echo '=== Pinning protobuf==${PROTOBUF_PIN} for s390x (avoid broken upb ≥6.33.0) ==='
-# testsuite deps live in Poetry group "main" (see Dockerfile.s390x).
+# testsuite deps live in Poetry group \"main\" (see Dockerfile.s390x).
 if ! poetry add --group main --no-interaction 'protobuf==${PROTOBUF_PIN}'; then
   poetry add --no-interaction 'protobuf==${PROTOBUF_PIN}'
 fi
 poetry run python -c \"from importlib.metadata import version; print('protobuf', version('protobuf'))\"
+
+# s390x workaround for Kuadrant/testsuite#952 (JAVASCRIPT/GraalJS → Velocity).
+# File is mounted from ConfigMap kuadrant-testrunner-hook (see step prep below).
+echo '=== s390x workaround: install Velocity MockServer echo expectations ==='
+cp -f /kuadrant-hook/echo_expectation.json testsuite/resources/echo_expectation.json
+grep -n templateType testsuite/resources/echo_expectation.json || true
 
 echo '=== Testsuite configuration verification ==='
 poetry run python -c \"
@@ -473,10 +510,12 @@ oc -n "${TEST_RUNNER_NAMESPACE}" create secret generic kuadrant-testrunner-confi
   --from-file=kubeconfig="${SHARED_DIR}/kubeconfig" \
   --dry-run=client -o yaml | oc apply -f -
 
-# ConfigMap: pytest plugins (DNS resolver + diagnostics logger).
+# ConfigMap: pytest plugins (DNS resolver + diagnostics logger) + Velocity
+# MockServer expectations (s390x workaround for Kuadrant/testsuite#952).
 oc -n "${TEST_RUNNER_NAMESPACE}" create configmap kuadrant-testrunner-hook \
   --from-file=kuadrant_coredns_resolve.py="${PLUGIN_FILE}" \
   --from-file=kuadrant_debug_logger.py="${DIAGNOSTICS_PLUGIN}" \
+  --from-file=echo_expectation.json="${ECHO_EXPECTATION_FILE}" \
   --dry-run=client -o yaml | oc apply -f -
 
 JOB_FILE="${WORK_DIR}/job.yaml"
