@@ -85,9 +85,14 @@ export HYPERFLEET_IDENTITY_EXPECTEDIDENTITY="system:serviceaccount:${NAMESPACE}:
 
 export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_CREDENTIALS_PATH}/hcm-hyperfleet-e2e.json"
 
+# Copy test binary to writable working directory so ginkgo workers inherit
+# a writable CWD (ginkgo sets each worker's CWD to the binary's parent dir)
+cp "${E2E_TEST_BIN}" ./e2e.test
+E2E_TEST_BIN="./e2e.test"
+
 # Run e2e tests via ginkgo CLI with parallel execution
 "${GINKGO_BIN}" \
-  --procs="${PROCS:-4}" \
+  --procs="${PROCS:-8}" \
   --timeout="${SUITE_TIMEOUT:-2h}" \
   --label-filter="${LABEL_FILTER}" \
   --flake-attempts="${FLAKE_ATTEMPTS:-2}" \
