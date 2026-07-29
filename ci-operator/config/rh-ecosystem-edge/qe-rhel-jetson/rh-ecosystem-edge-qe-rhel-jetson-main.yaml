@@ -17,10 +17,9 @@ images:
       RUN dnf install -y git && \
           ln -sf /usr/bin/python3.12 /usr/bin/python && \
           ln -sf /usr/bin/pip3.12 /usr/bin/pip && \
-          pip install --no-cache-dir ruff pytest PyYAML requests paramiko fabric jumpstarter && \
+          pip install --no-cache-dir ruff pytest PyYAML requests paramiko fabric && \
           dnf clean all
       COPY --from=source /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson/beaker/ansible /opt/qe-rhel-jetson-ansible
-      COPY --from=source /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson/jumpstarter /opt/qe-rhel-jetson-jumpstarter
       COPY --from=source /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson /workspace
       WORKDIR /workspace
     from: ubi-python
@@ -52,6 +51,9 @@ tests:
   restrict_network_access: false
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
+    env:
+      JETSON_HOSTNAME: nvidia-jetson-agx-orin-03.khw.eng.bos2.dc.redhat.com
+      JUMPHOST: ""
     test:
     - ref: rh-ecosystem-edge-qe-rhel-jetson-pytest
 - as: bootc-install
@@ -67,18 +69,6 @@ tests:
       BOOTC_IMAGE_TAG: 7.2_6.12.0-211.20.1_062526071550
     test:
     - ref: rh-ecosystem-edge-qe-rhel-jetson-bootc-install
-- as: jumpstarter-tests
-  capabilities:
-  - intranet
-  cluster: build07
-  optional: true
-  restrict_network_access: false
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    env:
-      JUMPSTARTER_DEVICE_NAME: nvidia-jetson-nx-orin-01
-    test:
-    - ref: rh-ecosystem-edge-qe-rhel-jetson-jumpstarter-test
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
