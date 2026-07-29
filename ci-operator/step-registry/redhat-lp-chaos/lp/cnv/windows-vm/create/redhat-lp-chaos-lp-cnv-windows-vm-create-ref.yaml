@@ -1,0 +1,33 @@
+ref:
+  as: redhat-lp-chaos-lp-cnv-windows-vm-create
+  from_image:
+    namespace: ci
+    name: benchmark-runner
+    tag: latest
+  commands: redhat-lp-chaos-lp-cnv-windows-vm-create-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: lp-chaos--vm-img--windows
+    mount_path: /var/run/secrets/vm-img--windows
+  env:
+  - name: WORKLOAD
+    default: windows_vm
+    documentation: Benchmark workload to run. Must be windows_vm for this step.
+  - name: SCALE
+    default: "1"
+    documentation: Number of VMs to create.
+  - name: WINDOWS_IMAGE
+    default: windows11
+    documentation: Windows image type (windows11, windows_server_2019, windows_server_2022, windows_server_2025). Used to label the VM.
+  grace_period: 30s
+  timeout: 2h0m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: >-
+    Creates a Windows VM in the benchmark-runner namespace using the benchmark-runner
+    container image. Accesses the cluster via $KUBECONFIG from $SHARED_DIR (set by
+    the IPI installer), making it compatible with dynamically provisioned AWS clusters.
+    The step sets CREATE_VMS_ONLY=True so benchmark-runner creates the VM and exits without
+    running a benchmark workload. The VM is left running for downstream chaos steps.
