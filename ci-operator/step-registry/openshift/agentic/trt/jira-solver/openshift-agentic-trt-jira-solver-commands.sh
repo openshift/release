@@ -38,31 +38,35 @@ if [[ ! -d .git ]]; then
 fi
 git config user.name "openshift-trt"
 git config user.email "openshift-trt@redhat.com"
-git remote add fork "https://github.com/${FORK_REPO}.git"
+git remote add fork "https://github.com/${FORK_REPO}.git" 2>/dev/null || true
 
-echo "Running setup script: ${SETUP_SCRIPT}..."
-# shellcheck source=/dev/null
-source "${WORKDIR}/${SETUP_SCRIPT}"
+if [[ "${SKIP_SHARED_SETUP:-}" != "true" ]]; then
+    echo "Running setup script: ${SETUP_SCRIPT}..."
+    # shellcheck source=/dev/null
+    source "${WORKDIR}/${SETUP_SCRIPT}"
 
-echo "Installing Claude Code..."
-curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
-export PATH="${HOME}/.local/bin:${PATH}"
+    echo "Installing Claude Code..."
+    curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
+    export PATH="${HOME}/.local/bin:${PATH}"
+fi
 
 mkdir -p "${WORKDIR}/artifacts"
 
-copy_artifacts() {
-    echo "Copying artifacts..."
-    cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
-    podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
-    if [[ -d "${HOME}/.claude/projects" ]]; then
-        echo "Archiving Claude session logs..."
-        tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
-    fi
-}
-trap copy_artifacts EXIT TERM INT
+if [[ "${SKIP_SHARED_SETUP:-}" != "true" ]]; then
+    copy_artifacts() {
+        echo "Copying artifacts..."
+        cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
+        podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
+        if [[ -d "${HOME}/.claude/projects" ]]; then
+            echo "Archiving Claude session logs..."
+            tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
+        fi
+    }
+    trap copy_artifacts EXIT TERM INT
+fi
 
 # --- Assemble prompt: generic base + repo-specific config ---
-SOLVE_PROMPT="/tmp/agentic-solve-prompt.md"
+SOLVE_PROMPT="/tmp/agentic-solve-prompt-$(basename "${WORKDIR}").md"
 cat > "${SOLVE_PROMPT}" <<'SOLVE_BASE_EOF'
 # Solve Jira Issue
 
