@@ -81,8 +81,15 @@ LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 
 # True when BRANCH is 4.16 or newer (used to gate APIs introduced in 4.16).
+# Non-numeric values (main/master) are treated as older than 4.16 with a warning,
+# not coerced to 0.0 via awk. Optional "release-" prefix is stripped.
 branch_at_least_4_16() {
-  local branch="${BRANCH:-0.0}"
+  local branch="${BRANCH:-}"
+  branch="${branch#release-}"
+  if [[ -z "${branch}" || ! "${branch}" =~ ^[0-9]+(\.[0-9]+)*([.-].*)?$ ]]; then
+    echo "WARNING: BRANCH='${BRANCH:-unset}' is not a numeric OCP version; treating as older than 4.16 for API gates" >&2
+    return 1
+  fi
   echo "${branch}" | awk -F. '{
     major=$1+0; minor=$2+0;
     if (major > 4 || (major == 4 && minor >= 16)) exit 0;
@@ -90,15 +97,20 @@ branch_at_least_4_16() {
   }'
 }
 
+# Set when ensure_rhcos_resized successfully resized locally with qemu-img.
+RHCOS_RESIZED_LOCALLY=false
+
 # Resize RHCOS qcow before upload. ocp/4.15:libvirt-installer often lacks qemu-img;
 # do not dnf-install it (prior attempts failed on missing libaio deps). Caller falls
 # back to virsh vol-resize on the hypervisor after upload when needed.
 ensure_rhcos_resized() {
   local image_path=$1
   local capacity=$2
+  RHCOS_RESIZED_LOCALLY=false
   if command -v qemu-img >/dev/null 2>&1; then
     echo "Resizing rhcos image with qemu-img to ${capacity}..."
     qemu-img resize "${image_path}" "${capacity}"
+    RHCOS_RESIZED_LOCALLY=true
     return 0
   fi
   echo "WARNING: qemu-img unavailable; uploading image as-is (will virsh vol-resize to ${capacity})"
@@ -371,7 +383,13 @@ else
       ${INSTALL_DIR}/${VOLUME_NAME}
 
     # If local qemu-img was unavailable, expand the uploaded volume on the hypervisor.
-    ${VIRSH} vol-resize --pool "${POOL_NAME}" "${VOLUME_NAME}" "${VOLUME_CAPACITY}" || true
+    # This is the only resize path in that case — fail loudly rather than proceed undersized.
+    if [[ "${RHCOS_RESIZED_LOCALLY}" != "true" ]]; then
+      if ! ${VIRSH} vol-resize --pool "${POOL_NAME}" "${VOLUME_NAME}" "${VOLUME_CAPACITY}"; then
+        echo "ERROR: virsh vol-resize failed for ${VOLUME_NAME}; cannot reach capacity ${VOLUME_CAPACITY} without qemu-img" >&2
+        exit 1
+      fi
+    fi
   fi
 
   # Generate manifests for cluster modifications
@@ -564,17 +582,17 @@ create_node () {
     # ocp/4.15:libvirt-installer does not; use ACPI-free virsh define/start instead.
     if command -v virt-install >/dev/null 2>&1; then
       virt-install \
-        --connect ${LIBVIRT_CONNECTION} \
-        --name ${NAME} \
-        --memory ${DOMAIN_MEMORY} \
-        --vcpus ${DOMAIN_VCPUS} \
-        --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
+        --connect "${LIBVIRT_CONNECTION}" \
+        --name "${NAME}" \
+        --memory "${DOMAIN_MEMORY}" \
+        --vcpus "${DOMAIN_VCPUS}" \
+        --network "network=${CLUSTER_NAME},mac=${MAC_ADDRESS}" \
         --disk="vol=${POOL_NAME}/${NAME}-volume" \
-        --osinfo ${VIRT_INSTALL_OSINFO} \
+        --osinfo "${VIRT_INSTALL_OSINFO}" \
         --graphics=none \
         --import \
         --noautoconsole \
-        --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+        --disk "vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional"
     else
       echo "virt-install not found; defining ${NAME} with virsh (≤4.15 libvirt-installer fallback, no ACPI)"
       DOMAIN_XML="${INSTALL_DIR}/${NAME}.xml"
