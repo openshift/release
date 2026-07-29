@@ -133,6 +133,28 @@ main() {
     echo "${CATALOG_IMAGE}" > "${SHARED_DIR}/catalog_image"
     if [[ "$CATALOG_MODE" != "direct" ]]; then
         echo "${FBC_COMMIT_SHA}" > "${SHARED_DIR}/rhwa_fbc_commit_sha"
+
+        local snapshot_name=""
+        local fbc_repo="${QUAY_REPO_PATH}/${FBC_IMAGE_PREFIX}-${OCP_VERSION}"
+        local tag_url="https://quay.io/api/v1/repository/${fbc_repo}/tag/?specificTag=${FBC_COMMIT_SHA}"
+        local tag_json
+        tag_json=$(curl -sSf --max-time 10 "$tag_url") || true
+        if [[ -n "$tag_json" ]]; then
+            local start_ts
+            start_ts=$(echo "$tag_json" | jq -r '.tags[0].start_ts // empty') || true
+            if [[ -n "$start_ts" && "$start_ts" != "null" ]]; then
+                local snap_date
+                snap_date=$(date -u -d "@${start_ts}" '+%Y%m%d-%H%M%S') || true
+                if [[ -n "$snap_date" ]]; then
+                    snapshot_name="${FBC_IMAGE_PREFIX}-${OCP_VERSION}-${snap_date}-000"
+                    log "Resolved Konflux snapshot name (approximate): ${snapshot_name}"
+                fi
+            fi
+        fi
+        if [[ -z "$snapshot_name" ]]; then
+            log "Could not resolve Konflux snapshot name from Quay tag timestamp"
+        fi
+        echo "${snapshot_name}" > "${SHARED_DIR}/rhwa_fbc_snapshot_name"
         log "=== Done. Commit SHA exported to \${SHARED_DIR}/rhwa_fbc_commit_sha ==="
     else
         log "=== Done. CatalogSource ${CATALOG_SOURCE_NAME} is READY ==="
