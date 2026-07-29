@@ -52,32 +52,27 @@ if [[ "$HOSTED_CP" == "true" ]]; then
    CLUSTER_SWITCH="--hosted-cp"
 fi
 
-# Support to create the account-roles with the higher version
+# Resolve the OpenShift version for account roles
 VERSION_SWITCH=""
-if [[ "$CHANNEL_GROUP" != "stable" ]]; then
-  # Get the X.Y from the release payload pullspec if we're using the one from CI
-  if [[ "$OPENSHIFT_VERSION" == "release:latest" ]]; then
-    if [[ -n "${ORIGINAL_RELEASE_IMAGE_LATEST:-}" ]]; then
-      OPENSHIFT_VERSION=$(echo "$ORIGINAL_RELEASE_IMAGE_LATEST" | sed -E 's/.*:([0-9]+\.[0-9]+).*/\1/')
-    fi
+
+# Get the X.Y from the release payload pullspec if we're using the one from CI
+if [[ "$OPENSHIFT_VERSION" == "release:latest" ]]; then
+  if [[ -n "${ORIGINAL_RELEASE_IMAGE_LATEST:-}" ]]; then
+    OPENSHIFT_VERSION=$(echo "$ORIGINAL_RELEASE_IMAGE_LATEST" | sed -E 's/.*:([0-9]+\.[0-9]+).*/\1/')
   fi
+fi
 
-  if [[ -z "$OPENSHIFT_VERSION" ]]; then
-    versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
-    if [[ "$HOSTED_CP" == "true" ]]; then
-      versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
-    fi
-    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
-  fi
-
-  OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
-
-  # Determine cluster type switch early so the version fallback can use it
-  CLUSTER_SWITCH="--classic"
+if [[ -z "$OPENSHIFT_VERSION" ]]; then
   if [[ "$HOSTED_CP" == "true" ]]; then
-    CLUSTER_SWITCH="--hosted-cp"
+    versionList=$(rosa list versions --channel-group "${CHANNEL_GROUP}" --hosted-cp -o json | jq -r '.[].raw_id')
+  else
+    versionList=$(rosa list versions --channel-group "${CHANNEL_GROUP}" -o json | jq -r '.[].raw_id')
   fi
+  OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
+fi
 
+if [[ -n "$OPENSHIFT_VERSION" ]]; then
+  OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
   VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
 fi
 
@@ -135,7 +130,7 @@ elif [[ "${create_ret}" -ne 0 ]]; then
 fi
 
 # Share the resolved version (includes fallback if one was used)
-if [[ "${CHANNEL_GROUP}" != "stable" && -n "${OPENSHIFT_VERSION:-}" ]]; then
+if [[ -n "${OPENSHIFT_VERSION:-}" ]]; then
   echo -n "${OPENSHIFT_VERSION}" > "${SHARED_DIR}/openshift_version"
   echo "Stored resolved version ${OPENSHIFT_VERSION} to SHARED_DIR"
 fi
