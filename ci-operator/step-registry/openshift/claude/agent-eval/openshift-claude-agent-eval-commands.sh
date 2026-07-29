@@ -104,6 +104,15 @@ else
 fi
 
 # -----------------------------------------------------------------------
+# Install plugins
+# -----------------------------------------------------------------------
+echo ""
+echo "=== Installing plugins ==="
+EVAL_HARNESS_DIR="/tmp/agent-eval-harness"
+git clone --depth 1 https://github.com/opendatahub-io/agent-eval-harness.git "${EVAL_HARNESS_DIR}"
+echo "agent-eval-harness cloned."
+
+# -----------------------------------------------------------------------
 # Run optional setup script (e.g. extract snapshots, populate fixtures)
 # -----------------------------------------------------------------------
 if [[ -n "${EVAL_SETUP_SCRIPT}" ]]; then
@@ -117,15 +126,6 @@ if [[ -n "${EVAL_SETUP_SCRIPT}" ]]; then
     export EVAL_SNAPSHOT_DIR
     echo "Snapshot dir: ${EVAL_SNAPSHOT_DIR}"
 fi
-
-# -----------------------------------------------------------------------
-# Install plugins
-# -----------------------------------------------------------------------
-echo ""
-echo "=== Installing plugins ==="
-EVAL_HARNESS_DIR="/tmp/agent-eval-harness"
-git clone --depth 1 https://github.com/opendatahub-io/agent-eval-harness.git "${EVAL_HARNESS_DIR}"
-echo "agent-eval-harness cloned."
 
 # -----------------------------------------------------------------------
 # Artifact copy trap
