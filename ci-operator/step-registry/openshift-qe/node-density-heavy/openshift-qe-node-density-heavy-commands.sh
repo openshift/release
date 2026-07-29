@@ -26,6 +26,8 @@ oc projects
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
+UUID=$(uuidgen)
+
 GSHEET_KEY_LOCATION="/ga-gsheet/gcp-sa-account"
 export GSHEET_KEY_LOCATION
 
@@ -54,7 +56,7 @@ if [[ -n "${USER_METADATA}" ]]; then
   echo "${USER_METADATA}" > user-metadata.yaml
   EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
 fi
-export EXTRA_FLAGS
+export EXTRA_FLAGS UUID
 export ADDITIONAL_PARAMS
 
 set +o errexit
@@ -62,9 +64,9 @@ set +o errexit
 RUN_EXIT_CODE=$?
 set -o errexit
 
-if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
-    metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
-    cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
+METRICS_FOLDER="collected-metrics-${UUID}"
+if [[ -d ${METRICS_FOLDER} ]]; then
+  cp -r ${METRICS_FOLDER} "${ARTIFACT_DIR}/"
 fi
 
 #node-density-heavy test
