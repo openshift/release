@@ -6,9 +6,13 @@ set -o pipefail
 set -x
 
 install_jq() {
-  local jq_version
-  jq_version=$(curl -s https://api.github.com/repos/jqlang/jq/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
-  curl -sSfL "https://github.com/jqlang/jq/releases/download/${jq_version}/jq-linux-amd64" -o /tmp/jq
+  # Pin version + checksum (do not use /releases/latest — supply-chain hygiene).
+  # Update both when bumping; checksum from https://github.com/jqlang/jq/releases
+  local jq_version="jq-1.7.1"
+  local jq_sha256="5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5"
+  curl -sSfL --connect-timeout 10 --max-time 60 --retry 3 \
+    "https://github.com/jqlang/jq/releases/download/${jq_version}/jq-linux-amd64" -o /tmp/jq
+  echo "${jq_sha256}  /tmp/jq" | sha256sum -c -
   chmod u+x /tmp/jq
   export PATH=${PATH}:/tmp
 }
@@ -71,12 +75,6 @@ EOF
 patch_csv_images(){
   CSV=$(oc get csv -n openshift-netobserv-operator | grep -iE "net.*observ" | awk '{print $1}')
 
-  # patch as Downstream to scrape metrics
-  OVERRIDE_VAR="DOWNSTREAM_DEPLOYMENT"
-  ENV_INDEX=$(oc get csv/$CSV -n openshift-netobserv-operator -o json | jq --arg override_var "$OVERRIDE_VAR" '.spec.install.spec.deployments[0].spec.template.spec.containers[0].env | map(.name) | index($override_var)')
-
-  oc patch csv/$CSV -n openshift-netobserv-operator --type=json -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/${ENV_INDEX}/value\", \"value\": \"true\"}]"
-
   if [[ $PATCH_EBPFAGENT_IMAGE ]]; then
     OVERRIDE_VAR="RELATED_IMAGE_EBPF_AGENT"
     echo "====> Patching eBPF image"
@@ -93,11 +91,11 @@ patch_csv_images(){
 
   if [[ $PATCH_CONSOLE_PLUGIN_IMAGE ]]; then
     if [[ $OCP_VERSION -ge "416" && $OCP_VERSION -le "421" ]]; then
-      OVERRIDE_VAR="RELATED_IMAGE_CONSOLE_PLUGIN_PF5"
+      OVERRIDE_VAR="RELATED_IMAGE_WEB_CONSOLE_PF5"
     elif [[ $OCP_VERSION -le "415" ]]; then
-      OVERRIDE_VAR="RELATED_IMAGE_CONSOLE_PLUGIN_PF4"
+      OVERRIDE_VAR="RELATED_IMAGE_WEB_CONSOLE_PF4"
     else
-      OVERRIDE_VAR="RELATED_IMAGE_CONSOLE_PLUGIN"
+      OVERRIDE_VAR="RELATED_IMAGE_WEB_CONSOLE"
     fi
     echo $OVERRIDE_VAR
 

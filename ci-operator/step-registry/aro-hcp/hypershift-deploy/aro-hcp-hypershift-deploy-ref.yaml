@@ -1,0 +1,54 @@
+ref:
+  as: aro-hcp-hypershift-deploy
+  from: aro-hcp-e2e-tools
+  commands: aro-hcp-hypershift-deploy-commands.sh
+  grace_period: 15s
+  leases:
+    - resource_type: aro-hcp-msi-mock-cs-sp-dev
+      env: LEASED_MSI_MOCK_SP
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  credentials:
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-int
+      mount_path: /var/run/aro-hcp-int
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-stg
+      mount_path: /var/run/aro-hcp-stg
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-prod
+      mount_path: /var/run/aro-hcp-prod
+  env:
+    - name: VAULT_SECRET_PROFILE
+      default: "dev"
+      documentation: |-
+        Selects which environment's cluster secrets to use (dev, int, stg, prod).
+    - name: LOCATION
+      default: ""
+      documentation: |-
+        Azure region to provision resources in. Normally set by the
+        slot-manager via aro-hcp-slot.env (SELECTED_LOCATION).
+    - name: USE_OC_LOGIN_REGISTRIES
+      default: ""
+      documentation: Space-separated list of registries that require oc registry login for authentication
+    - name: ARO_HCP_DEPLOY_ENV
+      default: "prow"
+      documentation: |-
+        Config environment name. Also used to select the infrastructure
+        subscription from Vault (infra-{ARO_HCP_DEPLOY_ENV}-subscription-id).
+    - name: COMPRESS_TIMING_METADATA
+      default: "true"
+      documentation: Whether to compress timing metadata files with gzip.
+  documentation: |-
+    Provisions a full ARO HCP environment from scratch for hypershift PR
+    testing. Resolves the latest ARO-HCP service images from the dev ACR
+    at runtime (so the environment always uses current main-branch images),
+    and merges HO/CPO image overrides from
+    SHARED_DIR/hypershift-image-overrides.yaml (written by
+    aro-hcp-hypershift-images-push) into the config overlay so the HO is
+    deployed with the PR-built image during initial provisioning.

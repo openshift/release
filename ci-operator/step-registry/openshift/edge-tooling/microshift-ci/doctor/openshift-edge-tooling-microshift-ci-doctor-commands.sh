@@ -128,11 +128,12 @@ load_secrets() {
             return 1
         fi
 
-        GITHUB_TOKEN_USHIFT="$(github_app_token "${GITHUB_APP_JWT}" openshift/microshift)"
-        if [ -z "${GITHUB_TOKEN_USHIFT}" ] || [ "${GITHUB_TOKEN_USHIFT}" = "null" ]; then
+        GITHUB_TOKEN="$(github_app_token "${GITHUB_APP_JWT}" openshift/microshift)"
+        if [ -z "${GITHUB_TOKEN}" ] || [ "${GITHUB_TOKEN}" = "null" ]; then
             echo "ERROR: Failed to generate installation access token for openshift/microshift"
             return 1
         fi
+        export GITHUB_TOKEN
 
         echo "GitHub tokens generated."
     else
@@ -249,30 +250,28 @@ SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/microshift-ci"
 cd "${SRC_DIR}"
 
-# Configure the GitHub token for MicroShift repo operations
-{ set +x; export GITHUB_TOKEN="${GITHUB_TOKEN_USHIFT}"; set -x; }
-
 # Close duplicate rebase PRs before running the analysis to prevent them
 # from being included in the analysis and bug creation.
 echo "Running automatic closing of duplicate rebase PRs..."
 "${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
+    --component microshift \
     --mode close-duplicates \
     --execute \
     --author 'microshift-rebase-script[bot]' \
     --filter 'NO-ISSUE: rebase-release'
 echo "Automatic closing of duplicate rebase PRs completed"
 
-# Run analysis on all releases and open rebase PRs (45m and 100 turns).
+# Run analysis on all releases and open rebase PRs (60m and 100 turns).
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
 CLAUDE_RC=0
-timeout 2700 claude \
+timeout 3600 claude \
     --model "${CLAUDE_MODEL}" \
     --max-turns 100 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
     -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
     --verbose &> "${CLAUDE_DOCTOR_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "doctor" 45
+check_claude_rc "${CLAUDE_RC}" "doctor" 60
 
 # DISABLED: Automatic bug creation is turned off - bugs are filed manually
 # via the "Create Bug in JIRA" buttons in the HTML report. 
@@ -336,6 +335,7 @@ check_claude_rc "${CLAUDE_RC}" "doctor-refresh" 10
 # complete successfully, the PR will be automatically merged.
 echo "Running automatic restart of failed rebase PRs tests..."
 "${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
+    --component microshift \
     --mode restart \
     --execute \
     --author 'microshift-rebase-script[bot]'

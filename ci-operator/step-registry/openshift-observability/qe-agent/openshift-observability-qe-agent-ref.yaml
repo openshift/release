@@ -3,7 +3,7 @@ ref:
   from: obs-tests-runner
   best_effort: true
   commands: openshift-observability-qe-agent-commands.sh
-  timeout: 1h30m0s
+  timeout: 1h40m0s
   grace_period: 2m0s
   env:
   - name: AGENT_SKILL
@@ -33,6 +33,32 @@ ref:
     default: "claude-opus-4-6"
     documentation: |-
       Claude model to use for test failure analysis.
+  - name: STEP_TIMEOUT_MINUTES
+    default: "100"
+    documentation: |-
+      Total step timeout in minutes. Must match the timeout field on this ref
+      (currently 1h40m0s = 100). The Claude invocation is capped at this value
+      minus 10 minutes to reserve time for post-processing and Jira filing.
+  - name: JIRA_PROJECT
+    default: ""
+    documentation: |-
+      Jira project key for filing product bug reports (e.g. TRACING).
+      When set, the agent files a Jira issue after writing bug-report.md.
+      Filing is skipped if this variable is unset or empty.
+  - name: JIRA_ASSIGNEE
+    default: ""
+    documentation: |-
+      Display name or email of the Jira assignee for filed bug reports.
+      The agent looks up the account ID via the Jira user search API.
+      Assignee is left unset on the issue if this variable is omitted.
+  - name: JIRA_BASE_URL
+    default: "https://redhat.atlassian.net"
+    documentation: |-
+      Base URL of the Jira instance for filing bug reports.
+  - name: JIRA_ISSUE_TYPE
+    default: "Bug"
+    documentation: |-
+      Jira issue type name for filed bug reports.
   resources:
     requests:
       cpu: "1"

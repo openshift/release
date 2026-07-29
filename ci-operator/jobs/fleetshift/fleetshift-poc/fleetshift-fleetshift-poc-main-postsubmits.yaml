@@ -1,7 +1,7 @@
 postsubmits:
   fleetshift/fleetshift-poc:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     cluster: build05
@@ -9,12 +9,16 @@ postsubmits:
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
+      - Dockerfile.fleetshift
       - Dockerfile.local
+      - fleetshift-ui/Dockerfile.web
     labels:
       capability/arm64: arm64
+      ci-operator.openshift.io/variant: aio
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-fleetshift-fleetshift-poc-main-pr-merge-image-mirror
+    name: branch-ci-fleetshift-fleetshift-poc-main-aio-pr-merge-image-mirror
+    run_if_changed: ^Dockerfile(\.local|\.fleetshift)?$|^deploy/scripts/|^fleetshift-server/|^fleetshift-cli/|^fleetshift-ui/
     spec:
       containers:
       - args:
@@ -23,6 +27,7 @@ postsubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=pr-merge-image-mirror
+        - --variant=aio
         command:
         - ci-operator
         env:
@@ -73,7 +78,7 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     cluster: build05
@@ -84,9 +89,86 @@ postsubmits:
       - Dockerfile.local
     labels:
       capability/arm64: arm64
+      ci-operator.openshift.io/variant: server
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-fleetshift-fleetshift-poc-main-pr-merge-image-mirror-local
+    name: branch-ci-fleetshift-fleetshift-poc-main-server-pr-merge-image-mirror
+    skip_if_only_changed: ^fleetshift-ui/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=pr-merge-image-mirror
+        - --variant=server
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile
+      - Dockerfile.local
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: server
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-fleetshift-fleetshift-poc-main-server-pr-merge-image-mirror-local
+    skip_if_only_changed: ^fleetshift-ui/
     spec:
       containers:
       - args:
@@ -95,6 +177,81 @@ postsubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=pr-merge-image-mirror-local
+        - --variant=server
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    cluster: build05
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - fleetshift-ui/Dockerfile.web
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: ui
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-fleetshift-fleetshift-poc-main-ui-pr-merge-image-mirror
+    run_if_changed: ^fleetshift-ui/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=pr-merge-image-mirror
+        - --variant=ui
         command:
         - ci-operator
         env:

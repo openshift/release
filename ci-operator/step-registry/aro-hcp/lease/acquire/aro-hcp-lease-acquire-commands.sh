@@ -10,8 +10,13 @@ slot_manager_args=(
     --shared-dir "${SHARED_DIR}"
 )
 
-if [[ -n "${ALLOWED_SUBSCRIPTIONS:-}" ]]; then
-    slot_manager_args+=(--allowed-subscriptions "${ALLOWED_SUBSCRIPTIONS}")
+if [[ -n "${CLUSTER_PROFILE_DIRS:-}" ]]; then
+    slot_manager_args+=(--cluster-profile-dirs "${CLUSTER_PROFILE_DIRS}")
+fi
+
+effective_allowed_subscriptions="${MULTISTAGE_PARAM_OVERRIDE_ALLOWED_SUBSCRIPTIONS:-${ALLOWED_SUBSCRIPTIONS:-}}"
+if [[ -n "${effective_allowed_subscriptions}" ]]; then
+    slot_manager_args+=(--allowed-subscriptions "${effective_allowed_subscriptions}")
 fi
 
 if [[ -n "${ALLOWED_LOCATIONS:-}" ]]; then

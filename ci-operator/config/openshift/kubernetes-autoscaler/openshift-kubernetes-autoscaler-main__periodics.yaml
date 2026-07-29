@@ -17,7 +17,7 @@ tests:
     test:
     - as: rebasebot
       commands: |
-        UPSTREAM_VERSION=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/kubernetes/autoscaler/releases" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | grep -E 'cluster-autoscaler-[0-9.]+' | sort -V | tail -n1)
+        UPSTREAM_VERSION=$(git ls-remote --tags https://github.com/kubernetes/autoscaler 'refs/tags/cluster-autoscaler-*' | sed 's|.*refs/tags/||' | grep -E '^cluster-autoscaler-[0-9.]+$' | sort -V | tail -n 1)
         rebasebot --source https://github.com/kubernetes/autoscaler:"${UPSTREAM_VERSION}" \
                   --dest openshift/kubernetes-autoscaler:main \
                   --rebase openshift/kubernetes-autoscaler:rebase-bot-main \

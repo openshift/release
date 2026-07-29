@@ -128,7 +128,7 @@ def add_osd_rc_service_account_resources(gendoc):
                 'kind': 'Role',
                 'metadata': {
                     'name': 'art-rc-query',
-                    'namespace': 'ocp-private'
+                    'namespace': 'ocp-priv'
                 },
                 'rules': [{
                     'apiGroups': ['image.openshift.io'],
@@ -141,7 +141,7 @@ def add_osd_rc_service_account_resources(gendoc):
                 'kind': 'RoleBinding',
                 'metadata': {
                     'name': 'art-rc-query-binding',
-                    'namespace': 'ocp-private'
+                    'namespace': 'ocp-priv'
                 },
                 'roleRef': {
                     'apiGroup': 'rbac.authorization.k8s.io',

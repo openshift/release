@@ -23,6 +23,10 @@ base_images:
     name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -1602,6 +1606,22 @@ tests:
       CONTROL_PLANE_AMI: ami-0b78302f83217d149
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
+- as: periodic-jira-agent
+  cron: 0 9 * * *
+  steps:
+    env:
+      JIRA_AGENT_MAX_ISSUES: "1"
+    workflow: installer-jira-agent
+- as: periodic-review-agent
+  cron: '@yearly'
+  steps:
+    workflow: installer-review-agent
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: installer-review-agent-trigger
 zz_generated_metadata:
   branch: main
   org: openshift

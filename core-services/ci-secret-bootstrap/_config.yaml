@@ -36,6 +36,7 @@ cluster_groups:
   - build13
   - core-ci
   - hosted-mgmt
+  - hosted-mgmt2
   non_app_ci:
   - build01
   - build02
@@ -68,6 +69,7 @@ cluster_groups:
   - build13
   - core-ci
   - hosted-mgmt
+  - hosted-mgmt2
   - vsphere02
 secret_configs:
 - from:
@@ -304,6 +306,9 @@ secret_configs:
   - cluster: app.ci
     name: slack-credentials-prow
     namespace: ci
+  - cluster: core-ci
+    name: slack-credentials-prow
+    namespace: ci
 - from:
     url:
       field: url
@@ -361,6 +366,9 @@ secret_configs:
   - cluster: app.ci
     name: cookie
     namespace: ci
+  - cluster: core-ci
+    name: cookie
+    namespace: ci
 - from:
     hmac:
       field: hmac-token
@@ -389,6 +397,9 @@ secret_configs:
       item: gcs-tide-publisher
   to:
   - cluster: app.ci
+    name: gce-sa-credentials-gcs-tide-publisher
+    namespace: ci
+  - cluster: core-ci
     name: gce-sa-credentials-gcs-tide-publisher
     namespace: ci
 - from:
@@ -424,6 +435,9 @@ secret_configs:
       item: gcs-crier-publisher
   to:
   - cluster: app.ci
+    name: gce-sa-credentials-gcs-crier-publisher
+    namespace: ci
+  - cluster: core-ci
     name: gce-sa-credentials-gcs-crier-publisher
     namespace: ci
 - from:
@@ -2411,6 +2425,10 @@ secret_configs:
     - non_app_ci
     name: cluster-secrets-libvirt-ppc64le-s2s
     namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-power-s2s
+    namespace: ci
 - from:
     pull-secret:
       dockerconfigJSON:
@@ -3625,6 +3643,9 @@ secret_configs:
   - cluster: app.ci
     name: crier
     namespace: ci
+  - cluster: core-ci
+    name: crier
+    namespace: ci
 - from:
     sa.config-updater.app.ci.config:
       field: sa.config-updater.app.ci.config
@@ -3674,8 +3695,8 @@ secret_configs:
     sa.config-updater.hosted-mgmt.config:
       field: sa.config-updater.hosted-mgmt.config
       item: config-updater
-    sa.config-updater.hypershift-konflux.config:
-      field: sa.config-updater.hypershift-konflux.config
+    sa.config-updater.hosted-mgmt2.config:
+      field: sa.config-updater.hosted-mgmt2.config
       item: config-updater
     sa.config-updater.vsphere02.config:
       field: sa.config-updater.vsphere02.config
@@ -3789,6 +3810,9 @@ secret_configs:
       item: build_farm
   to:
   - cluster: app.ci
+    name: deck
+    namespace: ci
+  - cluster: core-ci
     name: deck
     namespace: ci
 - from:
@@ -3992,6 +4016,12 @@ secret_configs:
     sa.prow-controller-manager.hosted-mgmt.token.txt:
       field: sa.prow-controller-manager.hosted-mgmt.token.txt
       item: build_farm
+    sa.prow-controller-manager.hosted-mgmt2.config:
+      field: sa.prow-controller-manager.hosted-mgmt2.config
+      item: build_farm
+    sa.prow-controller-manager.hosted-mgmt2.token.txt:
+      field: sa.prow-controller-manager.hosted-mgmt2.token.txt
+      item: build_farm
     sa.prow-controller-manager.vsphere02.config:
       field: sa.prow-controller-manager.vsphere02.config
       item: build_farm
@@ -4000,6 +4030,9 @@ secret_configs:
       item: build_farm
   to:
   - cluster: app.ci
+    name: prow-controller-manager
+    namespace: ci
+  - cluster: core-ci
     name: prow-controller-manager
     namespace: ci
 - from:
@@ -4121,6 +4154,9 @@ secret_configs:
       item: build_farm
   to:
   - cluster: app.ci
+    name: sinker
+    namespace: ci
+  - cluster: core-ci
     name: sinker
     namespace: ci
 - from:
@@ -4447,6 +4483,12 @@ secret_configs:
     sa.hypershift-workload.hosted-mgmt.token.txt:
       field: sa.hypershift-workload.hosted-mgmt.token.txt
       item: build_farm
+    sa.hypershift-workload.hosted-mgmt2.config:
+      field: sa.hypershift-workload.hosted-mgmt2.config
+      item: build_farm
+    sa.hypershift-workload.hosted-mgmt2.token.txt:
+      field: sa.hypershift-workload.hosted-mgmt2.token.txt
+      item: build_farm
   to:
   - cluster: app.ci
     name: ci-chat-bot-kubeconfigs
@@ -4541,6 +4583,12 @@ secret_configs:
       item: build_farm
     sa.github-ldap-user-group-creator.hosted-mgmt.token.txt:
       field: sa.github-ldap-user-group-creator.hosted-mgmt.token.txt
+      item: build_farm
+    sa.github-ldap-user-group-creator.hosted-mgmt2.config:
+      field: sa.github-ldap-user-group-creator.hosted-mgmt2.config
+      item: build_farm
+    sa.github-ldap-user-group-creator.hosted-mgmt2.token.txt:
+      field: sa.github-ldap-user-group-creator.hosted-mgmt2.token.txt
       item: build_farm
     sa.github-ldap-user-group-creator.vsphere02.config:
       field: sa.github-ldap-user-group-creator.vsphere02.config
@@ -4730,6 +4778,10 @@ secret_configs:
     namespace: ci
     type: kubernetes.io/dockerconfigjson
   - cluster: app.ci
+    name: registry-push-credentials-ci-images-mirror
+    namespace: ocp
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
     name: registry-push-credentials-quay-qci-art-builder
     namespace: ci
     type: kubernetes.io/dockerconfigjson
@@ -4740,6 +4792,10 @@ secret_configs:
   - cluster: core-ci
     name: registry-push-credentials-ci-images-mirror
     namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: core-ci
+    name: registry-push-credentials-ci-images-mirror
+    namespace: ocp
     type: kubernetes.io/dockerconfigjson
 - from:
     .dockerconfigjson:
@@ -4919,6 +4975,23 @@ secret_configs:
     name: hosted-mgmt-dex-oidc
     namespace: ci
 - from:
+    hosted-mgmt2-id:
+      field: hosted-mgmt2-id
+      item: dex
+    hosted-mgmt2-secret:
+      field: hosted-mgmt2-secret
+      item: dex
+  to:
+  - cluster: app.ci
+    name: hosted-mgmt2-secret
+    namespace: dex
+  - cluster: app.ci
+    name: hosted-mgmt2-dex-oidc
+    namespace: ci
+  - cluster: core-ci
+    name: hosted-mgmt2-dex-oidc
+    namespace: ci
+- from:
     art-id:
       field: art-id
       item: dex
@@ -4962,6 +5035,14 @@ secret_configs:
       item: dex
   to:
   - cluster: hosted-mgmt
+    name: dex-rh-sso
+    namespace: openshift-config
+- from:
+    clientSecret:
+      field: hosted-mgmt2-secret
+      item: dex
+  to:
+  - cluster: hosted-mgmt2
     name: dex-rh-sso
     namespace: openshift-config
 - from:
@@ -5423,6 +5504,39 @@ secret_configs:
     name: cluster-secrets-hypershift-gcp
     namespace: ci
 - from:
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-platform-gcp
+    namespace: ci
+- from:
     vault-secret-manager-id:
       field: vault-secret-manager-client-id
       item: dex
@@ -5560,6 +5674,12 @@ secret_configs:
       item: build_farm
     sa.cluster-display.hosted-mgmt.token.txt:
       field: sa.cluster-display.hosted-mgmt.token.txt
+      item: build_farm
+    sa.cluster-display.hosted-mgmt2.config:
+      field: sa.cluster-display.hosted-mgmt2.config
+      item: build_farm
+    sa.cluster-display.hosted-mgmt2.token.txt:
+      field: sa.cluster-display.hosted-mgmt2.token.txt
       item: build_farm
     sa.cluster-display.vsphere02.config:
       field: sa.cluster-display.vsphere02.config
@@ -6160,6 +6280,45 @@ secret_configs:
   to:
   - cluster_groups:
     - non_app_ci
+    name: cluster-secrets-powervs-10
+    namespace: ci
+- from:
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+    ssh-privatekey:
+      field: ssh-privatekey
+      item: openshift-ci-aws-credentials
+    ssh-publickey:
+      field: ssh-publickey
+      item: openshift-ci-aws-credentials
+  to:
+  - cluster_groups:
+    - non_app_ci
     name: cluster-secrets-powervs-sno-1
     namespace: ci
 - from:
@@ -6238,6 +6397,9 @@ secret_configs:
     name: splunk-receiver-token
     namespace: log-forwarding
   - cluster: hosted-mgmt
+    name: splunk-receiver-token
+    namespace: log-forwarding
+  - cluster: hosted-mgmt2
     name: splunk-receiver-token
     namespace: log-forwarding
 - from:
@@ -6431,6 +6593,9 @@ secret_configs:
       item: openshift-monitoring-credentials
     OPENSHIFT_MONITORING_CI_TOKEN_ON_HOSTED_MGMT:
       field: sa.ci-monitoring.hosted-mgmt.token.txt
+      item: openshift-monitoring-credentials
+    OPENSHIFT_MONITORING_CI_TOKEN_ON_HOSTED_MGMT2:
+      field: sa.ci-monitoring.hosted-mgmt2.token.txt
       item: openshift-monitoring-credentials
   to:
   - cluster: app.ci
@@ -7648,5 +7813,6 @@ user_secrets_target_clusters:
 - build13
 - core-ci
 - hosted-mgmt
+- hosted-mgmt2
 - vsphere02
 vault_dptp_prefix: dptp

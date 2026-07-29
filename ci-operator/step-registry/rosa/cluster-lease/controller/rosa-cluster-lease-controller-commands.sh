@@ -38,7 +38,7 @@ ocm_get_cluster() {
         log "ERROR: OCM lookup failed for ${name}: ${response}"
         return 1
     fi
-    echo "${response}" | jq '.items[0] // empty | select(.aws.tags["rosa-cluster-lease"] == "true")' 2>/dev/null
+    echo "${response}" | jq '.items[0] // empty' 2>/dev/null
 }
 
 # Query OCM for a cluster by ID. Sets globals:
@@ -106,11 +106,154 @@ data:
 EOF
 }
 
-# Configure AWS credentials from cluster profile
+# Configure cloud credentials from cluster profile
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
     export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
 fi
+
+GCP_CREDENTIALS_FILE="${GCP_CREDENTIALS_FILE:-/etc/rosa-e2e-gcp/osd-ccs-gcp.json}"
+
+# Resolve the latest available version for a given cloud provider and version prefix
+resolve_version() {
+    local type="$1" version_prefix="$2" channel="${3:-stable}"
+    if [[ "${type}" == "osd-gcp" ]]; then
+        ocm get /api/clusters_mgmt/v1/versions \
+            --parameter search="enabled = 'true' AND raw_id like '${version_prefix}%' AND channel_group = '${channel}' AND gcp_marketplace_enabled = 'true'" \
+            --parameter size=100 2>/dev/null \
+            | jq -r '.items[].raw_id // empty' 2>/dev/null \
+            | sort -V | tail -n1
+    else
+        rosa list versions --channel-group "${channel}" -o json 2>/dev/null \
+            | jq -r '.[] | select(.enabled == true) | select(.raw_id | startswith("'"${version_prefix}"'")) | .raw_id' \
+            | sort -V | tail -n1
+    fi
+}
+
+# Provision a cluster based on its type
+provision_cluster() {
+    local name="$1" type="$2" region="$3" version="$4" channel="$5"
+    local compute_nodes="$6" machine_type="$7"
+    local cluster_json="$8" desired_cm="$9"
+
+    if [[ "${type}" == "osd-gcp" ]]; then
+        provision_gcp_cluster "${name}" "${region}" "${version}" "${channel}" "${compute_nodes}" "${machine_type}"
+    else
+        provision_sts_cluster "${name}" "${region}" "${version}" "${channel}" "${compute_nodes}" "${machine_type}" "${cluster_json}" "${desired_cm}"
+    fi
+}
+
+provision_gcp_cluster() {
+    local name="$1" region="$2" version="$3" channel="$4"
+    local compute_nodes="$5" machine_type="$6"
+
+    if [[ ! -f "${GCP_CREDENTIALS_FILE}" ]]; then
+        log "WARNING: GCP credentials not found at ${GCP_CREDENTIALS_FILE}. Skipping ${name}."
+        return 1
+    fi
+
+    ocm create cluster "${name}" \
+        --ccs \
+        --provider gcp \
+        --service-account-file "${GCP_CREDENTIALS_FILE}" \
+        --region "${region}" \
+        --version "${version}" \
+        --channel-group "${channel}" \
+        --compute-machine-type "${machine_type}" \
+        --compute-nodes "${compute_nodes}" \
+        || { log "ERROR: Failed to create GCP cluster ${name}"; return 1; }
+}
+
+provision_sts_cluster() {
+    local name="$1" region="$2" version="$3" channel="$4"
+    local compute_nodes="$5" machine_type="$6"
+    local cluster_json="$7" desired_cm="$8"
+
+    local oidc_config_id role_prefix aws_account_id
+
+    oidc_config_id=$(echo "${cluster_json}" | jq -r '.["oidc-config-id"] // empty')
+    if [[ -z "${oidc_config_id}" ]]; then
+        oidc_config_id=$(echo "${desired_cm}" | jq -r '.data["oidc-config-id"] // empty')
+    fi
+    if [[ -z "${oidc_config_id}" ]]; then
+        log "WARNING: No oidc-config-id for ${name}. Skipping."
+        return 1
+    fi
+
+    role_prefix=$(echo "${cluster_json}" | jq -r '.["account-role-prefix"] // empty')
+    if [[ -z "${role_prefix}" ]]; then
+        role_prefix=$(echo "${desired_cm}" | jq -r '.data["account-role-prefix"] // "rosa-lease"')
+    fi
+
+    aws_account_id=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)
+    if [[ -z "${aws_account_id}" ]]; then
+        log "WARNING: Cannot determine AWS account ID. Skipping ${name}."
+        return 1
+    fi
+
+    rosa create cluster -y \
+        --cluster-name "${name}" \
+        --sts \
+        --mode auto \
+        --region "${region}" \
+        --version "${version}" \
+        --channel-group "${channel}" \
+        --compute-nodes "${compute_nodes}" \
+        --compute-machine-type "${machine_type}" \
+        --role-arn "arn:aws:iam::${aws_account_id}:role/${role_prefix}-Installer-Role" \
+        --support-role-arn "arn:aws:iam::${aws_account_id}:role/${role_prefix}-Support-Role" \
+        --worker-iam-role "arn:aws:iam::${aws_account_id}:role/${role_prefix}-Worker-Role" \
+        --controlplane-iam-role "arn:aws:iam::${aws_account_id}:role/${role_prefix}-ControlPlane-Role" \
+        --oidc-config-id "${oidc_config_id}" \
+        --operator-roles-prefix "${name}" \
+        --tags "rosa-cluster-lease:true,lease-managed:true" \
+        || { log "ERROR: Failed to create cluster ${name}"; return 1; }
+}
+
+# Delete a cluster based on its type
+delete_cluster() {
+    local cluster_id="$1" type="$2"
+    if [[ "${type}" == "osd-gcp" ]]; then
+        ocm delete "/api/clusters_mgmt/v1/clusters/${cluster_id}"
+    else
+        rosa delete cluster -c "${cluster_id}" -y
+        rosa delete operator-roles -c "${cluster_id}" -y --mode auto || true
+        rosa delete oidc-provider -c "${cluster_id}" -y --mode auto || true
+    fi
+}
+
+# List available upgrades for a cluster
+list_upgrades() {
+    local cluster_id="$1" type="$2" desired_version="$3"
+    if [[ "${type}" == "osd-gcp" ]]; then
+        ocm get "/api/clusters_mgmt/v1/clusters/${cluster_id}" 2>/dev/null \
+            | jq -r --arg desired "${desired_version}" \
+              '.version.available_upgrades[] | select(startswith($desired))' 2>/dev/null \
+            | sort -V | tail -n1
+    else
+        rosa list upgrades -c "${cluster_id}" -o json 2>/dev/null \
+            | jq -r --arg desired "${desired_version}" \
+              '.[] | select(.version | startswith($desired)) | .version' 2>/dev/null \
+            | sort -V | tail -n1
+    fi
+}
+
+# Schedule an upgrade for a cluster
+schedule_upgrade() {
+    local cluster_id="$1" type="$2" target_version="$3"
+    local next_run
+    next_run=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    if [[ "${type}" == "osd-gcp" ]]; then
+        echo "{\"version\": \"${target_version}\", \"schedule_type\": \"manual\", \"next_run\": \"${next_run}\"}" \
+            | ocm post "/api/clusters_mgmt/v1/clusters/${cluster_id}/upgrade_policies"
+    else
+        rosa upgrade cluster -c "${cluster_id}" \
+            --version "${target_version}" \
+            --schedule-date "$(date -u +%Y-%m-%d)" \
+            --schedule-time "$(date -u +%H:%M)" \
+            -y
+    fi
+}
 
 # Log in to OCM
 SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
@@ -288,64 +431,23 @@ while IFS= read -r cluster_json; do
     fi
 
     log "PROVISION: ${NAME} (${TYPE}, ${ENV}, ${REGION}, ${VERSION})"
-    echo "PROVISION: ${NAME} env=${ENV} region=${REGION} version=${VERSION}" >> "${REPORT}"
+    echo "PROVISION: ${NAME} env=${ENV} region=${REGION} version=${VERSION} type=${TYPE}" >> "${REPORT}"
 
     if dry_run_guard "Would provision ${NAME}"; then
         continue
     fi
 
-    # Resolve latest version
-    FULL_VERSION=$(rosa list versions --channel-group "${CHANNEL}" -o json 2>/dev/null \
-        | jq -r '.[] | select(.enabled == true) | select(.raw_id | startswith("'"${VERSION}"'")) | .raw_id' \
-        | sort -V | tail -n1)
-
+    FULL_VERSION=$(resolve_version "${TYPE}" "${VERSION}" "${CHANNEL}")
     if [[ -z "${FULL_VERSION}" ]]; then
-        log "WARNING: No available version matching ${VERSION} in ${CHANNEL}. Skipping ${NAME}."
+        log "WARNING: No available version matching ${VERSION} in ${CHANNEL} for ${TYPE}. Skipping ${NAME}."
         continue
     fi
-
     log "Resolved version: ${FULL_VERSION}"
 
-    # Read OIDC config ID (per-cluster, then fall back to global)
-    OIDC_CONFIG_ID=$(echo "${cluster_json}" | jq -r '.["oidc-config-id"] // empty')
-    if [[ -z "${OIDC_CONFIG_ID}" ]]; then
-        OIDC_CONFIG_ID=$(echo "${DESIRED_CM}" | jq -r '.data["oidc-config-id"] // empty')
-    fi
-    if [[ -z "${OIDC_CONFIG_ID}" ]]; then
-        log "WARNING: No oidc-config-id for ${NAME}. Skipping."
+    if ! provision_cluster "${NAME}" "${TYPE}" "${REGION}" "${FULL_VERSION}" "${CHANNEL}" \
+        "${COMPUTE_NODES}" "${MACHINE_TYPE}" "${cluster_json}" "${DESIRED_CM}"; then
         continue
     fi
-
-    # Read account role prefix (per-cluster, then fall back to global)
-    ROLE_PREFIX=$(echo "${cluster_json}" | jq -r '.["account-role-prefix"] // empty')
-    if [[ -z "${ROLE_PREFIX}" ]]; then
-        ROLE_PREFIX=$(echo "${DESIRED_CM}" | jq -r '.data["account-role-prefix"] // "rosa-lease"')
-    fi
-
-    # Get AWS account ID for role ARNs
-    AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)
-    if [[ -z "${AWS_ACCOUNT_ID}" ]]; then
-        log "WARNING: Cannot determine AWS account ID. Skipping ${NAME}."
-        continue
-    fi
-
-    rosa create cluster -y \
-        --cluster-name "${NAME}" \
-        --sts \
-        --mode auto \
-        --region "${REGION}" \
-        --version "${FULL_VERSION}" \
-        --channel-group "${CHANNEL}" \
-        --compute-nodes "${COMPUTE_NODES}" \
-        --compute-machine-type "${MACHINE_TYPE}" \
-        --role-arn "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${ROLE_PREFIX}-Installer-Role" \
-        --support-role-arn "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${ROLE_PREFIX}-Support-Role" \
-        --worker-iam-role "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${ROLE_PREFIX}-Worker-Role" \
-        --controlplane-iam-role "arn:aws:iam::${AWS_ACCOUNT_ID}:role/${ROLE_PREFIX}-ControlPlane-Role" \
-        --oidc-config-id "${OIDC_CONFIG_ID}" \
-        --operator-roles-prefix "${NAME}" \
-        --tags "rosa-cluster-lease:true,lease-managed:true" \
-        || { log "ERROR: Failed to create cluster ${NAME}"; continue; }
 
     # Register immediately as provisioning
     CLUSTER_ID=$(ocm_get_cluster "${NAME}" | jq -r '.id // empty' 2>/dev/null || true)
@@ -426,31 +528,85 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
     HOLDER=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/holder"] // ""')
     ACQUIRED_AT=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/acquired-at"] // ""')
 
-    # Stale lease recovery
-    if [[ "${STATUS}" == "in-use" && -n "${ACQUIRED_AT}" ]]; then
-        ACQUIRED_EPOCH=$(date -d "${ACQUIRED_AT}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "${ACQUIRED_AT}" +%s 2>/dev/null || echo "0")
-        LEASE_AGE=$(( NOW_EPOCH - ACQUIRED_EPOCH ))
+    # Stale lease recovery (per-operator and legacy)
+    if [[ "${STATUS}" == "in-use" ]]; then
+        OPERATORS_ANNOTATION=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/operators"] // ""')
 
-        if [[ ${LEASE_AGE} -gt ${STALE_THRESHOLD} ]]; then
-            LEASE_HOURS=$(( LEASE_AGE / 3600 ))
-            log "STALE LEASE: ${CM_NAME} held by ${HOLDER} for ${LEASE_HOURS}h"
+        if [[ -n "${OPERATORS_ANNOTATION}" ]]; then
+            # Per-operator mode: check each operator's timestamp for staleness
+            STALE_OPS=""
+            LIVE_OPS=""
+            IFS=',' read -ra OP_LIST <<< "${OPERATORS_ANNOTATION}"
+            for op_entry in "${OP_LIST[@]}"; do
+                [[ -z "${op_entry}" ]] && continue
+                OP_NAME=$(echo "${op_entry}" | cut -d: -f1)
+                OP_EPOCH=$(echo "${op_entry}" | cut -d: -f2)
+                OP_AGE=$(( NOW_EPOCH - OP_EPOCH ))
+                if [[ ${OP_AGE} -gt ${STALE_THRESHOLD} ]]; then
+                    OP_HOURS=$(( OP_AGE / 3600 ))
+                    log "STALE OPERATOR: ${OP_NAME} on ${CM_NAME} for ${OP_HOURS}h"
+                    STALE_OPS="${STALE_OPS:+${STALE_OPS},}${OP_NAME}"
+                else
+                    LIVE_OPS="${LIVE_OPS:+${LIVE_OPS},}${op_entry}"
+                fi
+            done
 
-            if ! dry_run_guard "Would release stale lease on ${CM_NAME}"; then
-                lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
-                    "metadata": {
-                        "labels": { "rosa-cluster-lease/status": "available" },
-                        "annotations": {
-                            "rosa-cluster-lease/holder": "",
-                            "rosa-cluster-lease/build-id": "",
-                            "rosa-cluster-lease/released-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",
-                            "rosa-cluster-lease/recovered-by": "controller"
-                        }
-                    }
-                }' || true
+            if [[ -n "${STALE_OPS}" ]]; then
+                if [[ -z "${LIVE_OPS}" ]]; then
+                    # All operators stale, release the whole cluster
+                    if ! dry_run_guard "Would release all stale operators on ${CM_NAME}"; then
+                        RECOVERED_CM=$(echo "${CM}" | jq '
+                            .metadata.labels["rosa-cluster-lease/status"] = "available" |
+                            .metadata.annotations["rosa-cluster-lease/operators"] = "" |
+                            .metadata.annotations["rosa-cluster-lease/holder"] = "" |
+                            .metadata.annotations["rosa-cluster-lease/build-id"] = "" |
+                            .metadata.annotations["rosa-cluster-lease/released-at"] = "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" |
+                            .metadata.annotations["rosa-cluster-lease/recovered-by"] = "controller"
+                        ')
+                        echo "${RECOVERED_CM}" | lease_oc replace -n "${LEASE_NAMESPACE}" -f - || true
+                    fi
+                    echo "RECOVERED: ${CM_NAME} (all operators stale: ${STALE_OPS})" >> "${REPORT}"
+                else
+                    # Some operators stale, remove just those
+                    if ! dry_run_guard "Would remove stale operators ${STALE_OPS} from ${CM_NAME}"; then
+                        RECOVERED_CM=$(echo "${CM}" | jq '
+                            .metadata.annotations["rosa-cluster-lease/operators"] = "'"${LIVE_OPS}"'" |
+                            .metadata.annotations["rosa-cluster-lease/released-at"] = "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" |
+                            .metadata.annotations["rosa-cluster-lease/recovered-by"] = "controller"
+                        ')
+                        echo "${RECOVERED_CM}" | lease_oc replace -n "${LEASE_NAMESPACE}" -f - || true
+                    fi
+                    echo "RECOVERED: ${CM_NAME} (stale operators: ${STALE_OPS}, remaining: ${LIVE_OPS})" >> "${REPORT}"
+                fi
+                RECOVERED=$((RECOVERED + 1))
+                continue
             fi
-            RECOVERED=$((RECOVERED + 1))
-            echo "RECOVERED: ${CM_NAME} (stale ${LEASE_HOURS}h)" >> "${REPORT}"
-            continue
+        elif [[ -n "${ACQUIRED_AT}" ]]; then
+            # Legacy exclusive mode: check acquired-at timestamp
+            ACQUIRED_EPOCH=$(date -d "${ACQUIRED_AT}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "${ACQUIRED_AT}" +%s 2>/dev/null || echo "0")
+            LEASE_AGE=$(( NOW_EPOCH - ACQUIRED_EPOCH ))
+
+            if [[ ${LEASE_AGE} -gt ${STALE_THRESHOLD} ]]; then
+                LEASE_HOURS=$(( LEASE_AGE / 3600 ))
+                log "STALE LEASE: ${CM_NAME} held by ${HOLDER} for ${LEASE_HOURS}h"
+
+                if ! dry_run_guard "Would release stale lease on ${CM_NAME}"; then
+                    lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                        "metadata": {
+                            "labels": { "rosa-cluster-lease/status": "available" },
+                            "annotations": {
+                                "rosa-cluster-lease/holder": "",
+                                "rosa-cluster-lease/build-id": "",
+                                "rosa-cluster-lease/released-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",
+                                "rosa-cluster-lease/recovered-by": "controller"
+                            }
+                        }
+                    }' || true
+                fi
+                RECOVERED=$((RECOVERED + 1))
+                echo "RECOVERED: ${CM_NAME} (stale ${LEASE_HOURS}h)" >> "${REPORT}"
+                continue
+            fi
         fi
     fi
 
@@ -606,15 +762,11 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
         continue
     fi
 
-    # Delete the ROSA cluster
     CLUSTER_OCM_ENV=$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')
+    CLUSTER_TYPE=$(echo "${CM}" | jq -r '.metadata.labels["rosa-cluster-lease/type"] // "classic-sts"')
     ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
-    rosa delete cluster -c "${CLUSTER_ID}" -y 2>/dev/null || true
-
-    # Clean up operator roles and OIDC provider (best effort)
-    rosa delete operator-roles -c "${CLUSTER_ID}" -y --mode auto 2>/dev/null || true
-    rosa delete oidc-provider -c "${CLUSTER_ID}" -y --mode auto 2>/dev/null || true
+    delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}"
 
     # Remove the ConfigMap (next reconcile will provision a replacement)
     lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" || true
@@ -660,10 +812,8 @@ while IFS= read -r cluster_json; do
     CLUSTER_OCM_ENV=$(echo "${ACTUAL_CM}" | jq -r '.data["ocm-env"] // "staging"')
     ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
-    TARGET_VERSION=$(rosa list upgrades -c "${CLUSTER_ID}" -o json 2>/dev/null \
-        | jq -r --arg desired "${DESIRED_VERSION}" \
-          '.[] | select(.version | startswith($desired)) | .version' 2>/dev/null \
-        | sort -V | tail -n1 || true)
+    CLUSTER_TYPE=$(echo "${ACTUAL_CM}" | jq -r '.metadata.labels["rosa-cluster-lease/type"] // "classic-sts"')
+    TARGET_VERSION=$(list_upgrades "${CLUSTER_ID}" "${CLUSTER_TYPE}" "${DESIRED_VERSION}")
 
     if [[ -z "${TARGET_VERSION}" ]]; then
         continue
@@ -684,11 +834,7 @@ while IFS= read -r cluster_json; do
         }
     }' || true
 
-    rosa upgrade cluster -c "${CLUSTER_ID}" \
-        --version "${TARGET_VERSION}" \
-        --schedule-date "$(date -u +%Y-%m-%d)" \
-        --schedule-time "$(date -u +%H:%M)" \
-        -y 2>/dev/null || {
+    schedule_upgrade "${CLUSTER_ID}" "${CLUSTER_TYPE}" "${TARGET_VERSION}" 2>/dev/null || {
             log "WARNING: Failed to schedule upgrade for ${NAME}"
             lease_oc patch configmap "${NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
                 "metadata": { "labels": { "rosa-cluster-lease/status": "available" } }

@@ -2,12 +2,13 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.22
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 releases:
   latest:
-    release:
-      channel: candidate
-      version: "4.22"
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -25,10 +26,15 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       ODF_BACKEND_STORAGE_CLASS: managed-csi
       ODF_OPERATOR_CHANNEL: stable-4.21
+      OPERATORS: |
+        [
+            {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}
+        ]
     observers:
       enable:
       - observers-resource-watch
     test:
+    - ref: install-operators
     - as: install-cnv
       cli: latest
       commands: |
@@ -54,9 +60,9 @@ tests:
         name: KONFLUX_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-konflux-pull-secret/token
         name: KONFLUX_REGISTRY_TOKEN_PATH
-      - default: "4.22"
+      - default: "5.0"
         name: OCP_VERSION
-      - default: "4.22"
+      - default: "5.0"
         name: CNV_VERSION
       - default: /tmp/artifacts
         name: ARTIFACTS_DIR
@@ -86,6 +92,8 @@ tests:
         name: STORAGE_CLASS
       - default: test_id:1780|test_id:1783|test_id:1513|test_id:1514
         name: TEST_SKIPS
+      - default: "false"
+        name: ACCEPT_WINDOWS_EULA
       - default: openshift-cnv
         name: TARGET_NAMESPACE
       - default: /tmp/artifacts
@@ -106,7 +114,7 @@ tests:
         export OCP_VIRT_VALIDATION_IMAGE=$(echo "$OCP_VIRT_VALIDATION_IMAGE" | sed "s|registry.redhat.io/container-native-virtualization|quay.io/openshift-virtualization/konflux-builds/v${CNV_VERSION//./-}|")
         make ci-validate-disconnected
       env:
-      - default: "4.22"
+      - default: "5.0"
         name: CNV_VERSION
       - default: "false"
         name: DRY_RUN

@@ -214,4 +214,9 @@ wait_for_catalogsource() {
 }
 MEDIK8S_LIB_EOF
 
+# Single source of truth for the workload image used by all medik8s E2E
+# destructive tests (connected, disconnected, upgrade). Change HERE to
+# update the image for all environments in one place.
+echo "registry.access.redhat.com/ubi9/ubi-minimal:latest" > "${SHARED_DIR}/workload_image"
+
 echo "medik8s-lib.sh written to ${SHARED_DIR}"

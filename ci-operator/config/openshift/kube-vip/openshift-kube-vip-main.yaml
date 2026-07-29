@@ -3,6 +3,24 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.26-openshift-5.0
+images:
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: kube-vip
+promotion:
+  to:
+  - name: "5.0"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -10,7 +28,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: go test -race ./...
 tests:
 - as: unit-tests
   commands: make unit-tests
