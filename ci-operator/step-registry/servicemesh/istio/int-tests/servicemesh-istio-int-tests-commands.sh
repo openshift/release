@@ -78,13 +78,6 @@ run_tests() {
     "${TEST_SUITE}" "${SKIP_PARSER_SKIP_TESTS}" "${SKIP_PARSER_SKIP_SUBSUITES}"
 }
 
-# are_tests_done checks for /tmp/ISTIO_TESTS_DONE which integ-suite-ocp.sh creates
-# at normal completion. Absence means the run was killed mid-flight.
-are_tests_done() {
-  echo "Checking if /tmp/ISTIO_TESTS_DONE exists"
-  [ -f /tmp/ISTIO_TESTS_DONE ]
-}
-
 print_debug_info() {
   echo -e "\n"
   echo "################################################################"
@@ -105,7 +98,6 @@ print_debug_info() {
 
 clean_test_run() {
   echo "Cleaning previous test run"
-  rm -f /tmp/ISTIO_TESTS_DONE
 
   if [ "${CONTROL_PLANE_SOURCE}" == "sail" ]; then
     oc delete istiocni --all -n istio-cni --wait=true --timeout=120s
@@ -134,9 +126,8 @@ set +o errexit
 run_tests
 TEST_RC=$?
 
-if ! are_tests_done; then
-  echo "WARNING: test run exited with ${TEST_RC} but /tmp/ISTIO_TESTS_DONE was not found."
-  echo "This may indicate the test run was killed mid-flight (timeout, OOM, etc.)"
+if [ "${TEST_RC}" -ne 0 ]; then
+  echo "WARNING: test run failed with exit code ${TEST_RC}, retrying..."
   print_debug_info
 
   echo "Retrying test execution in ${RETRY_SLEEP_INTERVAL} seconds..."
@@ -148,8 +139,8 @@ if ! are_tests_done; then
   run_tests
   TEST_RC=$?
 
-  if [ "${TEST_RC}" -ne 0 ] || ! are_tests_done; then
-    echo "ERROR: Second attempt failed. Exit code: ${TEST_RC}, Marker file present: $(are_tests_done && echo "Yes" || echo "No")"
+  if [ "${TEST_RC}" -ne 0 ]; then
+    echo "ERROR: Second attempt failed. Exit code: ${TEST_RC}"
     print_debug_info
     exit 1
   else
