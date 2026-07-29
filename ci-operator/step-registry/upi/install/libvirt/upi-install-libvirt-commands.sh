@@ -597,10 +597,9 @@ create_node () {
       echo "virt-install not found; defining ${NAME} with virsh (≤4.15 libvirt-installer fallback, no ACPI)"
       DOMAIN_XML="${INSTALL_DIR}/${NAME}.xml"
       write_upi_domain_xml "${NAME}" "${MAC_ADDRESS}" "${IGNITION_VOLUME}" "${DOMAIN_XML}"
-      echo "Domain XML:"
-      cat "${DOMAIN_XML}"
-      ${VIRSH} destroy "${NAME}" || true
-      ${VIRSH} undefine "${NAME}" || true
+      # Domain may not exist yet on first create; silence expected "failed to get domain" noise.
+      ${VIRSH} destroy "${NAME}" >/dev/null 2>&1 || true
+      ${VIRSH} undefine "${NAME}" >/dev/null 2>&1 || true
       ${VIRSH} define "${DOMAIN_XML}"
       ${VIRSH} start "${NAME}"
       ${VIRSH} autostart "${NAME}" || true
