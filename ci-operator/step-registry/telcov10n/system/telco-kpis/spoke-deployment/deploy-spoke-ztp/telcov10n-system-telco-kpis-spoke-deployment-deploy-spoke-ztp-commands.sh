@@ -12,6 +12,10 @@ main() {
 
     setup_ansible_inventory "${SPOKE_CLUSTER}" "${HUB_CLUSTER}"
 
+    if [[ -n "${LOCKDOWN_URI:-}" ]]; then
+        resolve_ocp_version_from_lockdown "${LOCKDOWN_URI}"
+    fi
+
     cd /eco-ci-cd
 
     local kubeconfig="/home/telcov10n/project/generated/${HUB_CLUSTER}/auth/kubeconfig"
@@ -29,6 +33,7 @@ main() {
 
     local extra_vars=(
         -e "kubeconfig=${kubeconfig}"
+        -e "ocp_version=${VERSION}"
         -e "spoke_cluster=${SPOKE_CLUSTER}"
         -e "force_cleanup=${FORCE_CLEANUP:-false}"
         -e "ztp_git_repo_url=${ZTP_GIT_REPO}"
@@ -40,18 +45,12 @@ main() {
     )
 
     if [[ -n "${LOCKDOWN_URI:-}" ]]; then
-        resolve_ocp_version_from_lockdown "${LOCKDOWN_URI}"
-        local uri_tail
-        uri_tail=$(basename "${LOCKDOWN_URI}" .json)
-        extra_vars+=(-e "ocp_version=$(cat "${SHARED_DIR}/ocp_version_from_${uri_tail}")")
         extra_vars+=(-e "lockdown_uri=${LOCKDOWN_URI}")
     elif [[ -n "${OCP_RELEASE_IMAGE:-}" ]]; then
         if [[ "${OCP_RELEASE_IMAGE}" != *"@sha256:"* ]]; then
             echo "OCP_RELEASE_IMAGE is tag-based — wrapper will resolve to digest format"
         fi
         extra_vars+=(-e "raw_ocp_release_image=${OCP_RELEASE_IMAGE}")
-    else
-        extra_vars+=(-e "ocp_version=${VERSION}")
     fi
 
     ansible-playbook ./playbooks/telco-kpis/deploy-spoke-ztp.yml \

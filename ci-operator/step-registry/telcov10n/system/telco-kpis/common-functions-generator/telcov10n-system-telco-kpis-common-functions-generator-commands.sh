@@ -489,7 +489,8 @@ __debug_on_fail_exit_handler() {
 #
 # Side effects:
 #   - Writes ${SHARED_DIR}/ocp_version_from_<uri_tail>
-#   - Caller reads the file to get the version string
+#   - Exports VERSION with the extracted value so all downstream
+#     code that references ${VERSION} gets the correct value
 #
 # Must be called AFTER setup_ansible_inventory (needs bastion SSH).
 # ----------------------------------------------------------------------
@@ -501,13 +502,13 @@ resolve_ocp_version_from_lockdown() {
     local output_file="${SHARED_DIR}/ocp_version_from_${uri_tail}"
 
     if [[ -f "${output_file}" ]]; then
-        echo "OCP version (cached from ${uri_tail}): $(cat "${output_file}")"
+        VERSION=$(cat "${output_file}")
+        export VERSION
+        echo "OCP version (cached from ${uri_tail}): ${VERSION}"
         return 0
     fi
 
-    local saved_dir
-    saved_dir=$(pwd)
-    cd /eco-ci-cd
+    pushd /eco-ci-cd > /dev/null
 
     ansible-playbook ./playbooks/telco-kpis/ocp-version-from-lockdown.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
@@ -515,9 +516,11 @@ resolve_ocp_version_from_lockdown() {
         -e "ocp_version_output_file=${output_file}" \
         -vv
 
-    cd "${saved_dir}"
+    popd > /dev/null
 
-    echo "OCP version extracted (${uri_tail}): $(cat "${output_file}")"
+    VERSION=$(cat "${output_file}")
+    export VERSION
+    echo "OCP version extracted (${uri_tail}): ${VERSION}"
 }
 EOF
 
