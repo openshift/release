@@ -475,6 +475,50 @@ __debug_on_fail_exit_handler() {
     echo "Exiting debug mode with original exit code: ${exit_code}"
     exit ${exit_code}
 }
+
+# ----------------------------------------------------------------------
+# resolve_ocp_version_from_lockdown
+#
+# Extracts the OCP version (X.Y) from a lockdown JSON URI by running
+# the ocp-version-from-lockdown.yml Ansible playbook. Caches the result
+# per URI tail in ${SHARED_DIR} so subsequent calls with the same URI
+# return instantly.
+#
+# Parameters:
+#   1 - lockdown_uri: URL to hub or spoke lockdown JSON
+#
+# Side effects:
+#   - Writes ${SHARED_DIR}/ocp_version_from_<uri_tail>
+#   - Caller reads the file to get the version string
+#
+# Must be called AFTER setup_ansible_inventory (needs bastion SSH).
+# ----------------------------------------------------------------------
+
+resolve_ocp_version_from_lockdown() {
+    local lockdown_uri="$1"
+    local uri_tail
+    uri_tail=$(basename "${lockdown_uri}" .json)
+    local output_file="${SHARED_DIR}/ocp_version_from_${uri_tail}"
+
+    if [[ -f "${output_file}" ]]; then
+        echo "OCP version (cached from ${uri_tail}): $(cat "${output_file}")"
+        return 0
+    fi
+
+    local saved_dir
+    saved_dir=$(pwd)
+    cd /eco-ci-cd
+
+    ansible-playbook ./playbooks/telco-kpis/ocp-version-from-lockdown.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        -e "lockdown_uri=${lockdown_uri}" \
+        -e "ocp_version_output_file=${output_file}" \
+        -vv
+
+    cd "${saved_dir}"
+
+    echo "OCP version extracted (${uri_tail}): $(cat "${output_file}")"
+}
 EOF
 
 echo "Shared functions written to ${SHARED_DIR}/telco-kpis-common-functions.sh"

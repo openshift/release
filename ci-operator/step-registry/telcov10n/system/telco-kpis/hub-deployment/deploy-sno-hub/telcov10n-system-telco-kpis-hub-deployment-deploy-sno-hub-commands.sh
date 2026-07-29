@@ -13,6 +13,10 @@ main() {
     # Hub IS the OCP cluster being deployed — pass as both spoke and hub args
     setup_ansible_inventory "${HUB_CLUSTER}" "${HUB_CLUSTER}"
 
+    if [[ -n "${HUB_LOCKDOWN_URI:-}" ]]; then
+        resolve_ocp_version_from_lockdown "${HUB_LOCKDOWN_URI}"
+    fi
+
     cd /eco-ci-cd
 
     DEBUG_FLAG="-vv"

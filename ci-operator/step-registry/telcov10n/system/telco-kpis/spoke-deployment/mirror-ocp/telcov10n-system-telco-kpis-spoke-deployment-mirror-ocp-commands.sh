@@ -12,6 +12,10 @@ main() {
 
     setup_ansible_inventory "${SPOKE_CLUSTER:-dummy-spoke}" "${HUB_CLUSTER}"
 
+    if [[ -n "${LOCKDOWN_URI:-}" ]]; then
+        resolve_ocp_version_from_lockdown "${LOCKDOWN_URI}"
+    fi
+
     cd /eco-ci-cd
 
     local kubeconfig="/home/telcov10n/project/generated/${HUB_CLUSTER}/auth/kubeconfig"

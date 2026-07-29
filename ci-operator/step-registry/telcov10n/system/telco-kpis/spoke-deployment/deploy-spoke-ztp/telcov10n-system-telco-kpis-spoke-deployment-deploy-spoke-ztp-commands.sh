@@ -39,20 +39,19 @@ main() {
         -e "bmc_secret_name=baremetal-bmc-secret"
     )
 
-    if [[ -z "${LOCKDOWN_URI:-}" && -z "${OCP_RELEASE_IMAGE:-}" ]]; then
-        extra_vars+=(-e "ocp_version=${VERSION}")
-    fi
-
-    if [[ -n "${OCP_RELEASE_IMAGE:-}" ]]; then
+    if [[ -n "${LOCKDOWN_URI:-}" ]]; then
+        resolve_ocp_version_from_lockdown "${LOCKDOWN_URI}"
+        local uri_tail
+        uri_tail=$(basename "${LOCKDOWN_URI}" .json)
+        extra_vars+=(-e "ocp_version=$(cat "${SHARED_DIR}/ocp_version_from_${uri_tail}")")
+        extra_vars+=(-e "lockdown_uri=${LOCKDOWN_URI}")
+    elif [[ -n "${OCP_RELEASE_IMAGE:-}" ]]; then
         if [[ "${OCP_RELEASE_IMAGE}" != *"@sha256:"* ]]; then
             echo "OCP_RELEASE_IMAGE is tag-based — wrapper will resolve to digest format"
         fi
         extra_vars+=(-e "raw_ocp_release_image=${OCP_RELEASE_IMAGE}")
-    fi
-
-    if [[ -n "${LOCKDOWN_URI:-}" ]]; then
-        echo "Lockdown URI provided for OCP release image resolution: ${LOCKDOWN_URI}"
-        extra_vars+=(-e "lockdown_uri=${LOCKDOWN_URI}")
+    else
+        extra_vars+=(-e "ocp_version=${VERSION}")
     fi
 
     ansible-playbook ./playbooks/telco-kpis/deploy-spoke-ztp.yml \

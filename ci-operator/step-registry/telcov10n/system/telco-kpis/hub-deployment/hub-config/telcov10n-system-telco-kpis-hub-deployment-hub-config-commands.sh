@@ -12,6 +12,14 @@ main() {
 
     setup_ansible_inventory "${HUB_CLUSTER}" "${HUB_CLUSTER}"
 
+    if [[ -z "${VERSION:-}" && -n "${HUB_LOCKDOWN_URI:-}" ]]; then
+        resolve_ocp_version_from_lockdown "${HUB_LOCKDOWN_URI}"
+        local uri_tail
+        uri_tail=$(basename "${HUB_LOCKDOWN_URI}" .json)
+        VERSION=$(cat "${SHARED_DIR}/ocp_version_from_${uri_tail}")
+        echo "Using OCP version from lockdown: ${VERSION}"
+    fi
+
     cd /eco-ci-cd
 
     local kubeconfig="/home/telcov10n/project/generated/${HUB_CLUSTER}/auth/kubeconfig"
