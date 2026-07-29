@@ -1,6 +1,9 @@
 ref:
   as: upi-install-libvirt
   from: libvirt-installer
+  # Provide oc for images that omit it (e.g. ocp/4.15:libvirt-installer).
+  # openshift-install is still extracted from OPENSHIFT_INSTALL_TARGET (release payload).
+  cli: latest
   grace_period: 30m
   commands: upi-install-libvirt-commands.sh
   env:
@@ -46,4 +49,8 @@ ref:
     - name: "release:latest"
       env: OPENSHIFT_INSTALL_TARGET
   documentation: >-
-    The UPI libvirt install step runs the openshift-install in order to bring up an OpenShift cluster via a remote libvirt configuration with a fixed load balancer.
+    The UPI libvirt install step runs openshift-install and creates guests on a remote
+    libvirt hypervisor. Prefer virt-install when present (4.16+ libvirt-installer images).
+    If virt-install is missing (typical of ocp/4.15:libvirt-installer), guests are defined
+    with virsh using ACPI-free domain XML so RHEL 9 s390x QEMU accepts them. ETCD_DISK_SPEED=slow
+    is applied only when BRANCH is 4.16 or newer (API not present on older releases).

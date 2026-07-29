@@ -1,0 +1,42 @@
+workflow:
+  as: openshift-e2e-libvirt-vpn-oz-upi
+  steps:
+    env:
+      # IBM Z Orange Zone VPN (phc-cicd): install-config / libvirt network naming.
+      USE_EXTERNAL_DNS: "true"
+      # OZ hypervisors: shared UPI pool on the large /home volume (not root FS).
+      LIBVIRT_IMAGE_PATH: "/home/libvirt/openshift-images"
+      POOL_NAME: multiarch-ci-pool
+      # Do not set ETCD_DISK_SPEED=slow here: controlPlaneHardwareSpeed is 4.16+.
+      # upi-install-libvirt also gates that patch on BRANCH >= 4.16.
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+    test:
+    - chain: openshift-e2e-libvirt-test
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+  documentation: |-
+    User-provisioned (UPI) libvirt e2e for IBM Z Orange Zone VPN leases
+    (cluster_profile libvirt-s390x-vpn-oz).
+
+    Intended for OCP 4.15 and older nightlies where the classic
+    openshift-e2e-libvirt-vpn path is not usable: that workflow assumes a
+    4.16+ libvirt-installer image with virt-install (MULTIARCH-4111) and
+    often sets ETCD_DISK_SPEED=slow (API from 4.16).
+
+    This workflow reuses the same UPI conf/install chains as product UPI
+    (platform: none, ignition + RHCOS volumes) with VPN naming
+    (USE_EXTERNAL_DNS → baseDomain phc-cicd.cis.ibm.net, cluster name =
+    lease). upi-install-libvirt falls back to ACPI-free virsh define when
+    virt-install is missing, and pulls oc via cli:latest when the step
+    image lacks it.
+
+    For 4.16+ prefer openshift-e2e-libvirt-vpn (or -fips) on libvirt-s390x-vpn.
+    Do not use this workflow on Power s2s or non-VPN libvirt profiles.
