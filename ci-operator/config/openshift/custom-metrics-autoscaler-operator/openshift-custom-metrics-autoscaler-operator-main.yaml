@@ -40,6 +40,10 @@ operator:
     context_dir: .
     dockerfile_path: bundle.Dockerfile.ci
     skip_building_index: true
+  - as: custom-metrics-autoscaler-operator-previous-bundle
+    context_dir: .
+    dockerfile_path: bundle-previous.Dockerfile.ci
+    skip_building_index: true
   substitutions:
   - pullspec: ghcr.io/kedacore/keda-olm-operator:.*
     with: pipeline:custom-metrics-autoscaler-operator
@@ -129,6 +133,17 @@ tests:
     - chain: ipi-gcp-pre
     test:
     - chain: keda-e2e-cma
+- as: cma-e2e-upgrade-aws
+  optional: true
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - chain: keda-e2e-cma-upgrade
 zz_generated_metadata:
   branch: main
   org: openshift
