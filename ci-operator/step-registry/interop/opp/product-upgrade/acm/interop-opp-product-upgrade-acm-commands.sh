@@ -36,14 +36,14 @@ trap 'exit_code=$?; if (( exit_code != 0 )); then collect_diagnostics; fi' EXIT
 get_current_csv() {
     oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.currentCSV}' 2>/dev/null
+        -o jsonpath='{.status.currentCSV}' 2>/dev/null || true
 }
 
 get_csv_phase() {
     local csv_name="$1"
     oc get csv "${csv_name}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.phase}' 2>/dev/null
+        -o jsonpath='{.status.phase}' 2>/dev/null || true
 }
 
 get_installed_version() {
@@ -54,13 +54,13 @@ get_installed_version() {
     fi
     oc get csv "${csv_name}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.version}' 2>/dev/null
+        -o jsonpath='{.spec.version}' 2>/dev/null || true
 }
 
 get_current_channel() {
     oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.channel}' 2>/dev/null
+        -o jsonpath='{.spec.channel}' 2>/dev/null || true
 }
 
 resolve_target_channel() {
@@ -79,17 +79,17 @@ resolve_target_channel() {
     local catalog_namespace
     catalog_namespace="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.sourceNamespace}' 2>/dev/null)"
+        -o jsonpath='{.spec.sourceNamespace}' 2>/dev/null || true)"
 
     local package_name
     package_name="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.name}' 2>/dev/null)"
+        -o jsonpath='{.spec.name}' 2>/dev/null || true)"
 
     local channels
     channels="$(oc get packagemanifest "${package_name}" \
         -n "${catalog_namespace}" \
-        -o jsonpath='{.status.channels[*].name}' 2>/dev/null)"
+        -o jsonpath='{.status.channels[*].name}' 2>/dev/null || true)"
 
     if [[ -z "${channels}" ]]; then
         echo >&2 "ERROR: No channels found in packagemanifest for ${package_name}"
@@ -188,6 +188,9 @@ parse_timeout() {
         minutes="$(( BASH_REMATCH[1] * 60 ))"
     elif [[ "${input}" =~ ^([0-9]+)$ ]]; then
         minutes="${input}"
+    else
+        echo >&2 "WARNING: Unrecognized timeout format '${input}'; defaulting to 30m"
+        minutes=30
     fi
     echo "$(( minutes * 60 + seconds ))"
 }
@@ -324,7 +327,7 @@ install_plan=""
 for _ in $(seq 1 12); do
     install_plan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.installplan.name}' 2>/dev/null || true)"
+        -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null || true)"
     if [[ -z "${install_plan}" ]]; then
         install_plan="$(oc get installplan -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
             --sort-by=.metadata.creationTimestamp \
@@ -366,5 +369,10 @@ validate_hub_health
     printf 'CSV:      %s\n' "${new_csv}"
     printf 'Status:   SUCCESS\n'
 } > "${ARTIFACT_DIR}/acm-upgrade-summary.txt"
+
+if [[ -n "${SHARED_DIR:-}" ]]; then
+    echo "${new_version}" > "${SHARED_DIR}/acm-upgraded-version"
+    echo "${target_channel}" > "${SHARED_DIR}/acm-upgraded-channel"
+fi
 
 echo "=== ACM Operator Upgrade: SUCCESS ==="
