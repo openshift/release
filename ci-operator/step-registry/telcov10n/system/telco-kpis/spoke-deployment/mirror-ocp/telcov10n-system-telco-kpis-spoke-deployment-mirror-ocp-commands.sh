@@ -25,26 +25,28 @@ main() {
         DEBUG_FLAG="-vvv"
     fi
 
+    local ocp_version="${VERSION}"
     local extra_vars=(
         -e "kubeconfig=${kubeconfig}"
-        -e "ocp_version=${VERSION}"
     )
 
-    if [[ -n "${OCP_RELEASE_IMAGE:-}" ]]; then
+    if [[ -n "${LOCKDOWN_URI:-}" ]]; then
+        echo "Lockdown URI provided for OCP release image resolution: ${LOCKDOWN_URI}"
+        local uri_tail
+        uri_tail=$(basename "${LOCKDOWN_URI}" .json)
+        ocp_version=$(cat "${SHARED_DIR}/ocp_version_from_${uri_tail}")
+        echo "Using OCP version from lockdown: ${ocp_version}"
+        extra_vars+=(-e "lockdown_uri=${LOCKDOWN_URI}")
+    elif [[ -n "${OCP_RELEASE_IMAGE:-}" ]]; then
         if [[ "${OCP_RELEASE_IMAGE}" != *"@sha256:"* ]]; then
             echo "OCP_RELEASE_IMAGE is tag-based -- playbook will resolve to digest format"
         fi
         extra_vars+=(-e "raw_ocp_release_image=${OCP_RELEASE_IMAGE}")
-    fi
-
-    if [[ -n "${LOCKDOWN_URI:-}" ]]; then
-        echo "Lockdown URI provided for OCP release image resolution: ${LOCKDOWN_URI}"
-        extra_vars+=(-e "lockdown_uri=${LOCKDOWN_URI}")
-    fi
-
-    if [[ -z "${OCP_RELEASE_IMAGE:-}" ]] && [[ -z "${LOCKDOWN_URI:-}" ]]; then
+    else
         echo "No explicit image or lockdown -- will mirror hub cluster's own release image"
     fi
+
+    extra_vars+=(-e "ocp_version=${ocp_version}")
 
     ansible-playbook ./playbooks/telco-kpis/mirror-ocp.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
