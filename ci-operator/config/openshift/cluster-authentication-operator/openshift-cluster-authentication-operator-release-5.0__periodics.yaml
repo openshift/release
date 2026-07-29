@@ -447,6 +447,93 @@ tests:
       TEST_SKIPS: \[OCPFeatureGate:ExternalOIDC\]\|\[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]
       TEST_SUITE: openshift/auth/external-oidc
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-component-proxy
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SUITE: openshift/auth/component-proxy
+    workflow: openshift-e2e-aws
+- as: e2e-azure-component-proxy
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SUITE: openshift/auth/component-proxy
+    workflow: openshift-e2e-azure
+- as: e2e-gcp-component-proxy
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SUITE: openshift/auth/component-proxy
+    workflow: openshift-e2e-gcp
+- as: e2e-vsphere-component-proxy
+  cron: 15 12 * * 3
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SUITE: openshift/auth/component-proxy
+    workflow: openshift-e2e-vsphere
+- as: e2e-metal-ovn-ipv4-component-proxy
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SUITE: openshift/auth/component-proxy
+    workflow: baremetalds-e2e
+- as: e2e-metal-ovn-ipv6-component-proxy
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SUITE: openshift/auth/component-proxy
+    workflow: baremetalds-e2e
+- as: e2e-metal-ovn-dualstack-component-proxy
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SUITE: openshift/auth/component-proxy
+    workflow: baremetalds-e2e
+- as: e2e-aws-sno-component-proxy
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants,legacy-node-invariants,legacy-kube-apiserver-invariants,audit-log-analyzer
+      TEST_SUITE: openshift/auth/component-proxy
+    workflow: openshift-e2e-aws-single-node
 zz_generated_metadata:
   branch: release-5.0
   org: openshift
