@@ -49,8 +49,6 @@ bash "${PCP_SCRIPTS}/generate-dashboard.sh" \
     --local "${LOCAL_ARTIFACTS}" \
     --output "${ARTIFACT_DIR}/pcp-dashboard.html"
 
-rm -rf "${LOCAL_ARTIFACTS}"
-
 # Build a gcsweb link to the interactive dashboard.
 # Spyglass does not execute JavaScript in custom-link HTML, so the toggle
 # provides a link to the full interactive dashboard instead.
