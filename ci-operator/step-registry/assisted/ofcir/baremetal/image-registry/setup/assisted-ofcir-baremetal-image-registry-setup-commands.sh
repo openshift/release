@@ -6,6 +6,13 @@ set -o pipefail
 
 echo "************ assisted ofcir baremetal image registry setup command ************"
 
+if [[ "${TEST_TYPE:-none}" == "none" ]]; then
+  echo "TEST_TYPE is 'none', skipping image registry setup."
+  exit 0
+fi
+
+echo "TEST_TYPE=${TEST_TYPE}: enabling cluster image registry (Managed + emptyDir)"
+
 timeout -s 9 30m ssh -F "${SHARED_DIR}/ssh_config" ci_machine bash - <<'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 set -euo pipefail
 cd /home/assisted
