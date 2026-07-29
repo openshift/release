@@ -321,6 +321,9 @@ function install_osc_operator() {
 
   echo ">>> Installing OSC operator"
 
+  echo ">>> Creating namespace ${OSC_NAMESPACE}"
+  oc create namespace "${OSC_NAMESPACE}" 2>/dev/null || true
+
   local operator_yaml="${SCRATCH}/operator-manifests.yaml"
   if ! render_osc_operator_chart "${charts_dir}" > "${operator_yaml}"; then
     echo ">>> ERROR: Failed to render operator chart"
