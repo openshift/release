@@ -591,12 +591,18 @@ function main {
 	oc get ImageDigestMirrorSet -oyaml >/tmp/mgmt_idms.yaml && yq-go r /tmp/mgmt_idms.yaml 'items[*].spec.imageDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml || true
 
 	# Extract source commit from catalog image for integration test builds.
-	local commit
-	commit=$(oc image info --insecure --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
-		| jq -r '.config.config.Labels["vcs-ref"]') || true
-	if [[ -n "${commit}" && "${commit}" != "null" ]]; then
-		echo -n "${commit}" > "${SHARED_DIR}/lvm_source_commit"
+	# Fail hard if vcs-ref label is missing — wrong commit means meaningless test results.
+	local commit image_info_flags=""
+	if [[ "$DISCONNECTED" == "true" ]]; then
+		image_info_flags="--insecure -a /tmp/new-dockerconfigjson"
 	fi
+	commit=$(oc image info ${image_info_flags} --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+		| jq -r '.config.config.Labels["vcs-ref"]')
+	if [[ -z "${commit}" || "${commit}" == "null" ]]; then
+		echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
+		return 1
+	fi
+	echo -n "${commit}" > "${SHARED_DIR}/lvm_source_commit"
 
 	return 0
 }
