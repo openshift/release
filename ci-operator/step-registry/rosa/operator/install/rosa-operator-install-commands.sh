@@ -195,6 +195,11 @@ if [[ "${CLUSTER_PACKAGE_NAME}" != "${OPERATOR_NAME}" ]]; then
 fi
 
 # Create the ClusterPackage CR
+PKO_CONFIG="    image: ${OPERATOR_IMAGE}"
+if [[ -n "${PKO_CONFIG_NAMESPACE:-}" ]]; then
+    PKO_CONFIG="${PKO_CONFIG}
+    namespace: ${PKO_CONFIG_NAMESPACE}"
+fi
 cat <<EOF | oc apply -f -
 apiVersion: package-operator.run/v1alpha1
 kind: ClusterPackage
@@ -205,7 +210,7 @@ metadata:
 spec:
   image: ${OPERATOR_PKO_IMAGE}
   config:
-    image: ${OPERATOR_IMAGE}
+${PKO_CONFIG}
 EOF
 
 # Save the ClusterPackage name for cleanup
