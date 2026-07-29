@@ -10,6 +10,28 @@ export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
 export AZURE_TOKEN_CREDENTIALS=prod
 
+# The shared-leftovers workflow resolves orphaned role-assignment principals via
+# Microsoft Graph, which requires directory read permissions (Directory.Read.All).
+# The per-environment ARM identity above usually lacks that tenant-wide grant, so
+# export a dedicated Graph identity from GRAPH_SECRET_PROFILE (the dev bot by
+# default). When it resolves to the same profile as the ARM identity, skip it and
+# let cleanup-sweeper fall back to a single identity for both ARM and Graph.
+GRAPH_PROFILE_DIR="/var/run/aro-hcp-${GRAPH_SECRET_PROFILE}"
+# Log which identity backs ARM versus Graph (no secrets: only profile paths and a
+# yes/no) so a failed run makes it obvious whether the dedicated Graph identity was
+# picked up or the ARM identity was used as fallback.
+echo "cleanup-sweeper identity selection:"
+echo "  ARM profile:   ${CLUSTER_PROFILE_DIR} (VAULT_SECRET_PROFILE=${VAULT_SECRET_PROFILE})"
+echo "  Graph profile: ${GRAPH_PROFILE_DIR} (GRAPH_SECRET_PROFILE=${GRAPH_SECRET_PROFILE}) exists=$([[ -d "${GRAPH_PROFILE_DIR}" ]] && echo yes || echo no)"
+if [[ -d "${GRAPH_PROFILE_DIR}" && "${GRAPH_PROFILE_DIR}" != "${CLUSTER_PROFILE_DIR}" ]]; then
+  export GRAPH_AZURE_CLIENT_ID; GRAPH_AZURE_CLIENT_ID=$(cat "${GRAPH_PROFILE_DIR}/client-id")
+  export GRAPH_AZURE_TENANT_ID; GRAPH_AZURE_TENANT_ID=$(cat "${GRAPH_PROFILE_DIR}/tenant")
+  export GRAPH_AZURE_CLIENT_SECRET; GRAPH_AZURE_CLIENT_SECRET=$(cat "${GRAPH_PROFILE_DIR}/client-secret")
+  echo "  using dedicated Graph identity for directory reads"
+else
+  echo "  using ARM identity for directory reads (no separate Graph profile)"
+fi
+
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 
 go build -o /tmp/cleanup-sweeper ./tooling/cleanup-sweeper
