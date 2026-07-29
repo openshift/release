@@ -306,7 +306,7 @@ echo ${TLS_PROXY_URL} > ${SHARED_DIR}/https_proxy_url
 
 # need a squid image with at least version 4.x so that we can do a TLS 1.3 handshake.
 # 4.5:egress-http-proxy image only does up to 1.2 which podman fails to do a handshake with  https://github.com/containers/image/issues/699
-PROXY_IMAGE=registry.ci.openshift.org/origin/4.18:egress-http-proxy
+PROXY_IMAGE=quay-proxy.ci.openshift.org/openshift/ci:origin_4.18_egress-http-proxy
 cat >> ${SHARED_DIR}/install-config.yaml << EOF
 proxy:
   httpsProxy: ${TLS_PROXY_URL}

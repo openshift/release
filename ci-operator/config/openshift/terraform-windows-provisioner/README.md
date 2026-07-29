@@ -6,7 +6,7 @@ This directory contains CI operator configuration for building the [terraform-wi
 
 The built image is available at:
 ```
-registry.ci.openshift.org/ci/terraform-windows-provisioner:latest
+quay-proxy.ci.openshift.org/openshift/ci:ci_terraform-windows-provisioner_latest
 ```
 
 ## What's in the Image
