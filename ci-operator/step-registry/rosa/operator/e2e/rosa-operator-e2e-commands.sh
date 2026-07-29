@@ -4,7 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+collect_operator_logs() {
+    local ns="${OPERATOR_NAMESPACE:-openshift-${OPERATOR_NAME}}"
+    if [[ -n "${ARTIFACT_DIR:-}" ]] && oc get namespace "${ns}" &>/dev/null; then
+        for deploy in $(oc get deployment -n "${ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
+            oc logs "deployment/${deploy}" -n "${ns}" --all-containers --tail=500 \
+                > "${ARTIFACT_DIR}/${deploy}-logs.txt" 2>&1 || true
+        done
+        oc get events -n "${ns}" --sort-by='.lastTimestamp' \
+            > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
+    fi
+}
+
+trap 'collect_operator_logs; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM EXIT
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
