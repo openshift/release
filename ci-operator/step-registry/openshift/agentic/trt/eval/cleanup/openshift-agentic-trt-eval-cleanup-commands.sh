@@ -11,25 +11,42 @@ GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token" 2>/dev/null || echo "")
 export GITHUB_TOKEN
 set -x
 
-PR_NUM=""
-if [[ -f "${SHARED_DIR}/pr-number" ]]; then
-    PR_NUM=$(cat "${SHARED_DIR}/pr-number")
+if [[ -z "${GITHUB_TOKEN}" ]]; then
+    echo "No token available, skipping cleanup."
+    exit 0
 fi
 
-if [[ -n "${PR_NUM}" && -n "${GITHUB_TOKEN}" ]]; then
-    echo "Closing eval PR #${PR_NUM} and deleting branch..."
-    gh pr close "${PR_NUM}" --repo "${UPSTREAM_REPO}" --delete-branch 2>/dev/null || true
-elif [[ -n "${GITHUB_TOKEN}" ]]; then
-    CLAUDE_BRANCH=""
-    if [[ -f "${SHARED_DIR}/claude-branch" ]]; then
-        CLAUDE_BRANCH=$(cat "${SHARED_DIR}/claude-branch")
-    fi
-    if [[ -n "${CLAUDE_BRANCH}" ]]; then
-        echo "No PR found, deleting branch ${CLAUDE_BRANCH} directly..."
-        gh api "repos/${UPSTREAM_REPO}/git/refs/heads/${CLAUDE_BRANCH}" -X DELETE 2>/dev/null || true
-    fi
-else
-    echo "No token available, skipping cleanup."
+if [[ ! -f "${SHARED_DIR}/eval-cases" ]]; then
+    echo "No eval-cases file found, skipping cleanup."
+    exit 0
 fi
+
+mapfile -t CASE_LIST < "${SHARED_DIR}/eval-cases"
+echo "Cleaning up ${#CASE_LIST[@]} cases..."
+
+for case_name in "${CASE_LIST[@]}"; do
+    CASE_SHARED="${SHARED_DIR}/cases/${case_name}"
+
+    PR_NUM=""
+    if [[ -f "${CASE_SHARED}/pr-number" ]]; then
+        PR_NUM=$(cat "${CASE_SHARED}/pr-number")
+    fi
+
+    if [[ -n "${PR_NUM}" ]]; then
+        echo "[${case_name}] Closing PR #${PR_NUM} and deleting branch..."
+        gh pr close "${PR_NUM}" --repo "${UPSTREAM_REPO}" --delete-branch 2>/dev/null || true
+    else
+        CLAUDE_BRANCH=""
+        if [[ -f "${CASE_SHARED}/claude-branch" ]]; then
+            CLAUDE_BRANCH=$(cat "${CASE_SHARED}/claude-branch")
+        fi
+        if [[ -n "${CLAUDE_BRANCH}" ]]; then
+            echo "[${case_name}] No PR found, deleting branch ${CLAUDE_BRANCH}..."
+            gh api "repos/${UPSTREAM_REPO}/git/refs/heads/${CLAUDE_BRANCH}" -X DELETE 2>/dev/null || true
+        else
+            echo "[${case_name}] Nothing to clean up."
+        fi
+    fi
+done
 
 echo "=== TRT Eval Cleanup Complete ==="

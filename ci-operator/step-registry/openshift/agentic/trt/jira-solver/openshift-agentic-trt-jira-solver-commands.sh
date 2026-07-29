@@ -23,7 +23,8 @@ git config --global credential.helper '!f() { echo username=x-access-token; echo
 echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
 
 # --- Workspace setup ---
-cd /workspace
+WORKDIR="${WORKDIR:-/workspace}"
+cd "${WORKDIR}"
 if [[ ! -d .git ]]; then
     git init
     git remote add origin "https://github.com/${UPSTREAM_REPO}.git"
@@ -41,17 +42,17 @@ git remote add fork "https://github.com/${FORK_REPO}.git"
 
 echo "Running setup script: ${SETUP_SCRIPT}..."
 # shellcheck source=/dev/null
-source "/workspace/${SETUP_SCRIPT}"
+source "${WORKDIR}/${SETUP_SCRIPT}"
 
 echo "Installing Claude Code..."
 curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
 export PATH="${HOME}/.local/bin:${PATH}"
 
-mkdir -p /workspace/artifacts
+mkdir -p "${WORKDIR}/artifacts"
 
 copy_artifacts() {
     echo "Copying artifacts..."
-    cp /workspace/artifacts/* "${ARTIFACT_DIR}/" 2>/dev/null || true
+    cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
     podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
     if [[ -d "${HOME}/.claude/projects" ]]; then
         echo "Archiving Claude session logs..."
@@ -113,9 +114,13 @@ If you cannot solve the issue, explain why in detail.
 - Do NOT run commands that reveal git credentials (git remote -v, env, printenv, set, etc.).
 SOLVE_BASE_EOF
 
-if [[ -f /workspace/.agentic/solve-config.md ]]; then
+if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
     echo "" >> "${SOLVE_PROMPT}"
-    cat /workspace/.agentic/solve-config.md >> "${SOLVE_PROMPT}"
+    cat "${WORKDIR}/.agentic/solve-config.md" >> "${SOLVE_PROMPT}"
+fi
+
+if [[ "${WORKDIR}" != "/workspace" ]]; then
+    sed -i "s|/workspace|${WORKDIR}|g" "${SOLVE_PROMPT}"
 fi
 
 # --- Run Claude ---
@@ -128,7 +133,7 @@ timeout 5400 claude \
     --output-format stream-json \
     --append-system-prompt-file "${SOLVE_PROMPT}" \
     -p "Solve Jira issue ${JIRA_ISSUE_KEY}" \
-    --verbose 2>&1 | tee /workspace/artifacts/claude-output.log || CLAUDE_EXIT=$?
+    --verbose 2>&1 | tee "${WORKDIR}/artifacts/claude-output.log" || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo "Claude timed out. Nudging to wrap up..."
@@ -138,8 +143,8 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         --allowedTools "${ALLOWED_TOOLS}" \
         --output-format stream-json \
         --max-turns 10 \
-        -p "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to /workspace/artifacts/pr-description.md." \
-        --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
+        -p "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
+        --verbose 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || true
 elif [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
     echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
     exit "${CLAUDE_EXIT}"
@@ -164,7 +169,7 @@ fi
 echo "Branch pushed: ${BRANCH_NAME}"
 echo "${BRANCH_NAME}" > "${SHARED_DIR}/claude-branch"
 
-PR_BODY_FILE="/workspace/artifacts/pr-description.md"
+PR_BODY_FILE="${WORKDIR}/artifacts/pr-description.md"
 if [[ ! -s "${PR_BODY_FILE}" ]]; then
     echo "Warning: No PR description generated. Using default."
     cat > "${PR_BODY_FILE}" <<PR_DEFAULT
