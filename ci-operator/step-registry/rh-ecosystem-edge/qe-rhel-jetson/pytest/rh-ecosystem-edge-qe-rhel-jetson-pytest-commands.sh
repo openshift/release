@@ -20,7 +20,7 @@ if [[ -n "${JUMPHOST:-}" ]]; then
     TUNNEL_PID=$!
     trap 'kill ${TUNNEL_PID} 2>/dev/null || true' EXIT
     # Wait for tunnel to be ready
-    for i in $(seq 1 15); do
+    for _ in $(seq 1 15); do
         if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=2 \
                -i /tmp/jetson_id_rsa \
                -p "${LOCAL_PORT}" root@127.0.0.1 true 2>/dev/null; then
