@@ -304,7 +304,9 @@ PY
 # newer lock entry. Re-pin pyproject+lock in the Job before make so sync stays
 # on 6.32.1.
 PROTOBUF_PIN="${PROTOBUF_PIN:-6.32.1}"
-PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve -p kuadrant_debug_logger -vv --tb=short --setup-show"
+# Ignore UI: the s390x testsuite image omits Playwright; collecting
+# singlecluster/ui still imports conftest and fails make with ModuleNotFoundError.
+PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve -p kuadrant_debug_logger -vv --tb=short --setup-show --ignore=testsuite/tests/singlecluster/ui"
 
 # Build in-container diagnostics plugin with strict timeouts and fail-safe
 DIAGNOSTICS_PLUGIN="${WORK_DIR}/kuadrant_debug_logger.py"
@@ -472,13 +474,15 @@ print('default_exposer:', settings.get('default_exposer', 'NOT SET'))
 print('====================================')
 \" 2>&1 || echo 'Config verification failed (non-fatal, but indicates config load issue!)'
 "
+# Smoke and kuadrant are independent: each records failure into rc but does not
+# skip the next target. Kuadrant always runs after smoke when enabled.
 if [[ "${RUN_SMOKE}" == "true" ]]; then
   CONTAINER_SCRIPT+="echo '=== make smoke ==='
 flags='${PYTEST_PLUGIN_FLAGS}' make smoke || rc=1
 "
 fi
 if [[ "${RUN_KUADRANT}" == "true" ]]; then
-  CONTAINER_SCRIPT+="echo '=== make kuadrant ==='
+  CONTAINER_SCRIPT+="echo '=== make kuadrant (runs even if smoke failed) ==='
 flags='${PYTEST_PLUGIN_FLAGS}' make kuadrant || rc=1
 "
 fi
