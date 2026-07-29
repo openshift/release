@@ -102,7 +102,7 @@ if [[ -z "${ami_id}" ]]; then
     ami_id=$(aws --region "${region}" ec2 describe-images \
         --owners 309956199498 \
         --filters \
-            'Name=name,Values=RHEL-9.*_HVM-*-x86_64-*-Hourly2-GP3' \
+            'Name=name,Values=RHEL-8.*_HVM-*-x86_64-*-Hourly2-GP3' \
             'Name=state,Values=available' \
             'Name=architecture,Values=x86_64' \
             'Name=root-device-type,Values=ebs' \
@@ -111,7 +111,7 @@ if [[ -z "${ami_id}" ]]; then
         --output text)
 fi
 if [[ ! "${ami_id}" =~ ^ami-[a-f0-9]+$ ]]; then
-    echo "Could not resolve an official RHEL 9 AMI in ${region}." >&2
+    echo "Could not resolve an official RHEL 8 AMI in ${region}." >&2
     exit 1
 fi
 root_device_name=$(aws --region "${region}" ec2 describe-images \
