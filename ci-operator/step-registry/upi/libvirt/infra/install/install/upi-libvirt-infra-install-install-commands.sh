@@ -104,10 +104,10 @@ fi
 
 # Move the install config to the install directory
 echo "Move the install config to the install directory..."
-cp ${SHARED_DIR}/${INFRA_PREFIX}install-config.yaml ${INSTALL_DIR}
+cp ${SHARED_DIR}/${INFRA_PREFIX}install-config.yaml ${INSTALL_DIR}/install-config.yaml
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  cp ${SHARED_DIR}/${INFRA_PREFIX}agent-config.yaml ${INSTALL_DIR}
+  cp ${SHARED_DIR}/${INFRA_PREFIX}agent-config.yaml ${INSTALL_DIR}/agent-config.yaml
   ${OCPINSTALL} --dir ${INSTALL_DIR} agent create pxe-files
   save_credentials
 
