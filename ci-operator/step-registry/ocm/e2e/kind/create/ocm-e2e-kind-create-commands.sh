@@ -58,6 +58,10 @@ echo "Waiting up to 5 minutes for VM to be ready"
 _timeout=300
 _elapsed=''
 _step=15
+
+# make sure the key has correct permissions
+chmod 600 "$KEY"
+
 while true; do
     # Check if this is the first iteration
     if [[ -z "$_elapsed" ]]; then
