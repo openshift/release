@@ -24,6 +24,17 @@ echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}
 
 # --- Workspace setup ---
 cd /workspace
+if [[ ! -d .git ]]; then
+    git init
+    git remote add origin "https://github.com/${UPSTREAM_REPO}.git"
+    if [[ -f "${SHARED_DIR}/eval-base-branch" ]]; then
+        git fetch origin "$(cat "${SHARED_DIR}/eval-base-branch")"
+        git checkout "$(cat "${SHARED_DIR}/eval-base-branch")"
+    else
+        git fetch origin
+        git checkout main
+    fi
+fi
 git config user.name "openshift-trt"
 git config user.email "openshift-trt@redhat.com"
 git remote add fork "https://github.com/${FORK_REPO}.git"
@@ -140,7 +151,18 @@ if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "
     echo "ERROR: Claude did not create a feature branch."
     exit 1
 fi
+# In eval mode, rename branch with timestamp to avoid collisions across runs
+if [[ -f "${SHARED_DIR}/eval-base-branch" ]]; then
+    EVAL_BRANCH="${BRANCH_NAME}-eval-$(date +%Y%m%d-%H%M%S)"
+    echo "Eval mode: renaming branch ${BRANCH_NAME} -> ${EVAL_BRANCH}"
+    git branch -m "${BRANCH_NAME}" "${EVAL_BRANCH}"
+    git push fork --delete "${BRANCH_NAME}" 2>/dev/null || true
+    git push fork "${EVAL_BRANCH}" 2>/dev/null || git push origin "${EVAL_BRANCH}"
+    BRANCH_NAME="${EVAL_BRANCH}"
+fi
+
 echo "Branch pushed: ${BRANCH_NAME}"
+echo "${BRANCH_NAME}" > "${SHARED_DIR}/claude-branch"
 
 PR_BODY_FILE="/workspace/artifacts/pr-description.md"
 if [[ ! -s "${PR_BODY_FILE}" ]]; then
@@ -153,10 +175,16 @@ PR_DEFAULT
 fi
 printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
 
+BASE_ARGS=()
+if [[ -f "${SHARED_DIR}/eval-base-branch" ]]; then
+    BASE_ARGS=(--base "$(cat "${SHARED_DIR}/eval-base-branch")")
+fi
+
 echo "Creating PR..."
 PR_URL=$(gh pr create \
     --repo "${UPSTREAM_REPO}" \
     --head "${FORK_REPO%%/*}:${BRANCH_NAME}" \
+    "${BASE_ARGS[@]}" \
     --no-maintainer-edit \
     --title "$(echo "${JIRA_ISSUE_KEY}: ${ISSUE_SUMMARY}" | head -c 250)" \
     --body-file "${PR_BODY_FILE}" \
@@ -168,5 +196,10 @@ PR_URL=$(gh pr create \
 echo "PR created: ${PR_URL}"
 PR_NUM=$(echo "${PR_URL}" | grep -o '[0-9]*$')
 echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
+
+# Copy PR description to SHARED_DIR for downstream steps (e.g., eval-judge)
+if [[ -s "${PR_BODY_FILE}" ]]; then
+    cp "${PR_BODY_FILE}" "${SHARED_DIR}/pr-description.md"
+fi
 
 echo "=== TRT Jira Solver Complete ==="

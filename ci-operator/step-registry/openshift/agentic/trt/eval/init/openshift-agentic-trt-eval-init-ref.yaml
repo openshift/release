@@ -1,0 +1,32 @@
+ref:
+  as: openshift-agentic-trt-eval-init
+  from: agentic-dev
+  commands: openshift-agentic-trt-eval-init-commands.sh
+  env:
+  - name: EVAL_CASE
+    default: ""
+    documentation: |-
+      Eval case directory name (e.g., case-001-trt-2698-mcp-tests).
+      Required. Override via Gangway: MULTISTAGE_PARAM_OVERRIDE_EVAL_CASE.
+  - name: MULTISTAGE_PARAM_OVERRIDE_EVAL_CASE
+    default: ""
+    documentation: |-
+      Gangway API override for EVAL_CASE.
+  - name: UPSTREAM_REPO
+    documentation: |-
+      Target repo for PRs (set to eval repo).
+  - name: FORK_REPO
+    documentation: |-
+      Fork repo for pushing branches (set to eval repo).
+  - name: SETUP_SCRIPT
+    default: "hack/agentic_setup.sh"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 10m0s
+  documentation: |-
+    Eval init step. Replaces the normal TRT init for eval runs.
+    Reads case config from ai-helpers, copies JIRA JSON snapshot to
+    SHARED_DIR, clones the eval repo into /workspace at the case's
+    base branch, and writes eval metadata for the judge step.
