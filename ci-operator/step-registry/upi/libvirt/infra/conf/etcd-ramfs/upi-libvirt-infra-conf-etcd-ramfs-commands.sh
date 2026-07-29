@@ -4,18 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
-# separate SHARED_DIR subdirectory so mgmt and infra files never collide.
+# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease.
+# Files are prefixed with "infra-" to stay flat in SHARED_DIR — Kubernetes
+# secrets don't support subdirectories and silently drop them between steps.
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   export LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
-  export SHARED_DIR="${SHARED_DIR}/infra"
-  mkdir -p "${SHARED_DIR}"
+  INFRA_PREFIX="infra-"
+else
+  INFRA_PREFIX=""
 fi
 
 if [[ "${USE_RAMFS:=false}" == "true" ]]; then
 
 echo "Creating the manifest_etcd-on-ramfs-mc.yml file..."
-cat >> "${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml" << EOF
+cat >> "${SHARED_DIR}/${INFRA_PREFIX}manifest_etcd-on-ramfs-mc.yml" << EOF
 kind: MachineConfig
 apiVersion: machineconfiguration.openshift.io/v1
 metadata:

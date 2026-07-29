@@ -4,12 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
-# separate SHARED_DIR subdirectory so mgmt and infra files never collide.
+# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease.
+# Files are prefixed with "infra-" to stay flat in SHARED_DIR — Kubernetes
+# secrets don't support subdirectories and silently drop them between steps.
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   export LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
-  export SHARED_DIR="${SHARED_DIR}/infra"
-  mkdir -p "${SHARED_DIR}"
+  INFRA_PREFIX="infra-"
+else
+  INFRA_PREFIX=""
 fi
 
 node_role=${APPLY_NODE_ROLE:=worker}
@@ -24,7 +26,7 @@ if [[ "${ARCH}" == "amd64" ]] ||  [[ "${ARCH}" == "s390x" ]]; then
 fi
 
 echo "Configuring kernel dumps on $node_role nodes"
-cat >> "${SHARED_DIR}/manifest_99_${node_role}_kdump.bu" << EOF
+cat >> "${SHARED_DIR}/${INFRA_PREFIX}manifest_99_${node_role}_kdump.bu" << EOF
 variant: openshift
 version: "${BUTANE_RELEASE}"
 metadata:
@@ -60,7 +62,7 @@ systemd:
       enabled: true
 EOF
 
-cat "${SHARED_DIR}/manifest_99_${node_role}_kdump.bu"
+cat "${SHARED_DIR}/${INFRA_PREFIX}manifest_99_${node_role}_kdump.bu"
 
 # Lookup butane executable
 butane_filename="butane"
@@ -71,7 +73,7 @@ else
 fi
   
 curl -sSL https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/butane/latest/$butane_filename --output "/tmp/butane" && chmod +x "/tmp/butane"
-/tmp/butane "${SHARED_DIR}/manifest_99_${node_role}_kdump.bu" -o "${SHARED_DIR}/manifest_99_${node_role}_kdump.yml"
+/tmp/butane "${SHARED_DIR}/${INFRA_PREFIX}manifest_99_${node_role}_kdump.bu" -o "${SHARED_DIR}/${INFRA_PREFIX}manifest_99_${node_role}_kdump.yml"
 
 echo "Printing final base-64 encoded config"
-cat ${SHARED_DIR}/manifest_99_${node_role}_kdump.yml
+cat ${SHARED_DIR}/${INFRA_PREFIX}manifest_99_${node_role}_kdump.yml

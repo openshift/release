@@ -4,12 +4,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
-# separate SHARED_DIR subdirectory so mgmt and infra files never collide.
+# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease.
+# Files are prefixed with "infra-" to stay flat in SHARED_DIR — Kubernetes
+# secrets don't support subdirectories and silently drop them between steps.
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   export LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
-  export SHARED_DIR="${SHARED_DIR}/infra"
-  mkdir -p "${SHARED_DIR}"
+  INFRA_PREFIX="infra-"
+else
+  INFRA_PREFIX=""
 fi
 
 # Info output
@@ -37,7 +39,7 @@ if [[ -n "${MASTER_STREAM}" ]]; then
   echo "Configuring the master MCP for ${MASTER_STREAM} osImageStream"
   # these haven't changed in six years so lets assume for now they're stable
   # source https://github.com/openshift/machine-config-operator/tree/main/manifests
-  cat > "${SHARED_DIR}/manifest_master.machineconfigpool.yaml" <<EOF
+  cat > "${SHARED_DIR}/${INFRA_PREFIX}manifest_master.machineconfigpool.yaml" <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfigPool
 metadata:
@@ -62,7 +64,7 @@ fi
 # Generate worker MCP manifest if stream is configured
 if [[ -n "${WORKER_STREAM}" ]]; then
   echo "Configuring the worker MCP for ${WORKER_STREAM} osImageStream"
-  cat > "${SHARED_DIR}/manifest_worker.machineconfigpool.yaml" <<EOF
+  cat > "${SHARED_DIR}/${INFRA_PREFIX}manifest_worker.machineconfigpool.yaml" <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfigPool
 metadata:

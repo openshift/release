@@ -4,12 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
-# separate SHARED_DIR subdirectory so mgmt and infra files never collide.
+# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease.
+# Files are prefixed with "infra-" to stay flat in SHARED_DIR — Kubernetes
+# secrets don't support subdirectories and silently drop them between steps.
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
-  SHARED_DIR="${SHARED_DIR}/infra"
-  mkdir -p "${SHARED_DIR}"
+  INFRA_PREFIX="infra-"
+else
+  INFRA_PREFIX=""
 fi
 
 # Scan for yq-v4
@@ -53,7 +55,7 @@ fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
 echo "Creating the agent-config.yaml file..."
-cat >> "${SHARED_DIR}/agent-config.yaml" << EOF
+cat >> "${SHARED_DIR}/${INFRA_PREFIX}agent-config.yaml" << EOF
 apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
@@ -87,4 +89,4 @@ hosts:
         macAddress: $(leaseLookup 'compute[1].mac')
 EOF
 
-cat "${SHARED_DIR}/agent-config.yaml"
+cat "${SHARED_DIR}/${INFRA_PREFIX}agent-config.yaml"

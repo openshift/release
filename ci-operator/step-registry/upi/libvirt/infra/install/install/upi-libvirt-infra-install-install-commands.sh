@@ -4,13 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
-# separate SHARED_DIR subdirectory so mgmt and infra files never collide.
-# The kubeconfig is saved as kubeconfig (mgmt) or infra/kubeconfig (infra).
+# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease.
+# Files are prefixed with "infra-" to stay flat in SHARED_DIR — Kubernetes
+# secrets don't support subdirectories and silently drop them between steps.
+# The kubeconfig is saved as kubeconfig (mgmt) or infra-kubeconfig (infra).
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
-  SHARED_DIR="${SHARED_DIR}/infra"
-  mkdir -p "${SHARED_DIR}"
+  INFRA_PREFIX="infra-"
+else
+  INFRA_PREFIX=""
 fi
 
 INSTALL_DIR=/tmp
@@ -40,15 +42,15 @@ function save_credentials () {
   # Save credentials for diagnostic steps going forward
   echo "Saving authentication files for next steps..."
   if [ -f ${INSTALL_DIR}/metadata.json ]; then
-    cp ${INSTALL_DIR}/metadata.json ${SHARED_DIR}
+    cp ${INSTALL_DIR}/metadata.json ${SHARED_DIR}/${INFRA_PREFIX}metadata.json
   fi
-  cp ${INSTALL_DIR}/auth/kubeconfig ${SHARED_DIR}
-  cp ${INSTALL_DIR}/auth/kubeadmin-password ${SHARED_DIR}
+  cp ${INSTALL_DIR}/auth/kubeconfig ${SHARED_DIR}/${INFRA_PREFIX}kubeconfig
+  cp ${INSTALL_DIR}/auth/kubeadmin-password ${SHARED_DIR}/${INFRA_PREFIX}kubeadmin-password
 }
 
 function prepare_next_steps () {
   EXIT_CODE=$?
-  echo ${EXIT_CODE} > "${SHARED_DIR}/install-status.txt"
+  echo ${EXIT_CODE} > "${SHARED_DIR}/${INFRA_PREFIX}install-status.txt"
   if [[ ${EXIT_CODE} != 0 ]]; then
     exit ${EXIT_CODE}
   fi
@@ -102,10 +104,10 @@ fi
 
 # Move the install config to the install directory
 echo "Move the install config to the install directory..."
-cp ${SHARED_DIR}/install-config.yaml ${INSTALL_DIR}
+cp ${SHARED_DIR}/${INFRA_PREFIX}install-config.yaml ${INSTALL_DIR}
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  cp ${SHARED_DIR}/agent-config.yaml ${INSTALL_DIR}
+  cp ${SHARED_DIR}/${INFRA_PREFIX}agent-config.yaml ${INSTALL_DIR}
   ${OCPINSTALL} --dir ${INSTALL_DIR} agent create pxe-files
   save_credentials
 
@@ -280,55 +282,55 @@ else
 fi
 
 # Check for the node tuning yaml config, and save it in the installation directory
-NODE_TUNING_YAML="${SHARED_DIR}/99-sysctl-worker.yaml"
+NODE_TUNING_YAML="${SHARED_DIR}/${INFRA_PREFIX}99-sysctl-worker.yaml"
 if [ -f "${NODE_TUNING_YAML}" ]; then
   echo "Saving ${NODE_TUNING_YAML} to the install directory..."
   cp ${NODE_TUNING_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Sets up the chrony machineconfig for the worker nodes
-CHRONY_WORKER_YAML="${SHARED_DIR}/99-chrony-worker.yaml"
+CHRONY_WORKER_YAML="${SHARED_DIR}/${INFRA_PREFIX}99-chrony-worker.yaml"
 if [ -f "${CHRONY_WORKER_YAML}" ]; then
   echo "Saving ${CHRONY_WORKER_YAML} to the install directory..."
   cp ${CHRONY_WORKER_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Sets up the chrony machineconfig for the master nodes
-CHRONY_MASTER_YAML="${SHARED_DIR}/99-chrony-master.yaml"
+CHRONY_MASTER_YAML="${SHARED_DIR}/${INFRA_PREFIX}99-chrony-master.yaml"
 if [ -f "${CHRONY_MASTER_YAML}" ]; then
   echo "Saving ${CHRONY_MASTER_YAML} to the install directory..."
   cp ${CHRONY_MASTER_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Check for the master mcp yaml config, and save it in the installation directory
-MCP_MASTER_YAML="${SHARED_DIR}/manifest_master.machineconfigpool.yaml"
+MCP_MASTER_YAML="${SHARED_DIR}/${INFRA_PREFIX}manifest_master.machineconfigpool.yaml"
 if [[ -f "${MCP_MASTER_YAML}" ]]; then
   echo "Saving ${MCP_MASTER_YAML} to the install manifests directory..."
   cp ${MCP_MASTER_YAML} "${INSTALL_DIR}/manifests/"
 fi
 
 # Check for the worker mcp yaml config, and save it in the installation directory
-MCP_WORKER_YAML="${SHARED_DIR}/manifest_worker.machineconfigpool.yaml"
+MCP_WORKER_YAML="${SHARED_DIR}/${INFRA_PREFIX}manifest_worker.machineconfigpool.yaml"
 if [[ -f "${MCP_WORKER_YAML}" ]]; then
   echo "Saving ${MCP_WORKER_YAML} to the install manifests directory..."
   cp ${MCP_WORKER_YAML} "${INSTALL_DIR}/manifests/"
 fi
 # Check for the etcd on ramdisk yaml config, and save it in the installation directory
-ETCD_RAMDISK_YAML="${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
+ETCD_RAMDISK_YAML="${SHARED_DIR}/${INFRA_PREFIX}manifest_etcd-on-ramfs-mc.yml"
 if [ -f "${ETCD_RAMDISK_YAML}" ]; then
   echo "Saving ${ETCD_RAMDISK_YAML} to the install directory..."
   cp ${ETCD_RAMDISK_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Check for static pod controller degraded yaml config, and save it in the installation directory
-STATIC_POD_DEGRADED_YAML="${SHARED_DIR}/manifest_static-pod-check-workaround-master-mc.yml"
+STATIC_POD_DEGRADED_YAML="${SHARED_DIR}/${INFRA_PREFIX}manifest_static-pod-check-workaround-master-mc.yml"
 if [ -f "${STATIC_POD_DEGRADED_YAML}" ]; then
   echo "Saving ${STATIC_POD_DEGRADED_YAML} to the install directory..."
   cp ${STATIC_POD_DEGRADED_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Check for kdump worker yaml config, and save it in the installation directory
-KDUMP_WORKER_YAML="${SHARED_DIR}/manifest_99_worker_kdump.yml"
+KDUMP_WORKER_YAML="${SHARED_DIR}/${INFRA_PREFIX}manifest_99_worker_kdump.yml"
 if [ -f "${KDUMP_WORKER_YAML}" ]; then
   echo "Saving ${KDUMP_WORKER_YAML} to the install directory..."
   cp ${KDUMP_WORKER_YAML} /tmp/manifests

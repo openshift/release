@@ -1,11 +1,13 @@
 #!/bin/bash
 
-# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
-# separate SHARED_DIR subdirectory so mgmt and infra files never collide.
+# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease.
+# Files are prefixed with "infra-" to stay flat in SHARED_DIR — Kubernetes
+# secrets don't support subdirectories and silently drop them between steps.
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
-  SHARED_DIR="${SHARED_DIR}/infra"
-  mkdir -p "${SHARED_DIR}"
+  INFRA_PREFIX="infra-"
+else
+  INFRA_PREFIX=""
 fi
 
 # Scan for yq-v4
@@ -43,7 +45,7 @@ mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-list
 
 # Show network xml
 echo "Printing network xml to be created:"
-cat "${SHARED_DIR}/network.xml"
+cat "${SHARED_DIR}/${INFRA_PREFIX}network.xml"
 
 # Create the libvirt network
 echo "Creating the libvirt network..."
@@ -52,7 +54,7 @@ if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
 else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi
-mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-define "${SHARED_DIR}/network.xml"
+mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-define "${SHARED_DIR}/${INFRA_PREFIX}network.xml"
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-autostart "${CLUSTER_NAME}"
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-start "${CLUSTER_NAME}"
 

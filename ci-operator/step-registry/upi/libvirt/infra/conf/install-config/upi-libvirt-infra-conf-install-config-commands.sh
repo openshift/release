@@ -4,12 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
-# separate SHARED_DIR subdirectory so mgmt and infra files never collide.
+# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease.
+# Files are prefixed with "infra-" to stay flat in SHARED_DIR — Kubernetes
+# secrets don't support subdirectories and silently drop them between steps.
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
-  SHARED_DIR="${SHARED_DIR}/infra"
-  mkdir -p "${SHARED_DIR}"
+  INFRA_PREFIX="infra-"
+else
+  INFRA_PREFIX=""
 fi
 
 # ensure LEASED_RESOURCE is set
@@ -56,7 +58,7 @@ fi
 
 # Default UPI installation
 echo "Create the install-config.yaml file..."
-cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+cat >> "${SHARED_DIR}/${INFRA_PREFIX}install-config.yaml" << EOF
 apiVersion: v1
 baseDomain: "${BASE_DOMAIN}"
 metadata:
@@ -90,28 +92,28 @@ EOF
 
 if [ ${FIPS_ENABLED} = "true" ]; then
 	echo "Adding 'fips: true' to the install config..."
-	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+	cat >> "${SHARED_DIR}/${INFRA_PREFIX}install-config.yaml" << EOF
 fips: true
 EOF
 fi
 
 if [ ! -z "${OS_IMAGE_STREAM}" ]; then
 	echo "Adding 'OSImageStream: ${OS_IMAGE_STREAM}' to the install config..."
-	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+	cat >> "${SHARED_DIR}/${INFRA_PREFIX}install-config.yaml" << EOF
 osImageStream: "${OS_IMAGE_STREAM}"
 EOF
 fi
 
 if [ -n "${FEATURE_SET}" ]; then
-        echo "Adding 'featureSet: ...' to install-config.yaml"
-        cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+	       echo "Adding 'featureSet: ...' to install-config.yaml"
+	       cat >> "${SHARED_DIR}/${INFRA_PREFIX}install-config.yaml" << EOF
 featureSet: ${FEATURE_SET}
 EOF
 fi
 
 if [ ${NODE_TUNING} = "true" ]; then
   echo "Saving node tuning yaml config..."
-  cat >> ${SHARED_DIR}/99-sysctl-worker.yaml << EOF
+  cat >> ${SHARED_DIR}/${INFRA_PREFIX}99-sysctl-worker.yaml << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -138,7 +140,7 @@ fi
 # setting it to clock.corp.redhat.com
 if [ ${ARCH} = "ppc64le" ]; then
   echo "Saving chrony worker yaml config..."
-  cat >> ${SHARED_DIR}/99-chrony-worker.yaml << EOF
+  cat >> ${SHARED_DIR}/${INFRA_PREFIX}99-chrony-worker.yaml << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -160,7 +162,7 @@ spec:
 EOF
 
   echo "Saving chrony master yaml config..."
-  cat >> ${SHARED_DIR}/99-chrony-master.yaml << EOF
+  cat >> ${SHARED_DIR}/${INFRA_PREFIX}99-chrony-master.yaml << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:

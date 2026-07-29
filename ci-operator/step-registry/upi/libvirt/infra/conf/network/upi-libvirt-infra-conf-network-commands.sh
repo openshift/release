@@ -4,12 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
-# separate SHARED_DIR subdirectory so mgmt and infra files never collide.
+# Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease.
+# Files are written with an "infra-" prefix so they stay flat in SHARED_DIR —
+# Kubernetes secrets don't support subdirectories; any subdir is silently
+# dropped by the sidecar when it serialises the shared dir between steps.
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
-  SHARED_DIR="${SHARED_DIR}/infra"
-  mkdir -p "${SHARED_DIR}"
+  INFRA_PREFIX="infra-"
+else
+  INFRA_PREFIX=""
 fi
 
 # Scan for yq-v4
@@ -57,7 +60,7 @@ echo "Creating the libvirt network.xml file..."
 # We do this so that we can debug agent-based clusters by taking advantage of the open
 # SSH tunnel we created to pull debug logs for our libvirt IPI and UPI default workflows.
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  cat >> "${SHARED_DIR}/network.xml" << EOF
+  cat >> "${SHARED_DIR}/${INFRA_PREFIX}network.xml" << EOF
 <network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
   <name>${CLUSTER_NAME}</name>
   <forward mode='nat'>
@@ -98,7 +101,7 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
 EOF
 
 else
-  cat >> "${SHARED_DIR}/network.xml" << EOF
+  cat >> "${SHARED_DIR}/${INFRA_PREFIX}network.xml" << EOF
 <network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
   <name>${CLUSTER_NAME}</name>
   <forward mode='nat'>
@@ -144,4 +147,4 @@ else
 EOF
 fi
 
-cat "${SHARED_DIR}/network.xml"
+cat "${SHARED_DIR}/${INFRA_PREFIX}network.xml"
