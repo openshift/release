@@ -277,3 +277,33 @@ for backup in "${CR_BACKUP_DIR}"/*.yaml; do
         oc apply -f "${backup}" 2>/dev/null || true
     fi
 done
+
+# Wait for additional operator-managed deployments to become ready.
+# Some operators create secondary deployments (e.g., ocm-agent-operator
+# creates an ocm-agent Deployment) after reconciling their CRs.
+if [[ -n "${OPERATOR_WAIT_DEPLOYMENTS:-}" ]]; then
+    IFS=',' read -ra WAIT_DEPS <<< "${OPERATOR_WAIT_DEPLOYMENTS}"
+    for dep in "${WAIT_DEPS[@]}"; do
+        dep=$(echo "${dep}" | xargs)
+        log "Waiting for secondary deployment ${dep} to exist..."
+        for _i in $(seq 1 30); do
+            if oc get deployment "${dep}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+                break
+            fi
+            sleep 10
+        done
+        if oc get deployment "${dep}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+            log "Waiting for deployment ${dep} to be ready..."
+            if ! oc wait deployment "${dep}" -n "${OPERATOR_NAMESPACE}" \
+                --for=condition=Available --timeout=300s; then
+                log "ERROR: deployment ${dep} not ready after 5 minutes"
+                oc get deployment "${dep}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
+                oc get pods -n "${OPERATOR_NAMESPACE}" -l app="${dep}" 2>/dev/null || true
+                exit 1
+            fi
+        else
+            log "ERROR: deployment ${dep} not found after 5 minutes"
+            exit 1
+        fi
+    done
+fi
