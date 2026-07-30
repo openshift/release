@@ -247,7 +247,8 @@ for service in quay-app.service quay-redis.service quay-pod.service; do
     systemctl --user is-active --quiet "${service}"
 done
 echo "Checking OMR v2 health at https://${registry_hostname}:8443/health/instance."
-curl --retry 20 --retry-delay 3 --retry-all-errors \
+# --retry-all-errors requires curl >=7.71, unavailable on RHEL 8 (7.61.1).
+curl --retry 20 --retry-delay 3 \
     --silent --show-error --fail \
     --cacert "${quay_root}/quay-rootCA/rootCA.pem" \
     "https://${registry_hostname}:8443/health/instance" >/dev/null
