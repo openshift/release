@@ -1,0 +1,44 @@
+ref:
+  as: openshift-mcp-server-mcpchecker-eval
+  from: src
+  cli: latest
+  commands: openshift-mcp-server-mcpchecker-eval-commands.sh
+  env:
+  - name: EVAL_CONFIG
+    default: evals/openai-agent/eval.yaml
+    documentation: Repo-relative path to the mcpchecker eval YAML
+  - name: EVAL_LABEL_SELECTOR
+    default: suite=core
+    documentation: Label selector for task filtering
+  - name: TOOLSETS
+    default: core,config
+    documentation: MCP server toolsets to enable
+  - name: TASK_PASS_RATE
+    default: "0.0"
+    documentation: Minimum task pass rate (0.0 disables the gate)
+  - name: ASSERTION_PASS_RATE
+    default: "0.0"
+    documentation: Minimum assertion pass rate (0.0 disables the gate)
+  - name: GOOGLE_CLOUD_LOCATION
+    default: ""
+    documentation: Vertex AI region (e.g. us-east5); leave empty for non-Vertex runs
+  - name: GOOGLE_CLOUD_PROJECT
+    default: ""
+    documentation: GCP project ID for Vertex AI; leave empty for non-Vertex runs
+  - name: GEMINI_USE_VERTEX
+    default: ""
+    documentation: Set to "1" to route Google Gemini calls through Vertex AI
+  - name: ANTHROPIC_USE_VERTEX
+    default: ""
+    documentation: Set to "1" to route Anthropic Claude calls through Vertex AI
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  grace_period: 5m0s
+  timeout: 4h0m0s
+  documentation: |-
+    Runs mcpchecker evaluations against the openshift-mcp-server on a live OCP cluster.
+    Credentials must be written to ${SHARED_DIR}/mcpchecker-creds.env by a preceding
+    setup step. Produces JSON and JUnit artifacts under ${ARTIFACT_DIR}.
+    An optional pass-rate gate exits non-zero if results fall below the threshold.
