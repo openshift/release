@@ -32,7 +32,7 @@ for case_name in "${CASE_LIST[@]}"; do
 
     if [[ -n "${PR_NUM}" ]]; then
         echo "[${case_name}] Closing PR #${PR_NUM} and deleting branch..."
-        gh pr close "${PR_NUM}" --repo "${UPSTREAM_REPO}" --delete-branch 2>/dev/null || true
+        gh pr close "${PR_NUM}" --repo "${UPSTREAM_REPO}" --delete-branch || true
     else
         CLAUDE_BRANCH=""
         if [[ -f "${SHARED_DIR}/${case_name}.claude-branch" ]]; then
@@ -40,7 +40,7 @@ for case_name in "${CASE_LIST[@]}"; do
         fi
         if [[ -n "${CLAUDE_BRANCH}" ]]; then
             echo "[${case_name}] No PR found, deleting branch ${CLAUDE_BRANCH}..."
-            gh api "repos/${UPSTREAM_REPO}/git/refs/heads/${CLAUDE_BRANCH}" -X DELETE 2>/dev/null || true
+            gh api "repos/${UPSTREAM_REPO}/git/refs/heads/${CLAUDE_BRANCH}" -X DELETE || true
         else
             echo "[${case_name}] Nothing to clean up."
         fi

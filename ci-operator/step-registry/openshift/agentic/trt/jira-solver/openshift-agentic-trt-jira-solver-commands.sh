@@ -25,22 +25,18 @@ echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}
 # --- Workspace setup ---
 WORKDIR="${WORKDIR:-/workspace}"
 cd "${WORKDIR}"
+# In eval mode, eval-solve pre-clones the repo — this block only runs in standalone (production) mode
 if [[ ! -d .git ]]; then
     git init
     git remote add origin "https://github.com/${UPSTREAM_REPO}.git"
-    if [[ -f "${SHARED_DIR}/eval-base-branch" ]]; then
-        git fetch origin "$(cat "${SHARED_DIR}/eval-base-branch")"
-        git checkout "$(cat "${SHARED_DIR}/eval-base-branch")"
-    else
-        git fetch origin
-        git checkout main
-    fi
+    git fetch origin
+    git checkout main
 fi
 git config user.name "openshift-trt"
 git config user.email "openshift-trt@redhat.com"
 git remote add fork "https://github.com/${FORK_REPO}.git" 2>/dev/null || true
 
-if [[ "${SKIP_SHARED_SETUP:-}" != "true" ]]; then
+if [[ "${EVAL_MODE:-}" != "true" ]]; then
     echo "Running setup script: ${SETUP_SCRIPT}..."
     # shellcheck source=/dev/null
     source "${WORKDIR}/${SETUP_SCRIPT}"
@@ -52,7 +48,7 @@ fi
 
 mkdir -p "${WORKDIR}/artifacts"
 
-if [[ "${SKIP_SHARED_SETUP:-}" != "true" ]]; then
+if [[ "${EVAL_MODE:-}" != "true" ]]; then
     copy_artifacts() {
         echo "Copying artifacts..."
         cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
@@ -100,7 +96,7 @@ The repo-specific build, test, and verify commands are provided below.
 
 ## Step 4: Write PR description
 
-Write a PR description to `/workspace/artifacts/pr-description.md` (CI) or print it (local). Include:
+Write a PR description to `__WORKDIR__/artifacts/pr-description.md` (CI) or print it (local). Include:
 - A summary section describing what changed and why
 - A test plan section listing what you verified
 - Link to the Jira issue
@@ -123,9 +119,7 @@ if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
     cat "${WORKDIR}/.agentic/solve-config.md" >> "${SOLVE_PROMPT}"
 fi
 
-if [[ "${WORKDIR}" != "/workspace" ]]; then
-    sed -i "s|/workspace|${WORKDIR}|g" "${SOLVE_PROMPT}"
-fi
+sed -i "s|__WORKDIR__|${WORKDIR}|g" "${SOLVE_PROMPT}"
 
 # --- Run Claude ---
 echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
@@ -160,13 +154,12 @@ if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "
     echo "ERROR: Claude did not create a feature branch."
     exit 1
 fi
-# In eval mode, rename branch with timestamp to avoid collisions across runs
-if [[ -f "${SHARED_DIR}/eval-base-branch" ]]; then
+if [[ "${EVAL_MODE:-}" == "true" ]]; then
     EVAL_BRANCH="${BRANCH_NAME}-eval-$(date +%Y%m%d-%H%M%S)"
     echo "Eval mode: renaming branch ${BRANCH_NAME} -> ${EVAL_BRANCH}"
     git branch -m "${BRANCH_NAME}" "${EVAL_BRANCH}"
     git push fork --delete "${BRANCH_NAME}" 2>/dev/null || true
-    git push fork "${EVAL_BRANCH}" 2>/dev/null || git push origin "${EVAL_BRANCH}"
+    git push fork "${EVAL_BRANCH}" || git push origin "${EVAL_BRANCH}"
     BRANCH_NAME="${EVAL_BRANCH}"
 fi
 
@@ -185,7 +178,7 @@ fi
 printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
 
 BASE_ARGS=()
-if [[ -f "${SHARED_DIR}/eval-base-branch" ]]; then
+if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then
     BASE_ARGS=(--base "$(cat "${SHARED_DIR}/eval-base-branch")")
 fi
 

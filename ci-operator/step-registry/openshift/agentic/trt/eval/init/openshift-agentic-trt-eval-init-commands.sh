@@ -28,6 +28,7 @@ fi
 echo "Cases to run: ${CASE_LIST[*]}"
 
 # --- Set up per-case metadata ---
+# input.yaml must use flat "key: value" format — no nesting, quoting, or indentation
 yaml_val() { grep "^${1}:" "$2" | cut -d' ' -f2-; }
 
 for case_name in "${CASE_LIST[@]}"; do

@@ -12,7 +12,6 @@ echo "Cases to judge (${#CASE_LIST[@]}): ${CASE_LIST[*]}"
 
 # --- Clone repo template ---
 TEMPLATE_DIR="/tmp/eval-repo-template"
-set +x
 CLONE_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
 git clone "https://x-access-token:${CLONE_TOKEN}@github.com/${UPSTREAM_REPO}.git" "${TEMPLATE_DIR}"
 git -C "${TEMPLATE_DIR}" remote set-url origin "https://github.com/${UPSTREAM_REPO}.git"
@@ -21,6 +20,14 @@ GITHUB_TOKEN="${CLONE_TOKEN}"
 export GITHUB_TOKEN
 
 # --- Utilities ---
+diff_stat_total() {
+    local stat_line=$1
+    local ins del
+    ins=$(echo "${stat_line}" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo "0")
+    del=$(echo "${stat_line}" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo "0")
+    echo $(( ins + del ))
+}
+
 jaccard_similarity() {
     local file_a=$1 file_b=$2
     python3 -c "
@@ -107,23 +114,25 @@ for case_name in "${CASE_LIST[@]}"; do
     fi
 
     # code_compiles
+    BUILD_LOG="${ARTIFACT_DIR}/${case_name}-build.log"
     echo "  Running: make build..."
-    if make build > /tmp/eval-build.log 2>&1; then
+    if make build > "${BUILD_LOG}" 2>&1; then
         record_check "code_compiles" "pass"
     else
         record_check "code_compiles" "fail"
         echo "  Build output (last 20 lines):"
-        tail -20 /tmp/eval-build.log | sed 's/^/    /'
+        tail -20 "${BUILD_LOG}" | sed 's/^/    /'
     fi
 
     # tests_pass
+    TEST_LOG="${ARTIFACT_DIR}/${case_name}-test.log"
     echo "  Running: make test..."
-    if make test > /tmp/eval-test.log 2>&1; then
+    if make test > "${TEST_LOG}" 2>&1; then
         record_check "tests_pass" "pass"
     else
         record_check "tests_pass" "fail"
         echo "  Test output (last 20 lines):"
-        tail -20 /tmp/eval-test.log | sed 's/^/    /'
+        tail -20 "${TEST_LOG}" | sed 's/^/    /'
     fi
 
     # pr_created
@@ -168,13 +177,11 @@ for case_name in "${CASE_LIST[@]}"; do
         record_score "file_overlap" "0.0"
     fi
 
-    CLAUDE_LINES=$(git diff "origin/${BASE_BRANCH}" --stat 2>/dev/null | tail -1 | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo "0")
-    CLAUDE_DEL=$(git diff "origin/${BASE_BRANCH}" --stat 2>/dev/null | tail -1 | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo "0")
-    CLAUDE_TOTAL=$(( CLAUDE_LINES + CLAUDE_DEL ))
+    CLAUDE_STAT=$(git diff "origin/${BASE_BRANCH}" --stat 2>/dev/null | tail -1)
+    CLAUDE_TOTAL=$(diff_stat_total "${CLAUDE_STAT}")
 
-    EXPECTED_LINES=$(git diff "origin/${BASE_BRANCH}" "origin/${EXPECTED_BRANCH}" --stat 2>/dev/null | tail -1 | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo "0")
-    EXPECTED_DEL=$(git diff "origin/${BASE_BRANCH}" "origin/${EXPECTED_BRANCH}" --stat 2>/dev/null | tail -1 | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo "0")
-    EXPECTED_TOTAL=$(( EXPECTED_LINES + EXPECTED_DEL ))
+    EXPECTED_STAT=$(git diff "origin/${BASE_BRANCH}" "origin/${EXPECTED_BRANCH}" --stat 2>/dev/null | tail -1)
+    EXPECTED_TOTAL=$(diff_stat_total "${EXPECTED_STAT}")
 
     if [[ "${EXPECTED_TOTAL}" -gt 0 ]]; then
         RATIO=$(python3 -c "print(f'{${CLAUDE_TOTAL} / ${EXPECTED_TOTAL}:.2f}')")

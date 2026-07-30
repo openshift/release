@@ -22,7 +22,8 @@ echo "Cases (${#CASE_LIST[@]}): ${CASE_LIST[*]} | Parallelism: ${MAX_PARALLEL}"
 
 # --- Clone repo template ---
 TEMPLATE_DIR="/tmp/eval-repo-template"
-git clone "https://github.com/${UPSTREAM_REPO}.git" "${TEMPLATE_DIR}"
+git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${UPSTREAM_REPO}.git" "${TEMPLATE_DIR}"
+git -C "${TEMPLATE_DIR}" remote set-url origin "https://github.com/${UPSTREAM_REPO}.git"
 git -C "${TEMPLATE_DIR}" config user.name "openshift-trt"
 git -C "${TEMPLATE_DIR}" config user.email "openshift-trt@redhat.com"
 git -C "${TEMPLATE_DIR}" remote add fork "https://github.com/${FORK_REPO}.git"
@@ -56,6 +57,9 @@ copy_artifacts() {
 trap copy_artifacts EXIT TERM INT
 
 # --- Per-case dispatch ---
+# Each subshell gets a temp SHARED_DIR with standard filenames the solver expects:
+#   reads:  gh-fork-token, gh-upstream-token, jira-issue-key, jira-issue.json, eval-base-branch, eval-case
+#   writes: claude-branch, pr-number, pr-description.md
 RESULTS_DIR="/tmp/eval-results"
 mkdir -p "${RESULTS_DIR}"
 RUNNING=0
@@ -80,7 +84,7 @@ for case_name in "${CASE_LIST[@]}"; do
 
         export SHARED_DIR="${CASE_SHARED}"
         export WORKDIR="${CASE_WORKDIR}"
-        export SKIP_SHARED_SETUP=true
+        export EVAL_MODE=true
         /opt/scripts/solve.sh
 
         # Copy outputs back as flat files for judge/cleanup
@@ -111,7 +115,7 @@ for case_name in "${CASE_LIST[@]}"; do
     if [[ "${result}" == "pass" ]]; then
         echo "  [PASS] ${case_name}"
     else
-        echo "  [FAIL] ${case_name}"
+        echo "  [FAIL] ${case_name} (see ${ARTIFACT_DIR}/solve-${case_name}.log)"
         FAILURES=$(( FAILURES + 1 ))
     fi
 done
