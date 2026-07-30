@@ -67,7 +67,7 @@ controlPlane:
   architecture: "${ARCH}"
   hyperthreading: Enabled
   name: master
-  replicas: ${CONTROL_COUNT}
+  replicas: ${CONTROL_COUNT_INFRA}
 networking:
   clusterNetwork:
   - cidr: 10.8.0.0/14

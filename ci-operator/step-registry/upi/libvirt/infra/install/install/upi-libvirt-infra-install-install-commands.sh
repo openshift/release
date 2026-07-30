@@ -366,7 +366,7 @@ save_credentials
 restart_nodes () {
   echo "Starting node monitor to restart nodes post-install."
   GUESTS_RESTARTED=0
-  TOTAL_GUESTS=$((${CONTROL_COUNT:-0} + ${COMPUTE_COUNT:-0}))
+  TOTAL_GUESTS=$((${CONTROL_COUNT_INFRA:-0} + ${COMPUTE_COUNT:-0}))
   while [ $GUESTS_RESTARTED -lt $TOTAL_GUESTS ]
   do
      INSTALLED=$(${VIRSH} list --all | grep "${LEASED_RESOURCE}" | grep "shut off" | awk -F' ' '{print $2}' || true)
@@ -486,7 +486,7 @@ if [ "$INSTALLER_TYPE" == "default" ]; then
 fi
 
 # Create the control plane nodes.
-for (( i=0; i<=${CONTROL_COUNT}-1; i++ )); do
+for (( i=0; i<=${CONTROL_COUNT_INFRA}-1; i++ )); do
   NODE="${LEASED_RESOURCE}-control-${i}"
   echo "Creating ${NODE} node..."
   MAC_ADDRESS=$(leaseLookup "control-plane[$i].mac")
