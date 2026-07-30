@@ -37,8 +37,7 @@ else: print(f'{len(a & b) / len(a | b):.2f}')
 TOTAL_CHECKS_PASS=0
 TOTAL_CHECKS_TOTAL=0
 ALL_JUNIT_TESTCASES=""
-ALL_HTML_SECTIONS=""
-ALL_YAML_CASES=""
+ALL_SUMMARY_ROWS=""
 
 # =============================================
 # JUDGE EACH CASE
@@ -219,43 +218,45 @@ for case_name in "${CASE_LIST[@]}"; do
         fi
     done
 
-    # YAML case block
+    # --- Per-case YAML ---
     if [[ -n "${CLAUDE_FILES}" ]]; then
-        CLAUDE_FILES_YAML=$(echo "${CLAUDE_FILES}" | sed 's/^/      - /')
+        CLAUDE_FILES_YAML=$(echo "${CLAUDE_FILES}" | sed 's/^/  - /')
     else
-        CLAUDE_FILES_YAML="      - (none)"
+        CLAUDE_FILES_YAML="  - (none)"
     fi
     if [[ -n "${EXPECTED_FILES}" ]]; then
-        EXPECTED_FILES_YAML=$(echo "${EXPECTED_FILES}" | sed 's/^/      - /')
+        EXPECTED_FILES_YAML=$(echo "${EXPECTED_FILES}" | sed 's/^/  - /')
     else
-        EXPECTED_FILES_YAML="      - (none)"
+        EXPECTED_FILES_YAML="  - (none)"
     fi
 
-    ALL_YAML_CASES="${ALL_YAML_CASES}
-  - case: ${EVAL_CASE}
-    jira_key: ${JIRA_ISSUE_KEY}
-    claude_branch: ${CLAUDE_BRANCH:-none}
-    base_branch: ${BASE_BRANCH}
-    expected_branch: ${EXPECTED_BRANCH}
-    pr_number: ${PR_NUM:-none}
-    checks:
-      branch_created: ${CHECKS[branch_created]}
-      code_compiles: ${CHECKS[code_compiles]}
-      tests_pass: ${CHECKS[tests_pass]}
-      pr_created: ${CHECKS[pr_created]}
-      pr_description_exists: ${CHECKS[pr_description_exists]}
-      passed: ${CHECKS_PASS}
-      total: ${CHECKS_TOTAL}
-    scores:
-$(echo -e "${SCORES}" | sed 's/^/      /')
-    claude_files_changed:
+    cat > "${ARTIFACT_DIR}/eval-${EVAL_CASE}.yaml" <<CASE_YAML_EOF
+case: ${EVAL_CASE}
+jira_key: ${JIRA_ISSUE_KEY}
+claude_branch: ${CLAUDE_BRANCH:-none}
+base_branch: ${BASE_BRANCH}
+expected_branch: ${EXPECTED_BRANCH}
+pr_number: ${PR_NUM:-none}
+checks:
+  branch_created: ${CHECKS[branch_created]}
+  code_compiles: ${CHECKS[code_compiles]}
+  tests_pass: ${CHECKS[tests_pass]}
+  pr_created: ${CHECKS[pr_created]}
+  pr_description_exists: ${CHECKS[pr_description_exists]}
+  passed: ${CHECKS_PASS}
+  total: ${CHECKS_TOTAL}
+scores:
+$(echo -e "${SCORES}" | sed 's/^/  /')
+claude_files_changed:
 ${CLAUDE_FILES_YAML}
-    expected_files_changed:
+expected_files_changed:
 ${EXPECTED_FILES_YAML}
-    claude_diff_lines: ${CLAUDE_TOTAL}
-    expected_diff_lines: ${EXPECTED_TOTAL}"
+claude_diff_lines: ${CLAUDE_TOTAL}
+expected_diff_lines: ${EXPECTED_TOTAL}
+CASE_YAML_EOF
+    echo "  Written: eval-${EVAL_CASE}.yaml"
 
-    # HTML case section
+    # --- Per-case HTML ---
     CHECKS_HTML=""
     check_icon() { if [[ "$1" == "pass" ]]; then echo "&#x2705;"; else echo "&#x274C;"; fi; }
     for check_name in branch_created code_compiles tests_pass pr_created pr_description_exists; do
@@ -274,32 +275,50 @@ ${EXPECTED_FILES_YAML}
         EXPECTED_FILES_HTML="<li>(none)</li>"
     fi
 
-    ALL_HTML_SECTIONS="${ALL_HTML_SECTIONS}
-<div class=\"case\">
-<h2>${EVAL_CASE}</h2>
-<table class=\"meta\">
-  <tr><td>JIRA</td><td><a href=\"https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}\">${JIRA_ISSUE_KEY}</a></td></tr>
+    cat > "${ARTIFACT_DIR}/eval-${EVAL_CASE}.html" <<CASE_HTML_EOF
+<!DOCTYPE html>
+<html>
+<head>
+<title>Eval: ${EVAL_CASE}</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 2em auto; padding: 0 1em; }
+  h1 { font-size: 1.4em; }
+  h2 { font-size: 1.1em; margin-top: 1.5em; border-bottom: 1px solid #ddd; padding-bottom: 0.3em; }
+  table { border-collapse: collapse; width: 100%; margin: 0.5em 0; }
+  th, td { text-align: left; padding: 6px 12px; border: 1px solid #ddd; }
+  th { background: #f5f5f5; }
+  .score { font-size: 1.3em; font-weight: bold; }
+  .meta td:first-child { font-weight: bold; width: 160px; }
+  ul { margin: 0.3em 0; padding-left: 1.5em; }
+</style>
+</head>
+<body>
+<h1>Eval: ${EVAL_CASE}</h1>
+
+<h2>Metadata</h2>
+<table class="meta">
+  <tr><td>JIRA</td><td><a href="https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}">${JIRA_ISSUE_KEY}</a></td></tr>
   <tr><td>Claude branch</td><td>${CLAUDE_BRANCH:-none}</td></tr>
   <tr><td>Base branch</td><td>${BASE_BRANCH}</td></tr>
   <tr><td>Expected branch</td><td>${EXPECTED_BRANCH}</td></tr>
   <tr><td>PR</td><td>${PR_NUM:+#}${PR_NUM:-none}</td></tr>
 </table>
 
-<h3>Checks (${CHECKS_PASS}/${CHECKS_TOTAL})</h3>
+<h2>Checks (${CHECKS_PASS}/${CHECKS_TOTAL})</h2>
 <table>
   <tr><th></th><th>Check</th><th>Result</th></tr>
   ${CHECKS_HTML}
 </table>
 
-<h3>Scores</h3>
+<h2>Scores</h2>
 <table>
   <tr><th>Metric</th><th>Value</th></tr>
-  <tr><td>File overlap (Jaccard)</td><td class=\"score\">${OVERLAP:-N/A}</td></tr>
-  <tr><td>Diff size ratio (claude/expected)</td><td class=\"score\">${RATIO:-N/A}</td></tr>
-  <tr><td>Function overlap</td><td class=\"score\">${FUNC_OVERLAP:-N/A}</td></tr>
+  <tr><td>File overlap (Jaccard)</td><td class="score">${OVERLAP:-N/A}</td></tr>
+  <tr><td>Diff size ratio (claude/expected)</td><td class="score">${RATIO:-N/A}</td></tr>
+  <tr><td>Function overlap</td><td class="score">${FUNC_OVERLAP:-N/A}</td></tr>
 </table>
 
-<h3>Files Changed</h3>
+<h2>Files Changed</h2>
 <table>
   <tr><th>Claude (${CLAUDE_TOTAL} lines)</th><th>Expected (${EXPECTED_TOTAL} lines)</th></tr>
   <tr>
@@ -307,7 +326,13 @@ ${EXPECTED_FILES_YAML}
     <td><ul>${EXPECTED_FILES_HTML}</ul></td>
   </tr>
 </table>
-</div>"
+</body>
+</html>
+CASE_HTML_EOF
+    echo "  Written: eval-${EVAL_CASE}.html"
+
+    # --- Accumulate summary line ---
+    ALL_SUMMARY_ROWS="${ALL_SUMMARY_ROWS}<tr><td><a href=\"eval-${EVAL_CASE}.html\">${EVAL_CASE}</a></td><td>${JIRA_ISSUE_KEY}</td><td>${CHECKS_PASS}/${CHECKS_TOTAL}</td><td>${OVERLAP:-N/A}</td><td>${RATIO:-N/A}</td><td>${FUNC_OVERLAP:-N/A}</td><td>${PR_NUM:+#}${PR_NUM:-none}</td></tr>"
 
 done
 
@@ -319,15 +344,6 @@ echo "=========================================="
 echo "Aggregate: ${TOTAL_CHECKS_PASS}/${TOTAL_CHECKS_TOTAL} checks passed across ${#CASE_LIST[@]} cases"
 echo "=========================================="
 
-# --- eval-summary.yaml ---
-cat > "${ARTIFACT_DIR}/eval-summary.yaml" <<SUMMARY_EOF
-cases_run: ${#CASE_LIST[@]}
-total_checks_passed: ${TOTAL_CHECKS_PASS}
-total_checks: ${TOTAL_CHECKS_TOTAL}
-cases:${ALL_YAML_CASES}
-SUMMARY_EOF
-echo "Summary written to ${ARTIFACT_DIR}/eval-summary.yaml"
-
 # --- JUnit XML ---
 TOTAL_FAILURES=$(( TOTAL_CHECKS_TOTAL - TOTAL_CHECKS_PASS ))
 cat > "${ARTIFACT_DIR}/junit_jira-solver-eval.xml" <<JUNIT_EOF
@@ -338,7 +354,15 @@ ${ALL_JUNIT_TESTCASES}
 JUNIT_EOF
 echo "JUnit XML written to ${ARTIFACT_DIR}/junit_jira-solver-eval.xml"
 
-# --- HTML ---
+# --- Summary YAML ---
+cat > "${ARTIFACT_DIR}/eval-summary.yaml" <<SUMMARY_EOF
+cases_run: ${#CASE_LIST[@]}
+total_checks_passed: ${TOTAL_CHECKS_PASS}
+total_checks: ${TOTAL_CHECKS_TOTAL}
+SUMMARY_EOF
+echo "Summary written to ${ARTIFACT_DIR}/eval-summary.yaml"
+
+# --- Summary HTML ---
 cat > "${ARTIFACT_DIR}/eval-summary.html" <<HTML_EOF
 <!DOCTYPE html>
 <html>
@@ -347,16 +371,10 @@ cat > "${ARTIFACT_DIR}/eval-summary.html" <<HTML_EOF
 <style>
   body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 2em auto; padding: 0 1em; }
   h1 { font-size: 1.4em; }
-  h2 { font-size: 1.2em; margin-top: 2em; border-bottom: 2px solid #333; padding-bottom: 0.3em; }
-  h3 { font-size: 1em; margin-top: 1em; border-bottom: 1px solid #ddd; padding-bottom: 0.2em; }
   table { border-collapse: collapse; width: 100%; margin: 0.5em 0; }
   th, td { text-align: left; padding: 6px 12px; border: 1px solid #ddd; }
   th { background: #f5f5f5; }
-  .score { font-size: 1.3em; font-weight: bold; }
-  .meta td:first-child { font-weight: bold; width: 160px; }
   .summary { font-size: 1.2em; margin: 1em 0; padding: 0.5em; background: #f0f0f0; border-radius: 4px; }
-  ul { margin: 0.3em 0; padding-left: 1.5em; }
-  .case { margin-bottom: 2em; }
 </style>
 </head>
 <body>
@@ -364,7 +382,10 @@ cat > "${ARTIFACT_DIR}/eval-summary.html" <<HTML_EOF
 <div class="summary">
   ${TOTAL_CHECKS_PASS}/${TOTAL_CHECKS_TOTAL} checks passed across ${#CASE_LIST[@]} cases
 </div>
-${ALL_HTML_SECTIONS}
+<table>
+  <tr><th>Case</th><th>JIRA</th><th>Checks</th><th>File Overlap</th><th>Diff Ratio</th><th>Func Overlap</th><th>PR</th></tr>
+  ${ALL_SUMMARY_ROWS}
+</table>
 </body>
 </html>
 HTML_EOF
