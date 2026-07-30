@@ -164,6 +164,24 @@ case "${CLOUD_PROVIDER}" in
           --azure-private-creds=${PRIVATE_CREDS} \
           --azure-pls-resource-group=${PLS_RG}"
       fi
+
+      # Enable Azure scale-from-zero if self-managed credentials are available
+      if [ -f "/etc/hypershift-ci-jobs-self-managed-azure/credentials.json" ] && \
+         echo "${INSTALL_HELP}" | grep -q -- '--scale-from-zero-provider'; then
+        SUBSCRIPTION_ID=$(python3 -c "import json; d=json.load(open('/etc/hypershift-ci-jobs-self-managed-azure/credentials.json')); print(d.get('subscriptionId',''))" 2>/dev/null || true)
+        if [ -n "${SUBSCRIPTION_ID}" ]; then
+          SCALE_FROM_ZERO_CREDS=$(mktemp)
+          python3 -c "
+import json
+with open('/etc/hypershift-ci-jobs-self-managed-azure/credentials.json') as f:
+    d = json.load(f)
+d['location'] = '${HYPERSHIFT_AZURE_LOCATION:-centralus}'
+with open('${SCALE_FROM_ZERO_CREDS}', 'w') as f:
+    json.dump(d, f)
+"
+          EXTRA_ARGS="${EXTRA_ARGS} --scale-from-zero-provider azure --scale-from-zero-creds ${SCALE_FROM_ZERO_CREDS}"
+        fi
+      fi
     fi
 
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
