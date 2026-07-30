@@ -214,11 +214,41 @@ provision_sts_cluster() {
 delete_cluster() {
     local cluster_id="$1" type="$2"
     if [[ "${type}" == "osd-gcp" ]]; then
-        ocm delete "/api/clusters_mgmt/v1/clusters/${cluster_id}"
+        ocm delete "/api/clusters_mgmt/v1/clusters/${cluster_id}" || true
     else
+        local cluster_desc roles_prefix oidc_config_id describe_attempt
+        for describe_attempt in $(seq 1 5); do
+            cluster_desc=$(rosa describe cluster -c "${cluster_id}" -o json 2>/dev/null || true)
+            if [[ -n "${cluster_desc}" ]]; then
+                break
+            fi
+            log "WARNING: Failed to describe cluster ${cluster_id} (attempt ${describe_attempt}/5)"
+            sleep 10
+        done
+        if [[ -z "${cluster_desc}" ]]; then
+            log "ERROR: Failed to describe cluster ${cluster_id} after 5 attempts, skipping deletion"
+            return 1
+        fi
+        roles_prefix=$(echo "${cluster_desc}" | jq -r '.aws.sts.operator_role_prefix // empty' 2>/dev/null || true)
+        oidc_config_id=$(echo "${cluster_desc}" | jq -r '.aws.sts.oidc_config.id // empty' 2>/dev/null || true)
+
         rosa delete cluster -c "${cluster_id}" -y
-        rosa delete operator-roles -c "${cluster_id}" -y --mode auto || true
-        rosa delete oidc-provider -c "${cluster_id}" -y --mode auto || true
+        log "Waiting for cluster ${cluster_id} to be fully removed before cleaning up IAM resources..."
+        local wait_attempt
+        for wait_attempt in $(seq 1 60); do
+            if ! rosa describe cluster -c "${cluster_id}" &>/dev/null; then
+                log "Cluster ${cluster_id} fully removed"
+                break
+            fi
+            log "  Cluster ${cluster_id} still being removed (attempt ${wait_attempt}/60)"
+            sleep 60
+        done
+        if [[ -n "${roles_prefix}" ]]; then
+            rosa delete operator-roles --prefix "${roles_prefix}" -y --mode auto || true
+        fi
+        if [[ -n "${oidc_config_id}" ]]; then
+            rosa delete oidc-provider --oidc-config-id "${oidc_config_id}" -y --mode auto || true
+        fi
     fi
 }
 
@@ -875,11 +905,10 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
     fi
 
     CLUSTER_OCM_ENV=$(echo "${ACTUAL_CMS}" | jq -r ".items[${i}].data[\"ocm-env\"] // \"staging\"")
+    CLUSTER_TYPE=$(echo "${ACTUAL_CMS}" | jq -r ".items[${i}].metadata.labels[\"rosa-cluster-lease/type\"] // \"classic-sts\"")
     ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
-    rosa delete cluster -c "${CLUSTER_ID}" -y 2>/dev/null || true
-    rosa delete operator-roles -c "${CLUSTER_ID}" -y --mode auto 2>/dev/null || true
-    rosa delete oidc-provider -c "${CLUSTER_ID}" -y --mode auto 2>/dev/null || true
+    delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}" || true
     lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" || true
     log "Decommissioned ${CM_NAME}"
 done
