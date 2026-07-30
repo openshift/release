@@ -25,11 +25,19 @@ az login --service-principal \
 
 eval "$(ssh-agent -s)"
 
+git remote add test https://github.com/Jakob-Naucke/trusted-cluster-operator
+git fetch test
+git switch timed-client-ci
+
+export REGISTRY=quay.io/jnaucke
+export TAG=20260730-cd170d1
+export INTEGRATION_TEST_THREADS=2
+
 echo "[INFO] Install cert-manager"
 CRT_MGR_VERSION=$(go list -m -f '{{.Version}}' github.com/cert-manager/cert-manager)
 oc apply -f "https://github.com/cert-manager/cert-manager/releases/download/${CRT_MGR_VERSION}/cert-manager.yaml"
 
-# TODO stabilize tests enough to be able to add more
-echo "[INFO] Running basic attestation test..."
-sed -i '/^attestation-tests:/{n;s/$/ test_attestation/}' Makefile
-make attestation-tests
+echo "[INFO] Running integration tests until failure..."
+while make integration-tests
+do :
+done
