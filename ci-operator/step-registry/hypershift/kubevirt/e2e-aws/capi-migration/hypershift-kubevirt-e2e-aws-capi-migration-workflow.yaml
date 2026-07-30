@@ -1,0 +1,31 @@
+workflow:
+  as: hypershift-kubevirt-e2e-aws-capi-migration
+  documentation: |-
+    Tests CAPI storage version migration from v1beta1 to v1beta2 on a
+    KubeVirt-based HyperShift management cluster running on AWS infrastructure,
+    then runs the full HyperShift KubeVirt e2e suite to verify everything
+    works post-migration.
+
+    The workflow installs HyperShift from an older release (via
+    INSTALL_FROM_LATEST), runs the migration e2e test which upgrades the
+    operator and triggers automatic storage migration, then runs the full
+    e2e suite against the migrated cluster.
+  steps:
+    env:
+      COMPUTE_NODE_TYPE: c5n.metal
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_INSTANCE_TYPE: "m6i.2xlarge"
+      ZONES_COUNT: "3"
+      ENABLE_HYPERSHIFT_OPERATOR_VALIDATING_WEBHOOK: "true"
+    pre:
+      - chain: ipi-aws-ovn-pre
+      - chain: ipi-install
+      - ref: hypershift-kubevirt-install
+      - ref: hypershift-install
+    test:
+      - ref: hypershift-kubevirt-run-e2e-capi-migration
+      - chain: hypershift-kubevirt-run-e2e-local
+    post:
+      - chain: hypershift-dump
+      - chain: gather-core-dump
+      - chain: ipi-aws-post
