@@ -44,6 +44,31 @@ fetch_with_backoff() {
 CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 export CLAUDE_CONFIG_DIR
 
+AGENT_HARNESS="${AGENT_HARNESS:-claude-code}"
+case "${AGENT_HARNESS}" in
+    claude-code)
+        AGENT_DISPLAY_NAME="Claude"
+        AGENT_MODEL="${CLAUDE_MODEL}"
+        ;;
+    codex)
+        AGENT_DISPLAY_NAME="Codex"
+        AGENT_MODEL="${CODEX_MODEL:-gpt-5.6-sol}"
+        CODEX_AUTH_FILE="${CODEX_HOME:-${HOME}/.codex}/auth.json"
+        if ! command -v codex >/dev/null 2>&1; then
+            echo "ERROR: AGENT_HARNESS=codex requires the codex binary in the payload agent image."
+            exit 1
+        fi
+        if [[ -z "${CODEX_API_KEY:-}" && -z "${CODEX_ACCESS_TOKEN:-}" && -z "${OPENAI_API_KEY:-}" && ! -f "${CODEX_AUTH_FILE}" ]]; then
+            echo "ERROR: AGENT_HARNESS=codex requires CODEX_API_KEY, CODEX_ACCESS_TOKEN, OPENAI_API_KEY, or ${CODEX_AUTH_FILE}."
+            exit 1
+        fi
+        ;;
+    *)
+        echo "ERROR: Unsupported AGENT_HARNESS=${AGENT_HARNESS}. Expected claude-code or codex."
+        exit 1
+        ;;
+esac
+
 # --- Gangway override ---
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG:-}" ]]; then
     echo "Applying Gangway override: PAYLOAD_TAG=${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG}"
@@ -67,8 +92,9 @@ if [[ -z "${PAYLOAD_TAG:-}" ]]; then
     echo "Auto-selected: ${PAYLOAD_TAG}"
 fi
 
-echo "Starting claude-payload-agent for payload: ${PAYLOAD_TAG}"
-echo "Model: ${CLAUDE_MODEL}"
+echo "Starting payload agent for payload: ${PAYLOAD_TAG}"
+echo "Harness: ${AGENT_HARNESS}"
+echo "Model: ${AGENT_MODEL}"
 
 # Load secrets with xtrace disabled to prevent leaking credentials in logs
 set +x
@@ -309,7 +335,7 @@ while true; do
                 SLACK_TEXT=":green-check: *Payload Accepted for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
 
 All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}
-_Model: ${CLAUDE_MODEL}_"
+_Harness: ${AGENT_HARNESS} | Model: ${AGENT_MODEL}_"
 
                 set +x
                 jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
@@ -357,8 +383,8 @@ done
 
 PHASE_WAIT_DURATION=$(( $(date +%s) - PHASE_WAIT_START ))
 
-# Run Claude to analyze the payload
-echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
+# Run the configured agent to analyze the payload
+echo "Invoking ${AGENT_DISPLAY_NAME} to analyze payload ${PAYLOAD_TAG}..."
 
 WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
@@ -372,9 +398,9 @@ copy_reports() {
         find "${WORKDIR}" -name "payload-results-*.yaml" -exec cp {} "${ARTIFACT_DIR}/" \; || true
     fi
 
-    # Archive the full Claude session directory (including subagent logs) for session continuation.
+    # Archive Claude sessions for continuation. Codex runs are ephemeral.
     CLAUDE_HOME="/home/claude/.claude"
-    if [[ -d "${CLAUDE_HOME}/projects" ]]; then
+    if [[ "${AGENT_HARNESS}" == "claude-code" && -d "${CLAUDE_HOME}/projects" ]]; then
         echo "Archiving Claude session logs..."
         if tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${CLAUDE_HOME}" projects/ 2>/dev/null; then
             touch "${SHARED_DIR}/claude-session-available"
@@ -406,7 +432,9 @@ echo "Plugins installed."
 
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 
-# agentic-ci manages OTEL collector lifecycle per invocation; collect JSONL after each run
+# agentic-ci manages OTEL collector lifecycle per invocation; collect JSONL after each run.
+# Keep the established artifact name for downstream consumers; it contains telemetry
+# from whichever harness is selected.
 OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
 ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
@@ -421,20 +449,52 @@ agentic_ci() {
         esac
     done
     local prompt="$1"; shift
+    local harness_args=()
+    case "${AGENT_HARNESS}" in
+        claude-code)
+            harness_args=(
+                --permission-mode default
+                --allowedTools "${ALLOWED_TOOLS}"
+                --verbose
+                "$@"
+            )
+            ;;
+        codex)
+            # Codex runs are ephemeral, so follow-up invocations start fresh and
+            # inspect artifacts already written to WORKDIR. Translate the one
+            # system-prompt option and discard Claude-only continuation/turn flags.
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --append-system-prompt)
+                        prompt="$2"$'\n\n'"${prompt}"
+                        shift 2
+                        ;;
+                    --continue)
+                        shift
+                        ;;
+                    --max-turns)
+                        shift 2
+                        ;;
+                    *)
+                        echo "ERROR: Unsupported Codex payload-agent argument: $1"
+                        return 2
+                        ;;
+                esac
+            done
+            ;;
+    esac
     local cmd=(
         agentic-ci run
         --backend local
-        --harness claude-code
-        --model "${CLAUDE_MODEL}"
+        --harness "${AGENT_HARNESS}"
+        --model "${AGENT_MODEL}"
         --workdir "${WORKDIR}"
         "${agentic_args[@]+"${agentic_args[@]}"}"
         "${prompt}"
-        --
-        --permission-mode default
-        --allowedTools "${ALLOWED_TOOLS}"
-        --verbose
-        "$@"
     )
+    if [[ ${#harness_args[@]} -gt 0 ]]; then
+        cmd+=(-- "${harness_args[@]}")
+    fi
     if [[ -n "${timeout_seconds}" ]]; then
         timeout "${timeout_seconds}" "${cmd[@]}"
     else
@@ -455,19 +515,19 @@ SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer triaging fai
 After completing your analysis, you MUST use the Skill tool to invoke ci:payload-results-yaml and ci:payload-autodl-json to generate the structured output files. NEVER write these files directly — the skills enforce the canonical schema."
 
 PHASE_ANALYSIS_START=$(date +%s)
-CLAUDE_EXIT=0
+AGENT_EXIT=0
 agentic_ci --timeout 3600 \
     "/ci:payload-analysis ${PAYLOAD_TAG} --snapshot-dir ${SNAPSHOT_DATA_DIR}" \
     --max-turns 100 \
     --append-system-prompt "${SYSTEM_PROMPT}" \
-    || CLAUDE_EXIT=$?
+    || AGENT_EXIT=$?
 
-# If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
+# If the agent timed out (exit 124), nudge it to wrap up with a shorter timeout
 PHASE_NUDGE_START=$(date +%s)
 NUDGE_EXIT=0
-if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+if [[ "${AGENT_EXIT}" -eq 124 ]]; then
     echo ""
-    echo "Claude timed out. Nudging to wrap up..."
+    echo "${AGENT_DISPLAY_NAME} timed out. Nudging it to wrap up..."
     agentic_ci --timeout 600 \
         "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
         --continue \
@@ -510,7 +570,7 @@ for attempt in 1 2 3; do
     MISSING=""
     if ! $YAML_OK; then MISSING="ci:payload-results-yaml"; fi
     if ! $JSON_OK; then MISSING="${MISSING:+${MISSING} and }ci:payload-autodl-json"; fi
-    echo "Attempt ${attempt}: Missing/invalid outputs (${MISSING}). Re-invoking Claude..."
+    echo "Attempt ${attempt}: Missing/invalid outputs (${MISSING}). Re-invoking ${AGENT_DISPLAY_NAME}..."
 
     agentic_ci --timeout 600 \
         "Your structured output files are missing or invalid. Use the Skill tool to invoke ${MISSING} to regenerate them now." \
@@ -524,7 +584,7 @@ PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
 # Generate JUnit XML for timeout and phase duration tracking
 JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-ci.xml"
 PHASE_PREFIX="[sig-claude]"
-TIMEOUT_TESTCASE="${PHASE_PREFIX} Claude should complete in a reasonable time"
+TIMEOUT_TESTCASE="${PHASE_PREFIX} ${AGENT_DISPLAY_NAME} should complete in a reasonable time"
 TOTAL_DURATION=$(( PHASE_WAIT_DURATION + PHASE_SNAPSHOT_DURATION + PHASE_ANALYSIS_DURATION + PHASE_NUDGE_DURATION ))
 
 PHASE_CASES="  <testcase name=\"${PHASE_PREFIX} Phase: wait for blocking jobs\" time=\"${PHASE_WAIT_DURATION}\"/>
@@ -535,11 +595,11 @@ TIMEOUT_CASES=""
 FAILURE_COUNT=0
 TIMEOUT_TEST_COUNT=0
 
-if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+if [[ "${AGENT_EXIT}" -eq 124 ]]; then
     TIMEOUT_TEST_COUNT=1
     FAILURE_COUNT=1
     TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\">
-    <failure message=\"Claude timed out.\">Claude exceeded the time limit and had to be nudged to wrap up.</failure>
+    <failure message=\"${AGENT_DISPLAY_NAME} timed out.\">${AGENT_DISPLAY_NAME} exceeded the time limit and had to be nudged to wrap up.</failure>
   </testcase>"
 
     HAS_REPORT=false
@@ -559,7 +619,7 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         FAILURE_COUNT=2
         TIMEOUT_CASES="${TIMEOUT_CASES}
   <testcase name=\"${TIMEOUT_TESTCASE} (recovery)\" time=\"${PHASE_NUDGE_DURATION}\">
-    <failure message=\"Claude failed to recover after nudge\">Claude was nudged to wrap up but did not produce a report (exit code: ${NUDGE_EXIT}).</failure>
+    <failure message=\"${AGENT_DISPLAY_NAME} failed to recover after nudge\">${AGENT_DISPLAY_NAME} was nudged to wrap up but did not produce a report (exit code: ${NUDGE_EXIT}).</failure>
   </testcase>"
     fi
 else
@@ -567,10 +627,12 @@ else
     TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 fi
 
-# Extract session metrics (cost, tokens, duration) for BigQuery
+# Extract Claude session metrics (cost, tokens, duration) for BigQuery.
+# Codex OTEL is retained in OTEL_LOG, but the current extractor understands
+# only Claude's metric and trace attribute names.
 METRICS_CASE=""
 METRICS_TEST_COUNT=0
-if [[ -n "${EXTRACT_METRICS}" ]] && [[ -f "${OTEL_LOG}" ]]; then
+if [[ "${AGENT_HARNESS}" == "claude-code" && -n "${EXTRACT_METRICS}" && -f "${OTEL_LOG}" ]]; then
     METRICS_TEST_COUNT=1
     METRICS_ARGS=("${OTEL_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json")
     if python3 "${EXTRACT_METRICS}" "${METRICS_ARGS[@]}"; then
@@ -584,7 +646,7 @@ if [[ -n "${EXTRACT_METRICS}" ]] && [[ -f "${OTEL_LOG}" ]]; then
 fi
 
 PHASE_COUNT=3
-if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+if [[ "${AGENT_EXIT}" -eq 124 ]]; then
     PHASE_COUNT=$((PHASE_COUNT + 1))
 fi
 TEST_COUNT=$(( PHASE_COUNT + TIMEOUT_TEST_COUNT + METRICS_TEST_COUNT ))
@@ -614,14 +676,18 @@ else
     PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
 fi
 
-echo "Asking Claude to summarize findings for Slack..."
+echo "Asking ${AGENT_DISPLAY_NAME} to summarize findings for Slack..."
 SLACK_LOG=$(mktemp)
 agentic_ci --no-streaming \
     "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If you identified revert candidates, mention them. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
     --continue \
     --max-turns 5 \
     > "${SLACK_LOG}" 2>&1 || true
-SUMMARY=$(grep -E '^\{' "${SLACK_LOG}" | jq -r 'select(.type == "result") | .result // empty' 2>/dev/null | head -1) || SUMMARY=""
+if [[ "${AGENT_HARNESS}" == "codex" ]]; then
+    SUMMARY=$(grep -E '^\{' "${SLACK_LOG}" | jq -r 'select(.type == "item.completed" and .item.type == "agent_message") | .item.text // empty' 2>/dev/null | tail -1) || SUMMARY=""
+else
+    SUMMARY=$(grep -E '^\{' "${SLACK_LOG}" | jq -r 'select(.type == "result") | .result // empty' 2>/dev/null | head -1) || SUMMARY=""
+fi
 rm -f "${SLACK_LOG}"
 
 if [[ -n "${SLACK_WEBHOOK}" ]]; then
@@ -630,7 +696,7 @@ if [[ -n "${SLACK_WEBHOOK}" ]]; then
 ${SUMMARY:-No summary available.}
 
 <${PROW_JOB_URL}|:point_right: View Full Analysis Report>
-_Model: ${CLAUDE_MODEL}_"
+_Harness: ${AGENT_HARNESS} | Model: ${AGENT_MODEL}_"
 
     set +x
     jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
