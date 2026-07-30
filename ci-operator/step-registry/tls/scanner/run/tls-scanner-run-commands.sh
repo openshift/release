@@ -50,6 +50,11 @@ run_tls_scan() {
       SCANNER_ARGS="--all-pods"
   fi
 
+  if [[ -n "${COMPONENT_FILTER:-}" ]]; then
+      SCANNER_ARGS="${SCANNER_ARGS} --component-filter ${COMPONENT_FILTER}"
+      echo "Component filter: ${COMPONENT_FILTER}"
+  fi
+
   # Enable post-quantum cryptography checks when requested by the step ref.
   if [[ "${PQC_CHECK:-false}" == "true" ]]; then
       SCANNER_ARGS="${SCANNER_ARGS} --pqc-check"
