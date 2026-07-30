@@ -165,8 +165,8 @@ for case_name in "${CASE_LIST[@]}"; do
     # --- Diff-based scoring ---
     echo "  --- Scores ---"
 
-    CLAUDE_FILES=$(git diff "origin/${BASE_BRANCH}" --name-only 2>/dev/null | sort)
-    EXPECTED_FILES=$(git diff "origin/${BASE_BRANCH}" "origin/${EXPECTED_BRANCH}" --name-only 2>/dev/null | sort)
+    CLAUDE_FILES=$(git diff "origin/${BASE_BRANCH}" --name-only 2>/dev/null | sort || echo "")
+    EXPECTED_FILES=$(git diff "origin/${BASE_BRANCH}" "origin/${EXPECTED_BRANCH}" --name-only 2>/dev/null | sort || echo "")
 
     echo "${CLAUDE_FILES}" > /tmp/eval-claude-files.txt
     echo "${EXPECTED_FILES}" > /tmp/eval-expected-files.txt
@@ -178,10 +178,10 @@ for case_name in "${CASE_LIST[@]}"; do
         record_score "file_overlap" "0.0"
     fi
 
-    CLAUDE_STAT=$(git diff "origin/${BASE_BRANCH}" --stat 2>/dev/null | tail -1)
+    CLAUDE_STAT=$(git diff "origin/${BASE_BRANCH}" --stat 2>/dev/null | tail -1 || echo "")
     CLAUDE_TOTAL=$(diff_stat_total "${CLAUDE_STAT}")
 
-    EXPECTED_STAT=$(git diff "origin/${BASE_BRANCH}" "origin/${EXPECTED_BRANCH}" --stat 2>/dev/null | tail -1)
+    EXPECTED_STAT=$(git diff "origin/${BASE_BRANCH}" "origin/${EXPECTED_BRANCH}" --stat 2>/dev/null | tail -1 || echo "")
     EXPECTED_TOTAL=$(diff_stat_total "${EXPECTED_STAT}")
 
     if [[ "${EXPECTED_TOTAL}" -gt 0 ]]; then
@@ -205,6 +205,21 @@ for case_name in "${CASE_LIST[@]}"; do
         record_score "function_overlap" "N/A"
     fi
 
+    # --- Score-based checks ---
+    if python3 -c "exit(0 if float('${OVERLAP}') >= 0.25 else 1)" 2>/dev/null; then
+        record_check "file_overlap_threshold" "pass"
+    else
+        record_check "file_overlap_threshold" "fail"
+    fi
+
+    if [[ "${RATIO}" == "N/A" ]]; then
+        record_check "diff_size_threshold" "pass"
+    elif python3 -c "r=float('${RATIO}'); exit(0 if 0.1 <= r <= 5.0 else 1)" 2>/dev/null; then
+        record_check "diff_size_threshold" "pass"
+    else
+        record_check "diff_size_threshold" "fail"
+    fi
+
     # --- Per-case summary ---
     echo "  Checks: ${CHECKS_PASS}/${CHECKS_TOTAL} passed"
 
@@ -213,7 +228,7 @@ for case_name in "${CASE_LIST[@]}"; do
     TOTAL_CHECKS_TOTAL=$(( TOTAL_CHECKS_TOTAL + CHECKS_TOTAL ))
 
     # JUnit test cases
-    for check_name in branch_created code_compiles tests_pass pr_created pr_description_exists; do
+    for check_name in branch_created code_compiles tests_pass pr_created pr_description_exists file_overlap_threshold diff_size_threshold; do
         result="${CHECKS[${check_name}]}"
         if [[ "${result}" == "pass" ]]; then
             ALL_JUNIT_TESTCASES="${ALL_JUNIT_TESTCASES}
@@ -251,6 +266,8 @@ checks:
   tests_pass: ${CHECKS[tests_pass]}
   pr_created: ${CHECKS[pr_created]}
   pr_description_exists: ${CHECKS[pr_description_exists]}
+  file_overlap_threshold: ${CHECKS[file_overlap_threshold]}
+  diff_size_threshold: ${CHECKS[diff_size_threshold]}
   passed: ${CHECKS_PASS}
   total: ${CHECKS_TOTAL}
 scores:
@@ -275,7 +292,7 @@ CASE_YAML_EOF
     # --- Per-case HTML detail (inline into summary) ---
     CHECKS_HTML=""
     check_icon() { if [[ "$1" == "pass" ]]; then echo "&#x2705;"; else echo "&#x274C;"; fi; }
-    for check_name in branch_created code_compiles tests_pass pr_created pr_description_exists; do
+    for check_name in branch_created code_compiles tests_pass pr_created pr_description_exists file_overlap_threshold diff_size_threshold; do
         result="${CHECKS[${check_name}]}"
         CHECKS_HTML="${CHECKS_HTML}<tr><td>$(check_icon "${result}")</td><td>${check_name}</td><td>${result}</td></tr>"
     done
@@ -399,5 +416,10 @@ ${ALL_CASE_DETAILS}
 </html>
 HTML_EOF
 echo "HTML summary written to ${ARTIFACT_DIR}/eval-summary.html"
+
+if [[ "${TOTAL_CHECKS_PASS}" -lt "${TOTAL_CHECKS_TOTAL}" ]]; then
+    echo "FAILED: ${TOTAL_CHECKS_PASS}/${TOTAL_CHECKS_TOTAL} checks passed."
+    exit 1
+fi
 
 echo "=== TRT Eval Judge Complete ==="

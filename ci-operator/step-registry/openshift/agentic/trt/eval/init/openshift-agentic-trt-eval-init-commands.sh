@@ -42,6 +42,10 @@ for case_name in "${CASE_LIST[@]}"; do
     BASE_BRANCH=$(yaml_val base_branch "${INPUT_FILE}")
     EXPECTED_BRANCH=$(yaml_val expected_branch "${INPUT_FILE}")
 
+    [[ -n "${JIRA_ISSUE_KEY}" ]] || { echo "ERROR: ${case_name}: missing jira_key in input.yaml"; exit 1; }
+    [[ -n "${BASE_BRANCH}" ]] || { echo "ERROR: ${case_name}: missing base_branch in input.yaml"; exit 1; }
+    [[ -n "${EXPECTED_BRANCH}" ]] || { echo "ERROR: ${case_name}: missing expected_branch in input.yaml"; exit 1; }
+
     echo "${JIRA_ISSUE_KEY}" > "${SHARED_DIR}/${case_name}.jira-issue-key"
     cp "${CASE_SRC}/jira-issue.json" "${SHARED_DIR}/${case_name}.jira-issue.json"
     echo "${BASE_BRANCH}" > "${SHARED_DIR}/${case_name}.eval-base-branch"
