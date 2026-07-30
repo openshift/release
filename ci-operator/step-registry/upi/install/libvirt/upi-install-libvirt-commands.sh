@@ -82,8 +82,19 @@ if [[ $(${VIRSH} pool-list | grep ${POOL_NAME}) ]]; then
   # pool-build creates the target dir if missing; pool-refresh re-syncs libvirt's
   # volume list with the actual filesystem state.
   if [[ "${POOL_REFRESH:-false}" == "true" ]]; then
-    ${VIRSH} pool-build ${POOL_NAME} || true
-    ${VIRSH} pool-refresh ${POOL_NAME}
+    # pool-build creates the target directory on the hypervisor if it is missing.
+    # Tolerate only "target directory already exists" (exit 1 + "already exists"
+    # in stderr); any other failure (connection error, permission denied, etc.)
+    # is a real problem and should abort the step.
+    pool_build_output=$(${VIRSH} pool-build "${POOL_NAME}" 2>&1) || {
+      if echo "${pool_build_output}" | grep -qi "already exists"; then
+        echo "pool-build: target directory already exists, continuing."
+      else
+        echo "pool-build failed: ${pool_build_output}" >&2
+        exit 1
+      fi
+    }
+    ${VIRSH} pool-refresh "${POOL_NAME}"
   fi
 else
   if [[ $(${VIRSH} pool-list --all | grep ${POOL_NAME}) ]]; then
