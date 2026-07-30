@@ -6,8 +6,8 @@ set -o pipefail
 run_tls_scan() {
 
   # TLS Scanner - scans TLS configurations of all pods in the cluster
-  local NAMESPACE="${SCANNER_NAMESPACE:-tls-scanner}"
-  local OWNS_NAMESPACE=true
+  NAMESPACE="${SCANNER_NAMESPACE:-tls-scanner}"
+  OWNS_NAMESPACE=true
   # When SCANNER_NAMESPACE is explicitly set, deploy into an existing namespace
   # (do not create/delete it). Check the variable itself, not the resolved value,
   # so that SCANNER_NAMESPACE=tls-scanner is also treated as externally owned.
@@ -318,8 +318,7 @@ EOF
   echo "Artifacts saved to: ${SCANNER_ARTIFACT_DIR}"
   ls -la "${SCANNER_ARTIFACT_DIR}" || true
 
-  # Unregister the trap so it doesn't fire after the function returns (local
-  # variables NAMESPACE/OWNS_NAMESPACE would be unbound at that point).
+  # Unregister the trap so it doesn't fire after the function returns.
   trap - EXIT
 }
 
