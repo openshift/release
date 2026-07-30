@@ -127,6 +127,68 @@ tests:
       OPERATOR_NAMESPACE: openshift-splunk-forwarder-operator
       PKO_CONFIG_NAMESPACE: openshift-splunk-forwarder-operator
     workflow: rosa-cluster-lease-e2e-workflow
+- as: osd-gcp-e2e
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:splunk-forwarder-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      LEASE_TYPE: osd-gcp
+      OCM_CLUSTER_ID: e2e-test-cluster
+      OPERATOR_CRDS: splunkforwarders.splunkforwarder.managed.openshift.io
+      OPERATOR_NAME: splunk-forwarder-operator
+      OPERATOR_NAMESPACE: openshift-splunk-forwarder-operator
+      PKO_CONFIG_NAMESPACE: openshift-splunk-forwarder-operator
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: osd-gcp-e2e-promotion-int
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:splunk-forwarder-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      LEASE_ENV: integration
+      LEASE_TYPE: osd-gcp
+      OCM_CLUSTER_ID: e2e-test-cluster
+      OPERATOR_CRDS: splunkforwarders.splunkforwarder.managed.openshift.io
+      OPERATOR_NAME: splunk-forwarder-operator
+      OPERATOR_NAMESPACE: openshift-splunk-forwarder-operator
+      PKO_CONFIG_NAMESPACE: openshift-splunk-forwarder-operator
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: osd-gcp-e2e-promotion-stage
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:splunk-forwarder-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      LEASE_ENV: staging
+      LEASE_TYPE: osd-gcp
+      OCM_CLUSTER_ID: e2e-test-cluster
+      OPERATOR_CRDS: splunkforwarders.splunkforwarder.managed.openshift.io
+      OPERATOR_NAME: splunk-forwarder-operator
+      OPERATOR_NAMESPACE: openshift-splunk-forwarder-operator
+      PKO_CONFIG_NAMESPACE: openshift-splunk-forwarder-operator
+    workflow: rosa-cluster-lease-e2e-workflow
 zz_generated_metadata:
   branch: master
   org: openshift
