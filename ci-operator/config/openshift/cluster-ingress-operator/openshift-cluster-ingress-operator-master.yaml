@@ -11,6 +11,10 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -307,6 +311,34 @@ tests:
         requests:
           cpu: 100m
     workflow: ingress-vsphere-static-metallb
+- always_run: false
+  as: tls-scanner-gatewayapi
+  optional: true
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPONENT_FILTER: tls-scanner-gatewayapi
+      FEATURE_SET: TechPreviewNoUpgrade
+      GATEWAY_NAME: tls-scanner-gatewayapi
+      SCAN_NAMESPACE: openshift-ingress
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - as: setup-gateway
+      cli: latest
+      commands: make generate gatewayapi-tls-scanner-setup
+      env:
+      - name: GATEWAY_NAME
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 - always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true
