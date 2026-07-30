@@ -40,14 +40,6 @@ main() {
         -e threshold_duration="${THRESHOLD_DURATION}" \
         ${DEBUG_FLAG} || rc=$?
 
-    echo "Copy JUnit XML to SHARED_DIR for reporter step"
-    local artifact_subdir="${ARTIFACT_DIR}/ztp_ai_deployment_time-${SPOKE_CLUSTER}"
-    if [[ -d "${artifact_subdir}" ]]; then
-        find "${artifact_subdir}" -name "junit_*.xml" -exec cp {} "${SHARED_DIR}/" \;
-    else
-        echo "WARNING: artifact directory not found at ${artifact_subdir}"
-    fi
-
     echo "ZTP AI deployment time test completed for ${SPOKE_CLUSTER} (rc=${rc})"
     return "${rc}"
 }

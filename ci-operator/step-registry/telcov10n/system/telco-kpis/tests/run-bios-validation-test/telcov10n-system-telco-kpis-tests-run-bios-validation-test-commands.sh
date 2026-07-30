@@ -43,14 +43,6 @@ main() {
         -e reboot_after_apply="${REBOOT_AFTER_APPLY}" \
         ${DEBUG_FLAG} || rc=$?
 
-    echo "Copy artifacts to ARTIFACT_DIR and SHARED_DIR"
-    local artifact_subdir="${ARTIFACT_DIR}/bios_validation-${SPOKE_CLUSTER}"
-    if [[ -d "${artifact_subdir}" ]]; then
-        find "${artifact_subdir}" -name "junit_*.xml" -exec cp {} "${SHARED_DIR}/" \;
-    else
-        echo "WARNING: artifact directory not found at ${artifact_subdir}"
-    fi
-
     echo "BIOS validation test completed for ${SPOKE_CLUSTER} (rc=${rc})"
     return "${rc}"
 }

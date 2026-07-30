@@ -46,13 +46,6 @@ main() {
         ${FILTER_FLAG} \
         ${DEBUG_FLAG}
 
-    echo "Copy report artifacts to SHARED_DIR"
-    if [[ -d "${ARTIFACT_DIR}/reports" ]]; then
-        find "${ARTIFACT_DIR}/reports" -type f -exec cp {} "${SHARED_DIR}/" \;
-    else
-        echo "WARNING: reports directory not found at ${ARTIFACT_DIR}/reports"
-    fi
-
     echo "Report generation completed for ${SPOKE_CLUSTER}"
 }
 

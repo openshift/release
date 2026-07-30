@@ -45,14 +45,6 @@ main() {
         -e skip_rebuild_image="${SKIP_REBUILD_IMAGE}" \
         ${DEBUG_FLAG} || rc=$?
 
-    echo "Copy artifacts to SHARED_DIR for reporter step"
-    local artifact_subdir="${ARTIFACT_DIR}/${TEST_NAME}-${SPOKE_CLUSTER}"
-    if [[ -d "${artifact_subdir}" ]]; then
-        find "${artifact_subdir}" -name "junit_*.xml" -exec cp {} "${SHARED_DIR}/" \;
-    else
-        echo "WARNING: artifact directory not found at ${artifact_subdir}"
-    fi
-
     echo "cpu_util test completed for ${SPOKE_CLUSTER} (rc=${rc})"
     return "${rc}"
 }
