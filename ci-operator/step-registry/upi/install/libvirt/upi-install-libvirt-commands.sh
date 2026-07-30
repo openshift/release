@@ -82,19 +82,16 @@ if [[ $(${VIRSH} pool-list | grep ${POOL_NAME}) ]]; then
   # pool-build creates the target dir if missing; pool-refresh re-syncs libvirt's
   # volume list with the actual filesystem state.
   if [[ "${POOL_REFRESH:-false}" == "true" ]]; then
-    # pool-build creates the target directory on the hypervisor if it is missing.
-    # Tolerate only "target directory already exists" (exit 1 + "already exists"
-    # in stderr); any other failure (connection error, permission denied, etc.)
-    # is a real problem and should abort the step.
-    pool_build_output=$(${VIRSH} pool-build "${POOL_NAME}" 2>&1) || {
-      if echo "${pool_build_output}" | grep -qi "already exists"; then
-        echo "pool-build: target directory already exists, continuing."
-      else
-        echo "pool-build failed: ${pool_build_output}" >&2
-        exit 1
-      fi
-    }
+    # pool-build is rejected on an already-active pool. To ensure the backing
+    # directory exists on the hypervisor (e.g. after a reboot on vpn-oz hosts),
+    # temporarily stop the pool, rebuild it (creates the dir if missing), then
+    # restart and refresh so libvirt's volume list is in sync with the filesystem.
+    echo "Stopping pool '${POOL_NAME}' to rebuild backing directory..."
+    ${VIRSH} pool-destroy "${POOL_NAME}"
+    ${VIRSH} pool-build "${POOL_NAME}"
+    ${VIRSH} pool-start "${POOL_NAME}"
     ${VIRSH} pool-refresh "${POOL_NAME}"
+    echo "Pool '${POOL_NAME}' rebuilt and refreshed successfully."
   fi
 else
   if [[ $(${VIRSH} pool-list --all | grep ${POOL_NAME}) ]]; then
