@@ -34,18 +34,6 @@ ref:
       documentation: |-
         When "true", broker-join failures are logged but do not fail the job.
         Used for iterative debugging of broker deployment and cluster join.
-    - name: SUBMARINER_CCLM_CNV_NAMESPACE
-      default: "openshift-cnv"
-      documentation: |-
-        Namespace where virt-synchronization-controller runs. A NetworkPolicy
-        named allow-submariner-cclm-sync is created here to allow cross-cluster
-        pod CIDRs (from Submariner gateway connections) to reach port
-        SUBMARINER_CCLM_SYNC_PORT — required for KubeVirt CCLM sync.
-    - name: SUBMARINER_CCLM_SYNC_PORT
-      default: "8443"
-      documentation: |-
-        TCP port that virt-synchronization-controller listens on for CCLM sync.
-        Used when creating the allow-submariner-cclm-sync NetworkPolicy.
     - name: SUBMARINER_VERIFY_HUB_SPOKE
       default: "false"
       documentation: |-
@@ -71,12 +59,10 @@ ref:
     Asserts submariner-globalnet is absent and remote subnets are not 242.x.
     Waits for OpenShift CoreDNS (dns-default) or kube-system coredns
     to include the Lighthouse clusterset.local stub zone on each spoke.
-    Creates NetworkPolicy allow-submariner-cclm-sync in SUBMARINER_CCLM_CNV_NAMESPACE
-    (default: openshift-cnv) on each cluster allowing cross-cluster pod CIDRs
-    (from Submariner gateway connections) to reach SUBMARINER_CCLM_SYNC_PORT.
-    This is required because OVN-K enforces NetworkPolicies at the pod interface
-    and the CNV operator creates restrictive ingress rules in openshift-cnv
-    that silently drop cross-cluster pod-IP traffic (TCP timeout, exit code 124).
+    Note: AllowCclmSyncIngress NetworkPolicy (cross-cluster pod CIDRs → openshift-cnv
+    port 8443) is applied in the verify step AFTER tunnels are confirmed connected,
+    not here — IPsec tunnels are not yet established at this stage so the gateway
+    CRs carry no CIDR data and the policy would be silently skipped.
 
     Submariner broker is deployed WITHOUT Globalnet. Spokes must use
     non-overlapping pod CIDRs (acm-interop-p2p-cluster-install ResolveSpokeCidr)

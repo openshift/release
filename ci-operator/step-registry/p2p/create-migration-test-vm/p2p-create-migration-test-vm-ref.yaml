@@ -70,15 +70,29 @@ ref:
     documentation: Set to "true" to delete prior VM/DV/prime-* PVCs before create.
   - name: CNV_VIRT_API_NAMESPACE
     default: "openshift-cnv"
-    documentation: Namespace where the virt-api Deployment lives. Used by WaitForVirtApiReady.
+    documentation: Namespace where the virt-api and cdi-apiserver Deployments live.
   - name: CNV_VIRT_API_WAIT_TIMEOUT
     default: "5m"
-    documentation: oc rollout status timeout when waiting for virt-api before CNV resource creation.
+    documentation: oc rollout status timeout when waiting for virt-api/cdi-apiserver before CNV resource creation.
+  - name: CNV_VIRT_API_SETTLE_SECS
+    default: "15"
+    documentation: |-
+      Extra seconds to wait after virt-api/cdi-apiserver rollout status returns OK.
+      Pod readiness probes pass before the webhook endpoint is fully initialised;
+      this settle time reduces InternalError webhook timeouts on the first apply attempt.
   - name: CNV_APPLY_MAX_RETRIES
-    default: "3"
+    default: "5"
     documentation: |-
       Maximum number of SpokeOc apply retries when admission webhook errors occur during
-      DataVolume or VirtualMachine creation. Each retry is preceded by WaitForVirtApiReady.
+      DataVolume or VirtualMachine creation. Each retry is preceded by WaitForVirtApiReady
+      (waits for both virt-api and cdi-apiserver). Increased from 3 to 5 to handle
+      slow cdi-apiserver webhook initialisation after cluster install.
+  - name: CNV_APPLY_RETRY_SLEEP_SECS
+    default: "30"
+    documentation: |-
+      Seconds to sleep between SpokeApplyWithRetry attempts (after WaitForVirtApiReady).
+      Longer than the webhook timeout (13s) to allow the cdi-apiserver webhook endpoint
+      to settle between retries.
   - name: P2P_CCLM_DEBUG_MODE
     default: "false"
     documentation: |-
