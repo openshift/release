@@ -194,10 +194,12 @@ DeployBroker() {
             --kubeconfig "${KUBECONFIG}"
     )
     [ -f "${brokerInfoFile}" ]
-    BrokerInfoHasGlobalnet "${brokerInfoFile}" && {
+    # Use `if` (not `&&`) so that BrokerInfoHasGlobalnet returning 1 (no globalnet, which
+    # is the GOOD path) does not cause the `&&` compound to exit 1 and trigger set -e.
+    if BrokerInfoHasGlobalnet "${brokerInfoFile}"; then
         : "deploy-broker created a Globalnet-enabled broker — CCLM requires Globalnet disabled"
         return 1
-    }
+    fi
 }
 
 # ── EnsureBrokerNoGlobalnet — deploy or reuse broker without Globalnet ────────
@@ -206,10 +208,11 @@ EnsureBrokerNoGlobalnet() {
 
     if KUBECONFIG="${KUBECONFIG}" oc get namespace submariner-k8s-broker 1>/dev/null; then
         RecoverBrokerInfo
-        BrokerInfoHasGlobalnet "${brokerInfoFile}" && {
+        # Use `if` (not `&&`) — same reason as in DeployBroker above.
+        if BrokerInfoHasGlobalnet "${brokerInfoFile}"; then
             : "Existing hub broker has Globalnet enabled — remediate failed or was disabled"
             return 1
-        }
+        fi
         : "Reusing existing Submariner broker without Globalnet"
         return 0
     fi

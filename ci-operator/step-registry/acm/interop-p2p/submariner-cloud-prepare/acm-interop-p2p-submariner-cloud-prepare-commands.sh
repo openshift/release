@@ -17,13 +17,10 @@
 # HUB CLUSTER (hub-spoke jobs only, SUBMARINER_VERIFY_HUB_SPOKE=true):
 #   PrepareHubAwsCluster + WaitForHubGatewayNode — hub-specific functions.
 #   The hub uses c5n.metal bare-metal workers (no MachineSets).  Standard
-#   subctl cloud prepare creates a '<infraID>-submariner' SG but only attaches
-#   it to MachineSet-provisioned instances.  On bare-metal the SG is created
-#   but never attached, so incoming UDP 4500 (IPsec NAT-T) from the spoke is
-#   dropped by the default worker SG even though the IKE handshake succeeds.
-#   --dedicated-gateway=false tells subctl to add the Submariner port rules
-#   directly to the EXISTING worker SG (already on all bare-metal nodes) and
-#   label one existing node as gateway — no MachineSet needed.
+#   subctl cloud prepare --gateways 1 creates the '<infraID>-submariner-gw-sg' SG
+#   with the required IPsec ports and handles security group setup.  On bare-metal
+#   clusters with no MachineSets, subctl labels an existing worker node as the
+#   gateway.  SG management is handled entirely by subctl.
 #
 # WHY the hub is optionally prepared (SUBMARINER_VERIFY_HUB_SPOKE=true only):
 #   KubeVirt CCLM sync uses raw pod-IP routing (port 8443) between the
@@ -165,22 +162,13 @@ PrepareAwsCluster() {
         --gateways 1
 }
 
-# ── PrepareHubAwsCluster — open Submariner ports on a bare-metal hub cluster ──
+# ── PrepareHubAwsCluster — prepare AWS cloud for Submariner on the hub cluster ─
 # HUB ONLY (SUBMARINER_VERIFY_HUB_SPOKE=true): the hub uses c5n.metal bare-metal
-# workers with no MachineSets.
-#
-# WHY --dedicated-gateway=false:
-#   Default subctl behaviour (dedicated-gateway=true) creates a MachineSet and
-#   attaches the '<infraID>-submariner' SG to new MachineSet-provisioned instances.
-#   On bare-metal there are no MachineSets, so the SG is created but never attached
-#   to any running instance.  The default worker SG does NOT allow inbound UDP 4500
-#   (IPsec NAT-T), so ESP data packets from the spoke are silently dropped even
-#   though the IKE handshake reports 'connected'.
-#   --dedicated-gateway=false tells subctl to add the Submariner port rules directly
-#   to the EXISTING worker security group (already attached to all bare-metal workers
-#   including the gateway-labeled node) and label one existing node as the gateway.
-#   subctl uses its embedded Go AWS SDK and reads from ~/.aws/credentials — no
-#   external 'aws' CLI binary required in the step container.
+# workers with no MachineSets.  subctl cloud prepare --gateways 1 creates the
+# '<infraID>-submariner-gw-sg' SG with the required IPsec ports and handles the
+# security group setup.  On bare-metal clusters with no MachineSets, subctl labels
+# an existing worker node as the gateway.  SG management is handled entirely by
+# subctl — no manual rule injection needed.
 PrepareHubAwsCluster() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset metadataFile="${1:?}"; (($#)) && shift
@@ -194,12 +182,11 @@ PrepareHubAwsCluster() {
         : "WARNING: aws.region not found in ${metadataFile}; using current AWS_DEFAULT_REGION for '${clusterName}'"
     fi
 
-    : "Preparing hub '${clusterName}' with --dedicated-gateway=false (bare-metal, no MachineSets)"
+    : "Preparing hub '${clusterName}' with --gateways 1"
     "${subctlBin}" cloud prepare aws \
         --kubeconfig "${kubeconfig}" \
         --ocp-metadata "${metadataFile}" \
-        --gateways 1 \
-        --dedicated-gateway=false
+        --gateways 1
 }
 
 # ── WaitForGatewayNode — wait for Submariner MachineSet and gateway-labeled node
@@ -269,8 +256,8 @@ WaitForGatewayNode() {
 
 # ── WaitForHubGatewayNode — wait for gateway-labeled node on bare-metal hub ───
 # HUB ONLY: bare-metal hubs have no MachineSets so Loops 1+2 (MachineSet creation
-# and readiness) are not applicable.  PrepareHubAwsCluster with --dedicated-gateway=false
-# labels an existing worker node almost immediately after subctl completes.
+# and readiness) are not applicable.  PrepareHubAwsCluster runs subctl cloud prepare
+# --gateways 1 which labels an existing worker node almost immediately after completing.
 # This function waits only for the submariner.io/gateway=true label (Loop 3).
 WaitForHubGatewayNode() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
