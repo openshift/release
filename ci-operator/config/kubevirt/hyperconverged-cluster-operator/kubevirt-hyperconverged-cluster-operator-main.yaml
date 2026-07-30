@@ -19,6 +19,10 @@ base_images:
     name: hyperconverged-cluster-bundle
     namespace: ci
     tag: 1.18.0-unstable
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 binary_build_commands: make install
 build_root:
   image_stream_tag:
@@ -153,6 +157,32 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
+    workflow: optional-operators-ci-operator-sdk-azure
+- always_run: false
+  as: hco-tls-scan-azure
+  optional: true
+  steps:
+    cluster_profile: azure-virtualization
+    dependencies:
+      OO_BUNDLE: hco-bundle
+    env:
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_INSTALL_TIMEOUT_MINUTES: "15"
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: kubevirt-hyperconverged
+      SCANNER_CPU: "2"
+    test:
+    - ref: tls-13
+    - as: deploy-cr
+      commands: |
+        make deploy_cr
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - ref: tls-scanner-run
     workflow: optional-operators-ci-operator-sdk-azure
 - as: hco-e2e-operator-sdk-sno-azure
   optional: true
@@ -492,6 +522,33 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: hco-tls-scan-aws
+  optional: true
+  steps:
+    cluster_profile: aws-virtualization
+    dependencies:
+      OO_BUNDLE: hco-bundle
+    env:
+      BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_INSTALL_TIMEOUT_MINUTES: "15"
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: kubevirt-hyperconverged
+      SCANNER_CPU: "2"
+      SPOT_INSTANCES: "true"
+    test:
+    - ref: tls-13
+    - as: deploy-cr
+      commands: |
+        KVM_EMULATION=true make deploy_cr
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - ref: tls-scanner-run
     workflow: optional-operators-ci-operator-sdk-aws
 - as: hco-e2e-operator-sdk-gcp
   run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
