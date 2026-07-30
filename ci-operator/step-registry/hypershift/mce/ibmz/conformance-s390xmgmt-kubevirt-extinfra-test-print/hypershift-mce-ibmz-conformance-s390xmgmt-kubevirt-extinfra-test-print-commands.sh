@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 MGMT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
-INFRA_KUBECONFIG="${SHARED_DIR}/infra/kubeconfig"
+INFRA_KUBECONFIG="${SHARED_DIR}/infra-kubeconfig"
 
 echo "============================================================"
 echo "Management cluster nodes (KUBECONFIG=${MGMT_KUBECONFIG})"
