@@ -138,11 +138,13 @@ LoadSpokeConfig() {
     true
 }
 
-# ── PrepareAwsCluster — open Submariner firewall ports and deploy gateway ─────
-# SPOKE CLUSTERS: identical to upstream main branch.
-# Creates a dedicated gateway MachineSet and '<infraID>-submariner' SG.
-# Region is extracted from metadata.json so AWS SDK calls target the correct
-# region for each spoke, not the us-east-1 default in ~/.aws/config.
+# ── PrepareAwsCluster — run subctl cloud prepare and patch worker SG ──────────
+# SPOKE CLUSTERS (and any bare-metal cluster).
+# subctl cloud prepare creates the '<infraID>-submariner-gw-sg' SG.  On clusters
+# with MachineSets it also provisions a dedicated gateway node with that SG.
+# On bare-metal (c5n.metal, no MachineSets) it labels an existing worker but
+# cannot retroactively attach the SG — EnsureWorkerSgHasIpsecPorts fixes this.
+# Region is extracted from metadata.json so AWS SDK calls target the right region.
 PrepareAwsCluster() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset metadataFile="${1:?}"; (($#)) && shift
@@ -160,15 +162,14 @@ PrepareAwsCluster() {
         --kubeconfig "${kubeconfig}" \
         --ocp-metadata "${metadataFile}" \
         --gateways 1
+
+    EnsureWorkerSgHasIpsecPorts "${metadataFile}" "${spokeName}"
 }
 
 # ── PrepareHubAwsCluster — prepare AWS cloud for Submariner on the hub cluster ─
-# HUB ONLY (SUBMARINER_VERIFY_HUB_SPOKE=true): the hub uses c5n.metal bare-metal
-# workers with no MachineSets.  subctl cloud prepare --gateways 1 creates the
-# '<infraID>-submariner-gw-sg' SG with the required IPsec ports and handles the
-# security group setup.  On bare-metal clusters with no MachineSets, subctl labels
-# an existing worker node as the gateway.  SG management is handled entirely by
-# subctl — no manual rule injection needed.
+# HUB ONLY (SUBMARINER_VERIFY_HUB_SPOKE=true).  Same as PrepareAwsCluster but
+# uses the hub kubeconfig and metadata.  The hub also uses c5n.metal bare-metal
+# so the same SG fix is needed.
 PrepareHubAwsCluster() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset metadataFile="${1:?}"; (($#)) && shift
@@ -187,6 +188,135 @@ PrepareHubAwsCluster() {
         --kubeconfig "${kubeconfig}" \
         --ocp-metadata "${metadataFile}" \
         --gateways 1
+
+    EnsureWorkerSgHasIpsecPorts "${metadataFile}" "${clusterName}"
+}
+
+# ── EnsureWorkerSgHasIpsecPorts — add Submariner IPsec rules to cluster worker SG
+# subctl cloud prepare creates '<infraID>-submariner-gw-sg' with UDP 4500/500/ESP/4490
+# but only attaches it to MachineSet-provisioned gateway instances.  When a cluster
+# uses bare-metal instances (e.g. c5n.metal) there are no MachineSets, so subctl
+# labels an existing running worker as the gateway — but EC2 does not retroactively
+# attach the new SG to already-provisioned instances.  The worker keeps its original
+# '<infraID>-worker' SG which has no inbound UDP 4500 (IPsec NAT-T), so ESP data
+# packets from the remote cluster are silently dropped by AWS even though IKE reports
+# the tunnel as 'connected'.
+# This function adds the four required Submariner ingress rules directly to the worker
+# SG via the EC2 Query API.  It is safe to call on standard IPI clusters too (the
+# rules are redundant but harmless when the gateway is MachineSet-provisioned).
+# Uses Python 3 stdlib (urllib + hmac SigV4) and reads ~/.aws/credentials set by
+# SetAwsCredentials — no boto3 or aws-cli binary required.
+EnsureWorkerSgHasIpsecPorts() {
+    typeset metadataFile="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+
+    typeset infraId clusterRegion
+    infraId="$(jq -r '.infraID // empty' "${metadataFile}")"
+    clusterRegion="$(jq -r '.aws.region // empty' "${metadataFile}")"
+
+    [[ -n "${infraId}" && -n "${clusterRegion}" ]] || {
+        : "WARNING: infraID or aws.region missing in ${metadataFile} — skipping worker SG IPsec rules for '${clusterName}'"
+        return 0
+    }
+
+    : "Adding Submariner IPsec ingress rules to worker SG '${infraId}-worker' for '${clusterName}' (${clusterRegion})"
+
+    python3 - "${infraId}" "${clusterRegion}" <<'PYEOF'
+"""Add Submariner IPsec ingress rules to the OCP worker SG.
+Uses EC2 Query API with SigV4 signing; no boto3 required."""
+import sys, os, re, hmac, hashlib, urllib.request, urllib.parse
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+
+def _read_creds():
+    cred_file = os.path.expanduser("~/.aws/credentials")
+    ak = sk = ""
+    with open(cred_file) as f:
+        for line in f:
+            if re.match(r'\s*aws_access_key_id\s*=', line):
+                ak = line.split("=", 1)[1].strip()
+            elif re.match(r'\s*aws_secret_access_key\s*=', line):
+                sk = line.split("=", 1)[1].strip()
+    if not ak or not sk:
+        raise RuntimeError("Could not read AWS credentials from ~/.aws/credentials")
+    return ak, sk
+
+def _sign(key, msg):
+    k = key if isinstance(key, bytes) else key.encode()
+    return hmac.new(k, msg.encode(), hashlib.sha256).digest()
+
+def _derive_key(secret, date, region, service):
+    return _sign(_sign(_sign(_sign("AWS4" + secret, date), region), service), "aws4_request")
+
+def _ec2(action, params, region, ak, sk):
+    host = f"ec2.{region}.amazonaws.com"
+    t = datetime.now(timezone.utc)
+    amz_date = t.strftime("%Y%m%dT%H%M%SZ")
+    date_stamp = t.strftime("%Y%m%d")
+    all_p = dict(params, Action=action, Version="2016-11-15")
+    body = urllib.parse.urlencode(sorted(all_p.items()))
+    ph = hashlib.sha256(body.encode()).hexdigest()
+    ch = f"content-type:application/x-www-form-urlencoded\nhost:{host}\nx-amz-date:{amz_date}\n"
+    sh = "content-type;host;x-amz-date"
+    cr = f"POST\n/\n\n{ch}\n{sh}\n{ph}"
+    cs = f"{date_stamp}/{region}/ec2/aws4_request"
+    sts = f"AWS4-HMAC-SHA256\n{amz_date}\n{cs}\n{hashlib.sha256(cr.encode()).hexdigest()}"
+    sig = hmac.new(_derive_key(sk, date_stamp, region, "ec2"), sts.encode(), hashlib.sha256).hexdigest()
+    auth = f"AWS4-HMAC-SHA256 Credential={ak}/{cs}, SignedHeaders={sh}, Signature={sig}"
+    req = urllib.request.Request(
+        f"https://{host}/",
+        data=body.encode(),
+        headers={"Content-Type": "application/x-www-form-urlencoded",
+                 "X-Amz-Date": amz_date, "Authorization": auth},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req) as r:
+            return ET.fromstring(r.read())
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode()
+        if "InvalidPermission.Duplicate" in err_body:
+            return None  # rule already exists — OK
+        print(f"EC2 API error {e.code}: {err_body}", file=sys.stderr)
+        raise
+
+def main():
+    infra_id, region = sys.argv[1], sys.argv[2]
+    ak, sk = _read_creds()
+    ns = "{http://ec2.amazonaws.com/doc/2016-11-15/}"
+    resp = _ec2("DescribeSecurityGroups", {
+        "Filter.1.Name": "group-name",
+        "Filter.1.Value.1": f"{infra_id}-worker",
+    }, region, ak, sk)
+    ids = [el.text for el in resp.iter(f"{ns}groupId")]
+    if not ids:
+        print(f"Worker SG '{infra_id}-worker' not found — skipping", file=sys.stderr)
+        return
+    sg_id = ids[0]
+    print(f"Worker SG: {sg_id} ({infra_id}-worker)")
+    rules = [
+        ("UDP 4500 (IPsec NAT-T)", {"IpPermissions.1.IpProtocol": "udp",
+            "IpPermissions.1.FromPort": "4500", "IpPermissions.1.ToPort": "4500",
+            "IpPermissions.1.IpRanges.1.CidrIp": "0.0.0.0/0"}),
+        ("UDP 500  (IKE)",        {"IpPermissions.1.IpProtocol": "udp",
+            "IpPermissions.1.FromPort": "500",  "IpPermissions.1.ToPort": "500",
+            "IpPermissions.1.IpRanges.1.CidrIp": "0.0.0.0/0"}),
+        ("ESP (proto 50)",        {"IpPermissions.1.IpProtocol": "50",
+            "IpPermissions.1.FromPort": "-1",   "IpPermissions.1.ToPort": "-1",
+            "IpPermissions.1.IpRanges.1.CidrIp": "0.0.0.0/0"}),
+        ("UDP 4490 (NAT-D)",      {"IpPermissions.1.IpProtocol": "udp",
+            "IpPermissions.1.FromPort": "4490", "IpPermissions.1.ToPort": "4490",
+            "IpPermissions.1.IpRanges.1.CidrIp": "0.0.0.0/0"}),
+    ]
+    for label, rule in rules:
+        params = {"GroupId": sg_id}
+        params.update(rule)
+        result = _ec2("AuthorizeSecurityGroupIngress", params, region, ak, sk)
+        print(f"  {label}: {'already exists' if result is None else 'added OK'}")
+    print(f"Done — Submariner IPsec rules in {sg_id}")
+
+main()
+PYEOF
 }
 
 # ── WaitForGatewayNode — wait for Submariner MachineSet and gateway-labeled node

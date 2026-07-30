@@ -12,13 +12,16 @@
 #   - Wait (in order) for: submariner-operator, gateway, routeagent,
 #     lighthouse-agent, and lighthouse-coredns to be fully ready on all joined clusters
 #
-# SPOKE CLUSTERS (spoke-to-spoke and hub-spoke jobs):
-#   All spoke steps are identical to the upstream main branch.
+# ALL CLUSTERS (spoke-to-spoke and hub-spoke jobs):
+#   After WaitSubmarinerReady, RestartRouteAgent is called on EVERY cluster
+#   (all spokes, and the hub when enrollHub=true).  The routeagent DaemonSet
+#   starts before IPsec tunnels are established, so its initial OVN-K flow
+#   programming is incomplete.  A restart after readiness forces a full
+#   reprogramming pass — without this, subctl verify --only connectivity
+#   fails with Ncat: TIMEOUT even when the control plane shows "connected".
 #
 # HUB CLUSTER (hub-spoke jobs only, SUBMARINER_VERIFY_HUB_SPOKE=true):
 #   Hub join runs the same sequence as spokes, gated by enrollHub.
-#   After join and readiness, RestartRouteAgent is called on the hub to ensure
-#   OVN-K policy-based routing entries are programmed after the gateway is up.
 #
 # WHY hub join is conditional (SUBMARINER_VERIFY_HUB_SPOKE=true only):
 #   For hub↔spoke CCLM: KubeVirt CCLM uses raw pod-IP routing (port 8443) for
@@ -462,10 +465,20 @@ typeset -i submarinerStepRc=0
             || _brokerFailed=1
     done
 
-    # ── Hub routeagent restart (hub-spoke jobs only) ──────────────────────────
-    # Restart after hub WaitSubmarinerReady so the routeagent can re-program
-    # OVN flows with a fully-started gateway. Spoke routeagents are left as-is
-    # (their OVN entries are programmed correctly once the gateway DaemonSet is ready).
+    # ── Routeagent restart (all clusters) ────────────────────────────────────
+    # The submariner-routeagent DaemonSet programs OVN-K flow tables at startup.
+    # It starts early — before IPsec tunnels are established — so it programs
+    # incomplete OVN flows based on "no connected peers" state.  When tunnels
+    # later come up (shown as "connected" by subctl show connections), the
+    # routeagent does not automatically reprogram all OVN-K routes.  Restarting
+    # it here (after WaitSubmarinerReady) forces a full OVN reprogramming pass
+    # so cross-cluster pod traffic is correctly steered through the gateway.
+    # Without this, subctl verify --only connectivity fails with Ncat: TIMEOUT
+    # even though the control plane reports the tunnel as "connected".
+    for ((i = 0; i < spokeCount; i++)); do
+        RestartRouteAgent "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" || _brokerFailed=1
+    done
+
     if [[ "${enrollHub}" == "true" ]]; then
         RestartRouteAgent "${KUBECONFIG}" "hub" || _brokerFailed=1
     fi
