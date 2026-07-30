@@ -122,7 +122,7 @@ EOF
 
     run_command "cd /tmp"
     CGWURL="https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw"
-    run_command "curl -L -o oc-mirror.tar.gz ${CGWURL}/oc-mirror/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
+    run_command "curl -L -o oc-mirror.tar.gz ${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-amd64.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
 
     # Setup TLS certificate for mirror registry by extracting from cluster
     echo "Extracting mirror registry CA certificate from cluster..."

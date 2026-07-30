@@ -55,7 +55,7 @@ mirror:
 EOF2
 
 CGWURL="https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw"
-wget ${CGWURL}/oc-mirror/oc-mirror.tar.gz
+wget -O oc-mirror.tar.gz ${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-amd64.tar.gz
 tar xvzf oc-mirror.tar.gz
 chmod +x oc-mirror
 jq -s '.[0] * .[1]' "${XDG_RUNTIME_DIR}/containers/auth.json" /home/pull-secret > /home/oc_mirror_auth
