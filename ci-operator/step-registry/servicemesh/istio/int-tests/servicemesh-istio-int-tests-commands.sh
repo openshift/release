@@ -5,11 +5,6 @@ set -o errexit
 set -o pipefail
 set -o xtrace
 
-# --- Configuration ---
-readonly RETRY_SLEEP_INTERVAL=30
-
-# --- Functions ---
-
 # run_tests runs prow/integ-suite-ocp.sh directly from the step container.
 # Images are pre-built and pushed to TEST_HUB by servicemesh-istio-images-build.
 run_tests() {
@@ -83,77 +78,10 @@ run_tests() {
     "${TEST_SUITE}" "${SKIP_PARSER_SKIP_TESTS}" "${SKIP_PARSER_SKIP_SUBSUITES}"
 }
 
-print_debug_info() {
-  echo -e "\n"
-  echo "################################################################"
-  echo "     DEBUG INFO"
-  echo "################################################################"
-  echo "oc status:"
-  oc status
-  echo "All pods in ${MAISTRA_NAMESPACE}:"
-  oc get pods -n "${MAISTRA_NAMESPACE}" || true
-  echo "Events in ${MAISTRA_NAMESPACE}:"
-  oc get events -n "${MAISTRA_NAMESPACE}" || true
-  echo "All nodes:"
-  oc get nodes -o wide
-  oc describe nodes
-  echo "Cluster operators:"
-  oc get clusteroperators
-}
-
-clean_test_run() {
-  echo "Cleaning previous test run"
-
-  if [ "${CONTROL_PLANE_SOURCE}" == "sail" ]; then
-    oc delete istiocni --all -n istio-cni --wait=true --timeout=120s
-    oc delete ztunnel --all -n ztunnel --wait=true --timeout=120s
-    oc delete istio --all -n istio-system --wait=true --timeout=120s
-    oc delete namespace istio-system istio-cni ztunnel
-  else
-    curl -sL https://istio.io/downloadIstioctl | sh -
-    export PATH=$HOME/.istioctl/bin:$PATH
-    istioctl uninstall --purge -y
-    oc delete namespace istio-system
-  fi
-
-  # Restore any test-generated files in the workspace
-  rm -f tests/integration/pilot/testdata/gateway-conformance-manifests.yaml
-  git restore tests/integration/pilot/gateway_conformance_test.go || true
-
-  oc delete namespace -l istio-testing
-
-  echo "Sleeping 120s before starting new test run"
-  sleep 120
-}
-
-echo "--- Running Istio int tests (attempt 1) ---"
+echo "--- Running Istio int tests ---"
 set +o errexit
 run_tests
 TEST_RC=$?
-
-if [ "${TEST_RC}" -ne 0 ]; then
-  echo "WARNING: test run failed with exit code ${TEST_RC}, retrying..."
-  print_debug_info
-
-  echo "Retrying test execution in ${RETRY_SLEEP_INTERVAL} seconds..."
-  sleep "${RETRY_SLEEP_INTERVAL}"
-
-  clean_test_run
-
-  echo "--- Running Istio int tests (attempt 2) ---"
-  run_tests
-  TEST_RC=$?
-
-  if [ "${TEST_RC}" -ne 0 ]; then
-    echo "ERROR: Second attempt failed. Exit code: ${TEST_RC}"
-    print_debug_info
-    exit 1
-  else
-    echo "SUCCESS: Second attempt passed successfully."
-    exit 0
-  fi
-fi
-
 set -o errexit
 
 # Share artifacts with next job step which uploads results to report portal
