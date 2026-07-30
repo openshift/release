@@ -73,6 +73,11 @@ run_tests() {
 
   export SKIP_SETUP=true
   export BUILD_WITH_CONTAINER="0"
+  # OpenShift sets NAMESPACE to the CI step container's own namespace (ci-op-*).
+  # Force istio-system so the sail-operator-setup.sh converter uses the right namespace
+  # for the Istio CR and the istiod wait; without this the CR gets spec.namespace=ci-op-*
+  # and the sail operator has no RBAC to create resources there.
+  export NAMESPACE=istio-system
 
   prow/integ-suite-ocp.sh \
     "${TEST_SUITE}" "${SKIP_PARSER_SKIP_TESTS}" "${SKIP_PARSER_SKIP_SUBSUITES}"
