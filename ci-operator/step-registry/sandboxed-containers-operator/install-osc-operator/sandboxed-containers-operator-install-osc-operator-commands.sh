@@ -150,9 +150,9 @@ function fetch_osc_charts() {
   fi
 
   # DEBUG until https://github.com/confidential-devhub/charts/pull/3 merges
-  if grep -q 'startingCSV.*$' "${result_dir}/osc-operator/templates/subscription.yaml" 2>/dev/null; then
-    sed -ie 's/startingCSV.*$//' "${result_dir}/osc-operator/templates/subscription.yaml" || true
-    echo ">>> DEBUG: subscription.yaml patched.  PR 3 not merged yet." >&2
+  if grep -q 'startingCSV' "${result_dir}/osc-operator/templates/subscription.yaml" 2>/dev/null; then
+    sed -i '/startingCSV/d' "${result_dir}/osc-operator/templates/subscription.yaml"
+    echo ">>> DEBUG: subscription.yaml patched (removed startingCSV line). PR 3 not merged yet." >&2
   fi
 
   echo "${result_dir}"
