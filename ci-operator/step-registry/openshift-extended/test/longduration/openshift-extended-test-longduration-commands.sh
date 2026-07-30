@@ -329,15 +329,15 @@ if [[ "${OVERRIDE_OC_MIRROR:-}" == "true" ]]; then
 
         # Download oc-mirror from CGW (Content Gateway)
         CGWURL="https://mirror.openshift.com/pub/cgw"
-        echo "Downloading oc-mirror from https://mirror.openshift.com/pub/cgw/oc-mirror/"
+        echo "Downloading oc-mirror from https://mirror.openshift.com/pub/cgw/oc-mirror/latest/"
         curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
-            "${CGWURL}/oc-mirror/oc-mirror.tar.gz"
+            "${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-amd64.tar.gz"
 
         # Verify the integrity of the downloaded tarball
         echo "Verifying oc-mirror.tar.gz integrity..."
         curl -fL --retry 5 --connect-timeout 30 -o sha256sum.txt \
-            "${CGWURL}/oc-mirror/sha256sum.txt"
-        grep "oc-mirror.tar.gz" sha256sum.txt | sha256sum -c - || {
+            "${CGWURL}/oc-mirror/latest/sha256sum.txt"
+        grep "oc-mirror-rhel9-linux-amd64.tar.gz" sha256sum.txt | sed 's/oc-mirror-rhel9-linux-amd64.tar.gz/oc-mirror.tar.gz/' | sha256sum -c - || {
             echo "ERROR: oc-mirror.tar.gz checksum verification failed"
             exit 1
         }
