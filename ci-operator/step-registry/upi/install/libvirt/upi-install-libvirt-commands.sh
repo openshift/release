@@ -97,12 +97,18 @@ branch_at_least_4_16() {
   }'
 }
 
+# True only for IBM Z on OCP < 4.16. New install fallbacks (missing virt-install /
+# qemu-img) must not change Power or 4.16+ s390x behavior.
+s390x_below_4_16() {
+  [[ "${ARCH}" == "s390x" ]] && ! branch_at_least_4_16
+}
+
 # Set when ensure_rhcos_resized successfully resized locally with qemu-img.
 RHCOS_RESIZED_LOCALLY=false
 
-# Resize RHCOS qcow before upload. ocp/4.15:libvirt-installer often lacks qemu-img;
-# do not dnf-install it (prior attempts failed on missing libaio deps). Caller falls
-# back to virsh vol-resize on the hypervisor after upload when needed.
+# Resize RHCOS qcow before upload. Soft fallback (upload as-is + virsh vol-resize)
+# is only for IBM Z on OCP < 4.16 where ocp/*/libvirt-installer may lack qemu-img.
+# Power and 4.16+ keep the historical hard dependency on qemu-img.
 ensure_rhcos_resized() {
   local image_path=$1
   local capacity=$2
@@ -113,36 +119,22 @@ ensure_rhcos_resized() {
     RHCOS_RESIZED_LOCALLY=true
     return 0
   fi
-  echo "WARNING: qemu-img unavailable; uploading image as-is (will virsh vol-resize to ${capacity})"
+  if ! s390x_below_4_16; then
+    echo "ERROR: qemu-img not found (required for ARCH=${ARCH} BRANCH=${BRANCH:-unset})" >&2
+    exit 1
+  fi
+  echo "WARNING: qemu-img unavailable on s390x BRANCH=${BRANCH}; uploading image as-is (will virsh vol-resize to ${capacity})"
   return 0
 }
 
-# ACPI-free domain XML for guests when virt-install is absent (≤4.15 images).
-# RHEL 9 s390x QEMU rejects domains that request <acpi/>.
+# ACPI-free s390x domain XML when virt-install is absent (≤4.15 images).
+# RHEL 9 s390x QEMU rejects domains that request <acpi/>. s390x-only path.
 write_upi_domain_xml() {
   local name=$1
   local mac=$2
   local ign_vol=$3
   local xml=$4
-  local arch_attr machine console_target uuid
-
-  case "${ARCH:-s390x}" in
-    s390x)
-      arch_attr="s390x"
-      machine="s390-ccw-virtio"
-      console_target="sclp"
-      ;;
-    ppc64le)
-      arch_attr="ppc64le"
-      machine="pseries"
-      console_target="serial"
-      ;;
-    *)
-      arch_attr="x86_64"
-      machine="q35"
-      console_target="serial"
-      ;;
-  esac
+  local uuid
 
   if [[ -r /proc/sys/kernel/random/uuid ]]; then
     uuid=$(cat /proc/sys/kernel/random/uuid)
@@ -158,7 +150,7 @@ write_upi_domain_xml() {
     echo "  <currentMemory unit='MiB'>${DOMAIN_MEMORY}</currentMemory>"
     echo "  <vcpu placement='static'>${DOMAIN_VCPUS}</vcpu>"
     echo "  <os>"
-    echo "    <type arch='${arch_attr}' machine='${machine}'>hvm</type>"
+    echo "    <type arch='s390x' machine='s390-ccw-virtio'>hvm</type>"
     echo "    <boot dev='hd'/>"
     echo "  </os>"
     echo "  <clock offset='utc'/>"
@@ -185,13 +177,12 @@ write_upi_domain_xml() {
     echo "      <model type='virtio'/>"
     echo "    </interface>"
     echo "    <console type='pty'>"
-    echo "      <target type='${console_target}' port='0'/>"
+    echo "      <target type='sclp' port='0'/>"
     echo "    </console>"
     echo "  </devices>"
     echo "</domain>"
   } > "${xml}"
 }
-
 # Only create the storage pool if there isn't one already...
 if [[ $(${VIRSH} pool-list | grep ${POOL_NAME}) ]]; then
   echo "Storage pool ${POOL_NAME} already exists. Skipping..."
@@ -579,7 +570,8 @@ create_node () {
 
     echo "Creating ${NAME} vm..."
     # virt-install ships in 4.16+ libvirt-installer images (MULTIARCH-4111).
-    # ocp/4.15:libvirt-installer does not; use ACPI-free virsh define/start instead.
+    # ACPI-free virsh define is only for IBM Z on OCP < 4.16 when virt-install is
+    # missing. Power and 4.16+ s390x still require virt-install.
     if command -v virt-install >/dev/null 2>&1; then
       virt-install \
         --connect "${LIBVIRT_CONNECTION}" \
@@ -593,8 +585,8 @@ create_node () {
         --import \
         --noautoconsole \
         --disk "vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional"
-    else
-      echo "virt-install not found; defining ${NAME} with virsh (≤4.15 libvirt-installer fallback, no ACPI)"
+    elif s390x_below_4_16; then
+      echo "virt-install not found; defining ${NAME} with virsh (s390x BRANCH=${BRANCH} <4.16 fallback, no ACPI)"
       DOMAIN_XML="${INSTALL_DIR}/${NAME}.xml"
       write_upi_domain_xml "${NAME}" "${MAC_ADDRESS}" "${IGNITION_VOLUME}" "${DOMAIN_XML}"
       # Domain may not exist yet on first create; silence expected "failed to get domain" noise.
@@ -603,6 +595,9 @@ create_node () {
       ${VIRSH} define "${DOMAIN_XML}"
       ${VIRSH} start "${NAME}"
       ${VIRSH} autostart "${NAME}" || true
+    else
+      echo "ERROR: virt-install not found (required for ARCH=${ARCH} BRANCH=${BRANCH:-unset})" >&2
+      exit 1
     fi
   fi
 }
