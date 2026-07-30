@@ -183,6 +183,29 @@ tests:
     test:
     - ref: tls-scanner-run
     workflow: openshift-e2e-aws-csi
+- always_run: false
+  as: tls-scanner-aws-efs
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      CLUSTERCSIDRIVER: efs.csi.aws.com
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: aws-efs-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+      SCAN_NAMESPACE: openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+      TRUECONDITIONS: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-aws-csi-efs
 - as: aws-efs-operator-e2e
   steps:
     cluster_profile: openshift-org-aws
