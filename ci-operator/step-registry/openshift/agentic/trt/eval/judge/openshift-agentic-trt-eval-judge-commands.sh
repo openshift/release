@@ -264,12 +264,12 @@ ${EXPECTED_FILES_YAML}
     done
 
     if [[ -n "${CLAUDE_FILES}" ]]; then
-        CLAUDE_FILES_HTML=$(echo "${CLAUDE_FILES}" | sed 's/.*/    <li>\&<\/li>/')
+        CLAUDE_FILES_HTML=$(echo "${CLAUDE_FILES}" | while IFS= read -r f; do echo "<li>${f}</li>"; done)
     else
         CLAUDE_FILES_HTML="<li>(none)</li>"
     fi
     if [[ -n "${EXPECTED_FILES}" ]]; then
-        EXPECTED_FILES_HTML=$(echo "${EXPECTED_FILES}" | sed 's/.*/    <li>\&<\/li>/')
+        EXPECTED_FILES_HTML=$(echo "${EXPECTED_FILES}" | while IFS= read -r f; do echo "<li>${f}</li>"; done)
     else
         EXPECTED_FILES_HTML="<li>(none)</li>"
     fi
