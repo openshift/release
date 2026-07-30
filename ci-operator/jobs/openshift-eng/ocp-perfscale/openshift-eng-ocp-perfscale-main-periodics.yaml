@@ -6750,7 +6750,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build11
-  cron: 0 2,14 * * *
+  cron: 0 2 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -6761,11 +6761,22 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
-    ci-operator.openshift.io/variant: rosa_hcp-4.22-nightly-x86
+    ci-operator.openshift.io/variant: rosa_hcp-5.0-nightly-x86
     ci.openshift.io/generator: prowgen
-    job-release: "4.22"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-eng-ocp-perfscale-main-rosa_hcp-4.22-nightly-x86-control-plane-24nodes-onperfsector
+  name: periodic-ci-openshift-eng-ocp-perfscale-main-rosa_hcp-5.0-nightly-x86-control-plane-24nodes-onperfsector
+  reporter_config:
+    slack:
+      channel: '#ocp-qe-scale-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:
@@ -6775,7 +6786,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=control-plane-24nodes-onperfsector
-      - --variant=rosa_hcp-4.22-nightly-x86
+      - --variant=rosa_hcp-5.0-nightly-x86
       command:
       - ci-operator
       env:
