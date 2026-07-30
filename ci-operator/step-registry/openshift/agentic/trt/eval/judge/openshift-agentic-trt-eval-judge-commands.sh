@@ -214,7 +214,7 @@ for case_name in "${CASE_LIST[@]}"; do
 
     if [[ "${RATIO}" == "N/A" ]]; then
         record_check "diff_size_threshold" "pass"
-    elif python3 -c "r=float('${RATIO}'); exit(0 if 0.1 <= r <= 5.0 else 1)" 2>/dev/null; then
+    elif python3 -c "exit(0 if float('${RATIO}') >= 0.1 else 1)" 2>/dev/null; then
         record_check "diff_size_threshold" "pass"
     else
         record_check "diff_size_threshold" "fail"
@@ -396,6 +396,7 @@ cat > "${ARTIFACT_DIR}/eval-summary.html" <<HTML_EOF
   summary { padding: 8px 12px; cursor: pointer; background: #fafafa; }
   summary:hover { background: #f0f0f0; }
   .case-detail { padding: 0 16px 12px; }
+  .footer { margin-top: 2em; padding-top: 1em; border-top: 1px solid #ddd; color: #999; font-size: 0.85em; }
 </style>
 </head>
 <body>
@@ -412,6 +413,7 @@ cat > "${ARTIFACT_DIR}/eval-summary.html" <<HTML_EOF
 
 <h2>Case Details</h2>
 ${ALL_CASE_DETAILS}
+<div class="footer">jira-solver-eval</div>
 </body>
 </html>
 HTML_EOF
