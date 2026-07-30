@@ -3,6 +3,10 @@ base_images:
     name: brew
     namespace: microshift
     tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -22,6 +26,20 @@ images:
           source_path: /go/src/github.com/openshift/microshift
     optional: true
     to: microshift-test-rpm
+  - dockerfile_literal: |
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y jq && dnf clean all
+      USER 1000
+      COPY src/microshift /go/src/github.com/openshift/microshift
+      WORKDIR /go/src/github.com/openshift/microshift
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift/microshift
+    to: rebase-cryptoscan-src
 promotion:
   to:
   - disabled: true
@@ -87,12 +105,17 @@ tests:
   steps:
     workflow: openshift-ci-security
 - as: test-rebase
+  capabilities:
+  - intranet
+  - nested-podman
+  nested_podman: true
   optional: true
+  restrict_network_access: false
   run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod|vendor/.*|deps/.*)$
   steps:
     env:
       DRY_RUN: "y"
-    workflow: openshift-microshift-rebase
+    workflow: openshift-microshift-rebase-cryptoscan
 - as: e2e-aws-tests
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
