@@ -69,6 +69,7 @@ class Config:
         # These can be removed once the corresponding periodics files exist.
         releases.add('4.23')
         releases.add('5.0')
+        releases.add('5.1')
 
         return sorted(releases)  # Glob does not provide any guarantees on ordering, so force an order by sorting.
 
