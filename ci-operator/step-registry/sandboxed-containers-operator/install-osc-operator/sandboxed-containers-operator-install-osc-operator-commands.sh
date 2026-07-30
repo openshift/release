@@ -31,6 +31,11 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 OSC_INSTALL=${OSC_INSTALL:-false}
 OSC_NAMESPACE=${OSC_NAMESPACE:-openshift-sandboxed-containers-operator}
 CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE:-}
+# Pick up the resolved catalog image from env-cm step (resolves :latest to a specific tag)
+if [[ -f "${SHARED_DIR}/catalog-source-image.env" ]]; then
+  # shellcheck disable=SC1091
+  source "${SHARED_DIR}/catalog-source-image.env"
+fi
 OSC_CHARTS_REPO=${OSC_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 OSC_CHARTS_REF=${OSC_CHARTS_REF:-main}
 ENABLEPEERPODS=${ENABLEPEERPODS:-false}
