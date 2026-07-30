@@ -1,0 +1,66 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  name: hypershift-z6sfr-worker-amd64-us-east-1b
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      kubernetes.io/arch: amd64
+      machineset-role: hypershift
+  template:
+    metadata:
+      labels:
+        kubernetes.io/arch: amd64
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machineset-role: hypershift
+    spec:
+      lifecycleHooks: {}
+      metadata:
+        labels:
+          hypershift.openshift.io/control-plane: "true"
+      providerSpec:
+        value:
+          ami:
+            id: ami-081de8a3a5826a7d1
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 0
+              kmsKey:
+                arn: ""
+              volumeSize: 100
+              volumeType: gp2
+          capacityReservationId: ""
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: hosted-mgmt-z6sfr-worker-profile
+          instanceType: m6a.4xlarge
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1b
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - hosted-mgmt-z6sfr-worker-sg
+          subnet:
+            id: subnet-03f733f40388a457e
+          tags:
+          - name: kubernetes.io/cluster/hosted-mgmt-z6sfr
+            value: owned
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: hypershift.openshift.io/control-plane
+        value: "true"
