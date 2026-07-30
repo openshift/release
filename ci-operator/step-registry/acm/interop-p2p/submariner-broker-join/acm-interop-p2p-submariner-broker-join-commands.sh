@@ -12,6 +12,14 @@
 #   - Wait (in order) for: submariner-operator, gateway, routeagent,
 #     lighthouse-agent, and lighthouse-coredns to be fully ready on all joined clusters
 #
+# SPOKE CLUSTERS (spoke-to-spoke and hub-spoke jobs):
+#   All spoke steps are identical to the upstream main branch.
+#
+# HUB CLUSTER (hub-spoke jobs only, SUBMARINER_VERIFY_HUB_SPOKE=true):
+#   Hub join runs the same sequence as spokes, gated by enrollHub.
+#   After join and readiness, RestartRouteAgent is called on the hub to ensure
+#   OVN-K policy-based routing entries are programmed after the gateway is up.
+#
 # WHY hub join is conditional (SUBMARINER_VERIFY_HUB_SPOKE=true only):
 #   For hub↔spoke CCLM: KubeVirt CCLM uses raw pod-IP routing (port 8443) for
 #   virt-synchronization-controller sync. The hub must be a Submariner participant
@@ -92,9 +100,8 @@ SanitizeClusterId() {
     id="${id:0:63}"
     id="${id%%-}"
 
-    [[ -n "${id}" ]] || { : "Cannot derive DNS label from '${raw}'"; false; }
+    [[ -n "${id}" ]] || { : "Cannot derive DNS label from '${raw}'"; return 1; }
     printf '%s\n' "${id}"
-    true
 }
 
 # ── BrokerInfoHasGlobalnet — true when broker-info enables Globalnet ──────────
@@ -111,9 +118,8 @@ RecoverBrokerInfo() {
         cd /tmp
         "${subctlBin}" recover-broker-info \
             --kubeconfig "${KUBECONFIG}"
-    )
+    ) || return 1
     [ -f "${brokerInfoFile}" ]
-    true
 }
 
 # ── ClusterHasGlobalnetDaemonset — Globalnet controller must not be present ───
@@ -141,8 +147,6 @@ UninstallSubmarinerFromCluster() {
         KUBECONFIG="${kubeconfig}" oc delete namespace submariner-k8s-broker \
             --wait=true --timeout=600s 1>/dev/null || true
     fi
-
-    true
 }
 
 # ── RemediateGlobalnetIfPresent — uninstall stale Globalnet before redeploy ───
@@ -179,7 +183,6 @@ RemediateGlobalnetIfPresent() {
     UninstallSubmarinerFromCluster "${KUBECONFIG}" "hub"
 
     sleep "${uninstallWaitSecs}"
-    true
 }
 
 # ── DeployBroker — deploy Submariner broker on the hub cluster ────────────────
@@ -193,9 +196,8 @@ DeployBroker() {
     [ -f "${brokerInfoFile}" ]
     BrokerInfoHasGlobalnet "${brokerInfoFile}" && {
         : "deploy-broker created a Globalnet-enabled broker — CCLM requires Globalnet disabled"
-        false
+        return 1
     }
-    true
 }
 
 # ── EnsureBrokerNoGlobalnet — deploy or reuse broker without Globalnet ────────
@@ -206,17 +208,16 @@ EnsureBrokerNoGlobalnet() {
         RecoverBrokerInfo
         BrokerInfoHasGlobalnet "${brokerInfoFile}" && {
             : "Existing hub broker has Globalnet enabled — remediate failed or was disabled"
-            false
+            return 1
         }
         : "Reusing existing Submariner broker without Globalnet"
         return 0
     fi
 
     DeployBroker
-    true
 }
 
-# ── JoinCluster — join one spoke to the broker ────────────────────────────────
+# ── JoinCluster — join one cluster to the broker ──────────────────────────────
 #
 # --label-gateway=false: gateway is pre-labeled by cloud prepare + WaitForGatewayNode.
 # --globalnet=false: explicit even though broker has Globalnet disabled; subctl
@@ -224,10 +225,10 @@ EnsureBrokerNoGlobalnet() {
 # Without --label-gateway=false, subctl join prompts interactively to pick a worker node in CI.
 JoinCluster() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset spokeName="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
 
     typeset clusterId
-    clusterId="$(SanitizeClusterId "${spokeName}")"
+    clusterId="$(SanitizeClusterId "${clusterName}")"
 
     "${subctlBin}" join \
         --kubeconfig "${kubeconfig}" \
@@ -235,7 +236,6 @@ JoinCluster() {
         --label-gateway=false \
         --globalnet=false \
         "${brokerInfoFile}"
-    # No trailing `true`: function exit code = subctl join exit code.
 }
 
 # ── WaitForObjectToExist — poll until a Kubernetes resource exists ────────────
@@ -244,161 +244,82 @@ WaitForObjectToExist() {
     typeset resource="${1:?}"; (($#)) && shift
     typeset namespace="${1:?}"; (($#)) && shift
     typeset -i timeoutSecs="${1:-300}"; (($#)) && shift
-    typeset spokeName="${1:-unknown}"; (($#)) && shift
+    typeset clusterName="${1:-unknown}"; (($#)) && shift
 
     (
         typeset -i wInt=10
         SECONDS=0
         until KUBECONFIG="${kubeconfig}" oc get "${resource}" -n "${namespace}" 1>/dev/null; do
             if (( SECONDS >= timeoutSecs )); then
-                : "${resource} not found in '${namespace}' after ${timeoutSecs}s on '${spokeName}'"
+                : "${resource} not found in '${namespace}' after ${timeoutSecs}s on '${clusterName}'"
                 KUBECONFIG="${kubeconfig}" oc get all -n "${namespace}" || true
                 exit 1
             fi
-            : "Waiting for ${resource} on '${spokeName}' (${SECONDS}/${timeoutSecs}s)"
+            : "Waiting for ${resource} on '${clusterName}' (${SECONDS}/${timeoutSecs}s)"
             sleep "${wInt}"
         done
-        true
-    )
-    # No trailing `true`: function exit code = inner subshell exit code (0=found, 1=timeout).
+    ) || return 1
 }
 
-# ── WaitSubmarinerReady — full component readiness sequence for one spoke ─────
+# ── WaitSubmarinerReady — full component readiness sequence for one cluster ───
 # Uses _smFailed tracking: set -e is suppressed when called from ( ) || ...
-# so `false`/`exit 1` inside error handlers do not abort the function.
-# Each critical wait uses || _smFailed=1 and the function's last command is
+# so error handlers do not abort the function automatically.
+# Each critical wait uses || _smFailed=1 and the last command is
 # (( _smFailed == 0 )) so the caller sees the correct exit code.
 WaitSubmarinerReady() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset spokeName="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
     typeset -i _smFailed=0
 
     KUBECONFIG="${kubeconfig}" oc wait deployment/submariner-operator \
         -n submariner-operator \
         --for=condition=Available \
         --timeout=10m 1>/dev/null || {
-        : "submariner-operator not Available on '${spokeName}'"
+        : "submariner-operator not Available on '${clusterName}'"
         KUBECONFIG="${kubeconfig}" oc get all -n submariner-operator || true
         _smFailed=1
     }
 
     WaitForObjectToExist "${kubeconfig}" daemonset/submariner-gateway \
-        submariner-operator 300 "${spokeName}" || _smFailed=1
+        submariner-operator 300 "${clusterName}" || _smFailed=1
     KUBECONFIG="${kubeconfig}" oc rollout status daemonset/submariner-gateway \
         -n submariner-operator --timeout=10m 1>/dev/null || _smFailed=1
 
     WaitForObjectToExist "${kubeconfig}" daemonset/submariner-routeagent \
-        submariner-operator 300 "${spokeName}" || _smFailed=1
+        submariner-operator 300 "${clusterName}" || _smFailed=1
     KUBECONFIG="${kubeconfig}" oc rollout status daemonset/submariner-routeagent \
         -n submariner-operator --timeout=20m 1>/dev/null || _smFailed=1
 
     WaitForObjectToExist "${kubeconfig}" deployment/submariner-lighthouse-agent \
-        submariner-operator 300 "${spokeName}" || _smFailed=1
+        submariner-operator 300 "${clusterName}" || _smFailed=1
     KUBECONFIG="${kubeconfig}" oc rollout status deployment/submariner-lighthouse-agent \
         -n submariner-operator --timeout=10m 1>/dev/null || _smFailed=1
 
     WaitForObjectToExist "${kubeconfig}" deployment/submariner-lighthouse-coredns \
-        submariner-operator 300 "${spokeName}" || _smFailed=1
+        submariner-operator 300 "${clusterName}" || _smFailed=1
     KUBECONFIG="${kubeconfig}" oc rollout status deployment/submariner-lighthouse-coredns \
         -n submariner-operator --timeout=10m 1>/dev/null || _smFailed=1
 
-    AssertNoGlobalnetDaemonset "${kubeconfig}" "${spokeName}" || _smFailed=1
+    AssertNoGlobalnetDaemonset "${kubeconfig}" "${clusterName}" || _smFailed=1
 
     (( _smFailed == 0 ))
 }
 
-# ── AssertNoGlobalnetDaemonset — Globalnet DS must not exist on CCLM spokes ───
-# Uses `return 1` (not `false`): `false` inside an `if` block is subject to
-# set -e suppression and the trailing `true` would override it anyway.
-# `return 1` exits the function immediately with exit code 1.
+# ── AssertNoGlobalnetDaemonset — Globalnet DS must not exist on CCLM clusters ─
 AssertNoGlobalnetDaemonset() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset spokeName="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
 
     if ClusterHasGlobalnetDaemonset "${kubeconfig}"; then
-        : "submariner-globalnet DaemonSet present on '${spokeName}' — incompatible with CCLM pod IP sync"
+        : "submariner-globalnet DaemonSet present on '${clusterName}' — incompatible with CCLM pod IP sync"
         return 1
     fi
 }
 
-# ── AllowCclmSyncIngress — NetworkPolicy: cross-cluster pod CIDRs → CNV port ──
-# Creates (or updates) a NetworkPolicy in the CNV namespace on each cluster so
-# that cross-cluster pod IPs (advertised by the Submariner gateway) are allowed
-# to reach all pods in the namespace on SUBMARINER_CCLM_SYNC_PORT (default 8443).
-#
-# WHY THIS IS NEEDED:
-#   OCP's OVN-Kubernetes enforces NetworkPolicies at the pod interface. The CNV
-#   operator (HCO) creates restrictive ingress policies in openshift-cnv that
-#   only allow intra-namespace traffic by default. Cross-cluster CCLM sync
-#   arrives at the virt-synchronization-controller pod from a remote pod CIDR
-#   that is NOT a local pod, so OVN-K drops it silently (timeout, not refused).
-#   Adding an ipBlock rule for the remote Submariner pod CIDRs makes the sync
-#   path explicit and compliant with the existing NetworkPolicy model.
-#
-# SAFETY: NetworkPolicy rules are additive — this policy does NOT restrict
-#   any traffic that was already permitted by existing policies.
-AllowCclmSyncIngress() {
-    typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset clusterName="${1:?}"; (($#)) && shift
-
-    typeset cnvNs="${SUBMARINER_CCLM_CNV_NAMESPACE:-openshift-cnv}"
-    typeset cclmPort="${SUBMARINER_CCLM_SYNC_PORT:-8443}"
-
-    # Collect remote pod/service CIDRs from active Submariner gateway connections.
-    typeset -a remoteCidrs=()
-    typeset cidr
-    while IFS= read -r cidr; do
-        [[ -n "${cidr}" ]] || continue
-        remoteCidrs+=("${cidr}")
-    done < <(
-        KUBECONFIG="${kubeconfig}" oc get gateways.submariner.io \
-            -n submariner-operator -o json 2>/dev/null \
-            | jq -r '.items[].status.connections[].endpoint.subnets[]?' \
-            || true
-    )
-
-    if (( ${#remoteCidrs[@]} == 0 )); then
-        : "No Submariner remote CIDRs found on '${clusterName}' — skipping CCLM NetworkPolicy"
-        return 0
-    fi
-
-    : "Creating CCLM ingress NetworkPolicy on '${clusterName}' ns='${cnvNs}' port=${cclmPort} cidrs=[${remoteCidrs[*]}]"
-
-    # Use jq to build valid JSON (avoid heredoc YAML indentation pitfalls).
-    # oc apply accepts JSON manifests directly.
-    KUBECONFIG="${kubeconfig}" oc apply -f - < <(
-        jq -n \
-            --arg  ns   "${cnvNs}" \
-            --arg  port "${cclmPort}" \
-            --argjson cidrs "$(printf '%s\n' "${remoteCidrs[@]}" | jq -R . | jq -s .)" \
-            '{
-                apiVersion: "networking.k8s.io/v1",
-                kind: "NetworkPolicy",
-                metadata: {name: "allow-submariner-cclm-sync", namespace: $ns},
-                spec: {
-                    podSelector: {},
-                    policyTypes: ["Ingress"],
-                    ingress: [{
-                        from: ($cidrs | map({ipBlock: {cidr: .}})),
-                        ports: [{protocol: "TCP", port: ($port | tonumber)}]
-                    }]
-                }
-            }'
-    ) || {
-        : "WARNING: could not apply CCLM sync NetworkPolicy on '${clusterName}' (ns may not exist yet)"
-        true
-    }
-
-    true
-}
-
-# ── AssertNoGlobalnetSubnets — remote routes must be pod CIDRs, not 242.x ───
-# Uses `return 1` (not `false`): `false` inside an `if` block is subject to
-# set -e suppression and the trailing `true` would override it anyway.
-# `return 1` exits the function immediately with exit code 1.
+# ── AssertNoGlobalnetSubnets — remote routes must be pod CIDRs, not 242.x ────
 AssertNoGlobalnetSubnets() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset spokeName="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
 
     typeset connOutput
     connOutput="$(
@@ -406,38 +327,15 @@ AssertNoGlobalnetSubnets() {
     )"
 
     if grep -E '242\.[0-9]+\.[0-9]+\.[0-9]+' <<< "${connOutput}"; then
-        : "Globalnet subnets (242.x.x.x) advertised on '${spokeName}' — incompatible with CCLM pod IP sync"
+        : "Globalnet subnets (242.x.x.x) advertised on '${clusterName}' — incompatible with CCLM pod IP sync"
         return 1
     fi
-}
-
-# ── RestartRouteAgent — restart routeagent DaemonSet to re-program OVN flows ──
-# WHY THIS IS NEEDED:
-#   The submariner-routeagent starts up during `subctl join` and immediately
-#   tries to program OVN-K policy-based routing entries for remote cluster pod
-#   CIDRs.  However at join time the IPsec tunnel may not yet be fully
-#   established, so the routeagent's initial OVN programming can fail silently
-#   (the pod stays Running/Ready because its readiness probe checks the agent
-#   process, not the OVN entries).  A restart AFTER the tunnel is confirmed
-#   connected and remote CIDRs are known gives the routeagent a clean slate to
-#   re-program the correct OVN flows.  Without this, hub↔spoke pod-IP routing
-#   (required for CCLM sync port 8443) may be missing even though the gateway
-#   shows "connected".
-RestartRouteAgent() {
-    typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset clusterName="${1:?}"; (($#)) && shift
-
-    : "Restarting submariner-routeagent on '${clusterName}' to re-program OVN routing flows"
-    KUBECONFIG="${kubeconfig}" oc rollout restart daemonset/submariner-routeagent \
-        -n submariner-operator 1>/dev/null
-    KUBECONFIG="${kubeconfig}" oc rollout status daemonset/submariner-routeagent \
-        -n submariner-operator --timeout=10m 1>/dev/null
 }
 
 # ── WaitForDnsForwardingConfigured — wait for .clusterset.local stub zone ─────
 WaitForDnsForwardingConfigured() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset spokeName="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
 
     typeset cmName cmNamespace
     if KUBECONFIG="${kubeconfig}" oc get configmap dns-default \
@@ -455,15 +353,14 @@ WaitForDnsForwardingConfigured() {
         until KUBECONFIG="${kubeconfig}" oc get configmap "${cmName}" -n "${cmNamespace}" \
                 -o jsonpath='{.data.Corefile}' | grep -q 'clusterset.local'; do
             if (( SECONDS >= timeout )); then
-                : "CoreDNS '${cmName}' not patched with clusterset.local on '${spokeName}' after ${timeout}s"
+                : "CoreDNS '${cmName}' not patched with clusterset.local on '${clusterName}' after ${timeout}s"
                 KUBECONFIG="${kubeconfig}" oc get configmap "${cmName}" -n "${cmNamespace}" -o yaml || true
                 exit 1
             fi
-            : "Waiting for clusterset.local in CoreDNS on '${spokeName}' (${SECONDS}/${timeout}s)"
+            : "Waiting for clusterset.local in CoreDNS on '${clusterName}' (${SECONDS}/${timeout}s)"
             sleep "${interval}"
         done
-        true
-    )
+    ) || return 1
 
     : "Waiting ${SUBMARINER_COREDNS_SETTLE_SECS}s for CoreDNS to propagate clusterset.local forwarding"
     sleep "${SUBMARINER_COREDNS_SETTLE_SECS}"
@@ -473,7 +370,22 @@ WaitForDnsForwardingConfigured() {
         -n openshift-dns --timeout=5m 1>/dev/null || \
     KUBECONFIG="${kubeconfig}" oc rollout status daemonset/coredns \
         -n kube-system --timeout=5m 1>/dev/null || true
-    # No trailing `true`: function exit code = inner subshell exit code (0=configured, 1=timeout).
+}
+
+# ── RestartRouteAgent — restart routeagent DaemonSet to re-program OVN flows ──
+# HUB ONLY: called after hub WaitSubmarinerReady to ensure OVN-K policy-based
+# routing entries for remote cluster pod CIDRs are programmed after the gateway
+# is fully up. The routeagent may start before IPsec tunnels are established and
+# fail to program routes silently; a restart gives it a clean state.
+RestartRouteAgent() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+
+    : "Restarting submariner-routeagent on '${clusterName}' to re-program OVN routing flows"
+    KUBECONFIG="${kubeconfig}" oc rollout restart daemonset/submariner-routeagent \
+        -n submariner-operator 1>/dev/null
+    KUBECONFIG="${kubeconfig}" oc rollout status daemonset/submariner-routeagent \
+        -n submariner-operator --timeout=10m 1>/dev/null
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -495,27 +407,28 @@ InstallSubctl
 
 typeset -i submarinerStepRc=0
 (
-    # bash set -e is suppressed for all commands inside ( ... ) || ... (the left
-    # side of || runs in an "errexit-ignored" context per POSIX/bash).  Functions
-    # returning non-zero do NOT abort the subshell automatically. Use explicit
-    # || _brokerFailed=1 on every critical call and make (( _brokerFailed == 0 ))
-    # the LAST command so the subshell exit code reflects any failure.
+    # bash set -e is suppressed inside ( ... ) || ... — use explicit || _brokerFailed=1
+    # on every critical call and make (( _brokerFailed == 0 )) the LAST command so
+    # the subshell exit code accurately reflects any failure.
     typeset -i _brokerFailed=0
     typeset -i i
 
     EnsureBrokerNoGlobalnet || _brokerFailed=1
 
+    # ── Hub join (hub-spoke jobs only) ────────────────────────────────────────
+    # Join hub first — its gateway was prepared by cloud-prepare using hub
+    # kubeconfig + ${SHARED_DIR}/metadata.json. Hub must be a Submariner
+    # participant for hub↔spoke pod-IP routing (CCLM sync port 8443).
     if [[ "${enrollHub}" == "true" ]]; then
-        # Join hub first — its gateway was prepared by cloud-prepare using hub
-        # kubeconfig + ${SHARED_DIR}/metadata.json. Hub must be a Submariner
-        # participant for hub↔spoke pod-IP routing (CCLM sync port 8443).
         JoinCluster "${KUBECONFIG}" "hub" || _brokerFailed=1
     fi
 
+    # ── Spoke join (all jobs) ─────────────────────────────────────────────────
     for ((i = 0; i < spokeCount; i++)); do
         JoinCluster "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" || _brokerFailed=1
     done
 
+    # ── Wait for Submariner components ────────────────────────────────────────
     if [[ "${enrollHub}" == "true" ]]; then
         WaitSubmarinerReady "${KUBECONFIG}" "hub" || _brokerFailed=1
     fi
@@ -524,6 +437,7 @@ typeset -i submarinerStepRc=0
         WaitSubmarinerReady "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" || _brokerFailed=1
     done
 
+    # ── Wait for DNS forwarding ───────────────────────────────────────────────
     if [[ "${enrollHub}" == "true" ]]; then
         WaitForDnsForwardingConfigured "${KUBECONFIG}" "hub" || _brokerFailed=1
     fi
@@ -533,6 +447,7 @@ typeset -i submarinerStepRc=0
             || _brokerFailed=1
     done
 
+    # ── Assert no Globalnet subnets ───────────────────────────────────────────
     if [[ "${enrollHub}" == "true" ]]; then
         AssertNoGlobalnetSubnets "${KUBECONFIG}" "hub" || _brokerFailed=1
     fi
@@ -544,25 +459,20 @@ typeset -i submarinerStepRc=0
             || _brokerFailed=1
     done
 
-    # Restart routeagent on all joined clusters now that tunnels are confirmed
-    # connected and remote CIDRs are known.  This forces a fresh OVN routing-flow
-    # programming pass, fixing cases where the initial startup raced against
-    # tunnel establishment and left OVN entries incomplete (leading to pod-IP
-    # routing timeouts even though the gateway shows "connected").
+    # ── Hub routeagent restart (hub-spoke jobs only) ──────────────────────────
+    # Restart after hub WaitSubmarinerReady so the routeagent can re-program
+    # OVN flows with a fully-started gateway. Spoke routeagents are left as-is
+    # (their OVN entries are programmed correctly once the gateway DaemonSet is ready).
     if [[ "${enrollHub}" == "true" ]]; then
         RestartRouteAgent "${KUBECONFIG}" "hub" || _brokerFailed=1
     fi
-    for ((i = 0; i < spokeCount; i++)); do
-        RestartRouteAgent "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" \
-            || _brokerFailed=1
-    done
 
-    # NOTE: AllowCclmSyncIngress (NetworkPolicy for CCLM sync ingress) is intentionally
-    # NOT called here.  At this point the IPsec tunnels are not yet established, so
-    # gateways.submariner.io has no connection entries and AllowCclmSyncIngress would
-    # silently skip (no remote CIDRs).  The call is made in the verify step AFTER
-    # WaitForConnectionsEstablished confirms all tunnels are connected and the gateway
-    # CRs contain full CIDR data.
+    # NOTE: AllowCclmSyncIngress (NetworkPolicy for CCLM sync ingress from remote
+    # pod CIDRs) is intentionally NOT called here. IPsec tunnels are not yet confirmed
+    # established at this point, so gateways.submariner.io has no connection entries
+    # and AllowCclmSyncIngress would silently skip (no remote CIDRs to allow).
+    # The call is made in the verify step AFTER WaitForConnectionsEstablished confirms
+    # all tunnels are connected and the gateway CRs contain full CIDR data.
 
     # LAST command: propagate any critical failure as the subshell exit code.
     (( _brokerFailed == 0 ))

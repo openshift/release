@@ -67,26 +67,50 @@ OnError() {
     exit "${ec}"
 }
 
-# WaitForVirtApiReady — wait for virt-api Deployment to have all replicas ready.
-# CNV admission webhooks (DataVolume, VirtualMachine, VMI mutators) are served by
-# virt-api pods. If a pod is restarting or OOMKilled, webhook calls time out (10s)
-# and `oc apply` returns InternalError. Waiting for all replicas before creating
-# resources avoids this race.
+# WaitForVirtApiReady — wait for virt-api AND cdi-apiserver Deployments to be ready.
+#
+# TWO separate webhook servers handle CNV resource creation:
+#   - virt-api (openshift-cnv): VirtualMachine, VMI, VMIM mutators
+#   - cdi-apiserver (openshift-cnv): DataVolume, DataSource mutators
+#
+# `rollout status` checks pod readiness, NOT webhook endpoint responsiveness.
+# After the rollout completes the actual TLS/cert-manager webhook endpoint may
+# still take several seconds to start accepting requests. CNV_VIRT_API_SETTLE_SECS
+# (default 15) adds a short extra wait after rollout to reduce webhook timeout races.
 WaitForVirtApiReady() {
     typeset cnvNs="${CNV_VIRT_API_NAMESPACE:-openshift-cnv}"
     typeset timeout="${CNV_VIRT_API_WAIT_TIMEOUT:-5m}"
+    typeset -i settleSecs="${CNV_VIRT_API_SETTLE_SECS:-15}"
 
-    : "Waiting for virt-api deployment to be fully ready in '${cnvNs}' (timeout=${timeout})"
+    : "Waiting for virt-api in '${cnvNs}' (timeout=${timeout})"
     SpokeOc rollout status deployment/virt-api -n "${cnvNs}" --timeout="${timeout}" 1>/dev/null
+
+    # DataVolume webhooks are served by cdi-apiserver, NOT virt-api.
+    # Wait for cdi-apiserver separately; ignore if the deployment doesn't exist
+    # (some CNV builds ship a different name).
+    if SpokeOc get deployment/cdi-apiserver -n "${cnvNs}" 1>/dev/null 2>&1; then
+        : "Waiting for cdi-apiserver in '${cnvNs}' (timeout=${timeout})"
+        SpokeOc rollout status deployment/cdi-apiserver -n "${cnvNs}" \
+            --timeout="${timeout}" 1>/dev/null
+    fi
+
+    # Extra settle time: pod readiness probes pass before the webhook endpoint
+    # is fully initialised. A short sleep avoids InternalError on the first apply.
+    if (( settleSecs > 0 )); then
+        : "Waiting ${settleSecs}s for CNV webhook endpoints to settle after rollout"
+        sleep "${settleSecs}"
+    fi
 }
 
 # SpokeApplyWithRetry — drain stdin to a temp file then retry SpokeOc apply up to
-# CNV_APPLY_MAX_RETRIES (default 3) times. Between attempts, wait for virt-api to
-# recover in case the admission webhook was temporarily overloaded.
+# CNV_APPLY_MAX_RETRIES (default 5) times. Between attempts, call WaitForVirtApiReady
+# to wait for both virt-api and cdi-apiserver, then sleep CNV_APPLY_RETRY_SLEEP_SECS
+# (default 30) for the webhook endpoints to settle.
 # WHY temp file: stdin from a pipe can only be read once; the retry loop needs to
 # replay the same manifest bytes on each attempt.
 SpokeApplyWithRetry() {
-    typeset -i maxRetries="${CNV_APPLY_MAX_RETRIES:-3}"
+    typeset -i maxRetries="${CNV_APPLY_MAX_RETRIES:-5}"
+    typeset -i retrySleepSecs="${CNV_APPLY_RETRY_SLEEP_SECS:-30}"
     typeset tmpManifest
     tmpManifest="$(mktemp /tmp/manifest-XXXXXX.yaml)"
     cat > "${tmpManifest}"
@@ -102,9 +126,9 @@ SpokeApplyWithRetry() {
             return 0
         fi
         if (( attempt < maxRetries )); then
-            : "SpokeApplyWithRetry: attempt ${attempt}/${maxRetries} failed (rc=${applyRc}) — waiting for virt-api before retry"
+            : "SpokeApplyWithRetry: attempt ${attempt}/${maxRetries} failed (rc=${applyRc}) — waiting for CNV webhooks before retry"
             WaitForVirtApiReady || true
-            sleep 10
+            sleep "${retrySleepSecs}"
         fi
     done
 
