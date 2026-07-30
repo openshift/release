@@ -25,7 +25,6 @@ TESTSUITE_S390X_IMAGE="${TESTSUITE_S390X_IMAGE:-quay.io/vray_rh/rhcl-testsuite:s
 # Must match the image USER/ownership so `make` can write stamp files in WORKDIR.
 TESTSUITE_RUN_AS_USER="${TESTSUITE_RUN_AS_USER:-65532}"
 JOB_NAME="kuadrant-testsuite-run"
-JOB_ACTIVE_DEADLINE="${JOB_ACTIVE_DEADLINE:-10200}"   # ~2h50m, under the step timeout
 
 COREDNS_ZONE="${COREDNS_ZONE:-k.example.com}"
 COREDNS_NAMESPACE="${COREDNS_NAMESPACE:-kuadrant-coredns}"
@@ -306,141 +305,7 @@ PY
 PROTOBUF_PIN="${PROTOBUF_PIN:-6.32.1}"
 # Ignore UI: the s390x testsuite image omits Playwright; collecting
 # singlecluster/ui still imports conftest and fails make with ModuleNotFoundError.
-PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve -p kuadrant_debug_logger -vv --tb=short --setup-show --ignore=testsuite/tests/singlecluster/ui"
-
-# Build in-container diagnostics plugin with strict timeouts and fail-safe
-DIAGNOSTICS_PLUGIN="${WORK_DIR}/kuadrant_debug_logger.py"
-cat > "${DIAGNOSTICS_PLUGIN}" <<'DIAGPY'
-"""Pytest plugin to capture cluster state during test execution.
-All operations are non-blocking with strict timeouts and exception handling.
-"""
-import subprocess
-import sys
-from datetime import datetime
-import threading
-
-def run_oc_safe(cmd, timeout=10):
-    """Run oc command with strict timeout, never hangs, always returns."""
-    result = {"output": f"TIMEOUT after {timeout}s"}
-    def target():
-        try:
-            proc = subprocess.run(
-                f"oc {cmd}",
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=timeout
-            )
-            result["output"] = proc.stdout if proc.returncode == 0 else f"ERROR(rc={proc.returncode})"
-        except subprocess.TimeoutExpired:
-            result["output"] = f"TIMEOUT_EXPIRED after {timeout}s"
-        except Exception as e:
-            result["output"] = f"EXCEPTION: {type(e).__name__}"
-
-    thread = threading.Thread(target=target, daemon=True)
-    thread.start()
-    thread.join(timeout=timeout + 1)  # +1s grace period for thread overhead
-    return result["output"]
-
-def safe_capture(label, cmd):
-    """Capture with label, guaranteed to complete quickly."""
-    try:
-        output = run_oc_safe(cmd, timeout=8)
-        return f"\n--- {label} ---\n{output}\n"
-    except Exception:
-        return f"\n--- {label} ---\nCAPTURE_FAILED\n"
-
-def check_deployments():
-    """Check for Deployment resources that might exist without pods."""
-    try:
-        # Check if Deployments exist
-        deps = run_oc_safe("get deploy -n kuadrant -o wide", timeout=5)
-        if deps and "No resources found" not in deps:
-            # Get detailed status
-            dep_names = run_oc_safe("get deploy -n kuadrant -o name", timeout=5)
-            details = []
-            for dep_name in dep_names.strip().split('\n'):
-                if dep_name:
-                    desc = run_oc_safe(f"describe {dep_name} -n kuadrant | grep -A 10 'Replicas\\|Events'", timeout=5)
-                    details.append(f"\n{dep_name}:\n{desc}")
-            return f"Deployments found:\n{deps}\n{''.join(details)}"
-        return "No Deployments in kuadrant namespace"
-    except Exception:
-        return "Failed to check Deployments"
-
-def log_diagnostics(phase):
-    """Capture critical state only, maximum 60s total."""
-    try:
-        print(f"\n{'='*80}", file=sys.stderr)
-        print(f"[DIAGNOSTIC {datetime.utcnow().strftime('%H:%M:%S')}] {phase}", file=sys.stderr)
-        print(f"{'='*80}", file=sys.stderr)
-
-        # Critical resources - backends, Deployments, ConfigMaps, and routing
-        print(safe_capture("Backend Pods (kuadrant)", "get pods -n kuadrant -l app=backend -o wide"), file=sys.stderr)
-        print(safe_capture("Backend Deployments (kuadrant)", "get deploy -n kuadrant -o wide"), file=sys.stderr)
-        print(safe_capture("Backend ConfigMaps (kuadrant)", "get cm -n kuadrant"), file=sys.stderr)
-        print(safe_capture("HTTPRoutes (kuadrant)", "get httproute -n kuadrant -o wide"), file=sys.stderr)
-        print(safe_capture("Services (kuadrant)", "get svc -n kuadrant"), file=sys.stderr)
-
-        print(f"{'='*80}\n", file=sys.stderr)
-    except Exception as e:
-        print(f"[DIAGNOSTIC] Failed: {type(e).__name__} (non-fatal)", file=sys.stderr)
-
-# Only log at critical pytest hooks - not every test
-def pytest_sessionstart(session):
-    log_diagnostics("SESSION_START (before fixtures)")
-
-def pytest_collection_finish(session):
-    """After collection, before session fixtures run."""
-    print(f"[DIAGNOSTIC] Collected {len(session.items)} tests", file=sys.stderr)
-
-def pytest_fixture_setup(fixturedef, request):
-    """Log only backend-related session fixtures."""
-    if fixturedef.scope == "session" and "backend" in fixturedef.argname.lower():
-        print(f"[DIAGNOSTIC] Setting up session fixture: {fixturedef.argname}", file=sys.stderr)
-
-def pytest_runtest_logstart(nodeid, location):
-    """Log first test start to capture post-fixture state."""
-    if location[2] == "test_gateway_basic_dns_tls" or "test_" in nodeid and nodeid.count("::") == 1:
-        log_diagnostics(f"BEFORE_TEST: {nodeid}")
-
-def pytest_sessionfinish(session, exitstatus):
-    log_diagnostics(f"SESSION_END (status={exitstatus})")
-
-    # Critical summary: what backends should exist vs what actually exists
-    print("\n" + "="*80, file=sys.stderr)
-    print("[DIAGNOSTIC] BACKEND DEPLOYMENT SUMMARY", file=sys.stderr)
-    print("="*80, file=sys.stderr)
-    print("Expected: MockServer Deployment + Pods in 'kuadrant' namespace", file=sys.stderr)
-    print("Expected: Service pointing to backend pods", file=sys.stderr)
-    print("\nActual findings:", file=sys.stderr)
-
-    # Check Deployments
-    print("\n--- Deployments ---", file=sys.stderr)
-    print(check_deployments(), file=sys.stderr)
-
-    # Check ConfigMaps (CRITICAL - determines if expectations are loaded)
-    print("\n--- ConfigMaps ---", file=sys.stderr)
-    cms = run_oc_safe("get cm -n kuadrant -o name", timeout=5)
-    print(cms if cms else "No ConfigMaps", file=sys.stderr)
-    if "mockserver" in (cms or "").lower():
-        details = run_oc_safe("get cm -n kuadrant -o yaml | grep -A 20 'echo_expectation\\|mockserver'", timeout=5)
-        print(f"MockServer ConfigMap details:\n{details}", file=sys.stderr)
-
-    # Check Pods
-    print("\n--- Pods ---", file=sys.stderr)
-    pods = run_oc_safe("get pods -n kuadrant -l app=backend -o wide", timeout=5)
-    if not pods or "No resources found" in pods:
-        pods = run_oc_safe("get pods -n kuadrant | grep -i mockserv || echo 'No mockserver pods'", timeout=5)
-    print(pods, file=sys.stderr)
-
-    # Check Services
-    print("\n--- Services ---", file=sys.stderr)
-    svcs = run_oc_safe("get svc -n kuadrant | grep -i mockserv || echo 'No mockserver services'", timeout=5)
-    print(svcs, file=sys.stderr)
-
-    print("="*80 + "\n", file=sys.stderr)
-DIAGPY
+PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve -vv --tb=short --ignore=testsuite/tests/singlecluster/ui"
 
 CONTAINER_SCRIPT="set -o pipefail
 cd /opt/workdir/kuadrant-testsuite
@@ -457,22 +322,6 @@ poetry run python -c \"from importlib.metadata import version; print('protobuf',
 echo '=== s390x workaround: install Velocity MockServer echo expectations ==='
 cp -f /kuadrant-hook/echo_expectation.json testsuite/resources/echo_expectation.json
 grep -n templateType testsuite/resources/echo_expectation.json || true
-
-echo '=== Testsuite configuration verification ==='
-poetry run python -c \"
-import os
-os.environ['SECRETS_FOR_DYNACONF'] = '/config/secrets.yaml'
-from testsuite.config import testsuite_property
-# Import triggers config load via SECRETS_FOR_DYNACONF
-from testsuite import settings
-print('===== DYNACONF SETTINGS LOADED =====')
-print('mockserver.image:', settings.get('mockserver', {}).get('image', 'NOT SET'))
-print('httpbin.image:', settings.get('httpbin', {}).get('image', 'NOT SET'))
-print('service_protection.project:', settings.get('service_protection', {}).get('project', 'NOT SET'))
-print('control_plane.provider_secret:', settings.get('control_plane', {}).get('provider_secret', 'NOT SET'))
-print('default_exposer:', settings.get('default_exposer', 'NOT SET'))
-print('====================================')
-\" 2>&1 || echo 'Config verification failed (non-fatal, but indicates config load issue!)'
 "
 # Smoke and kuadrant are independent: each records failure into rc but does not
 # skip the next target. Kuadrant always runs after smoke when enabled.
@@ -514,11 +363,10 @@ oc -n "${TEST_RUNNER_NAMESPACE}" create secret generic kuadrant-testrunner-confi
   --from-file=kubeconfig="${SHARED_DIR}/kubeconfig" \
   --dry-run=client -o yaml | oc apply -f -
 
-# ConfigMap: pytest plugins (DNS resolver + diagnostics logger) + Velocity
-# MockServer expectations (s390x workaround for Kuadrant/testsuite#952).
+# ConfigMap: CoreDNS getaddrinfo plugin + Velocity MockServer expectations
+# (s390x workaround for Kuadrant/testsuite#952).
 oc -n "${TEST_RUNNER_NAMESPACE}" create configmap kuadrant-testrunner-hook \
   --from-file=kuadrant_coredns_resolve.py="${PLUGIN_FILE}" \
-  --from-file=kuadrant_debug_logger.py="${DIAGNOSTICS_PLUGIN}" \
   --from-file=echo_expectation.json="${ECHO_EXPECTATION_FILE}" \
   --dry-run=client -o yaml | oc apply -f -
 
@@ -531,7 +379,6 @@ metadata:
   namespace: ${TEST_RUNNER_NAMESPACE}
 spec:
   backoffLimit: 0
-  activeDeadlineSeconds: ${JOB_ACTIVE_DEADLINE}
   template:
     metadata:
       labels:
@@ -606,141 +453,7 @@ echo "=== Test-runner Job manifest ==="
 cat "${JOB_FILE}"
 
 # ---------------------------------------------------------------------------
-# 5. Cluster-side diagnostics collectors (run from the build farm via oc)
-# ---------------------------------------------------------------------------
-PROXY_LOG_DIR="${ARTIFACT_DIR}/gateway-istio-proxy-logs"
-PROXY_COLLECTOR_PID=""
-DNS_LOG_DIR="${ARTIFACT_DIR}/dns-diagnostics-logs"
-DNS_COLLECTOR_PIDS=()
-
-wait_for_pids() {
-  local pid
-  for pid in "$@"; do
-    [[ -n "${pid}" ]] || continue
-    wait "${pid}" 2>/dev/null || true
-  done
-}
-
-kill_pid_tree() {
-  local pid="$1"
-  [[ -n "${pid}" ]] || return 0
-  pkill -P "${pid}" 2>/dev/null || true
-  kill "${pid}" 2>/dev/null || true
-}
-
-start_istio_proxy_log_collector() {
-  mkdir -p "${PROXY_LOG_DIR}/.seen" "${PROXY_LOG_DIR}/.pids"
-  echo "=== Starting concurrent istio-proxy log collector → ${PROXY_LOG_DIR} ==="
-  (
-    while true; do
-      oc get pods -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{range .spec.containers[*]}{.name}{" "}{end}{"\n"}{end}' 2>/dev/null \
-        | while IFS=$'\t' read -r ns name containers; do
-            [[ -n "${ns}" && -n "${name}" ]] || continue
-            [[ " ${containers} " == *" istio-proxy "* || "${containers}" == *istio-proxy* ]] || continue
-            [[ "${name}" == *"-istio-"* || "${name}" == *"-istio" ]] || continue
-            key="${ns}_${name}"
-            seen_file="${PROXY_LOG_DIR}/.seen/${key}"
-            [[ -e "${seen_file}" ]] && continue
-            : >"${seen_file}"
-            out="${PROXY_LOG_DIR}/${ns}_${name}_istio-proxy.log"
-            echo "[collector] following ${ns}/${name} -c istio-proxy → ${out}"
-            (
-              while oc get pod -n "${ns}" "${name}" >/dev/null 2>&1; do
-                oc logs -n "${ns}" "${name}" -c istio-proxy -f --timestamps=true >>"${out}" 2>&1 && break
-                sleep 2
-              done
-            ) &
-            echo $! >"${PROXY_LOG_DIR}/.pids/${key}.pid"
-          done
-      sleep 3
-    done
-  ) &
-  PROXY_COLLECTOR_PID=$!
-  echo "${PROXY_COLLECTOR_PID}" >"${PROXY_LOG_DIR}/.collector.pid"
-}
-
-stop_istio_proxy_log_collector() {
-  echo "=== Stopping concurrent istio-proxy log collector ==="
-  if [[ -n "${PROXY_COLLECTOR_PID}" ]] && kill -0 "${PROXY_COLLECTOR_PID}" 2>/dev/null; then
-    kill_pid_tree "${PROXY_COLLECTOR_PID}"
-  elif [[ -f "${PROXY_LOG_DIR}/.collector.pid" ]]; then
-    kill_pid_tree "$(cat "${PROXY_LOG_DIR}/.collector.pid" 2>/dev/null || true)"
-  fi
-  if [[ -d "${PROXY_LOG_DIR}/.pids" ]]; then
-    local f
-    for f in "${PROXY_LOG_DIR}/.pids"/*.pid; do
-      [[ -f "${f}" ]] || continue
-      kill_pid_tree "$(cat "${f}")"
-    done
-  fi
-  sleep 1
-  if [[ -n "${PROXY_COLLECTOR_PID}" ]]; then
-    wait_for_pids "${PROXY_COLLECTOR_PID}"
-  fi
-  if [[ -d "${PROXY_LOG_DIR}/.pids" ]]; then
-    local f
-    for f in "${PROXY_LOG_DIR}/.pids"/*.pid; do
-      [[ -f "${f}" ]] || continue
-      wait_for_pids "$(cat "${f}")"
-    done
-  fi
-  echo "--- captured istio-proxy log files ---"
-  ls -la "${PROXY_LOG_DIR}"/*_istio-proxy.log 2>/dev/null || echo "(no proxy log files captured)"
-}
-
-start_dns_log_collector() {
-  mkdir -p "${DNS_LOG_DIR}"
-  echo "=== Starting concurrent DNS diagnostics collector → ${DNS_LOG_DIR} ==="
-  {
-    echo "===== $(date -u +%Y-%m-%dT%H:%M:%SZ) DNS collector start ====="
-    echo "DNS_PROVIDER_SECRET_NAME=${DNS_PROVIDER_SECRET_NAME}"
-    echo "KUADRANT_NAMESPACE=${KUADRANT_NAMESPACE}"
-    echo "COREDNS_DNS_HOST=${COREDNS_DNS_HOST}"
-  } >"${DNS_LOG_DIR}/dns-collector-meta.txt"
-
-  (
-    while oc get deploy/dns-operator-controller-manager -n "${KUADRANT_NAMESPACE}" >/dev/null 2>&1; do
-      oc logs -n "${KUADRANT_NAMESPACE}" deploy/dns-operator-controller-manager \
-        -f --timestamps=true --all-containers=true >>"${DNS_LOG_DIR}/dns-operator-controller-manager.log" 2>&1 && break
-      sleep 2
-    done
-  ) &
-  DNS_COLLECTOR_PIDS+=("$!")
-
-  (
-    while true; do
-      {
-        echo "========== $(date -u +%Y-%m-%dT%H:%M:%SZ) =========="
-        oc get dnspolicy,dnsrecord,tlspolicy -A -o wide 2>&1 || true
-        oc get dnspolicy -A -o yaml 2>&1 || true
-        oc get dnsrecord -A -o yaml 2>&1 || true
-      } >>"${DNS_LOG_DIR}/dns-resources-snapshots.log" 2>&1
-      sleep 15
-    done
-  ) &
-  DNS_COLLECTOR_PIDS+=("$!")
-  echo "${DNS_COLLECTOR_PIDS[*]}" >"${DNS_LOG_DIR}/.collector.pids"
-}
-
-stop_dns_log_collector() {
-  echo "=== Stopping concurrent DNS diagnostics collector ==="
-  local pid
-  for pid in "${DNS_COLLECTOR_PIDS[@]}"; do
-    kill_pid_tree "${pid}"
-  done
-  if [[ -f "${DNS_LOG_DIR}/.collector.pids" ]]; then
-    for pid in $(cat "${DNS_LOG_DIR}/.collector.pids" 2>/dev/null || true); do
-      kill_pid_tree "${pid}"
-    done
-  fi
-  sleep 1
-  wait_for_pids "${DNS_COLLECTOR_PIDS[@]}"
-  echo "--- captured DNS diagnostic files ---"
-  ls -la "${DNS_LOG_DIR}" 2>/dev/null || echo "(none)"
-}
-
-# ---------------------------------------------------------------------------
-# 6. Launch the Job, stream logs, collect results
+# 5. Launch the Job, stream logs, collect results
 # ---------------------------------------------------------------------------
 extract_junit_from_log() {
   local logfile="$1" dest="$2"
@@ -777,61 +490,6 @@ PY
 FAILED=0
 JOB_LOG="${ARTIFACT_DIR}/kuadrant-testrunner-job.log"
 
-start_live_resource_monitor() {
-  local monitor_dir="${ARTIFACT_DIR}/live-resource-snapshots"
-  mkdir -p "${monitor_dir}"
-  echo "=== Starting live resource monitor → ${monitor_dir} ==="
-  (
-    # Monitor resources in kuadrant namespace every 30 seconds while tests run
-    iteration=0
-    while true; do
-      sleep 30
-      iteration=$((iteration + 1))
-      snapshot="${monitor_dir}/snapshot-${iteration}.log"
-      {
-        echo "=== Snapshot ${iteration} at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
-        echo "--- Pods in kuadrant namespace ---"
-        oc get pods -n kuadrant -o wide 2>&1 || true
-        echo "--- Services in kuadrant namespace ---"
-        oc get svc -n kuadrant -o wide 2>&1 || true
-        echo "--- Routes in kuadrant namespace ---"
-        oc get routes -n kuadrant -o wide 2>&1 || true
-        echo "--- DNSRecords in all namespaces ---"
-        oc get dnsrecords -A 2>&1 || true
-        echo "--- Backend pod status (if exists) ---"
-        for pod in $(oc get pods -n kuadrant -l app=backend -o name 2>/dev/null); do
-          pod_name=$(basename "${pod}")
-          echo "Pod: ${pod_name}"
-          oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.phase}' 2>&1 || true
-          echo ""
-        done
-      } >"${snapshot}" 2>&1
-    done
-  ) &
-  LIVE_MONITOR_PID=$!
-  echo "Live monitor started (PID ${LIVE_MONITOR_PID})"
-}
-
-stop_live_resource_monitor() {
-  if [[ -n "${LIVE_MONITOR_PID:-}" ]]; then
-    echo "=== Stopping live resource monitor (PID ${LIVE_MONITOR_PID}) ==="
-    kill_pid_tree "${LIVE_MONITOR_PID}"
-    LIVE_MONITOR_PID=""
-  fi
-}
-
-start_istio_proxy_log_collector
-start_dns_log_collector
-start_live_resource_monitor
-
-echo "=== Pre-test Backend Diagnostics ==="
-echo "--- Checking for existing backend pods in kuadrant namespace ---"
-oc get pods -n kuadrant -l app=backend -o wide 2>&1 || echo "No backend pods found yet (expected before tests start)"
-echo "--- Checking HTTPRoute backends ---"
-oc get httproutes -n kuadrant -o yaml 2>&1 | grep -A 10 "backendRefs:" || echo "No HTTPRoutes found yet"
-echo "--- Checking Services in kuadrant namespace ---"
-oc get svc -n kuadrant -o wide 2>&1 || echo "No services yet"
-
 echo "=== Launching test-runner Job ==="
 oc apply -f "${JOB_FILE}"
 
@@ -855,53 +513,13 @@ if [[ -n "${RUNNER_POD}" ]]; then
   oc -n "${TEST_RUNNER_NAMESPACE}" wait --for=condition=Ready \
     "pod/${RUNNER_POD}" --timeout=600s 2>/dev/null || true
 
-  # Start backend monitoring in background (logs to stdout every 30s)
-  (
-    echo "=== Starting backend monitor (logs every 30s while tests run) ==="
-    iteration=0
-    while true; do
-      sleep 30
-      iteration=$((iteration + 1))
-      echo "=== Backend Monitor Snapshot ${iteration} at $(date -u +%H:%M:%S) ==="
-
-      echo "--- Backend Deployments ---"
-      oc get deploy -n kuadrant -o wide 2>&1 || echo "No deployments"
-      # Show Deployment status (critical for diagnosing why pods don't exist)
-      for deploy in $(oc get deploy -n kuadrant -o name 2>/dev/null | grep -i mockserv); do
-        deploy_name=$(basename "${deploy}")
-        echo "  Deployment ${deploy_name}:"
-        echo "    Replicas: $(oc get deploy -n kuadrant "${deploy_name}" -o jsonpath='{.status.replicas}/{.spec.replicas}' 2>&1 || echo 'N/A')"
-        echo "    Ready: $(oc get deploy -n kuadrant "${deploy_name}" -o jsonpath='{.status.readyReplicas}' 2>&1 || echo '0')"
-        echo "    Image: $(oc get deploy -n kuadrant "${deploy_name}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>&1 || echo 'N/A')"
-      done
-
-      echo "--- Backend pods ---"
-      oc get pods -n kuadrant -l app=backend -o wide 2>&1 || echo "No backend pods"
-      # Also check for any mockserver pods (might not have backend label)
-      oc get pods -n kuadrant 2>&1 | grep -i mockserv || true
-
-      echo "--- Backend services ---"
-      oc get svc -n kuadrant 2>&1 | grep -i mockserv || echo "No mockserver services"
-
-      echo "--- HTTPRoutes ---"
-      oc get httproutes -n kuadrant -o name 2>&1 | head -5 || echo "No HTTPRoutes"
-    done
-  ) &
-  BACKEND_MONITOR_PID=$!
-  echo "Backend monitor started (PID ${BACKEND_MONITOR_PID})"
-
   oc -n "${TEST_RUNNER_NAMESPACE}" logs -f "job/${JOB_NAME}" 2>&1 | tee "${JOB_LOG}" || true
 
-  # Stop backend monitor
-  if [[ -n "${BACKEND_MONITOR_PID:-}" ]]; then
-    echo "=== Stopping backend monitor (PID ${BACKEND_MONITOR_PID}) ==="
-    kill_pid_tree "${BACKEND_MONITOR_PID}" 2>/dev/null || true
-  fi
-
   echo "=== Waiting for Job completion ==="
-  deadline=$(( $(date +%s) + JOB_ACTIVE_DEADLINE ))
+  # No Job activeDeadlineSeconds; wait until the Job reports terminal status
+  # (step timeout is the outer bound).
   job_state=""
-  while [[ $(date +%s) -lt ${deadline} ]]; do
+  while true; do
     if [[ "$(oc -n "${TEST_RUNNER_NAMESPACE}" get job "${JOB_NAME}" -o jsonpath='{.status.succeeded}' 2>/dev/null)" == "1" ]]; then
       job_state="succeeded"; break
     fi
@@ -910,151 +528,17 @@ if [[ -n "${RUNNER_POD}" ]]; then
     fi
     sleep 10
   done
-  echo "Job state: ${job_state:-timed-out}"
+  echo "Job state: ${job_state}"
   [[ "${job_state}" == "succeeded" ]] || FAILED=1
 
   # Recover JUnit reports from the captured log stream.
   extract_junit_from_log "${JOB_LOG}" "${RESULTS_DIR}" || true
 fi
 
-stop_dns_log_collector
-stop_istio_proxy_log_collector
-stop_live_resource_monitor
-
-echo "=== Test-runner diagnostics ==="
+echo "=== Test-runner Job status ==="
 oc -n "${TEST_RUNNER_NAMESPACE}" get pods -o wide 2>&1 || true
 oc -n "${TEST_RUNNER_NAMESPACE}" describe job "${JOB_NAME}" 2>&1 \
   | tee "${ARTIFACT_DIR}/kuadrant-testrunner-job-describe.txt" || true
-
-# Enhanced diagnostics on failure - capture state before cleanup
-if [[ "${FAILED}" -ne 0 ]]; then
-  echo "=== Capturing diagnostic state before cleanup ===" >&2
-
-  # CoreDNS and DNSRecords diagnostics
-  echo "=== CoreDNS Diagnostics ===" | tee "${ARTIFACT_DIR}/coredns-diagnostics.log"
-  echo "--- CoreDNS Pod Status ---" | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log"
-  oc get pods -n "${COREDNS_NAMESPACE}" -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log" || true
-  echo "--- CoreDNS Service ---" | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log"
-  oc get svc -n "${COREDNS_NAMESPACE}" -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/coredns-service.yaml" || true
-  echo "--- CoreDNS Logs (last 200 lines) ---" | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log"
-  for pod in $(oc get pods -n "${COREDNS_NAMESPACE}" -l app.kubernetes.io/name=coredns -o name 2>/dev/null); do
-    pod_name=$(basename "${pod}")
-    echo "=== CoreDNS logs from ${pod_name} ===" | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log"
-    oc logs -n "${COREDNS_NAMESPACE}" "${pod_name}" --tail=200 2>&1 | tee -a "${ARTIFACT_DIR}/coredns-diagnostics.log" || true
-  done
-
-  # Test CoreDNS connectivity from cluster
-  echo "=== Testing CoreDNS from cluster ===" | tee "${ARTIFACT_DIR}/coredns-connectivity-test.log"
-  coredns_ip="$(oc get svc kuadrant-coredns -n "${COREDNS_NAMESPACE}" -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)"
-  if [[ -n "${coredns_ip}" ]]; then
-    echo "Testing DNS query to ${coredns_ip}:53 for test.${COREDNS_ZONE}" | tee -a "${ARTIFACT_DIR}/coredns-connectivity-test.log"
-    oc run dns-test --image=registry.access.redhat.com/ubi9/ubi-minimal:latest --rm -i --restart=Never -- \
-      sh -c "microdnf install -y bind-utils && dig @${coredns_ip} test.${COREDNS_ZONE} +short" 2>&1 \
-      | tee -a "${ARTIFACT_DIR}/coredns-connectivity-test.log" || true
-  fi
-
-  # DNSRecords in all namespaces
-  echo "=== DNSRecords across all namespaces ===" | tee "${ARTIFACT_DIR}/dnsrecords-diagnostics.log"
-  oc get dnsrecords -A -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/dnsrecords-diagnostics.log" || true
-  oc get dnsrecords -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/dnsrecords.yaml" || true
-
-  # DNSPolicies
-  echo "=== DNSPolicies ===" | tee -a "${ARTIFACT_DIR}/dnsrecords-diagnostics.log"
-  oc get dnspolicies -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/dnspolicies.yaml" || true
-
-  # Kuadrant DNS operator logs
-  echo "=== Kuadrant DNS Operator Logs ===" | tee "${ARTIFACT_DIR}/dns-operator-logs.log"
-  for pod in $(oc get pods -n kuadrant-system -l control-plane=dns-operator-controller-manager -o name 2>/dev/null); do
-    pod_name=$(basename "${pod}")
-    echo "=== DNS operator logs from ${pod_name} ===" | tee -a "${ARTIFACT_DIR}/dns-operator-logs.log"
-    oc logs -n kuadrant-system "${pod_name}" --tail=300 2>&1 | tee -a "${ARTIFACT_DIR}/dns-operator-logs.log" || true
-  done
-
-  # Backend pod logs and diagnostics
-  echo "=== Backend Diagnostics ===" | tee "${ARTIFACT_DIR}/backend-diagnostics.log"
-  echo "--- Backend pods in kuadrant namespace ---" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-  oc get pods -n kuadrant -l app=backend -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log" || true
-
-  # Detailed backend pod information
-  echo "--- Backend pod details ---" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-  for pod in $(oc get pods -n kuadrant -l app=backend -o name 2>/dev/null); do
-    pod_name=$(basename "${pod}")
-    echo "=== Pod: ${pod_name} ===" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-    echo "Image: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.spec.containers[0].image}' 2>&1)" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-    echo "Status: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.phase}' 2>&1)" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-    echo "Ready: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>&1)" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-    echo "Restarts: $(oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>&1)" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-
-    # Check if pod has readiness probe
-    echo "Readiness Probe:" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-    oc get pod -n kuadrant "${pod_name}" -o jsonpath='{.spec.containers[0].readinessProbe}' 2>&1 | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log" || echo "  No readiness probe" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-    echo "" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-  done
-
-  # Backend pod logs
-  echo "--- Backend pod logs ---" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-  for pod in $(oc get pods -n kuadrant -l app=backend -o name 2>/dev/null); do
-    pod_name=$(basename "${pod}")
-    echo "=== Logs for ${pod_name} ===" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-    oc logs -n kuadrant "${pod_name}" --all-containers=true --tail=200 2>&1 | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log" || true
-    echo "=== Describe ${pod_name} ===" | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log"
-    oc describe pod -n kuadrant "${pod_name}" 2>&1 | tee -a "${ARTIFACT_DIR}/backend-diagnostics.log" || true
-  done
-
-  # Routes and Services
-  echo "=== OpenShift Routes in kuadrant namespace ===" | tee "${ARTIFACT_DIR}/route-diagnostics.log"
-  oc get routes -n kuadrant -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/route-diagnostics.log" || true
-  oc get routes -n kuadrant -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/route-diagnostics.yaml" || true
-
-  echo "=== Services in kuadrant namespace ===" | tee -a "${ARTIFACT_DIR}/route-diagnostics.log"
-  oc get svc -n kuadrant -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/route-diagnostics.log" || true
-
-  # Endpoints
-  echo "=== Service Endpoints ===" | tee -a "${ARTIFACT_DIR}/route-diagnostics.log"
-  oc get endpoints -n kuadrant 2>&1 | tee -a "${ARTIFACT_DIR}/route-diagnostics.log" || true
-
-  # HTTPRoutes (if any)
-  echo "=== HTTPRoutes in kuadrant namespace ===" | tee -a "${ARTIFACT_DIR}/route-diagnostics.log"
-  oc get httproutes -n kuadrant -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/httproutes.yaml" || true
-
-  # Gateway status
-  echo "=== Gateway status ===" | tee "${ARTIFACT_DIR}/gateway-status.log"
-  oc get gateways -A -o wide 2>&1 | tee -a "${ARTIFACT_DIR}/gateway-status.log" || true
-  oc get gateways -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/gateway-status.yaml" || true
-
-  # RateLimitPolicies and AuthPolicies
-  echo "=== Kuadrant Policies ===" | tee "${ARTIFACT_DIR}/policies.log"
-  oc get ratelimitpolicies -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/policies.yaml" || true
-  oc get authpolicies -A -o yaml 2>&1 | tee -a "${ARTIFACT_DIR}/policies.yaml" || true
-
-  # Test backend connectivity directly
-  echo "=== Testing Backend Connectivity ===" | tee "${ARTIFACT_DIR}/backend-connectivity-test.log"
-  for svc in $(oc get svc -n kuadrant -l app=backend -o name 2>/dev/null); do
-    svc_name=$(basename "${svc}")
-    svc_ip="$(oc get svc -n kuadrant "${svc_name}" -o jsonpath='{.spec.clusterIP}' 2>/dev/null || true)"
-    svc_port="$(oc get svc -n kuadrant "${svc_name}" -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || true)"
-    if [[ -n "${svc_ip}" && -n "${svc_port}" ]]; then
-      echo "Testing backend ${svc_name} at ${svc_ip}:${svc_port}" | tee -a "${ARTIFACT_DIR}/backend-connectivity-test.log"
-      # Try to curl /get endpoint
-      oc run backend-test-${RANDOM} --image=registry.access.redhat.com/ubi9/ubi-minimal:latest --rm -i --restart=Never -- \
-        sh -c "microdnf install -y curl && curl -v http://${svc_ip}:${svc_port}/get" 2>&1 \
-        | tee -a "${ARTIFACT_DIR}/backend-connectivity-test.log" || true
-      echo "---" | tee -a "${ARTIFACT_DIR}/backend-connectivity-test.log"
-    fi
-  done
-
-  # Test a sample Route from inside cluster
-  echo "=== Testing Route connectivity from cluster ===" | tee "${ARTIFACT_DIR}/route-connectivity-test.log"
-  sample_route=$(oc get route -n kuadrant -o jsonpath='{.items[0].spec.host}' 2>/dev/null || echo "")
-  if [[ -n "${sample_route}" ]]; then
-    echo "Testing route: http://${sample_route}/get" | tee -a "${ARTIFACT_DIR}/route-connectivity-test.log"
-    oc run curl-test --image=curlimages/curl:latest --rm -i --restart=Never -- \
-      curl -v -H "Host: ${sample_route}" "http://${sample_route}/get" 2>&1 \
-      | tee -a "${ARTIFACT_DIR}/route-connectivity-test.log" || true
-  fi
-
-  echo "=== Diagnostic capture complete ===" >&2
-fi
 
 echo "=== Copying test artifacts to ${ARTIFACT_DIR} ==="
 if ls "${RESULTS_DIR}"/junit-*.xml >/dev/null 2>&1; then

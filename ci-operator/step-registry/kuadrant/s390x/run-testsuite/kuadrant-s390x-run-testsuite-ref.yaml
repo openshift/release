@@ -10,7 +10,7 @@ ref:
       memory: 4Gi
     limits:
       memory: 8Gi
-  timeout: 3h0m0s
+  timeout: 8h0m0s
   env:
   - name: TESTSUITE_S390X_IMAGE
     default: "quay.io/vray_rh/rhcl-testsuite:stablev1"
@@ -37,11 +37,6 @@ ref:
     documentation: |-
       Namespace created on the target cluster to host the test-runner Job, its
       config Secret (dynaconf settings + admin kubeconfig) and resolver ConfigMap.
-  - name: JOB_ACTIVE_DEADLINE
-    default: "10200"
-    documentation: |-
-      activeDeadlineSeconds for the test-runner Job (default ~2h50m, kept under
-      the step timeout so results/diagnostics can still be collected).
   - name: PYTEST_FLAGS
     default: "-n1"
     documentation: |-
@@ -122,6 +117,5 @@ ref:
     The step (running on the build farm) generates dynaconf settings and a small
     getaddrinfo resolver plugin, mounts them plus the admin kubeconfig into a Job
     that uses TESTSUITE_S390X_IMAGE on an s390x worker node, streams the Job logs
-    into ARTIFACT_DIR, recovers JUnit reports from the log stream, and collects
-    istio-proxy / DNS diagnostics from the cluster concurrently. The OpenShift
+    into ARTIFACT_DIR, and recovers JUnit reports from the log stream. The OpenShift
     CLI is injected via cli: latest.
