@@ -3,11 +3,31 @@ base_images:
     name: brew
     namespace: microshift
     tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.26-openshift-5.0
+images:
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y jq && dnf clean all
+      USER 1000
+      COPY src/ /go/src/github.com/openshift/microshift
+      WORKDIR /go/src/github.com/openshift/microshift
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift/microshift
+    to: cryptoscan-src
 releases:
   latest:
     candidate:
