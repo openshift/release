@@ -1,0 +1,26 @@
+ref:
+  as: keda-e2e-cma-upgrade-redhat-auth
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  cli: latest
+  commands: keda-e2e-cma-upgrade-redhat-auth-commands.sh
+  grace_period: 1m0s
+  timeout: 30m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  documentation: |-
+    Merges registry.redhat.io credentials (from the shared
+    openshift-custom-mirror-registry credential) into the cluster's global
+    pull secret and waits for the MachineConfigPool rollout, so the cluster
+    nodes can pull the released Custom Metrics Autoscaler operator and operand
+    images that the previous bundle's CSV references during the upgrade test.
+    Only the cluster pulls from registry.redhat.io; both bundle images are
+    built in this CI run, so no client-side credentials are needed.
