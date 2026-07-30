@@ -29,7 +29,7 @@ do not need it.
 | `OSC_INSTALL` | `false` | Set to `true` to enable installation |
 | `OSC_CHARTS_REPO` | `https://github.com/confidential-devhub/charts.git` | Git repo URL for Helm charts |
 | `OSC_CHARTS_REF` | `main` | Git ref (branch/tag/commit) |
-| `OSC_CATALOG_SOURCE_IMAGE` | `""` | Custom CatalogSource image for dev/pre-GA |
+| `CATALOG_SOURCE_IMAGE` | `""` | Custom CatalogSource image for dev/pre-GA |
 | `ENABLEPEERPODS` | `false` | Enable peer-pods in KataConfig |
 | `WORKLOAD_TO_TEST` | `kata` | Workload type: kata, peer-pods, or coco |
 | `OSC_NAMESPACE` | `openshift-sandboxed-containers-operator` | Target namespace |

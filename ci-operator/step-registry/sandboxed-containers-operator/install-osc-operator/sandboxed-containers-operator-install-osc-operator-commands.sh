@@ -9,7 +9,7 @@
 # Environment Variables:
 #   OSC_INSTALL                   - "true" to install, "false" to skip (default: false)
 #   OSC_NAMESPACE                 - Namespace for operator (default: openshift-sandboxed-containers-operator)
-#   OSC_CATALOG_SOURCE_IMAGE      - Custom catalog image (optional)
+#   CATALOG_SOURCE_IMAGE      - Custom catalog image (optional)
 #   OSC_CHARTS_REPO               - Charts repo URL
 #   OSC_CHARTS_REF                - Charts git ref (default: main)
 #   ENABLEPEERPODS                - "true" to enable peer-pods (default: false)
@@ -30,7 +30,7 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 
 OSC_INSTALL=${OSC_INSTALL:-false}
 OSC_NAMESPACE=${OSC_NAMESPACE:-openshift-sandboxed-containers-operator}
-OSC_CATALOG_SOURCE_IMAGE=${OSC_CATALOG_SOURCE_IMAGE:-}
+CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE:-}
 OSC_CHARTS_REPO=${OSC_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 OSC_CHARTS_REF=${OSC_CHARTS_REF:-main}
 ENABLEPEERPODS=${ENABLEPEERPODS:-false}
@@ -53,8 +53,8 @@ echo ">>> OSC charts: ${OSC_CHARTS_REPO} (ref: ${OSC_CHARTS_REF})"
 echo ">>> Namespace: ${OSC_NAMESPACE}"
 echo ">>> Workload: ${WORKLOAD_TO_TEST}"
 echo ">>> Peer-pods: ${ENABLEPEERPODS}"
-if [[ -n "${OSC_CATALOG_SOURCE_IMAGE}" ]]; then
-  echo ">>> Catalog source: osc-operator-dev-catalog (image: ${OSC_CATALOG_SOURCE_IMAGE})"
+if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
+  echo ">>> Catalog source: osc-operator-dev-catalog (image: ${CATALOG_SOURCE_IMAGE})"
 else
   echo ">>> Catalog source: redhat-operators (using existing catalog)"
 fi
@@ -185,12 +185,12 @@ function render_osc_operator_chart() {
     "--set" "namespaceOverride=${OSC_NAMESPACE}"
   )
 
-  if [[ -n "${OSC_CATALOG_SOURCE_IMAGE}" ]]; then
+  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
     helm_args+=(
       "--set" "dev.enabled=true"
-      "--set" "dev.image=${OSC_CATALOG_SOURCE_IMAGE}"
+      "--set" "dev.image=${CATALOG_SOURCE_IMAGE}"
     )
-    echo ">>> Helm: dev.enabled=true, dev.image=${OSC_CATALOG_SOURCE_IMAGE}" >&2
+    echo ">>> Helm: dev.enabled=true, dev.image=${CATALOG_SOURCE_IMAGE}" >&2
   else
     helm_args+=(
       "--set" "dev.enabled=false"
@@ -381,7 +381,7 @@ function wait_for_operator() {
   fi
 
   # Stage 1: Wait for custom CatalogSource if configured
-  if [[ -n "${OSC_CATALOG_SOURCE_IMAGE}" ]]; then
+  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
     if ! wait_until "OSC CatalogSource osc-operator-dev-catalog READY" 60 5 \
       "[[ \"\$(oc get catalogsource -n openshift-marketplace osc-operator-dev-catalog -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
       oc get catalogsource -n openshift-marketplace || true
