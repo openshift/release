@@ -142,12 +142,20 @@ function fetch_osc_charts() {
   fi
 
   echo ">>> Charts fetched" >&2
+  local result_dir
   if [[ -d "${charts_dir}/charts" ]]; then
-    echo "${charts_dir}/charts"
+    result_dir="${charts_dir}/charts"
   else
-    echo "${charts_dir}"
+    result_dir="${charts_dir}"
   fi
-  return 0
+
+  # DEBUG until https://github.com/confidential-devhub/charts/pull/3 merges
+  if grep -q 'startingCSV.*$' "${result_dir}/osc-operator/templates/subscription.yaml" 2>/dev/null; then
+    sed -ie 's/startingCSV.*$//' "${result_dir}/osc-operator/templates/subscription.yaml" || true
+    echo ">>> DEBUG: subscription.yaml patched.  PR 3 not merged yet." >&2
+  fi
+
+  echo "${result_dir}"
 }
 
 #========================================
@@ -241,6 +249,9 @@ function render_osc_operands_chart() {
     provider=$(get_cloud_provider)
     helm_args+=("--set" "peerpods.provider=${provider}")
     echo ">>> Helm: peerpods.enabled=true, provider=${provider}" >&2
+
+    # Generate SSH keys via the chart's Makefile (ed25519, into files/ for .Files.Get)
+    make -C "${operands_chart}" ssh-keys >&2
 
     # Read cloud config from peerpods-param-cm (created by peerpods-param-cm step)
     local cm_data
