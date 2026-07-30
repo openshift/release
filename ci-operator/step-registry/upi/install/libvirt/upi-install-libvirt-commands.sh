@@ -76,6 +76,15 @@ VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 # Only create the storage pool if there isn't one already...
 if [[ $(${VIRSH} pool-list | grep ${POOL_NAME}) ]]; then
   echo "Storage pool ${POOL_NAME} already exists. Skipping..."
+  # On some hosts (e.g. libvirt-s390x-vpn-oz) the pool target directory may be
+  # absent or stale after a reboot: vol-create-as reports success but the file
+  # is never written, causing virsh start to fail with "path not accessible".
+  # pool-build creates the target dir if missing; pool-refresh re-syncs libvirt's
+  # volume list with the actual filesystem state.
+  if [[ "${POOL_REFRESH:-false}" == "true" ]]; then
+    ${VIRSH} pool-build ${POOL_NAME} || true
+    ${VIRSH} pool-refresh ${POOL_NAME}
+  fi
 else
   if [[ $(${VIRSH} pool-list --all | grep ${POOL_NAME}) ]]; then
     echo "Storage pool ${POOL_NAME} already exists in inactive state. Deleting it.."
