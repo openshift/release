@@ -267,7 +267,7 @@ function set_CA_for_nodes () {
 install_oc_mirror() {
   CGWURL="https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw"
   echo "Installing the latest oc-mirror client..."
-  run "cd /tmp && curl --noproxy '*' -k -L -o oc-mirror.tar.gz ${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-amd64.tar.gz && tar -xvzf oc-mirror.tar.gz && rm -f oc-mirror.tar.gz"
+  run "cd /tmp && curl --noproxy '*' -k -fL -o oc-mirror.tar.gz ${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-amd64.tar.gz && tar -xvzf oc-mirror.tar.gz && rm -f oc-mirror.tar.gz"
   if ls /tmp/oc-mirror > /dev/null; then
     chmod +x /tmp/oc-mirror
     run "oc version -o yaml"

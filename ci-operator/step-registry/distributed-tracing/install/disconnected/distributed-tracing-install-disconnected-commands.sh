@@ -158,7 +158,7 @@ EOF
 
     run_command "cd /tmp"
     CGWURL="https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw"
-    run_command "curl -L -o oc-mirror.tar.gz ${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-amd64.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
+    run_command "curl -fL -o oc-mirror.tar.gz ${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-amd64.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
     run_command "./oc-mirror --v1 --config=/tmp/image-set.yaml docker://${MIRROR_REGISTRY_HOST} --continue-on-error --ignore-history --source-skip-tls --dest-skip-tls || true"
     run_command "cp oc-mirror-workspace/results-*/mapping.txt ."
     run_command "sed -e 's|registry.redhat.io|registry.stage.redhat.io|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/tempo|brew.registry.redhat.io/rh-osbs/iib|g' -e 's|brew.registry.stage.redhat.io/rh-osbs/otel|brew.registry.redhat.io/rh-osbs/iib|g' mapping.txt > mapping-stage.txt"
