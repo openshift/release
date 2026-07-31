@@ -590,16 +590,18 @@ function main {
 	# Support hypershift config guest cluster's idms (non-fatal if yq-go is unavailable)
 	oc get ImageDigestMirrorSet -oyaml >/tmp/mgmt_idms.yaml && yq-go r /tmp/mgmt_idms.yaml 'items[*].spec.imageDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml || true
 
-	# Extract source commit from catalog image for integration test builds.
-	# Fail hard if vcs-ref label is missing — wrong commit means meaningless test results.
-	local commit
-	commit=$(oc image info --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
-		| jq -r '.config.config.Labels["vcs-ref"]')
-	if [[ -z "${commit}" || "${commit}" == "null" ]]; then
-		echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
-		return 1
+	# Extract source commit from catalog image for z-stream integration test builds.
+	# Only needed when ZSTREAM_VERSION is set — non-z-stream tests use pre-built images.
+	if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
+		local commit
+		commit=$(oc image info --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+			| jq -r '.config.config.Labels["vcs-ref"]')
+		if [[ -z "${commit}" || "${commit}" == "null" ]]; then
+			echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
+			return 1
+		fi
+		echo -n "${commit}" > "${SHARED_DIR}/lvm_source_commit"
 	fi
-	echo -n "${commit}" > "${SHARED_DIR}/lvm_source_commit"
 
 	return 0
 }
