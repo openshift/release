@@ -13,12 +13,13 @@
 #     lighthouse-agent, and lighthouse-coredns to be fully ready on all joined clusters
 #
 # ALL CLUSTERS (spoke-to-spoke and hub-spoke jobs):
-#   After WaitSubmarinerReady, RestartRouteAgent is called on EVERY cluster
-#   (all spokes, and the hub when enrollHub=true).  The routeagent DaemonSet
-#   starts before IPsec tunnels are established, so its initial OVN-K flow
-#   programming is incomplete.  A restart after readiness forces a full
-#   reprogramming pass — without this, subctl verify --only connectivity
-#   fails with Ncat: TIMEOUT even when the control plane shows "connected".
+#   After WaitSubmarinerReady, RestartRouteAgent + EnsureNonGatewayOvnRoutes
+#   are called on EVERY cluster.  In OCP 4.22 OVN-K IC mode each node owns a
+#   local OVN NB DB; Submariner's routeagent only programs spoke-CIDR routes on
+#   the GATEWAY node's local ovn_cluster_router — worker nodes get no routes and
+#   all cross-cluster pod traffic is silently dropped.  EnsureNonGatewayOvnRoutes
+#   reads the NonGatewayRoute CRs and execs into each non-gateway ovnkube-node
+#   pod to add the missing ovn_cluster_router entries via ovn-nbctl.
 #
 # HUB CLUSTER (hub-spoke jobs only, SUBMARINER_VERIFY_HUB_SPOKE=true):
 #   Hub join runs the same sequence as spokes, gated by enrollHub.
@@ -379,10 +380,10 @@ WaitForDnsForwardingConfigured() {
 }
 
 # ── RestartRouteAgent — restart routeagent DaemonSet to re-program OVN flows ──
-# HUB ONLY: called after hub WaitSubmarinerReady to ensure OVN-K policy-based
-# routing entries for remote cluster pod CIDRs are programmed after the gateway
-# is fully up. The routeagent may start before IPsec tunnels are established and
-# fail to program routes silently; a restart gives it a clean state.
+# Called after WaitSubmarinerReady to ensure the routeagent has a clean state
+# after all Submariner components are running and NonGatewayRoute CRs have been
+# created by the gateway.  The routeagent starts early (before tunnels establish)
+# and its initial OVN-K flow programming may be incomplete.
 RestartRouteAgent() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset clusterName="${1:?}"; (($#)) && shift
@@ -392,6 +393,114 @@ RestartRouteAgent() {
         -n submariner-operator 1>/dev/null
     KUBECONFIG="${kubeconfig}" oc rollout status daemonset/submariner-routeagent \
         -n submariner-operator --timeout=10m 1>/dev/null
+}
+
+# ── EnsureNonGatewayOvnRoutes — inject missing OVN cluster-router routes ──────
+# ROOT CAUSE (OCP 4.22 OVN-K IC mode):
+#   In OVN-K Interconnect (IC) mode each node owns a LOCAL OVN NB database.
+#   Submariner's routeagent programs spoke-CIDR routes only into the GATEWAY
+#   node's local ovn_cluster_router.  Non-gateway nodes' local OVN NB DBs have
+#   NO routes for the remote cluster CIDRs, so ALL cross-cluster pod traffic is
+#   silently dropped — even though "subctl show connections" reports "connected".
+#   This causes Ncat: TIMEOUT for every subctl verify connectivity test.
+#
+# FIX:
+#   Read the NonGatewayRoute CRs (created by the gateway routeagent after subctl
+#   join) to discover the IC transit next-hop and remote CIDRs, then exec into
+#   each non-gateway node's ovnkube-node pod and add the missing routes:
+#     ovn-nbctl lr-route-add ovn_cluster_router <remoteCIDR> <ICTransitNexthop>
+#   The IC transit next-hop (e.g. 100.88.0.x) is already reachable on each
+#   worker node — it is the gateway node's IC zone transit-switch IP as
+#   advertised in the NGR CR's spec.nextHops field.
+EnsureNonGatewayOvnRoutes() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+
+    : "EnsureNonGatewayOvnRoutes: injecting missing OVN routes on non-gateway nodes of '${clusterName}'"
+
+    # Wait up to 120 s for NonGatewayRoute CRs to be created by the gateway routeagent
+    typeset -i ngrCount=0 ngrWait=0
+    until (( ngrCount > 0 || ngrWait >= 120 )); do
+        ngrCount=$(KUBECONFIG="${kubeconfig}" oc get nongatewayroutes.submariner.io \
+            -n submariner-operator --no-headers 2>/dev/null | wc -l || true)
+        (( ngrCount > 0 )) && break
+        sleep 10
+        (( ngrWait += 10 ))
+        : "  Waiting for NonGatewayRoute CRs on '${clusterName}' (${ngrWait}/120 s)"
+    done
+
+    if (( ngrCount == 0 )); then
+        : "  No NonGatewayRoute CRs on '${clusterName}' after 120 s — skipping OVN route injection"
+        return 0
+    fi
+
+    # Extract IC transit next-hop and all remote CIDRs from all NGR CRs
+    typeset nextHop ngrJson
+    typeset -a remoteCIDRs=()
+    ngrJson=$(KUBECONFIG="${kubeconfig}" oc get nongatewayroutes.submariner.io \
+        -n submariner-operator -o json 2>/dev/null)
+    nextHop=$(echo "${ngrJson}" | jq -r '.items[0].spec.nextHops[0] // empty')
+    mapfile -t remoteCIDRs < <(
+        echo "${ngrJson}" | jq -r '.items[].spec.remoteCIDRs[]' 2>/dev/null | sort -u || true
+    )
+
+    if [[ -z "${nextHop}" ]] || (( ${#remoteCIDRs[@]} == 0 )); then
+        : "  NGR data incomplete (nextHop='${nextHop}', CIDRs=${#remoteCIDRs[@]}) on '${clusterName}' — skipping"
+        return 0
+    fi
+
+    : "  Remote CIDRs to route: ${remoteCIDRs[*]}"
+    : "  IC transit next-hop (gateway): ${nextHop}"
+
+    # Get all non-gateway node names
+    typeset -a nonGwNodes=()
+    mapfile -t nonGwNodes < <(
+        KUBECONFIG="${kubeconfig}" oc get nodes \
+            -l '!submariner.io/gateway' \
+            -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true
+    )
+
+    if (( ${#nonGwNodes[@]} == 0 )); then
+        : "  No non-gateway nodes on '${clusterName}' — nothing to patch"
+        return 0
+    fi
+
+    typeset node ovnkubePod cidr addOk
+    for node in "${nonGwNodes[@]}"; do
+        ovnkubePod=$(KUBECONFIG="${kubeconfig}" oc get pod \
+            -n openshift-ovn-kubernetes \
+            -l app=ovnkube-node \
+            --field-selector "spec.nodeName=${node}" \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+        [[ -z "${ovnkubePod}" ]] && {
+            : "  No ovnkube-node pod on '${node}' — skipping"
+            continue
+        }
+
+        for cidr in "${remoteCIDRs[@]}"; do
+            : "  ${node}: ovn_cluster_router ${cidr} → ${nextHop}"
+            addOk=false
+            # Try ovnkube-controller first (OCP 4.19+), then fall back to ovnkube-node
+            if KUBECONFIG="${kubeconfig}" oc exec \
+                    -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                    -c ovnkube-controller -- \
+                    ovn-nbctl --no-leader-only --may-exist lr-route-add \
+                    ovn_cluster_router "${cidr}" "${nextHop}" 2>/dev/null; then
+                addOk=true
+            elif KUBECONFIG="${kubeconfig}" oc exec \
+                    -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                    -c ovnkube-node -- \
+                    ovn-nbctl --no-leader-only --may-exist lr-route-add \
+                    ovn_cluster_router "${cidr}" "${nextHop}" 2>/dev/null; then
+                addOk=true
+            fi
+            [[ "${addOk}" != "true" ]] && \
+                : "  WARNING: could not add OVN route ${cidr} on '${node}' — will retry in verify step"
+        done
+    done
+
+    : "EnsureNonGatewayOvnRoutes: done for '${clusterName}'"
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -466,21 +575,32 @@ typeset -i submarinerStepRc=0
     done
 
     # ── Routeagent restart (all clusters) ────────────────────────────────────
-    # The submariner-routeagent DaemonSet programs OVN-K flow tables at startup.
-    # It starts early — before IPsec tunnels are established — so it programs
-    # incomplete OVN flows based on "no connected peers" state.  When tunnels
-    # later come up (shown as "connected" by subctl show connections), the
-    # routeagent does not automatically reprogram all OVN-K routes.  Restarting
-    # it here (after WaitSubmarinerReady) forces a full OVN reprogramming pass
-    # so cross-cluster pod traffic is correctly steered through the gateway.
-    # Without this, subctl verify --only connectivity fails with Ncat: TIMEOUT
-    # even though the control plane reports the tunnel as "connected".
+    # Restart to give the routeagent a clean start after all components are
+    # running and NonGatewayRoute CRs have been created by the gateway.
     for ((i = 0; i < spokeCount; i++)); do
         RestartRouteAgent "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" || _brokerFailed=1
     done
 
     if [[ "${enrollHub}" == "true" ]]; then
         RestartRouteAgent "${KUBECONFIG}" "hub" || _brokerFailed=1
+    fi
+
+    # ── Inject missing OVN cluster-router routes on non-gateway nodes ─────────
+    # In OCP 4.22 OVN-K IC mode each node has its own local OVN NB DB.
+    # Submariner's routeagent only programs spoke-CIDR routes on the GATEWAY
+    # node's local ovn_cluster_router; worker nodes get nothing.  Without these
+    # routes all cross-cluster pod traffic is silently dropped, causing
+    # Ncat: TIMEOUT in subctl verify even when tunnels show "connected".
+    # EnsureNonGatewayOvnRoutes reads the NGR CRs and execs into each non-gateway
+    # ovnkube-node pod to add the missing routes.  Best-effort: failure here is
+    # WARNING-level; verify step repeats the injection as belt-and-suspenders.
+    for ((i = 0; i < spokeCount; i++)); do
+        EnsureNonGatewayOvnRoutes \
+            "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" || true
+    done
+
+    if [[ "${enrollHub}" == "true" ]]; then
+        EnsureNonGatewayOvnRoutes "${KUBECONFIG}" "hub" || true
     fi
 
     # NOTE: AllowCclmSyncIngress (NetworkPolicy for CCLM sync ingress from remote
