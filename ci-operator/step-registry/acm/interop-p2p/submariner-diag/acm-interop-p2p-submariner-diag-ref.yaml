@@ -1,0 +1,42 @@
+ref:
+  as: acm-interop-p2p-submariner-diag
+  from: cli
+  commands: acm-interop-p2p-submariner-diag-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  timeout: 30m0s
+  grace_period: 10m0s
+  documentation: |-
+    Collect automated Submariner diagnostics across all spoke clusters using subctl.
+
+    Designed as a post-step that always exits 0 — never fails the job. Writes all output
+    to ${ARTIFACT_DIR}/submariner-diag/ for Prow artifact collection.
+
+    Per the Submariner troubleshooting guide
+    (https://submariner.io/operations/troubleshooting/#automated-troubleshooting),
+    this step runs:
+
+      subctl show all        — overview of endpoints, gateways, networks, and
+                               connections on each spoke
+      subctl diagnose all    — health check of submariner-operator, gateway engine,
+                               route agents, and lighthouse components on each spoke
+      subctl diagnose firewall inter-cluster
+                             — firewall rule audit between each spoke pair
+                               (merged kubeconfig with unique named contexts)
+      subctl gather          — deep diagnostic tarball for each spoke; archived
+                               under ${ARTIFACT_DIR}/submariner-diag/gather/
+
+    subctl is installed at step runtime to /tmp/bin/ (not stored in SHARED_DIR to
+    avoid the 3 MB Kubernetes Secret size limit).
+
+    Env vars consumed:
+      ACM_SPOKE_CLUSTER_COUNT  - number of spoke clusters (default: 2)
+      SHARED_DIR               - directory containing managed-cluster-kubeconfig-N
+                                 and managed-cluster-name-N files
+      ARTIFACT_DIR             - Prow artifact directory for output files
+  env:
+  - name: ACM_SPOKE_CLUSTER_COUNT
+    default: "2"
+    documentation: Number of ACM spoke clusters to diagnose.

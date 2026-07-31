@@ -1,0 +1,29 @@
+chain:
+  as: p2p-cclm-bidir-migration-test
+  steps:
+    - ref: p2p-create-migration-test-vm
+    - ref: p2p-mtv-execute-live-migration
+    - ref: p2p-mtv-execute-live-migration-return
+  documentation: |-
+    End-to-end bi-directional CCLM migration test for the same VM across two spoke clusters.
+
+    Requires p2p-mtv-bidir-mig-config (ForkliftController, providers, forward + return
+    network/storage maps), p2p-install-odf-spokes, p2p-acm-cnv-install-policy, and
+    acm-interop-p2p-submariner-install (pod-to-pod connectivity without Globalnet).
+
+    Step 1 (p2p-create-migration-test-vm):
+      Creates an ODF-backed RWX VM on the source spoke (spoke-1, index 1).
+
+    Step 2 (p2p-mtv-execute-live-migration):
+      Forward leg — live-migrates the VM from spoke-1 to spoke-2.
+      Uses forward Plan/Migration CRs (cclm-plan / cclm-run-1) and forward maps
+      (spoke-network-map / spoke-storage-map). Verifies VM Running on spoke-2.
+
+    Step 3 (p2p-mtv-execute-live-migration-return):
+      Return leg — live-migrates the same VM from spoke-2 back to spoke-1.
+      Uses return Plan/Migration CRs (cclm-plan-return / cclm-run-return) and return
+      maps (spoke-network-map-return / spoke-storage-map-return). Verifies VM Running
+      on spoke-1 once again, confirming full round-trip spoke-to-spoke migration.
+
+    Debug mode: set P2P_CCLM_DEBUG_MODE=true so both migration steps log failures
+    but exit 0, allowing downstream investigation steps to run.
