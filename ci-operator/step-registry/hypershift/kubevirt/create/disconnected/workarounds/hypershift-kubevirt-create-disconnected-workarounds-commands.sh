@@ -100,7 +100,7 @@ if [[ -z ${MCE} ]] ; then
   ### workaround for https://issues.redhat.com/browse/OCPBUGS-32770
   echo "workaround for https://issues.redhat.com/browse/OCPBUGS-32770"
   CNV_PRERELEASE_VERSION=$(cat /home/cnv-prerelease-version)
-  oc image -a /home/pull-secret-mirror mirror registry.ci.openshift.org/ocp/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt ${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt
+  oc image -a /home/pull-secret-mirror mirror quay.io/openshift/ci:ocp_${CNV_PRERELEASE_VERSION}_cluster-api-provider-kubevirt ${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt
   echo "${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt" > /home/capi_provider_kubevirt_image
 fi
 
