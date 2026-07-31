@@ -5,6 +5,20 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+[ -z "${AUX_HOST}" ] && { echo "AUX_HOST is not filled. Failing."; exit 1; }
+
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-upi-conf-network: Configuring cluster networking'" || true
+
 echo "Creating patch file to configure networking: ${SHARED_DIR}/network_patch_install_config.yaml"
 
 if [ -n "${PRIMARY_NET}" ]; then

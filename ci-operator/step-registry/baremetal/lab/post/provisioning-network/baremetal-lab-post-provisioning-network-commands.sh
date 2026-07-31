@@ -27,6 +27,10 @@ fi
 VLAN_ID=$(yq '.[] | select(.name|test("master-00")).ip' "${SHARED_DIR}/hosts.yaml")
 VLAN_ID=${VLAN_ID//*\./}
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-post-provisioning-network: Rolling back provisioning network'" || true
+
 SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-key"
 IFS=, read -r -a SWITCH_PORTS <<< \
   "$(yq e '[.[].switch_port_v2]|@csv' < "${SHARED_DIR:-.}"/hosts.yaml),$(<"${CLUSTER_PROFILE_DIR}/other-switch-ports")"

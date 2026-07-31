@@ -16,10 +16,15 @@ SSHOPTS=(-o 'ConnectTimeout=5'
     test -f /var/builds/"${NAMESPACE}"/preserve && \
   exit 0
 
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+
 if [ x"${DISCONNECTED}" != x"true" ]; then
   echo 'Skipping firewall configuration deprovisioning as not in a disconnected environment'
   exit 0
 fi
+
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-post-firewall: Deprovisioning firewall rules'" || true
 
 declare -a IP_ARRAY
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do

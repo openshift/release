@@ -14,10 +14,14 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+
 if [ "${SELF_MANAGED_NETWORK}" != "true" ]; then
   echo "Skipping the configuration of the DHCP."
   exit 0
 fi
+
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-ipi-conf-pxe: Disabling PXE boot'" || true
 
 echo "Disabling the PXE server in the baremetal network for the hosts with tag ${CLUSTER_NAME}..."
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "'${CLUSTER_NAME}'" <<'EOF'

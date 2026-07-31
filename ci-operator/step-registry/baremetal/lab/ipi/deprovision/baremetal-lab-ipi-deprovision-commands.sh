@@ -24,6 +24,9 @@ LIBVIRT_DEFAULT_URI="qemu+ssh://root@${AUX_HOST}:$(sed 's/^[%]\?\([0-9]*\)[%]\?$
 export LIBVIRT_DEFAULT_URI
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-ipi-deprovision: Deprovisioning cluster'" || true
+
 # This destroys the bootstrap VM in the libvirt hypervisor
 if virsh list --all --name | grep -q "${CLUSTER_NAME}"; then
   echo "[INFO] found the bootstrap VM. Destroying it..."

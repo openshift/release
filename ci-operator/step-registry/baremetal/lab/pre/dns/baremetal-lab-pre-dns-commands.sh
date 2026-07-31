@@ -23,6 +23,10 @@ if [ ${#api_vip} -eq 0 ] || [ ${#ingress_vip} -eq 0 ] || [ ${#api_int} -eq 0 ]; 
   exit 1
 fi
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-pre-dns: Configuring DNS records'" || true
+
 DNS_FORWARD=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
 
 if [ "${ipv4_enabled:-}" == "true" ]; then

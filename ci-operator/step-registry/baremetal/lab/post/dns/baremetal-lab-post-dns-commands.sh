@@ -17,6 +17,10 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   exit 0
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-post-dns: Removing DNS records'" || true
+
 echo "Destroying the dns and reloading bind9"
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${CLUSTER_NAME}" << 'EOF'
   set -o nounset

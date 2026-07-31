@@ -19,10 +19,15 @@ SSHOPTS=(-o 'ConnectTimeout=5'
     test -f /var/builds/"${NAMESPACE}"/preserve && \
   exit 0
 
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+
 if [ "${SELF_MANAGED_NETWORK}" != "true" ]; then
   echo "Skipping the wipe step, as it's not implemented for non self-managed networks"
   exit 0
 fi
+
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-post-wipe: Wiping disks and resetting hosts'" || true
 
 function wait_for_power_down() {
   local bmc_host="${1}"

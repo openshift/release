@@ -6,7 +6,18 @@ set -o pipefail
 
 [ -z "${AUX_HOST}" ] && { echo "AUX_HOST is not filled. Failing."; exit 1; }
 
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-ipi-conf-load-balancer: Generating HAProxy configuration'" || true
+
 API_VIP="$(yq .api_vip "$SHARED_DIR/vips.yaml")"
 INGRESS_VIP="$(yq .ingress_vip "$SHARED_DIR/vips.yaml")"
 API_VIP_V6="$(yq .api_vip_v6 "$SHARED_DIR/vips.yaml")"

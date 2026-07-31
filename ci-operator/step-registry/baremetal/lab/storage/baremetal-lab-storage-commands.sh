@@ -31,6 +31,10 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-storage: Configuring disk encryption/mirroring'" || true
+
 workdir=`mktemp -d`
 
 ocp_version=$(oc adm release info --registry-config ${CLUSTER_PROFILE_DIR}/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)

@@ -23,6 +23,9 @@ fi
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-post-dhcp-pxe-conf: Removing DHCP/PXE/GRUB config'" || true
+
 # Retrieves the MACs of the hosts to delete their grub.cfg
 declare -a MAC_ARRAY
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do

@@ -93,6 +93,9 @@ INSTALL_DIR="/tmp/installer"
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-ipi-install: Starting OpenShift IPI installation'" || true
+
 echo "[INFO] Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}..."
 echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 echo "[INFO] Set OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY to true for nightly payload"

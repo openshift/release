@@ -20,6 +20,9 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-post-release-nodes: Releasing reserved nodes'" || true
+
 timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "$CLUSTER_NAME" << 'EOF'
 CLUSTER_NAME="$1"
 DATA_STORAGE="/var/mnt/data-storage"

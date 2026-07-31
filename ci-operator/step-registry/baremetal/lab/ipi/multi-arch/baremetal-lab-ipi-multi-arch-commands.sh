@@ -5,10 +5,24 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+[ -z "${AUX_HOST}" ] && { echo "AUX_HOST is not filled. Failing."; exit 1; }
+
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+
 if [[ ! "${JOB_NAME}" =~ "multi-arch" ]]; then
   echo "Not a multi-arch job. Skipping..."
   exit 0
 fi
+
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-ipi-multi-arch: Adding multi-arch worker nodes'" || true
 
 if [ "${ADDITIONAL_WORKERS_DAY2:-false}" != "true" ]; then
   echo "No day 2 additional workers to add. Skipping..."

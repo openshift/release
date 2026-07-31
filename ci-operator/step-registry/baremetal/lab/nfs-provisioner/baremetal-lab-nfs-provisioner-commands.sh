@@ -3,6 +3,20 @@
 set -o errexit
 set -o pipefail
 
+[ -z "${AUX_HOST}" ] && { echo "AUX_HOST is not filled. Failing."; exit 1; }
+
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+
+timeout 10s ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+  "systemd-cat -t '${CLUSTER_NAME}' -p5 echo 'baremetal-lab-nfs-provisioner: Deploying NFS provisioner'" || true
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
