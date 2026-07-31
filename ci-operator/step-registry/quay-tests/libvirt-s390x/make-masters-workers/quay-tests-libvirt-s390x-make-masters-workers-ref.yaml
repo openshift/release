@@ -1,0 +1,23 @@
+ref:
+  as: quay-tests-libvirt-s390x-make-masters-workers
+  cli: latest
+  from: cli
+  commands: quay-tests-libvirt-s390x-make-masters-workers-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 30m0s
+  env:
+  - name: SCHEDULABLE_MASTER_COUNT
+    default: "2"
+    documentation: |-
+      Number of control-plane nodes to convert into dual-role master+worker
+      nodes that are schedulable for workloads. Remaining masters keep the
+      NoSchedule taint. Default 2 matches libvirt-s390x clusters that have
+      three masters and only two dedicated compute nodes.
+  documentation: |-
+    After libvirt UPI install, label the first N master nodes with the worker
+    role, enable mastersSchedulable, and leave any remaining masters
+    non-schedulable. Gives Quay more capacity when only two compute nodes
+    are available in the leases pool.
