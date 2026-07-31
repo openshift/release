@@ -17,6 +17,10 @@ main() {
 
     setup_ansible_inventory "${SPOKE_CLUSTER}" "${HUB_CLUSTER}"
 
+    if [[ -n "${LOCKDOWN_URI}" ]]; then
+        resolve_ocp_version_from_lockdown "${LOCKDOWN_URI}"
+    fi
+
     SPOKE_KUBECONFIG="/tmp/${SPOKE_CLUSTER}-kubeconfig"
 
     if [[ -z "${BIOS_PROFILE_URL}" ]]; then
