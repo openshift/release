@@ -90,6 +90,15 @@ export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_CREDENTIALS_PATH}/hcm-hy
 cp "${E2E_TEST_BIN}" ./e2e.test
 E2E_TEST_BIN="./e2e.test"
 
+# Debug: verify ginkgo binary and parallel config
+log "=== Parallel execution debug ==="
+log "PROCS=${PROCS:-unset}"
+log "GINKGO_BIN=${GINKGO_BIN}"
+log "GINKGO_BIN resolves to: $(which "${GINKGO_BIN}" 2>&1 || echo 'NOT FOUND')"
+"${GINKGO_BIN}" version || true
+log "E2E_TEST_BIN=${E2E_TEST_BIN}"
+log "=== End debug ==="
+
 # Run e2e tests via ginkgo CLI with parallel execution
 "${GINKGO_BIN}" \
   --procs="${PROCS:-8}" \
