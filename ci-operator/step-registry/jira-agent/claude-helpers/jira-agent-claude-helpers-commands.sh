@@ -51,7 +51,7 @@ run_claude() {
     --backend local \
     --harness claude-code \
     --model "${CLAUDE_MODEL}" \
-    --workdir /tmp/project-repo \
+    --workdir "${AGENTIC_WORKDIR:-/tmp/project-repo}" \
     --no-streaming \
     "${prompt}" \
     -- \
