@@ -141,6 +141,7 @@ resolve_target_channel() {
 }
 
 wait_for_csv_succeeded() {
+    local previous_csv="$1"
     local timeout_seconds
     timeout_seconds="$(parse_timeout "${ACM_UPGRADE_TIMEOUT}")"
     local start_time elapsed new_csv phase
@@ -154,7 +155,7 @@ wait_for_csv_succeeded() {
         fi
 
         new_csv="$(get_current_csv)"
-        if [[ -z "${new_csv}" ]]; then
+        if [[ -z "${new_csv}" || "${new_csv}" == "${previous_csv}" ]]; then
             sleep 10
             continue
         fi
@@ -312,6 +313,13 @@ if [[ "${target_channel}" == "${current_channel}" ]]; then
         echo "No pending upgrade on current channel; nothing to do"
         exit 0
     fi
+    plan_phase="$(oc get installplan "${install_plan}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    if [[ "${plan_phase}" == "Complete" ]]; then
+        echo "InstallPlan ${install_plan} already complete; no pending upgrade"
+        exit 0
+    fi
 fi
 
 echo "Patching subscription channel: ${current_channel} -> ${target_channel}"
@@ -354,7 +362,7 @@ if [[ -n "${install_plan}" ]]; then
 fi
 
 echo "Waiting for ACM CSV to reach Succeeded phase..."
-wait_for_csv_succeeded
+wait_for_csv_succeeded "${current_csv}"
 new_csv="$(get_current_csv)"
 new_version="$(get_installed_version)"
 echo "Upgrade complete: ${current_version} -> ${new_version} (CSV: ${new_csv})"
