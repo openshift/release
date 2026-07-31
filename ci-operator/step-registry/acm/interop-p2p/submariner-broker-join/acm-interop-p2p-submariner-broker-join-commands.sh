@@ -466,6 +466,7 @@ EnsureNonGatewayOvnRoutes() {
     fi
 
     typeset node ovnkubePod cidr addOk
+    typeset -i _injFailed=0 _injTotal=0
     for node in "${nonGwNodes[@]}"; do
         ovnkubePod=$(KUBECONFIG="${kubeconfig}" oc get pod \
             -n openshift-ovn-kubernetes \
@@ -479,6 +480,7 @@ EnsureNonGatewayOvnRoutes() {
         }
 
         for cidr in "${remoteCIDRs[@]}"; do
+            (( _injTotal++ ))
             : "  ${node}: ovn_cluster_router ${cidr} → ${nextHop}"
             addOk=false
             # Try ovnkube-controller first (OCP 4.19+), then fall back to ovnkube-node
@@ -495,12 +497,41 @@ EnsureNonGatewayOvnRoutes() {
                     ovn_cluster_router "${cidr}" "${nextHop}" 2>/dev/null; then
                 addOk=true
             fi
-            [[ "${addOk}" != "true" ]] && \
-                : "  WARNING: could not add OVN route ${cidr} on '${node}' — will retry in verify step"
+
+            if [[ "${addOk}" != "true" ]]; then
+                (( _injFailed++ ))
+                echo "  ERROR: ovn-nbctl lr-route-add failed for ${cidr} on '${node}'" >&2
+                continue
+            fi
+
+            # Read-back: verify the route is actually present in the local NB DB.
+            # lr-route-add exits 0 for --may-exist even when the route was already removed
+            # by a reconciliation loop; a read-back confirms the route survived injection.
+            typeset _routePresent
+            _routePresent=$(KUBECONFIG="${kubeconfig}" oc exec \
+                -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                -c ovnkube-controller -- \
+                ovn-nbctl --no-leader-only find Logical_Router_Static_Route \
+                "ip_prefix=${cidr}" 2>/dev/null \
+                | grep -c "${nextHop}" || \
+                KUBECONFIG="${kubeconfig}" oc exec \
+                -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                -c ovnkube-node -- \
+                ovn-nbctl --no-leader-only find Logical_Router_Static_Route \
+                "ip_prefix=${cidr}" 2>/dev/null \
+                | grep -c "${nextHop}" || echo "0")
+
+            if (( _routePresent == 0 )); then
+                (( _injFailed++ ))
+                echo "  ERROR: route ${cidr}→${nextHop} not found in NB DB after injection on '${node}' — likely cleared by reconciliation" >&2
+            else
+                : "  ${node}: route ${cidr}→${nextHop} confirmed present in NB DB"
+            fi
         done
     done
 
-    : "EnsureNonGatewayOvnRoutes: done for '${clusterName}'"
+    : "EnsureNonGatewayOvnRoutes '${clusterName}': ${_injFailed} failed of ${_injTotal} route-node pairs"
+    (( _injFailed == 0 ))
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -592,8 +623,11 @@ typeset -i submarinerStepRc=0
     # routes all cross-cluster pod traffic is silently dropped, causing
     # Ncat: TIMEOUT in subctl verify even when tunnels show "connected".
     # EnsureNonGatewayOvnRoutes reads the NGR CRs and execs into each non-gateway
-    # ovnkube-node pod to add the missing routes.  Best-effort: failure here is
-    # WARNING-level; verify step repeats the injection as belt-and-suspenders.
+    # ovnkube-node pod to add the missing routes.  Now includes post-injection
+    # read-back verification and explicit failure counting.  Still best-effort
+    # here (|| true): failure is logged to stderr but does NOT block broker-join
+    # since the verify step repeats injection as belt-and-suspenders.  Any
+    # read-back failures will produce clear ERROR lines visible in the CI log.
     for ((i = 0; i < spokeCount; i++)); do
         EnsureNonGatewayOvnRoutes \
             "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" || true
