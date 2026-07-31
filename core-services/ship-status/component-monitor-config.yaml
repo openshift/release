@@ -322,30 +322,65 @@ components:
       artifact_url_style: "gcs"
       history_runs: 5
       failed_runs_threshold: 3
-#   - component_slug: "build-farm"
-#     sub_component_slug: "build02"
-#     prometheus_monitor:
-#       prometheus_location:
-#         cluster: "app.ci"
-#         namespace: "openshift-monitoring"
-#         route: "thanos-querier"
-#       queries:
-#         - query: "probe_success{job=\"blackbox\",instance=\"https://console.build02.ci.openshift.org\"} > 0"
-#           duration: "5m"
-#           step: "30s"
-#           severity: "Down"
-#         - query: "rate(prowjob_state_transitions{cluster=\"build02\",state=\"success\"}[2h]) > 0"
-#           duration: "2h"
-#           step: "5m"
-#           severity: "Degraded"
-#     junit_monitor:
-#       job_name: "periodic-build-farm-canary-build02"
-#       max_age: "2h"
-#       severity: "Degraded"
-#       artifact_url_style: "gcs"
-#       history_runs: 5
-#       failed_runs_threshold: 3
-#
+  - component_slug: "build-farm"
+    sub_component_slug: "build01"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build01"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build02"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console.build02.ci.openshift.org\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build02\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_name: "periodic-build-farm-canary-build02"
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build02"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build02"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
   - component_slug: "build-farm"
     sub_component_slug: "build03"
     prometheus_monitor:
@@ -370,6 +405,24 @@ components:
       history_runs: 5
       failed_runs_threshold: 3
   - component_slug: "build-farm"
+    sub_component_slug: "build03"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build03"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
     sub_component_slug: "build04"
     prometheus_monitor:
       prometheus_location:
@@ -392,6 +445,24 @@ components:
       artifact_url_style: "gcs"
       history_runs: 5
       failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build04"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build04"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
   - component_slug: "build-farm"
     sub_component_slug: "build05"
     prometheus_monitor:
@@ -416,6 +487,24 @@ components:
       history_runs: 5
       failed_runs_threshold: 3
   - component_slug: "build-farm"
+    sub_component_slug: "build05"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build05"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
     sub_component_slug: "build06"
     prometheus_monitor:
       prometheus_location:
@@ -438,6 +527,24 @@ components:
       artifact_url_style: "gcs"
       history_runs: 5
       failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build06"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build06"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
   - component_slug: "build-farm"
     sub_component_slug: "build07"
     prometheus_monitor:
@@ -462,6 +569,24 @@ components:
       history_runs: 5
       failed_runs_threshold: 3
   - component_slug: "build-farm"
+    sub_component_slug: "build07"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build07"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
     sub_component_slug: "build08"
     prometheus_monitor:
       prometheus_location:
@@ -484,6 +609,24 @@ components:
       artifact_url_style: "gcs"
       history_runs: 5
       failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build08"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build08"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
   - component_slug: "build-farm"
     sub_component_slug: "build09"
     prometheus_monitor:
@@ -508,6 +651,24 @@ components:
       history_runs: 5
       failed_runs_threshold: 3
   - component_slug: "build-farm"
+    sub_component_slug: "build09"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build09"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
     sub_component_slug: "build10"
     prometheus_monitor:
       prometheus_location:
@@ -531,6 +692,24 @@ components:
       history_runs: 5
       failed_runs_threshold: 3
   - component_slug: "build-farm"
+    sub_component_slug: "build10"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build10"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
     sub_component_slug: "build11"
     prometheus_monitor:
       prometheus_location:
@@ -553,4 +732,22 @@ components:
       artifact_url_style: "gcs"
       history_runs: 5
       failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build11"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build11"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{job=\"kube-state-metrics\",phase=\"Pending\",namespace=~\"ci-op-.*\"} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
   # END: auto-generated build-farm entries

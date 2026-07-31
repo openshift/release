@@ -73,6 +73,24 @@ def monitor_entry(cluster_name: str, console_url: str) -> str:
       artifact_url_style: "gcs"
       history_runs: 5
       failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "{cluster_name}"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "{cluster_name}"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "(count(kube_pod_status_phase{{job=\\"kube-state-metrics\\",phase=\\"Pending\\",namespace=~\\"ci-op-.*\\"}} == 1) or vector(0)) <= 50"
+          failure_query: "count(kube_pod_status_phase{{job=\\"kube-state-metrics\\",phase=\\"Pending\\",namespace=~\\"ci-op-.*\\"}} == 1)"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}} > 0 or absent(kube_deployment_status_replicas_available{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}})"
+          failure_query: "kube_deployment_status_replicas{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
 """
 
 
