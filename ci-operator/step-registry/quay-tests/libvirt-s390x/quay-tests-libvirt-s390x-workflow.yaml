@@ -9,7 +9,10 @@ workflow:
     build12. Hypervisor hostnames and network layout come from Boskos (LEASED_RESOURCE)
     and the cluster profile leases secret—not from workflow env.
 
-    Quay operator/catalog/deploy/test steps are defined on the job (test: chain), not here.
+    After install, quay-tests-libvirt-s390x-make-masters-workers converts two control-plane
+    nodes into dual-role master+worker (schedulable) because the leases pool currently
+    provides only two dedicated compute nodes. Quay operator/catalog/deploy/test steps
+    remain on the job test: chain.
   steps:
     allow_best_effort_post_steps: true
     pre:
@@ -18,6 +21,7 @@ workflow:
     - ref: ipi-debug-missing-static-pod-controller-degraded
     - ref: ipi-conf-etcd-on-ramfs
     - chain: upi-install-libvirt
+    - ref: quay-tests-libvirt-s390x-make-masters-workers
     post:
     - ref: ipi-conf-debug-kdump-gather-logs
     - chain: gather
@@ -26,4 +30,5 @@ workflow:
       ARCH: s390x
       BRANCH: "4.21"
       ETCD_DISK_SPEED: slow
+      SCHEDULABLE_MASTER_COUNT: "2"
       USE_EXTERNAL_DNS: "true"
