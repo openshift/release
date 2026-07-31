@@ -22,8 +22,7 @@ echo "Cases (${#CASE_LIST[@]}): ${CASE_LIST[*]} | Parallelism: ${MAX_PARALLEL}"
 
 # --- Clone repo template ---
 TEMPLATE_DIR="/tmp/eval-repo-template"
-git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${UPSTREAM_REPO}.git" "${TEMPLATE_DIR}"
-git -C "${TEMPLATE_DIR}" remote set-url origin "https://github.com/${UPSTREAM_REPO}.git"
+git clone "https://github.com/${UPSTREAM_REPO}.git" "${TEMPLATE_DIR}"
 git -C "${TEMPLATE_DIR}" config user.name "openshift-trt"
 git -C "${TEMPLATE_DIR}" config user.email "openshift-trt@redhat.com"
 git -C "${TEMPLATE_DIR}" remote add fork "https://github.com/${FORK_REPO}.git"
@@ -99,7 +98,7 @@ for case_name in "${CASE_LIST[@]}"; do
 
     RUNNING=$(( RUNNING + 1 ))
     if [[ ${RUNNING} -ge ${MAX_PARALLEL} ]]; then
-        wait -n
+        wait -n || true
         RUNNING=$(( RUNNING - 1 ))
     fi
 done

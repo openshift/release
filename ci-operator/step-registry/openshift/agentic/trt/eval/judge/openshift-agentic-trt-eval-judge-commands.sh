@@ -12,12 +12,12 @@ echo "Cases to judge (${#CASE_LIST[@]}): ${CASE_LIST[*]}"
 
 # --- Clone repo template ---
 TEMPLATE_DIR="/tmp/eval-repo-template"
-CLONE_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
-git clone "https://x-access-token:${CLONE_TOKEN}@github.com/${UPSTREAM_REPO}.git" "${TEMPLATE_DIR}"
-git -C "${TEMPLATE_DIR}" remote set-url origin "https://github.com/${UPSTREAM_REPO}.git"
+git clone "https://github.com/${UPSTREAM_REPO}.git" "${TEMPLATE_DIR}"
 
-GITHUB_TOKEN="${CLONE_TOKEN}"
+set +x
+GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
 export GITHUB_TOKEN
+set -x
 
 # --- Utilities ---
 diff_stat_total() {
