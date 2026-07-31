@@ -67,7 +67,7 @@ function DebugOnExit () {
     true
 }
 
-trap '{( exitCode=$?; DebugOnExit )}' EXIT TERM
+trap '{ exitCode=$?; DebugOnExit; }' EXIT TERM
 
 set +x
 KUBECONFIG="" oc registry login
@@ -91,7 +91,7 @@ function CheckSigned () {
     if [[ "${payload}" =~ "@sha256:" ]]; then
         digest="$(echo "${payload}" | cut -f2 -d@)"
     else
-        digest="$(oc image info "${payload}" -o json | awk -F'"' '/"digest"/{print $4; exit}')"
+        digest="$(oc image info "${payload}" -o jsonpath='{.digest}')"
     fi
     : "Image digest: ${digest}"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
@@ -411,7 +411,7 @@ function Main () {
 
     ResolveTargetImage
 
-    targetVersion="$(oc adm release info "${upgradeTarget}" --output=json | awk -F'"' '/"version"/{print $4; exit}')"
+    targetVersion="$(oc adm release info "${upgradeTarget}" -o jsonpath='{.metadata.version}')"
     targetMinorVersion="$(echo "${targetVersion}" | cut -f2 -d.)"
     export targetVersion targetMinorVersion
     : "Target release: ${targetVersion} (minor: ${targetMinorVersion})"
