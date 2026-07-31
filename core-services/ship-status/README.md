@@ -12,14 +12,20 @@ These should merge first so the component-monitor has kubeconfigs for the new cl
 - **`core-services/ci-secret-generator/_config.yaml`** -- add the cluster to the `ship-status-dash-component-monitor` item's `cluster` list so tokens and kubeconfigs are generated.
 - **`core-services/ci-secret-bootstrap/_config.yaml`** -- add `buildNN.config` and `sa.component-monitor.buildNN.token.txt` entries to the `component-monitor-kubeconfigs` secret block, following the existing pattern.
 
-### 2. Canary job
+### 2. Blackbox probe target
+
+The component-monitor's blackbox probe checks console reachability. Without the target, `probe_success` returns empty and the cluster reports as Down.
+
+- **`clusters/app.ci/openshift-user-workload-monitoring/blackbox_probe.yaml`** -- add the cluster's console URL to the `blackbox` Probe's `staticConfig.static` list.
+
+### 3. Canary job
 
 The component-monitor's `junit_monitor` probe checks canary job results. Without the job, the probe errors and the cluster never reports status.
 
 - **`ci-operator/jobs/infra-build-farm-periodics.yaml`** -- add a `periodic-build-farm-canary-buildNN` entry matching the existing pattern (runs every 15 min, 10m timeout, no rehearsal label).
 - **`core-services/sanitize-prow-jobs/_config.yaml`** -- pin the canary job to its cluster under the `buildNN: jobs:` section. Without this, the job runs on the default cluster instead.
 
-### 3. Monitoring config
+### 4. Monitoring config
 
 - **`hack/generate-build-farm-monitor-config.py`** -- add the cluster to `CONSOLE_URLS` (with its console URL) and extend `BUILD_ORDER`.
 - Run `python3 hack/generate-build-farm-monitor-config.py` to regenerate:
