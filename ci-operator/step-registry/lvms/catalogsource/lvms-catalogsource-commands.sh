@@ -595,6 +595,8 @@ function main {
 	local commit image_info_flags=""
 	if [[ "$DISCONNECTED" == "true" ]]; then
 		image_info_flags="--insecure -a /tmp/new-dockerconfigjson"
+	else
+		image_info_flags="-a ${CLUSTER_PROFILE_DIR}/pull-secret"
 	fi
 	commit=$(oc image info ${image_info_flags} --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
 		| jq -r '.config.config.Labels["vcs-ref"]')
