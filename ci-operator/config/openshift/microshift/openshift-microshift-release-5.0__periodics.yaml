@@ -3,10 +3,6 @@ base_images:
     name: brew
     namespace: microshift
     tag: latest
-  nested-podman:
-    name: nested-podman
-    namespace: ci
-    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -15,18 +11,18 @@ build_root:
 images:
   items:
   - dockerfile_literal: |
-      FROM nested-podman
+      FROM src
       USER 0
-      RUN dnf install -y jq && dnf clean all
+      RUN dnf install -y podman shadow-utils jq file && dnf clean all && \
+          setcap cap_setuid+ep /usr/bin/newuidmap && \
+          setcap cap_setgid+ep /usr/bin/newgidmap && \
+          touch /etc/subgid /etc/subuid && \
+          chmod g=u /etc/subuid /etc/subgid
       USER 1000
-      COPY src/microshift /go/src/github.com/openshift/microshift
-      WORKDIR /go/src/github.com/openshift/microshift
-    from: nested-podman
     inputs:
       src:
-        paths:
-        - destination_dir: src
-          source_path: /go/src/github.com/openshift/microshift
+        as:
+        - src
     to: rebase-cryptoscan-src
 releases:
   latest:
