@@ -18,7 +18,9 @@ ISSUE_JSON="${SHARED_DIR}/jira-issue.json"
 ISSUE_SUMMARY=$(jq -r '.fields.summary // "No summary"' "${ISSUE_JSON}")
 export ISSUE_SUMMARY
 
-git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
+if [[ "${EVAL_MODE:-}" != "true" ]]; then
+    git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
+fi
 
 echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
 

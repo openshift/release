@@ -103,7 +103,7 @@ for case_name in "${CASE_LIST[@]}"; do
     fi
 done
 
-wait
+wait || true
 
 # --- Report results ---
 echo ""
@@ -120,4 +120,6 @@ for case_name in "${CASE_LIST[@]}"; do
 done
 
 echo "Completed: ${#CASE_LIST[@]} cases, ${FAILURES} failures."
+# Always exit 0 so the judge step runs and produces the eval summary.
+# The judge determines pass/fail based on check results.
 echo "=== TRT Eval Solve Complete ==="
