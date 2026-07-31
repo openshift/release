@@ -515,6 +515,122 @@ EOF
         --ignore-not-found 1>/dev/null &
 }
 
+# ── _RunNodePinnedProbe — TCP probe from a pod pinned to a named node ────────────
+# Uses oc create with a full pod manifest (not oc run --overrides) so nodeName,
+# tolerations, and restartPolicy are set cleanly.  The pod is placed in the
+# 'submariner-operator' namespace so OVN-K's PBR rules for cross-cluster routing
+# are already programmed (avoids the namespace reconciliation race).
+# Returns 0 (probe succeeded) or 1 (probe failed / pod not Succeeded).
+_RunNodePinnedProbe() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset podName="${1:?}"; (($#)) && shift
+    typeset nodeName="${1:?}"; (($#)) && shift
+    typeset destIp="${1:?}"; (($#)) && shift
+    typeset destPort="${1:?}"; (($#)) && shift
+
+    typeset -r probeNs="submariner-operator"
+
+    KUBECONFIG="${kubeconfig}" oc delete pod "${podName}" \
+        -n "${probeNs}" --ignore-not-found --wait=true --timeout=30s 1>/dev/null 2>&1 || true
+
+    KUBECONFIG="${kubeconfig}" oc create -f - 1>/dev/null <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${podName}
+  namespace: ${probeNs}
+spec:
+  nodeName: ${nodeName}
+  restartPolicy: Never
+  tolerations:
+  - operator: Exists
+  containers:
+  - name: probe
+    image: registry.redhat.io/ubi9/ubi-minimal:latest
+    command: ["timeout", "20", "bash", "-c", "echo >/dev/tcp/${destIp}/${destPort}"]
+EOF
+
+    KUBECONFIG="${kubeconfig}" oc wait "pod/${podName}" \
+        -n "${probeNs}" \
+        --for=jsonpath='{.status.phase}'=Succeeded \
+        --timeout=90s 1>/dev/null 2>&1 || true
+
+    typeset phase exitCode
+    phase="$(KUBECONFIG="${kubeconfig}" oc get "pod/${podName}" -n "${probeNs}" \
+        -o jsonpath='{.status.phase}' 2>/dev/null || echo 'Unknown')"
+    exitCode="$(KUBECONFIG="${kubeconfig}" oc get "pod/${podName}" -n "${probeNs}" \
+        -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' \
+        2>/dev/null || echo '1')"
+
+    KUBECONFIG="${kubeconfig}" oc delete pod "${podName}" \
+        -n "${probeNs}" --ignore-not-found --wait=false 1>/dev/null &
+
+    [[ "${phase}" == "Succeeded" && "${exitCode}" == "0" ]]
+}
+
+# ── DiagnoseGatewayVsWorkerConnectivity — isolate GW vs non-GW datapath ──────
+# Runs a TCP probe from a GATEWAY-PINNED pod and from a WORKER-PINNED pod to
+# the same remote pod IP.  Outcome map:
+#
+#   GW OK  / Worker OK   → OVN routes correct on both node types; fix working.
+#   GW OK  / Worker FAIL → OVN reroute policy or table-150 gap on non-GW nodes;
+#                          EnsureNonGatewayOvnRoutes injection may need revisiting.
+#   GW FAIL/ Worker FAIL → Upstream issue (IPsec tunnel, XFRM, gateway OVN routes).
+#   GW FAIL/ Worker OK   → Unexpected; indicates OVN mis-routing via the gateway.
+#
+# This is DIAGNOSTIC ONLY — never fails the CI step.
+DiagnoseGatewayVsWorkerConnectivity() {
+    typeset srcKubeconfig="${1:?}"; (($#)) && shift
+    typeset srcName="${1:?}"; (($#)) && shift
+    typeset destIp="${1:?}"; (($#)) && shift
+    typeset destPort="${1:?}"; (($#)) && shift
+    typeset diagSuffix="${1:?}"; (($#)) && shift
+
+    typeset gwNode workerNode
+    gwNode=$(KUBECONFIG="${srcKubeconfig}" oc get nodes \
+        -l 'submariner.io/gateway=true' \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    workerNode=$(KUBECONFIG="${srcKubeconfig}" oc get nodes \
+        -l '!submariner.io/gateway' \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+    if [[ -z "${gwNode}" ]]; then
+        : "DiagnoseGatewayVsWorkerConnectivity: no gateway node on '${srcName}' — skipping"
+        return 0
+    fi
+    if [[ -z "${workerNode}" ]]; then
+        : "DiagnoseGatewayVsWorkerConnectivity: no non-gateway node on '${srcName}' — skipping"
+        return 0
+    fi
+
+    : "DiagnoseGatewayVsWorkerConnectivity '${srcName}' → ${destIp}:${destPort}"
+    : "  GW node:     ${gwNode}"
+    : "  Worker node: ${workerNode}"
+
+    typeset gwResult="FAIL" wkResult="FAIL"
+    _RunNodePinnedProbe "${srcKubeconfig}" "diag-gw-${diagSuffix}" \
+        "${gwNode}" "${destIp}" "${destPort}" \
+        && gwResult="OK" \
+        || gwResult="FAIL"
+    _RunNodePinnedProbe "${srcKubeconfig}" "diag-wk-${diagSuffix}" \
+        "${workerNode}" "${destIp}" "${destPort}" \
+        && wkResult="OK" \
+        || wkResult="FAIL"
+
+    : "DiagnoseGatewayVsWorkerConnectivity '${srcName}': GW=${gwResult} Worker=${wkResult}"
+
+    if [[ "${gwResult}" == "OK" && "${wkResult}" == "OK" ]]; then
+        : "  → OVN routes correct on both node types; EnsureNonGatewayOvnRoutes fix confirmed working"
+    elif [[ "${gwResult}" == "OK" && "${wkResult}" == "FAIL" ]]; then
+        : "  → OVN reroute policy or host table-150 gap on non-GW nodes; route injection may need revisiting"
+    elif [[ "${gwResult}" == "FAIL" && "${wkResult}" == "FAIL" ]]; then
+        : "  → Upstream failure (IPsec tunnel down, XFRM policy, or gateway OVN routes missing)"
+    else
+        : "  → Unexpected asymmetry (GW=FAIL, Worker=OK); inspect OVN policies on gateway"
+    fi
+    true
+}
+
 # ── GetSyncControllerPodIp — first Running virt-synchronization-controller pod IP ─
 GetSyncControllerPodIp() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
@@ -732,6 +848,62 @@ typeset -i submarinerStepRc=0
     done
     if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
         EnsureNonGatewayOvnRoutes "${KUBECONFIG}" "hub" || true
+    fi
+
+    # ── Dataplane symmetry diagnostic (GW-pinned vs worker-pinned probe) ────────
+    # Non-blocking: always runs after OVN route injection to confirm whether the
+    # fix worked and to isolate the failure layer if it did not.
+    # Uses the first virt-synchronization-controller pod IP on each remote cluster
+    # as the cross-cluster TCP target (same target used by VerifyCclmSyncPath).
+    # Spoke-to-spoke: probe from spoke[i] → sync-controller IP on spoke[j].
+    # Hub-spoke: probe from hub → sync-controller IP on spoke[i] and vice versa.
+    if [[ "${SUBMARINER_VERIFY_CCLM_SYNC}" == "true" ]]; then
+        for ((i = 0; i < spokeCount; i++)); do
+            for ((j = i + 1; j < spokeCount; j++)); do
+                typeset _diagDest
+                _diagDest="$(GetSyncControllerPodIp "${spokeKubeconfigsArr[j]}" || true)"
+                if [[ -n "${_diagDest}" ]]; then
+                    DiagnoseGatewayVsWorkerConnectivity \
+                        "${spokeKubeconfigsArr[i]}" \
+                        "${spokeNamesArr[i]}" \
+                        "${_diagDest}" \
+                        "${SUBMARINER_CCLM_SYNC_PORT:-8443}" \
+                        "s${i}to${j}" || true
+                fi
+                _diagDest="$(GetSyncControllerPodIp "${spokeKubeconfigsArr[i]}" || true)"
+                if [[ -n "${_diagDest}" ]]; then
+                    DiagnoseGatewayVsWorkerConnectivity \
+                        "${spokeKubeconfigsArr[j]}" \
+                        "${spokeNamesArr[j]}" \
+                        "${_diagDest}" \
+                        "${SUBMARINER_CCLM_SYNC_PORT:-8443}" \
+                        "s${j}to${i}" || true
+                fi
+            done
+        done
+        if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+            for ((i = 0; i < spokeCount; i++)); do
+                typeset _diagDest
+                _diagDest="$(GetSyncControllerPodIp "${spokeKubeconfigsArr[i]}" || true)"
+                if [[ -n "${_diagDest}" ]]; then
+                    DiagnoseGatewayVsWorkerConnectivity \
+                        "${KUBECONFIG}" \
+                        "hub" \
+                        "${_diagDest}" \
+                        "${SUBMARINER_CCLM_SYNC_PORT:-8443}" \
+                        "hubtospoke${i}" || true
+                fi
+                _diagDest="$(GetSyncControllerPodIp "${KUBECONFIG}" || true)"
+                if [[ -n "${_diagDest}" ]]; then
+                    DiagnoseGatewayVsWorkerConnectivity \
+                        "${spokeKubeconfigsArr[i]}" \
+                        "${spokeNamesArr[i]}" \
+                        "${_diagDest}" \
+                        "${SUBMARINER_CCLM_SYNC_PORT:-8443}" \
+                        "spoke${i}tohub" || true
+                fi
+            done
+        fi
     fi
 
     # ── Apply CCLM sync ingress NetworkPolicy (after tunnels confirmed up) ────
