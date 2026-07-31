@@ -189,8 +189,15 @@ WaitForConnectionsEstablished() {
 #   WaitForConnectionsEstablished has confirmed all tunnels are "connected" and
 #   gateways.submariner.io contains full CIDR data.
 #
-# SAFETY: NetworkPolicy rules are additive — this policy does NOT restrict
-#   any traffic already permitted by existing policies.
+# CRITICAL — WHY WE INCLUDE THE MACHINE NETWORK CIDR IN THE INGRESS ALLOW LIST:
+#   Using `podSelector: {}` selects ALL pods in the CNV namespace.  In Kubernetes,
+#   once any NetworkPolicy selects a pod via an Ingress rule, ALL ingress not
+#   explicitly listed is DENIED.  The kube-apiserver runs in host-network on
+#   control-plane nodes (not a pod CIDR), so adding only remote cluster CIDRs to
+#   the allow list blocks kube-apiserver → cdi-apiserver and kube-apiserver →
+#   virt-api on port 8443, breaking ALL CNV admission webhooks (DataVolume,
+#   VirtualMachine mutators).  Including the local machine network CIDR ensures
+#   control-plane host-network traffic is preserved.
 AllowCclmSyncIngress() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset clusterName="${1:?}"; (($#)) && shift
@@ -199,11 +206,11 @@ AllowCclmSyncIngress() {
     typeset cclmPort="${SUBMARINER_CCLM_SYNC_PORT:-8443}"
 
     # Collect remote pod/service CIDRs from active Submariner gateway connections.
-    typeset -a remoteCidrs=()
+    typeset -a allowCidrs=()
     typeset cidr
     while IFS= read -r cidr; do
         [[ -n "${cidr}" ]] || continue
-        remoteCidrs+=("${cidr}")
+        allowCidrs+=("${cidr}")
     done < <(
         KUBECONFIG="${kubeconfig}" oc get gateways.submariner.io \
             -n submariner-operator -o json 2>/dev/null \
@@ -211,18 +218,31 @@ AllowCclmSyncIngress() {
             || true
     )
 
-    if (( ${#remoteCidrs[@]} == 0 )); then
+    if (( ${#allowCidrs[@]} == 0 )); then
         : "No Submariner remote CIDRs found on '${clusterName}' — skipping CCLM NetworkPolicy"
         return 0
     fi
 
-    : "Creating CCLM ingress NetworkPolicy on '${clusterName}' ns='${cnvNs}' port=${cclmPort} cidrs=[${remoteCidrs[*]}]"
+    # Also include the local machine network CIDR so that kube-apiserver
+    # (running in host-network on control-plane nodes) can still reach
+    # cdi-apiserver and virt-api webhooks on port 8443.
+    typeset machineCidr
+    machineCidr=$(KUBECONFIG="${kubeconfig}" oc get network.config.openshift.io cluster \
+        -o jsonpath='{.spec.machineNetwork[0].cidr}' 2>/dev/null || true)
+    if [[ -n "${machineCidr}" ]]; then
+        : "Including machine network CIDR '${machineCidr}' to preserve kube-apiserver webhook access"
+        allowCidrs+=("${machineCidr}")
+    else
+        : "WARNING: could not read machine network CIDR — kube-apiserver webhook access may be blocked"
+    fi
+
+    : "Creating CCLM ingress NetworkPolicy on '${clusterName}' ns='${cnvNs}' port=${cclmPort} cidrs=[${allowCidrs[*]}]"
 
     KUBECONFIG="${kubeconfig}" oc apply -f - < <(
         jq -n \
             --arg  ns   "${cnvNs}" \
             --arg  port "${cclmPort}" \
-            --argjson cidrs "$(printf '%s\n' "${remoteCidrs[@]}" | jq -R . | jq -s .)" \
+            --argjson cidrs "$(printf '%s\n' "${allowCidrs[@]}" | jq -R . | jq -s .)" \
             '{
                 apiVersion: "networking.k8s.io/v1",
                 kind: "NetworkPolicy",

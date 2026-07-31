@@ -138,108 +138,145 @@ LoadSpokeConfig() {
     true
 }
 
-# ── PrepareAwsCluster — run subctl cloud prepare and patch worker SG ──────────
-# SPOKE CLUSTERS (and any bare-metal cluster).
-# subctl cloud prepare creates the '<infraID>-submariner-gw-sg' SG.  On clusters
-# with MachineSets it also provisions a dedicated gateway node with that SG.
-# On bare-metal (c5n.metal, no MachineSets) it labels an existing worker but
-# cannot retroactively attach the SG — EnsureWorkerSgHasIpsecPorts fixes this.
-# Region is extracted from metadata.json so AWS SDK calls target the right region.
+# ── PrepareAwsCluster — run subctl cloud prepare aws ─────────────────────────
+# Creates '<infraID>-submariner-gw-sg' SG and provisions a gateway node.
+# On MachineSet-based clusters (including c5n.metal that has MachineSets) subctl
+# creates a dedicated gateway MachineSet whose new instance gets the gw-sg attached
+# at provisioning time.  On clusters where no MachineSet is created, subctl labels
+# an existing worker directly.
+# SG patching (EnsureWorkerSgHasIpsecPorts) is done AFTER WaitForGatewayNode in
+# the main flow — not here — so it always runs on the confirmed-ready gateway node.
 PrepareAwsCluster() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset metadataFile="${1:?}"; (($#)) && shift
-    typeset spokeName="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
 
-    typeset spokeRegion
-    spokeRegion="$(jq -r '.aws.region // empty' "${metadataFile}" || true)"
-    if [[ -n "${spokeRegion}" ]]; then
-        export AWS_DEFAULT_REGION="${spokeRegion}"
+    typeset clusterRegion
+    clusterRegion="$(jq -r '.aws.region // empty' "${metadataFile}" || true)"
+    if [[ -n "${clusterRegion}" ]]; then
+        export AWS_DEFAULT_REGION="${clusterRegion}"
     else
-        : "WARNING: aws.region not found in ${metadataFile}; using current AWS_DEFAULT_REGION for '${spokeName}'"
+        : "WARNING: aws.region not found in ${metadataFile}; using current AWS_DEFAULT_REGION for '${clusterName}'"
     fi
 
     "${subctlBin}" cloud prepare aws \
         --kubeconfig "${kubeconfig}" \
         --ocp-metadata "${metadataFile}" \
         --gateways 1
-
-    EnsureWorkerSgHasIpsecPorts "${metadataFile}" "${spokeName}"
 }
 
 # ── PrepareHubAwsCluster — prepare AWS cloud for Submariner on the hub cluster ─
-# HUB ONLY (SUBMARINER_VERIFY_HUB_SPOKE=true).  Same as PrepareAwsCluster but
-# uses the hub kubeconfig and metadata.  The hub also uses c5n.metal bare-metal
-# so the same SG fix is needed.
+# HUB ONLY (SUBMARINER_VERIFY_HUB_SPOKE=true).  Identical to PrepareAwsCluster —
+# both hub and spokes use c5n.metal bare-metal, so the same logic applies.
 PrepareHubAwsCluster() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset metadataFile="${1:?}"; (($#)) && shift
     typeset clusterName="${1:?}"; (($#)) && shift
 
-    typeset hubRegion
-    hubRegion="$(jq -r '.aws.region // empty' "${metadataFile}" || true)"
-    if [[ -n "${hubRegion}" ]]; then
-        export AWS_DEFAULT_REGION="${hubRegion}"
-    else
-        : "WARNING: aws.region not found in ${metadataFile}; using current AWS_DEFAULT_REGION for '${clusterName}'"
-    fi
-
-    : "Preparing hub '${clusterName}' with --gateways 1"
-    "${subctlBin}" cloud prepare aws \
-        --kubeconfig "${kubeconfig}" \
-        --ocp-metadata "${metadataFile}" \
-        --gateways 1
-
-    EnsureWorkerSgHasIpsecPorts "${metadataFile}" "${clusterName}"
+    : "Preparing hub '${clusterName}' for Submariner (same path as spoke)"
+    PrepareAwsCluster "${kubeconfig}" "${metadataFile}" "${clusterName}"
 }
 
-# ── EnsureWorkerSgHasIpsecPorts — add Submariner IPsec rules to cluster worker SG
-# subctl cloud prepare creates '<infraID>-submariner-gw-sg' with UDP 4500/500/ESP/4490
-# but only attaches it to MachineSet-provisioned gateway instances.  When a cluster
-# uses bare-metal instances (e.g. c5n.metal) there are no MachineSets, so subctl
-# labels an existing running worker as the gateway — but EC2 does not retroactively
-# attach the new SG to already-provisioned instances.  The worker keeps its original
-# '<infraID>-worker' SG which has no inbound UDP 4500 (IPsec NAT-T), so ESP data
-# packets from the remote cluster are silently dropped by AWS even though IKE reports
-# the tunnel as 'connected'.
-# This function adds the four required Submariner ingress rules directly to the worker
-# SG via the EC2 Query API.  It is safe to call on standard IPI clusters too (the
-# rules are redundant but harmless when the gateway is MachineSet-provisioned).
-# Uses Python 3 stdlib (urllib + hmac SigV4) and reads ~/.aws/credentials set by
-# SetAwsCredentials — no boto3 or aws-cli binary required.
+# ── EnsureWorkerSgHasIpsecPorts — add Submariner IPsec rules to gateway node SGs
+#
+# PROBLEM: subctl cloud prepare creates '<infraID>-submariner-gw-sg' with the
+# required Submariner IPsec ports (UDP 4500/500/ESP/4490), but:
+#   - On MachineSet-provisioned clusters: subctl attaches this new SG to the new
+#     gateway Machine — so the gateway's SGs are correct.
+#   - On bare-metal clusters (c5n.metal, no MachineSets): subctl labels an existing
+#     running worker as the gateway but EC2 cannot retroactively attach a new SG to
+#     an already-running bare-metal instance.  The node keeps its original SGs (e.g.
+#     '<infraID>-worker') which have no inbound UDP 4500 (IPsec NAT-T) — so ESP
+#     data packets are silently dropped by AWS even though IKE says 'connected'.
+#
+# FIX: Find the gateway-labeled node's EC2 instance via oc, then call
+# DescribeInstances to get its ACTUAL attached SGs (by-name lookup is fragile and
+# broke when SG names differed from the expected pattern), then add the four
+# required Submariner ingress rules to every SG attached to that instance.
+#
+# CREDENTIALS: Uses AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN
+# environment variables first (matching how subctl/AWS SDK resolves credentials),
+# then falls back to ~/.aws/credentials.  Session token support is critical for CI
+# environments that use STS temporary credentials — without it, the SigV4 signature
+# is invalid and DescribeSecurityGroups returns empty results without error.
+#
+# SAFETY: Safe to call on standard IPI clusters too (redundant rules are harmless
+# when the gateway is MachineSet-provisioned with the submariner-gw-sg already).
 EnsureWorkerSgHasIpsecPorts() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset metadataFile="${1:?}"; (($#)) && shift
     typeset clusterName="${1:?}"; (($#)) && shift
 
-    typeset infraId clusterRegion
-    infraId="$(jq -r '.infraID // empty' "${metadataFile}")"
-    clusterRegion="$(jq -r '.aws.region // empty' "${metadataFile}")"
-
-    [[ -n "${infraId}" && -n "${clusterRegion}" ]] || {
-        : "WARNING: infraID or aws.region missing in ${metadataFile} — skipping worker SG IPsec rules for '${clusterName}'"
+    typeset clusterRegion
+    clusterRegion="$(jq -r '.aws.region // empty' "${metadataFile}" || true)"
+    [[ -n "${clusterRegion}" ]] || {
+        : "WARNING: aws.region missing in ${metadataFile} — skipping IPsec SG rules for '${clusterName}'"
         return 0
     }
 
-    : "Adding Submariner IPsec ingress rules to worker SG '${infraId}-worker' for '${clusterName}' (${clusterRegion})"
+    # Find the gateway node's EC2 instance ID from its providerID annotation.
+    # subctl labels the gateway immediately after 'subctl cloud prepare aws', so
+    # this lookup should succeed right away for bare-metal and within a few minutes
+    # for MachineSet-provisioned clusters (once the new node joins).
+    typeset providerID instanceId
+    providerID="$(KUBECONFIG="${kubeconfig}" oc get node \
+        -l submariner.io/gateway=true \
+        -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null || true)"
 
-    python3 - "${infraId}" "${clusterRegion}" <<'PYEOF'
-"""Add Submariner IPsec ingress rules to the OCP worker SG.
-Uses EC2 Query API with SigV4 signing; no boto3 required."""
+    if [[ -z "${providerID}" ]]; then
+        # For MachineSet-based spokes: subctl cloud prepare creates a new MachineSet whose
+        # node is still provisioning at this point — the new dedicated gateway node will get
+        # the submariner-gw-sg (with correct IPsec ports) attached automatically at provisioning
+        # time.  No need to patch an existing SG; safe to skip.
+        # For bare-metal clusters: subctl labels an existing worker immediately, so this
+        # branch should not be reached on bare-metal.
+        : "No gateway-labeled node on '${clusterName}' (MachineSet still provisioning — dedicated gateway will get submariner-gw-sg automatically)"
+        return 0
+    fi
+
+    # providerID format: aws:///us-east-2a/i-0123456789abcdef  or  aws:///<zone>/<id>
+    instanceId="${providerID##*/}"
+    : "Gateway node provider ID '${providerID}' → instance '${instanceId}' on '${clusterName}' (${clusterRegion})"
+
+    python3 - "${instanceId}" "${clusterRegion}" <<'PYEOF'
+"""Add Submariner IPsec ingress rules to ALL SGs of a gateway EC2 instance.
+Uses EC2 Query API with SigV4 signing; no boto3 required.
+Credentials resolved from env vars first (matching AWS SDK chain), then
+~/.aws/credentials, with full STS session-token support."""
 import sys, os, re, hmac, hashlib, urllib.request, urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
 def _read_creds():
+    """Return (access_key, secret_key, session_token); session_token may be ''."""
+    ak = os.environ.get("AWS_ACCESS_KEY_ID", "")
+    sk = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+    token = os.environ.get("AWS_SESSION_TOKEN", "")
+    if ak and sk:
+        return ak, sk, token
+
+    # Fallback: credentials file
     cred_file = os.path.expanduser("~/.aws/credentials")
-    ak = sk = ""
-    with open(cred_file) as f:
-        for line in f:
-            if re.match(r'\s*aws_access_key_id\s*=', line):
-                ak = line.split("=", 1)[1].strip()
-            elif re.match(r'\s*aws_secret_access_key\s*=', line):
-                sk = line.split("=", 1)[1].strip()
+    ak = sk = token = ""
+    try:
+        with open(cred_file) as f:
+            for line in f:
+                m = re.match(r'\s*(\w+)\s*=\s*(.*)', line)
+                if not m:
+                    continue
+                key, val = m.group(1), m.group(2).strip()
+                if key == "aws_access_key_id":
+                    ak = val
+                elif key == "aws_secret_access_key":
+                    sk = val
+                elif key == "aws_session_token":
+                    token = val
+    except FileNotFoundError:
+        pass
+
     if not ak or not sk:
-        raise RuntimeError("Could not read AWS credentials from ~/.aws/credentials")
-    return ak, sk
+        raise RuntimeError("AWS credentials not found in env vars or ~/.aws/credentials")
+    return ak, sk, token
 
 def _sign(key, msg):
     k = key if isinstance(key, bytes) else key.encode()
@@ -248,26 +285,46 @@ def _sign(key, msg):
 def _derive_key(secret, date, region, service):
     return _sign(_sign(_sign(_sign("AWS4" + secret, date), region), service), "aws4_request")
 
-def _ec2(action, params, region, ak, sk):
+def _ec2(action, params, region, ak, sk, token=""):
+    """Call EC2 Query API with SigV4 (includes session token if provided)."""
     host = f"ec2.{region}.amazonaws.com"
     t = datetime.now(timezone.utc)
     amz_date = t.strftime("%Y%m%dT%H%M%SZ")
     date_stamp = t.strftime("%Y%m%d")
+
     all_p = dict(params, Action=action, Version="2016-11-15")
     body = urllib.parse.urlencode(sorted(all_p.items()))
     ph = hashlib.sha256(body.encode()).hexdigest()
-    ch = f"content-type:application/x-www-form-urlencoded\nhost:{host}\nx-amz-date:{amz_date}\n"
-    sh = "content-type;host;x-amz-date"
+
+    # Canonical headers — must be sorted alphabetically; include security token when present.
+    if token:
+        ch = (f"content-type:application/x-www-form-urlencoded\n"
+              f"host:{host}\n"
+              f"x-amz-date:{amz_date}\n"
+              f"x-amz-security-token:{token}\n")
+        sh = "content-type;host;x-amz-date;x-amz-security-token"
+    else:
+        ch = f"content-type:application/x-www-form-urlencoded\nhost:{host}\nx-amz-date:{amz_date}\n"
+        sh = "content-type;host;x-amz-date"
+
     cr = f"POST\n/\n\n{ch}\n{sh}\n{ph}"
     cs = f"{date_stamp}/{region}/ec2/aws4_request"
     sts = f"AWS4-HMAC-SHA256\n{amz_date}\n{cs}\n{hashlib.sha256(cr.encode()).hexdigest()}"
     sig = hmac.new(_derive_key(sk, date_stamp, region, "ec2"), sts.encode(), hashlib.sha256).hexdigest()
     auth = f"AWS4-HMAC-SHA256 Credential={ak}/{cs}, SignedHeaders={sh}, Signature={sig}"
+
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-Amz-Date": amz_date,
+        "Authorization": auth,
+    }
+    if token:
+        headers["X-Amz-Security-Token"] = token
+
     req = urllib.request.Request(
         f"https://{host}/",
         data=body.encode(),
-        headers={"Content-Type": "application/x-www-form-urlencoded",
-                 "X-Amz-Date": amz_date, "Authorization": auth},
+        headers=headers,
         method="POST",
     )
     try:
@@ -281,39 +338,51 @@ def _ec2(action, params, region, ak, sk):
         raise
 
 def main():
-    infra_id, region = sys.argv[1], sys.argv[2]
-    ak, sk = _read_creds()
+    instance_id, region = sys.argv[1], sys.argv[2]
+    ak, sk, token = _read_creds()
     ns = "{http://ec2.amazonaws.com/doc/2016-11-15/}"
-    resp = _ec2("DescribeSecurityGroups", {
-        "Filter.1.Name": "group-name",
-        "Filter.1.Value.1": f"{infra_id}-worker",
-    }, region, ak, sk)
-    ids = [el.text for el in resp.iter(f"{ns}groupId")]
-    if not ids:
-        print(f"Worker SG '{infra_id}-worker' not found — skipping", file=sys.stderr)
-        return
-    sg_id = ids[0]
-    print(f"Worker SG: {sg_id} ({infra_id}-worker)")
+
+    # Get SGs attached to the gateway EC2 instance (avoids fragile name-based lookup).
+    resp = _ec2("DescribeInstances", {"InstanceId.1": instance_id}, region, ak, sk, token)
+    if resp is None:
+        print(f"ERROR: DescribeInstances returned no response for '{instance_id}'", file=sys.stderr)
+        sys.exit(1)
+
+    # Collect all groupId elements from all reservations/instances in the response.
+    all_sg_ids = list(dict.fromkeys(el.text for el in resp.iter(f"{ns}groupId")))
+    if not all_sg_ids:
+        print(f"ERROR: no security groups found for instance '{instance_id}'", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Gateway instance '{instance_id}' has SG(s): {', '.join(all_sg_ids)}")
+
     rules = [
-        ("UDP 4500 (IPsec NAT-T)", {"IpPermissions.1.IpProtocol": "udp",
+        ("UDP 4500 (IPsec NAT-T)",       {"IpPermissions.1.IpProtocol": "udp",
             "IpPermissions.1.FromPort": "4500", "IpPermissions.1.ToPort": "4500",
             "IpPermissions.1.IpRanges.1.CidrIp": "0.0.0.0/0"}),
-        ("UDP 500  (IKE)",        {"IpPermissions.1.IpProtocol": "udp",
+        ("UDP 500  (IKE)",               {"IpPermissions.1.IpProtocol": "udp",
             "IpPermissions.1.FromPort": "500",  "IpPermissions.1.ToPort": "500",
             "IpPermissions.1.IpRanges.1.CidrIp": "0.0.0.0/0"}),
-        ("ESP (proto 50)",        {"IpPermissions.1.IpProtocol": "50",
+        ("UDP 4800 (NATT discovery)",    {"IpPermissions.1.IpProtocol": "udp",
+            "IpPermissions.1.FromPort": "4800", "IpPermissions.1.ToPort": "4800",
+            "IpPermissions.1.IpRanges.1.CidrIp": "0.0.0.0/0"}),
+        ("ESP (proto 50)",               {"IpPermissions.1.IpProtocol": "50",
             "IpPermissions.1.FromPort": "-1",   "IpPermissions.1.ToPort": "-1",
             "IpPermissions.1.IpRanges.1.CidrIp": "0.0.0.0/0"}),
-        ("UDP 4490 (NAT-D)",      {"IpPermissions.1.IpProtocol": "udp",
+        ("UDP 4490 (NAT-D probe)",       {"IpPermissions.1.IpProtocol": "udp",
             "IpPermissions.1.FromPort": "4490", "IpPermissions.1.ToPort": "4490",
             "IpPermissions.1.IpRanges.1.CidrIp": "0.0.0.0/0"}),
     ]
-    for label, rule in rules:
-        params = {"GroupId": sg_id}
-        params.update(rule)
-        result = _ec2("AuthorizeSecurityGroupIngress", params, region, ak, sk)
-        print(f"  {label}: {'already exists' if result is None else 'added OK'}")
-    print(f"Done — Submariner IPsec rules in {sg_id}")
+
+    for sg_id in all_sg_ids:
+        print(f"Patching SG {sg_id}:")
+        for label, rule in rules:
+            params = {"GroupId": sg_id}
+            params.update(rule)
+            result = _ec2("AuthorizeSecurityGroupIngress", params, region, ak, sk, token)
+            print(f"  {label}: {'already exists' if result is None else 'added OK'}")
+
+    print(f"Done — Submariner IPsec rules applied to instance '{instance_id}'")
 
 main()
 PYEOF
@@ -384,18 +453,55 @@ WaitForGatewayNode() {
     fi
 }
 
-# ── WaitForHubGatewayNode — wait for gateway-labeled node on bare-metal hub ───
-# HUB ONLY: bare-metal hubs have no MachineSets so Loops 1+2 (MachineSet creation
-# and readiness) are not applicable.  PrepareHubAwsCluster runs subctl cloud prepare
-# --gateways 1 which labels an existing worker node almost immediately after completing.
-# This function waits only for the submariner.io/gateway=true label (Loop 3).
+# ── WaitForHubGatewayNode — wait for hub gateway (MachineSet or direct label) ─
+# Hub and spokes both use c5n.metal bare-metal.  subctl cloud prepare aws may create
+# a submariner-gw MachineSet (same as spoke) OR label an existing worker directly
+# (when MachineSet provisioning is unavailable).  This function tries MachineSet
+# first (short timeout), then falls back to label-only polling — giving correct
+# behaviour regardless of which path subctl took.
 WaitForHubGatewayNode() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset clusterName="${1:?}"; (($#)) && shift
 
     typeset -i wMax="${SUBMARINER_GATEWAY_WAIT_TIMEOUT}"
     typeset -i wInt=15
+    typeset -i msetDetectTimeout=120  # how long to wait for a submariner MachineSet to appear
 
+    # ── Loop 1: check for a submariner MachineSet (short window) ─────────────
+    typeset gwMachineSet="" ms allMachineSets
+    SECONDS=0
+    until [[ -n "${gwMachineSet}" ]] || (( SECONDS >= msetDetectTimeout )); do
+        allMachineSets="$(KUBECONFIG="${kubeconfig}" oc get machineset \
+            -n openshift-machine-api \
+            -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)"
+        for ms in ${allMachineSets}; do
+            if [[ "${ms,,}" == *submariner* ]]; then
+                gwMachineSet="${ms}"
+                break
+            fi
+        done
+        [[ -n "${gwMachineSet}" ]] && break
+        : "Checking for submariner MachineSet on hub '${clusterName}' (${SECONDS}/${msetDetectTimeout}s)"
+        sleep "${wInt}"
+    done
+
+    if [[ -n "${gwMachineSet}" ]]; then
+        : "Hub '${clusterName}' has submariner MachineSet '${gwMachineSet}' — waiting for readyReplicas=1"
+        # ── Loop 2: wait for MachineSet ready ────────────────────────────────
+        KUBECONFIG="${kubeconfig}" oc wait "machineset/${gwMachineSet}" \
+            -n openshift-machine-api \
+            --for=jsonpath='{.status.readyReplicas}'=1 \
+            --timeout="${wMax}s" || {
+            : "Gateway MachineSet '${gwMachineSet}' not ready on hub '${clusterName}' after ${wMax}s"
+            KUBECONFIG="${kubeconfig}" oc get machineset "${gwMachineSet}" \
+                -n openshift-machine-api -o wide || true
+            return 1
+        }
+    else
+        : "No submariner MachineSet found on hub '${clusterName}' after ${msetDetectTimeout}s — subctl labeled an existing worker directly"
+    fi
+
+    # ── Loop 3: wait for exactly 1 gateway-labeled node ──────────────────────
     typeset -i gwCount=0
     SECONDS=0
     until (( gwCount == 1 || SECONDS >= wMax )); do
@@ -463,6 +569,9 @@ typeset -i submarinerStepRc=0
     done
 
     # ── Wait for gateway nodes ────────────────────────────────────────────────
+    # Wait BEFORE patching SGs so EnsureWorkerSgHasIpsecPorts always targets
+    # the confirmed-ready final gateway node (not a transient label on a worker
+    # that subctl may have set temporarily while a MachineSet node provisions).
     if [[ "${enrollHub}" == "true" ]]; then
         WaitForHubGatewayNode "${KUBECONFIG}" "hub" || _cloudFailed=1
     fi
@@ -470,6 +579,29 @@ typeset -i submarinerStepRc=0
     for ((i = 0; i < spokeCount; i++)); do
         WaitForGatewayNode \
             "${spokeKubeconfigsArr[i]}" \
+            "${spokeNamesArr[i]}" \
+            || _cloudFailed=1
+    done
+
+    # ── Patch gateway node SGs (after nodes are Ready and labeled) ────────────
+    # EnsureWorkerSgHasIpsecPorts finds the gateway node via oc, then calls
+    # DescribeInstances to get its actual SGs and adds Submariner IPsec ports.
+    # For MachineSet-provisioned gateways the submariner-gw-sg already has these
+    # rules so the call is idempotent (rules come back "already exists").
+    # For bare-metal direct-labeled gateways the worker SG needs patching.
+    # Called for ALL clusters uniformly — hub and spokes are treated identically.
+    if [[ "${enrollHub}" == "true" ]]; then
+        EnsureWorkerSgHasIpsecPorts \
+            "${KUBECONFIG}" \
+            "${hubMetadataFile}" \
+            "hub" \
+            || _cloudFailed=1
+    fi
+
+    for ((i = 0; i < spokeCount; i++)); do
+        EnsureWorkerSgHasIpsecPorts \
+            "${spokeKubeconfigsArr[i]}" \
+            "${spokeMetadataFilesArr[i]}" \
             "${spokeNamesArr[i]}" \
             || _cloudFailed=1
     done
