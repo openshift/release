@@ -135,6 +135,7 @@ EnsureNonGatewayOvnRoutes() {
     (( ${#nonGwNodes[@]} == 0 )) && { : "  No non-gateway nodes — nothing to patch"; return 0; }
 
     typeset node ovnkubePod cidr addOk
+    typeset -i _injFailed=0 _injTotal=0
     for node in "${nonGwNodes[@]}"; do
         ovnkubePod=$(KUBECONFIG="${kubeconfig}" oc get pod \
             -n openshift-ovn-kubernetes \
@@ -145,6 +146,7 @@ EnsureNonGatewayOvnRoutes() {
         [[ -z "${ovnkubePod}" ]] && { : "  No ovnkube-node pod on '${node}'"; continue; }
 
         for cidr in "${remoteCIDRs[@]}"; do
+            (( _injTotal++ ))
             : "  ${node}: ovn_cluster_router ${cidr} → ${nextHop}"
             addOk=false
             if KUBECONFIG="${kubeconfig}" oc exec \
@@ -160,12 +162,41 @@ EnsureNonGatewayOvnRoutes() {
                     ovn_cluster_router "${cidr}" "${nextHop}" 2>/dev/null; then
                 addOk=true
             fi
-            [[ "${addOk}" != "true" ]] && \
-                : "  WARNING: could not add OVN route ${cidr} on '${node}'"
+
+            if [[ "${addOk}" != "true" ]]; then
+                (( _injFailed++ ))
+                echo "  ERROR: ovn-nbctl lr-route-add failed for ${cidr} on '${node}'" >&2
+                continue
+            fi
+
+            # Read-back: verify the route is actually present in the local NB DB after
+            # injection.  --may-exist exits 0 even if a reconciliation loop cleared the
+            # route between subshells; a read-back confirms the route survived.
+            typeset _routePresent
+            _routePresent=$(KUBECONFIG="${kubeconfig}" oc exec \
+                -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                -c ovnkube-controller -- \
+                ovn-nbctl --no-leader-only find Logical_Router_Static_Route \
+                "ip_prefix=${cidr}" 2>/dev/null \
+                | grep -c "${nextHop}" || \
+                KUBECONFIG="${kubeconfig}" oc exec \
+                -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                -c ovnkube-node -- \
+                ovn-nbctl --no-leader-only find Logical_Router_Static_Route \
+                "ip_prefix=${cidr}" 2>/dev/null \
+                | grep -c "${nextHop}" || echo "0")
+
+            if (( _routePresent == 0 )); then
+                (( _injFailed++ ))
+                echo "  ERROR: route ${cidr}→${nextHop} missing from NB DB after injection on '${node}' — cleared by reconciliation loop" >&2
+            else
+                : "  ${node}: route ${cidr}→${nextHop} confirmed present in NB DB"
+            fi
         done
     done
 
-    : "EnsureNonGatewayOvnRoutes: done for '${clusterName}'"
+    : "EnsureNonGatewayOvnRoutes '${clusterName}': ${_injFailed} failed of ${_injTotal} route-node pairs"
+    (( _injFailed == 0 ))
 }
 
 # ── ShowConnections — display gateway tunnel status ───────────────────────────
