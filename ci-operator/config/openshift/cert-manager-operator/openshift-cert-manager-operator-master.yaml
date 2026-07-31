@@ -11,6 +11,10 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -424,6 +428,46 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- always_run: false
+  as: tls-scanner
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+      SCAN_NAMESPACE: cert-manager-operator,cert-manager
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - as: deploy-operand
+      cli: latest
+      commands: |-
+        oc apply -f - <<EOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: CertManager
+        metadata:
+          name: cluster
+        spec:
+          logLevel: Normal
+          managementState: Managed
+        EOF
+        echo "Waiting for cert-manager operand deployments..."
+        oc wait --for=condition=Available -n cert-manager deployment/cert-manager --timeout=5m
+        oc wait --for=condition=Available -n cert-manager deployment/cert-manager-webhook --timeout=5m
+        oc wait --for=condition=Available -n cert-manager deployment/cert-manager-cainjector --timeout=5m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: master
   org: openshift
