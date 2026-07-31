@@ -21,7 +21,8 @@ backplane_bin_dir=""
 backplane_proxy_url=""
 if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   echo "=== OCM backplane login (Hive) ==="
-  cred_dir="${OCM_FVT_BACKPLANE_CREDENTIALS_DIR:-/usr/local/cs-qe-credentials}"
+  # (BACKPLANE_CLIENT_ID/SECRET env, or backplane_client_{id,secret} files).
+  cred_dir="${OCM_FVT_BACKPLANE_CREDENTIALS_DIR:-/usr/local/rosa-clusters-service-sandbox}"
   # Disable tracing while reading backplane client credentials.
   [[ $- == *x* ]] && WAS_TRACING_BP=true || WAS_TRACING_BP=false
   set +x
@@ -37,8 +38,10 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   if [[ -z "${backplane_client_id}" || -z "${backplane_client_secret}" ]]; then
     echo "ERROR: OCM_FVT_USE_BACKPLANE=true but backplane client credentials are missing" >&2
     echo "Expected BACKPLANE_CLIENT_ID/SECRET env or ${cred_dir}/backplane_client_{id,secret}" >&2
+    echo "(CS mounts these from ci/rosa-clusters-service-sandbox)" >&2
     exit 1
   fi
+  echo "Using backplane credentials from ${cred_dir} (or env)"
 
   # Defaults match rosa-e2e-ocm-fvt*-ref.yaml; override via job/workflow env if needed.
   backplane_cluster_id="${OCM_FVT_BACKPLANE_CLUSTER_ID:-1g268u7pp694gj152nj16me4sv615lpv}"
