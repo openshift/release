@@ -467,6 +467,13 @@ function install_osc_operands() {
     return 1
   fi
 
+  # DEBUG until https://github.com/confidential-devhub/charts/pull/4 merges
+  # openshift-tests-private expects kataconfig name to be "example-kataconfig". Rename to match the test expectation.
+  if grep -q 'name: kataconfig' "${operands_yaml}" 2>/dev/null; then
+    sed -i 's/name:.*$/name: example-kataconfig/' "${operands_yaml}"
+    echo ">>> DEBUG: kataconfig.yaml patched (renamed to example-kataconfig). PR 4 not merged yet." >&2
+  fi
+
   echo ">>> Rendered operands YAML:"
   cat "${operands_yaml}"
 
