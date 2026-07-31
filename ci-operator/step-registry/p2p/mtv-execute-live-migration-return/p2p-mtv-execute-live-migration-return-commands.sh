@@ -12,8 +12,12 @@ eval "$(
 )"; EnsureReqs jq
 
 if [[ -n "${SHARED_DIR}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    # proxy-conf.sh may contain credentials — disable xtrace while sourcing.
+    [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+    [[ "${_wasTracing}" == "true" ]] && set -x || true
 fi
 
 [[ -n "${KUBECONFIG}" ]]
@@ -319,9 +323,10 @@ MaybePreflightSubmarinerNoGlobalnet() {
 GetSourceVirtLauncherPod() {
     typeset podName
 
+    # Use jq to avoid "array index out of bounds" stderr from oc jsonpath on empty lists.
     podName="$(SourceOc get pods -n "${MTV_TEST_VM_NAMESPACE}" \
         -l "kubevirt.io=virt-launcher,kubevirt.io/domain=${MTV_TEST_VM_NAME}" \
-        -o jsonpath='{.items[0].metadata.name}' || true)"
+        -o json | jq -r 'first(.items[].metadata.name) // empty' || true)"
     [[ -n "${podName}" ]] && printf '%s' "${podName}" && return 0
 
     podName="$(SourceOc get pods -n "${MTV_TEST_VM_NAMESPACE}" -o json \
@@ -583,7 +588,7 @@ JStep() {
     if (( rc == 0 )); then
         printf 'PASS\t%s\t%d\t\n' "${name}" "${elapsed}" >> "${junitFile}"
     else
-        printf 'FAIL\t%s\t%d\tFailed (rc=%d); see diagnostics in mtv-live-migration-diagnostics/\n' \
+        printf 'FAIL\t%s\t%d\tFailed (rc=%d); see diagnostics in mtv-live-migration-return-diagnostics/\n' \
             "${name}" "${elapsed}" "${rc}" >> "${junitFile}"
     fi
     return "${rc}"
@@ -621,11 +626,11 @@ WriteJunit() {
 
     {
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
-        printf '<testsuite name="cclm-live-migration" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
+        printf '<testsuite name="cclm-live-migration-return" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
             "${total}" "${failures}" "${totalTime}"
         while IFS=$'\t' read -r status name elapsed failMsg; do
             typeset escapedName; escapedName="$(XmlEscape "${name}")"
-            printf '  <testcase name="%s" classname="cclm-live-migration" time="%d">\n' \
+            printf '  <testcase name="%s" classname="cclm-live-migration-return" time="%d">\n' \
                 "${escapedName}" "${elapsed}"
             if [[ "${status}" == "FAIL" ]]; then
                 typeset escapedMsg; escapedMsg="$(XmlEscape "${failMsg}")"
@@ -692,7 +697,7 @@ WriteJunit
 if (( cclmStepRc != 0 )); then
     DumpDiagnostics
     if [[ "${cclmDebugMode}" == "true" ]]; then
-        : "WARNING: p2p-mtv-execute-live-migration failed (rc=${cclmStepRc}); not failing job (debug mode)"
+        : "WARNING: p2p-mtv-execute-live-migration-return failed (rc=${cclmStepRc}); not failing job (debug mode)"
     else
         exit "${cclmStepRc}"
     fi

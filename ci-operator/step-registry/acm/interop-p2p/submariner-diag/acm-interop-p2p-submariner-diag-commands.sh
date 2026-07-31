@@ -6,7 +6,9 @@
 # Runs subctl show all, diagnose all, diagnose firewall inter-cluster, and gather
 # against every spoke cluster.  Always exits 0 — diagnostic only, never fails the job.
 #
-set -euxo pipefail; shopt -s inherit_errexit
+# Use -uo (no -e, no -x) so that individual command failures never abort the script.
+# Each function guards its own failures with || true.
+set -uo pipefail
 
 typeset -r subctlBin="/tmp/bin/subctl"
 typeset -r diagDir="${ARTIFACT_DIR}/submariner-diag"
@@ -18,26 +20,30 @@ typeset -a spokeNamesArr=()
 # InstallSubctl — install subctl to /tmp/bin/ at step runtime.
 # WHY not SHARED_DIR: large binaries cause CI operator "Request entity too large"
 # when serialising SHARED_DIR into a Kubernetes Secret between steps (3 MB limit).
+# Returns 1 (non-fatal) if installation fails; callers check exit status.
 InstallSubctl() {
-    mkdir -p /tmp/bin
+    mkdir -p /tmp/bin || return 1
     if [[ -x "${subctlBin}" ]]; then
         return 0
     fi
-    curl -Ls https://get.submariner.io | bash
-    cp "${HOME}/.local/bin/subctl" "${subctlBin}"
-    chmod +x "${subctlBin}"
+    curl -Ls https://get.submariner.io | bash || return 1
+    cp "${HOME}/.local/bin/subctl" "${subctlBin}" || return 1
+    chmod +x "${subctlBin}" || return 1
     true
 }
 
 # LoadSpokeConfig — populate spoke kubeconfig and name arrays from SHARED_DIR.
+# Returns 1 (non-fatal) if any expected file is missing.
 LoadSpokeConfig() {
     typeset -i i
     for ((i = 1; i <= spokeCount; i++)); do
         typeset kcFile="${SHARED_DIR}/managed-cluster-kubeconfig-${i}"
         typeset nameFile="${SHARED_DIR}/managed-cluster-name-${i}"
 
-        [ -f "${kcFile}" ]
-        [ -f "${nameFile}" ]
+        if [[ ! -f "${kcFile}" || ! -f "${nameFile}" ]]; then
+            : "LoadSpokeConfig: missing files for spoke ${i} — skipping"
+            return 1
+        fi
 
         spokeKubeconfigsArr+=("${kcFile}")
         spokeNamesArr+=("$(< "${nameFile}")")
@@ -126,7 +132,7 @@ DiagnoseFirewallInterCluster() {
 
     KUBECONFIG="${mergedKc}" "${subctlBin}" diagnose firewall inter-cluster \
         --context   "${name1}-admin" \
-        --tocontext "${name2}-admin" \
+        --remotecontext "${name2}-admin" \
         > "${outFile}" 2>&1 || true
 
     rm -f "${mergedKc}"
@@ -162,17 +168,33 @@ GatherSubmariner() {
 }
 
 # --- Main ---
-command -v oc     1>/dev/null
-command -v curl   1>/dev/null
-command -v jq     1>/dev/null
 
-[[ -n "${SHARED_DIR}" ]]
-[[ -n "${ARTIFACT_DIR}" ]]
+# Precondition checks — warn and skip rather than abort (diagnostic-only step).
+typeset _diagSkip=false
 
-mkdir -p "${diagDir}/gather"
+for _cmd in oc curl jq; do
+    command -v "${_cmd}" 1>/dev/null || { : "WARNING: ${_cmd} not found — skipping diagnostics"; _diagSkip=true; }
+done
 
-LoadSpokeConfig
-InstallSubctl
+if [[ -z "${SHARED_DIR:-}" || -z "${ARTIFACT_DIR:-}" ]]; then
+    : "WARNING: SHARED_DIR or ARTIFACT_DIR unset — skipping diagnostics"
+    _diagSkip=true
+fi
+
+mkdir -p "${diagDir}/gather" || _diagSkip=true
+
+if [[ "${_diagSkip}" != "true" ]]; then
+    LoadSpokeConfig || { : "WARNING: LoadSpokeConfig failed — skipping diagnostics"; _diagSkip=true; }
+fi
+
+if [[ "${_diagSkip}" != "true" ]]; then
+    InstallSubctl || { : "WARNING: InstallSubctl failed — skipping diagnostics"; _diagSkip=true; }
+fi
+
+if [[ "${_diagSkip}" == "true" ]]; then
+    : "Submariner diagnostics skipped due to setup failure — see warnings above"
+    exit 0
+fi
 
 : "=== subctl show all (per spoke) ==="
 typeset -i i

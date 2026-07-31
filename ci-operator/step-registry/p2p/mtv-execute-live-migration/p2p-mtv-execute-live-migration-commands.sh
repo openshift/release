@@ -11,8 +11,12 @@ eval "$(
 )"; EnsureReqs jq
 
 if [[ -n "${SHARED_DIR}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    # proxy-conf.sh may contain credentials — disable xtrace while sourcing.
+    [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+    [[ "${_wasTracing}" == "true" ]] && set -x || true
 fi
 
 [[ -n "${KUBECONFIG}" ]]
@@ -318,9 +322,10 @@ MaybePreflightSubmarinerNoGlobalnet() {
 GetSourceVirtLauncherPod() {
     typeset podName
 
+    # Use jq to avoid "array index out of bounds" stderr from oc jsonpath on empty lists.
     podName="$(SourceOc get pods -n "${MTV_TEST_VM_NAMESPACE}" \
         -l "kubevirt.io=virt-launcher,kubevirt.io/domain=${MTV_TEST_VM_NAME}" \
-        -o jsonpath='{.items[0].metadata.name}' || true)"
+        -o json | jq -r 'first(.items[].metadata.name) // empty' || true)"
     [[ -n "${podName}" ]] && printf '%s' "${podName}" && return 0
 
     podName="$(SourceOc get pods -n "${MTV_TEST_VM_NAMESPACE}" -o json \
