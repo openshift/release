@@ -1,0 +1,55 @@
+ref:
+  as: acm-interop-p2p-submariner-snat-fix
+  from: cli
+  commands: acm-interop-p2p-submariner-snat-fix-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  timeout: 40m0s
+  grace_period: 5m0s
+  env:
+    - name: ACM_SPOKE_CLUSTER_COUNT
+      default: "2"
+      documentation: |-
+        Number of ACM spoke clusters to apply the SNAT workaround to.
+    - name: SUBMARINER_SNAT_FIX_SETTLE_SECS
+      default: "30"
+      documentation: |-
+        Seconds to wait after the DaemonSet rollouts complete for OVN to
+        converge routes across all nodes. Increase if subsequent subctl verify
+        still observes connectivity failures due to slow OVN reconvergence.
+  documentation: |-
+    Applies the official Submariner SNAT workaround for OVN-Kubernetes IC mode
+    to every spoke cluster (ACM-22805, ACM-24786, ACM-36927).
+
+    Ref: https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.13/html/release_notes/acm-release-notes#source-ip-ocp-ovnk
+
+    Root cause: OVN-K's nftables mgmtport-snat chain rewrites the source IP of
+    cross-cluster traffic, breaking return routing on non-gateway nodes.
+    Submariner's route agent is not managing SNAT by default, so OVN-K's rules
+    take precedence and corrupt the return path.
+
+    What this step does (idempotent, safe to re-run):
+      1. Creates submariner-global ConfigMap (enable-snat-handler=true) in
+         submariner-operator namespace on each spoke. This tells Submariner's
+         route agent to own SNAT rule management via nftables, preventing OVN-K
+         from overwriting them.
+      2. Deletes all submariner-routeagent pods (--wait=false). Route-agent only
+         reads the ConfigMap at startup; the rolling restart picks it up.
+      3. Deletes all ovnkube-node pods (--wait=false). Forces OVN to re-read
+         Submariner's NonGatewayRoute annotations on each node, repopulating
+         missing routes in the OVN cluster router for non-gateway nodes.
+      4. Waits up to 5m for submariner-routeagent rollout and up to 10m for
+         ovnkube-node rollout (timeouts are non-fatal; job continues either way).
+      5. Sleeps SUBMARINER_SNAT_FIX_SETTLE_SECS (default 30) for OVN convergence.
+
+    Must run after acm-interop-p2p-submariner-install (broker-join + verify)
+    and before any MTV/CCLM migration steps.
+
+    Applies to: Submariner v0.24 on OCP 4.22+ with OVN-Kubernetes network plugin.
+
+    Env vars consumed:
+      ACM_SPOKE_CLUSTER_COUNT          - number of spoke clusters (default: 2)
+      SUBMARINER_SNAT_FIX_SETTLE_SECS  - OVN convergence settle time (default: 30)
+      SHARED_DIR                       - shared artifact directory
