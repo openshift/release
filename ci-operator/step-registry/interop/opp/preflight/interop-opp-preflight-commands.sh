@@ -115,7 +115,7 @@ check_api_deprecations() {
 
     # Check all versions up to and including the target
     for minor in "${!REMOVED_APIS[@]}"; do
-        if (( minor <= target_minor )); then
+        if (( target_major > 4 || minor <= target_minor )); then
             for api_entry in ${REMOVED_APIS[${minor}]}; do
                 local api_version api_kind
                 api_kind="${api_entry##*/}"
