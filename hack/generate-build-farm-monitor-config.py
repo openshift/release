@@ -19,9 +19,11 @@ CONSOLE_URLS = {
     "build09": "https://console-openshift-console.apps.build09.ci.devcluster.openshift.com",
     "build10": "https://console-openshift-console.apps.build10.ci.devcluster.openshift.com",
     "build11": "https://console-openshift-console.apps.build11.ci.devcluster.openshift.com",
+    "build12": "https://console-openshift-console.apps.build12.ci.devcluster.openshift.com",
+    "build13": "https://console.build13.ci.openshift.org",
 }
 
-BUILD_ORDER = [f"build{i:02d}" for i in range(1, 13)]
+BUILD_ORDER = [f"build{i:02d}" for i in range(1, 14)]
 
 
 def splice(path, begin, end, body):
