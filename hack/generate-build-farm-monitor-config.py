@@ -89,7 +89,7 @@ def monitor_entry(cluster_name: str, console_url: str) -> str:
           step: "1m"
           severity: "Degraded"
         - query: "kube_deployment_status_replicas_available{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}} > 0 or absent(kube_deployment_status_replicas_available{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}})"
-          failure_query: "kube_deployment_status_replicas{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}}"
+          failure_query: "kube_deployment_status_replicas_available{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}}"
           duration: "5m"
           step: "30s"
           severity: "Degraded"
