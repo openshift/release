@@ -22,6 +22,9 @@ backplane_proxy_url=""
 if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   echo "=== OCM backplane login (Hive) ==="
   cred_dir="${OCM_FVT_BACKPLANE_CREDENTIALS_DIR:-/usr/local/cs-qe-credentials}"
+  # Disable tracing while reading backplane client credentials.
+  [[ $- == *x* ]] && WAS_TRACING_BP=true || WAS_TRACING_BP=false
+  set +x
   backplane_client_id="${BACKPLANE_CLIENT_ID:-}"
   backplane_client_secret="${BACKPLANE_CLIENT_SECRET:-}"
   if [[ -z "${backplane_client_id}" && -f "${cred_dir}/backplane_client_id" ]]; then
@@ -30,13 +33,14 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   if [[ -z "${backplane_client_secret}" && -f "${cred_dir}/backplane_client_secret" ]]; then
     backplane_client_secret="$(cat "${cred_dir}/backplane_client_secret")"
   fi
+  $WAS_TRACING_BP && set -x
   if [[ -z "${backplane_client_id}" || -z "${backplane_client_secret}" ]]; then
     echo "ERROR: OCM_FVT_USE_BACKPLANE=true but backplane client credentials are missing" >&2
     echo "Expected BACKPLANE_CLIENT_ID/SECRET env or ${cred_dir}/backplane_client_{id,secret}" >&2
     exit 1
   fi
 
-  # hivei01ue1 OCM cluster id (integration Hive). Override via env if needed.
+  # Defaults match rosa-e2e-ocm-fvt*-ref.yaml; override via job/workflow env if needed.
   backplane_cluster_id="${OCM_FVT_BACKPLANE_CLUSTER_ID:-1g268u7pp694gj152nj16me4sv615lpv}"
   backplane_ocm_url="${OCM_FVT_BACKPLANE_OCM_URL:-https://api.openshift.com}"
   backplane_proxy_url="${OCM_FVT_BACKPLANE_PROXY_URL:-http://squid.corp.redhat.com:3128}"
@@ -62,11 +66,15 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   mkdir -p "${HOME}/.config/backplane"
   printf '{"proxy-url":"%s"}\n' "${backplane_proxy_url}" > "${HOME}/.config/backplane/config.json"
 
+  # Disable tracing due to client-secret handling on ocm login.
+  [[ $- == *x* ]] && WAS_TRACING_BP=true || WAS_TRACING_BP=false
+  set +x
   ocm login \
     --client-id="${backplane_client_id}" \
     --client-secret="${backplane_client_secret}" \
     --url="${backplane_ocm_url}"
   ocm-backplane login "${backplane_cluster_id}"
+  $WAS_TRACING_BP && set -x
   # Warm elevate path (RBAC for Hive/AAO reads); kubeconfig exec plugin uses the session.
   ocm-backplane elevate "${backplane_elevate_reason}" -- true
 
@@ -99,8 +107,12 @@ if [[ -n "${hive_kubeconfig}" ]]; then
   # Current ocmci image expects kubeconfig YAML content in the env var.
   # Pass via --env (preserves newlines); env-file cannot. Path mount is
   # available for newer ocm-backend-tests that accept a file path.
+  # Disable tracing while loading kubeconfig content into the env var.
+  [[ $- == *x* ]] && WAS_TRACING_BP=true || WAS_TRACING_BP=false
+  set +x
   export AWS_ACCOUNT_OPERATOR_KUBECONFIG
   AWS_ACCOUNT_OPERATOR_KUBECONFIG="$(cat "${hive_kubeconfig}")"
+  $WAS_TRACING_BP && set -x
   echo "PATH=/usr/local/backplane-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >> "${podman_env_file}"
   echo "HOME=/home/ci-user" >> "${podman_env_file}"
   echo "HTTPS_PROXY=${backplane_proxy_url}" >> "${podman_env_file}"
