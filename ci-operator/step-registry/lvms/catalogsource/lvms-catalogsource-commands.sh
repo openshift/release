@@ -592,13 +592,8 @@ function main {
 
 	# Extract source commit from catalog image for integration test builds.
 	# Fail hard if vcs-ref label is missing — wrong commit means meaningless test results.
-	local commit image_info_flags=""
-	if [[ "$DISCONNECTED" == "true" ]]; then
-		image_info_flags="--insecure -a /tmp/new-dockerconfigjson"
-	else
-		image_info_flags="-a ${CLUSTER_PROFILE_DIR}/pull-secret"
-	fi
-	commit=$(oc image info ${image_info_flags} --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+	local commit
+	commit=$(oc image info --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
 		| jq -r '.config.config.Labels["vcs-ref"]')
 	if [[ -z "${commit}" || "${commit}" == "null" ]]; then
 		echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
