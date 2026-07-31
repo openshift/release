@@ -1,0 +1,31 @@
+ref:
+  as: vcf-migration-execute
+  from: upi-installer
+  commands: vcf-migration-execute-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 180m0s
+  env:
+  - name: VCF_MIGRATION_TIMEOUT
+    default: "9600"
+    documentation: Timeout in seconds for the migration to reach Ready=True.
+  credentials:
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-ci
+    mount_path: /var/run/vault/vsphere-ibmcloud-ci
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-config
+    mount_path: /var/run/vault/vsphere-ibmcloud-config
+  - namespace: test-credentials
+    name: ci-ibmcloud
+    mount_path: /var/run/vault/ibmcloud
+  - namespace: test-credentials
+    name: ci-ibmcloud-2
+    mount_path: /var/run/vault/ibmcloud-2
+  documentation: |-
+    Imports RHCOS OVA templates into target vCenter datacenters if not already
+    present, creates the migration CR, waits for the controller to move through
+    each migration condition, and emits debug information if the migration stalls
+    or fails.
