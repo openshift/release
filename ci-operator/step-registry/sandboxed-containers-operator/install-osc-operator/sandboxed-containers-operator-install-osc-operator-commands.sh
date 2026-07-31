@@ -81,7 +81,7 @@ function exit_handler() {
     echo ">>> Namespace status:"
     oc get all -n "${OSC_NAMESPACE}" || true
     echo ">>> Operator logs:"
-    oc logs -n "${OSC_NAMESPACE}" -l name=controller-manager --tail=50 || true
+    oc logs -n "${OSC_NAMESPACE}" deployment/controller-manager --tail=50 || true
   fi
 }
 trap 'exit_handler' EXIT
@@ -444,11 +444,11 @@ function wait_for_operator() {
     return 1
   fi
 
-  # Stage 6: Wait for controller-manager pods to be Ready (900s)
-  if ! wait_until "controller-manager pods Ready" 900 5 \
-    "oc get pods -n '${OSC_NAMESPACE}' -l name=controller-manager -o jsonpath='{.items[0].status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q 'True'"; then
+  # Stage 6: Wait for controller-manager rollout to complete (900s)
+  if ! wait_until "controller-manager rollout complete" 900 5 \
+    "oc rollout status deployment/controller-manager -n '${OSC_NAMESPACE}' --timeout=0 2>/dev/null | grep -q 'successfully rolled out'"; then
     oc get pods -n "${OSC_NAMESPACE}" || true
-    oc describe pods -n "${OSC_NAMESPACE}" -l name=controller-manager | tail -50 || true
+    oc describe deployment -n "${OSC_NAMESPACE}" controller-manager | tail -30 || true
     return 1
   fi
 
