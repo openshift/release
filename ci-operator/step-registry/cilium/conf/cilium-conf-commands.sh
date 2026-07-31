@@ -110,7 +110,7 @@ cilium install \
     --set hubble.enabled="${HUBBLE}" \
     --set tunnelPort="${TUNNEL_PORT}" \
     --set clusterHealthPort=9940 \
-    --set socketLB.enabled=true \
+    --set socketLB.enabled=false \
     > "${WORKDIR}/cilium-install-all.yaml"
 
 # Split the multi-document YAML into individual manifest files
