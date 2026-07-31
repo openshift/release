@@ -436,16 +436,16 @@ function wait_for_operator() {
   csv_name=$(oc get csv -n "${OSC_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
   echo ">>> CSV ${csv_name} is Succeeded"
 
-  # Stage 5: Wait for controller-manager Deployment to be Available (600s)
-  if ! wait_until "controller-manager deployment Available" 600 5 \
+  # Stage 5: Wait for controller-manager Deployment to be Available (900s)
+  if ! wait_until "controller-manager deployment Available" 900 5 \
     "oc get deployment -n '${OSC_NAMESPACE}' controller-manager -o jsonpath='{.status.conditions[?(@.type==\"Available\")].status}' 2>/dev/null | grep -q 'True'"; then
     oc get deployment -n "${OSC_NAMESPACE}" || true
     oc get pods -n "${OSC_NAMESPACE}" || true
     return 1
   fi
 
-  # Stage 6: Wait for controller-manager pods to be Ready (600s)
-  if ! wait_until "controller-manager pods Ready" 600 5 \
+  # Stage 6: Wait for controller-manager pods to be Ready (900s)
+  if ! wait_until "controller-manager pods Ready" 900 5 \
     "oc get pods -n '${OSC_NAMESPACE}' -l name=controller-manager -o jsonpath='{.items[0].status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q 'True'"; then
     oc get pods -n "${OSC_NAMESPACE}" || true
     oc describe pods -n "${OSC_NAMESPACE}" -l name=controller-manager | tail -50 || true
