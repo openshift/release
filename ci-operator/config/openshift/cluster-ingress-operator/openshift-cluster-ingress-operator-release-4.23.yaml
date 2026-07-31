@@ -310,6 +310,16 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - as: patch-gateway
+      cli: latest
+      commands: oc patch gateway ${GATEWAY_NAME} -n openshift-ingress --type=json
+        -p '[{"op":"remove","path":"/spec/listeners/0/hostname"}]'
+      env:
+      - name: GATEWAY_NAME
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - ref: tls-scanner-run
     workflow: ipi-aws
 - always_run: false
