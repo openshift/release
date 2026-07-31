@@ -44,5 +44,13 @@ rc=$?
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
     cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 fi
+<<<<<<< HEAD
+=======
+
+
+if [[ -f /home/krkn/kraken/kraken.report.pdf ]]; then
+  cp /home/krkn/kraken/kraken.report.pdf ${ARTIFACT_DIR}/kraken.report.pdf
+fi
+>>>>>>> 382e38da7d1 (adding saving artifact)
 echo "Finished running network chaos"
 echo "Return code: $rc"
