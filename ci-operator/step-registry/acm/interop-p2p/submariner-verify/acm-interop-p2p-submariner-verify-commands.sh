@@ -79,6 +79,95 @@ LoadSpokeConfig() {
     true
 }
 
+# ── EnsureNonGatewayOvnRoutes — inject missing OVN cluster-router routes ──────
+# Belt-and-suspenders repeat of the same function in broker-join.
+# Submariner's routeagent in OCP 4.22 OVN-K IC mode only programs spoke-CIDR
+# routes on the gateway node's local OVN NB DB.  Non-gateway nodes have NO
+# ovn_cluster_router routes for remote CIDRs, causing Ncat: TIMEOUT in
+# subctl verify connectivity tests even when tunnels show "connected".
+# Called here after WaitForConnectionsEstablished so the tunnel state is
+# confirmed stable before the injection.
+EnsureNonGatewayOvnRoutes() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+
+    : "EnsureNonGatewayOvnRoutes: injecting missing OVN routes on non-gateway nodes of '${clusterName}'"
+
+    typeset -i ngrCount=0 ngrWait=0
+    until (( ngrCount > 0 || ngrWait >= 120 )); do
+        ngrCount=$(KUBECONFIG="${kubeconfig}" oc get nongatewayroutes.submariner.io \
+            -n submariner-operator --no-headers 2>/dev/null | wc -l || true)
+        (( ngrCount > 0 )) && break
+        sleep 10
+        (( ngrWait += 10 ))
+        : "  Waiting for NonGatewayRoute CRs on '${clusterName}' (${ngrWait}/120 s)"
+    done
+
+    if (( ngrCount == 0 )); then
+        : "  No NonGatewayRoute CRs on '${clusterName}' after 120 s — skipping"
+        return 0
+    fi
+
+    typeset nextHop ngrJson
+    typeset -a remoteCIDRs=()
+    ngrJson=$(KUBECONFIG="${kubeconfig}" oc get nongatewayroutes.submariner.io \
+        -n submariner-operator -o json 2>/dev/null)
+    nextHop=$(echo "${ngrJson}" | jq -r '.items[0].spec.nextHops[0] // empty')
+    mapfile -t remoteCIDRs < <(
+        echo "${ngrJson}" | jq -r '.items[].spec.remoteCIDRs[]' 2>/dev/null | sort -u || true
+    )
+
+    if [[ -z "${nextHop}" ]] || (( ${#remoteCIDRs[@]} == 0 )); then
+        : "  NGR data incomplete (nextHop='${nextHop}', CIDRs=${#remoteCIDRs[@]}) — skipping"
+        return 0
+    fi
+
+    : "  Remote CIDRs: ${remoteCIDRs[*]}"
+    : "  IC transit next-hop: ${nextHop}"
+
+    typeset -a nonGwNodes=()
+    mapfile -t nonGwNodes < <(
+        KUBECONFIG="${kubeconfig}" oc get nodes \
+            -l '!submariner.io/gateway' \
+            -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true
+    )
+
+    (( ${#nonGwNodes[@]} == 0 )) && { : "  No non-gateway nodes — nothing to patch"; return 0; }
+
+    typeset node ovnkubePod cidr addOk
+    for node in "${nonGwNodes[@]}"; do
+        ovnkubePod=$(KUBECONFIG="${kubeconfig}" oc get pod \
+            -n openshift-ovn-kubernetes \
+            -l app=ovnkube-node \
+            --field-selector "spec.nodeName=${node}" \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+        [[ -z "${ovnkubePod}" ]] && { : "  No ovnkube-node pod on '${node}'"; continue; }
+
+        for cidr in "${remoteCIDRs[@]}"; do
+            : "  ${node}: ovn_cluster_router ${cidr} → ${nextHop}"
+            addOk=false
+            if KUBECONFIG="${kubeconfig}" oc exec \
+                    -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                    -c ovnkube-controller -- \
+                    ovn-nbctl --no-leader-only --may-exist lr-route-add \
+                    ovn_cluster_router "${cidr}" "${nextHop}" 2>/dev/null; then
+                addOk=true
+            elif KUBECONFIG="${kubeconfig}" oc exec \
+                    -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                    -c ovnkube-node -- \
+                    ovn-nbctl --no-leader-only --may-exist lr-route-add \
+                    ovn_cluster_router "${cidr}" "${nextHop}" 2>/dev/null; then
+                addOk=true
+            fi
+            [[ "${addOk}" != "true" ]] && \
+                : "  WARNING: could not add OVN route ${cidr} on '${node}'"
+        done
+    done
+
+    : "EnsureNonGatewayOvnRoutes: done for '${clusterName}'"
+}
+
 # ── ShowConnections — display gateway tunnel status ───────────────────────────
 ShowConnections() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
@@ -629,6 +718,21 @@ typeset -i submarinerStepRc=0
 
     # ── Wait for all tunnels to be connected ──────────────────────────────────
     WaitForConnectionsEstablished 600 || _stepFailed=1
+
+    # ── Re-inject missing OVN cluster-router routes (belt-and-suspenders) ─────
+    # OCP 4.22 OVN-K IC mode: each node has its own local OVN NB DB.  The
+    # routeagent only programs spoke-CIDR routes on the gateway node's DB;
+    # worker nodes have no routes for remote CIDRs, causing Ncat: TIMEOUT.
+    # This mirrors the injection done in broker-join and ensures the routes are
+    # present immediately before subctl verify runs, in case anything cleared
+    # them between steps (routeagent reconciliation, pod restarts, etc.).
+    for ((i = 0; i < spokeCount; i++)); do
+        EnsureNonGatewayOvnRoutes \
+            "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" || true
+    done
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        EnsureNonGatewayOvnRoutes "${KUBECONFIG}" "hub" || true
+    fi
 
     # ── Apply CCLM sync ingress NetworkPolicy (after tunnels confirmed up) ────
     # Best-effort: a missing openshift-cnv namespace must not block verification.
