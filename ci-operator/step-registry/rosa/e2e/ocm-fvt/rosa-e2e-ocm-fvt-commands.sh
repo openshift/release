@@ -66,6 +66,15 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   chmod 0755 "${backplane_bin_dir}/ocm-backplane"
   rm -f "${bp_tar}"
 
+  # nested-podman image has no oc; ocm-backplane login/elevate invoke it.
+  echo "Installing oc CLI into ${backplane_bin_dir}"
+  oc_tar="$(mktemp /tmp/openshift-client.XXXXXX.tar.gz)"
+  curl -sSL -o "${oc_tar}" \
+    "https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz"
+  tar -xzf "${oc_tar}" -C "${backplane_bin_dir}" oc
+  chmod 0755 "${backplane_bin_dir}/oc"
+  rm -f "${oc_tar}"
+
   mkdir -p "${HOME}/.config/backplane"
   printf '{"proxy-url":"%s"}\n' "${backplane_proxy_url}" > "${HOME}/.config/backplane/config.json"
 
