@@ -387,7 +387,10 @@ VerifyConnectivity() {
 
     KUBECONFIG="${kc1Renamed}:${kc2Renamed}" oc config view --flatten -o json > "${mergedKc}"
 
-    KUBECONFIG="${mergedKc}" "${subctlBin}" verify \
+    # Bound subctl verify to 35m so it exits before the 45m step timeout.
+    # Without this, each failing TCP test takes ~7m and the process is killed
+    # externally (exit 127) before the SUBMARINER_VERIFY_DEBUG_MODE handler runs.
+    KUBECONFIG="${mergedKc}" timeout 35m "${subctlBin}" verify \
         --context   "${ctx1}" \
         --tocontext "${ctx2}" \
         --only connectivity,service-discovery \
