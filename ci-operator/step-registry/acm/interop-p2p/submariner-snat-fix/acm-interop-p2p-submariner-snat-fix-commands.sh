@@ -29,6 +29,13 @@
 
 set -uo pipefail; shopt -s inherit_errexit
 
+# ── Bootstrap: ensure required tools are present ─────────────────────────────
+eval "$(
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+)"; EnsureReqs jq
+
 # ── Constants ─────────────────────────────────────────────────────────────────
 typeset -i spokeCount="${ACM_SPOKE_CLUSTER_COUNT}"
 typeset -i settleSecs="${SUBMARINER_SNAT_FIX_SETTLE_SECS}"
@@ -52,10 +59,30 @@ LoadSpokeConfig() {
     true
 }
 
-# ── GetRemoteSubnets — discover the other spokes' pod+service CIDRs ──────────
-# Reads Submariner Endpoint CRs from the given spoke's submariner-operator
-# namespace, filters out the local cluster, and prints each remote subnet on
-# its own line.
+# ── GetLocalClusterID — find the cluster_id of this spoke's own endpoint ─────
+# Matches on the gateway node's short hostname (e.g. "ip-10-1-99-33") which
+# Submariner stores in spec.hostname of the local Endpoint CR.
+GetLocalClusterID() {
+    typeset kubeconfig="${1:?}"
+
+    typeset gwNode
+    gwNode="$(KUBECONFIG="${kubeconfig}" oc get nodes \
+        -l submariner.io/gateway=true \
+        -o jsonpath='{.items[0].metadata.name}')"
+
+    # Strip domain suffix: "ip-10-1-99-33.us-east-2.compute.internal" → "ip-10-1-99-33"
+    typeset gwShort="${gwNode%%.*}"
+
+    KUBECONFIG="${kubeconfig}" oc get endpoints.submariner.io \
+        -n submariner-operator \
+        -o json \
+    | jq -r --arg host "${gwShort}" \
+        '.items[] | select(.spec.hostname == $host) | .spec.cluster_id' \
+    | head -1
+}
+
+# ── GetRemoteSubnets — list every subnet from non-local endpoints ─────────────
+# Output: one subnet per line (e.g. "10.132.0.0/14\n172.31.0.0/16")
 GetRemoteSubnets() {
     typeset kubeconfig="${1:?}"
     typeset localClusterID="${2:?}"
@@ -69,27 +96,10 @@ GetRemoteSubnets() {
          | .spec.subnets[]'
 }
 
-# ── GetLocalClusterID — read the cluster_id from the local Endpoint CR ───────
-GetLocalClusterID() {
-    typeset kubeconfig="${1:?}"
-
-    KUBECONFIG="${kubeconfig}" oc get endpoints.submariner.io \
-        -n submariner-operator \
-        -o json \
-    | jq -r --arg gw "$(KUBECONFIG="${kubeconfig}" \
-            oc get nodes -l submariner.io/gateway=true \
-            -o jsonpath='{.items[0].metadata.name}')" \
-        '.items[]
-         | select(.spec.private_ip == ($gw | split(".") | map(tonumber) | @sh)
-                  or (.metadata.name | test($gw | split(".")[0])))
-         | .spec.cluster_id' \
-    | head -1
-}
-
 # ── InjectNftablesOnGateway — add remote subnets to the SNAT exemption set ───
 # Uses "oc debug node" to run nft on the gateway node's host network.
-# The nftables table family is "inet" (confirmed on OCP 4.22; the
-# mgmtport-no-snat-subnets-v4 set lives in family inet, table ovn-kubernetes).
+# Family is "inet" (confirmed on OCP 4.22; mgmtport-no-snat-subnets-v4 lives
+# in family inet, table ovn-kubernetes).
 InjectNftablesOnGateway() {
     typeset kubeconfig="${1:?}"
     typeset gatewayNode="${2:?}"
@@ -116,29 +126,26 @@ ApplySnatFix() {
 
     : "ApplySnatFix: spoke='${spokeName}'"
 
-    # Determine this spoke's own cluster ID from its local Endpoint CRs.
+    # Determine this spoke's own cluster ID from its gateway node hostname.
     typeset localClusterID
-    localClusterID="$(KUBECONFIG="${kubeconfig}" \
-        oc get endpoints.submariner.io \
-        -n submariner-operator \
-        -o json \
-        | jq -r '.items[] | select(.spec.private_ip != null)
-                  | .spec.cluster_id' \
-        | sort -u \
-        | grep "${spokeName}" \
-        | head -1)"
+    localClusterID="$(GetLocalClusterID "${kubeconfig}")"
 
     if [[ -z "${localClusterID}" ]]; then
-        # Fallback: derive from the endpoint name (always contains cluster ID)
-        localClusterID="$(KUBECONFIG="${kubeconfig}" \
-            oc get endpoints.submariner.io \
+        # Fallback: match cluster_id by spoke name (cluster names contain spokeName)
+        localClusterID="$(KUBECONFIG="${kubeconfig}" oc get endpoints.submariner.io \
             -n submariner-operator \
-            -o jsonpath='{.items[0].spec.cluster_id}')"
+            -o jsonpath='{range .items[*]}{.spec.cluster_id}{"\n"}{end}' \
+            | grep "${spokeName}" | head -1)"
+    fi
+
+    if [[ -z "${localClusterID}" ]]; then
+        : "ApplySnatFix: could not determine localClusterID for '${spokeName}' — skipping"
+        return 0
     fi
 
     : "ApplySnatFix: localClusterID='${localClusterID}'"
 
-    # Collect remote subnets across all remote spokes (newline-separated).
+    # Collect remote subnets (newline-separated).
     typeset remoteSubnetList
     remoteSubnetList="$(GetRemoteSubnets "${kubeconfig}" "${localClusterID}")"
 
@@ -152,11 +159,9 @@ ApplySnatFix() {
     nftElements="$(echo "${remoteSubnetList}" | paste -sd ',' - | sed 's/,/, /g')"
     : "ApplySnatFix: remote subnets for injection: ${nftElements}"
 
-    # Find ALL gateway nodes on this spoke (there may be more than one
-    # in a HA Submariner setup, though typically only one is active).
-    typeset gatewayNodes
-    mapfile -t gatewayNodes < <(KUBECONFIG="${kubeconfig}" \
-        oc get nodes \
+    # Find ALL gateway nodes on this spoke.
+    typeset -a gatewayNodes
+    mapfile -t gatewayNodes < <(KUBECONFIG="${kubeconfig}" oc get nodes \
         -l submariner.io/gateway=true \
         -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
@@ -170,8 +175,6 @@ ApplySnatFix() {
         InjectNftablesOnGateway "${kubeconfig}" "${gwNode}" "${nftElements}"
     done
 
-    # Brief settle so the nftables rules take effect before the caller
-    # runs subctl verify or starts migration.
     sleep "${settleSecs}"
 
     : "ApplySnatFix: '${spokeName}' complete"
