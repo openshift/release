@@ -14,43 +14,45 @@ ref:
       documentation: |-
         Number of ACM spoke clusters to apply the SNAT workaround to.
     - name: SUBMARINER_SNAT_FIX_SETTLE_SECS
-      default: "60"
+      default: "10"
       documentation: |-
-        Seconds to wait after routeagent rollout completes for its nftables
-        exemption rules to propagate across all nodes. 30s was insufficient on
-        OCP 4.22 nightly; raised to 60s as baseline.
+        Seconds to wait after nftables injection for rules to take effect before
+        the next step runs subctl verify or starts migration. Kept short because
+        no pod restarts are involved; nft changes take effect immediately.
   documentation: |-
-    Applies the official Submariner SNAT workaround for OVN-Kubernetes IC mode
-    to every spoke cluster (ACM-22805, ACM-24786, ACM-36927).
-
-    Ref: https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.13/html/release_notes/acm-release-notes#source-ip-ocp-ovnk
+    Fixes the OVN-Kubernetes mgmtport-snat SNAT issue that breaks Submariner
+    cross-cluster connectivity on OCP 4.22 nightly (ACM-22805, ACM-24786,
+    ACM-36927).
 
     Root cause: OVN-K's nftables mgmtport-snat chain rewrites the source IP of
-    cross-cluster traffic, breaking return routing. Submariner's route agent is
-    not managing SNAT by default, so OVN-K's rules corrupt the return path.
+    cross-cluster traffic arriving at a spoke's gateway node.  The routeagent
+    sets k8s.ovn.org/node-ingress-snat-exclude-subnets on the gateway Node but
+    OVN-K on OCP 4.22 nightly does NOT reconcile that annotation into the
+    mgmtport-no-snat-subnets-v4 nftables set, leaving it empty.
 
     What this step does (idempotent, safe to re-run):
-      1. Creates submariner-global ConfigMap (enable-snat-handler=true) in
-         submariner-operator namespace on each spoke. This tells Submariner's
-         route agent to install nftables rules that exempt cross-cluster traffic
-         from OVN-K SNAT.
-      2. Deletes all submariner-routeagent pods (--wait=false). Route-agent only
-         reads the ConfigMap at startup; the rolling restart picks it up.
-      3. Waits up to 5m for routeagent rollout (non-fatal timeout; job continues).
-      4. Sleeps SUBMARINER_SNAT_FIX_SETTLE_SECS (default 60) for nftables rules
-         to propagate across all nodes.
+      1. For each spoke, discovers the OTHER spokes' pod+service CIDRs by
+         reading Submariner Endpoint CRs from the local submariner-operator
+         namespace.
+      2. Uses "oc debug node" to directly inject those CIDRs into the
+         mgmtport-no-snat-subnets-v4 nftables set (family: inet, table:
+         ovn-kubernetes) on every gateway node of that spoke.
+      3. Sleeps SUBMARINER_SNAT_FIX_SETTLE_SECS (default 10) for the rules
+         to take effect.
 
-    NOTE: ovnkube-node is intentionally NOT restarted. The official ACM docs
-    only require route-agent restart. Restarting ovnkube-node re-programs all
-    OVN flows after routeagent and can overwrite the nftables exemption on
-    OCP 4.22+, negating the fix.
+    NOTE: The ConfigMap (enable-snat-handler) + routeagent-restart approach
+    is intentionally NOT used. Restarting submariner-routeagent re-publishes
+    Endpoint CRs on the broker; remote gateways detect the change and restart
+    NAT discovery (UDP/4800), which can break the IPsec tunnel for an extended
+    period in multi-VPC AWS environments. Direct nftables injection avoids
+    touching the Submariner control plane entirely.
 
     Must run after acm-interop-p2p-submariner-broker-join and before
     acm-interop-p2p-submariner-verify.
 
-    Applies to: ACM 2.13+ with OVN-Kubernetes network plugin.
+    Applies to: ACM 2.13+ with OVN-Kubernetes network plugin on OCP 4.18+.
 
     Env vars consumed:
       ACM_SPOKE_CLUSTER_COUNT          - number of spoke clusters (default: 2)
-      SUBMARINER_SNAT_FIX_SETTLE_SECS  - nftables propagation settle time (default: 60)
+      SUBMARINER_SNAT_FIX_SETTLE_SECS  - post-injection settle time (default: 10)
       SHARED_DIR                       - shared artifact directory
