@@ -18,17 +18,38 @@ typeset -a spokeKubeconfigsArr=()
 typeset -a spokeNamesArr=()
 
 # InstallSubctl — install subctl to /tmp/bin/ at step runtime.
+# Downloads the pinned release tarball from GitHub, verifies its SHA-256 checksum,
+# then extracts the binary.  Uses SUBCTL_VERSION (set in ref.yaml env) so the
+# version can be bumped without touching the script.
+#
 # WHY not SHARED_DIR: large binaries cause CI operator "Request entity too large"
 # when serialising SHARED_DIR into a Kubernetes Secret between steps (3 MB limit).
-# Returns 1 (non-fatal) if installation fails; callers check exit status.
+# Returns 1 (non-fatal) if any step fails; callers check exit status.
 InstallSubctl() {
     mkdir -p /tmp/bin || return 1
     if [[ -x "${subctlBin}" ]]; then
         return 0
     fi
-    curl -Ls https://get.submariner.io | bash || return 1
-    cp "${HOME}/.local/bin/subctl" "${subctlBin}" || return 1
-    chmod +x "${subctlBin}" || return 1
+
+    typeset version="${SUBCTL_VERSION:?SUBCTL_VERSION must be set}"
+    typeset arch="linux-amd64"
+    typeset tarball="subctl-v${version}-${arch}.tar.xz"
+    typeset baseURL="https://github.com/submariner-io/subctl/releases/download/v${version}"
+    typeset workDir
+    workDir="$(mktemp -d /tmp/subctl-install-XXXXXX)" || return 1
+
+    (
+        cd "${workDir}" || return 1
+        curl -fsSL -o "${tarball}"        "${baseURL}/${tarball}"        || return 1
+        curl -fsSL -o "${tarball}.sha256" "${baseURL}/${tarball}.sha256" || return 1
+        # Verify integrity before executing anything from the archive.
+        sha256sum --check "${tarball}.sha256" || return 1
+        tar -xJf "${tarball}" "subctl-v${version}-${arch}/subctl"       || return 1
+        cp "subctl-v${version}-${arch}/subctl" "${subctlBin}"           || return 1
+        chmod +x "${subctlBin}"                                          || return 1
+    ) || { rm -rf "${workDir}"; return 1; }
+
+    rm -rf "${workDir}"
     true
 }
 

@@ -6,16 +6,19 @@
 # Ref: https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.13/html/release_notes/acm-release-notes#source-ip-ocp-ovnk
 #
 # Root cause: OVN-K nftables mgmtport-snat chain rewrites the source IP of
-# cross-cluster traffic, breaking return routing on non-gateway nodes.
+# cross-cluster traffic, breaking return routing.
 #
-# Workaround:
+# Workaround (per official ACM docs):
 #   1. Create submariner-global ConfigMap with enable-snat-handler=true
-#      Tells Submariner's route agent to manage SNAT itself (nftables rules)
-#      instead of relying on OVN-K.
+#      Tells Submariner's route agent to install nftables rules that exempt
+#      cross-cluster traffic from OVN-K's SNAT.
 #   2. Restart submariner-routeagent DaemonSet — only reads ConfigMap at startup.
-#   3. Restart ovnkube-node DaemonSet — forces OVN to re-read Submariner route
-#      annotations on each node, repopulating non-gateway node routing.
-#   4. Wait for both DaemonSets to finish rolling out, then settle.
+#   3. Wait for rollout and settle.
+#
+# NOTE: ovnkube-node is intentionally NOT restarted. The official workaround
+# (ACM 2.13 docs) only requires route-agent restart. Restarting ovnkube-node
+# after route-agent re-programs OVN flows and can overwrite the nftables
+# exemption installed by the route-agent, negating the fix on OCP 4.22+.
 #
 # Applied to every spoke cluster. Idempotent: safe to re-run.
 #
@@ -65,25 +68,13 @@ ApplySnatFix() {
         -l app=submariner-routeagent \
         --wait=false
 
-    # Step 3: restart ovnkube-node — forces OVN to re-read Submariner route
-    #         annotations; repopulates non-gateway node OVN cluster router routes
-    KUBECONFIG="${kubeconfig}" oc delete pod \
-        -n openshift-ovn-kubernetes \
-        -l app=ovnkube-node \
-        --wait=false
-
-    # Step 4: wait for DaemonSet rollouts; non-fatal timeout so job continues
+    # Step 3: wait for routeagent rollout; non-fatal timeout so job continues
     KUBECONFIG="${kubeconfig}" oc rollout status daemonset/submariner-routeagent \
         -n submariner-operator \
         --timeout=5m || \
         : "routeagent rollout on '${spokeName}': timed out — continuing"
 
-    KUBECONFIG="${kubeconfig}" oc rollout status daemonset/ovnkube-node \
-        -n openshift-ovn-kubernetes \
-        --timeout=10m || \
-        : "ovnkube-node rollout on '${spokeName}': timed out — continuing"
-
-    # Step 5: settle — OVN needs time to converge routes across all nodes
+    # Step 4: settle — allow nftables rules to propagate across all nodes
     sleep "${settleSecs}"
 
     : "ApplySnatFix: '${spokeName}' complete"

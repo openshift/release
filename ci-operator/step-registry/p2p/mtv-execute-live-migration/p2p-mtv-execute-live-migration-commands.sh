@@ -323,15 +323,16 @@ GetSourceVirtLauncherPod() {
     typeset podName
 
     # Use jq to avoid "array index out of bounds" stderr from oc jsonpath on empty lists.
+    # No "|| true" — SourceOc failures and jq parse errors must propagate.
+    # An empty pod list is handled gracefully: jq "// empty" exits 0 with no output.
     podName="$(SourceOc get pods -n "${MTV_TEST_VM_NAMESPACE}" \
         -l "kubevirt.io=virt-launcher,kubevirt.io/domain=${MTV_TEST_VM_NAME}" \
-        -o json | jq -r 'first(.items[].metadata.name) // empty' || true)"
+        -o json | jq -r 'first(.items[].metadata.name) // empty')"
     [[ -n "${podName}" ]] && printf '%s' "${podName}" && return 0
 
     podName="$(SourceOc get pods -n "${MTV_TEST_VM_NAMESPACE}" -o json \
         | jq -r --arg name "${MTV_TEST_VM_NAME}" \
-            '[.items[].metadata.name | select(startswith("virt-launcher-" + $name))] | first // ""' \
-        || true)"
+            '[.items[].metadata.name | select(startswith("virt-launcher-" + $name))] | first // ""')"
     [[ -n "${podName}" ]] && printf '%s' "${podName}"
 }
 
