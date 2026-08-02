@@ -77,21 +77,33 @@ if ! oc wait 'storagecluster.ocs.openshift.io/ocs-storagecluster' \
     -n "${ODF__INSTALL_NAMESPACE}" \
     --for=condition=Available \
     --timeout="${ODF__STORAGE_CLUSTER_WAIT_TIMEOUT}" 1>/dev/null; then
-    echo "StorageCluster Available condition not met within ${ODF__STORAGE_CLUSTER_WAIT_TIMEOUT}; falling back to OSD readiness check"
-    # On HyperShift, OCSInitialization owner-ref resolution fails in the API server, which
-    # prevents the Available condition from ever being set even when Ceph is healthy.
-    # Wait for all 3 OSD deployments to be Available as a proxy for storage readiness.
-    # StorageCluster spec: count=1, replica=3 → 3 OSD deployments expected.
-    expected_osd=3
-    actual_osd=$(oc get deploy -n "${ODF__INSTALL_NAMESPACE}" -l app=rook-ceph-osd \
-        --no-headers 2>/dev/null | wc -l | tr -d ' ')
-    if [[ "${actual_osd}" -lt "${expected_osd}" ]]; then
-        echo "Expected ${expected_osd} OSD deployments, found ${actual_osd} — storage not fully provisioned"
+    if [[ "${ODF_SC_AVAILABLE_FALLBACK:-}" != "true" ]]; then
+        echo "ERROR: StorageCluster did not reach Available condition within ${ODF__STORAGE_CLUSTER_WAIT_TIMEOUT}"
         exit 1
     fi
+    echo "StorageCluster Available condition not met; falling back to OSD readiness check (ODF_SC_AVAILABLE_FALLBACK=true)"
+    # On HyperShift, OCSInitialization owner-ref resolution fails in the API server, which
+    # prevents the Available condition from ever being set even when Ceph is healthy.
+    # Wait for at least one OSD deployment to appear, then wait for all to be Available.
+    echo "Waiting for rook-ceph-osd deployments to appear (up to 5m)..."
+    elapsed=0
+    while true; do
+        count=$(oc get deploy -n "${ODF__INSTALL_NAMESPACE}" -l app=rook-ceph-osd \
+            --no-headers 2>/dev/null | wc -l | tr -d ' ')
+        if [[ "${count}" -gt 0 ]]; then
+            echo "Found ${count} OSD deployment(s)"
+            break
+        fi
+        if [[ ${elapsed} -ge 300 ]]; then
+            echo "ERROR: no rook-ceph-osd deployments appeared within 5m"
+            exit 1
+        fi
+        sleep 10
+        elapsed=$((elapsed + 10))
+    done
     oc wait deploy -l app=rook-ceph-osd -n "${ODF__INSTALL_NAMESPACE}" \
         --for=condition=Available --timeout="${ODF__STORAGE_CLUSTER_WAIT_TIMEOUT}"
-    echo "OSD deployments are Available; storage is ready"
+    echo "All OSD deployments are Available; storage is ready"
 fi
 
 # Remove is-default-class annotation from all storage classes, then promote
