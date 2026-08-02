@@ -42,8 +42,14 @@ typeset -i settleSecs="${SUBMARINER_SNAT_FIX_SETTLE_SECS}"
 
 typeset -a spokeKubeconfigsArr=()
 typeset -a spokeNamesArr=()
+typeset -a _tmpKubeconfigsToClean=()
 
 # ── LoadSpokeConfig — populate spoke arrays from SHARED_DIR ──────────────────
+# CI spoke kubeconfigs can have 'namespace: ci-op-XXXXXXXX' in their current
+# context.  That namespace does not exist on the spoke cluster, which causes
+# oc to fail namespace-validation before executing ANY command (even cluster-
+# scoped ones like "oc get nodes").  We create a temp copy of each kubeconfig
+# with the context namespace patched to 'default' to avoid this.
 LoadSpokeConfig() {
     typeset -i i
     for ((i = 1; i <= spokeCount; i++)); do
@@ -53,7 +59,17 @@ LoadSpokeConfig() {
         [ -f "${kcFile}" ]
         [ -f "${nameFile}" ]
 
-        spokeKubeconfigsArr+=("${kcFile}")
+        typeset tmpKc
+        tmpKc="$(mktemp -t submariner-snat-fix-kc-XXXXXX)"
+        _tmpKubeconfigsToClean+=("${tmpKc}")
+        cp "${kcFile}" "${tmpKc}"
+        # Use kubectl (not oc) here to avoid triggering oc's own namespace
+        # validation while we are patching the context namespace.
+        kubectl --kubeconfig="${tmpKc}" config set-context \
+            "$(kubectl --kubeconfig="${tmpKc}" config current-context)" \
+            --namespace=default > /dev/null
+
+        spokeKubeconfigsArr+=("${tmpKc}")
         spokeNamesArr+=("$(<"${nameFile}")")
     done
     true
@@ -68,7 +84,8 @@ GetLocalClusterID() {
     typeset gwNode
     gwNode="$(KUBECONFIG="${kubeconfig}" oc get nodes \
         -l submariner.io/gateway=true \
-        -o jsonpath='{.items[0].metadata.name}')"
+        -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+        | head -1)"
 
     # Strip domain suffix: "ip-10-1-99-33.us-east-2.compute.internal" → "ip-10-1-99-33"
     typeset gwShort="${gwNode%%.*}"
@@ -108,13 +125,13 @@ InjectNftablesOnGateway() {
     : "InjectNftablesOnGateway: node='${gatewayNode}' elements='${nftElements}'"
 
     KUBECONFIG="${kubeconfig}" oc debug "node/${gatewayNode}" \
-        --quiet -- chroot /host \
+        --quiet --to-namespace=default -- chroot /host \
         nft add element inet ovn-kubernetes mgmtport-no-snat-subnets-v4 \
         "{ ${nftElements} }" 2>&1 | grep -v '^$' || true
 
     : "InjectNftablesOnGateway: verifying set on '${gatewayNode}'"
     KUBECONFIG="${kubeconfig}" oc debug "node/${gatewayNode}" \
-        --quiet -- chroot /host \
+        --quiet --to-namespace=default -- chroot /host \
         nft list set inet ovn-kubernetes mgmtport-no-snat-subnets-v4 \
         2>/dev/null || true
 }
@@ -189,6 +206,11 @@ for ((i = 0; i < spokeCount; i++)); do
     ApplySnatFix \
         "${spokeKubeconfigsArr[i]}" \
         "${spokeNamesArr[i]}"
+done
+
+typeset _tmpKc
+for _tmpKc in "${_tmpKubeconfigsToClean[@]+"${_tmpKubeconfigsToClean[@]}"}"; do
+    rm -f "${_tmpKc}"
 done
 
 true
