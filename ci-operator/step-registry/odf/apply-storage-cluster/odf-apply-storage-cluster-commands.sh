@@ -73,10 +73,26 @@ spec:
     resources: {}
 ocEOF
 
-oc wait 'storagecluster.ocs.openshift.io/ocs-storagecluster' \
+if ! oc wait 'storagecluster.ocs.openshift.io/ocs-storagecluster' \
     -n "${ODF__INSTALL_NAMESPACE}" \
     --for=condition=Available \
-    --timeout="${ODF__STORAGE_CLUSTER_WAIT_TIMEOUT}" 1>/dev/null
+    --timeout="${ODF__STORAGE_CLUSTER_WAIT_TIMEOUT}" 1>/dev/null; then
+    echo "StorageCluster Available condition not met within ${ODF__STORAGE_CLUSTER_WAIT_TIMEOUT}; falling back to OSD readiness check"
+    # On HyperShift, OCSInitialization owner-ref resolution fails in the API server, which
+    # prevents the Available condition from ever being set even when Ceph is healthy.
+    # Wait for all 3 OSD deployments to be Available as a proxy for storage readiness.
+    # StorageCluster spec: count=1, replica=3 → 3 OSD deployments expected.
+    expected_osd=3
+    actual_osd=$(oc get deploy -n "${ODF__INSTALL_NAMESPACE}" -l app=rook-ceph-osd \
+        --no-headers 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "${actual_osd}" -lt "${expected_osd}" ]]; then
+        echo "Expected ${expected_osd} OSD deployments, found ${actual_osd} — storage not fully provisioned"
+        exit 1
+    fi
+    oc wait deploy -l app=rook-ceph-osd -n "${ODF__INSTALL_NAMESPACE}" \
+        --for=condition=Available --timeout="${ODF__STORAGE_CLUSTER_WAIT_TIMEOUT}"
+    echo "OSD deployments are Available; storage is ready"
+fi
 
 # Remove is-default-class annotation from all storage classes, then promote
 # ocs-storagecluster-ceph-rbd as the default storage class.
