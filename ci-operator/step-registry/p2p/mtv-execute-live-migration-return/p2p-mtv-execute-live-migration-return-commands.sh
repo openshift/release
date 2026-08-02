@@ -121,7 +121,10 @@ DumpDiagnostics() {
 # DumpCclmSyncDiagnostics — targeted dump when the migration is stuck in the
 # Synchronization phase (source=Synchronizing, dest=WaitingForSync).
 # Captures virt-synchronization-controller state, Submariner service exports/
-# imports, forklift-controller logs, virt-handler logs, and VMI migration state.
+# imports, forklift-controller logs, virt-handler logs, VMI migration state,
+# virt-handler client-cert Secret presence (missing certs block mTLS to dest
+# virt-sync-controller:9185), nftables SNAT exclusion set re-verification, and
+# OVN-K gateway-node logs.
 # Called from CheckSyncStuck (immediately on detection) and from DumpDiagnostics
 # (on any live-plan error path).
 DumpCclmSyncDiagnostics() {
@@ -177,6 +180,39 @@ DumpCclmSyncDiagnostics() {
             -l 'kubevirt.io=virt-handler' \
             --tail=150 \
             > "${syncDir}/${spoke}-virt-handler-logs.txt" 2>&1 || true
+
+        # virt-handler CCLM client-certificate Secrets (metadata only — no secret data).
+        # Missing certs prevent virt-handler from making mTLS connections to the
+        # dest virt-synchronization-controller on port 9185.
+        oc --kubeconfig="${kc}" get secrets -n "${MTV_CNV_NAMESPACE}" \
+            > "${syncDir}/${spoke}-cnv-secrets-list.txt" 2>&1 || true
+        oc --kubeconfig="${kc}" get ds virt-handler -n "${MTV_CNV_NAMESPACE}" -o json \
+            2>/dev/null \
+            | jq '[.spec.template.spec.volumes[]?
+                   | select(.name | test("cert|tls|key"; "i"))
+                   | {name, secret: (.secret.secretName // null),
+                      configMap: (.configMap.name // null)}]' \
+            > "${syncDir}/${spoke}-virt-handler-cert-volumes.json" 2>&1 || true
+
+        # OVN-K gateway node logs — check for route/policy issues affecting cross-cluster.
+        typeset _gwNode
+        _gwNode="$(oc --kubeconfig="${kc}" get nodes \
+            -l submariner.io/gateway=true \
+            -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+            2>/dev/null | head -1 || true)"
+        if [[ -n "${_gwNode}" ]]; then
+            oc --kubeconfig="${kc}" logs \
+                -n openshift-ovn-kubernetes \
+                -l 'app=ovnkube-node' \
+                --field-selector="spec.nodeName=${_gwNode}" \
+                --tail=80 \
+                > "${syncDir}/${spoke}-ovnkube-node-gateway-logs.txt" 2>&1 || true
+            # Verify nftables SNAT exclusion set still contains remote CIDRs.
+            oc --kubeconfig="${kc}" debug "node/${_gwNode}" \
+                --quiet --to-namespace=default -- chroot /host \
+                nft list set inet ovn-kubernetes mgmtport-no-snat-subnets-v4 \
+                > "${syncDir}/${spoke}-nftables-snat-set.txt" 2>&1 || true
+        fi
     done
 
     # forklift-controller logs from the hub (MTV migration orchestrator).
@@ -532,10 +568,10 @@ CheckSyncStuck() {
     if [[ "${srcVmimPhase}" == "Synchronizing" && "${destVmimPhase}" == "WaitingForSync" ]]; then
         : "Synchronization stuck >${syncStuckMinutes}m (source=${srcVmimPhase}, dest=${destVmimPhase})"
         DumpCclmSyncDiagnostics
-        false
+        return 1
     fi
 
-    true
+    return 0
 }
 
 # RefreshProviderInventory — re-scan spoke KubeVirt inventory before live Plan validation.
@@ -662,7 +698,7 @@ WaitMigrationSucceeded() {
             false
         fi
 
-        CheckSyncStuck
+        CheckSyncStuck || return 1
 
         PrintMigrationPipeline
         : "Migration in progress${msg:+: ${msg}} (${SECONDS}/${deadline}s)"
