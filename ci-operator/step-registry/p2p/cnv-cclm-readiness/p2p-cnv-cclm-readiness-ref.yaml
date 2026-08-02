@@ -1,0 +1,71 @@
+ref:
+  as: p2p-cnv-cclm-readiness
+  from: cli
+  commands: p2p-cnv-cclm-readiness-commands.sh
+  timeout: 35m0s
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CNV_ENABLE_CCLM
+    default: "false"
+    documentation: |-
+      When "true", run CCLM readiness checks: restart virt-operator, verify
+      /etc/virt-handler/clientcertificates/tls.crt is present in virt-handler pods,
+      and ensure the virt-synchronization-controller Service and ServiceExport exist.
+      Set to "true" for CCLM scenarios; leave "false" for upgrade or non-CCLM jobs.
+  - name: CNV_CCLM_WAIT_TIMEOUT
+    default: "600"
+    documentation: |-
+      Maximum seconds to poll for /etc/virt-handler/clientcertificates/tls.crt in
+      a virt-handler pod after virt-operator restart.  The fallback DaemonSet patch
+      is attempted if the cert is still absent after this timeout.
+  - name: CNV_CCLM_VIRT_HANDLER_CERT_SECRET
+    default: "kubevirt-virt-handler-certs"
+    documentation: |-
+      Name of the Secret in openshift-cnv to mount at
+      /etc/virt-handler/clientcertificates when virt-operator does not add the
+      mount automatically (fallback DaemonSet patch path only).
+  - name: CNV_CCLM_SYNC_PORT
+    default: "9185"
+    documentation: |-
+      TCP port for the virt-synchronization-controller sync data endpoint.
+      Used when creating the missing Service in openshift-cnv.
+  documentation: |-
+    Verifies and remediates CCLM (Cross-Cluster Live Migration) prerequisites on
+    every spoke cluster before migration steps run.  No-op when CNV_ENABLE_CCLM
+    is not "true".
+
+    Background — root cause observed on OCP 4.22 nightly with CNV 4.17+:
+    When decentralizedLiveMigration=true is set in HyperConverged featureGates at
+    install time, virt-operator may not reconcile the virt-handler DaemonSet to add
+    the /etc/virt-handler/clientcertificates volume mount in its first pass.  Without
+    this mount, virt-handler emits "failed to load the certificate
+    /etc/virt-handler/clientcertificates/tls.crt: no such file or directory" every
+    60 s and cannot make the required mTLS connection to the destination
+    virt-synchronization-controller:9185, leaving the migration stuck in
+    Synchronizing/WaitingForSync indefinitely.
+
+    What this step does (idempotent, safe to re-run):
+      1. Restarts virt-operator on each spoke and waits for its rollout to finish
+         (triggers DaemonSet reconciliation — usually sufficient to fix the mount).
+      2. Waits up to CNV_CCLM_WAIT_TIMEOUT seconds for the CCLM client cert to
+         appear in a virt-handler pod.
+      3. Fallback: if the cert is still absent, patches the virt-handler DaemonSet
+         directly to mount CNV_CCLM_VIRT_HANDLER_CERT_SECRET at
+         /etc/virt-handler/clientcertificates.  Collects diagnostics and fails the
+         step if the cert is still absent after the patch rollout.
+      4. Ensures a Service named virt-synchronization-controller on port
+         CNV_CCLM_SYNC_PORT (9185) exists in openshift-cnv.
+      5. Ensures a ServiceExport for that Service exists, allowing Submariner to
+         propagate it to other clusters for cross-cluster DNS resolution.  Skipped
+         gracefully when the ServiceExport CRD (Submariner) is not yet installed.
+
+    Reads spoke names and kubeconfigs from ${SHARED_DIR} (managed-cluster-kubeconfig-N
+    and managed-cluster-name-N files).
+
+    Must run after p2p-acm-cnv-install-policy and ideally after
+    acm-interop-p2p-submariner-install (so ServiceExport CRD is available).
+    Must run before p2p-mtv-bidir-mig-config / p2p-cclm-bidir-migration-test.
