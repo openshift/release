@@ -113,6 +113,110 @@ DumpDiagnostics() {
     DestOc logs -n "${MTV_CNV_NAMESPACE}" \
         -l kubevirt.io=virt-controller --tail=100 \
         > "${diagDir}/dest-virt-controller.log" 2>&1 || true
+
+    DumpCclmSyncDiagnostics
+}
+
+# DumpCclmSyncDiagnostics — targeted dump when the migration is stuck in the
+# Synchronization phase (source=Synchronizing, dest=WaitingForSync).
+# Captures virt-synchronization-controller state, Submariner service exports/
+# imports, forklift-controller logs, virt-handler logs, and VMI migration state.
+# Called from CheckSyncStuck (immediately on detection) and from DumpDiagnostics
+# (on any live-plan error path).
+DumpCclmSyncDiagnostics() {
+    [[ "${MTV_PLAN_TYPE}" != "live" ]] && return 0
+    [[ -n "${ARTIFACT_DIR}" ]] || return 0
+
+    typeset syncDir="${ARTIFACT_DIR}/mtv-cclm-sync-diagnostics"
+    mkdir -p "${syncDir}"
+
+    typeset spoke kc
+    for spoke in source dest; do
+        [[ "${spoke}" == "source" ]] && kc="${sourceKubeconfig}" || kc="${destKubeconfig}"
+
+        # Broad search: virt-sync related pods across ALL namespaces.
+        oc --kubeconfig="${kc}" get pods -A -o wide 2>/dev/null \
+            | grep -E 'virt-sync|synchronization-controller|virt-migration' \
+            > "${syncDir}/${spoke}-virt-sync-pods-all-ns.txt" 2>&1 || true
+
+        # Targeted: pods + logs from the CNV namespace by deployment name.
+        oc --kubeconfig="${kc}" get pods \
+            -n "${MTV_CNV_NAMESPACE}" -o wide \
+            2>/dev/null \
+            | grep 'virt-synchronization-controller' \
+            > "${syncDir}/${spoke}-virt-sync-pods-cnv-ns.txt" 2>&1 || true
+
+        oc --kubeconfig="${kc}" logs \
+            -n "${MTV_CNV_NAMESPACE}" \
+            deployment/virt-synchronization-controller \
+            --tail=200 \
+            > "${syncDir}/${spoke}-virt-sync-controller-logs.txt" 2>&1 || true
+
+        # Submariner service discovery state.
+        oc --kubeconfig="${kc}" get serviceexport -A \
+            > "${syncDir}/${spoke}-serviceexports.txt" 2>&1 || true
+        oc --kubeconfig="${kc}" get serviceimport -A \
+            > "${syncDir}/${spoke}-serviceimports.txt" 2>&1 || true
+
+        # Services on the CCLM sync port (8443) or the KubeVirt migration port.
+        oc --kubeconfig="${kc}" get svc -A -o json 2>/dev/null \
+            | jq -r '.items[]
+                | select(.spec.ports[]?.port == 8443
+                      or .spec.ports[]?.port == 9185
+                      or .spec.ports[]?.targetPort == 8443
+                      or (.spec.ports[]?.name // "" | test("sync|migr|virt")))
+                | "\(.metadata.namespace)/\(.metadata.name)\t"
+                  + "ports=\([.spec.ports[]? | "\(.port):\(.targetPort // "")"] | join(","))\t"
+                  + "clusterIP=\(.spec.clusterIP)"' \
+            > "${syncDir}/${spoke}-sync-services.txt" 2>&1 || true
+
+        # virt-handler logs (per-node daemon that drives actual live migration).
+        oc --kubeconfig="${kc}" logs \
+            -n "${MTV_CNV_NAMESPACE}" \
+            -l 'kubevirt.io=virt-handler' \
+            --tail=150 \
+            > "${syncDir}/${spoke}-virt-handler-logs.txt" 2>&1 || true
+    done
+
+    # forklift-controller logs from the hub (MTV migration orchestrator).
+    oc --kubeconfig="${KUBECONFIG}" logs \
+        -n "${MTV_NAMESPACE}" \
+        deployment/forklift-controller \
+        --tail=300 \
+        > "${syncDir}/hub-forklift-controller-logs.txt" 2>&1 || true
+
+    # Detailed VMI migration state.
+    SourceOc get "virtualmachineinstance/${MTV_TEST_VM_NAME}" \
+        -n "${MTV_TEST_VM_NAMESPACE}" -o json 2>/dev/null \
+        | jq '{name: .metadata.name, phase: .status.phase,
+               migrationState: .status.migrationState,
+               conditions: [.status.conditions[]?
+                            | {type, status, reason, message}]}' \
+        > "${syncDir}/source-vmi-migration-state.json" 2>&1 || true
+
+    DestOc get "virtualmachineinstance/${MTV_TEST_VM_NAME}" \
+        -n "${targetNs}" -o json 2>/dev/null \
+        | jq '{name: .metadata.name, phase: .status.phase,
+               migrationState: .status.migrationState,
+               conditions: [.status.conditions[]?
+                            | {type, status, reason, message}]}' \
+        > "${syncDir}/dest-vmi-migration-state.json" 2>&1 || true
+
+    # Full VMIM YAML (more detail than vmim.yaml in the base diagnostics dir).
+    SourceOc get vmim -n "${MTV_TEST_VM_NAMESPACE}" -o yaml \
+        > "${syncDir}/source-vmim.yaml" 2>&1 || true
+    DestOc get vmim -n "${targetNs}" -o yaml \
+        > "${syncDir}/dest-vmim.yaml" 2>&1 || true
+
+    # Events in the migration namespaces.
+    SourceOc get events -n "${MTV_TEST_VM_NAMESPACE}" \
+        --sort-by='.lastTimestamp' \
+        > "${syncDir}/source-vm-ns-events.txt" 2>&1 || true
+    DestOc get events -n "${targetNs}" \
+        --sort-by='.lastTimestamp' \
+        > "${syncDir}/dest-vm-ns-events.txt" 2>&1 || true
+
+    : "CCLM sync diagnostics written → ${syncDir}"
 }
 
 # OnError — dump diagnostics before propagating failure.
@@ -426,7 +530,7 @@ CheckSyncStuck() {
 
     if [[ "${srcVmimPhase}" == "Synchronizing" && "${destVmimPhase}" == "WaitingForSync" ]]; then
         : "Synchronization stuck >${syncStuckMinutes}m (source=${srcVmimPhase}, dest=${destVmimPhase})"
-        DumpDiagnostics
+        DumpCclmSyncDiagnostics
         false
     fi
 
