@@ -31,11 +31,7 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 OSC_INSTALL=${OSC_INSTALL:-false}
 OSC_NAMESPACE=${OSC_NAMESPACE:-openshift-sandboxed-containers-operator}
 CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE:-}
-# Pick up the resolved catalog image from env-cm step (resolves :latest to a specific tag)
-if [[ -f "${SHARED_DIR}/catalog-source-image.env" ]]; then
-  # shellcheck disable=SC1091
-  source "${SHARED_DIR}/catalog-source-image.env"
-fi
+CATALOG_SOURCE_NAME=${CATALOG_SOURCE_NAME:-redhat-operators}
 OSC_CHARTS_REPO=${OSC_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 OSC_CHARTS_REF=${OSC_CHARTS_REF:-main}
 ENABLEPEERPODS=${ENABLEPEERPODS:-false}
@@ -59,7 +55,7 @@ echo ">>> Namespace: ${OSC_NAMESPACE}"
 echo ">>> Workload: ${WORKLOAD_TO_TEST}"
 echo ">>> Peer-pods: ${ENABLEPEERPODS}"
 if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
-  echo ">>> Catalog source: osc-operator-dev-catalog (image: ${CATALOG_SOURCE_IMAGE})"
+  echo ">>> Catalog source: ${CATALOG_SOURCE_NAME} (image: ${CATALOG_SOURCE_IMAGE})"
 else
   echo ">>> Catalog source: redhat-operators (using existing catalog)"
 fi
@@ -126,6 +122,135 @@ function wait_until() {
 
   echo ">>> ERROR: ${description} - TIMEOUT after ${timeout_seconds}s" >&2
   return 1
+}
+
+#========================================
+# CatalogSource Setup
+#========================================
+
+function mirror_konflux() {
+  echo ">>> Create mirror for konflux images"
+  oc apply -f "https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/refs/heads/devel/.tekton/images-mirror-set.yaml"
+  oc apply -f "https://raw.githubusercontent.com/openshift/trustee-fbc/refs/heads/main/.tekton/images-mirror-set.yaml"
+}
+
+function latest_catsrc_image_tag() {
+    local api_url="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc/tag/"
+    local page=1
+    local max_pages=20
+
+    while [ "$page" -le "$max_pages" ]; do
+        local resp
+        resp=$(curl -sf "${api_url}?limit=100&page=${page}&onlyActiveTags=true")
+
+        if [ -z "$resp" ] || ! jq -e '.tags | length > 0' <<< "$resp" >/dev/null 2>&1; then
+            break
+        fi
+
+        local first_match
+        first_match=$(echo "$resp" | \
+            jq -r '.tags[]? | select(.name | test("^[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]+$")) | .name' | head -1)
+
+        if [ -n "$first_match" ]; then
+            echo "$first_match"
+            return 0
+        fi
+
+        ((page++))
+    done
+
+    if [ "$page" -gt "$max_pages" ]; then
+        echo "ERROR: Hit max_pages ($max_pages) limit while searching for tags." >&2
+    fi
+
+    echo "WARNING: No X.Y.Z-unix_epoch tag found, using :latest" >&2
+    echo "latest"
+}
+
+function create_catsrc() {
+  local catsrc_name="$1"
+  local catsrc_image="$2"
+  local catsrc_path="${SHARED_DIR}/catsrc_${catsrc_name}.yaml"
+
+  echo ">>> Create a custom CatalogSource named ${catsrc_name} for internal builds"
+
+  cat<<-EOF | tee "${catsrc_path}"
+  apiVersion: operators.coreos.com/v1alpha1
+  kind: CatalogSource
+  metadata:
+    name: "${catsrc_name}"
+    namespace: openshift-marketplace
+  spec:
+    displayName: QE
+    image: "${catsrc_image}"
+    publisher: QE
+    sourceType: grpc
+EOF
+
+  oc apply -f "${catsrc_path}"
+}
+
+function wait_for_catsrc() {
+  local catsrc_name="$1"
+  local timeout=300
+  echo ">>> Waiting for CatalogSource ${catsrc_name} to be READY..."
+
+  local deadline=$(( SECONDS + timeout ))
+  while (( SECONDS < deadline )); do
+    local state
+    state="$(oc get catalogsource -n openshift-marketplace \
+        "${catsrc_name}" -o jsonpath='{.status.connectionState.lastObservedState}' \
+        2>/dev/null || echo "")"
+    if [[ "${state}" == "READY" ]]; then
+      echo ">>> CatalogSource ${catsrc_name} is READY"
+      return 0
+    fi
+    sleep 10
+  done
+
+  state="$(oc get catalogsource -n openshift-marketplace "${catsrc_name}" \
+      -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")"
+  if [[ "${state}" != "READY" ]]; then
+    echo ">>> ERROR: CatalogSource ${catsrc_name} not READY after ${timeout}s (state: ${state})" >&2
+    oc get catalogsource -n openshift-marketplace "${catsrc_name}" -o yaml || true
+    return 1
+  fi
+  echo ">>> CatalogSource ${catsrc_name} is READY"
+  return 0
+}
+
+function setup_catalog_source() {
+  if [[ -z "${CATALOG_SOURCE_IMAGE}" ]]; then
+    echo ">>> No CATALOG_SOURCE_IMAGE set, using existing redhat-operators catalog"
+    return 0
+  fi
+
+  echo ">>> Setting up CatalogSource for Pre-GA install"
+
+  mirror_konflux
+
+  local default_catsrc_image="quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
+  if [[ "${CATALOG_SOURCE_IMAGE}" = "${default_catsrc_image}:latest" ]]; then
+    local catsrc_image_tag
+    catsrc_image_tag=$(latest_catsrc_image_tag)
+    CATALOG_SOURCE_IMAGE="${default_catsrc_image}:${catsrc_image_tag}"
+    echo ">>> Resolved :latest to tag: ${catsrc_image_tag}"
+  else
+    echo ">>> Using provided catalog image: ${CATALOG_SOURCE_IMAGE}"
+  fi
+
+  create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
+  wait_for_catsrc "${CATALOG_SOURCE_NAME}"
+
+  echo "CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE}" > "${SHARED_DIR}/catalog-source-image.env"
+  echo ">>> Saved resolved CATALOG_SOURCE_IMAGE to ${SHARED_DIR}/catalog-source-image.env"
+
+  # Update osc-config ConfigMap with the resolved catalog source name
+  if oc get configmap osc-config -n default &>/dev/null; then
+    oc patch configmap osc-config -n default --type merge \
+      -p "{\"data\":{\"catalogsourcename\":\"${CATALOG_SOURCE_NAME}\"}}" || true
+    echo ">>> Patched osc-config with catalogsourcename=${CATALOG_SOURCE_NAME}"
+  fi
 }
 
 #========================================
@@ -198,8 +323,8 @@ function render_osc_operator_chart() {
     "--set" "namespaceOverride=${OSC_NAMESPACE}"
   )
 
-  # TODO: use --set dev.enabled=true --set dev.image= once https://github.com/confidential-devhub/charts/pull/4 merges
-  echo ">>> Helm: using redhat-operators (catalog source patched via sed after render)" >&2
+  # DEBUG until https://github.com/confidential-devhub/charts/pull/4 merges
+  echo ">>> DEBUG: Helm renders source=redhat-operators (patched via sed after render). PR 4 not merged yet." >&2
 
   local helm_output
   if ! helm_output=$(helm template "${helm_args[@]}" 2>&1); then
@@ -337,15 +462,9 @@ function install_osc_operator() {
   fi
 
   # TODO: remove sed workaround once https://github.com/confidential-devhub/charts/pull/4 merges
-  # The chart always renders Subscription source as redhat-operators; patch it
-  # to the catalog created by env-cm when running Pre-GA.
-  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
-    local catsrc_name
-    catsrc_name=$(oc get configmap osc-config -n default -o jsonpath='{.data.catalogsourcename}' 2>/dev/null || echo "")
-    if [[ -n "${catsrc_name}" && "${catsrc_name}" != "redhat-operators" ]]; then
-      echo ">>> Patching Subscription source: redhat-operators -> ${catsrc_name}"
-      sed -i "s/source: redhat-operators/source: ${catsrc_name}/" "${operator_yaml}"
-    fi
+  if [[ -n "${CATALOG_SOURCE_IMAGE}" && "${CATALOG_SOURCE_NAME}" != "redhat-operators" ]]; then
+    echo ">>> Patching Subscription source: redhat-operators -> ${CATALOG_SOURCE_NAME}"
+    sed -i "s/source: redhat-operators/source: ${CATALOG_SOURCE_NAME}/" "${operator_yaml}"
   fi
 
   echo ">>> Rendered operator objects:"
@@ -399,17 +518,13 @@ function wait_for_operator() {
     return 1
   fi
 
-  # Stage 1: Wait for the CatalogSource created by env-cm (e.g. brew-catalog)
-  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
-    local catsrc_name
-    catsrc_name=$(oc get configmap osc-config -n default -o jsonpath='{.data.catalogsourcename}' 2>/dev/null || echo "")
-    if [[ -n "${catsrc_name}" && "${catsrc_name}" != "redhat-operators" ]]; then
-      if ! wait_until "CatalogSource ${catsrc_name} READY" 60 5 \
-        "[[ \"\$(oc get catalogsource -n openshift-marketplace '${catsrc_name}' -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
-        oc get catalogsource -n openshift-marketplace || true
-        oc describe catalogsource -n openshift-marketplace "${catsrc_name}" || true
-        return 1
-      fi
+  # Stage 1: Wait for the custom CatalogSource (e.g. brew-catalog)
+  if [[ -n "${CATALOG_SOURCE_IMAGE}" && "${CATALOG_SOURCE_NAME}" != "redhat-operators" ]]; then
+    if ! wait_until "CatalogSource ${CATALOG_SOURCE_NAME} READY" 60 5 \
+      "[[ \"\$(oc get catalogsource -n openshift-marketplace '${CATALOG_SOURCE_NAME}' -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
+      oc get catalogsource -n openshift-marketplace || true
+      oc describe catalogsource -n openshift-marketplace "${CATALOG_SOURCE_NAME}" || true
+      return 1
     fi
   fi
 
@@ -673,6 +788,9 @@ echo ">>> OSC Operator Installation"
 echo ">>> Workload: ${WORKLOAD_TO_TEST}"
 echo ">>> Peer-pods: ${ENABLEPEERPODS}"
 echo "========================================="
+
+# Phase 1: Set up CatalogSource (if Pre-GA)
+setup_catalog_source
 
 # Phase 2: Fetch charts
 CHARTS_DIR=$(fetch_osc_charts)
