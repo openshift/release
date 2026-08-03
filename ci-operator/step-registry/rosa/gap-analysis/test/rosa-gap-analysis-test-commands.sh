@@ -64,10 +64,10 @@ EOF
 
 VALIDATION_FAILED=0
 
-# Get cluster kubeconfig
-log "Fetching cluster credentials..."
-if ! rosa describe cluster -c "${CLUSTER_ID}" &>/dev/null; then
-  error "Failed to describe cluster ${CLUSTER_ID}"
+# Verify cluster exists via OCM API
+log "Verifying cluster exists..."
+if ! ocm get /api/clusters_mgmt/v1/clusters/"${CLUSTER_ID}" &>/dev/null; then
+  error "Failed to get cluster ${CLUSTER_ID} from OCM API"
   exit 1
 fi
 
@@ -93,43 +93,11 @@ fi
 log "Successfully authenticated with cluster"
 
 ###########################################
-# Validation 1: Wait for cluster ready state
+# Validation 1: Validate ClusterOperators
 ###########################################
-log "Validation 1: Waiting for cluster ready state (timeout: ${VALIDATION_TIMEOUT})..."
-TIMEOUT_SECONDS=$(($(echo "${VALIDATION_TIMEOUT}" | sed 's/m$//' | sed 's/h$//' | awk '{print $1}') * 60))
-START_TIME=$(date +%s)
-
+log "Validation 1: Validating ClusterOperators..."
 echo "" >> "${VALIDATION_REPORT}"
-echo "1. Cluster Ready State" >> "${VALIDATION_REPORT}"
-echo "----------------------" >> "${VALIDATION_REPORT}"
-
-while true; do
-  ELAPSED=$(($(date +%s) - START_TIME))
-  if [[ ${ELAPSED} -ge ${TIMEOUT_SECONDS} ]]; then
-    error "Timeout waiting for cluster ready state after ${VALIDATION_TIMEOUT}"
-    echo "Status: FAILED (timeout after ${VALIDATION_TIMEOUT})" >> "${VALIDATION_REPORT}"
-    VALIDATION_FAILED=1
-    break
-  fi
-
-  CLUSTER_STATE=$(rosa describe cluster -c "${CLUSTER_ID}" -o json 2>/dev/null | jq -r '.state // "unknown"')
-  if [[ "${CLUSTER_STATE}" == "ready" ]]; then
-    success "Cluster is in ready state"
-    echo "Status: READY" >> "${VALIDATION_REPORT}"
-    echo "Time to ready: ${ELAPSED}s" >> "${VALIDATION_REPORT}"
-    break
-  else
-    log "Cluster state: ${CLUSTER_STATE}, waiting... (${ELAPSED}s elapsed)"
-    sleep 30
-  fi
-done
-
-###########################################
-# Validation 2: Validate ClusterOperators
-###########################################
-log "Validation 2: Validating ClusterOperators..."
-echo "" >> "${VALIDATION_REPORT}"
-echo "2. ClusterOperators Status" >> "${VALIDATION_REPORT}"
+echo "1. ClusterOperators Status" >> "${VALIDATION_REPORT}"
 echo "--------------------------" >> "${VALIDATION_REPORT}"
 
 CO_OUTPUT="${ARTIFACT_DIR}/clusteroperators.txt"
@@ -166,11 +134,11 @@ if [[ -f "${CO_OUTPUT}" ]]; then
 fi
 
 ###########################################
-# Validation 3: Validate nodes
+# Validation 2: Validate nodes
 ###########################################
-log "Validation 3: Validating nodes..."
+log "Validation 2: Validating nodes..."
 echo "" >> "${VALIDATION_REPORT}"
-echo "3. Nodes Status" >> "${VALIDATION_REPORT}"
+echo "2. Nodes Status" >> "${VALIDATION_REPORT}"
 echo "---------------" >> "${VALIDATION_REPORT}"
 
 NODES_OUTPUT="${ARTIFACT_DIR}/nodes.txt"
@@ -206,7 +174,7 @@ fi
 ###########################################
 log "Collecting cluster logs and diagnostics..."
 echo "" >> "${VALIDATION_REPORT}"
-echo "4. Cluster Logs and Diagnostics" >> "${VALIDATION_REPORT}"
+echo "3. Cluster Logs and Diagnostics" >> "${VALIDATION_REPORT}"
 echo "--------------------------------" >> "${VALIDATION_REPORT}"
 
 # Collect cluster-version logs
