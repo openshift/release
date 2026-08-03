@@ -1,0 +1,40 @@
+workflow:
+  as: hypershift-e2e-v2-ote-azure-self-managed
+  documentation: |-
+    OTE variant of the HyperShift Azure e2e v2 self-managed workflow. Uses
+    hypershift-tests-ext (OTE binary) instead of run-tests for test orchestration.
+    Same infrastructure: nested management cluster, self-managed guest clusters.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+    - Bryan Cox (brcox@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/CNTRLPLANE/summary
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-azure-setup-private-link
+    - ref: hypershift-install
+    - ref: hypershift-resolve-nodepool-releases
+    - ref: hypershift-e2e-v2-ote-azure-self-managed-create-guests
+    test:
+    - chain: hypershift-e2e-v2-ote-run
+    post:
+    - chain: hypershift-e2e-v2-ote-azure-self-managed-dump-guests
+    - chain: hypershift-e2e-v2-ote-azure-self-managed-destroy-guests
+    - chain: hypershift-destroy-nested-management-cluster
+    env:
+      CLOUD_PROVIDER: "Azure"
+      HYPERSHIFT_PLATFORM: "azure"
+      HYPERSHIFT_NODE_COUNT: "6"
+      HYPERSHIFT_AZURE_LOCATION: "centralus"
+      AZURE_SELF_MANAGED: "true"
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "sm.hcp-sm-azure.azure.devcluster.openshift.com"
+      HYPERSHIFT_ETCD_STORAGE_CLASS: "managed-csi-premium-v2"
