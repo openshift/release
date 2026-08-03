@@ -196,7 +196,7 @@ do
 	
     policy_arn=$(cat "${output_policy}" | jq -r '.Policy.Arn')
     
-    echo "${policy_arn}" >> "${SHARED_DIR}/aws_policy_arns"
+    echo "${policy_arn}" >> "${SHARED_DIR}/aws_policy_arns_static"
 
     #  Create user
     # 
@@ -209,7 +209,7 @@ do
 
     key_id=$(cat "${output_access_keys}" | jq -r '.AccessKey.AccessKeyId')
     key_sec=$(cat "${output_access_keys}" | jq -r '.AccessKey.SecretAccessKey')
-    echo "${user_name}" >> "${SHARED_DIR}/aws_user_names"
+    echo "${user_name}" >> "${SHARED_DIR}/aws_user_names_static"
 
     # Generate users manifests
     user_manifest="${SHARED_DIR}/manifest_user-${ns}-${name}-secret.yaml"
