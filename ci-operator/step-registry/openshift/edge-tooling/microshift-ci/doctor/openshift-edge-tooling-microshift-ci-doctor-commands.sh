@@ -245,6 +245,10 @@ trap atexit_handler EXIT TERM INT
 load_secrets
 configure_claude
 
+cd /tmp
+git clone https://github.com/pmtk/edge-tooling.git -b ci-doctor-prepared
+EDGE_TOOLING_DIR="/tmp/edge-tooling"
+
 # Use the edge-tooling source pre-installed in the image
 SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/microshift-ci"
