@@ -53,6 +53,10 @@ tests:
   container:
     from: src
 - as: pr-check-default
+  capabilities:
+  - intranet
+  - nested-podman
+  cluster: build05
   commands: |
     git remote add origin .
     git update-ref refs/remotes/origin/konflux-master HEAD
@@ -61,7 +65,9 @@ tests:
     set -x
     ./pr_check.sh
   container:
-    from: src
+    from: golang-plus
+  nested_podman: true
+  restrict_network_access: false
   secrets:
   - mount_path: /usr/local/rosa-clusters-service-sandbox
     name: rosa-clusters-service-sandbox
