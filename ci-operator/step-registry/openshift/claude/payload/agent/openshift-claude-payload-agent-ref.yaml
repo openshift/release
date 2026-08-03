@@ -1,6 +1,7 @@
 ref:
   as: openshift-claude-payload-agent
   from: claude-ai-helpers
+  nested_podman: true
   commands: openshift-claude-payload-agent-commands.sh
   credentials:
   - namespace: test-credentials
@@ -12,6 +13,9 @@ ref:
   - namespace: test-credentials
     name: claude-payload-agent-github-token
     mount_path: /var/run/github-token
+  - namespace: test-credentials
+    name: ci-pull-credentials
+    mount_path: /var/run/ci-pull-credentials
   env:
   - name: PAYLOAD_TAG
   - name: MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG
@@ -40,6 +44,11 @@ ref:
       https://amd64.origin.releases.ci.openshift.org.
   - name: ENABLE_SLACK_NOTIFICATIONS
     default: "true"
+  - name: REGISTRY_AUTH_FILE
+    default: "/var/run/ci-pull-credentials/.dockerconfigjson"
+    documentation: |-
+      Credentials for podman to pull release images from
+      registry.ci.openshift.org when extracting the RHCOS rpmdb.
   resources:
     requests:
       cpu: 1000m
