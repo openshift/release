@@ -120,6 +120,57 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
+  as: e2e-aws-serial-haproxy28-techpreview
+  optional: true
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      HAPROXY_VERSION: "2.8"
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-e2e-aws-serial
+- always_run: false
+  as: e2e-agnostic-haproxy28-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      HAPROXY_VERSION: "2.8"
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-gcp-post
+    pre:
+    - ref: enable-node-coredumps
+    - chain: ipi-conf-gcp
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-e2e-gcp
+- always_run: false
+  as: e2e-upgrade-haproxy28-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      HAPROXY_VERSION: "2.8"
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-azure-post
+    pre:
+    - ref: enable-node-coredumps
+    - chain: ipi-conf-azure
+    - chain: azure-provision-service-principal-minimal-permission
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-upgrade-azure
+- always_run: false
   as: e2e-metal-ipi-ovn-router
   capabilities:
   - intranet
