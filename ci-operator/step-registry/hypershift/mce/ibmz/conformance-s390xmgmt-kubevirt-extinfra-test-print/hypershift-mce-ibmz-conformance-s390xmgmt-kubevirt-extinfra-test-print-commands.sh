@@ -11,9 +11,14 @@ echo "============================================================"
 echo "Management cluster nodes (KUBECONFIG=${MGMT_KUBECONFIG})"
 echo "============================================================"
 KUBECONFIG="${MGMT_KUBECONFIG}" oc get nodes -o wide
+oc get co
+oc get mce
+oc get po -n openshift-cnv
 
 echo ""
 echo "============================================================"
 echo "Infra cluster nodes (KUBECONFIG=${INFRA_KUBECONFIG})"
 echo "============================================================"
 KUBECONFIG="${INFRA_KUBECONFIG}" oc get nodes -o wide
+oc get co
+oc get po -n openshift-cnv

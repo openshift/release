@@ -4,6 +4,7 @@ workflow:
     Phase 1 workflow that provisions two ephemeral OpenShift clusters on libvirt:
     a management cluster and an external infrastructure (infra) cluster. This is the
     foundation for HyperShift KubeVirt on external infrastructure testing.
+    MCE + virt operator are installed on the mgmt cluster; virt operator alone on infra.
   steps:
     allow_best_effort_post_steps: true
     leases:
@@ -26,6 +27,16 @@ workflow:
     - ref: upi-libvirt-infra-debug-static-pod
     - ref: upi-libvirt-infra-conf-etcd-ramfs
     - chain: upi-libvirt-infra-install
+
+    # ── Operator installs ─────────────────────────────────────────────────
+    # MCE on mgmt cluster (uses default $KUBECONFIG → mgmt kubeconfig)
+    - ref: hypershift-mce-install
+    # KubeVirt / virt operator on mgmt cluster
+    - ref: hypershift-kubevirt-install
+    # KubeVirt / virt operator on infra cluster (override KUBECONFIG to infra)
+    - ref: hypershift-kubevirt-install
+      env:
+        KUBECONFIG: /tmp/shared/infra-kubeconfig
     test:
     - ref: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra-test-print
     post:
