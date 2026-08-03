@@ -139,6 +139,16 @@ PatchVirtHandlerDaemonSetCertMount() {
                       \"mountPath\":\"${clientCertMountPath}\",
                       \"readOnly\":true}}
         ]"
+    # Explicitly restart to guarantee the DaemonSet controller evicts old pods.
+    # Without this, `rollout status` can return for the *    # Without this, `rollout status` can return for the *previous* generation before
+    # the controller has processed the patch, leaving old pods (without the new mount)
+    # in place for the post-patch cert check.
+    oc --kubeconfig="${kubeconfig}" rollout restart ds/virt-handler -n "${cnvNs}"
+    true
+}previous* generation before
+    # the controller has processed the patch, leaving old pods (without the new mount)
+    # in place for the post-patch cert check.
+    oc --kubeconfig="${kubeconfig}" rollout restart ds/virt-handler -n "${cnvNs}"
     true
 }
 
