@@ -45,8 +45,8 @@ if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
 fi
 
 
-if [[ -f /home/krkn/kraken/kraken.report.pdf ]]; then
-  cp /home/krkn/kraken/kraken.report.pdf ${ARTIFACT_DIR}/kraken.report.pdf
+if [[ -f /tmp/report.out.pdf ]]; then
+  cp /tmp/report.out.pdf ${ARTIFACT_DIR}/kraken.report.pdf
 fi
 echo "Done running the test!" 
 echo "Return code: $rc"
