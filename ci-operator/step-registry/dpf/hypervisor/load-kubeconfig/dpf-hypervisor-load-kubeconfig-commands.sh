@@ -46,6 +46,7 @@ fi
 # Copy the cluster kubeconfig from the last install dir on the hypervisor
 echo "=== Copying kubeconfig from ${LAST_OPENSHIFT_DPF} on hypervisor ==="
 scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME} /tmp/kubeconfig.${CLUSTER_NAME}
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/.env "${SHARED_DIR}/.env"
 
 # The kubeconfig's API server is addressed by an internal hostname that is
 # not resolvable from the CI cluster's network. Resolve it from the

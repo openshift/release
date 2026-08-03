@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+cp "${SHARED_DIR}/.env" .
+
 echo "=== Run DPF Kubernetes Traffic Flow Tests ==="
 
 echo "Verifying cluster access..."
