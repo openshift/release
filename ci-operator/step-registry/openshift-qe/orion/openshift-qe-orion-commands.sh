@@ -216,12 +216,7 @@ export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_
 if [[ -n $pull_number ]]; then
     export pull_number=${pull_number}
 fi
-<<<<<<< HEAD
 orion --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
-=======
-
-orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/${FILENAME}.txt
->>>>>>> 134b0893dd9 (adding merge)
 orion_exit_status=$?
 set -e
 
