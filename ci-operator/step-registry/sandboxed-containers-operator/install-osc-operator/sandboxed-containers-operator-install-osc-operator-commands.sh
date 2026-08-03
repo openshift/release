@@ -399,13 +399,17 @@ function wait_for_operator() {
     return 1
   fi
 
-  # Stage 1: Wait for custom CatalogSource if configured
+  # Stage 1: Wait for the CatalogSource created by env-cm (e.g. brew-catalog)
   if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
-    if ! wait_until "OSC CatalogSource osc-operator-dev-catalog READY" 60 5 \
-      "[[ \"\$(oc get catalogsource -n openshift-marketplace osc-operator-dev-catalog -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
-      oc get catalogsource -n openshift-marketplace || true
-      oc describe catalogsource -n openshift-marketplace osc-operator-dev-catalog || true
-      return 1
+    local catsrc_name
+    catsrc_name=$(oc get configmap osc-config -n default -o jsonpath='{.data.catalogsourcename}' 2>/dev/null || echo "")
+    if [[ -n "${catsrc_name}" && "${catsrc_name}" != "redhat-operators" ]]; then
+      if ! wait_until "CatalogSource ${catsrc_name} READY" 60 5 \
+        "[[ \"\$(oc get catalogsource -n openshift-marketplace '${catsrc_name}' -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
+        oc get catalogsource -n openshift-marketplace || true
+        oc describe catalogsource -n openshift-marketplace "${catsrc_name}" || true
+        return 1
+      fi
     fi
   fi
 
