@@ -34,13 +34,24 @@ images:
     to: tests
   - dockerfile_path: images/hello-openshift/Dockerfile.rhel
     to: hello-openshift
+  - dockerfile_path: .devcontainer/Dockerfile
+    to: origin-devcontainer
 promotion:
   to:
-  - name: "5.1"
+  - excluded_images:
+    - origin-devcontainer
+    name: "5.1"
     namespace: ocp-priv
 prowgen:
   private: true
 raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      dnf install -y python3.12 && dnf clean all
+      alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 && alternatives --set python3 /usr/bin/python3.12
+      curl -LsSf https://astral.sh/uv/0.7.19/install.sh | env INSTALLER_NO_MODIFY_PATH=1 UV_INSTALL_DIR=/usr/local/bin sh
+    from: bin
+    to: bin-uv
 - pipeline_image_cache_step:
     commands: |
       curl http://base-openstack-4-22.ocp.svc > /etc/yum.repos.art/ci/base-openstack-4-22.repo
@@ -91,7 +102,7 @@ tests:
   commands: |
     make verify -k --warn-undefined-variables
   container:
-    from: bin
+    from: bin-uv
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: verify-deps
   commands: |
@@ -566,9 +577,7 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true
@@ -655,6 +664,19 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-cgroupsv2
+- always_run: false
+  as: e2e-agent-compact-ipv4-iso-no-registry
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
+        AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
+    workflow: agent-e2e-generic-conformance-iso-no-registry
 - as: lint
   commands: |
     export GOCACHE=/tmp/
@@ -675,6 +697,9 @@ tests:
       --allow-missing-architectures=e2e-quay-io-keycloak-keycloak \
       --allow-missing-architectures=e2e-quay-io-crio-artifact-subpath-8cuvQpZ0AoyNahYr \
       --allow-missing-architectures=e2e-quay-io-kubevirt-fedora-with-test-tooling-container-disk \
+      --allow-missing-architectures=e2e-ghcr-io-nicolaka-netshoot \
+      --allow-missing-architectures=registry-k8s-io-e2e-test-images-node-perf-npb \
+      --allow-missing-architectures=registry-k8s-io-e2e-test-images-node-perf-pytorch-wide-deep \
       --log-level=debug
   container:
     from: tests
