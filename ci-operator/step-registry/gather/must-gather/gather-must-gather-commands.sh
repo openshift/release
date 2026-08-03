@@ -313,9 +313,16 @@ fi
 
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
 
+# no internet access in C2S/SC2S env, disable proxy
+if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+    source "${SHARED_DIR}/unset-proxy.sh"
+fi
 # Download the binary from mirror
 curl -sL "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
 chmod +x /tmp/mco-sanitize
+if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 set -x # log the MG commands
 echo "Running must-gather..."

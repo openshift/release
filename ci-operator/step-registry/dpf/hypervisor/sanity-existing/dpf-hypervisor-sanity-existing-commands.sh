@@ -1,13 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
+
 # Configuration
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
 
-# $ host api.doca8.nvidia.eng.rdu2.dc.redhat.com
-# api.doca8.nvidia.eng.rdu2.dc.redhat.com has address 10.6.135.33
-echo "Setting DOCA8 CLUSTER_API_IP to 10.6.135.33"
-CLUSTER_API_IP="10.6.135.33"
+CLUSTER_API_IP=$(cat "${CLUSTER_PROFILE_DIR}/cluster-api-ip")
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
@@ -44,7 +43,7 @@ echo "Remote host: ${REMOTE_HOST}"
 
 datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
 SANITY_TESTS_RESULT=""
-REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
+REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
 # Extract the kubeconfig from the last DPF openshift-dpf install dir on hypervisor
 echo "=== SCP the kubeconfig from the last DPF openshift-dpf install dir on hypervisor ==="
@@ -56,7 +55,7 @@ ls -ltr /tmp
 if [ -f /tmp/last-openshift-dpf-dir.sh ] ; then
   cat /tmp/last-openshift-dpf-dir.sh
   set -a
-  source /tmp/last-openshift-dpf-dir.sh 
+  source /tmp/last-openshift-dpf-dir.sh
   echo "last DPF openshift-dpf dir is: '${LAST_OPENSHIFT_DPF}'"
 else
   echo "Failed to find scp-ed file '/tmp/last-openshift-dpf-dir.sh'"
@@ -66,22 +65,22 @@ fi
 # scp DPF managment cluster kubeconfig from last dpf install dir
 echo "SCP DPF managment cluster kubeconfig from last dpf install dir to /tmp locally"
 
-scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.doca8 /tmp
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME} /tmp
 
 ls -ltr /tmp
-cp /tmp/kubeconfig.doca8 /tmp/kubeconfig.doca8_ORIG
+cp /tmp/kubeconfig.${CLUSTER_NAME} /tmp/kubeconfig.${CLUSTER_NAME}_ORIG
 
-echo " Substitute the hypervisor domain name 'api.doca8.nvidia.eng.rdu2.dc.redhat.com' for cluster api ip address '${CLUSTER_API_IP}'"
+echo " Substitute the hypervisor domain name 'api.${CLUSTER_NAME}.nvidia.eng.rdu2.dc.redhat.com' for cluster api ip address '${CLUSTER_API_IP}'"
 
-sed -i "s|server: https://api.doca8.nvidia.eng.rdu2.dc.redhat.com:6443|server: https://${CLUSTER_API_IP}:6443|" /tmp/kubeconfig.doca8
+sed -i "s|server: https://api.${CLUSTER_NAME}.nvidia.eng.rdu2.dc.redhat.com:6443|server: https://${CLUSTER_API_IP}:6443|" /tmp/kubeconfig.${CLUSTER_NAME}
 
-cat /tmp/kubeconfig.doca8 | grep 6443
+cat /tmp/kubeconfig.${CLUSTER_NAME} | grep 6443
 
-export KUBECONFIG=/tmp/kubeconfig.doca8
+export KUBECONFIG=/tmp/kubeconfig.${CLUSTER_NAME}
 
 
 
-# Containerfile is updated in openshift-dpf to dnf install oc client, and the openshift-dpf 
+# Containerfile is updated in openshift-dpf to dnf install oc client, and the openshift-dpf
 # latest main clone should be mounted in /root/dpf-ci
 echo "=== Checking if the openshift-dpf latest PR clone is mounted in /root/dpf-ci dir on this running pod"
 ls -ltr /root/dpf-ci
@@ -133,7 +132,7 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -a; \
     env; \
     cd \${LAST_OPENSHIFT_DPF}; \
     pwd; \
-    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.doca8; \
+    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME}; \
     oc get co; \
     oc get nodes; \
     oc get dpu -A; \
@@ -148,10 +147,10 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -a; \
     make verify-dpudeployment; \
     echo \$? > verification-result"; then
 
-  echo "DPF spot check tests Passed"; 
+  echo "DPF spot check tests Passed";
 
-else 
-  echo "DPF spot checks tests Failed"; 
+else
+  echo "DPF spot checks tests Failed";
   exit 1
 fi
 
@@ -169,14 +168,14 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   pwd; \
   cat .env; \
   cat verification-result; \
-  make run-dpf-sanity 2>&1 | tee log-dpf-sanity-checks-${datetime_string}"; then 
-  
+  make run-dpf-sanity 2>&1 | tee log-dpf-sanity-checks-${datetime_string}"; then
+
   # Note the above statement will return true if it get executed and even if it sanity fails
   # Need to try a different approach to check pass/fail for sanity test
 
-  echo "Sanity Test Passed on hypervisor"; 
+  echo "Sanity Test Passed on hypervisor";
   SANITY_TESTS_RESULT="PASS";
-else 
+else
   echo "Sanity Test Failed on hypervisor";
 
 fi
@@ -189,9 +188,9 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_L
   cd \${LAST_OPENSHIFT_DPF}; \
   cat log-dpf-sanity-checks-${datetime_string}"; then
 
-  echo "Successfully output Sanity Test log file"; 
-  
-else 
+  echo "Successfully output Sanity Test log file";
+
+else
   echo "Failed to output Sanity Test log file";
 
 fi

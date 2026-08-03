@@ -29,6 +29,19 @@ ref:
   - name: EXTRA_ARGS
     default: ""
     documentation: "Extra args to pass to the create cluster aws command"
+  - name: FIPS
+    default: "false"
+    documentation: "When set to true, enables FIPS mode for the hosted cluster."
+  - name: IMAGE_CONTENT_SOURCES
+    default: ""
+    documentation: |-
+      YAML content specifying alternate image registry sources and their mirrors,
+      passed to the hypershift CLI via --image-content-sources. When set, the content
+      is written to a file and passed to the create cluster command.
+      Example format:
+      - source: quay.io/openshift-release-dev/ocp-release
+        mirrors:
+        - my-mirror.example.com/openshift-release-dev/ocp-release
   - name: HYPERSHIFT_HC_RELEASE_IMAGE
     default: ""
     documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
@@ -38,6 +51,9 @@ ref:
   - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
     default: "SingleReplica"
     documentation: "Availability policy for infrastructure services in guest cluster. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
+  - name: HOSTED_MANAGEMENT_CLUSTER
+    default: "hosted-mgmt"
+    documentation: "The cluster used to execute hypershift and host control plane components"
   - name: OLM_CATALOG_PLACEMENT
     default: "management"
     documentation: "The OLM catalog placement. Supported options: management, guest, default management"
@@ -98,9 +114,6 @@ ref:
       memory: 100Mi
   timeout: 60m0s
   credentials:
-  - mount_path: /etc/hypershift-ci-jobs-awscreds
-    name: hypershift-ci-jobs-awscreds
-    namespace: test-credentials
   - mount_path: /etc/ci-pull-credentials
     name: ci-pull-credentials
     namespace: test-credentials
@@ -109,6 +122,9 @@ ref:
     namespace: test-credentials
   - mount_path: /var/run/hypershift-workload-credentials
     name: hypershift-workload-credentials
+    namespace: test-credentials
+  - mount_path: /var/run/hypershift-workload-credentials-hosted-mgmt2
+    name: hypershift-workload-credentials-hosted-mgmt2
     namespace: test-credentials
   dependencies:
   - name: "release:latest"

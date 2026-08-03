@@ -463,6 +463,7 @@ CONFIG = {
     'packet-edge-quota-slice': {
         'default': 50,
     },
+    'power-s2s-quota-slice': {},
     'vsphere-dis-2-quota-slice':{},
     'vsphere-connected-2-quota-slice':{},
     'vsphere-elastic-quota-slice':{},
@@ -734,6 +735,10 @@ for i in range(3):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 # Reserve one for internal debugging use
 del CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-3']
+
+for i in range(1):        
+    for j in range(4):    
+        CONFIG['power-s2s-quota-slice']['power-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 

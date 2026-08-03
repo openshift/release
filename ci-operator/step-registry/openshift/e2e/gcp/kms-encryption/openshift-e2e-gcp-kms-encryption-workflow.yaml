@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-e2e-gcp-kms-encryption
+  steps:
+    pre:
+    - ref: gcp-provision-kms-key
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-osdisk-encryption-key
+    - chain: ipi-install
+    test:
+    - ref: gcp-verify-kms-bucket-encryption
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-gcp-post
+  documentation: |-
+    The GCP KMS encryption workflow ensures a shared customer-managed KMS key
+    exists (global location, reused across runs), configures install-config
+    with OS disk encryption, installs a cluster, verifies KMS encryption is
+    applied to GCS buckets (bootstrap ignition and image registry), and runs
+    the conformance suite.
+
+    Note: The KMS keyring and key are NOT deleted after the test completes.
+    This is intentional because GCP does not allow deletion of KMS keys (they
+    can only be disabled). The same key is reused across all CI runs to avoid
+    resource accumulation.

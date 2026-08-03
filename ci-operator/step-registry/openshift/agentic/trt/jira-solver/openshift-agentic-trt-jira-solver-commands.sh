@@ -18,39 +18,53 @@ ISSUE_JSON="${SHARED_DIR}/jira-issue.json"
 ISSUE_SUMMARY=$(jq -r '.fields.summary // "No summary"' "${ISSUE_JSON}")
 export ISSUE_SUMMARY
 
-git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
+if [[ "${EVAL_MODE:-}" != "true" ]]; then
+    git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
+fi
 
 echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
 
 # --- Workspace setup ---
-cd /workspace
+WORKDIR="${WORKDIR:-/workspace}"
+cd "${WORKDIR}"
+# In eval mode, eval-solve pre-clones the repo — this block only runs in standalone (production) mode
+if [[ ! -d .git ]]; then
+    git init
+    git remote add origin "https://github.com/${UPSTREAM_REPO}.git"
+    git fetch origin
+    git checkout main
+fi
 git config user.name "openshift-trt"
 git config user.email "openshift-trt@redhat.com"
-git remote add fork "https://github.com/${FORK_REPO}.git"
+git remote add fork "https://github.com/${FORK_REPO}.git" 2>/dev/null || true
 
-echo "Running setup script: ${SETUP_SCRIPT}..."
-# shellcheck source=/dev/null
-source "/workspace/${SETUP_SCRIPT}"
+if [[ "${EVAL_MODE:-}" != "true" ]]; then
+    echo "Running setup script: ${SETUP_SCRIPT}..."
+    # shellcheck source=/dev/null
+    source "${WORKDIR}/${SETUP_SCRIPT}"
 
-echo "Installing Claude Code..."
-curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
-export PATH="${HOME}/.local/bin:${PATH}"
+    echo "Installing Claude Code..."
+    curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
+    export PATH="${HOME}/.local/bin:${PATH}"
+fi
 
-mkdir -p /workspace/artifacts
+mkdir -p "${WORKDIR}/artifacts"
 
-copy_artifacts() {
-    echo "Copying artifacts..."
-    cp /workspace/artifacts/* "${ARTIFACT_DIR}/" 2>/dev/null || true
-    podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
-    if [[ -d "${HOME}/.claude/projects" ]]; then
-        echo "Archiving Claude session logs..."
-        tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
-    fi
-}
-trap copy_artifacts EXIT TERM INT
+if [[ "${EVAL_MODE:-}" != "true" ]]; then
+    copy_artifacts() {
+        echo "Copying artifacts..."
+        cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
+        podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
+        if [[ -d "${HOME}/.claude/projects" ]]; then
+            echo "Archiving Claude session logs..."
+            tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
+        fi
+    }
+    trap copy_artifacts EXIT TERM INT
+fi
 
 # --- Assemble prompt: generic base + repo-specific config ---
-SOLVE_PROMPT="/tmp/agentic-solve-prompt.md"
+SOLVE_PROMPT="/tmp/agentic-solve-prompt-$(basename "${WORKDIR}").md"
 cat > "${SOLVE_PROMPT}" <<'SOLVE_BASE_EOF'
 # Solve Jira Issue
 
@@ -84,7 +98,7 @@ The repo-specific build, test, and verify commands are provided below.
 
 ## Step 4: Write PR description
 
-Write a PR description to `/workspace/artifacts/pr-description.md` (CI) or print it (local). Include:
+Write a PR description to `__WORKDIR__/artifacts/pr-description.md` (CI) or print it (local). Include:
 - A summary section describing what changed and why
 - A test plan section listing what you verified
 - Link to the Jira issue
@@ -102,10 +116,12 @@ If you cannot solve the issue, explain why in detail.
 - Do NOT run commands that reveal git credentials (git remote -v, env, printenv, set, etc.).
 SOLVE_BASE_EOF
 
-if [[ -f /workspace/.agentic/solve-config.md ]]; then
+if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
     echo "" >> "${SOLVE_PROMPT}"
-    cat /workspace/.agentic/solve-config.md >> "${SOLVE_PROMPT}"
+    cat "${WORKDIR}/.agentic/solve-config.md" >> "${SOLVE_PROMPT}"
 fi
+
+sed -i "s|__WORKDIR__|${WORKDIR}|g" "${SOLVE_PROMPT}"
 
 # --- Run Claude ---
 echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
@@ -117,7 +133,7 @@ timeout 5400 claude \
     --output-format stream-json \
     --append-system-prompt-file "${SOLVE_PROMPT}" \
     -p "Solve Jira issue ${JIRA_ISSUE_KEY}" \
-    --verbose 2>&1 | tee /workspace/artifacts/claude-output.log || CLAUDE_EXIT=$?
+    --verbose 2>&1 | tee "${WORKDIR}/artifacts/claude-output.log" || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo "Claude timed out. Nudging to wrap up..."
@@ -127,8 +143,8 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         --allowedTools "${ALLOWED_TOOLS}" \
         --output-format stream-json \
         --max-turns 10 \
-        -p "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to /workspace/artifacts/pr-description.md." \
-        --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
+        -p "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
+        --verbose 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || true
 elif [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
     echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
     exit "${CLAUDE_EXIT}"
@@ -140,9 +156,19 @@ if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "
     echo "ERROR: Claude did not create a feature branch."
     exit 1
 fi
-echo "Branch pushed: ${BRANCH_NAME}"
+if [[ "${EVAL_MODE:-}" == "true" ]]; then
+    EVAL_BRANCH="${BRANCH_NAME}-eval-$(date +%Y%m%d-%H%M%S)"
+    echo "Eval mode: renaming branch ${BRANCH_NAME} -> ${EVAL_BRANCH}"
+    git branch -m "${BRANCH_NAME}" "${EVAL_BRANCH}"
+    git push fork --delete "${BRANCH_NAME}" 2>/dev/null || true
+    git push fork "${EVAL_BRANCH}" || git push origin "${EVAL_BRANCH}"
+    BRANCH_NAME="${EVAL_BRANCH}"
+fi
 
-PR_BODY_FILE="/workspace/artifacts/pr-description.md"
+echo "Branch pushed: ${BRANCH_NAME}"
+echo "${BRANCH_NAME}" > "${SHARED_DIR}/claude-branch"
+
+PR_BODY_FILE="${WORKDIR}/artifacts/pr-description.md"
 if [[ ! -s "${PR_BODY_FILE}" ]]; then
     echo "Warning: No PR description generated. Using default."
     cat > "${PR_BODY_FILE}" <<PR_DEFAULT
@@ -153,10 +179,16 @@ PR_DEFAULT
 fi
 printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
 
+BASE_ARGS=()
+if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then
+    BASE_ARGS=(--base "$(cat "${SHARED_DIR}/eval-base-branch")")
+fi
+
 echo "Creating PR..."
 PR_URL=$(gh pr create \
     --repo "${UPSTREAM_REPO}" \
     --head "${FORK_REPO%%/*}:${BRANCH_NAME}" \
+    "${BASE_ARGS[@]}" \
     --no-maintainer-edit \
     --title "$(echo "${JIRA_ISSUE_KEY}: ${ISSUE_SUMMARY}" | head -c 250)" \
     --body-file "${PR_BODY_FILE}" \
@@ -168,5 +200,10 @@ PR_URL=$(gh pr create \
 echo "PR created: ${PR_URL}"
 PR_NUM=$(echo "${PR_URL}" | grep -o '[0-9]*$')
 echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
+
+# Copy PR description to SHARED_DIR for downstream steps (e.g., eval-judge)
+if [[ -s "${PR_BODY_FILE}" ]]; then
+    cp "${PR_BODY_FILE}" "${SHARED_DIR}/pr-description.md"
+fi
 
 echo "=== TRT Jira Solver Complete ==="

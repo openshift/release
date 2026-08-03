@@ -2,9 +2,7 @@
 set -o nounset -o errexit -o
 
 # Variables
-PROBE_NS="openshift-image-registry"               # fallback to operators later if missing
 GLOBAL_DEADLINE=$(( $(date +%s) + 1200 ))         # 20 minutes global timebox
-SURV=""                                           # will be detected
 SKIP_HOST_SSH=0
 
 # Logging
@@ -33,27 +31,6 @@ must_have_time() {
   if [[ ${left} -le 60 ]]; then
     log "TIMEBOX_EXIT (≤60s left)"
     exit 0
-  fi
-}
-
-pin_single_replica_recreate() {
-  local ns="$1" dep="$2" dels="${3:-}"
-  must_have_time
-
-  if oc -n "${ns}" get deploy "${dep}" >/dev/null 2>&1; then
-    oc -n "${ns}" patch deploy/"${dep}" --type=merge -p "{
-      \"spec\":{
-        \"replicas\":1,
-        \"strategy\":{\"type\":\"Recreate\"},
-        \"template\":{\"spec\":{\"nodeSelector\":{\"kubernetes.io/hostname\":\"${SURV}\"}}}
-      }
-    }" || true
-
-    if [[ -n "${dels}" ]]; then
-      oc -n "${ns}" delete pod -l "${dels}" --force --grace-period=0 || true
-    else
-      oc -n "${ns}" delete pod --all --force --grace-period=0 || true
-    fi
   fi
 }
 
@@ -89,19 +66,12 @@ wait_for_image_registry_stable() {
     sleep 10
   done
 
-  # Best-effort only
   log "image-registry did not stay non-Progressing long enough before timeout (continuing anyway)."
   return 0
 }
 
 
 wait_for_image_registry_stable
-# Survivor node detection
-SURV="$(oc get nodes -l node-role.kubernetes.io/master \
-  -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\n"}{end}{end}' \
-  | awk '$2=="True"{print $1;exit}')"
-: "${SURV:=master-0}"
-log "Survivor: ${SURV}"
 
 # Host SSH setup (optional)
 SKIP_HOST_SSH="${SKIP_HOST_SSH:-0}"
@@ -167,6 +137,19 @@ sudo pcs resource status || true
 echo "[master-0] debug-stop etcd (best-effort)..."
 sudo pcs resource debug-stop etcd || true
 
+# Wait for etcd ports to be released before restarting.
+# debug-stop uses 'podman stop -t=80' which can take up to ~90s to fully
+# release ports 2379/2380. debug-start's internal port wait is only 60s,
+# so without this explicit wait the start can time out.
+echo "[master-0] waiting for etcd ports 2379/2380 to be released..."
+for _i in $(seq 1 120); do
+  if ! ss -Htan '( sport = 2379 or sport = 2380 )' | grep -q .; then
+    echo "[master-0] etcd ports released after ${_i}s"
+    break
+  fi
+  sleep 1
+done
+
 # Force start etcd on survivor with the notify meta env var required by the RA
 echo "[master-0] debug-start etcd with notify meta env var..."
 sudo OCF_RESKEY_CRM_meta_notify_start_resource='etcd' pcs resource debug-start etcd
@@ -190,113 +173,6 @@ EOF
 else
   log "Host SSH not attempted (no packet-conf.sh or IP empty)"
 fi
-
-probe_pod() {
-  # $1 name, $2 duration(sec)
-  local name="$1" dur="$2"
-  must_have_time
-
-  local node_selector_json
-  node_selector_json=$(printf '{"spec":{"nodeSelector":{"kubernetes.io/hostname":"%s"}}}' "${SURV}")
-
-  oc -n "${PROBE_NS}" delete pod "${name}" --ignore-not-found --wait=false || true
-
-  oc -n "${PROBE_NS}" run "${name}" \
-    --image=curlimages/curl:8.9.1 \
-    --image-pull-policy=IfNotPresent \
-    --restart=Never \
-    --overrides="${node_selector_json}" \
-    -- sh -lc "
-      set -eu
-      end=\$((\$(date +%s) + ${dur}*2))
-      while [ \$(date +%s) -lt \"\${end}\" ]; do
-        date '+%F %T'
-        code=\$(curl -sk -o /dev/null -w '%{http_code}' https://image-registry.openshift-image-registry.svc:5000/v2/ || echo 000)
-        echo REGISTRY:\${code}
-        sleep 2
-      done
-    " >/dev/null 2>&1 || true
-
-  timeout 30s oc -n "${PROBE_NS}" logs "pod/${name}" --tail=200 || true
-  oc -n "${PROBE_NS}" delete pod "${name}" --ignore-not-found --wait=false || true
-}
-
-# Bounded probes
-probe_pod precheck 150
-probe_pod postcheck 300
-
-# Image Registry pin/scale
-must_have_time
-
-mgmt="$(oc get configs.imageregistry.operator.openshift.io/cluster -o jsonpath='{.spec.managementState}' 2>/dev/null || echo "")"
-if [[ "${mgmt}" == "Removed" ]]; then
-  log "Image Registry managementState=Removed; skipping registry pin/scale."
-else
-  log "Forcing registry single replica on ${SURV} with emptyDir storage (clearing PVC/others)"
-  oc patch configs.imageregistry.operator.openshift.io/cluster --type=merge -p "{
-    \"spec\": {
-      \"replicas\": 1,
-      \"managementState\": \"Managed\",
-      \"nodeSelector\": {\"kubernetes.io/hostname\":\"${SURV}\"},
-      \"tolerations\": [],
-      \"storage\": {
-        \"emptyDir\": {},
-        \"pvc\": null,
-        \"s3\": null, \"gcs\": null, \"azure\": null, \"swift\": null, \"ibmcos\": null
-      }
-    }
-  }" || true
-
-  oc -n openshift-image-registry patch deploy/image-registry --type=merge -p "{
-    \"spec\": {
-      \"replicas\": 1,
-      \"strategy\": {\"type\": \"Recreate\", \"rollingUpdate\": null},
-      \"template\": {\"spec\": {\"nodeSelector\": {\"kubernetes.io/hostname\": \"${SURV}\"}}}
-    }
-  }" || true
-
-  # Delete any registry pod marooned on NotReady nodes
-NOT_READY_NODES="$(
-  oc get nodes \
-    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[*]}{.type}{"="}{.status}{";"}{end}{"\n"}{end}' 2>/dev/null \
-    || echo ""
-)"
-
-TMP=""
-while read -r name conds; do
-  if [[ -n "${name}" && "${conds}" != *"Ready=True"* ]]; then
-    TMP+="${name} "
-  fi
-done <<< "${NOT_READY_NODES}"
-
-NOT_READY_NODES="${TMP}"
-
-  # Bounded readiness: success when exactly 1 Running registry pod on SURV, none elsewhere
-  deadline=$(( $(date +%s) + 1200 ))
-  while [[ $(date +%s) -lt ${deadline} ]]; do
-    must_have_time
-    if oc -n openshift-image-registry get pod -o jsonpath='{range .items[*]}{.metadata.name} {.status.phase} {.spec.nodeName}{"\n"}{end}' 2>/dev/null \
-      | awk -v N="${SURV}" '
-          /^image-registry-/{
-            if ($2=="Running"){running[$3]++}
-          }
-          END{
-            ok=(running[N]==1)
-            for(n in running) if(n!=N && running[n]>0) ok=0
-            exit !ok
-          }'
-    then
-      log "Registry stable: 1 Running pod on ${SURV}"
-      break
-    fi
-    sleep 10
-  done
-fi
-
-# Pin OCM / OLM / CSO
-pin_single_replica_recreate "openshift-controller-manager" "controller-manager" "app=openshift-controller-manager"
-pin_single_replica_recreate "openshift-operator-lifecycle-manager" "packageserver" "app=packageserver"
-pin_single_replica_recreate "openshift-cluster-storage-operator" "cluster-storage-operator"
 
 log "Pre step complete (degraded mode). Exiting clean."
 exit 0

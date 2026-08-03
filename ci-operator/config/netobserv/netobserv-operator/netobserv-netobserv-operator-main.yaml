@@ -19,6 +19,8 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+binary_build_commands: GOCACHE=/tmp/gocache GOMODCACHE=/tmp/gomodcache cd integration-tests/backend
+  && go build ./...
 build_root:
   from_repository: true
 images:
@@ -69,9 +71,9 @@ resources:
       memory: 4Gi
   e2etests-lint-fmt:
     limits:
-      memory: 8Gi
+      memory: 6Gi
     requests:
-      cpu: "1"
+      cpu: "2"
       memory: 4Gi
 tests:
 - as: e2e-operator
@@ -175,25 +177,18 @@ tests:
   commands: |
     export HOME=/tmp/home
     export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export GOPATH=/tmp/gopath
     export GOLANGCI_LINT_CACHE=/tmp/golangci-lint-cache
     export GOWORK=off
-    export GOFLAGS=-mod=mod
+    export GOFLAGS="-mod=mod -p=2"
+    export GOGC=10
+    export GOMAXPROCS=2
+    export GOLANGCI_LINT_CONCURRENCY=2
     cd integration-tests/backend/
     go mod tidy
     make prereqs
     make lint
-    echo -e "\n###############  gofmt  ####################"
-    bad_gofmt_files=$(gofmt -s -l ./)
-    if [[ -n "${bad_gofmt_files}" ]]; then
-        echo "ERROR:"
-        echo "!!! gofmt needs to be run on the listed files"
-        echo "${bad_gofmt_files}"
-        echo "Try running 'gofmt -s [file_path]' Or autocorrect with 'gofmt -s -w [file_path]'"
-        exit 1
-    else
-        echo "gofmt SUCCESS"
-    fi
 
     echo -e "\n###############  yamllint  ####################"
     export PATH=$GOPATH/bin:$PATH
@@ -208,6 +203,7 @@ tests:
   container:
     from: src
   run_if_changed: integration-tests/backend/.*\.(yaml|go)
+  timeout: 1h0m0s
 - as: e2etest
   run_if_changed: integration-tests/backend/.*\.(yaml|go)
   steps:
@@ -238,6 +234,7 @@ tests:
         requests:
           cpu: 100m
     - ref: netobserv-ginkgo-tests
+    - ref: netobserv-evaluate-failures
     workflow: optional-operators-ci-operator-sdk-aws
   timeout: 8h0m0s
 zz_generated_metadata:

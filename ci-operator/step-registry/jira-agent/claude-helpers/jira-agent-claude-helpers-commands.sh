@@ -17,7 +17,7 @@ cat > "${SHARED_DIR}/claude-helpers.sh" << 'HEREDOC_EOF'
 #   extract_claude_tokens    - Extract token usage metrics
 #   record_phase_duration    - Record phase wall-clock time
 #   run_claude_phase         - Run a full Claude CLI phase with extraction
-#   validate_jira_plugin     - Verify jira plugin is installed
+#   validate_jira_plugin     - Verify openshift-developer plugin is installed
 #   build_solve_prompt       - Build Phase 1 (solve) prompt
 #   build_review_prompt      - Build Phase 2 (review) prompt
 #   build_fix_prompt         - Build Phase 3 (fix) prompt
@@ -254,19 +254,17 @@ run_claude_phase() {
 
 # ── Prompt builders ───────────────────────────────────────────────────────────
 
-# Validate that the jira plugin is installed and solve.md is available.
-# Sets: SKILL_CONTENT
+# Validate that the openshift-developer plugin is installed and jira-solve skill is available.
 # Exits with error if plugin is missing.
 validate_jira_plugin() {
   local plugin_dir
   plugin_dir=$(claude plugin list --json 2>/dev/null \
-    | jq -r '.[] | select(.id | test("^jira@")) | .installPath' 2>/dev/null) || true
-  if [[ -z "$plugin_dir" ]] || [[ ! -f "${plugin_dir}/commands/solve.md" ]]; then
-    echo "ERROR: jira plugin solve.md not found — is openshift-developer bundle installed?"
+    | jq -r '.[] | select(.id | test("^openshift-developer@")) | .installPath' 2>/dev/null) || true
+  if [[ -z "$plugin_dir" ]] || [[ ! -f "${plugin_dir}/skills/jira-solve/SKILL.md" ]]; then
+    echo "ERROR: openshift-developer plugin jira-solve skill not found — is openshift-developer bundle installed?"
     exit 1
   fi
-  SKILL_CONTENT=$(cat "${plugin_dir}/commands/solve.md")
-  echo "Jira plugin validated (solve.md loaded)"
+  echo "openshift-developer plugin validated (jira-solve skill loaded)"
 }
 
 # Build the prompt for Phase 1 (solve).
@@ -274,7 +272,7 @@ validate_jira_plugin() {
 # Outputs: prints the prompt to stdout (fork context passed via --append-system-prompt)
 build_solve_prompt() {
   local issue_key=$1
-  echo "/jira:solve ${issue_key} origin --ci"
+  echo "/openshift-developer:jira-solve ${issue_key} origin --ci"
 }
 
 # Build the prompt for Phase 2 (review).

@@ -55,6 +55,8 @@ tests:
       <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6gd.2xlarge
@@ -101,8 +103,10 @@ tests:
         NETWORK_TYPE=OVNKubernetes
       GINKGO_FOCUS_FILTER: "53844"
       SKIP_QE_APP_REGISTRY: "true"
+      TIMEOUT: + 6 hours
     test:
     - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
+    - ref: wait
     - chain: openshift-e2e-test-netobserv-pf5
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: netobserv-metal-ds-ipi-ovn-ipv4-f60-virt
@@ -120,8 +124,10 @@ tests:
       GINKGO_FOCUS_FILTER: with VMs
       SKIP_FRONTEND_TESTS: "true"
       SKIP_QE_APP_REGISTRY: "true"
+      TIMEOUT: + 6 hours
     test:
     - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
+    - ref: wait
     - chain: openshift-e2e-test-netobserv-pf5
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: netobserv-vsphere-ipi-amd-f28

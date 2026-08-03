@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Configuration
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
+CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
@@ -40,7 +41,7 @@ datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
 NETWORK_TESTS_RESULT=""
 
 # Run dpf make target checks test
-REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
+REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
 echo "=== DPF Make Target checks on Existing Cluster ==="
 echo "Using openshift-dpf dir from last cluster-deploy: '${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}'"
@@ -78,7 +79,7 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -a; \
     cd \${LAST_OPENSHIFT_DPF}; \
     pwd; \
     set -e;\
-    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.doca8; \
+    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME}; \
     oc get co; \
     oc get nodes; \
     oc get dpu -A; \
@@ -91,17 +92,17 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -a; \
     make verify-dpudeployment; \
     echo \$? > verification-result"; then
 
-  echo "DPF spot check tests Passed"; 
+  echo "DPF spot check tests Passed";
 
-else 
-  echo "DPF spot checks tests Failed"; 
+else
+  echo "DPF spot checks tests Failed";
   exit 1
 fi
 
 
 echo "=== Run DPF Kubernetes Traffic Flow Tests on Existing Cluster ==="
 
-# Need to export the doca8 dpu-workers after they are renamed, on hypervisor:
+# Need to export the dpu-workers after they are renamed, on hypervisor:
 # export TFT_SERVER_NODE=worker-303ea713ea90
 # export TFT_CLIENT_NODE=worker-303ea713ea94
 
@@ -115,7 +116,7 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   pwd; \
   ls -ltra; \
   set -e;\
-  export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.doca8; \
+  export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME}; \
   oc get nodes; \
   export TFT_SERVER_NODE=\$(oc get nodes | grep worker-dpu | awk 'NR==1 {print \$1}'); \
   echo \${TFT_SERVER_NODE} ;\
@@ -128,7 +129,7 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   echo "Kubernetes Network Traffic Flow Iperf Tests Passed";
   NETWORK_TESTS_RESULT="PASS"
 
-else 
+else
   echo "Kubernetes Network Traffic Flow Iperf Tests Failed";
 
 fi
@@ -140,14 +141,14 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_L
   cd \${LAST_OPENSHIFT_DPF}; \
   cat log-traffic-flow-tests-${datetime_string}"; then
 
-  echo "Successfully output Kubernetes Network Traffic Flow Iperf Tests logs"; 
+  echo "Successfully output Kubernetes Network Traffic Flow Iperf Tests logs";
 
-else 
+else
   echo "Failed to output DPF kubernetes Traffic Flow Iperf Tests logs";
 
 fi
 
-# Parse the log files, may need to scp to container running ssh cmds and process the 
+# Parse the log files, may need to scp to container running ssh cmds and process the
 # output file and exit accordingly
 
 if [ "${NETWORK_TESTS_RESULT}" == "PASS" ]; then

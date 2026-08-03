@@ -1,13 +1,16 @@
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM quay.io/fedora/fedora:43
-      RUN dnf install -y git findutils
+      # Define a Build Root Image that pulls from fedora:latest so
+      # this never needs to be updated. The requirements are just
+      # git and a writable /go directory [1].
+      # [1] https://docs.ci.openshift.org/architecture/ci-operator/#build-root-image
+      FROM quay.io/fedora/fedora:latest
+      RUN dnf install -y git
       RUN mkdir /go && chmod 777 /go
 images:
   items:
   - dockerfile_path: Dockerfile
-    from: root
     to: bin
   skip_if_only_changed: ^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|^ci/hermetic/|docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 resources:

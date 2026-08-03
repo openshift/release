@@ -7,6 +7,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: must-gather
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -87,6 +91,73 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-ptp
+      OO_PACKAGE: ptp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-ptp
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - as: wait-ptp-tls-restart
+      cli: latest
+      commands: |
+        echo "Waiting for PTP operator to restart after TLS profile change..."
+        oc rollout status deployment ptp-operator -n openshift-ptp --timeout=300s
+        oc rollout status daemonset linuxptp-daemon -n openshift-ptp --timeout=400s
+        echo "PTP operator and daemon restarted with new TLS profile"
+        oc get pods -n openshift-ptp
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
+- as: tls-scan-periodic
+  cron: 0 3 * * 5
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-ptp
+      OO_PACKAGE: ptp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-ptp
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - as: wait-ptp-tls-restart
+      cli: latest
+      commands: |
+        echo "Waiting for PTP operator to restart after TLS profile change..."
+        oc rollout status deployment ptp-operator -n openshift-ptp --timeout=300s
+        oc rollout status daemonset linuxptp-daemon -n openshift-ptp --timeout=400s
+        echo "PTP operator and daemon restarted with new TLS profile"
+        oc get pods -n openshift-ptp
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
     workflow: optional-operators-ci-aws
 - as: security
   optional: true

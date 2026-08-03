@@ -7,6 +7,10 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -218,6 +222,21 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: eastus
     workflow: hypershift-azure-aks-e2e
+- always_run: false
+  as: tls-scanner-vsphere-problem-detector
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-vsphere
 zz_generated_metadata:
   branch: release-4.23
   org: openshift

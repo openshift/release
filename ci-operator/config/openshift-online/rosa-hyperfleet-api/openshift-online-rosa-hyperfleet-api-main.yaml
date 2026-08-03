@@ -1,10 +1,38 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 build_root:
-  project_image:
-    dockerfile_path: ci/Containerfile
+  from_repository: true
+  use_build_cache: true
 images:
   items:
-  - dockerfile_path: Dockerfile
-    to: rosa-regional-platform-api
+  - dockerfile_literal: |-
+      FROM go-tools AS go-stage
+      FROM nested-podman
+      COPY --from=go-stage /usr/lib/golang /usr/lib/golang
+      COPY --from=go-stage /usr/bin/go /usr/bin/go
+      COPY --from=go-stage /usr/bin/gofmt /usr/bin/gofmt
+      ENV PATH="/usr/lib/golang/bin:${PATH}"
+      USER root
+      RUN dnf install -y git make gcc --setopt=install_weak_deps=False && dnf clean all
+      USER 1000
+      COPY src/ /opt/app-root/src
+      WORKDIR /opt/app-root/src/rosa-hyperfleet-api
+    from: nested-podman
+    inputs:
+      src:
+        as:
+        - go-tools
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-online/rosa-hyperfleet-api
+    to: integration-runner
+  - dockerfile_path: platform-api/Containerfile
+    to: platform-api
+  - dockerfile_path: hyperfleet-operator/Containerfile
+    to: hyperfleet-operator
 resources:
   '*':
     limits:
@@ -31,30 +59,57 @@ tests:
   commands: ./ci/verify.sh
   container:
     from: src
-- as: push-image
+- as: integration
+  capabilities:
+  - nested-podman
+  commands: ./ci/integration-tests.sh
+  container:
+    from: integration-runner
+  nested_podman: true
+- as: push-api-image
   postsubmit: true
   steps:
     dependencies:
-      CI_COMPONENT_IMAGE: rosa-regional-platform-api
+      CI_COMPONENT_IMAGE: platform-api
     env:
-      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/rosa-regional-platform-api-release
+      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/platform-api-release
+    test:
+    - ref: rosa-hyperfleet-image-push
+- as: push-operator-image
+  postsubmit: true
+  steps:
+    dependencies:
+      CI_COMPONENT_IMAGE: hyperfleet-operator
+    env:
+      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/hyperfleet-operator-release
     test:
     - ref: rosa-hyperfleet-image-push
 - always_run: false
-  as: rosa-regionality-compatibility-e2e
+  as: on-demand-e2e
   steps:
     dependencies:
-      CI_COMPONENT_IMAGE: rosa-regional-platform-api
+      CI_API_IMAGE: platform-api
+      CI_OPERATOR_IMAGE: hyperfleet-operator
     env:
-      ROSA_REGIONAL_COMPONENT_NAME: platform-api
-      ROSA_REGIONAL_HELM_OVERRIDE_YAML: |
-        platformApi:
-          app:
-            image:
-              repository: IMAGE_REPO
-              tag: IMAGE_TAG
-      ROSA_REGIONAL_HELM_VALUES_FILE: argocd/config/regional-cluster/platform-api/values.yaml
-      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/rosa-regional-platform-api
+      ROSA_REGIONAL_EXTRA_COMPONENTS: |
+        - image: CI_API_IMAGE
+          repo: quay.io/rrp-dev-ci/platform-api
+          target: argocd/config/regional-cluster/platform-api/values.yaml
+          override:
+            platformApi:
+              app:
+                image:
+                  repository: IMAGE_REPO
+                  tag: IMAGE_TAG
+        - image: CI_OPERATOR_IMAGE
+          repo: quay.io/rrp-dev-ci/hyperfleet-operator
+          target: argocd/config/regional-cluster/hyperfleet/values.yaml
+          override:
+            hyperfleet:
+              helmValues:
+                image:
+                  repository: IMAGE_REPO
+                  tag: IMAGE_TAG
     workflow: rosa-hyperfleet-ephemeral-e2e
 zz_generated_metadata:
   branch: main
