@@ -4,6 +4,13 @@ set -euo pipefail
 
 # Runs the Kuadrant testsuite as an in-cluster Job on the s390x cluster.
 #
+# Bastion-proven s390x workarounds applied in-Job before make:
+#   - Velocity MockServer echo (header-mirroring; Kuadrant/testsuite#952)
+#   - Authorino/OIDC dataplane-ready soft-wait patch
+#   - protobuf==6.32.1 pin (broken s390x upb ≥6.33.0)
+#   - CFSSL ensure (baked in Dockerfile.s390x; fallback download if missing)
+#   - CoreDNS getaddrinfo plugin + UI ignore
+#
 # Why: the ci-operator step pod lives on the amd64 build farm, on a different
 # network than the leased s390x cluster. It cannot resolve the private CoreDNS
 # zone (*.k.example.com) nor reach the Gateway MetalLB IPs (192.168.x.240).
@@ -128,6 +135,9 @@ cat "${SECRETS_FILE}" | sed -e "s/${KEYCLOAK_ADMIN_PASSWORD}/REDACTED/g" | tee "
 #     make smoke. Proven on rhcl-mc1 with mockserver-s390x-fixed-v10.
 # ---------------------------------------------------------------------------
 ECHO_EXPECTATION_FILE="${WORK_DIR}/echo_expectation.json"
+# Velocity echo that mirrors request headers (httpbin-style). Header values are
+# JSON-escaped so Authorino JsonResponse headers (e.g. "simple": "{\"data\":...}")
+# survive into response.json()["headers"] for extract_response().
 cat > "${ECHO_EXPECTATION_FILE}" <<'EOF'
 [
   {
@@ -141,17 +151,236 @@ cat > "${ECHO_EXPECTATION_FILE}" <<'EOF'
   },
   {
     "id": "echo",
-    "httpRequest": {
-      "path": "/.*"
-    },
+    "httpRequest": {},
     "httpResponseTemplate": {
       "templateType": "VELOCITY",
-      "template": "{\"statusCode\": 200, \"headers\": {\"content-type\": [\"application/json\"]}, \"body\": \"{\\\"headers\\\": {}, \\\"method\\\": \\\"$request.method\\\", \\\"url\\\": \\\"$request.path\\\"}\"}"
+      "template": "#set($first = true)\n{\n  \"statusCode\": 200,\n  \"headers\": {\"content-type\": [\"application/json\"]},\n  \"body\": {\n    \"headers\": {\n#foreach($entry in $request.headers.entrySet())\n#set($raw = $entry.value.get(0))\n#set($q = '\"')\n#set($bs = '\\')\n#set($val = $raw.replace($bs, $bs + $bs).replace($q, $bs + $q))\n#if($first)#set($first = false)#else\n,\n#end\n      \"$entry.key\": \"$val\"\n#end\n    },\n    \"method\": \"$request.method\",\n    \"url\": \"$request.path\"\n  }\n}\n"
     },
     "priority": -10
   }
 ]
 EOF
+
+# ---------------------------------------------------------------------------
+# 2a2. Authorino/OIDC dataplane-ready soft-wait (s390x race after AuthPolicy Enforced)
+#     Applied in-Job onto the baked testsuite tree before make. Source of truth for
+#     review also lives next to this script as s390x-testsuite-dataplane-ready.patch.
+# ---------------------------------------------------------------------------
+DATAPLANE_PATCH_FILE="${WORK_DIR}/s390x-testsuite-dataplane-ready.patch"
+cat > "${DATAPLANE_PATCH_FILE}" <<'PATCH_EOF'
+diff --git a/testsuite/kuadrant/extensions/oidc_policy.py b/testsuite/kuadrant/extensions/oidc_policy.py
+index 2896b48..6c13428 100644
+--- a/testsuite/kuadrant/extensions/oidc_policy.py
++++ b/testsuite/kuadrant/extensions/oidc_policy.py
+@@ -63,5 +63,6 @@ class OIDCPolicy(Policy):
+     def wait_for_ready(self):
+         """Wait for OIDCPolicy to be enforced"""
+         super().wait_for_ready()
+-        # Even after enforced condition OIDCPolicy requires a short sleep
+-        time.sleep(OIDC_POST_ENFORCEMENT_WAIT)  # Workaround for issue #884
++        # CR Enforced is not enough for dataplane redirect; tests also poll for HTTP 302
++        # via wait_for_oidc_dataplane. Keep a short settle for issue #884.
++        time.sleep(OIDC_POST_ENFORCEMENT_WAIT)  # Workaround for https://github.com/Kuadrant/testsuite/issues/884
+diff --git a/testsuite/tests/singlecluster/authorino/conftest.py b/testsuite/tests/singlecluster/authorino/conftest.py
+index 38c3726..5553458 100644
+--- a/testsuite/tests/singlecluster/authorino/conftest.py
++++ b/testsuite/tests/singlecluster/authorino/conftest.py
+@@ -1,10 +1,16 @@
+ """Conftest for Authorino tests"""
+ 
++import logging
++
++import backoff
+ import pytest
+ 
+ from testsuite.httpx.auth import HttpxOidcClientAuth
+ from testsuite.kuadrant.authorino import AuthorinoCR, PreexistingAuthorino
+ from testsuite.kuadrant.policy.authorization.auth_config import AuthConfig
++from testsuite.utils.constants import AUTH_DATAPLANE_READY_INTERVAL, AUTH_DATAPLANE_READY_TIMEOUT
++
++LOGGER = logging.getLogger(__name__)
+ 
+ 
+ @pytest.fixture(scope="session")
+@@ -55,3 +61,66 @@ def commit(request, authorization):
+     request.addfinalizer(authorization.delete)
+     authorization.commit()
+     authorization.wait_for_ready()
++
++
++@pytest.fixture(scope="module")
++def wait_for_unauthenticated_denial():
++    """
++    Whether module setup should poll for unauthenticated /get denial (401/403) or a
++    `simple` response header as a dataplane-readiness signal.
++
++    Override to False in modules where that signal is wrong (e.g. mTLS frontend
++    validation, path-conditional AuthPolicies that leave /get open).
++    """
++    return True
++
++
++def _auth_dataplane_ready(response) -> bool:
++    """True when Authorino is active on the request path."""
++    if response.status_code in (401, 403):
++        # Required identity is enforced (typical OIDC / API key / x509 policies).
++        return True
++    if response.status_code != 200:
++        return False
++    try:
++        headers = response.json().get("headers", {})
++    except Exception:  # pylint: disable=broad-exception-caught
++        return False
++    # Anonymous (or other allow-unauthenticated) policies: wait for injected response headers.
++    return any(name.lower() == "simple" for name in headers)
++
++
++@pytest.fixture(scope="module", autouse=True)
++def wait_for_auth_dataplane(commit, client, wait_for_unauthenticated_denial):  # pylint: disable=unused-argument
++    """
++    Best-effort wait until Authorino is enforcing on the gateway dataplane.
++
++    AuthPolicy Enforced / first HTTP 200 after wasm 503s is not enough: traffic can be
++    fail-opened while the wasm filter is still loading. Retry an unauthenticated request
++    until identity denial (401/403) or an Authorino `simple` response header appears.
++
++    Timeout does not fail setup: modules where unauth /get is never denied would otherwise
++    become mass ERROR. Those tests still fail in-body if auth is not ready.
++    """
++    if not wait_for_unauthenticated_denial:
++        return
++
++    @backoff.on_predicate(
++        backoff.constant,
++        lambda ready: not ready,
++        interval=AUTH_DATAPLANE_READY_INTERVAL,
++        max_time=AUTH_DATAPLANE_READY_TIMEOUT,
++        jitter=None,
++    )
++    def _wait():
++        try:
++            return _auth_dataplane_ready(client.get("/get"))
++        except Exception:  # pylint: disable=broad-exception-caught
++            return False
++
++    if not _wait():
++        LOGGER.warning(
++            "Authorino dataplane readiness signal not observed within %ss "
++            "(unauthenticated /get never returned 401/403 or a 'simple' header); continuing",
++            AUTH_DATAPLANE_READY_TIMEOUT,
++        )
+diff --git a/testsuite/tests/singlecluster/authorino/dinosaur/conftest.py b/testsuite/tests/singlecluster/authorino/dinosaur/conftest.py
+index 8e9cea3..fa4bece 100644
+--- a/testsuite/tests/singlecluster/authorino/dinosaur/conftest.py
++++ b/testsuite/tests/singlecluster/authorino/dinosaur/conftest.py
+@@ -11,6 +11,12 @@ from testsuite.utils import ContentType
+ from testsuite.kuadrant.policy.authorization import Pattern, PatternRef, Value, ValueFrom, DenyResponse
+ 
+ 
++@pytest.fixture(scope="module")
++def wait_for_unauthenticated_denial():
++    """Dinosaur AuthPolicy is path/when-conditional; unauth /get is not a readiness signal."""
++    return False
++
++
+ @pytest.fixture(scope="session")
+ def admin_rhsso(blame, keycloak):
+     """Keycloak Admin realm"""
+diff --git a/testsuite/tests/singlecluster/authorino/identity/x509/gateway_validation/conftest.py b/testsuite/tests/singlecluster/authorino/identity/x509/gateway_validation/conftest.py
+index 69e048c..159f07e 100644
+--- a/testsuite/tests/singlecluster/authorino/identity/x509/gateway_validation/conftest.py
++++ b/testsuite/tests/singlecluster/authorino/identity/x509/gateway_validation/conftest.py
+@@ -8,6 +8,12 @@ from testsuite.kuadrant.policy.tls import TLSPolicy
+ from testsuite.kubernetes.config_map import ConfigMap
+ 
+ 
++@pytest.fixture(scope="module")
++def wait_for_unauthenticated_denial():
++    """mTLS frontend validation: plain unauth /get is not a valid Authorino readiness signal."""
++    return False
++
++
+ @pytest.fixture(scope="module")
+ def exposer(request, testconfig, cluster) -> Exposer:
+     """Exposer object instance with TLS passthrough"""
+diff --git a/testsuite/tests/singlecluster/extensions/oidc_policy/conftest.py b/testsuite/tests/singlecluster/extensions/oidc_policy/conftest.py
+index 0a72db0..9a2cba1 100644
+--- a/testsuite/tests/singlecluster/extensions/oidc_policy/conftest.py
++++ b/testsuite/tests/singlecluster/extensions/oidc_policy/conftest.py
+@@ -6,11 +6,14 @@ in their respective test files.
+ """
+ 
+ from contextlib import contextmanager
++
++import backoff
+ import pytest
+ 
+ from testsuite.gateway import Gateway, GatewayListener
+ from testsuite.gateway.gateway_api.gateway import KuadrantGateway
+ from testsuite.kuadrant.extensions.oidc_policy import OIDCPolicy
++from testsuite.utils.constants import OIDC_DATAPLANE_READY_INTERVAL, OIDC_DATAPLANE_READY_TIMEOUT
+ 
+ 
+ @pytest.fixture(scope="module")
+@@ -62,3 +65,32 @@ def commit(request, oidc_policy):
+     request.addfinalizer(oidc_policy.delete)
+     oidc_policy.commit()
+     oidc_policy.wait_for_ready()
++
++
++@pytest.fixture(scope="module", autouse=True)
++def wait_for_oidc_dataplane(commit, client):  # pylint: disable=unused-argument
++    """
++    Wait until OIDCPolicy redirect is active on the gateway dataplane.
++
++    OIDCPolicy Enforced / fixed post-enforcement sleep is not enough: traffic can still
++    be fail-opened (HTTP 200) while AuthConfig/wasm is catching up. Retry an
++    unauthenticated request until it returns the OAuth2 redirect (302).
++    """
++
++    @backoff.on_predicate(
++        backoff.constant,
++        lambda ready: not ready,
++        interval=OIDC_DATAPLANE_READY_INTERVAL,
++        max_time=OIDC_DATAPLANE_READY_TIMEOUT,
++        jitter=None,
++    )
++    def _wait():
++        try:
++            return client.get("/").status_code == 302
++        except Exception:  # pylint: disable=broad-exception-caught
++            return False
++
++    assert _wait(), (
++        f"Timed out after {OIDC_DATAPLANE_READY_TIMEOUT}s waiting for OIDC dataplane readiness "
++        "(unauthenticated request never returned 302 redirect)"
++    )
+diff --git a/testsuite/utils/constants.py b/testsuite/utils/constants.py
+index 26c6a71..4c9ad83 100644
+--- a/testsuite/utils/constants.py
++++ b/testsuite/utils/constants.py
+@@ -167,9 +167,19 @@ DNS_PROPAGATION_WAIT = 300  # 5 minutes
+ 
+ # --- Miscellaneous Workarounds (seconds) ---
+ 
+-# Workaround for https://github.com/Kuadrant/testsuite/issues/884 — remove when fixed
++# Workaround for https://github.com/Kuadrant/testsuite/issues/884 — remove when fixed.
++# Prefer OIDC dataplane readiness polling (wait_for_oidc_dataplane) over relying on this alone.
+ OIDC_POST_ENFORCEMENT_WAIT = 10
+ 
++# Wait for Authorino to enforce on the gateway dataplane after AuthPolicy is Enforced.
++# CR readiness alone is insufficient while wasm/Envoy is still loading (common on slow arches).
++AUTH_DATAPLANE_READY_TIMEOUT = 60
++AUTH_DATAPLANE_READY_INTERVAL = 1
++
++# Wait for OIDCPolicy redirect to be active on the gateway dataplane (unauth -> 302).
++OIDC_DATAPLANE_READY_TIMEOUT = 60
++OIDC_DATAPLANE_READY_INTERVAL = 1
++
+ # Wait for OPA external registry cache TTL to expire (TTL + buffer).
+ OPA_CACHE_TTL_WAIT = 2
+ 
+PATCH_EOF
 
 # ---------------------------------------------------------------------------
 # 2b. getaddrinfo plugin → mounted into the Job as a ConfigMap
@@ -322,6 +551,37 @@ poetry run python -c \"from importlib.metadata import version; print('protobuf',
 echo '=== s390x workaround: install Velocity MockServer echo expectations ==='
 cp -f /kuadrant-hook/echo_expectation.json testsuite/resources/echo_expectation.json
 grep -n templateType testsuite/resources/echo_expectation.json || true
+
+# Authorino/OIDC dataplane soft-wait (CR Enforced ≠ gateway ready on slow arches).
+# Idempotent: skip if the baked image already includes the wait helpers.
+echo '=== Applying s390x dataplane-ready testsuite patch ==='
+if grep -q 'AUTH_DATAPLANE_READY_TIMEOUT' testsuite/utils/constants.py 2>/dev/null; then
+  echo 'dataplane-ready helpers already present; skipping patch'
+else
+  if command -v git >/dev/null 2>&1; then
+    git apply --verbose /kuadrant-hook/s390x-testsuite-dataplane-ready.patch
+  elif command -v patch >/dev/null 2>&1; then
+    patch -p1 < /kuadrant-hook/s390x-testsuite-dataplane-ready.patch
+  else
+    echo 'ERROR: neither git nor patch available to apply dataplane-ready patch' >&2
+    exit 1
+  fi
+fi
+grep -n AUTH_DATAPLANE_READY_TIMEOUT testsuite/utils/constants.py || true
+grep -n wait_for_auth_dataplane testsuite/tests/singlecluster/authorino/conftest.py || true
+
+# CFSSL: Dockerfile.s390x installs /usr/bin/cfssl; re-install if the baked image is older.
+echo '=== Ensuring cfssl is on PATH ==='
+if ! command -v cfssl >/dev/null 2>&1; then
+  echo 'cfssl missing; downloading s390x binary from cloudflare/cfssl v1.6.5'
+  mkdir -p /tmp/bin
+  curl -fsSL -o /tmp/bin/cfssl \\
+    https://github.com/cloudflare/cfssl/releases/download/v1.6.5/cfssl_1.6.5_linux_s390x
+  chmod +x /tmp/bin/cfssl
+  export PATH=\"/tmp/bin:\$PATH\"
+fi
+command -v cfssl
+cfssl version || true
 "
 # Smoke and kuadrant are independent: each records failure into rc but does not
 # skip the next target. Kuadrant always runs after smoke when enabled.
@@ -368,6 +628,7 @@ oc -n "${TEST_RUNNER_NAMESPACE}" create secret generic kuadrant-testrunner-confi
 oc -n "${TEST_RUNNER_NAMESPACE}" create configmap kuadrant-testrunner-hook \
   --from-file=kuadrant_coredns_resolve.py="${PLUGIN_FILE}" \
   --from-file=echo_expectation.json="${ECHO_EXPECTATION_FILE}" \
+  --from-file=s390x-testsuite-dataplane-ready.patch="${DATAPLANE_PATCH_FILE}" \
   --dry-run=client -o yaml | oc apply -f -
 
 JOB_FILE="${WORK_DIR}/job.yaml"
