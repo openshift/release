@@ -164,9 +164,9 @@ EOF
 # ---------------------------------------------------------------------------
 # 2a2. Authorino/OIDC dataplane-ready soft-wait (s390x race after AuthPolicy Enforced)
 #     Applied in-Job onto the baked testsuite tree before make. Source of truth for
-#     review also lives next to this script as s390x-testsuite-dataplane-ready.patch.
+#     review also lives next to this script as kuadrant-s390x-run-testsuite-dataplane-ready.patch.
 # ---------------------------------------------------------------------------
-DATAPLANE_PATCH_FILE="${WORK_DIR}/s390x-testsuite-dataplane-ready.patch"
+DATAPLANE_PATCH_FILE="${WORK_DIR}/kuadrant-s390x-run-testsuite-dataplane-ready.patch"
 cat > "${DATAPLANE_PATCH_FILE}" <<'PATCH_EOF'
 diff --git a/testsuite/kuadrant/extensions/oidc_policy.py b/testsuite/kuadrant/extensions/oidc_policy.py
 index 2896b48..6c13428 100644
@@ -559,9 +559,9 @@ if grep -q 'AUTH_DATAPLANE_READY_TIMEOUT' testsuite/utils/constants.py 2>/dev/nu
   echo 'dataplane-ready helpers already present; skipping patch'
 else
   if command -v git >/dev/null 2>&1; then
-    git apply --verbose /kuadrant-hook/s390x-testsuite-dataplane-ready.patch
+    git apply --verbose /kuadrant-hook/kuadrant-s390x-run-testsuite-dataplane-ready.patch
   elif command -v patch >/dev/null 2>&1; then
-    patch -p1 < /kuadrant-hook/s390x-testsuite-dataplane-ready.patch
+    patch -p1 < /kuadrant-hook/kuadrant-s390x-run-testsuite-dataplane-ready.patch
   else
     echo 'ERROR: neither git nor patch available to apply dataplane-ready patch' >&2
     exit 1
@@ -628,7 +628,7 @@ oc -n "${TEST_RUNNER_NAMESPACE}" create secret generic kuadrant-testrunner-confi
 oc -n "${TEST_RUNNER_NAMESPACE}" create configmap kuadrant-testrunner-hook \
   --from-file=kuadrant_coredns_resolve.py="${PLUGIN_FILE}" \
   --from-file=echo_expectation.json="${ECHO_EXPECTATION_FILE}" \
-  --from-file=s390x-testsuite-dataplane-ready.patch="${DATAPLANE_PATCH_FILE}" \
+  --from-file=kuadrant-s390x-run-testsuite-dataplane-ready.patch="${DATAPLANE_PATCH_FILE}" \
   --dry-run=client -o yaml | oc apply -f -
 
 JOB_FILE="${WORK_DIR}/job.yaml"
