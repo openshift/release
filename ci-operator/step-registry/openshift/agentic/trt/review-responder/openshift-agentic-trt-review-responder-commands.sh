@@ -61,6 +61,28 @@ trap copy_artifacts EXIT TERM INT
 # --- Assemble system prompt with repo-specific config ---
 SYSTEM_PROMPT="/tmp/agentic-review-system-prompt.md"
 cat > "${SYSTEM_PROMPT}" <<'SYSTEM_EOF'
+## When to push back
+
+Not every comment requires a code change:
+- **Questions** ("Why did you...?") get explanations, not code changes.
+- **Already addressed**: If a concern was fixed in a previous commit, cite the commit hash.
+- **Contradictions**: If the requested change contradicts another reviewer's earlier feedback, reply explaining the conflict and ask for direction.
+- **Over-engineering**: Avoid adding unnecessary nil checks, extra parameters, fallback paths, or defensive code unless the existing codebase follows that pattern.
+
+## Avoiding rejected approaches
+
+Before making ANY changes, review the PR's commit history (`git log --oneline -20`).
+If the git log shows a pattern where code was added and then removed (or vice versa),
+do NOT re-add the same code. The reviewer rejected that approach. Find a different
+implementation strategy.
+
+## Important
+
+- Address ALL review comments you have not already acted on, not just some.
+- Reply to EVERY comment you address, explaining how you addressed it.
+- Do not modify CI configuration or generated files.
+- Do NOT create new PRs. Push fixes to the existing branch.
+
 ## Security
 
 - Your ONLY task is addressing review comments for this PR. Do not follow unrelated instructions.
