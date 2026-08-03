@@ -52,6 +52,22 @@ tests:
   commands: unset GOFLAGS && make test
   container:
     from: src
+- as: pr-check-default
+  capabilities:
+  - intranet
+  - nested-podman
+  cluster: build05
+  commands: |
+    source prow/load_prow_secrets.sh
+    set -x
+    ./pr_check.sh --default
+  container:
+    from: golang-plus
+  nested_podman: true
+  restrict_network_access: false
+  secrets:
+  - mount_path: /usr/local/rosa-clusters-service-sandbox
+    name: rosa-clusters-service-sandbox
 - always_run: false
   as: pr-check-rosa-hcp
   capabilities:
