@@ -163,8 +163,8 @@ EOF
 
 # ---------------------------------------------------------------------------
 # 2a2. Authorino/OIDC dataplane-ready soft-wait (s390x race after AuthPolicy Enforced)
-#     Applied in-Job onto the baked testsuite tree before make. Source of truth for
-#     review also lives next to this script as kuadrant-s390x-run-testsuite-dataplane-ready.patch.
+#     Applied in-Job onto the baked testsuite tree before make. The unified diff is
+#     embedded below (step-registry only allows known companion suffixes).
 # ---------------------------------------------------------------------------
 DATAPLANE_PATCH_FILE="${WORK_DIR}/kuadrant-s390x-run-testsuite-dataplane-ready.patch"
 cat > "${DATAPLANE_PATCH_FILE}" <<'PATCH_EOF'
