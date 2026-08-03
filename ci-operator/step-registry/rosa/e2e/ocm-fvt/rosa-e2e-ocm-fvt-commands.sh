@@ -87,8 +87,8 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
     --url="${backplane_ocm_url}"
   ocm-backplane login "${backplane_cluster_id}"
   $WAS_TRACING_BP && set -x
-  # Warm elevate path (RBAC for Hive/AAO reads); kubeconfig exec plugin uses the session.
-  ocm-backplane elevate "${backplane_elevate_reason}" -- true
+  # Warm elevate: args after -- are oc verbs (not a shell command).
+  ocm-backplane elevate "${backplane_elevate_reason}" -- whoami
 
   hive_kubeconfig="$(mktemp /tmp/hive-kubeconfig.XXXXXX)"
   chmod 0600 "${hive_kubeconfig}"
