@@ -1,0 +1,36 @@
+workflow:
+  as: hypershift-self-managed-azure-e2e-backuprestore
+  documentation: |-
+    The HyperShift self-managed-Azure e2e-backuprestore workflow executes backup and
+    restore tests against a self-managed HyperShift installation on Azure (nested
+    management cluster) using OADP with Azure Blob Storage.
+
+    It provisions the nested management cluster, installs HyperShift, creates
+    self-managed Azure guest clusters, installs OLM and the OADP operator with
+    Azure-specific configuration against the public guest cluster, runs backup/restore
+    E2E tests, and then runs a minimal conformance suite.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-azure-setup-private-link
+    - ref: hypershift-install
+    - ref: hypershift-resolve-nodepool-releases
+    - chain: hypershift-azure-create-selfmanaged-guests
+    - ref: operatorhub-subscribe-oadp-operator
+    - ref: hypershift-self-managed-azure-oadp-setup
+    test:
+    - chain: hypershift-e2e-backuprestore
+    post:
+    - chain: hypershift-azure-dump-selfmanaged-guests
+    - ref: hypershift-self-managed-azure-oadp-destroy
+    - chain: hypershift-azure-destroy-selfmanaged-guests
+    - chain: hypershift-destroy-nested-management-cluster
+    env:
+      CLOUD_PROVIDER: "Azure"
+      HYPERSHIFT_PLATFORM: "azure"
+      HYPERSHIFT_NODE_COUNT: "6"
+      HYPERSHIFT_AZURE_LOCATION: "centralus"
+      AZURE_SELF_MANAGED: "true"
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "sm.hcp-sm-azure.azure.devcluster.openshift.com"
+      HYPERSHIFT_ETCD_STORAGE_CLASS: "managed-csi-premium-v2"
