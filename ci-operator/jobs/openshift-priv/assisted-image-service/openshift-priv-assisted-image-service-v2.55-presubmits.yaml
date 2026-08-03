@@ -1,93 +1,32 @@
 presubmits:
-  openshift-priv/file-integrity-operator:
+  openshift-priv/assisted-image-service:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build03
-    context: ci/prow/ci-index-file-integrity-operator-bundle
+    - ^v2\.55$
+    - ^v2\.55-
+    context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - Dockerfile.ci
+      - .ci-operator.yaml
+      - Dockerfile.image-service
+      - Dockerfile.image-service-build
     hidden: true
     labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-file-integrity-operator-release-4.13-ci-index-file-integrity-operator-bundle
-    path_alias: github.com/openshift/file-integrity-operator
-    rerun_command: /test ci-index-file-integrity-operator-bundle
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-file-integrity-operator-bundle
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index-file-integrity-operator-bundle,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build06
-    context: ci/prow/e2e-aws
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-      sparse_checkout_files:
-      - Dockerfile.ci
-    hidden: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-file-integrity-operator-release-4.13-e2e-aws
-    path_alias: github.com/openshift/file-integrity-operator
-    rerun_command: /test e2e-aws
+    name: pull-ci-openshift-priv-assisted-image-service-v2.55-e2e-metal-assisted
+    path_alias: github.com/openshift/assisted-image-service
+    rerun_command: /test e2e-metal-assisted
+    skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -97,7 +36,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws
+        - --target=e2e-metal-assisted
         command:
         - ci-operator
         env:
@@ -156,30 +95,33 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-assisted,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build06
-    context: ci/prow/e2e-bundle-aws
+    - ^v2\.55$
+    - ^v2\.55-
+    context: ci/prow/e2e-metal-assisted-day2-arm-workers
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - Dockerfile.ci
+      - .ci-operator.yaml
+      - Dockerfile.image-service
+      - Dockerfile.image-service-build
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-file-integrity-operator-release-4.13-e2e-bundle-aws
-    path_alias: github.com/openshift/file-integrity-operator
-    rerun_command: /test e2e-bundle-aws
+    name: pull-ci-openshift-priv-assisted-image-service-v2.55-e2e-metal-assisted-day2-arm-workers
+    optional: true
+    path_alias: github.com/openshift/assisted-image-service
+    rerun_command: /test e2e-metal-assisted-day2-arm-workers
     spec:
       containers:
       - args:
@@ -189,7 +131,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-bundle-aws
+        - --target=e2e-metal-assisted-day2-arm-workers
         command:
         - ci-operator
         env:
@@ -248,30 +190,34 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-bundle-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-day2-arm-workers,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build06
-    context: ci/prow/e2e-bundle-aws-upgrade
+    - ^v2\.55$
+    - ^v2\.55-
+    context: ci/prow/e2e-metal-assisted-deploy-nodes
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - Dockerfile.ci
+      - .ci-operator.yaml
+      - Dockerfile.image-service
+      - Dockerfile.image-service-build
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-file-integrity-operator-release-4.13-e2e-bundle-aws-upgrade
-    path_alias: github.com/openshift/file-integrity-operator
-    rerun_command: /test e2e-bundle-aws-upgrade
+    name: pull-ci-openshift-priv-assisted-image-service-v2.55-e2e-metal-assisted-deploy-nodes
+    optional: true
+    path_alias: github.com/openshift/assisted-image-service
+    rerun_command: /test e2e-metal-assisted-deploy-nodes
     spec:
       containers:
       - args:
@@ -281,7 +227,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-bundle-aws-upgrade
+        - --target=e2e-metal-assisted-deploy-nodes
         command:
         - ci-operator
         env:
@@ -340,36 +286,44 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-bundle-aws-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-deploy-nodes,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build03
-    context: ci/prow/go-build
+    - ^v2\.55$
+    - ^v2\.55-
+    context: ci/prow/e2e-metal-assisted-external
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - Dockerfile.ci
+      - .ci-operator.yaml
+      - Dockerfile.image-service
+      - Dockerfile.image-service-build
     hidden: true
     labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-file-integrity-operator-release-4.13-go-build
-    path_alias: github.com/openshift/file-integrity-operator
-    rerun_command: /test go-build
+    name: pull-ci-openshift-priv-assisted-image-service-v2.55-e2e-metal-assisted-external
+    optional: true
+    path_alias: github.com/openshift/assisted-image-service
+    rerun_command: /test e2e-metal-assisted-external
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=go-build
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-metal-assisted-external
         command:
         - ci-operator
         env:
@@ -387,6 +341,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -404,6 +364,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -413,13 +382,107 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )go-build,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-external,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^v2\.55$
+    - ^v2\.55-
+    context: ci/prow/e2e-oci-assisted
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.image-service
+      - Dockerfile.image-service-build
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: oci-edge
+      ci-operator.openshift.io/cloud-cluster-profile: oci-assisted
+      ci.openshift.io/generator: prowgen
+      job-release: "5.0"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-assisted-image-service-v2.55-e2e-oci-assisted
+    optional: true
+    path_alias: github.com/openshift/assisted-image-service
+    rerun_command: /test e2e-oci-assisted
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-oci-assisted
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-oci-assisted,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build03
+    - ^v2\.55$
+    - ^v2\.55-
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -427,13 +490,16 @@ presubmits:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - Dockerfile.ci
+      - .ci-operator.yaml
+      - Dockerfile.image-service
+      - Dockerfile.image-service-build
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-file-integrity-operator-release-4.13-images
-    path_alias: github.com/openshift/file-integrity-operator
+    name: pull-ci-openshift-priv-assisted-image-service-v2.55-images
+    path_alias: github.com/openshift/assisted-image-service
     rerun_command: /test images
     spec:
       containers:
@@ -480,26 +546,29 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build03
-    context: ci/prow/unit
+    - ^v2\.55$
+    - ^v2\.55-
+    context: ci/prow/lint
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - Dockerfile.ci
+      - .ci-operator.yaml
+      - Dockerfile.image-service
+      - Dockerfile.image-service-build
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-file-integrity-operator-release-4.13-unit
-    path_alias: github.com/openshift/file-integrity-operator
-    rerun_command: /test unit
+    name: pull-ci-openshift-priv-assisted-image-service-v2.55-lint
+    path_alias: github.com/openshift/assisted-image-service
+    rerun_command: /test lint
+    skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -507,7 +576,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --target=lint
         command:
         - ci-operator
         env:
@@ -551,28 +620,31 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build03
-    context: ci/prow/verify
+    - ^v2\.55$
+    - ^v2\.55-
+    context: ci/prow/test
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - Dockerfile.ci
+      - .ci-operator.yaml
+      - Dockerfile.image-service
+      - Dockerfile.image-service-build
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-file-integrity-operator-release-4.13-verify
-    path_alias: github.com/openshift/file-integrity-operator
-    rerun_command: /test verify
+    name: pull-ci-openshift-priv-assisted-image-service-v2.55-test
+    path_alias: github.com/openshift/assisted-image-service
+    rerun_command: /test test
+    skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -580,7 +652,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=verify
+        - --secret-dir=/secrets/assisted-image-service-codecov-token
+        - --target=test
         command:
         - ci-operator
         env:
@@ -598,6 +671,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/assisted-image-service-codecov-token
+          name: assisted-image-service-codecov-token
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -615,6 +691,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: assisted-image-service-codecov-token
+        secret:
+          secretName: assisted-image-service-codecov-token
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -624,4 +703,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify,?($|\s.*)
+    trigger: (?m)^/test( | .* )test,?($|\s.*)
