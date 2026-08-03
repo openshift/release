@@ -63,7 +63,7 @@ tests:
 - as: interop-opp-aws
   capabilities:
   - intranet
-  cron: 0 23 31 2 *
+  cron: 0 6,14,22 * * *
   reporter_config:
     channel: '#opp-discussion'
     job_states_to_report:
@@ -82,6 +82,7 @@ tests:
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      DR__RP__CR_COMP_NAME: lp-interop--OPP
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-aws-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
@@ -89,6 +90,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       IGNORE_SECONDARY_POLICIES: "true"
+      MAP_TESTS: "true"
       ODF_VERSION_MAJOR_MINOR: "4.21"
       OPERATORS: |
         [
@@ -105,6 +107,7 @@ tests:
     - ref: acm-tests-clc-destroy
     - ref: gather-aws-console
     - chain: ipi-deprovision
+    - ref: mpiit-data-router-reporter
     - ref: firewatch-report-issues
     pre:
     - ref: ipi-conf
@@ -131,7 +134,7 @@ tests:
 - as: interop-opp-vsphere
   capabilities:
   - intranet
-  cron: 0 0 1,15 * *
+  cron: 0 6 * * *
   reporter_config:
     channel: '#opp-discussion'
     job_states_to_report:
@@ -148,6 +151,7 @@ tests:
     env:
       COMPUTE_NODE_REPLICAS: "6"
       DISABLE_ENVIRONMENT_CHECKER: "true"
+      DR__RP__CR_COMP_NAME: lp-interop--OPP
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-vsphere-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
@@ -155,6 +159,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       IGNORE_SECONDARY_POLICIES: "true"
+      MAP_TESTS: "true"
       ODF_VERSION_MAJOR_MINOR: "4.21"
       OPENSHIFT_REQUIRED_CORES: "72"
       OPENSHIFT_REQUIRED_MEMORY: "288"
@@ -166,6 +171,13 @@ tests:
       SIZE_VARIANT: large
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: mce-must-gather
+    - chain: ipi-vsphere-post
+    - ref: mpiit-data-router-reporter
+    - ref: firewatch-report-issues
     test:
     - ref: install-operators
     - ref: acm-mch
