@@ -7,8 +7,13 @@ export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
 AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
 OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/konveyor/hypershift-oadp-plugin:latest}"
 
+# TODO: This picks the "public" cluster by default. The hypershift-azure-create-selfmanaged-guests
+# creates a number of clusters which is baked into the create-guests binary from HyperShift.
+# We need to find a way tell the binary to create only a single cluster.
+CLUSTER_PREFIX="${CLUSTER_PREFIX:-public}"
+
 echo "Discovering the public self-managed-Azure guest cluster..."
-CLUSTER_NAME="$(oc get hostedcluster -n clusters -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep "public" | head -n1)"
+CLUSTER_NAME="$(oc get hostedcluster -n clusters -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep "${CLUSTER_PREFIX}" | head -n1)"
 if [[ -z "${CLUSTER_NAME}" ]]; then
   echo "!!! Unable to find a public HostedCluster in the 'clusters' namespace"
   oc get hostedcluster -n clusters
@@ -67,7 +72,6 @@ set +x
 
 AZURE_CREDS_FILE="$(mktemp)"
 cat <<EOF > "${AZURE_CREDS_FILE}"
-[default]
 AZURE_SUBSCRIPTION_ID=${AZURE_AUTH_SUBSCRIPTION_ID}
 AZURE_TENANT_ID=${AZURE_AUTH_TENANT_ID}
 AZURE_CLIENT_ID=${AZURE_AUTH_CLIENT_ID}
