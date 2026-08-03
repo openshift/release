@@ -198,18 +198,8 @@ function render_osc_operator_chart() {
     "--set" "namespaceOverride=${OSC_NAMESPACE}"
   )
 
-  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
-    helm_args+=(
-      "--set" "dev.enabled=true"
-      "--set" "dev.image=${CATALOG_SOURCE_IMAGE}"
-    )
-    echo ">>> Helm: dev.enabled=true, dev.image=${CATALOG_SOURCE_IMAGE}" >&2
-  else
-    helm_args+=(
-      "--set" "dev.enabled=false"
-    )
-    echo ">>> Helm: dev.enabled=false (using redhat-operators)" >&2
-  fi
+  # TODO: use --set dev.enabled=true --set dev.image= once https://github.com/confidential-devhub/charts/pull/4 merges
+  echo ">>> Helm: using redhat-operators (catalog source patched via sed after render)" >&2
 
   local helm_output
   if ! helm_output=$(helm template "${helm_args[@]}" 2>&1); then
@@ -344,6 +334,18 @@ function install_osc_operator() {
   if ! render_osc_operator_chart "${charts_dir}" > "${operator_yaml}"; then
     echo ">>> ERROR: Failed to render operator chart"
     return 1
+  fi
+
+  # TODO: remove sed workaround once https://github.com/confidential-devhub/charts/pull/4 merges
+  # The chart always renders Subscription source as redhat-operators; patch it
+  # to the catalog created by env-cm when running Pre-GA.
+  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
+    local catsrc_name
+    catsrc_name=$(oc get configmap osc-config -n default -o jsonpath='{.data.catalogsourcename}' 2>/dev/null || echo "")
+    if [[ -n "${catsrc_name}" && "${catsrc_name}" != "redhat-operators" ]]; then
+      echo ">>> Patching Subscription source: redhat-operators -> ${catsrc_name}"
+      sed -i "s/source: redhat-operators/source: ${catsrc_name}/" "${operator_yaml}"
+    fi
   fi
 
   echo ">>> Rendered operator objects:"
