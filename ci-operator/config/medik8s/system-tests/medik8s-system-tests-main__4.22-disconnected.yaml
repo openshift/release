@@ -95,6 +95,97 @@ tests:
           memory: 200Mi
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-disconnected
+- always_run: false
+  as: e2e-sbr-aws-disconnected-nfs
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: component:post-deploy
+      ENABLE_IDMS: "yes"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FBC_OCP_VERSION: "422"
+      MEDIK8S_PACKAGES: storage-based-remediation
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: storage-based-remediation
+      SBR_STORAGE_CLASS: nfs-sbr
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: medik8s-lib
+    - ref: medik8s-disconnected-catalogsource
+    - ref: medik8s-operator-subscribe
+    - ref: medik8s-sbr-nfs-bastion
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat "${SHARED_DIR}/sbr_watchdog_debug_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: SBR_STORAGE_CLASS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws-disconnected
+- as: e2e-sbr-weekly-aws-disconnected-nfs
+  capabilities:
+  - intranet
+  cron: 0 16 * * 3
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: component:post-deploy
+      ENABLE_IDMS: "yes"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FBC_OCP_VERSION: "422"
+      MEDIK8S_PACKAGES: storage-based-remediation
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: storage-based-remediation
+      SBR_STORAGE_CLASS: nfs-sbr
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: medik8s-lib
+    - ref: medik8s-disconnected-catalogsource
+    - ref: medik8s-operator-subscribe
+    - ref: medik8s-sbr-nfs-bastion
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat "${SHARED_DIR}/sbr_watchdog_debug_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: SBR_STORAGE_CLASS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws-disconnected
 zz_generated_metadata:
   branch: main
   org: medik8s
