@@ -1,0 +1,33 @@
+ref:
+  as: p2p-debug-sleep
+  from: cli
+  commands: p2p-debug-sleep-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: DEBUG_SLEEP_DURATION
+    default: "0"
+    documentation: |-
+      Number of seconds to sleep in the post phase before cluster uninstall/deprovision
+      begins.  Keeps the clusters alive so engineers can SSH in and debug failures.
+
+      Set to 0 (default) to skip the sleep entirely in normal runs.
+      Set to 7200 for a 2-hour hold during active debugging sessions.
+  documentation: |-
+    Debugging aid: sleeps for DEBUG_SLEEP_DURATION seconds in the post phase, after
+    diagnostic collection (must-gather, inspector, submariner-diag) but before
+    acm-interop-p2p-cluster-uninstall and ipi-deprovision tear the clusters down.
+
+    This gives engineers time to SSH into hub and spoke clusters, run manual
+    diagnostic commands, or re-run failing steps interactively before the
+    infrastructure is destroyed.
+
+    Usage:
+      - Add as the last step in the post phase before uninstall steps.
+      - Set DEBUG_SLEEP_DURATION=7200 (or any positive integer) in the job env.
+      - Set DEBUG_SLEEP_DURATION=0 (or remove the env override) when debugging is done.
+
+    The step is a no-op when DEBUG_SLEEP_DURATION=0 and adds zero overhead to
+    normal runs.
