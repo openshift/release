@@ -38,15 +38,17 @@ ref:
     every spoke cluster before migration steps run.  No-op when CNV_ENABLE_CCLM
     is not "true".
 
-    Background — root cause observed on OCP 4.22 nightly with CNV 4.17+:
-    When decentralizedLiveMigration=true is set in HyperConverged featureGates at
-    install time, virt-operator may not reconcile the virt-handler DaemonSet to add
-    the /etc/virt-handler/clientcertificates volume mount in its first pass.  Without
-    this mount, virt-handler emits "failed to load the certificate
+    Background — CNV bug CNV-89129 / upstream kubevirt#16264
+    (https://github.com/kubevirt/kubevirt/issues/16264):
+    virt-operator does not add the /etc/virt-handler/clientcertificates volume mount
+    to the virt-handler DaemonSet when DecentralizedLiveMigration is enabled, even
+    though the Secret (kubevirt-virt-handler-certs) exists and is populated.
+    Without this mount, virt-handler emits "failed to load the certificate
     /etc/virt-handler/clientcertificates/tls.crt: no such file or directory" every
     60 s and cannot make the required mTLS connection to the destination
     virt-synchronization-controller:9185, leaving the migration stuck in
     Synchronizing/WaitingForSync indefinitely.
+    Affected: CNV 4.17+ / OCP 4.22 (as of 2026-08).
 
     What this step does (idempotent, safe to re-run):
       1. Restarts virt-operator on each spoke and waits for its rollout to finish
