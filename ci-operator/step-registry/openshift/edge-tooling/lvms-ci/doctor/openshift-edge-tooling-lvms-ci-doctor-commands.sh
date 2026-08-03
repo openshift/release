@@ -156,6 +156,18 @@ SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/lvms-ci"
 cd "${SRC_DIR}"
 
+# Run deterministic data collection before Claude.
+# The prepare script collects failed jobs and downloads artifacts.
+# Its JSON summary is saved for the --prepared skill path.
+echo "Running doctor.sh prepare..."
+bash "${PLUGIN_DIR}/scripts/doctor.sh" prepare \
+    --component lvm-operator \
+    --workdir "${WORKDIR}" \
+    ${RELEASE_VERSIONS} \
+    --pull-requests \
+    > "${WORKDIR}/prepare-summary.json"
+echo "Prepare complete"
+
 # Run analysis on all releases.
 # Time-box analysis and limit turns to avoid uncontrolled billable minutes.
 echo "Running Claude to analyze LVMS CI jobs..."
@@ -164,6 +176,6 @@ timeout 4800 claude \
     --max-turns 100 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
-    -p "/lvms-ci:doctor ${RELEASE_VERSIONS}" \
+    -p "/lvms-ci:doctor --prepared ${RELEASE_VERSIONS}" \
     --verbose &> "${CLAUDE_DOCTOR_LOG}"
 echo "Analysis for LVMS CI jobs completed"

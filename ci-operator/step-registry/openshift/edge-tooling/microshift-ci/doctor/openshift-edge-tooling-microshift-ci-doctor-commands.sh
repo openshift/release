@@ -261,6 +261,25 @@ echo "Running automatic closing of duplicate rebase PRs..."
     --filter 'NO-ISSUE: rebase-release'
 echo "Automatic closing of duplicate rebase PRs completed"
 
+# Run deterministic data collection and graph generation before Claude.
+# The prepare script collects failed jobs, downloads artifacts, and clones
+# the source repo. Its JSON summary is saved for the --prepared skill path.
+echo "Running doctor.sh prepare..."
+bash "${PLUGIN_DIR}/scripts/doctor.sh" prepare \
+    --component microshift \
+    --workdir "${WORKDIR}" \
+    ${RELEASE_VERSIONS} \
+    --pull-requests \
+    --repo openshift/microshift \
+    > "${WORKDIR}/prepare-summary.json"
+echo "Prepare complete"
+
+echo "Running doctor.sh graphs..."
+bash "${PLUGIN_DIR}/scripts/doctor.sh" graphs \
+    --component microshift \
+    --workdir "${WORKDIR}"
+echo "Graphs complete"
+
 # Run analysis on all releases and open rebase PRs (60m and 100 turns).
 echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
 CLAUDE_RC=0
@@ -269,7 +288,7 @@ timeout 3600 claude \
     --max-turns 100 \
     --output-format stream-json \
     --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
+    -p "/microshift-ci:doctor --prepared ${RELEASE_VERSIONS}" \
     --verbose &> "${CLAUDE_DOCTOR_LOG}" || CLAUDE_RC=$?
 check_claude_rc "${CLAUDE_RC}" "doctor" 60
 
