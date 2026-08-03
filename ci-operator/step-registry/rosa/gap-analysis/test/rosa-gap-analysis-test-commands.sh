@@ -96,7 +96,6 @@ log "Successfully authenticated with cluster"
 # Validation 1: Wait for cluster ready state
 ###########################################
 log "Validation 1: Waiting for cluster ready state (timeout: ${VALIDATION_TIMEOUT})..."
-CLUSTER_READY=false
 TIMEOUT_SECONDS=$(($(echo "${VALIDATION_TIMEOUT}" | sed 's/m$//' | sed 's/h$//' | awk '{print $1}') * 60))
 START_TIME=$(date +%s)
 
@@ -118,7 +117,6 @@ while true; do
     success "Cluster is in ready state"
     echo "Status: READY" >> "${VALIDATION_REPORT}"
     echo "Time to ready: ${ELAPSED}s" >> "${VALIDATION_REPORT}"
-    CLUSTER_READY=true
     break
   else
     log "Cluster state: ${CLUSTER_STATE}, waiting... (${ELAPSED}s elapsed)"
