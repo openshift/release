@@ -386,6 +386,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/rosa-clusters-service-sandbox
         - --target=pr-check-default
         command:
         - ci-operator
@@ -419,6 +420,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /secrets/rosa-clusters-service-sandbox
+          name: rosa-clusters-service-sandbox
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
@@ -433,6 +437,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+      - name: rosa-clusters-service-sandbox
+        secret:
+          secretName: rosa-clusters-service-sandbox
     trigger: (?m)^/test( | .* )pr-check-default,?($|\s.*)
   - agent: kubernetes
     always_run: false
