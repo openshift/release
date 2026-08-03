@@ -29,14 +29,10 @@ workflow:
     - chain: upi-libvirt-infra-install
 
     # ── Operator installs ─────────────────────────────────────────────────
-    # MCE on mgmt cluster (uses default $KUBECONFIG → mgmt kubeconfig)
-    - ref: hypershift-mce-install
-    # KubeVirt / virt operator on mgmt cluster
-    - ref: hypershift-kubevirt-install
-    # KubeVirt / virt operator on infra cluster (override KUBECONFIG to infra)
-    - ref: hypershift-kubevirt-install
-      env:
-        KUBECONFIG: /tmp/shared/infra-kubeconfig
+    # MCE + virt on mgmt cluster (default $KUBECONFIG → mgmt)
+    - chain: hypershift-mce-ibmz-install-operators-mgmt
+    # virt operator on infra cluster ($SHARED_DIR/infra-kubeconfig)
+    - chain: hypershift-mce-ibmz-install-operators-infra
     test:
     - ref: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra-test-print
     post:

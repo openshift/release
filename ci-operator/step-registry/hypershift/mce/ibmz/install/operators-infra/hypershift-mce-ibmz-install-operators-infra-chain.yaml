@@ -1,0 +1,34 @@
+chain:
+  as: hypershift-mce-ibmz-install-operators-infra
+  steps:
+  - as: hypershift-kubevirt-install-infra
+    from: upi-installer
+    cli: latest
+    grace_period: 10m
+    env:
+    - name: CNV_SUBSCRIPTION_SOURCE
+      default: "cnv-prerelease-catalog-source"
+      documentation: |
+        Subscription source for kubevirt on the infra cluster.
+        Allowed values: redhat-operators or cnv-prerelease-catalog-source.
+    - name: BREW_IMAGE_REGISTRY_USERNAME
+      default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+    - name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      default: /var/run/cnv-ci-brew-pull-secret/token
+    commands: hypershift-mce-ibmz-install-operators-infra-commands.sh
+    credentials:
+    - mount_path: /etc/cnv-nightly-pull-credentials
+      name: openshift-cnv-quay-credentials
+      namespace: test-credentials
+    - collection: ""
+      mount_path: /var/run/cnv-ci-brew-pull-secret
+      name: cnv-ci-brew-pull-secret
+      namespace: test-credentials
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+  documentation: |-
+    Installs the KubeVirt / OpenShift Virtualization operator on the infra cluster.
+    Overrides KUBECONFIG to $SHARED_DIR/infra-kubeconfig so the operator is installed
+    on the infra cluster while the management cluster kubeconfig remains untouched.
