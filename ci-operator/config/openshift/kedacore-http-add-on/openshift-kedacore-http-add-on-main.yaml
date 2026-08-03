@@ -5,7 +5,10 @@ base_images:
     tag: base
 binary_build_commands: make build
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 images:
   items:
   - build_args:
@@ -26,6 +29,9 @@ images:
     dockerfile_path: scaler/Dockerfile
     from: base
     to: custom-metrics-autoscaler-http-add-on-scaler
+  - dockerfile_path: test/images/grpc-echo/Dockerfile
+    from: base
+    to: custom-metrics-autoscaler-http-add-on-grpc-echo
 promotion:
   to:
   - name: "5.0"
@@ -48,6 +54,50 @@ resources:
       cpu: 100m
       memory: 200Mi
 test_binary_build_commands: make test
+tests:
+- as: lint
+  commands: GOFLAGS="" make lint
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: http-addon-e2e-aws
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    post:
+    - as: e2e-clean
+      cli: latest
+      commands: GOFLAGS="" make e2e-test-openshift-clean
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    test:
+    - as: e2e-setup
+      cli: latest
+      commands: GOFLAGS="" make e2e-test-openshift-setup
+      dependencies:
+      - env: IMAGE_HTTP_ADDON_OPERATOR
+        name: custom-metrics-autoscaler-http-add-on-operator
+      - env: IMAGE_HTTP_ADDON_INTERCEPTOR
+        name: custom-metrics-autoscaler-http-add-on-interceptor
+      - env: IMAGE_HTTP_ADDON_SCALER
+        name: custom-metrics-autoscaler-http-add-on-scaler
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: e2e-run
+      cli: latest
+      commands: make e2e-test-openshift
+      dependencies:
+      - env: IMAGE_GRPC_ECHO
+        name: custom-metrics-autoscaler-http-add-on-grpc-echo
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
