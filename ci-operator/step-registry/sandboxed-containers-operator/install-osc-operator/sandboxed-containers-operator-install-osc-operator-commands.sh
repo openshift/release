@@ -346,8 +346,8 @@ function install_osc_operator() {
     return 1
   fi
 
-  echo ">>> Rendered operator YAML:"
-  cat "${operator_yaml}"
+  echo ">>> Rendered operator objects:"
+  oc apply -f "${operator_yaml}" --dry-run=client -o name || true
 
   local apply_output
   if ! apply_output=$(oc apply -f "${operator_yaml}" 2>&1); then
@@ -375,7 +375,8 @@ function wait_for_operator() {
 
     local total_catalogs ready_catalogs
     total_catalogs=$(echo "${catalog_states}" | wc -l)
-    ready_catalogs=$(echo "${catalog_states}" | grep -c "=READY" || echo "0")
+    ready_catalogs=$(echo "${catalog_states}" | grep -c "=READY" || true)
+    ready_catalogs=${ready_catalogs:-0}
 
     if [[ ${ready_catalogs} -eq ${total_catalogs} && ${ready_catalogs} -gt 0 ]]; then
       echo ">>> All CatalogSources are READY (${ready_catalogs}/${total_catalogs})"
@@ -469,13 +470,13 @@ function install_osc_operands() {
 
   # DEBUG until https://github.com/confidential-devhub/charts/pull/4 merges
   # openshift-tests-private expects kataconfig name to be "example-kataconfig". Rename to match the test expectation.
-  if grep -q 'name: kataconfig' "${operands_yaml}" 2>/dev/null; then
-    sed -i 's/name:.*$/name: example-kataconfig/' "${operands_yaml}"
+  if grep -qE '^\s+name: kataconfig$' "${operands_yaml}" 2>/dev/null; then
+    sed -i -E 's/^([[:space:]]*)name: kataconfig$/\1name: example-kataconfig/' "${operands_yaml}"
     echo ">>> DEBUG: kataconfig.yaml patched (renamed to example-kataconfig). PR 4 not merged yet." >&2
   fi
 
-  echo ">>> Rendered operands YAML:"
-  cat "${operands_yaml}"
+  echo ">>> Rendered operands objects:"
+  oc apply -f "${operands_yaml}" --dry-run=client -o name || true
 
   local apply_output
   if ! apply_output=$(oc apply -f "${operands_yaml}" 2>&1); then
