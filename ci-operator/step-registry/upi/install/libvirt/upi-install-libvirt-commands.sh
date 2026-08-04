@@ -79,6 +79,8 @@ LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 # Simplify the virsh command
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 
+RHCOS_RESIZED_LOCALLY=true
+
 # Returns true when BRANCH is a numeric OCP version older than 4.16.
 # Used only for s390x ≤4.15 etcd gating. Non-numeric/unset returns false.
 branch_known_older_than_4_16() {
@@ -92,24 +94,6 @@ branch_known_older_than_4_16() {
     if (major < 4 || (major == 4 && minor < 16)) exit 0;
     exit 1
   }'
-}
-
-RHCOS_RESIZED_LOCALLY=false
-
-# s390x-only: resize RHCOS locally when qemu-img exists; otherwise upload as-is
-# and resize on the hypervisor with virsh vol-resize.
-ensure_rhcos_resized() {
-  local image_path=$1
-  local capacity=$2
-  RHCOS_RESIZED_LOCALLY=false
-  if command -v qemu-img >/dev/null 2>&1; then
-    echo "Resizing rhcos image to match volume capacity..."
-    qemu-img resize ${image_path} ${capacity}
-    RHCOS_RESIZED_LOCALLY=true
-    return 0
-  fi
-  echo "WARNING: qemu-img unavailable; uploading image as-is (will virsh vol-resize to ${capacity})"
-  return 0
 }
 
 # Write s390x guest domain XML for the virsh fallback (no virt-install).
@@ -342,12 +326,14 @@ else
       fi
     fi
     # Resize the rhcos image to match the volume capacity.
-    # s390x ≤4.15 may lack qemu-img; other arches keep the original path.
-    if [[ "${ARCH}" == "s390x" ]]; then
-      ensure_rhcos_resized "${INSTALL_DIR}/${VOLUME_NAME}" "${VOLUME_CAPACITY}"
+    # s390x ≤4.15 may lack qemu-img; otherwise keep the historical path.
+    if [[ "${ARCH}" == "s390x" ]] && ! command -v qemu-img >/dev/null 2>&1; then
+      echo "WARNING: qemu-img unavailable; uploading image as-is (will virsh vol-resize to ${VOLUME_CAPACITY})"
+      RHCOS_RESIZED_LOCALLY=false
     else
       echo "Resizing rhcos image to match volume capacity..."
       qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
+      RHCOS_RESIZED_LOCALLY=true
     fi
 
     # Create the new source volume
@@ -560,8 +546,18 @@ create_node () {
     clone_volume ${NAME}-volume
 
     echo "Creating ${NAME} vm..."
-    # Prefer virt-install (4.16+ images). s390x ≤4.15 images may lack it; use virsh there.
-    if command -v virt-install >/dev/null 2>&1; then
+    # Historical path when virt-install exists (4.16+ / non-s390x).
+    # s390x ≤4.15 images may lack virt-install; use virsh there only.
+    if [[ "${ARCH}" == "s390x" ]] && ! command -v virt-install >/dev/null 2>&1; then
+      echo "virt-install not found; defining s390x guest ${NAME} with virsh"
+      DOMAIN_XML="${INSTALL_DIR}/${NAME}.xml"
+      write_upi_domain_xml "${NAME}" "${MAC_ADDRESS}" "${IGNITION_VOLUME}" "${DOMAIN_XML}"
+      ${VIRSH} destroy "${NAME}" >/dev/null 2>&1 || true
+      ${VIRSH} undefine "${NAME}" >/dev/null 2>&1 || true
+      ${VIRSH} define "${DOMAIN_XML}"
+      ${VIRSH} start "${NAME}"
+      ${VIRSH} autostart "${NAME}" || true
+    else
       virt-install \
         --connect ${LIBVIRT_CONNECTION} \
         --name ${NAME} \
@@ -574,18 +570,6 @@ create_node () {
         --import \
         --noautoconsole \
         --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
-    elif [[ "${ARCH}" == "s390x" ]]; then
-      echo "virt-install not found; defining s390x guest ${NAME} with virsh"
-      DOMAIN_XML="${INSTALL_DIR}/${NAME}.xml"
-      write_upi_domain_xml "${NAME}" "${MAC_ADDRESS}" "${IGNITION_VOLUME}" "${DOMAIN_XML}"
-      ${VIRSH} destroy "${NAME}" >/dev/null 2>&1 || true
-      ${VIRSH} undefine "${NAME}" >/dev/null 2>&1 || true
-      ${VIRSH} define "${DOMAIN_XML}"
-      ${VIRSH} start "${NAME}"
-      ${VIRSH} autostart "${NAME}" || true
-    else
-      echo "ERROR: virt-install is required for ARCH=${ARCH} but was not found in PATH" >&2
-      exit 1
     fi
   fi
 }
