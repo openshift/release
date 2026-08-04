@@ -1,3 +1,8 @@
+base_images:
+  cli-manager:
+    name: "5.1"
+    namespace: ocp
+    tag: cli-manager
 build_root:
   from_repository: true
 images:
@@ -66,7 +71,19 @@ tests:
     - ref: fips-check
     test:
     - ref: openshift-tests-extension-setup-out-of-payload
-    - ref: cli-manager-install-krew
+    - as: resolve-images
+      commands: |
+        echo "$OPERATOR_IMAGE" > "${SHARED_DIR}/operator-image"
+        echo "$OPERAND_IMAGE" > "${SHARED_DIR}/operand-image"
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: cli-manager-operator
+      - env: OPERAND_IMAGE
+        name: pipeline:cli-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - ref: openshift-e2e-test
     workflow: ipi-aws
 - as: security
