@@ -1,10 +1,5 @@
 #!/bin/bash
-
-set -o nounset
-set -o errexit
-set -o pipefail
-
-#Set Kubeconfig:
+set -euxo pipefail; shopt -s inherit_errexit
 
 echo "Quay version is ${QUAY_VERSION}"
 QUAY_VERSION_THRESHOLD="3.16"
@@ -41,8 +36,20 @@ function copyArtifacts {
 # Install Dependcies defined in packages.json
 npm install || true
 
-#Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
-trap copyArtifacts EXIT
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        copyArtifacts
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep
+    ' EXIT
+else
+    trap copyArtifacts EXIT
+fi
 
 #Check Quay pod status
 set +x
