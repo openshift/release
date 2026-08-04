@@ -58,9 +58,18 @@ done
 
 # fthub-01, kni-qe-106 and kni-qe-110 share the same hypervisor (helix107), but ci-operator
 # cannot mount the same secret twice.
-if [ "${CLUSTER_NAME}" = "kni-qe-106" ] || [ "${CLUSTER_NAME}" = "kni-qe-110" ]; then
+HV107_CLUSTERS=("kni-qe-106" "kni-qe-110")
+
+if [[ " ${HV107_CLUSTERS[*]} " =~ " ${CLUSTER_NAME} " ]]; then
   echo "Processing shared hypervisor inventory for ${CLUSTER_NAME} from fthub-01 mount"
   process_inventory "${MOUNTED_HOST_INVENTORY}/fthub-01/hypervisor" \
+    /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
+fi
+
+# kni-qe-130 uses helix118 
+if [ "${CLUSTER_NAME}" = "kni-qe-130" ]; then
+  echo "Processing shared hypervisor inventory for ${CLUSTER_NAME} "
+  process_inventory "${MOUNTED_HOST_INVENTORY}/helix118/hypervisor" \
     /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
 fi
 
