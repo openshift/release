@@ -116,8 +116,7 @@ ensure_rhcos_resized() {
   return 0
 }
 
-# ACPI-free domain XML for guests when virt-install is absent (≤4.15 images).
-# RHEL 9 s390x QEMU rejects domains that request <acpi/>.
+# Domain XML for guests when virt-install is absent (≤4.15 images).
 write_upi_domain_xml() {
   local name=$1
   local mac=$2
@@ -578,7 +577,7 @@ create_node () {
 
     echo "Creating ${NAME} vm..."
     # 4.16+ libvirt-installer images include virt-install (unchanged path).
-    # ≤4.15 images typically do not; fall back to ACPI-free virsh define/start.
+    # ≤4.15 images typically do not; fall back to virsh define/start.
     if command -v virt-install >/dev/null 2>&1; then
       virt-install \
         --connect ${LIBVIRT_CONNECTION} \
@@ -593,7 +592,7 @@ create_node () {
         --noautoconsole \
         --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
     else
-      echo "virt-install not found; defining ${NAME} with virsh (≤4.15 libvirt-installer fallback, no ACPI)"
+      echo "virt-install not found; defining ${NAME} with virsh (≤4.15 libvirt-installer fallback)"
       DOMAIN_XML="${INSTALL_DIR}/${NAME}.xml"
       write_upi_domain_xml "${NAME}" "${MAC_ADDRESS}" "${IGNITION_VOLUME}" "${DOMAIN_XML}"
       # Domain may not exist yet on first create; silence expected "failed to get domain" noise.
