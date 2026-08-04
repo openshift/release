@@ -47,8 +47,11 @@ Choose a method below - pod logs, cloudwatch or splunk - and then we can run the
 ```bash
 # get the credentials
 $ oc -n ci extract secret/registry-push-credentials-ci-images-mirror --to=- --keys .dockerconfigjson | jq > /tmp/qci.json
-# the source and the target are taken from the log
-$ oc image mirror --keep-manifest-list --registry-config=/tmp/qci.json --continue-on-error registry.ci.openshift.org/origin/scos-4.16:cluster-capi-operator=quay.io/openshift/ci:origin_scos-4.16_cluster-capi-operator
+# Prefer QCI/quay-proxy for origin floats (registry.ci public tags are often gone).
+# Form: quay-proxy.ci.openshift.org/openshift/ci:<namespace>_<name>_<tag>
+# Example taken from the log (update names to match the failing pair):
+$ oc image mirror --keep-manifest-list --registry-config=/tmp/qci.json --continue-on-error \
+  quay-proxy.ci.openshift.org/openshift/ci:origin_scos-4.16_cluster-capi-operator=quay.io/openshift/ci:origin_scos-4.16_cluster-capi-operator
 ```
 
 If it reproduces the same error, mostly, it is caused by a broken source image. In that case, we should
