@@ -1,3 +1,8 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -9,7 +14,8 @@ images:
   items:
   - dockerfile_path: Dockerfile.openshift
     to: openperouter-operator
-  - dockerfile_path: operator/bundle.Dockerfile.openshift
+  - context_dir: operator
+    dockerfile_path: bundle.Dockerfile
     to: openperouter-operator-bundle
   - build_args:
     - name: BASE_IMAGE
@@ -19,10 +25,11 @@ images:
 operator:
   bundles:
   - as: operator-bundle
-    dockerfile_path: operator/bundle.Dockerfile.openshift
+    context_dir: operator
+    dockerfile_path: bundle.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/redhat-user-workloads/telco-5g-tenant/openperouter-operator-[\d].*
+  - pullspec: quay.io/openperouter/router:main
     with: pipeline:openperouter-operator
 promotion:
   to:
@@ -47,6 +54,77 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: operator-deploy-verify
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-openperouter-system
+    test:
+    - as: verify
+      cli: latest
+      commands: |
+        set -exo pipefail
+
+        echo "### Label namespace privileged"
+        oc label --overwrite ns openshift-openperouter-system \
+          pod-security.kubernetes.io/enforce=privileged \
+          pod-security.kubernetes.io/audit=privileged \
+          pod-security.kubernetes.io/warn=privileged
+
+        echo "### Verify operator deployment"
+        oc wait --for condition=Available -n openshift-openperouter-system \
+          deployment --all --timeout=300s
+        oc get deployments -n openshift-openperouter-system
+
+        echo "### Create OpenPERouter CR"
+        cat <<'EOF' | oc apply -f -
+        apiVersion: network.openperouter.io/v1alpha1
+        kind: OpenPERouter
+        metadata:
+          name: openperouter
+          namespace: openshift-openperouter-system
+        spec:
+          logLevel: debug
+        EOF
+
+        echo "### Wait for controller daemonset"
+        until oc get daemonset controller -n openshift-openperouter-system &>/dev/null; do
+          sleep 5
+        done
+        oc rollout status daemonset/controller -n openshift-openperouter-system --timeout=300s
+
+        echo "### Wait for router daemonset"
+        until oc get daemonset router -n openshift-openperouter-system &>/dev/null; do
+          sleep 5
+        done
+        oc rollout status daemonset/router -n openshift-openperouter-system --timeout=300s
+
+        echo "### All pods"
+        oc get pods -n openshift-openperouter-system -o wide
+
+        echo "### Verify all containers are ready"
+        NOT_READY=$(oc get pods -n openshift-openperouter-system --no-headers \
+          | grep -v Completed | grep -v "Running" || true)
+        if [ -n "$NOT_READY" ]; then
+          echo "ERROR: Some pods are not healthy:"
+          echo "$NOT_READY"
+          oc describe pods -n openshift-openperouter-system
+          oc logs -n openshift-openperouter-system -l app=router --all-containers --tail=50
+          exit 1
+        fi
+
+        echo "### Deploy verification passed"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: openshift-kni
