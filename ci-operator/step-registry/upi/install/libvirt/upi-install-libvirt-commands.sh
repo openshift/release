@@ -112,31 +112,14 @@ ensure_rhcos_resized() {
   return 0
 }
 
-# Write guest domain XML for the virsh fallback path (no virt-install).
+# Write s390x guest domain XML for the virsh fallback (no virt-install).
+# Only used for IBM Z ≤4.15 images that lack virt-install.
 write_upi_domain_xml() {
   local name=$1
   local mac=$2
   local ign_vol=$3
   local xml=$4
-  local arch_attr machine console_target uuid
-
-  case "${ARCH:-s390x}" in
-    s390x)
-      arch_attr="s390x"
-      machine="s390-ccw-virtio"
-      console_target="sclp"
-      ;;
-    ppc64le)
-      arch_attr="ppc64le"
-      machine="pseries"
-      console_target="serial"
-      ;;
-    *)
-      arch_attr="x86_64"
-      machine="q35"
-      console_target="serial"
-      ;;
-  esac
+  local uuid
 
   if [[ -r /proc/sys/kernel/random/uuid ]]; then
     uuid=$(cat /proc/sys/kernel/random/uuid)
@@ -152,7 +135,7 @@ write_upi_domain_xml() {
     echo "  <currentMemory unit='MiB'>${DOMAIN_MEMORY}</currentMemory>"
     echo "  <vcpu placement='static'>${DOMAIN_VCPUS}</vcpu>"
     echo "  <os>"
-    echo "    <type arch='${arch_attr}' machine='${machine}'>hvm</type>"
+    echo "    <type arch='s390x' machine='s390-ccw-virtio'>hvm</type>"
     echo "    <boot dev='hd'/>"
     echo "  </os>"
     echo "  <clock offset='utc'/>"
@@ -179,7 +162,7 @@ write_upi_domain_xml() {
     echo "      <model type='virtio'/>"
     echo "    </interface>"
     echo "    <console type='pty'>"
-    echo "      <target type='${console_target}' port='0'/>"
+    echo "      <target type='sclp' port='0'/>"
     echo "    </console>"
     echo "  </devices>"
     echo "</domain>"
@@ -571,7 +554,7 @@ create_node () {
     clone_volume ${NAME}-volume
 
     echo "Creating ${NAME} vm..."
-    # Prefer virt-install (4.16+ images). Fall back to virsh when it is missing.
+    # Prefer virt-install (4.16+ images). s390x ≤4.15 images may lack it; use virsh there.
     if command -v virt-install >/dev/null 2>&1; then
       virt-install \
         --connect ${LIBVIRT_CONNECTION} \
@@ -585,8 +568,8 @@ create_node () {
         --import \
         --noautoconsole \
         --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
-    else
-      echo "virt-install not found; defining ${NAME} with virsh"
+    elif [[ "${ARCH}" == "s390x" ]]; then
+      echo "virt-install not found; defining s390x guest ${NAME} with virsh"
       DOMAIN_XML="${INSTALL_DIR}/${NAME}.xml"
       write_upi_domain_xml "${NAME}" "${MAC_ADDRESS}" "${IGNITION_VOLUME}" "${DOMAIN_XML}"
       ${VIRSH} destroy "${NAME}" >/dev/null 2>&1 || true
@@ -594,6 +577,9 @@ create_node () {
       ${VIRSH} define "${DOMAIN_XML}"
       ${VIRSH} start "${NAME}"
       ${VIRSH} autostart "${NAME}" || true
+    else
+      echo "ERROR: virt-install is required for ARCH=${ARCH} but was not found in PATH" >&2
+      exit 1
     fi
   fi
 }
