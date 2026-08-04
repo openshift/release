@@ -23,6 +23,11 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
   exit 1
 fi
 
+if [ "${IPV6_SINGLESTACK:-false}" == "true" ] && [ "${INSTALLER_TYPE:-default}" == "agent" ]; then
+  echo "IPV6_SINGLESTACK is not supported when INSTALLER_TYPE=agent"
+  exit 1
+fi
+
 LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
 function leaseLookup () {
   local lookup
@@ -90,7 +95,53 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
 EOF
 
 else
-  cat >> "${SHARED_DIR}/network.xml" << EOF
+  if [ "${IPV6_SINGLESTACK:-false}" == "true" ]; then
+    cat >> "${SHARED_DIR}/network.xml" << EOF
+<network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
+  <name>${CLUSTER_NAME}</name>
+  <forward mode='nat'>
+    <nat>
+      <port start='1024' end='65535'/>
+    </nat>
+  </forward>
+  <bridge name='ocp$(leaseLookup "subnet")' stp='on' delay='0'/>
+  <domain name='${BASE_URL}' localOnly='yes'/>
+  <dns enable='yes'>
+    <host ip='$(leaseLookup '"bootstrap"[0].ipv6')'>
+      <hostname>api.${BASE_URL}</hostname>
+      <hostname>api-int.${BASE_URL}</hostname>
+    </host>
+    <host ip='$(leaseLookup '"control-plane"[0].ipv6')'>
+      <hostname>api.${BASE_URL}</hostname>
+      <hostname>api-int.${BASE_URL}</hostname>
+    </host>
+    <host ip='$(leaseLookup '"control-plane"[1].ipv6')'>
+      <hostname>api.${BASE_URL}</hostname>
+      <hostname>api-int.${BASE_URL}</hostname>
+    </host>
+    <host ip='$(leaseLookup '"control-plane"[2].ipv6')'>
+      <hostname>api.${BASE_URL}</hostname>
+      <hostname>api-int.${BASE_URL}</hostname>
+    </host>
+  </dns>
+  <ip family='ipv6' address='$(leaseLookup 'ipv6.gateway')' prefix='$(leaseLookup 'ipv6.prefix')'>
+    <dhcp>
+      <range start='$(leaseLookup 'ipv6.dhcp_start')' end='$(leaseLookup 'ipv6.dhcp_end')'/>
+      <host mac='$(leaseLookup 'bootstrap[0].mac')' name='bootstrap.${BASE_URL}' ip='$(leaseLookup 'bootstrap[0].ipv6')'/>
+      <host mac='$(leaseLookup '"control-plane"[0].mac')' name='control-0.${BASE_URL}' ip='$(leaseLookup '"control-plane"[0].ipv6')'/>
+      <host mac='$(leaseLookup '"control-plane"[1].mac')' name='control-1.${BASE_URL}' ip='$(leaseLookup '"control-plane"[1].ipv6')'/>
+      <host mac='$(leaseLookup '"control-plane"[2].mac')' name='control-2.${BASE_URL}' ip='$(leaseLookup '"control-plane"[2].ipv6')'/>
+      <host mac='$(leaseLookup 'compute[0].mac')' name='compute-0.${BASE_URL}' ip='$(leaseLookup 'compute[0].ipv6')'/>
+      <host mac='$(leaseLookup 'compute[1].mac')' name='compute-1.${BASE_URL}' ip='$(leaseLookup 'compute[1].ipv6')'/>
+    </dhcp>
+  </ip>
+  <dnsmasq:options>
+    <dnsmasq:option value='address=/.apps.${BASE_URL}/$(leaseLookup 'ipv6.gateway')'/>
+  </dnsmasq:options>
+</network>
+EOF
+  else
+    cat >> "${SHARED_DIR}/network.xml" << EOF
 <network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
   <name>${CLUSTER_NAME}</name>
   <forward mode='nat'>
@@ -134,6 +185,7 @@ else
   </dnsmasq:options>
 </network>
 EOF
+  fi
 fi
 
 cat "${SHARED_DIR}/network.xml"
