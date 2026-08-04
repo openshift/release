@@ -136,9 +136,7 @@ function fetch_trustee_charts() {
 
   echo ">>> Fetching trustee charts from: ${TRUSTEE_CHARTS_REPO} (ref: ${TRUSTEE_CHARTS_REF})" >&2
 
-  mkdir -p "${charts_dir}"
   echo ">>> Cloning charts via git" >&2
-  rm -rf "${charts_dir}"
   git clone --depth 1 --branch "${TRUSTEE_CHARTS_REF}" "${TRUSTEE_CHARTS_REPO}" "${charts_dir}"
 
   if [[ ! -d "${charts_dir}" ]]; then
