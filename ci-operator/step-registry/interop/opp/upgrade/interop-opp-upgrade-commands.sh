@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euxo pipefail
+set -eux -o pipefail
 shopt -s inherit_errexit
 
 # NOTE: UPGRADE_TIMEOUT, POLL_INTERVAL, STALL_WINDOW, OPP_OPERATORS are set via step config YAML
@@ -67,7 +67,7 @@ function DebugOnExit () {
     true
 }
 
-trap '{ exitCode=$?; DebugOnExit; }' EXIT TERM
+trap '{( exitCode=$?; DebugOnExit; )}' EXIT TERM
 
 set +x
 KUBECONFIG="" oc registry login
