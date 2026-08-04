@@ -157,6 +157,7 @@ roxie deploy \
 echo ">>> Verifying deployment"
 # shellcheck disable=SC1090
 source "${ROXIE_ENVRC}"
+# Save admin password for use by later steps (e.g., diagnostics collection)
 echo "${ROX_ADMIN_PASSWORD}" > "${SHARED_DIR}/rox_admin_password"
 kubectl get nodes -o wide
 kubectl get pods -o wide --namespace stackrox
