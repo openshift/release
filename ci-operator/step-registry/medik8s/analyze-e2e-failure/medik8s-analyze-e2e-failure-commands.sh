@@ -86,11 +86,11 @@ MEDIK8S CONTEXT:
 - Tests run on ephemeral OCP clusters provisioned via IPI-AWS."
 
 echo ""
-echo "Running Claude with /ci:prow-job-analyze-test-failure skill..."
+echo "Running Claude with /ci:prow-job-analysis skill..."
 echo ""
 
 set +e
-timeout 1200 claude -p "/ci:prow-job-analyze-test-failure ${PROW_JOB_URL} --fast" \
+timeout 1200 claude -p "/ci:prow-job-analysis ${PROW_JOB_URL} --fast" \
   --append-system-prompt "$SYSTEM_PROMPT" \
   --allowedTools "Bash Read Write Edit Grep Glob WebFetch Skill" \
   --max-turns 100 \
@@ -137,7 +137,6 @@ echo "$TOKENS_JSON" > "${SHARED_DIR}/claude-failure-analysis-tokens.json" 2>/dev
 echo ""
 echo "=== Failure Analysis Complete ==="
 echo "Claude exit code: $CLAUDE_EXIT"
-echo "Cost: \$${COST}"
 echo "Duration: ${DURATION_S}s"
 echo "Turns: ${NUM_TURNS}"
 echo "Analysis: ${ARTIFACT_DIR}/failure-analysis.md"
