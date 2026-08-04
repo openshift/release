@@ -1,6 +1,6 @@
 base_images:
   base-rhel9:
-    name: "4.20"
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
   cli-operator-sdk:
@@ -12,7 +12,7 @@ base_images:
     namespace: origin
     tag: operator-sdk
   upi-installer:
-    name: "4.20"
+    name: "4.22"
     namespace: ocp
     tag: upi-installer
 binary_build_commands: make build --warn-undefined-variables
@@ -23,9 +23,17 @@ images:
   - dockerfile_path: images/ci/Dockerfile
     from: base-rhel9
     to: cert-manager-operator
-  - dockerfile_path: images/ci/operand.Dockerfile
+  - dockerfile_path: images/ci/certmanager.Dockerfile
     from: base-rhel9
     to: cert-manager
+  - dockerfile_path: images/ci/istiocsr.Dockerfile
+    from: base-rhel9
+    to: cert-manager-istio-csr
+  - dockerfile_path: images/ci/trustmanager.Dockerfile
+    from: base-rhel9
+    to: cert-manager-trust-manager
+  - dockerfile_path: images/ci/Dockerfile.coverage
+    to: cert-manager-operator-coverage
 operator:
   bundles:
   - as: cert-manager-operator-bundle
@@ -40,13 +48,17 @@ operator:
     with: pipeline:cert-manager
   - pullspec: quay.io/jetstack/cert-manager-cainjector:.*
     with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-istio-csr:.*
+    with: pipeline:cert-manager-istio-csr
+  - pullspec: quay.io/jetstack/trust-manager:.*
+    with: pipeline:cert-manager-trust-manager
 releases:
   latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -75,6 +87,18 @@ tests:
       SCAN_IMAGE: cert-manager
     test:
     - ref: fips-check-image-scan
+- as: fips-image-scan-istio-csr
+  steps:
+    dependencies:
+      SCAN_IMAGE: cert-manager-istio-csr
+    test:
+    - ref: fips-check-image-scan
+- as: fips-image-scan-trust-manager
+  steps:
+    dependencies:
+      SCAN_IMAGE: cert-manager-trust-manager
+    test:
+    - ref: fips-check-image-scan
 - as: e2e-operator
   cluster_claim:
     architecture: amd64
@@ -82,7 +106,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.20"
+    version: "4.22"
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -102,7 +126,123 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS,Generic} && CredentialsMode: isSubsetOf {Mint} && !TechPreview"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {AWS,Generic} && CredentialsMode: isSubsetOf {Mint} && !TechPreview' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- always_run: false
+  as: e2e-operator-coverage
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  steps:
+    post:
+    - as: collect-coverage
+      best_effort: true
+      cli: latest
+      commands: hack/e2e-coverage.sh collect
+      credentials:
+      - mount_path: /var/run/secrets/codecov
+        name: cert-manager-operator-codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    - chain: gather
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace cert-manager-operator
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n cert-manager-operator "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: cert-manager-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: setup-coverage
+      cli: latest
+      commands: hack/e2e-coverage.sh setup
+      dependencies:
+      - env: COVERAGE_IMAGE
+        name: cert-manager-operator-coverage
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {AWS,Generic} && CredentialsMode: isSubsetOf {Mint} && !TechPreview' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: publish-e2e-coverage
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  postsubmit: true
+  steps:
+    post:
+    - as: collect-coverage
+      best_effort: true
+      cli: latest
+      commands: hack/e2e-coverage.sh collect
+      credentials:
+      - mount_path: /var/run/secrets/codecov
+        name: cert-manager-operator-codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    - chain: gather
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace cert-manager-operator
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n cert-manager-operator "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: cert-manager-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: setup-coverage
+      cli: latest
+      commands: hack/e2e-coverage.sh setup
+      dependencies:
+      - env: COVERAGE_IMAGE
+        name: cert-manager-operator-coverage
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {AWS,Generic} && CredentialsMode: isSubsetOf {Mint} && !TechPreview' make test-e2e
       from: src
       resources:
         requests:
@@ -124,7 +264,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"(Platform: isSubsetOf {Generic} || TechPreview) && !TechPreview:Inverted"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='(Platform: isSubsetOf {Generic} || TechPreview) && !TechPreview:Inverted' make test-e2e
       from: src
       resources:
         requests:
@@ -146,7 +286,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}' make test-e2e
       from: src
       resources:
         requests:
@@ -168,7 +308,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}' make test-e2e
       from: src
       resources:
         requests:
@@ -190,7 +330,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Manual}"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Manual}' make test-e2e
       from: src
       resources:
         requests:
@@ -200,7 +340,7 @@ tests:
   as: e2e-operator-gcp-ovn
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
@@ -212,7 +352,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {GCP} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {GCP} && CredentialsMode: isSubsetOf {Mint}' make test-e2e
       from: src
       resources:
         requests:
@@ -222,7 +362,7 @@ tests:
   as: e2e-operator-gcp-workload-identity
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
@@ -234,7 +374,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {GCP} && CredentialsMode: isSubsetOf {Manual}"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {GCP} && CredentialsMode: isSubsetOf {Manual}' make test-e2e
       from: src
       resources:
         requests:
@@ -256,7 +396,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {Azure} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {Azure} && CredentialsMode: isSubsetOf {Mint}' make test-e2e
       from: src
       resources:
         requests:
@@ -278,7 +418,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {Azure} && CredentialsMode: isSubsetOf {Manual}"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='Platform: isSubsetOf {Azure} && CredentialsMode: isSubsetOf {Manual}' make test-e2e
       from: src
       resources:
         requests:

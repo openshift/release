@@ -57,8 +57,8 @@ function annotate() {
 	local conf="${base}/core-services/release-controller/_releases/release-$3"
 
 	if [[ -n "${private}" ]]; then
-        conf="${base}/core-services/release-controller/_releases/priv/release-$3"
-    fi
+		conf="${base}/core-services/release-controller/_releases/priv/release-$3"
+	fi
 
 	if [[ -s "${conf}" ]]; then
 		echo "${conf}"
@@ -81,6 +81,7 @@ function annotate() {
 
 for release in ${releases[@]}; do
 	annotate "origin" "${release}" "okd-${release}.json"
+	annotate "origin" "scos-${release}" "okd-scos-${release}.json"
 	annotate "origin" "scos-${release}" "okd-scos-${release}-ci.json"
 	annotate "origin" "scos-${release}-art" "okd-scos-${release}-art.json"
 
@@ -105,6 +106,10 @@ done
 annotate "origin" "release" "okd-4.y-stable.json"
 annotate "origin" "release-scos" "okd-scos-4.y-stable.json"
 annotate "origin" "release-scos-next" "okd-scos-4.y-next.json"
+
+# OKD 5.y-stable release streams
+annotate "origin" "release-5-scos" "okd-scos-5.y-stable.json"
+annotate "origin" "release-5-scos-next" "okd-scos-5.y-next.json"
 
 # 4.y-stable release streams
 annotate "ocp" "release" "ocp-4.y-stable.json"

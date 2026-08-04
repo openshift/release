@@ -40,6 +40,11 @@ trap cleanup EXIT
 
 export EVENTUALLY_VERBOSE="false"
 
+check_e2e_flag() {
+  grep -q "$1" <<<"$( bin/test-e2e -h 2>&1 )"
+  return $?
+}
+
 EXTERNAL_DNS_ARGS=""
 if [[ "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN:-}" != "" ]]; then
   EXTERNAL_DNS_ARGS="--e2e.external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
@@ -62,23 +67,27 @@ if [[ -n "$HYPERSHIFT_MANAGED_SERVICE" ]]; then
     export MANAGED_SERVICE="$HYPERSHIFT_MANAGED_SERVICE"
 fi
 
+if [[ -f "${SHARED_DIR}/nodepool_release_images" ]]; then
+    source "${SHARED_DIR}/nodepool_release_images"
+fi
+
 N1_NP_VERSION_TEST_ARGS=""
-if [[ ${OCP_IMAGE_N1} != "${OCP_IMAGE_LATEST}" ]]; then
+if [[ -n "${OCP_IMAGE_N1:-}" && "${OCP_IMAGE_N1}" != "${OCP_IMAGE_LATEST}" ]]; then
   N1_NP_VERSION_TEST_ARGS="--e2e.n1-minor-release-image=${OCP_IMAGE_N1}"
 fi
 
 N2_NP_VERSION_TEST_ARGS=""
-if [[ ${OCP_IMAGE_N2} != "${OCP_IMAGE_LATEST}" ]]; then
+if [[ -n "${OCP_IMAGE_N2:-}" && "${OCP_IMAGE_N2}" != "${OCP_IMAGE_LATEST}" ]]; then
   N2_NP_VERSION_TEST_ARGS="--e2e.n2-minor-release-image=${OCP_IMAGE_N2}"
 fi
 
 N3_NP_VERSION_TEST_ARGS=""
-if [[ ${OCP_IMAGE_N3} != "${OCP_IMAGE_LATEST}" ]]; then
+if [[ -n "${OCP_IMAGE_N3:-}" && "${OCP_IMAGE_N3}" != "${OCP_IMAGE_LATEST}" ]]; then
   N3_NP_VERSION_TEST_ARGS="--e2e.n3-minor-release-image=${OCP_IMAGE_N3}"
 fi
 
 N4_NP_VERSION_TEST_ARGS=""
-if [[ ${OCP_IMAGE_N4} != "${OCP_IMAGE_LATEST}" ]]; then
+if [[ -n "${OCP_IMAGE_N4:-}" && "${OCP_IMAGE_N4}" != "${OCP_IMAGE_LATEST}" ]]; then
   N4_NP_VERSION_TEST_ARGS="--e2e.n4-minor-release-image=${OCP_IMAGE_N4}"
 fi
 
@@ -101,6 +110,11 @@ MARKETPLACE_IMAGE_PARAMS=""
 # Use environment variables if set, otherwise use defaults based on version
 if [[ -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION:-}" ]]; then
   MARKETPLACE_IMAGE_PARAMS="--e2e.azure-marketplace-publisher ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER} --e2e.azure-marketplace-offer ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER} --e2e.azure-marketplace-sku ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU} --e2e.azure-marketplace-version ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
+fi
+
+ADDITIONAL_PULL_SECRET_PARAMS=""
+if check_e2e_flag 'e2e.additional-pull-secret-file' && [[ -f /etc/hypershift-additional-pull-secret/.dockerconfigjson ]]; then
+  ADDITIONAL_PULL_SECRET_PARAMS="--e2e.additional-pull-secret-file=/etc/hypershift-additional-pull-secret/.dockerconfigjson"
 fi
 
 OAUTH_EXTERNAL_OIDC_PARAM=""
@@ -155,5 +169,6 @@ hack/ci-test-e2e.sh -test.v \
   ${MARKETPLACE_IMAGE_PARAMS} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
-  --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
+  --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" \
+  ${ADDITIONAL_PULL_SECRET_PARAMS:-} &
 wait $!

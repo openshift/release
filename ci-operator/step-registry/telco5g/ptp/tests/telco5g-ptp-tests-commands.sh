@@ -52,7 +52,7 @@ spec:
   serviceAccountName: builder
   containers:
     - name: priv
-      image: quay.io/podman/stable
+      image: quay.io/podman/stable:v4.9.4
       command:
         - /bin/bash
         - -c
@@ -170,8 +170,22 @@ spec:
   #oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
 
   retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
-  dockercgf=$(oc -n openshift-ptp get sa builder -oyaml | grep imagePullSecrets -A 1 | grep -o "builder-.*")
-  jobdefinition=$(sed "s#BUILDER_DOCKERCFG#${dockercgf}#" <<<"$jobdefinition")
+  dockercgf=""
+  for i in $(seq 1 80); do
+    dockercgf=$(oc --request-timeout=10s -n openshift-ptp get secret \
+      -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+      | grep '^builder-dockercfg-' | head -1 || true)
+    if [[ -n "${dockercgf}" ]]; then
+      break
+    fi
+    echo "Waiting for builder-dockercfg secret (attempt ${i}/80)..."
+    sleep 5
+  done
+  if [[ -z "${dockercgf}" ]]; then
+    echo "[ERROR] builder-dockercfg secret not found after 400s"
+    exit 1
+  fi
+  jobdefinition=${jobdefinition//BUILDER_DOCKERCFG/${dockercgf}}
   echo "$jobdefinition"
   echo "$jobdefinition" | oc apply -f -
 
@@ -271,6 +285,24 @@ export IMG_VERSION="release-${T5CI_VERSION}"
 
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
+# Fail fast if any node is not Ready
+echo "************ Checking node readiness ************"
+oc get nodes -owide
+NOT_READY_NODES=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | grep -v "True$" || true)
+if [[ -n "${NOT_READY_NODES}" ]]; then
+  echo "[ERROR] The following nodes are not Ready:"
+  echo "${NOT_READY_NODES}"
+  echo "[ERROR] All nodes must be Ready before starting PTP tests. Aborting."
+  exit 1
+fi
+TOTAL_NODES=$(oc get nodes --no-headers | wc -l)
+if [[ "${TOTAL_NODES}" -eq 0 ]]; then
+  echo "[ERROR] No nodes found in the cluster. Aborting."
+  exit 1
+fi
+echo "[INFO] All ${TOTAL_NODES} nodes are Ready."
+echo "***************************************************"
+
 # Set go version
 if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
   source "$HOME"/golang-1.20
@@ -294,7 +326,7 @@ build_images
 
 # Get an updated version of oc
 mkdir ~/bin
-wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+wget https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
 tar -zxvf openshift-client-linux.tar.gz -C ~/bin
 export PATH=$HOME/bin:$PATH
 
@@ -352,11 +384,24 @@ if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
   if [[ "$T5CI_VERSION" =~ 4.1[2-5] ]]; then
     TEST_MODES=("${TEST_MODES[@]/dualnicbcha}")
   fi
+
+  # DualNICBoundaryClock test mode is only supported from 4.13 onwards,
+  # so if the version is less than 4.13, remove it from the list
+  if [[ "$T5CI_VERSION" == 4.12 ]]; then
+    TEST_MODES=("${TEST_MODES[@]/dualnicbc}")
+  fi
+
 else
   echo "Version is 4.19 or greater"
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
   # Only run tgm and dualfollower tests from 4.19 onwards
-  TEST_MODES=("tgm" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+  TEST_MODES=("tgm" "tbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+
+  # T-BC test mode is only supported from 4.20 onwards,
+  # so if the version is 4.19 then, remove it from the list
+  if [[ "$T5CI_VERSION" == 4.19 ]]; then
+    TEST_MODES=("${TEST_MODES[@]/tbc}")
+  fi
 fi
 
 # wait for the linuxptp-daemon to be deployed
@@ -430,7 +475,7 @@ mkdir -p $LOG_ARTIFACTS_DIR
 export JUNIT_OUTPUT_DIR=${ARTIFACT_DIR}
 
 export PTP_LOG_LEVEL=debug
-export SKIP_INTERFACES=eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,ens7f0np0,ens7f1np1,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3
+export SKIP_INTERFACES=eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,ens7f0np0,ens7f1np1,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12399
 export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
 
 # wait before first run
@@ -488,7 +533,16 @@ cd -
 
 python3 -m venv "${SHARED_DIR}"/myenv
 source "${SHARED_DIR}"/myenv/bin/activate
-git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci
+for attempt in $(seq 1 5); do
+  git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci && break
+  echo "WARNING: telco5gci clone attempt ${attempt}/5 failed"
+  rm -rf "${SHARED_DIR}"/telco5gci
+  [[ ${attempt} -lt 5 ]] && sleep 10
+done
+if [[ ! -d "${SHARED_DIR}"/telco5gci ]]; then
+  echo "ERROR: Failed to clone telco5gci after 5 attempts"
+  exit 1
+fi
 pip install -r "${SHARED_DIR}"/telco5gci/requirements.txt
 
 # Create HTML reports for humans/aliens

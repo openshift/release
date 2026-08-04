@@ -13,8 +13,10 @@ log(){
 HYPERFLEET_E2E_CREDENTIALS_PATH="/var/run/hyperfleet-e2e/"
 export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_CREDENTIALS_PATH}/hcm-hyperfleet-e2e.json"
 PROJECT_ID="$(jq -r -c .project_id "${GOOGLE_APPLICATION_CREDENTIALS}")"
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+export PROJECT_ID=${PROJECT_ID}
 
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+# Generates the kubeconfig and saves it to shared dir
 hyperfleet-credential-provider generate-kubeconfig \
   --provider=gcp \
   --project-id="$PROJECT_ID" \
@@ -22,9 +24,19 @@ hyperfleet-credential-provider generate-kubeconfig \
   --cluster-name="$CLUSTER_NAME" \
   --output="${SHARED_DIR}/kubeconfig" 
 
+# Resolve Gangway-overridable params (prefix is required for ci-operator to
+# inject overrides; bare names are used by downstream scripts and deploy-clm.sh).
+NAMESPACE_PREFIX="${MULTISTAGE_PARAM_OVERRIDE_NAMESPACE_PREFIX:-e2e}"
+
 # Generate namespace name with build_id suffix
 NAMESPACE_NAME=${NAMESPACE_PREFIX}-${BUILD_ID}
+
+# Export run-id for labeling resourecs and cleanup
+export RUN_ID="${NAMESPACE_NAME}"
+echo "${RUN_ID}" > "${SHARED_DIR}/run_id"
+# Saves namespace and project id to shared dir so test and cleanup have shared values
 echo "${NAMESPACE_NAME}" > "${SHARED_DIR}/namespace_name"
+echo "${PROJECT_ID}" > "${SHARED_DIR}/gcp_project_id"
 
 # Export chart parameters for the deployment
 export API_CHART_REPO="${API_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-api.git}"
@@ -40,19 +52,38 @@ export SENTINEL_CHART_PATH="${SENTINEL_CHART_PATH:-charts}"
 # Export image parameters for the deployment
 export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
 export API_IMAGE_REPO="${API_IMAGE_REPO:-ci/hyperfleet-api}"
-export API_IMAGE_TAG="${API_IMAGE_TAG:-latest}"
+export API_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_API_IMAGE_TAG:-latest}"
 export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
-export ADAPTER_IMAGE_TAG="${ADAPTER_IMAGE_TAG:-latest}"
+export ADAPTER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG:-latest}"
 export SENTINEL_IMAGE_REPO="${SENTINEL_IMAGE_REPO:-ci/hyperfleet-sentinel}"
-export SENTINEL_IMAGE_TAG="${SENTINEL_IMAGE_TAG:-latest}"
+export SENTINEL_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG:-latest}"
 
-# copy the deploy scripts to /tmp to avoid any potential permission issue when running deploy-clm.sh
-cp -r /e2e/ /tmp/
-cd "/tmp/e2e/deploy-scripts/"
-cp .env.example .env
-source .env
-./deploy-clm.sh --action install --namespace $NAMESPACE_NAME --debug-log-dir ${ARTIFACT_DIR}
+# Enable JWT authentication for the API
+export JWT_AUTH_ENABLED="${JWT_AUTH_ENABLED:-true}"
 
+# When JWT is enabled, discover the actual OIDC issuer URL from the cluster.
+# GKE uses a GCP-specific issuer (container.googleapis.com/v1/projects/...),
+# not kubernetes.default.svc.cluster.local, so we must detect it at runtime.
+if [[ "${JWT_AUTH_ENABLED}" == "true" ]]; then
+  OIDC_ISSUER_URL=$(kubectl get --raw /.well-known/openid-configuration | jq -r '.issuer')
+  OIDC_JWKS_URL="${OIDC_ISSUER_URL}/jwks"
+  export OIDC_ISSUER_URL OIDC_JWKS_URL
+  log "OIDC issuer discovered: ${OIDC_ISSUER_URL}"
+fi
+
+# Install hyperfleet components via infra repo
+# Will inherit all exported values here
+git clone --depth 1 "https://github.com/openshift-hyperfleet/hyperfleet-infra.git" /tmp/hyperfleet-infra
+cd /tmp/hyperfleet-infra
+
+HELMFILE_ENV="e2e-gcp"
+NAMESPACE=${NAMESPACE_NAME} HELMFILE_ENV="${HELMFILE_ENV}" make install-hyperfleet
+
+# Save installed charts for cleanup
+HELMFILE_JSON="${SHARED_DIR}/helm-release-${NAMESPACE_NAME}.json"
+NAMESPACE="${NAMESPACE_NAME}" helmfile -f helmfile/helmfile.yaml.gotmpl list -e "${HELMFILE_ENV}" --output json > "${HELMFILE_JSON}"
+
+# Verify deployed components
 log "=== Checking all deployed resources ==="
 kubectl get all -n $NAMESPACE_NAME > "${ARTIFACT_DIR}/all-resources.txt"
 
@@ -84,14 +115,39 @@ export MAESTRO_URL=http://${MAESTRO_EXTERNAL_IP}:8000
 echo "${MAESTRO_URL}" > "${SHARED_DIR}/maestro_url"
 
 
-log "=== Checking Hyperfleet API accessibility ==="
-if ! curl -f -X GET ${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/; then
-  log "ERROR: Hyperfleet API is not accessible at ${HYPERFLEET_API_URL}"
+wait_for_api() {
+  local url="$1"
+  local name="$2"
+  local max_attempts="${API_RETRY_ATTEMPTS:-30}"
+  local wait_seconds="${API_RETRY_INTERVAL:-10}"
+
+  log "=== Waiting for ${name} to become accessible at ${url} ==="
+  for attempt in $(seq 1 "$max_attempts"); do
+    # Accept 200 (no auth) or 401 (JWT enabled) as proof the API is up
+    local http_code
+    http_code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 -X GET "${url}" 2>/dev/null || echo "000")
+    if [[ "${http_code}" =~ ^(200|401|403)$ ]]; then
+      log "SUCCESS: ${name} is accessible (HTTP ${http_code}, attempt ${attempt}/${max_attempts})"
+      return 0
+    fi
+    if [ "$attempt" -lt "$max_attempts" ]; then
+      log "Attempt ${attempt}/${max_attempts}: ${name} not yet accessible, retrying in ${wait_seconds}s..."
+      sleep "$wait_seconds"
+    else
+      log "Attempt ${attempt}/${max_attempts}: ${name} not yet accessible, no retries remaining"
+    fi
+  done
+
+  log "ERROR: ${name} is not accessible at ${url} after ${max_attempts} attempts"
+  log "Final attempt output for diagnostics:"
+  curl --connect-timeout 5 --max-time 10 -X GET "${url}" 2>&1 || true
+  return 1
+}
+
+if ! wait_for_api "${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/" "Hyperfleet API"; then
   exit 1
 fi
 
-log "=== Checking Maestro API accessibility ==="
-if ! curl -f -X GET ${MAESTRO_URL}/api/maestro/v1/consumers; then
-  log "ERROR: Maestro API is not accessible at ${MAESTRO_URL}"
+if ! wait_for_api "${MAESTRO_URL}/api/maestro/v1/consumers" "Maestro API"; then
   exit 1
 fi

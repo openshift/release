@@ -10,7 +10,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 canonical_go_repository: github.com/stolostron/clusterlifecycle-state-metrics
 images:
   items:
@@ -25,16 +25,18 @@ promotion:
   - disabled: true
     name: "2.8"
     namespace: stolostron
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.18-priv
-      namespace: ocp-private
+      name: "4.18"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.18-priv
-      namespace: ocp-private
+      name: "4.18"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -68,14 +70,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: clusterlifecycle-state-metrics
-    env:
-      IMAGE_REPO: clusterlifecycle-state-metrics
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: backplane-2.8
   org: openshift-priv

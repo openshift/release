@@ -4,13 +4,17 @@ base_images:
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: 4.21-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: vertical-pod-autoscaler-operator-bundle
   previous-vpa-operator:
-    name: 4.21-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: vertical-pod-autoscaler-operator
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   ubi-python-311:
     name: ubi-python-311
     namespace: ocp
@@ -47,18 +51,21 @@ promotion:
   to:
   - additional_images:
       vertical-pod-autoscaler-operator-bundle: vertical-pod-autoscaler-operator-bundle
-    name: 5.0-priv
-    namespace: ocp-private
+    disabled: true
+    name: "5.0"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
   multilatest:
     release:
       architecture: multi
@@ -124,11 +131,23 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - as: operator
+      cli: latest
+      commands: SUITE=operator KUBECTL=$(which oc) make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-olm
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-vertical-pod-autoscaler
+      SCANNER_CPU: 500m
+      SCANNER_MEMORY: 1Gi
     test:
     - as: install
       cli: latest
@@ -150,6 +169,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - ref: tls-scanner-run
     workflow: ipi-aws
 - as: e2e-aws-upgrade
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$

@@ -85,6 +85,12 @@ rules:
     verbs:
       - '*'
   - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs:
+      - '*'
+  - apiGroups:
       - k8s.ovn.org
     resources:
       - egressfirewalls
@@ -114,6 +120,36 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: kv-external-infra-role
+EOF
+
+# ClusterRole to read cluster network config (needed for virt-launcher NetworkPolicy CIDR-based egress rules)
+oc apply -f - <<EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kv-external-infra-network-reader
+rules:
+  - apiGroups:
+      - config.openshift.io
+    resources:
+      - networks
+    verbs:
+      - get
+EOF
+
+oc apply -f - <<EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kv-external-infra-network-reader-binding
+subjects:
+  - kind: ServiceAccount
+    name: ${SA_NAME}
+    namespace: ${EXTERNAL_INFRA_NS}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kv-external-infra-network-reader
 EOF
 
 

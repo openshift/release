@@ -29,6 +29,30 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  payload-scan-4-12:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  payload-scan-4-15:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  payload-scan-4-20:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  payload-scan-5-0:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
 tests:
 - as: test
   commands: make test
@@ -45,6 +69,142 @@ tests:
     make verify
   container:
     from: golangci-lint
+- as: payload-scan-4-12
+  commands: |
+    set -euo pipefail
+    export REGISTRY_AUTH_FILE=/secrets/ci-pull-credentials/.dockerconfigjson
+    STREAM="4.12.0-0.nightly"
+    VERSION="4.12"
+    PULLSPEC=$(curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 10 --max-time 60 \
+      "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${STREAM}/latest" \
+      | jq -er .pullSpec)
+    if [[ -z "$PULLSPEC" ]]; then echo "ERROR: empty pullSpec" >&2; exit 1; fi
+    echo "Release: $PULLSPEC"
+    IMAGES=$(oc adm release info "$PULLSPEC" -a "$REGISTRY_AUTH_FILE" --pullspecs -o json \
+      | jq -r '[.references.spec.tags[] | select(.from.name != null) | .from.name] | .[0:15] | .[]')
+    if [[ -z "$IMAGES" ]]; then echo "ERROR: no images resolved" >&2; exit 1; fi
+    total=0 failed=0
+    for img in $IMAGES; do
+      total=$((total+1))
+      echo "--- [$total] Scanning: $img"
+      rm -rf /tmp/unpacked && mkdir -p /tmp/unpacked
+      if ! oc image extract "$img" -a "$REGISTRY_AUTH_FILE" --path /:/tmp/unpacked --confirm; then
+        echo "ERROR: failed to extract $img" >&2
+        failed=$((failed+1))
+        continue
+      fi
+      /check-payload scan local --path=/tmp/unpacked -V "$VERSION" -v=1 || failed=$((failed+1))
+    done
+    echo "Result: scanned $total images, $failed failed"
+    if [[ $failed -gt 0 ]]; then exit 1; fi
+  container:
+    from: check-payload
+  secret:
+    mount_path: /secrets/ci-pull-credentials
+    name: ci-pull-credentials
+  timeout: 45m0s
+- as: payload-scan-4-15
+  commands: |
+    set -euo pipefail
+    export REGISTRY_AUTH_FILE=/secrets/ci-pull-credentials/.dockerconfigjson
+    STREAM="4.15.0-0.nightly"
+    VERSION="4.15"
+    PULLSPEC=$(curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 10 --max-time 60 \
+      "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${STREAM}/latest" \
+      | jq -er .pullSpec)
+    if [[ -z "$PULLSPEC" ]]; then echo "ERROR: empty pullSpec" >&2; exit 1; fi
+    echo "Release: $PULLSPEC"
+    IMAGES=$(oc adm release info "$PULLSPEC" -a "$REGISTRY_AUTH_FILE" --pullspecs -o json \
+      | jq -r '[.references.spec.tags[] | select(.from.name != null) | .from.name] | .[0:15] | .[]')
+    if [[ -z "$IMAGES" ]]; then echo "ERROR: no images resolved" >&2; exit 1; fi
+    total=0 failed=0
+    for img in $IMAGES; do
+      total=$((total+1))
+      echo "--- [$total] Scanning: $img"
+      rm -rf /tmp/unpacked && mkdir -p /tmp/unpacked
+      if ! oc image extract "$img" -a "$REGISTRY_AUTH_FILE" --path /:/tmp/unpacked --confirm; then
+        echo "ERROR: failed to extract $img" >&2
+        failed=$((failed+1))
+        continue
+      fi
+      /check-payload scan local --path=/tmp/unpacked -V "$VERSION" -v=1 || failed=$((failed+1))
+    done
+    echo "Result: scanned $total images, $failed failed"
+    if [[ $failed -gt 0 ]]; then exit 1; fi
+  container:
+    from: check-payload
+  secret:
+    mount_path: /secrets/ci-pull-credentials
+    name: ci-pull-credentials
+  timeout: 45m0s
+- as: payload-scan-4-20
+  commands: |
+    set -euo pipefail
+    export REGISTRY_AUTH_FILE=/secrets/ci-pull-credentials/.dockerconfigjson
+    STREAM="4.20.0-0.nightly"
+    VERSION="4.20"
+    PULLSPEC=$(curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 10 --max-time 60 \
+      "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${STREAM}/latest" \
+      | jq -er .pullSpec)
+    if [[ -z "$PULLSPEC" ]]; then echo "ERROR: empty pullSpec" >&2; exit 1; fi
+    echo "Release: $PULLSPEC"
+    IMAGES=$(oc adm release info "$PULLSPEC" -a "$REGISTRY_AUTH_FILE" --pullspecs -o json \
+      | jq -r '[.references.spec.tags[] | select(.from.name != null) | .from.name] | .[0:15] | .[]')
+    if [[ -z "$IMAGES" ]]; then echo "ERROR: no images resolved" >&2; exit 1; fi
+    total=0 failed=0
+    for img in $IMAGES; do
+      total=$((total+1))
+      echo "--- [$total] Scanning: $img"
+      rm -rf /tmp/unpacked && mkdir -p /tmp/unpacked
+      if ! oc image extract "$img" -a "$REGISTRY_AUTH_FILE" --path /:/tmp/unpacked --confirm; then
+        echo "ERROR: failed to extract $img" >&2
+        failed=$((failed+1))
+        continue
+      fi
+      /check-payload scan local --path=/tmp/unpacked -V "$VERSION" -v=1 || failed=$((failed+1))
+    done
+    echo "Result: scanned $total images, $failed failed"
+    if [[ $failed -gt 0 ]]; then exit 1; fi
+  container:
+    from: check-payload
+  secret:
+    mount_path: /secrets/ci-pull-credentials
+    name: ci-pull-credentials
+  timeout: 45m0s
+- as: payload-scan-5-0
+  commands: |
+    set -euo pipefail
+    export REGISTRY_AUTH_FILE=/secrets/ci-pull-credentials/.dockerconfigjson
+    STREAM="5.0.0-0.nightly"
+    VERSION="5.0"
+    PULLSPEC=$(curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 10 --max-time 60 \
+      "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${STREAM}/latest" \
+      | jq -er .pullSpec)
+    if [[ -z "$PULLSPEC" ]]; then echo "ERROR: empty pullSpec" >&2; exit 1; fi
+    echo "Release: $PULLSPEC"
+    IMAGES=$(oc adm release info "$PULLSPEC" -a "$REGISTRY_AUTH_FILE" --pullspecs -o json \
+      | jq -r '[.references.spec.tags[] | select(.from.name != null) | .from.name] | .[0:15] | .[]')
+    if [[ -z "$IMAGES" ]]; then echo "ERROR: no images resolved" >&2; exit 1; fi
+    total=0 failed=0
+    for img in $IMAGES; do
+      total=$((total+1))
+      echo "--- [$total] Scanning: $img"
+      rm -rf /tmp/unpacked && mkdir -p /tmp/unpacked
+      if ! oc image extract "$img" -a "$REGISTRY_AUTH_FILE" --path /:/tmp/unpacked --confirm; then
+        echo "ERROR: failed to extract $img" >&2
+        failed=$((failed+1))
+        continue
+      fi
+      /check-payload scan local --path=/tmp/unpacked -V "$VERSION" -v=1 || failed=$((failed+1))
+    done
+    echo "Result: scanned $total images, $failed failed"
+    if [[ $failed -gt 0 ]]; then exit 1; fi
+  container:
+    from: check-payload
+  secret:
+    mount_path: /secrets/ci-pull-credentials
+    name: ci-pull-credentials
+  timeout: 45m0s
 zz_generated_metadata:
   branch: main
   org: openshift

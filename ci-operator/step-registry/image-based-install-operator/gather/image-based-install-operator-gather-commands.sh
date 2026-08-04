@@ -23,7 +23,8 @@ source network.sh
 export HUB_DIR=/ibio-gather/hub
 mkdir -p ${HUB_DIR}
 oc get baremetalhost ostest-extraworker-0 -n openshift-machine-api -o yaml > ${HUB_DIR}/baremetalhost.yaml
-oc get dataimage ostest-extraworker-0 -n openshift-machine-api -o yaml > ${HUB_DIR}/dataimage.yaml
+# older versions of IBIO do not delete the dataimage
+oc get dataimage ostest-extraworker-0 -n openshift-machine-api -o yaml > ${HUB_DIR}/dataimage.yaml || true
 oc get clusterdeployment ibi-cluster -n ibi-cluster -o yaml > ${HUB_DIR}/clusterdeployment.yaml
 oc get imageclusterinstall ibi-cluster -n ibi-cluster -o yaml > ${HUB_DIR}/imageclusterinstall.yaml
 oc logs --tail=-1 -l app=image-based-install-operator -n image-based-install-operator -c manager > ${HUB_DIR}/image-based-install-operator-manager.log
@@ -36,6 +37,7 @@ export SSH_FLAGS="-n -o IdentityFile=/home/ib-orchestrate-vm/bip-orchestrate-vm/
 # even if there is an error connecting to the ibi-host we still want the previous artifacts, so don't fail
 ssh ${SSH_FLAGS} core@${IBI_VM_IP} "sudo journalctl -u installation-configuration.service" > ${IBI_HOST_DIR}/installation-configuration.log || true
 ssh ${SSH_FLAGS} core@${IBI_VM_IP} "sudo tar -czf - /opt/openshift" > ${IBI_HOST_DIR}/opt-openshift.tar.gz || true
+# if the dataimage was not deleted, it will still be mounted
 ssh ${SSH_FLAGS} core@${IBI_VM_IP} "sudo mkdir /mnt/config-iso && sudo mount /dev/sr0 /mnt/config-iso && sudo tar -czf - /mnt/config-iso" > ${IBI_HOST_DIR}/config-iso.tar.gz || true
 
 EOF

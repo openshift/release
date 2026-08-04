@@ -3,62 +3,178 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TLS Scanner - scans TLS configurations of all pods in the cluster
-NAMESPACE="tls-scanner"
-SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
-ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
-SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
+run_tls_scan() {
 
-# Determine scanner arguments based on whether a specific namespace is requested
-if [[ -n "${SCAN_NAMESPACE:-}" ]]; then
-    SCANNER_ARGS="--all-pods --namespace-filter ${SCAN_NAMESPACE}"
-else
-    SCANNER_ARGS="--all-pods"
-fi
+  # TLS Scanner - scans TLS configurations of all pods in the cluster
+  local NAMESPACE="tls-scanner"
+  local OWNS_NAMESPACE=true
+  local SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
+  local ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 
-mkdir -p "${SCANNER_ARTIFACT_DIR}"
+  if [[ -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ]]; then
+    if [[ "${PQC_CHECK:-false}" == "true" ]]; then
+      SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner/pqc-${TLS_SCANNER_CLUSTER_LABEL}"
+    else
+      SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner/${TLS_SCANNER_CLUSTER_LABEL}"
+    fi
+    case "${TLS_SCANNER_CLUSTER_LABEL}" in
+      management)
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        if [[ -z "${SCAN_NAMESPACE:-}" && -f "${SHARED_DIR}/cluster-name" ]]; then
+          CLUSTER_NAME="$(<"${SHARED_DIR}/cluster-name")"
+          SCAN_NAMESPACE="clusters-${CLUSTER_NAME}"
+        fi
+        ;;
+      guest)
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        ;;
+      *)
+        echo "Unknown TLS_SCANNER_CLUSTER_LABEL: ${TLS_SCANNER_CLUSTER_LABEL}"
+        exit 1
+        ;;
+    esac
+  else
+    SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
+  fi
 
-echo "=== TLS Scanner ==="
-echo "Image: ${SCANNER_IMAGE}"
+  echo "TLS scanner target: ${TLS_SCANNER_CLUSTER_LABEL:-default} cluster"
+  echo "KUBECONFIG: ${KUBECONFIG:-<unset>}"
+  if [[ -n "${SCAN_NAMESPACE:-}" ]]; then
+    echo "Namespace filter: ${SCAN_NAMESPACE}"
+  fi
 
-# Create namespace
-oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+  # Determine scanner arguments based on whether a specific namespace is requested
+  if [[ -n "${SCAN_NAMESPACE:-}" ]]; then
+      SCANNER_ARGS="--all-pods --namespace-filter ${SCAN_NAMESPACE}"
+  else
+      SCANNER_ARGS="--all-pods"
+  fi
 
-# Cleanup on exit
-cleanup() {
-    echo "Cleaning up..."
-    oc delete namespace "${NAMESPACE}" --ignore-not-found --wait=false || true
-}
-trap cleanup EXIT
+  # Enable post-quantum cryptography checks when requested by the step ref.
+  if [[ "${PQC_CHECK:-false}" == "true" ]]; then
+      SCANNER_ARGS="${SCANNER_ARGS} --pqc-check"
+      echo "PQC readiness mode enabled: checks TLS 1.3 support and mlkem or mlkem25519 support per target."
+  fi
 
-# Grant cluster-admin to the default service account for full access
-oc adm policy add-cluster-role-to-user cluster-admin -z default -n "${NAMESPACE}"
+  if [[ -n "${SCAN_LIMIT_IPS:-}" && "${SCAN_LIMIT_IPS}" != "0" ]]; then
+      SCANNER_ARGS="${SCANNER_ARGS} --limit-ips ${SCAN_LIMIT_IPS}"
+      echo "Limiting scan to ${SCAN_LIMIT_IPS} IPs (smoke testing)."
+  fi
 
-# Grant privileged SCC to the service account (required for hostNetwork, hostPID, privileged container)
-oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
+  if [[ -n "${TLS_PROFILE_TYPE:-}" ]]; then
+      SCANNER_ARGS="${SCANNER_ARGS} --tls-profile-type ${TLS_PROFILE_TYPE}"
+      echo "Using expected TLS profile type for compliance checks: ${TLS_PROFILE_TYPE}"
+  fi
 
-# Wait for RBAC/SCC changes to propagate before creating the pod
-# This ensures the SCC admission controller sees the new binding
-echo "Waiting for RBAC/SCC changes to propagate..."
-sleep 10
+  local scanner_cpu="${SCANNER_CPU}"
+  local scanner_memory="${SCANNER_MEMORY}"
+  if [[ "${TLS_SCANNER_CLUSTER_LABEL:-}" == "guest" ]]; then
+    scanner_cpu="${SCANNER_CPU_GUEST:-1}"
+    scanner_memory="${SCANNER_MEMORY_GUEST:-2Gi}"
+  fi
+  echo "Scanner pod resources: cpu=${scanner_cpu} memory=${scanner_memory}"
 
-# Create the scanner pod with privileged access
-cat <<EOF | oc apply -f -
+  mkdir -p "${SCANNER_ARTIFACT_DIR}"
+
+  echo "=== TLS Scanner ==="
+  echo "Image: ${SCANNER_IMAGE}"
+
+  # For management cluster scans, deploy the scanner pod into the HCP namespace
+  # so it satisfies the HCP NetworkPolicy intra-namespace allow rules.
+  # The HCP namespace already exists and must not be deleted at cleanup.
+  if [[ "${TLS_SCANNER_CLUSTER_LABEL:-}" == "management" && -n "${SCAN_NAMESPACE:-}" ]]; then
+      NAMESPACE="${SCAN_NAMESPACE}"
+      OWNS_NAMESPACE=false
+  fi
+
+  if [[ "${OWNS_NAMESPACE}" == "true" ]]; then
+      # Shared clusters can retain tls-scanner resources from prior jobs.
+      # Pods are immutable; delete any leftover namespace before recreating.
+      echo "Removing any previous tls-scanner resources..."
+      oc delete namespace "${NAMESPACE}" --ignore-not-found --wait=true --timeout=120s || true
+      oc create namespace "${NAMESPACE}"
+  else
+      # Just remove any leftover scanner pod from a prior run; do not touch the namespace.
+      oc delete pod/tls-scanner -n "${NAMESPACE}" --ignore-not-found --wait=true --timeout=60s || true
+  fi
+
+  # Snapshot locals into global variables so the EXIT trap can reference them
+  # after run_tls_scan returns and locals go out of scope.
+  _CLEANUP_NAMESPACE="${NAMESPACE}"
+  _CLEANUP_OWNS_NAMESPACE="${OWNS_NAMESPACE}"
+  cleanup() {
+      echo "Cleaning up..."
+      if [[ "${_CLEANUP_OWNS_NAMESPACE}" == "true" ]]; then
+          oc delete namespace "${_CLEANUP_NAMESPACE}" --ignore-not-found --wait=false || true
+      else
+          oc delete pod/tls-scanner -n "${_CLEANUP_NAMESPACE}" --ignore-not-found --wait=false || true
+      fi
+  }
+  trap cleanup EXIT
+
+  # hostNetwork/hostPID are required for host-mode scanning but defeat NetworkPolicy
+  # for pod-mode management cluster scans (host-networked pods source from the node
+  # IP, which does not match any pod/namespace selector in HCP ingress rules).
+  # Pod-mode scanning uses the kube API for discovery and exec, so neither is needed.
+  if [[ "${OWNS_NAMESPACE}" == "false" ]]; then
+      HOST_NETWORK="false"
+      HOST_PID="false"
+      # PodSecurity restricted-compliant securityContext for HCP namespace scans.
+      # The scanner binary only needs kube API access in pod-mode, so root is not required.
+      SECURITY_CONTEXT_YAML="      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 65532
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault"
+  else
+      HOST_NETWORK="true"
+      HOST_PID="true"
+      SECURITY_CONTEXT_YAML="      privileged: true
+      runAsUser: 0"
+  fi
+
+  # Grant cluster-admin to the default service account for full API access
+  oc adm policy add-cluster-role-to-user cluster-admin -z default -n "${NAMESPACE}"
+
+  # Grant privileged SCC to the service account (required for hostNetwork/hostPID/privileged
+  # container in host-mode scans).
+  if [[ "${OWNS_NAMESPACE}" == "true" ]]; then
+      oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
+  fi
+
+  # Wait for RBAC/SCC changes to propagate before creating the pod
+  # This ensures the SCC admission controller sees the new binding
+  echo "Waiting for RBAC/SCC changes to propagate..."
+  sleep 10
+
+  # Create the scanner pod
+  cat <<EOF | oc create -f -
 apiVersion: v1
 kind: Pod
 metadata:
   name: tls-scanner
   namespace: ${NAMESPACE}
+  labels:
+    app: tls-scanner
+    # Required when running in an HCP namespace (OWNS_NAMESPACE=false): HyperShift's
+    # management-kas NetworkPolicy isolates pods without this label from the management
+    # cluster kube API (172.30.x.x service CIDR) via OVN ACLs that sit below standard
+    # NetworkPolicy. The label exempts the scanner so it can list pods via the
+    # management cluster API, which is the first thing tls-scanner does on startup.
+    hypershift.openshift.io/need-management-kas-access: "true"
 spec:
   serviceAccountName: default
   restartPolicy: Never
-  hostNetwork: true
-  hostPID: true
+  hostNetwork: ${HOST_NETWORK}
+  hostPID: ${HOST_PID}
   containers:
   - name: scanner
     image: ${SCANNER_IMAGE}
     command:
-    - /bin/sh
+    - /bin/bash
     - -c
     - |
       mkdir -p /results
@@ -67,19 +183,21 @@ spec:
         --csv-file /results/results.csv \
         --junit-file /results/junit_tls_scan.xml \
         --log-file /results/scan.log 2>&1 | tee /results/output.log
-      echo "Scan complete. Exit code: \$?"
-      # Keep pod alive for artifact collection
+      SCAN_EXIT_CODE=\${PIPESTATUS[0]}
+      echo "Scan complete. Exit code: \${SCAN_EXIT_CODE}" | tee -a /results/output.log
+      touch /results/scan.done
+      # Keep pod alive for artifact collection before exiting with the scanner's code.
       sleep 120
+      exit \${SCAN_EXIT_CODE}
     resources:
       requests:
-        cpu: "4"
-        memory: 4Gi
+        cpu: "${scanner_cpu}"
+        memory: ${scanner_memory}
       limits:
-        cpu: "4"
-        memory: 4Gi
+        cpu: "${scanner_cpu}"
+        memory: ${scanner_memory}
     securityContext:
-      privileged: true
-      runAsUser: 0
+${SECURITY_CONTEXT_YAML}
     volumeMounts:
     - name: results
       mountPath: /results
@@ -88,44 +206,140 @@ spec:
     emptyDir: {}
 EOF
 
-echo "Waiting for scanner pod to start..."
-oc wait --for=condition=Ready pod/tls-scanner -n "${NAMESPACE}" --timeout=5m || {
-    echo "Pod failed to start:"
-    oc describe pod/tls-scanner -n "${NAMESPACE}"
-    oc get events -n "${NAMESPACE}"
-    exit 1
+  echo "Waiting for scanner pod to start..."
+  oc wait --for=condition=Ready pod/tls-scanner -n "${NAMESPACE}" --timeout=5m || {
+      echo "Pod failed to start:"
+      oc describe pod/tls-scanner -n "${NAMESPACE}"
+      oc get events -n "${NAMESPACE}"
+      exit 1
+  }
+
+  echo "Streaming scanner logs (live)..."
+  oc logs -f pod/tls-scanner -n "${NAMESPACE}" &
+  LOGS_PID=$!
+
+  echo "Waiting for scan to finish (pod stays alive 120s after scan for artifact collection)..."
+  while true; do
+      phase=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+      echo "Poll: phase=${phase}"
+      # Scanner completion check first — must copy artifacts while pod is still running.
+      if oc exec pod/tls-scanner -n "${NAMESPACE}" -- test -f /results/scan.done 2>/dev/null; then
+          echo "/results/scan.done found — proceeding to copy artifacts"
+          break
+      fi
+      # Fallback: pod already exited (sleep window expired or crash).
+      if [[ "$phase" == "Succeeded" || "$phase" == "Failed" ]]; then
+          echo "Warning: pod ${phase} before artifact collection — oc cp will likely fail"
+          break
+      fi
+      sleep 15
+  done
+
+  echo "Copying artifacts..."
+  oc cp "${NAMESPACE}/tls-scanner:/results/." "${SCANNER_ARTIFACT_DIR}/" || echo "Warning: Failed to copy some artifacts"
+
+  if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
+      if [[ "${PQC_CHECK:-false}" == "true" && -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ]]; then
+        junit_artifact="${ARTIFACT_DIR}/junit_pqc_scan_${TLS_SCANNER_CLUSTER_LABEL}.xml"
+      elif [[ -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ]]; then
+        junit_artifact="${ARTIFACT_DIR}/junit_tls_scan_${TLS_SCANNER_CLUSTER_LABEL}.xml"
+      else
+        junit_artifact="${ARTIFACT_DIR}/junit_tls_scan.xml"
+      fi
+      cp "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" "${junit_artifact}"
+      echo "JUnit results copied to ${junit_artifact} for Spyglass"
+  fi
+
+  wait $LOGS_PID 2>/dev/null || true
+
+  # Check final pod status. The scanner exits non-zero when TLS findings are
+  # detected — this is expected and not an infrastructure failure. Propagate
+  # the scanner's exit code so CI marks the job accordingly, but do not treat
+  # it as a timeout or describe the pod as failed when artifacts were collected.
+  local pod_phase
+  pod_phase="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")"
+  local pod_exit_code
+  pod_exit_code="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo "")"
+
+  if [[ "${pod_phase}" == "Failed" ]]; then
+      echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code}"
+      if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
+          echo "Artifacts were collected — scanner found TLS compliance issues."
+      else
+          echo "No artifacts found — scanner may have crashed."
+          oc describe pod/tls-scanner -n "${NAMESPACE}"
+      fi
+      exit "${pod_exit_code:-1}"
+  elif [[ "${pod_phase}" != "Succeeded" ]]; then
+      local poll_timeout=600
+      local poll_interval=10
+      echo "Scanner pod in unexpected phase: ${pod_phase} — polling until terminal (up to $((poll_timeout/60))m)"
+      local wait_elapsed=0
+      while (( wait_elapsed < poll_timeout )); do
+          pod_phase="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")"
+          if [[ "${pod_phase}" == "Succeeded" || "${pod_phase}" == "Failed" ]]; then
+              break
+          fi
+          sleep "${poll_interval}"
+          (( wait_elapsed += poll_interval )) || true
+      done
+      if [[ "${pod_phase}" == "Failed" ]]; then
+          pod_exit_code="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null || echo "")"
+          echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code}"
+          if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
+              echo "Artifacts were collected — scanner found TLS compliance issues."
+          else
+              echo "No artifacts found — scanner may have crashed."
+              oc describe pod/tls-scanner -n "${NAMESPACE}"
+          fi
+          exit "${pod_exit_code:-1}"
+      elif [[ "${pod_phase}" != "Succeeded" ]]; then
+          echo "Scanner did not complete successfully - timeout exceeded (phase: ${pod_phase})"
+          oc describe pod/tls-scanner -n "${NAMESPACE}"
+          exit 1
+      fi
+  fi
+
+  echo "=== TLS Scanner Complete ==="
+  echo "Artifacts saved to: ${SCANNER_ARTIFACT_DIR}"
+  ls -la "${SCANNER_ARTIFACT_DIR}" || true
+
+  # Unregister the trap so it doesn't fire after the function returns (local
+  # variables NAMESPACE/OWNS_NAMESPACE would be unbound at that point).
+  trap - EXIT
 }
 
-echo "Waiting for scan to complete..."
-# Poll logs until scan completes (don't use -f which waits for container exit)
-while true; do
-    if oc logs pod/tls-scanner -n "${NAMESPACE}" 2>/dev/null | grep -q "Scan complete"; then
-        break
-    fi
-    # Show progress
-    echo "  Scan still running..."
-    sleep 30
-done
+if [[ "${TLS_SCANNER_RUN_HYPERSHIFT:-false}" == "true" ]]; then
+  OVERALL_EXIT_CODE=0
 
-echo "Scan completed. Fetching full logs..."
-oc logs pod/tls-scanner -n "${NAMESPACE}" || true
+  # First pass: TLS compliance only. Explicitly override PQC_CHECK in subshells.
+  for label in management guest; do
+    echo "=== TLS scanner: ${label} cluster ==="
+    (
+      export TLS_SCANNER_CLUSTER_LABEL="${label}"
+      export PQC_CHECK="false"
+      run_tls_scan
+    ) || OVERALL_EXIT_CODE=1
+    echo "=== TLS scanner: ${label} cluster complete ==="
+  done
 
-echo "Copying artifacts (container still alive in sleep phase)..."
-oc cp "${NAMESPACE}/tls-scanner:/results/." "${SCANNER_ARTIFACT_DIR}/" || echo "Warning: Failed to copy some artifacts"
+  # Second pass: PQC readiness check (only if PQC_CHECK was originally enabled).
+  if [[ "${PQC_CHECK:-false}" == "true" ]]; then
+    echo "=== TLS scanner: PQC readiness pass ==="
+    for label in management guest; do
+      echo "=== PQC scanner: ${label} cluster ==="
+      (
+        export TLS_SCANNER_CLUSTER_LABEL="${label}"
+        export PQC_CHECK="true"
+        run_tls_scan
+      ) || OVERALL_EXIT_CODE=1
+      echo "=== PQC scanner: ${label} cluster complete ==="
+    done
+    echo "=== PQC readiness pass complete ==="
+  fi
 
-# Copy JUnit XML to root artifact dir for Spyglass (pattern: artifacts/junit*.xml)
-if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
-    cp "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" "${ARTIFACT_DIR}/junit_tls_scan.xml"
-    echo "JUnit results copied to ${ARTIFACT_DIR}/junit_tls_scan.xml for Spyglass"
+  echo "=== HyperShift TLS scanner complete (management + guest) ==="
+  exit "${OVERALL_EXIT_CODE}"
 fi
 
-# Wait for pod to complete
-oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/tls-scanner -n "${NAMESPACE}" --timeout=4h || {
-    echo "Scanner did not complete successfully"
-    oc describe pod/tls-scanner -n "${NAMESPACE}"
-    exit 1
-}
-
-echo "=== TLS Scanner Complete ==="
-echo "Artifacts saved to: ${SCANNER_ARTIFACT_DIR}"
-ls -la "${SCANNER_ARTIFACT_DIR}" || true
+run_tls_scan

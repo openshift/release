@@ -11,6 +11,10 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: latest
+  tls-scanner-tool:
+    name: "5.0"
+    namespace: ocp-priv
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/insights-operator
@@ -19,18 +23,21 @@ images:
   - to: insights-operator
 promotion:
   to:
-  - name: 5.0-priv
-    namespace: ocp-private
+  - disabled: true
+    name: "5.0"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -66,7 +73,7 @@ tests:
 - as: e2e
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
@@ -76,7 +83,7 @@ tests:
 - as: insights-operator-e2e-tests
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -84,7 +91,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not serial and not periodic_only and not slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
+        pytest.sh -k "not serial and not periodic_only and not slow" --junitxml=$(pwd)/test-report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -110,9 +117,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -126,8 +130,6 @@ tests:
         name: SLACK_BOT_TOKEN
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -138,7 +140,7 @@ tests:
 - as: insights-operator-serial-tests
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -146,7 +148,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "serial and not periodic_only and not slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_serial_tests_pr_checks
+        pytest.sh -k "serial and not periodic_only and not slow" --junitxml=$(pwd)/test-report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -172,9 +174,6 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -188,8 +187,6 @@ tests:
         name: SLACK_BOT_TOKEN
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -200,7 +197,7 @@ tests:
 - as: insights-operator-slow-tests
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -208,7 +205,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not periodic_only and slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_slow_tests_pr_checks
+        pytest.sh -k "not periodic_only and slow" --junitxml=$(pwd)/test-report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -234,8 +231,61 @@ tests:
       - mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
-      - mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
+      env:
+      - default: /secret/aws/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: /secret/aws/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: /secret/aws/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      - default: /secret/slack-bot-token/slack-bot-token
+        name: SLACK_BOT_TOKEN
+      - default: /secret/slack-webhook-url/slack-webhook-url
+        name: SLACK_WEBHOOK_URL
+      from: insights-operator-tests
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: insights-runtime-extractor-tests
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
+  steps:
+    cluster_profile: openshift-org-gcp
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - mount_path: /secret/aws/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      - mount_path: /secret/slack-bot-token
+        name: slack-bot-token
+        namespace: test-credentials
+      - mount_path: /secret/slack-webhook-url
+        name: slack-webhook-url
+        namespace: test-credentials
+      - mount_path: /secret/ocm-access/
+        name: insights-ocm-token
         namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
@@ -250,13 +300,12 @@ tests:
         name: SLACK_BOT_TOKEN
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
 - always_run: false
   as: tls-scanner

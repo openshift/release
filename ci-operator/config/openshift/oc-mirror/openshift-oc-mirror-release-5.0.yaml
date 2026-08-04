@@ -14,7 +14,8 @@ images:
     to: oc-mirror-tests
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - oc-mirror-tests
     name: "5.0"
     namespace: ocp
@@ -50,16 +51,19 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^v1/
-- as: v1-e2e
+- always_run: false
+  as: v1-e2e
   commands: |
     pushd v1 || true
     make test-e2e
   container:
     from: src
+  pipeline_run_if_changed: ^v1/
 - as: v1-sanity
   commands: make -C v1 sanity
   container:
     from: src
+  run_if_changed: ^v1/
 - as: v1-unit
   commands: |
     export HOME=/tmp/home
@@ -67,6 +71,7 @@ tests:
     make -C v1 test-unit
   container:
     from: src
+  run_if_changed: ^v1/
 - as: lint
   commands: |
     export GOCACHE=/tmp/

@@ -3,6 +3,8 @@ base_images:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
+prowgen:
+  disable_rehearsals: true
 resources:
   '*':
     limits:
@@ -21,13 +23,15 @@ tests:
     test:
     - as: fournos
       commands: |
+        exec &> >(tee -a "$ARTIFACT_DIR/run.log")
+
         export PSAP_FORGE_FOURNOS_CI_SECRET_PATH=/var/run/psap-forge-ci
         export PSAP_FORGE_NOTIFICATIONS_SECRET_PATH=/var/run/psap-forge-notifications
 
         git -C $HOME fetch --quiet origin $PULL_PULL_SHA
         git -C $HOME reset --hard FETCH_HEAD
 
-        exec ./bin/run_ci fournos ci submit
+        exec ./bin/run_ci fournos_launcher ci submit
       credentials:
       - mount_path: /var/run/psap-forge-ci
         name: psap-forge-ci

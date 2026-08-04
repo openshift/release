@@ -15,7 +15,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.21
+    tag: rhel-9-golang-1.26-openshift-5.0
   use_build_cache: true
 images:
   items:
@@ -42,12 +42,14 @@ operator:
     with: pipeline:opendatahub-operator-rhoai
   - pullspec: REPLACE_IMAGE:v0.0.0-placeholder
     with: pipeline:opendatahub-operator
+prowgen:
+  skip_operator_presubmits: true
 releases:
   latest:
     release:
       architecture: multi
       channel: stable
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -61,8 +63,8 @@ tests:
     owner: opendatahub
     product: ocp
     timeout: 2h0m0s
-    version: "4.19"
-  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
+    version: "4.20"
+  skip_if_only_changed: ^\.github/|^build/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$|^api/cloudmanager/|^config/cloudmanager/|^internal/controller/cloudmanager/|^pkg/controller/cloudmanager/|^tests/e2e/cloudmanager/|^hack/update-cloudmanager-rbac\.sh$|^pkg/operatorconfig/cloudmanager\.go$|^pkg/utils/test/cloudmanager/
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -95,13 +97,13 @@ tests:
       cli: latest
       commands: |
         unset GOFLAGS
-        make e2e-test -e E2E_TEST_FLAGS="-timeout 60m" -e OPERATOR_NAMESPACE=opendatahub-operator
+        make e2e-test -e E2E_TEST_FLAGS="-timeout 80m" -e OPERATOR_NAMESPACE=opendatahub-operator
       from: src
       resources:
         requests:
           cpu: 2000m
           memory: 3Gi
-      timeout: 1h30m0s
+      timeout: 3h0m0s
     workflow: generic-claim
 - as: opendatahub-operator-rhoai-e2e
   cluster_claim:
@@ -110,8 +112,8 @@ tests:
     owner: opendatahub
     product: ocp
     timeout: 2h0m0s
-    version: "4.19"
-  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
+    version: "4.20"
+  skip_if_only_changed: ^\.github/|^build/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$|^api/cloudmanager/|^config/cloudmanager/|^internal/controller/cloudmanager/|^pkg/controller/cloudmanager/|^tests/e2e/cloudmanager/|^hack/update-cloudmanager-rbac\.sh$|^pkg/operatorconfig/cloudmanager\.go$|^pkg/utils/test/cloudmanager/
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -143,13 +145,13 @@ tests:
       cli: latest
       commands: |
         unset GOFLAGS
-        E2E_TEST_DSC_MONITORING_NAMESPACE=redhat-ods-monitoring make e2e-test -e ODH_PLATFORM_TYPE=rhoai -e E2E_TEST_FLAGS="-timeout 60m" -e OPERATOR_NAMESPACE=redhat-ods-operator
+        E2E_TEST_DSC_MONITORING_NAMESPACE=redhat-ods-monitoring make e2e-test -e ODH_PLATFORM_TYPE=rhoai -e E2E_TEST_FLAGS="-timeout 80m" -e OPERATOR_NAMESPACE=redhat-ods-operator
       from: src
       resources:
         requests:
           cpu: 2000m
           memory: 3Gi
-      timeout: 1h30m0s
+      timeout: 3h0m0s
     workflow: generic-claim
 - as: opendatahub-operator-image-mirror
   postsubmit: true

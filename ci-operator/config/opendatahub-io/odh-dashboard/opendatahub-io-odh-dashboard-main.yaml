@@ -29,6 +29,15 @@ images:
   - context_dir: .
     dockerfile_path: ./packages/autorag/Dockerfile.workspace
     to: odh-mod-arch-autorag-image
+  - context_dir: .
+    dockerfile_path: ./packages/agent-ops/Dockerfile.workspace
+    to: odh-mod-arch-agent-ops-image
+  - context_dir: .
+    dockerfile_path: ./distributions/core-bff/Dockerfile.workspace
+    to: odh-core-bff-image
+  - context_dir: .
+    dockerfile_path: ./dashboard-operator/Dockerfile
+    to: odh-dashboard-operator-image
 promotion:
   to:
   - namespace: opendatahub-io
@@ -64,6 +73,7 @@ tests:
       IMAGE_REPO: odh-dashboard
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-mod-arch-model-registry-pr-image-mirror
+  run_if_changed: ^packages/model-registry/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: odh-mod-arch-model-registry-image
@@ -80,6 +90,7 @@ tests:
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-mod-arch-gen-ai-pr-image-mirror
+  run_if_changed: ^packages/gen-ai/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: odh-mod-arch-gen-ai-image
@@ -96,6 +107,7 @@ tests:
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-mod-arch-maas-pr-image-mirror
+  run_if_changed: ^packages/maas/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: odh-mod-arch-maas-image
@@ -112,6 +124,7 @@ tests:
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-mod-arch-mlflow-pr-image-mirror
+  run_if_changed: ^packages/mlflow/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: odh-mod-arch-mlflow-image
@@ -128,6 +141,7 @@ tests:
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-mod-arch-eval-hub-pr-image-mirror
+  run_if_changed: ^packages/eval-hub/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: odh-mod-arch-eval-hub-image
@@ -144,6 +158,7 @@ tests:
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-mod-arch-automl-pr-image-mirror
+  run_if_changed: ^packages/automl/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: odh-mod-arch-automl-image
@@ -160,6 +175,7 @@ tests:
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-mod-arch-autorag-pr-image-mirror
+  run_if_changed: ^packages/autorag/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: odh-mod-arch-autorag-image
@@ -173,6 +189,56 @@ tests:
       SOURCE_IMAGE_REF: odh-mod-arch-autorag-image
     env:
       IMAGE_REPO: odh-mod-arch-autorag
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-agent-ops-pr-image-mirror
+  run_if_changed: ^packages/agent-ops/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-agent-ops-image
+    env:
+      IMAGE_REPO: odh-mod-arch-agent-ops
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-agent-ops-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-agent-ops-image
+    env:
+      IMAGE_REPO: odh-mod-arch-agent-ops
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-core-bff-pr-image-mirror
+  run_if_changed: ^distributions/core-bff/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-core-bff-image
+    env:
+      IMAGE_REPO: odh-core-bff
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-core-bff-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-core-bff-image
+    env:
+      IMAGE_REPO: odh-core-bff
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-dashboard-operator-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-dashboard-operator-image
+    env:
+      IMAGE_REPO: odh-dashboard-operator
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-dashboard-operator-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-dashboard-operator-image
+    env:
+      IMAGE_REPO: odh-dashboard-operator
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:

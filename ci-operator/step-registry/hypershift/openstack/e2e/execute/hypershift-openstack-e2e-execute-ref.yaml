@@ -3,6 +3,9 @@ ref:
   cli: latest
   commands: hypershift-openstack-e2e-execute-commands.sh
   credentials:
+    - mount_path: /etc/hypershift-pool-aws-credentials
+      name: hypershift-pool-aws-credentials
+      namespace: test-credentials
     - mount_path: /etc/ci-pull-credentials
       name: ci-pull-credentials
       namespace: test-credentials
@@ -12,7 +15,15 @@ ref:
     - env: OCP_IMAGE_PREVIOUS
       name: release:initial
   env:
-    - default: "rhcos-latest-hcp-nodepool"
+    - default: ""
+      documentation: |-
+        Name of a pre-existing Glance image to use for OpenStack nodes. On 4.19+
+        this is unused for TestCreateCluster and TestNodePool since ORC manages
+        the image lifecycle directly; it is only consumed by TestOpenStackAdvancedTest
+        (not in the default E2E_TESTS_REGEX). On 4.18 and earlier, DefaultOpenStackOptions
+        still wired this value into the NodePool ImageName field, so the 4.18 job
+        configs override this variable to reference a versioned pre-existing image
+        (e.g. rhcos-4.18-hcp-nodepool).
       name: RHCOS_IMAGE_NAME
     - default: 'TestCreateCluster$|TestNodePool|TestAutoscaling'
       documentation: |-

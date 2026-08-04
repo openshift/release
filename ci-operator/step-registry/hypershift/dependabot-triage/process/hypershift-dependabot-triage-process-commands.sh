@@ -112,12 +112,19 @@ DEPENDABOT_PRS=$(gh pr list \
   --json number,title,headRefName \
   --limit 50)
 
-# Filter out PRs that bump k8s.io or sigs.k8s.io dependencies (managed manually)
-echo "Filtering out k8s.io and sigs.k8s.io dependency bumps..."
+# Filter out PRs that are not Go module dependency bumps
+echo "Filtering out non-Go-module and k8s.io/sigs.k8s.io dependency bumps..."
 FILTERED_PRS="[]"
 while IFS= read -r pr_json; do
   pr_num=$(echo "$pr_json" | jq -r '.number')
   pr_title=$(echo "$pr_json" | jq -r '.title')
+  pr_branch=$(echo "$pr_json" | jq -r '.headRefName')
+  # Skip GitHub Actions dependency bumps (not Go modules, and workflow file pushes
+  # require the 'workflows' permission which the GitHub App token does not have)
+  if [[ "$pr_branch" == dependabot/github_actions/* ]]; then
+    echo "  Skipping PR #${pr_num}: ${pr_title} (GitHub Actions bump)"
+    continue
+  fi
   pr_diff=$(gh api "repos/openshift/hypershift/pulls/${pr_num}/files" \
     --jq '.[] | select(.filename == "go.mod" or .filename == "api/go.mod") | .patch' 2>/dev/null || true)
   if echo "$pr_diff" | grep -vE '// indirect' | grep -qE '^\+[^+].*\b(k8s\.io|sigs\.k8s\.io)/'; then
@@ -174,7 +181,7 @@ For EACH PR in the list above, do the following steps IN ORDER:
 3. **Run make verify**: Regenerate all necessary files
    - Run: `make verify 2>&1 | tee /tmp/make-verify-pr.log; VERIFY_EXIT=${PIPESTATUS[0]}`
    - If VERIFY_EXIT is non-zero, determine if gitlint is the ONLY failure by running:
-     `NON_GITLINT=$(grep 'make:.*\*\*\*' /tmp/make-verify-pr.log | grep -vi 'gitlint' || true)`
+     `NON_GITLINT=$(grep 'make:.*\*\*\*' /tmp/make-verify-pr.log | grep -viE 'gitlint|: verify\]' || true)`
    - If NON_GITLINT is empty: gitlint is the only failure, ignore it and continue
    - If NON_GITLINT is NOT empty: there are real failures. Record PR as failed with the NON_GITLINT output as reason, run `git reset --hard <saved_sha> && git clean -fd` to fully revert all changes, continue to next PR
 
@@ -220,7 +227,7 @@ echo "$CLAUDE_PROMPT" | claude --print \
   --allowedTools "Bash,Read,Write,Edit,Grep,Glob,WebFetch,Skill,Task,TodoWrite" \
   --verbose \
   --output-format stream-json \
-  --max-turns 100 \
+  --max-turns 200 \
   2> "/tmp/claude-dependabot-output.log" \
   | tee "$CLAUDE_OUTPUT_FILE"
 CLAUDE_EXIT_CODE=$?
@@ -433,7 +440,8 @@ VERIFY_LOG=$(mktemp /tmp/make-verify.XXXXXX)
 if ! make verify 2>&1 | tee "$VERIFY_LOG"; then
   # Check if any make target OTHER than run-gitlint failed
   # make failure lines look like: make: *** [Makefile:394: run-gitlint] Error 254
-  NON_GITLINT_FAILURES=$(grep 'make:.*\*\*\*' "$VERIFY_LOG" | grep -vi 'gitlint' || true)
+  # Also filter the parent 'verify' target which cascades from gitlint failures
+  NON_GITLINT_FAILURES=$(grep 'make:.*\*\*\*' "$VERIFY_LOG" | grep -viE 'gitlint|: verify\]' || true)
   if [ -z "$NON_GITLINT_FAILURES" ]; then
     echo "make verify failed due to gitlint only - ignoring"
   else

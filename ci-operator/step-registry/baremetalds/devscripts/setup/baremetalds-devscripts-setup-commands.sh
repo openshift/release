@@ -43,6 +43,10 @@ finished()
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
 
+  if [[ -d "${ARTIFACT_DIR}/root/dev-scripts/logs" ]]; then
+    touch "${SHARED_DIR}/devscripts-logs-collected"
+  fi
+
   # Save exit code for must-gather to generate junit. Make eats exit
   # codes, so we try to fetch it from the dev-scripts artifacts if we can.
   status_file=${ARTIFACT_DIR}/root/dev-scripts/logs/installer-status.txt
@@ -189,8 +193,17 @@ EOF
 
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 
+# Calculate timeouts: make timeout is configurable (must be in minutes e.g. "130m"),
+# SSH timeout adds 45m buffer for pre-make setup
+MAKE_TIMEOUT="${DEVSCRIPTS_SETUP_TIMEOUT:-130m}"
+if [[ ! "${MAKE_TIMEOUT}" =~ ^[1-9][0-9]*m$ ]]; then
+  echo "ERROR: DEVSCRIPTS_SETUP_TIMEOUT must be specified in minutes (e.g. '130m'), got '${MAKE_TIMEOUT}'"
+  exit 1
+fi
+SSH_TIMEOUT="$((${MAKE_TIMEOUT%m} + 45))m"
+
 # Use '/auths/ s/.*/' instead of 's/.*auths.*/' to avoid regex backtracking on long log lines
-timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e '/auths/ s/.*/*** PULL_SECRET ***/'
+timeout -s 9 "${SSH_TIMEOUT}" ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e '/auths/ s/.*/*** PULL_SECRET ***/'
 
 set -xeuo pipefail
 
@@ -433,7 +446,7 @@ fi
 echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root/.bashrc
 
 set +e
-timeout -s 9 130m make ${DEVSCRIPTS_TARGET}
+timeout -s 9 ${MAKE_TIMEOUT} make ${DEVSCRIPTS_TARGET}
 rv=\$?
 
 # squid needs to be restarted after network changes

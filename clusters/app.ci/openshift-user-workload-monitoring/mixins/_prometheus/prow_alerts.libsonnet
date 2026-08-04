@@ -16,14 +16,15 @@
             },
           },
           {
-            alert: 'ImagePullBackOff',
-            expr: 'sum(sum_over_time(kube_pod_container_status_waiting_reason{reason="ImagePullBackOff"}[5m])) > 30',
-            'for': '10m',
+            alert: 'NonKubeContainerWaiting',
+            expr: 'max by (namespace, pod, container) (kube_pod_container_status_waiting_reason{namespace!~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"} > 0)',
+            'for': '1h',
             labels: {
-              severity: 'critical',
+              severity: 'warning',
             },
             annotations: {
-              message: 'Many pods have been failing on pulling images. Please check the relevant events on the cluster.'
+              summary: 'Pod container waiting longer than 1 hour',
+	      description: 'pod/{{ $labels.pod }} in namespace {{ $labels.namespace }} on container {{ $labels.container }} has been in waiting state for longer than 1 hour. (reason: {{ with printf `kube_pod_container_status_waiting_reason{namespace="%s",pod="%s",container="%s"}` $labels.namespace $labels.pod $labels.container | query }}{{ . | first | label "reason" }}{{ end }}).',
             },
           },
           {

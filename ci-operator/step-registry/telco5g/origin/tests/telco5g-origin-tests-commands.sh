@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+exec > >(tee -i /tmp/tests-output.log) 2>&1
+
+cat > "${SHARED_DIR}/diagnose-telco5g-origin-tests.early" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-origin-tests
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=origintests
+EOF
+
 # shellcheck disable=SC1091
 source "$SHARED_DIR/main.env"
 
@@ -34,7 +43,7 @@ SSH_PKEY=~/key
 cp "$SSH_PKEY_PATH" "$SSH_PKEY"
 chmod 600 "$SSH_PKEY"
 
-if [[ "$T5CI_VERSION" == "4.22" ]]; then
+if [[ "$T5CI_VERSION" == "4.23" ]] || [[ "$T5CI_VERSION" == "5.0" ]]; then
     export CNF_BRANCH="master"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
@@ -389,6 +398,58 @@ EOF
 EOF
     )
     ;;
+
+  4.23)
+    TESTS_LIST=$(cat <<EOF
+"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support multiple inline ephemeral volumes [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-cli] Kubectl client Kubectl version should check is all data is printed [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-cli] oc debug dissect deployment config debug [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] Ingress API should support creating Ingress API operations [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] Proxy version v1 A set of valid responses are returned for both pod and service Proxy [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read-only inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-node] Security Context should support seccomp unconfined on the pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (delayed binding)] topology should fail to schedule a pod which has topologies that conflict with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-node] Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart http hook properly [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-api-machinery] client-go should negotiate watch and report errors with accept \"application/vnd.kubernetes.protobuf,application/json\" [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
+EOF
+    )
+    ;;
+
+  5.0)
+    TESTS_LIST=$(cat <<EOF
+"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support multiple inline ephemeral volumes [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-cli] Kubectl client Kubectl version should check is all data is printed [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-cli] oc debug dissect deployment config debug [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] Ingress API should support creating Ingress API operations [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] Proxy version v1 A set of valid responses are returned for both pod and service Proxy [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read-only inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-node] Security Context should support seccomp unconfined on the pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (delayed binding)] topology should fail to schedule a pod which has topologies that conflict with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-node] Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart http hook properly [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-api-machinery] client-go should negotiate watch and report errors with accept \"application/vnd.kubernetes.protobuf,application/json\" [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
+EOF
+    )
+    ;;
   *)
     echo "Error: Unsupported T5CI_VERSION."
     exit 1
@@ -520,16 +581,35 @@ cat << EOF > run-openshift-tests.yml
 EOF
 
 # Run OpenShift's conformance test suite
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i "$SHARED_DIR/inventory" run-openshift-tests.yml -vv
+status=0
 
-cd "$ARTIFACT_DIR"
-tar -xf openshift-tests.tar.gz
-rm openshift-tests.tar.gz
+rm -f "${SHARED_DIR}/diagnose-telco5g-origin-tests.early"
+cat > "${SHARED_DIR}/diagnose-telco5g-origin-tests" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-origin-tests
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=origintests
+export CLUSTER_NAME=${CLUSTER_NAME:-unknown}
+export TEST_SUITE=${TEST_SUITE:-unknown}
+EOF
 
-cd junit/
-for f in test-failures-summary_*.json; do
-    if [ -e "$f" ]; then
-        ln -s "$f" test-failures-summary.json
-        break
-    fi
-done
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i "$SHARED_DIR/inventory" run-openshift-tests.yml -vv || status=$?
+
+if [[ -f "$ARTIFACT_DIR/openshift-tests.tar.gz" ]]; then
+    cd "$ARTIFACT_DIR"
+    tar -xf openshift-tests.tar.gz
+    rm openshift-tests.tar.gz
+
+    cd junit/
+    for f in test-failures-summary_*.json; do
+        if [ -e "$f" ]; then
+            ln -s "$f" test-failures-summary.json
+            break
+        fi
+    done
+fi
+
+gzip -c /tmp/tests-output.log > ${SHARED_DIR}/tests-output.log.gz 2>/dev/null || true
+
+[[ ${status} -eq 0 ]] && rm -f "${SHARED_DIR}/diagnose-telco5g-origin-tests"
+exit ${status}

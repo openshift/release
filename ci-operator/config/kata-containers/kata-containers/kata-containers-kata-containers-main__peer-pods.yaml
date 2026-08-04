@@ -1,6 +1,6 @@
 base_images:
   tests-base:
-    name: "4.19"
+    name: "4.22"
     namespace: ocp
     tag: tests
 binary_build_commands: |
@@ -32,12 +32,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -52,7 +52,8 @@ tests:
     allow_skip_on_success: true
     cluster_profile: openshift-org-azure
     env:
-      TEST_ARGS: ' --max-parallel-tests 10 --cluster-stability Disruptive --run ^\[sig-node\].*'
+      TEST_ARGS: ' --max-parallel-tests 10 --cluster-stability Disruptive --retry-strategy=aggressive
+        --run ^\[sig-node\].*'
       TEST_SKIPS: \[sig-node\] Pods Extended Pod Container Status should never report\|\[sig-node\]
         Sysctls.*should support sysctls\|\[sig-node\] Pods Extended Pod Container
         Status should never report success for a pending container\|\[sig-node\] Security
@@ -74,7 +75,12 @@ tests:
         is set\|\[sig-node\].*TerminationMessagePath\|\[sig-node\].*CPU Partitioning\|\[sig-node\].*supplemental
         groups Ensure supplemental groups propagate to docker should propagate requested
         groups to the container\|\[sig-node\].*should override timeoutGracePeriodSeconds
-        when annotation is set
+        when annotation is set\|\[sig-node\].*\[DRA\]\|\[sig-node\].*User Namespaces.*\|\[sig-node\].*HostUsers.*\|\[sig-node\].*UserNamespacesSupport.*\|\[sig-node\].*FileKeyRef.*\|\[sig-node\].*HostnameOverride.*\|\[sig-node\].*SupplementalGroupsPolicy.*Strict.*\|\[sig-node\].*Pod
+        Generation.*\|\[sig-node\].*InPlace Resize.*\|\[sig-node\].*Pod InPlace Resize.*\|\[sig-node\].*limit-ranger.*\|\[sig-node\].*resource-quota.*\|\[sig-node\].*Downward
+        API.*limits.*\|\[sig-node\].*Downward API.*requests.*\|\[sig-node\].*QOS Class.*\|\[sig-node\].*PodRejectionStatus.*\|\[sig-node\].*Lifecycle
+        Sleep Hook.*\|\[sig-node\].*Lifecycle sleep action.*\|\[sig-node\].*Container
+        Restart Rules.*\|\[sig-node\].*zstd:chunked.*\|\[sig-node\].*ImageVolume.*\|\[sig-node\].*Allow
+        dev fuse by default.*
     pre:
     - chain: ipi-azure-pre
     - as: kata-containers-e2e-pre

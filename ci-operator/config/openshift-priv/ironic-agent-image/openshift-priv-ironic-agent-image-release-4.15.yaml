@@ -18,8 +18,10 @@ images:
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|Dockerfile.okd|main-packages-list.okd)$
 promotion:
   to:
-  - name: 4.15-priv
-    namespace: ocp-private
+  - name: "4.15"
+    namespace: ocp-priv
+prowgen:
+  private: true
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -30,27 +32,25 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ipi-bm
+- as: e2e-metal-ipi-sdn-ipv4
   capabilities:
   - intranet
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-serial-ipv4
   capabilities:

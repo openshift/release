@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -39,6 +39,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: rhel-coreos
+  tls-scanner-tool:
+    name: "5.0"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -58,12 +62,19 @@ images:
     from: ocp_os
     to: custom-os-image
   - dockerfile_literal: |
+      FROM src
+      RUN dnf install -y skopeo && dnf clean all
+    from: src
+    to: src-with-skopeo
+  - dockerfile_literal: |
       FROM quay.io/zzlotnik/zacks-openshift-helpers:latest
     to: zacks-toolbox
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - custom-os-image
+    - src-with-skopeo
     - zacks-toolbox
     name: "5.0"
     namespace: ocp
@@ -106,7 +117,11 @@ tests:
     - ref: agent-e2e-compact-ipv4-iso-no-registry-validation
     - as: iri-e2e-step
       cli: latest
-      commands: make test-e2e-iri
+      commands: |
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        make test-e2e-iri
+        TAGS=iri_delete make test-e2e-iri
       from: src
       resources:
         requests:
@@ -158,7 +173,7 @@ tests:
     workflow: ipi-aws
 - always_run: false
   as: e2e-aws-ovn
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
@@ -201,13 +216,13 @@ tests:
   as: e2e-gcp-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp
 - always_run: false
   as: e2e-gcp-rt-op
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       RT_ENABLED: "true"
     test:
@@ -223,7 +238,7 @@ tests:
   as: e2e-gcp-op
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -239,9 +254,9 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-op-part1
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -257,9 +272,9 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-op-part2
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -274,46 +289,31 @@ tests:
       timeout: 1h40m0s
     workflow: ipi-gcp
   timeout: 4h0m0s
-- as: e2e-gcp-op-ocl
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op-ocl-part1
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
-    cluster_profile: gcp
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e-ocl
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h10m0s
-    workflow: ipi-gcp
-- as: e2e-gcp-op-ocl-part1
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
-  steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
       commands: make test-e2e-ocl-1of2
-      from: src
+      from: src-with-skopeo
       resources:
         requests:
           cpu: 100m
       timeout: 2h30m0s
     workflow: ipi-gcp
-- as: e2e-gcp-op-ocl-part2
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+- always_run: false
+  as: e2e-gcp-op-ocl-part2
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
       commands: make test-e2e-ocl-2of2
-      from: src
+      from: src-with-skopeo
       resources:
         requests:
           cpu: 100m
@@ -323,7 +323,7 @@ tests:
   as: e2e-gcp-op-techpreview
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -338,7 +338,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-aws-ovn-upgrade
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
@@ -406,6 +406,44 @@ tests:
   optional: true
   steps:
     cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-zones
+- always_run: false
+  as: e2e-vsphere-mco-bootimages
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      TEST_ARGS: --run=MCO.Bootimages
+      TEST_SKIPS: ""
+      TEST_SUITE: openshift/machine-config-operator/longduration
+    workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-vsphere-zones-mco-bootimages
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      MAX_VCENTERS: "1"
+      OS_IMAGE_STREAM: rhel-9
+      TEST_ARGS: --run=MCO.Bootimages
+      TEST_SKIPS: ""
+      TEST_SUITE: openshift/machine-config-operator/longduration
+    workflow: openshift-e2e-vsphere-zones
+- always_run: false
+  as: e2e-vsphere-multi-vcenter-mco-bootimages
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      MAX_VCENTERS: "3"
+      OS_IMAGE_STREAM: rhel-9
+      TEST_ARGS: --run=MCO.Bootimages
+      TEST_SKIPS: ""
+      TEST_SUITE: openshift/machine-config-operator/longduration
     workflow: openshift-e2e-vsphere-zones
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
@@ -489,7 +527,7 @@ tests:
   as: e2e-gcp-rt
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp
@@ -497,19 +535,19 @@ tests:
   as: e2e-gcp-ovn-rt-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp-ovn-rt
 - always_run: false
   as: e2e-gcp-single-node
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-single-node
 - always_run: false
   as: e2e-gcp-op-single-node
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -531,7 +569,7 @@ tests:
 - always_run: false
   as: e2e-openstack
   optional: true
-  run_if_changed: .*/on-prem/.*|.*openstack.*
+  pipeline_run_if_changed: .*/on-prem/.*|.*openstack.*
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -556,7 +594,7 @@ tests:
     workflow: openshift-e2e-openstack-external-lb
 - always_run: false
   as: e2e-hypershift
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
@@ -713,18 +751,40 @@ tests:
 - always_run: false
   as: e2e-aws-mco-disruptive
   optional: true
+  reporter_config:
+    channel: '#trt-alert-mco'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-gcp-mco-disruptive
   optional: true
+  reporter_config:
+    channel: '#trt-alert-mco'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-azure-ovn-multidisk-techpreview
@@ -749,6 +809,19 @@ tests:
       DISK_SETUP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
+- always_run: false
+  as: tls-pqc-readiness
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-machine-config-operator
+      SCANNER_CPU: "2"
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

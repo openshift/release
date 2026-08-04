@@ -120,7 +120,7 @@ queue ${ARTIFACT_DIR}/gitopsservices.json  oc --insecure-skip-tls-verify --reque
 mkdir -p ${ARTIFACT_DIR}/must-gather-appstudio
 
 # Download the binary from mirror
-curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+curl -sL "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
 chmod +x /tmp/mco-sanitize
 
 oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-appstudio > ${ARTIFACT_DIR}/must-gather-appstudio/must-gather.log

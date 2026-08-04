@@ -26,7 +26,7 @@ set -euo pipefail
 cd ${remote_workdir}
 
 # Download the MCO sanitizer binary from mirror
-curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+curl -sL "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
 chmod +x /tmp/mco-sanitize
 
 oc --kubeconfig ${seed_kubeconfig} adm must-gather --dest-dir=./must-gather-cluster-${SEED_VM_NAME}

@@ -1,0 +1,55 @@
+ref:
+  as: hypershift-azure-performance-test
+  from: hypershift-tests
+  cli: latest
+  commands: hypershift-azure-performance-test-commands.sh
+  timeout: 90m0s
+  grace_period: 15m0s
+  credentials:
+  - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+    name: hypershift-ci-jobs-self-managed-azure
+    namespace: test-credentials
+  - mount_path: /etc/hypershift-ci-jobs-self-managed-azure-e2e
+    name: hypershift-ci-jobs-self-managed-azure-e2e
+    namespace: test-credentials
+  - mount_path: /etc/ci-pull-credentials
+    name: ci-pull-credentials
+    namespace: test-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  env:
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: "centralus"
+    documentation: |
+      Azure region where the hosted cluster will be created for performance testing.
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: "hcp-sm-azure.azure.devcluster.openshift.com"
+    documentation: |
+      Base domain for the hosted cluster DNS.
+  - name: HYPERSHIFT_INITIAL_NODE_COUNT
+    default: "2"
+    documentation: |
+      Initial number of worker nodes in the NodePool for performance testing.
+  - name: HYPERSHIFT_SCALED_NODE_COUNT
+    default: "10"
+    documentation: |
+      Target number of worker nodes when scaling up the NodePool.
+  - name: HYPERSHIFT_HC_RELEASE_IMAGE
+    default: ""
+    documentation: |
+      OCP release image for the hosted cluster. If empty, uses OCP_IMAGE_LATEST.
+  dependencies:
+  - env: OCP_IMAGE_LATEST
+    name: release:latest
+  documentation: |-
+    This step executes comprehensive performance testing for Azure self-managed HyperShift clusters.
+    It measures cluster lifecycle operations including:
+    - HostedCluster creation duration
+    - NodePool scaling performance (scale up and down)
+    - API server availability
+    - HostedCluster deletion duration
+
+    Performance metrics are collected and saved to the artifacts directory for analysis and comparison
+    against other HyperShift platforms (AWS, KubeVirt, bare metal).

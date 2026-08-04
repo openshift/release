@@ -139,9 +139,6 @@ spec:
         - mountPath: /etc/jira
           name: jira
           readOnly: true
-        - mountPath: /etc/plugins
-          name: plugins
-          readOnly: true
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
@@ -187,10 +184,6 @@ spec:
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
-      - configMap:
-          defaultMode: 420
-          name: plugins
-        name: plugins
       - name: release-controller-kubeconfigs
         secret:
           defaultMode: 420
@@ -203,7 +196,7 @@ spec:
         secret:
           defaultMode: 420
           items:
-          - key: .git-credentials
+          - key: git_url_with_credentials
             path: .git-credentials
           secretName: release-controller-oc-git-credentials
       - name: pull-secret
@@ -245,8 +238,9 @@ spec:
         - --release-architecture=amd64
         - --enable-jira
         - --jira-endpoint=https://redhat.atlassian.net
-        - --jira-username=brawilli@redhat.com
-        - --jira-password-file=/etc/jira/password
+        - --jira-username=openshift-release-controller-jira-bot@redhat.com
+        - --jira-password-file=/etc/jira/bot-password
+        - --release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml
         - -v=4
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest
         imagePullPolicy: Always
@@ -268,6 +262,9 @@ spec:
         - mountPath: /etc/jira
           name: jira
           readOnly: true
+        - mountPath: /etc/qualifiers-config
+          name: qualifiers-config
+          readOnly: true
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
@@ -286,6 +283,9 @@ spec:
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
+      - configMap:
+          name: release-controller-release-qualifiers
+        name: qualifiers-config
       - name: release-controller-kubeconfigs
         secret:
           defaultMode: 420
@@ -298,7 +298,7 @@ spec:
         secret:
           defaultMode: 420
           items:
-          - key: .git-credentials
+          - key: git_url_with_credentials
             path: .git-credentials
           secretName: release-controller-oc-git-credentials
       - name: pull-secret

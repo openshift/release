@@ -50,6 +50,7 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       INSTALL_NAMESPACE: nhc-install
+      OPERATOR_RELEASED_VERSION: 0.12.0
     test:
     - as: e2e-install
       cli: latest
@@ -61,7 +62,20 @@ tests:
         oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
         operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/self-node-remediation-operator-bundle:latest
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/node-healthcheck-operator-bundle:v"$OPERATOR_RELEASED_VERSION"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-healthcheck-controller-manager
+      env:
+      - name: INSTALL_NAMESPACE
+      - name: OPERATOR_RELEASED_VERSION
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
         oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-healthcheck-controller-manager
       dependencies:
       - env: OO_BUNDLE

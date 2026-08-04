@@ -128,7 +128,9 @@ OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 CHANNEL_GROUP=${CHANNEL_GROUP:-"stable"}
 ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
+FIPS=${FIPS:-false}
 SUBSCRIPTION_TYPE=${SUBSCRIPTION_TYPE:-"standard"}
+ENABLE_WIF=${ENABLE_WIF:-"no"}
 REGION=${REGION:-"${LEASED_RESOURCE}"}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 BOOTSTRAP_TIMEOUT=${BOOTSTRAP_TIMEOUT}
@@ -145,9 +147,19 @@ fi
 
 # Log in
 OCM_VERSION=$(ocm version)
-OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-logger "INFO" "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
-ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
+SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
+SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
+if [[ -n "${OCM_TOKEN}" ]]; then
+  logger "INFO" "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
+  ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+elif [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  logger "INFO" "Logging into ${OCM_LOGIN_ENV} with SSO credentials using ocm cli ${OCM_VERSION}"
+  ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+else
+  logger "ERROR" "Cannot login! You need to securely supply an ocm-token or SSO credentials!"
+  exit 1
+fi
 
 # Check whether the cluster with the same cluster name existes.
 OLD_CLUSTER_ID=$(ocm list clusters --columns=id --parameter search="name is '${CLUSTER_NAME}'" | tail -n 1)
@@ -157,8 +169,17 @@ if [[ "$OLD_CLUSTER_ID" != ID* ]]; then
   exit 1
 fi
 
-# Required
+# GCP credentials / WIF config
 GCP_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json"
+WIF_CONFIG_ID=""
+if [[ "${ENABLE_WIF}" == "yes" ]]; then
+  WIF_CONFIG_ID=$(cat "${SHARED_DIR}/wif-config-id" 2>/dev/null || true)
+  if [[ -z "${WIF_CONFIG_ID}" ]]; then
+    logger "ERROR" "ENABLE_WIF is set but no WIF config ID found in SHARED_DIR/wif-config-id"
+    exit 1
+  fi
+  logger "INFO" "Using WIF config: ${WIF_CONFIG_ID}"
+fi
 
 versionList=$(ocm list versions --channel-group ${CHANNEL_GROUP})
 logger "INFO" "Available cluster versions:"
@@ -246,6 +267,11 @@ if [[ "$SECURE_BOOT_FOR_SHIELDED_VMS" == "true" ]]; then
   SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH="--secure-boot-for-shielded-vms"
 fi
 
+FIPS_SWITCH=""
+if [[ "$FIPS" == "true" ]]; then
+  FIPS_SWITCH="--fips"
+fi
+
 PRIVATE_SWITCH=""
 if [[ "${PRIVATE}" == "yes" ]]; then
   PRIVATE_SWITCH="--private"
@@ -265,7 +291,12 @@ echo "  Etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Subscription type: ${SUBSCRIPTION_TYPE}"
 echo "  Secure boot for shielded VMs: ${SECURE_BOOT_FOR_SHIELDED_VMS}"
+echo "  Fips: ${FIPS}"
 echo "  Private: ${PRIVATE}"
+echo "  WIF: ${ENABLE_WIF}"
+if [[ "${ENABLE_WIF}" == "yes" ]]; then
+  echo "  WIF config ID: ${WIF_CONFIG_ID}"
+fi
 if [ "${ENABLE_SHARED_VPC}" == "yes" ]; then
   echo "  VPC project id: ${VPC_PROJECT_ID}"
   echo "  VPC name: ${VPC_NAME}"
@@ -273,11 +304,16 @@ if [ "${ENABLE_SHARED_VPC}" == "yes" ]; then
   echo "  Compute subnet: ${COMPUTE_SUBNET}"
 fi
 
+if [[ "${ENABLE_WIF}" == "yes" ]]; then
+  GCP_AUTH_SWITCH="--wif-config ${WIF_CONFIG_ID}"
+else
+  GCP_AUTH_SWITCH="--ccs --service-account-file ${GCP_CREDENTIALS_FILE}"
+fi
+
 cmd="ocm create cluster ${CLUSTER_NAME} \
---ccs \
+${GCP_AUTH_SWITCH} \
 --provider=gcp \
 --region ${REGION} \
---service-account-file ${GCP_CREDENTIALS_FILE} \
 --version ${OPENSHIFT_VERSION} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
@@ -288,6 +324,7 @@ ${MARKETPLACE_GCP_TERMS_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
 ${ETCD_ENCRYPTION_SWITCH} \
 ${SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH} \
+${FIPS_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${SHARED_VPC_SWITCH:-}"
 

@@ -16,7 +16,7 @@ export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
-# RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST, 
+# RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST,
 # but for some ci jobs triggerred by remote api, RELEASE_IMAGE_LATEST might be overridden with tag name, to avoid auth error
 # when accessing it, always use build farm registry pullspec.
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
@@ -27,7 +27,21 @@ echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FA
 # for deprovision.
 # https://docs.ci.openshift.org/docs/architecture/step-registry/#sharing-data-between-steps
 echo "> Extract gcp credentials requests from the release image"
-oc adm release extract --credentials-requests --cloud=gcp --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+dir="$(mktemp -d)"
+pushd "${dir}" >/dev/null
+cleanup() {
+  rm -f pull-secret
+  popd >/dev/null || true
+  rm -rf "${dir}"
+}
+trap cleanup EXIT
+
+cp "${CLUSTER_PROFILE_DIR}/pull-secret" pull-secret
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+KUBECONFIG="" oc registry login --to pull-secret
+oc adm release extract --registry-config pull-secret --credentials-requests --cloud=gcp --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 echo "> Output gcp credentials requests to directory: /tmp/credrequests"
 ls "/tmp/credrequests"

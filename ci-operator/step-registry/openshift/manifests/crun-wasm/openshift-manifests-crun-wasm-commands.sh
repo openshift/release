@@ -10,6 +10,11 @@ default_runtime = "crun-wasm"
 [crio.runtime.runtimes.crun-wasm]
 runtime_path = "/usr/bin/crun"
 platform_runtime_paths = {"wasi/wasm32" = "/usr/bin/crun-wasm"}
+allowed_annotations = [
+	"io.containers.trace-syscall",
+	"io.kubernetes.cri-o.Devices",
+	"io.kubernetes.cri-o.LinkLogs",
+]
 EOF
 
 cat > "${SHARED_DIR}/manifest_mc-master-crun-wasm.yml" << EOF

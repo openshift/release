@@ -7,7 +7,7 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.21"
-binary_build_commands: make build BUILD_TAGS=clusterapi
+binary_build_commands: make build BUILD_TAGS=clusterapi,openshift
 build_root:
   from_repository: true
 canonical_go_repository: k8s.io/autoscaler
@@ -20,7 +20,8 @@ images:
     to: vertical-pod-autoscaler
 promotion:
   to:
-  - name: "5.0"
+  - disabled: true
+    name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -53,7 +54,7 @@ resources:
     requests:
       cpu: "2"
       memory: 8Gi
-test_binary_build_commands: OS_GOFLAGS='-race' make build BUILD_TAGS=clusterapi
+test_binary_build_commands: OS_GOFLAGS='-race' make build BUILD_TAGS=clusterapi,openshift
 tests:
 - as: unit
   commands: JUNIT_REPORT=1 GO111MODULE=auto hack/test-go.sh
@@ -89,8 +90,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -103,8 +104,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -113,12 +114,12 @@ tests:
   as: e2e-gcp-operator
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -127,6 +128,8 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
+    env:
+      CI_TESTS_RUN: ^(TestCreateCluster|TestUpgradeControlPlane|TestAutoscaling)$
     workflow: hypershift-aws-e2e-external
 - always_run: false
   as: e2e-aws-periodic-pre
@@ -136,8 +139,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -146,12 +149,12 @@ tests:
   as: e2e-gcp-periodic-pre
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -164,8 +167,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -178,8 +181,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m
@@ -192,8 +195,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
-      from: stable:cluster-api-actuator-pkg
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-cas-periodic
+      from: stable:autoscale-tests
       resources:
         requests:
           cpu: 100m

@@ -25,7 +25,7 @@ images:
   items:
   - dockerfile_literal: |-
       FROM ubi_minimal
-      RUN microdnf install -y make git python3 python3-pip
+      RUN microdnf install -y make git python3 python3-pip nodejs npm
       RUN pip3 install pre-commit
 
       COPY --from=root:current /usr/lib/golang /usr/local/go
@@ -38,12 +38,12 @@ images:
       ENV PRE_COMMIT_HOME=/.cache/precommit
       ENV GOLANGCI_LINT_CACHE=/.cache/golangci
 
-      # Snyk
-      ENV SNYK_DIR=/tmp/snyk
-      RUN mkdir -p ${SNYK_DIR}
-      RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
-      RUN chmod +x ${SNYK_DIR}/snyk
-      ENV PATH=$PATH:${SNYK_DIR}
+      COPY .pre-commit-config.yaml /tmp/pre-commit-config.yaml
+      RUN cd /tmp && git init && \
+          pre-commit install-hooks -c /tmp/pre-commit-config.yaml && \
+          rm -rf /tmp/.git && \
+          rm -rf /.cache/golangci && mkdir /.cache/golangci && \
+          chmod -R 777 /.cache
     from: ubi_minimal
     inputs:
       root:
@@ -86,7 +86,7 @@ resources:
       memory: 200Mi
   precommit-check:
     requests:
-      cpu: 100m
+      cpu: "2"
       memory: 4Gi
 test_binary_build_commands: |
   go mod vendor
@@ -96,7 +96,9 @@ tests:
 - as: precommit-check
   commands: |
     export SKIP=no-commit-to-branch
-    pre-commit run --all-files --show-diff-on-failure
+    export GOMEMLIMIT=3500MiB
+    export GOGC=50
+    pre-commit run --all-files --show-diff-on-failure --verbose
   container:
     clone: true
     from: lvms-pre-commit
@@ -120,28 +122,6 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
-- as: snyk-code
-  commands: |
-    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-code
-  container:
-    clone: true
-    from: lvms-pre-commit
-  optional: true
-  secret:
-    mount_path: /tmp/secret
-    name: lvms-snyk-token
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
-- as: snyk-deps
-  commands: |
-    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-deps
-  container:
-    clone: true
-    from: lvms-pre-commit
-  optional: true
-  secret:
-    mount_path: /tmp/secret
-    name: lvms-snyk-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: e2e-aws-single-node
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$

@@ -1,0 +1,31 @@
+workflow:
+  as: aro-hcp-upgrade-e2e
+  steps:
+    allow_best_effort_post_steps: true
+    leases:
+      - env: LEASED_MSI_MOCK_SP
+        resource_type: aro-hcp-msi-mock-cs-sp-dev
+    pre:
+      - ref: aro-hcp-lease-acquire
+      - ref: aro-hcp-write-config
+      - ref: aro-hcp-provision-from-main
+      - as: aro-hcp-upgrade-environment
+        ref: aro-hcp-provision-environment
+    test:
+      - ref: aro-hcp-test-local
+    post:
+      - ref: aro-hcp-gather-provision-failure
+      - ref: aro-hcp-gather-visualization
+      - ref: aro-hcp-gather-test-visualization
+      - ref: aro-hcp-gather-custom-link-tools
+      - ref: aro-hcp-gather-observability
+      - ref: aro-hcp-gather-snapshot
+      - ref: aro-hcp-deprovision-environment
+      - ref: aro-hcp-lease-release
+  documentation: |-
+    Upgrade-path validation workflow for ARO HCP infrastructure changes.
+    Provisions a baseline environment from the main branch, then upgrades
+    it to the PR branch under test, and runs the full e2e suite against
+    the upgraded environment. Failures in provision-from-main indicate
+    a broken main branch; failures in aro-hcp-upgrade-environment indicate
+    an upgrade-path regression introduced by the PR.

@@ -48,7 +48,8 @@ tests:
     make test-unit
   container:
     from: src
-- as: e2e
+- always_run: false
+  as: e2e
   commands: make test-e2e
   container:
     from: src
@@ -71,7 +72,8 @@ tests:
     - ref: go-verify-deps
 - as: integration
   commands: |
-    ./scripts/flow-controller.sh all_happy_path
+    export OC_MIRROR_VERSION=4.20
+    cd /artifacts && ./integration.test
   container:
     from: oc-mirror-tests
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)

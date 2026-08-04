@@ -11,7 +11,7 @@ export PATH="${TOOLS_DIR}:${PATH}"
 
 if ! command -v oc &>/dev/null; then
     echo "oc not found, downloading OpenShift client..."
-    curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+    curl -sL https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
         | tar xzf - -C "${TOOLS_DIR}" oc kubectl 2>/dev/null || true
 fi
 
@@ -43,5 +43,16 @@ if [[ -n "${NEURON_NS}" ]]; then
     oc get all -n "${NEURON_NS}" -o wide > "${DUMP_DIR}/neuron-ns-resources.txt" 2>&1 || true
     oc get events -n "${NEURON_NS}" --sort-by='.lastTimestamp' > "${DUMP_DIR}/neuron-ns-events.txt" 2>&1 || true
 fi
+
+KSERVE_DIR="${DUMP_DIR}/kserve"
+INFERENCE_NAMESPACE="${INFERENCE_NAMESPACE:-neuron-inference}"
+mkdir -p "${KSERVE_DIR}"
+oc get inferenceservice -A -o yaml > "${KSERVE_DIR}/inferenceservices.yaml" 2>&1 || true
+oc get servingruntime -A -o yaml > "${KSERVE_DIR}/servingruntimes.yaml" 2>&1 || true
+oc get datasciencecluster -A -o yaml > "${KSERVE_DIR}/datascienceclusters.yaml" 2>&1 || true
+oc get knativeserving -A -o yaml > "${KSERVE_DIR}/knativeserving.yaml" 2>&1 || true
+oc get pods -n "${INFERENCE_NAMESPACE}" -o wide > "${KSERVE_DIR}/inference-pods.txt" 2>&1 || true
+oc get events -n "${INFERENCE_NAMESPACE}" --sort-by='.lastTimestamp' > "${KSERVE_DIR}/inference-events.txt" 2>&1 || true
+oc get ksvc -n "${INFERENCE_NAMESPACE}" -o yaml > "${KSERVE_DIR}/knative-services.yaml" 2>&1 || true
 
 echo "Neuron diagnostic data collected in ${DUMP_DIR}"

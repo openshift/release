@@ -124,6 +124,6 @@ if $CONFLICT; then
 else
   CI_BRANCH=${TARGET_BRANCH#release-}
   curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST \
-    -d "{\"body\":\"/ok-to-test\n/payload ${CI_BRANCH} ci blocking\n/payload ${CI_BRANCH} nightly blocking\"}" \
+    -d "{\"body\":\"/payload ${CI_BRANCH} ci blocking\n/payload ${CI_BRANCH} nightly blocking\n/pipeline required\"}" \
     "https://api.github.com/repos/${REPO}/issues/${PR_NUM}/comments"
 fi

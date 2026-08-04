@@ -5,9 +5,13 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/check-requirements
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -63,21 +67,26 @@ presubmits:
     trigger: (?m)^/test( | .* )check-requirements,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/e2e-metal-ipi-bm
+    cluster: build07
+    context: ci/prow/e2e-metal-ipi-ovn-ipv4
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ironic-image-main-e2e-metal-ipi-bm
-    rerun_command: /test e2e-metal-ipi-bm
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
+    name: pull-ci-openshift-ironic-image-main-e2e-metal-ipi-ovn-ipv4
+    rerun_command: /test e2e-metal-ipi-ovn-ipv4
     spec:
       containers:
       - args:
@@ -86,7 +95,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi-bm
+        - --target=e2e-metal-ipi-ovn-ipv4
         command:
         - ci-operator
         env:
@@ -142,15 +151,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-bm,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv4,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build07
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -159,7 +174,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ironic-image-main-e2e-metal-ipi-ovn-ipv6
     rerun_command: /test e2e-metal-ipi-ovn-ipv6
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
     spec:
       containers:
       - args:
@@ -227,12 +241,18 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build07
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -241,7 +261,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ironic-image-main-e2e-metal-ipi-virtualmedia
     rerun_command: /test e2e-metal-ipi-virtualmedia
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
     spec:
       containers:
       - args:
@@ -312,9 +331,13 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -370,7 +393,8 @@ presubmits:
     context: ci/prow/okd-scos-e2e-aws-ovn
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.scos
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -451,11 +475,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.scos
     labels:
       ci-operator.openshift.io/variant: okd-scos
       ci.openshift.io/generator: prowgen
@@ -506,12 +531,18 @@ presubmits:
     trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: .*packages-list.*
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/prevalidation-e2e-metal-ipi-bm-prevalidation
+    cluster: build07
+    context: ci/prow/prevalidation-e2e-metal-ipi-ovn-ipv4-prevalidation
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -519,9 +550,8 @@ presubmits:
       ci-operator.openshift.io/variant: prevalidation
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ironic-image-main-prevalidation-e2e-metal-ipi-bm-prevalidation
-    rerun_command: /test prevalidation-e2e-metal-ipi-bm-prevalidation
-    run_if_changed: .*packages-list.*
+    name: pull-ci-openshift-ironic-image-main-prevalidation-e2e-metal-ipi-ovn-ipv4-prevalidation
+    rerun_command: /test prevalidation-e2e-metal-ipi-ovn-ipv4-prevalidation
     spec:
       containers:
       - args:
@@ -530,7 +560,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi-bm-prevalidation
+        - --target=e2e-metal-ipi-ovn-ipv4-prevalidation
         - --variant=prevalidation
         command:
         - ci-operator
@@ -587,15 +617,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )prevalidation-e2e-metal-ipi-bm-prevalidation,?($|\s.*)
+    trigger: (?m)^/test( | .* )prevalidation-e2e-metal-ipi-ovn-ipv4-prevalidation,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: .*packages-list.*
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build07
     context: ci/prow/prevalidation-e2e-metal-ipi-ovn-ipv6-prevalidation
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -605,7 +641,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ironic-image-main-prevalidation-e2e-metal-ipi-ovn-ipv6-prevalidation
     rerun_command: /test prevalidation-e2e-metal-ipi-ovn-ipv6-prevalidation
-    run_if_changed: .*packages-list.*
     spec:
       containers:
       - args:
@@ -674,12 +709,18 @@ presubmits:
     trigger: (?m)^/test( | .* )prevalidation-e2e-metal-ipi-ovn-ipv6-prevalidation,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: .*packages-list.*
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build07
     context: ci/prow/prevalidation-e2e-metal-ipi-virtualmedia-prevalidation
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -689,7 +730,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ironic-image-main-prevalidation-e2e-metal-ipi-virtualmedia-prevalidation
     rerun_command: /test prevalidation-e2e-metal-ipi-virtualmedia-prevalidation
-    run_if_changed: .*packages-list.*
     spec:
       containers:
       - args:
@@ -761,9 +801,13 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/prevalidation-images
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     labels:
       ci-operator.openshift.io/variant: prevalidation
       ci.openshift.io/generator: prowgen

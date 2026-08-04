@@ -11,6 +11,10 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -23,9 +27,26 @@ images:
   items:
   - dockerfile_path: openshift/Dockerfile.openshift
     to: cluster-capi-controllers
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src/
+      WORKDIR /opt/app-root/src/cluster-api
+      USER root
+      RUN dnf install -y git go make jq python3-pip && dnf clean all && python3 -m pip install --no-cache-dir yq
+      RUN ln -s /usr/bin/podman /usr/local/bin/docker
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/sigs.k8s.io/cluster-api
+    to: src-podman
 promotion:
   to:
-  - name: "5.0"
+  - disabled: true
+    excluded_images:
+    - src-podman
+    name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -71,7 +92,7 @@ tests:
 - as: e2e-gcp-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -167,7 +188,7 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: verify-commits
   commands: |
-    commitchecker --start ${PULL_BASE_SHA:-master}
+    commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
   optional: true
@@ -178,9 +199,12 @@ tests:
     test:
     - ref: go-verify-deps
 - as: verify
+  capabilities:
+  - nested-podman
   commands: make -C openshift verify
   container:
-    from: src
+    from: src-podman
+  nested_podman: true
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

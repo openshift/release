@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
+    tag: rhel-9-golang-1.26-openshift-4.23
 images:
   items:
   - dockerfile_path: Containerfile
@@ -34,50 +34,43 @@ tests:
   commands: make unit-test
   container:
     from: src
-- as: ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
-  capabilities:
-  - nested-podman
-  commands: |
-    env -i bash --norc --noprofile << 'EOF' > /tmp/podman.env
-    export AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred
-    export AWS_SHARED_VPC_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials
-    source /usr/local/cs-qe-credentials/ocm-tokens
-    env | grep -v '^_='
-    EOF
-
-    podman run \
-    --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
-    --env-file /tmp/podman.env \
-    -v /usr/local/cs-qe-credentials:/credentials:ro,z \
-    --rm \
-    quay.io/redhat-services-prod/ocmci/ocmci:latest \
-    ocmtest test --service cms --job cs-rosa-hcp-ad-staging-main
-  container:
-    from: nested-podman
-    memory_backed_volume:
-      size: 1Gi
-  cron: 0 8 * * *
-  nested_podman: true
-  secrets:
-  - mount_path: /usr/local/cs-qe-credentials
-    name: cs-qe-credentials
 - as: lint
   commands: |
     unset GOFLAGS
     make lint
   container:
     from: src
-- as: rosa-hcp-e2e-nightly
-  cron: 0 4 * * *
+- as: e2e-rosa-hcp-smoke
+  optional: true
+  run_if_changed: ^(pkg/|test/|Containerfile|go\.(mod|sum))
   steps:
     cluster_profile: rosa-e2e-01
     env:
       CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
+      LABEL_FILTER: Importance:Critical && Platform:HCP && (Area:ClusterLifecycle
+        || Area:DataPlane || Area:ManagementPlane || Area:Upgrade)
       OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.21"
+      REGION: us-west-2
       REPLICAS: "3"
-    workflow: rosa-e2e
+    workflow: rosa-e2e-hcp
+- as: e2e-rosa-classic-smoke
+  optional: true
+  run_if_changed: ^(pkg/|test/|Containerfile|go\.(mod|sum))
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "false"
+      LABEL_FILTER: Importance:Critical && Platform:Classic && (Area:ClusterLifecycle
+        || Area:DataPlane || Area:ManagementPlane || Area:Upgrade)
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.21"
+      REPLICAS: "3"
+    workflow: rosa-e2e-classic
 zz_generated_metadata:
   branch: main
   org: openshift-online

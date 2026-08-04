@@ -21,19 +21,20 @@ promotion:
   to:
   - additional_images:
       console-tests: src
-    disabled: true
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -80,14 +81,21 @@ tests:
   container:
     from: test-bin
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
-- as: e2e-gcp-console
-  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+- always_run: false
+  as: e2e-gcp-console
+  pipeline_skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
-      commands: ./test-prow-e2e.sh
+      commands: |
+        export CYPRESS_RECORD_KEY="$(cat /var/run/cypress-secrets/record-key)"
+        ./test-prow-e2e.sh
+      credentials:
+      - mount_path: /var/run/cypress-secrets
+        name: cypress-record-key
+        namespace: test-credentials
       dependencies:
       - env: CYPRESS_PLUGIN_PULL_SPEC
         name: console-plugin-demo

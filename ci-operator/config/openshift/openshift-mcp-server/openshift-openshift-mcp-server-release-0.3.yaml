@@ -1,0 +1,71 @@
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: openshift-mcp-server
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.22"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
+    make lint
+  container:
+    from: src
+- as: test
+  commands: GOFLAGS='-mod=readonly' XDG_DATA_HOME=/tmp/.local/share make test
+  container:
+    from: src
+- as: e2e-aws
+  optional: true
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: install-operator
+      cli: latest
+      commands: make -f Makefile-ocp.mk e2e-install-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: deploy-mcp-server
+      cli: latest
+      commands: |
+        MCP_SERVER_IMAGE="${IMAGE_OPENSHIFT_MCP_SERVER}" make -f Makefile-ocp.mk e2e-deploy-mcp-server
+      dependencies:
+      - env: IMAGE_OPENSHIFT_MCP_SERVER
+        name: openshift-mcp-server
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: wait-ready
+      cli: latest
+      commands: make -f Makefile-ocp.mk e2e-wait-ready
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: security
+  optional: true
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-0.3
+  org: openshift
+  repo: openshift-mcp-server

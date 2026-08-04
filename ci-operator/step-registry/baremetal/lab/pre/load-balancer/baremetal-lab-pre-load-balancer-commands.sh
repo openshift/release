@@ -12,6 +12,7 @@ INGRESS80=""
 INGRESS443=""
 SSH=""
 ACCESS=""
+IRI=""
 first_host=true
 echo "Filling the load balancer targets..."
 num_workers="$(yq e '[.[] | select(.name|test("worker-[0-9]"))]|length' "$SHARED_DIR/hosts.yaml")"
@@ -64,6 +65,9 @@ listen $name-ssh
     timeout tunnel 5m
       server $name $ip:22 check inter 1s
       server $name-v6 [$ipv6]:22 check inter 1s"
+  IRI="$IRI
+      server $name $ip:22625 check inter 1s
+      server $name-v6 [$ipv6]:22625 check inter 1s"
 done
 echo "Generating the template..."
 
@@ -120,6 +124,11 @@ listen ingress-router-443
 $INGRESS443
 $SSH
 $ACCESS
+listen iri-22625
+    bind :::22625
+    mode tcp
+    balance source
+$IRI
 EOF
 
 echo "Templating for HAProxy done..."

@@ -257,41 +257,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: subsystem-aws-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.16"
-  cron: 0 20 * * 6
-  steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export TARGET=oc
-        export PERSISTENT_STORAGE="False"
-        export GENERATE_CRD='false'
-        unset GOFLAGS
-        make ci-deploy-for-subsystem
-        oc get pods
-        make test
-      dependencies:
-      - env: SERVICE
-        name: assisted-service
-      - env: IMAGE_SERVICE
-        name: assisted-image-service
-      from: assisted-service-subsystem
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
 - as: subsystem-kubeapi-aws
   cluster_claim:
     architecture: amd64
@@ -301,42 +266,6 @@ tests:
     timeout: 1h0m0s
     version: "4.16"
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
-  steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export TARGET=oc
-        export PERSISTENT_STORAGE="False"
-        export GENERATE_CRD='false'
-        unset GOFLAGS
-        make ci-deploy-for-subsystem
-        oc get pods
-        make enable-kube-api-for-subsystem
-        make test-kube-api
-      dependencies:
-      - env: SERVICE
-        name: assisted-service
-      - env: IMAGE_SERVICE
-        name: assisted-image-service
-      from: assisted-service-subsystem
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
-- as: subsystem-kubeapi-aws-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.16"
-  cron: 30 20 * * 6
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -376,18 +305,6 @@ tests:
     env:
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-periodic
-  capabilities:
-  - intranet
-  cron: 0 21 * * 6
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      CLUSTERTYPE: assisted_medium_el9
-    workflow: assisted-ofcir-baremetal-operator-ztp
 - always_run: false
   as: e2e-ai-operator-ztp-3masters
   capabilities:
@@ -403,39 +320,10 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-3masters-periodic
-  capabilities:
-  - intranet
-  cron: 30 21 * * 6
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-      CLUSTERTYPE: assisted_large_el9
-      NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-ofcir-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected
   capabilities:
   - intranet
   run_if_changed: ^(deploy/operator/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      CLUSTERTYPE: assisted_medium_el9
-      DISCONNECTED: "true"
-      IP_STACK: v6
-    workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-disconnected-periodic
-  capabilities:
-  - intranet
-  cron: 0 22 * * 6
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -495,43 +383,6 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-sno-day2-workers-periodic
-  capabilities:
-  - intranet
-  cron: 30 22 * * 6
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=1
-        NUMBER_OF_DAY2_HOSTS=1
-      CLUSTERTYPE: assisted_large_el9
-      NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-node-labels-periodic
-  capabilities:
-  - intranet
-  cron: 0 23 * * 6
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-        SPOKE_WORKER_AGENTS=2
-        NUMBER_OF_DAY2_HOSTS=1
-        MANIFEST_FILES='{"mcp.yaml":"machine_config_pool.yaml", "mc.yaml":"machine_config.yaml"}'
-        NODE_LABELS='{"ostest-extraworker-3":{"node-role.kubernetes.io/infra":""}, "ostest-extraworker-5":{"node-role.kubernetes.io/infra":""}}'
-        MACHINE_CONFIG_POOLS='{"ostest-extraworker-5":"infra","ostest-extraworker-3":"infra"}'
-        TEST_TO_RUN='node-labels'
-      CLUSTERTYPE: assisted_large_el9
-      NUM_EXTRA_WORKERS: "6"
-    workflow: assisted-ofcir-baremetal-operator-ztp
 - always_run: false
   as: e2e-ai-operator-ztp-node-labels
   capabilities:
@@ -568,23 +419,6 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
         NUMBER_OF_DAY2_HOSTS=1
         DAY2_LATE_BINDING=True
-      NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
-  capabilities:
-  - intranet
-  cron: 30 23 * * 6
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=1
-        NUMBER_OF_DAY2_HOSTS=1
-        DAY2_LATE_BINDING=True
-      CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
 - always_run: false
@@ -636,22 +470,6 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-ofcir-baremetal-operator-capi
-- as: e2e-ai-operator-ztp-capi-periodic
-  capabilities:
-  - intranet
-  cron: 0 0 * * 0
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      HYPERSHIFT_IMAGE: hypershift-operator
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      PROVIDER_IMAGE: cluster-api-provider-agent
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
-      CLUSTERTYPE: assisted_large_el9
-    workflow: assisted-ofcir-baremetal-operator-capi
 - as: e2e-ai-operator-disconnected-capi
   capabilities:
   - intranet
@@ -667,25 +485,6 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         IP_STACK=v6
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
-      DISCONNECTED: "true"
-      IP_STACK: v6
-    workflow: assisted-ofcir-baremetal-operator-capi
-- as: e2e-ai-operator-disconnected-capi-periodic
-  capabilities:
-  - intranet
-  cron: 30 0 * * 0
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      HYPERSHIFT_IMAGE: hypershift-operator
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      PROVIDER_IMAGE: cluster-api-provider-agent
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        IP_STACK=v6
-        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
-      CLUSTERTYPE: assisted_large_el9
       DISCONNECTED: "true"
       IP_STACK: v6
     workflow: assisted-ofcir-baremetal-operator-capi
@@ -718,25 +517,6 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
-    workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-remove-node-periodic
-  capabilities:
-  - intranet
-  cron: 0 1 * * 0
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-        SPOKE_WORKER_AGENTS=2
-        REMOVE_SPOKE_NODE=true
-      CLUSTERTYPE: assisted_large_el9
-      DEVSCRIPTS_CONFIG: |
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=False
-      NUM_EXTRA_WORKERS: "5"
     workflow: assisted-ofcir-baremetal-operator-ztp
 zz_generated_metadata:
   branch: release-ocm-2.11

@@ -1,35 +1,35 @@
 base_images:
   openstack-installer:
-    name: 5.0-priv
-    namespace: ocp-private
+    name: "5.0"
+    namespace: ocp-priv
     tag: openstack-installer
   operator-index:
     name: redhat-operator-index
     namespace: ci
     tag: v4.10
   rdma-cni:
-    name: 5.0-priv
-    namespace: ocp-private
+    name: "5.0"
+    namespace: ocp-priv
     tag: rdma-cni
   sriov-cni:
-    name: 5.0-priv
-    namespace: ocp-private
+    name: "5.0"
+    namespace: ocp-priv
     tag: sriov-cni
   sriov-dp-admission-controller:
-    name: 5.0-priv
-    namespace: ocp-private
+    name: "5.0"
+    namespace: ocp-priv
     tag: sriov-dp-admission-controller
   sriov-infiniband-cni:
-    name: 5.0-priv
-    namespace: ocp-private
+    name: "5.0"
+    namespace: ocp-priv
     tag: sriov-infiniband-cni
   sriov-network-device-plugin:
-    name: 5.0-priv
-    namespace: ocp-private
+    name: "5.0"
+    namespace: ocp-priv
     tag: sriov-network-device-plugin
   sriov-network-metrics-exporter:
-    name: 5.0-priv
-    namespace: ocp-private
+    name: "5.0"
+    namespace: ocp-priv
     tag: sriov-network-metrics-exporter
 build_root:
   from_repository: true
@@ -74,18 +74,21 @@ promotion:
   - disabled: true
     name: sriov-5.0
     namespace: origin
-  - name: 5.0-priv
-    namespace: ocp-private
+  - disabled: true
+    name: "5.0"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -121,7 +124,7 @@ tests:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
       OO_PACKAGE: sriov-network-operator
-      OO_TARGET_NAMESPACES: '!install'
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: start-sriov-operator
       cli: latest
@@ -191,7 +194,7 @@ tests:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
       OO_PACKAGE: sriov-network-operator
-      OO_TARGET_NAMESPACES: '!install'
+      OO_TARGET_NAMESPACES: '!all'
       T5CI_JOB_TYPE: sriov
       T5CI_VERSION: "4.17"
     test:
@@ -210,6 +213,8 @@ tests:
           enableInjector: true
           enableOperatorWebhook: true
           logLevel: 2
+          featureGates:
+            mellanoxFirmwareReset: true
         EOF
       from: src
       resources:
@@ -257,7 +262,7 @@ tests:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
       OO_PACKAGE: sriov-network-operator
-      OO_TARGET_NAMESPACES: '!install'
+      OO_TARGET_NAMESPACES: '!all'
       T5CI_JOB_TYPE: sno-ztp-cnftests
       T5CI_VERSION: "4.20"
     test:
@@ -306,7 +311,9 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: telco5g-sno-ztp-cnf
-- as: operator-e2e-sriov-sno
+- always_run: false
+  as: operator-e2e-sriov-sno
+  optional: true
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -315,8 +322,9 @@ tests:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
       OO_PACKAGE: sriov-network-operator
-      OO_TARGET_NAMESPACES: '!install'
+      OO_TARGET_NAMESPACES: '!all'
     post:
+    - chain: gather
     - ref: telco5g-delete-interface
     test:
     - ref: telco5g-add-interface

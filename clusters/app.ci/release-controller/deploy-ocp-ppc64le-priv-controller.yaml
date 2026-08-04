@@ -24,7 +24,7 @@ spec:
   tags:
   - from:
       kind: DockerImage
-      name: image-registry.openshift-image-registry.svc:5000/ocp/4.23:tools
+      name: image-registry.openshift-image-registry.svc:5000/ocp/5.0:tools
     importPolicy:
       scheduled: true
     name: tools
@@ -221,11 +221,11 @@ spec:
         - --github-graphql-endpoint=http://ghproxy/graphql
         - --github-throttle=250
         - --jira-endpoint=https://redhat.atlassian.net
-        - --jira-username=brawilli@redhat.com
-        - --jira-password-file=/etc/jira/password
+        - --jira-username=openshift-release-controller-jira-bot@redhat.com
+        - --jira-password-file=/etc/jira/bot-password
         - --verify-jira
-        - --plugin-config=/etc/plugins/plugins.yaml
-        - --supplemental-plugin-config-dir=/etc/plugins
+        - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+        - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
         - --authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.
         - --art-suffix=-art-latest-ppc64le-priv
         - --manifest-list-mode
@@ -265,9 +265,6 @@ spec:
         - mountPath: /etc/jira
           name: jira
           readOnly: true
-        - mountPath: /etc/plugins
-          name: plugins
-          readOnly: true
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
@@ -304,7 +301,7 @@ spec:
           value: /tmp/home
         - name: XDG_RUNTIME_DIR
           value: /tmp/home/run
-        image: release-controller:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
         name: oc-prepare
         volumeMounts:
         - mountPath: /tmp/home
@@ -332,10 +329,6 @@ spec:
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
-      - configMap:
-          defaultMode: 420
-          name: plugins
-        name: plugins
       - name: internal-tls
         secret:
           secretName: release-controller-ppc64le-priv-tls
@@ -354,7 +347,7 @@ spec:
         secret:
           defaultMode: 420
           items:
-          - key: .git-credentials
+          - key: git_url_with_credentials
             path: .git-credentials
           secretName: release-controller-oc-git-credentials
       - name: pull-secret
@@ -429,8 +422,9 @@ spec:
         - --art-suffix=-art-latest-ppc64le-priv
         - --enable-jira
         - --jira-endpoint=https://redhat.atlassian.net
-        - --jira-username=brawilli@redhat.com
-        - --jira-password-file=/etc/jira/password
+        - --jira-username=openshift-release-controller-jira-bot@redhat.com
+        - --jira-password-file=/etc/jira/bot-password
+        - --release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml
         env:
         - name: HOME
           value: /tmp/home
@@ -459,6 +453,9 @@ spec:
         - mountPath: /etc/jira
           name: jira
           readOnly: true
+        - mountPath: /etc/qualifiers-config
+          name: qualifiers-config
+          readOnly: true
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
@@ -481,7 +478,7 @@ spec:
           value: /tmp/home
         - name: XDG_RUNTIME_DIR
           value: /tmp/home/run
-        image: release-controller:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
         name: oc-prepare
         volumeMounts:
         - mountPath: /tmp/home
@@ -499,6 +496,9 @@ spec:
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
+      - configMap:
+          name: release-controller-release-qualifiers
+        name: qualifiers-config
       - name: internal-tls
         secret:
           secretName: release-controller-api-ppc64le-priv-tls
@@ -517,7 +517,7 @@ spec:
         secret:
           defaultMode: 420
           items:
-          - key: .git-credentials
+          - key: git_url_with_credentials
             path: .git-credentials
           secretName: release-controller-oc-git-credentials
       - name: pull-secret

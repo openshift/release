@@ -1,39 +1,40 @@
 base_images:
   cli:
-    name: "4.18"
+    name: "4.21"
     namespace: ocp
     tag: cli
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.18
+    tag: rhel-9-release-golang-1.25-openshift-4.21
 images:
   items:
   - dockerfile_path: Dockerfile
     to: quay-server
-  - dockerfile_literal: |
-      FROM src
-      RUN dnf module enable -y nodejs:20 && \
-          dnf install -y nodejs \
-          alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
-          libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
-          libxkbcommon libXfixes libXcursor libXext libXi libXtst \
-          libwayland-client && \
-          dnf clean all
-      WORKDIR /go/src/github.com/quay/quay/web
-      RUN npm ci
-      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
-      RUN npx playwright install chromium
+  - dockerfile_path: web/playwright/Dockerfile
     from: src
     to: quay-playwright-runner
+promotion:
+  to:
+  - namespace: quay
+    tag: latest
+    tag_by_commit: true
 releases:
   latest:
     candidate:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -49,8 +50,8 @@ tests:
     dependencies:
       QUAY_CI_IMAGE: pipeline:quay-server
     env:
-      BASE_DOMAIN: quayqe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m5.2xlarge
+      COMPUTE_MACHINE_TYPE: m5.4xlarge
+      OCM_LOGIN_ENV: production
       QUAY_EXTRA_CONFIG: |
         FEATURE_REPO_MIRROR: true
         FEATURE_USER_METADATA: true
@@ -59,13 +60,15 @@ tests:
           - admin
         GLOBAL_READONLY_SUPER_USERS:
           - readonly
-      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_CHANNEL: stable-3.17
       QUAY_OPERATOR_SOURCE: redhat-operators
+      REGION: us-east-1
+      REPLICAS: "3"
     test:
     - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-deploy-quay-custom-image
     - ref: quay-tests-test-quay-playwright
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: rosa-aws-sts-hcp
   timeout: 4h0m0s
 zz_generated_metadata:
   branch: master

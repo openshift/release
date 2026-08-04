@@ -5,6 +5,18 @@ set -o errexit
 set -o pipefail
 set -x
 
+export REDHAT_OPERATORS_INDEX_TAG="${REDHAT_OPERATORS_INDEX_TAG:-v4.15}"
+export DISCONNECTED="${DISCONNECTED:-false}"
+# Since OCP 4.18, include the packages and their channels based on
+# https://github.com/red-hat-storage/odf-operator/blob/release-4.18/bundle
+# The list should always include odf-operator, odf-dependencies plus
+# other dependencies listed in metadata/dependencies.yaml.
+# - nooba-operator is productized as mcg-operator (only include mcg-operator)
+# - csi-addons operator is productized as odf-csi-addons-operator (only include odf-csi-addons-operator)
+# - recipe operator's channel is stable-<version> (e.g. stable-4.18)
+export CCS_OPERATOR_PACKAGES="${CCS_OPERATOR_PACKAGES:-}"
+export CCS_OPERATOR_CHANNELS="${CCS_OPERATOR_CHANNELS:-}"
+
 function mirror_ccs() {
     echo "### Mirroring the selected operators to the internal registry"
     source "${SHARED_DIR}/packet-conf.sh"
@@ -24,7 +36,14 @@ function mirror_ccs() {
     set -xeo pipefail
 
     echo "1. Get mirror registry"
-    mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
+    mirror_registry=""
+    set +e
+    for attempt in 1 2 3; do
+        mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]') && break
+        echo "Attempt ${attempt}/3 failed to get imagecontentsourcepolicy, retrying in 30s..."
+        sleep 30
+    done
+    set -e
     mirror_registry=${mirror_registry%%/*}
     if [[ $mirror_registry == "" ]] ; then
         echo "Warning: Can not find the mirror registry, abort !!!"
@@ -34,7 +53,7 @@ function mirror_ccs() {
 
     echo "2: get oc-mirror from stable clients"
     if [[ ! -f /home/oc-mirror ]]; then
-        MIRROR2URL="https://mirror2.openshift.com/pub/openshift-v4"
+        MIRROR2URL="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4"
         CLIENTURL="${MIRROR2URL}"/x86_64/clients/ocp/stable
         curl -s -k -L "${CLIENTURL}/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
         if ls /home/oc-mirror > /dev/null ; then
@@ -49,18 +68,19 @@ function mirror_ccs() {
     echo "3: Check skopeo and registry credentials"
     if [[ ! -f /usr/bin/skopeo ]]; then
         yum install -y skopeo
-        oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm
-        set +x
-        mirror_token=$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "${mirror_registry}" '.auths[$var1]["auth"]'|base64 -d)
-        skopeo login "${mirror_registry}" -u "${mirror_token%:*}" -p "${mirror_token#*:}"
-        REGISTRY_REDHAT_IO_USER=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 1)
-        REGISTRY_REDHAT_IO_PASSWORD=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 2)
-        skopeo login registry.redhat.io -u "${REGISTRY_REDHAT_IO_USER}" -p "${REGISTRY_REDHAT_IO_PASSWORD}"
-        set -x
     fi
 
+    oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm
+    set +x
+    mirror_token=$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "${mirror_registry}" '.auths[$var1]["auth"]'|base64 -d)
+    skopeo login "${mirror_registry}" -u "${mirror_token%:*}" -p "${mirror_token#*:}"
+    REGISTRY_REDHAT_IO_USER=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 1)
+    REGISTRY_REDHAT_IO_PASSWORD=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 2)
+    skopeo login registry.redhat.io -u "${REGISTRY_REDHAT_IO_USER}" -p "${REGISTRY_REDHAT_IO_PASSWORD}"
+    set -x
+
     echo "4: skopeo copy docker://${CCS_CATALOG_IMAGE} oci:///home/ccs-local-catalog --remove-signatures"
-    skopeo copy "docker://${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures
+    skopeo copy "docker://${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures --authfile /home/pull-secret
 
     echo "5: oc-mirror"
     catalog_image="ccs-local-catalog/ccs-local-catalog"
@@ -125,9 +145,10 @@ END
     # cleanup leftovers from previous executions
     rm -rf oc-mirror-workspace
     # try at least 3 times to be sure to get all the images...
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+    for i in 1 2 3; do
+        echo "oc-mirror attempt ${i}/3"
+        /home/oc-mirror --v1 --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing || true
+    done
     popd
 
     echo "6: Create imageconentsourcepolicy and catalogsource"
@@ -170,14 +191,11 @@ END
 EOF
 }
 
+function create_catalogsource() {
+    local name
+    local created=false
 
-
-
-if [[ "${DISCONNECTED}" == "true" ]];
-then
-    mirror_ccs
-else
-    name="redhat-operators-$(echo $REDHAT_OPERATORS_INDEX_TAG| sed "s/[.]/-/g")"
+    name="redhat-operators-$(echo "$REDHAT_OPERATORS_INDEX_TAG" | sed "s/[.]/-/g")"
 
     oc apply -f - <<EOF
     apiVersion: operators.coreos.com/v1alpha1
@@ -229,7 +247,7 @@ EOF
             sleep 2
             continue
         fi
-        echo $state
+        echo "$state"
         if [ "$state" == "READY" ] ; then
             echo "Catalogsource created successfully after waiting $((5*i)) seconds"
             echo "current state of catalogsource is \"$state\""
@@ -241,5 +259,12 @@ EOF
         sleep 5
     done
     [ "$created" = "true" ]
+}
+
+if [[ "${DISCONNECTED}" == "true" ]];
+then
+    mirror_ccs
+else
+    create_catalogsource
 fi
 

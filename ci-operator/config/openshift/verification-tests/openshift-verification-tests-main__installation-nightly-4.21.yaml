@@ -65,8 +65,8 @@ resources:
       cpu: 400m
       memory: 800Mi
 tests:
-- as: aws-ipi-all-regions-f1
-  cron: 5 22 * * *
+- as: aws-ipi-all-regions-f3
+  cron: 5 22 1,4,7,10,13,16,19,22,25,28 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-qe
@@ -76,8 +76,8 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       TEST_OBJECT: Regions
     workflow: cucushift-installer-rehearse-aws-cases-clusters
-- as: aws-ipi-all-localzones-f1
-  cron: 13 18 * * *
+- as: aws-ipi-all-localzones-f3
+  cron: 13 18 1,4,7,10,13,16,19,22,25,28 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-qe
@@ -87,8 +87,8 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       TEST_OBJECT: LocalZones
     workflow: cucushift-installer-rehearse-aws-cases-clusters-edge-zone
-- as: aws-ipi-all-wavelength-zones-f1
-  cron: 25 17 * * *
+- as: aws-ipi-all-wavelength-zones-f3
+  cron: 25 17 1,4,7,10,13,16,19,22,25,28 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-qe
@@ -98,8 +98,8 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       TEST_OBJECT: WavelengthZones
     workflow: cucushift-installer-rehearse-aws-cases-clusters-edge-zone
-- as: aws-ipi-all-instance-types-f1
-  cron: 8 22 * * *
+- as: aws-ipi-all-instance-types-f3
+  cron: 8 22 1,4,7,10,13,16,19,22,25,28 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-qe
@@ -389,11 +389,16 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-usgov-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.gcp.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
+      OCP_ARCH: arm64
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-custom-dns
@@ -441,6 +446,32 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-upi
+- as: azure-ipi-all-instance-types-f3
+  cron: 28 5 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_FILTERS: "57148"
+      TEST_OBJECT: InstanceTypes
+    test:
+    - ref: openshift-extended-test-longduration
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-cases-clusters
+- as: azure-ipi-all-regions-f3
+  cron: 36 9 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_OBJECT: Regions
+    workflow: cucushift-installer-rehearse-azure-cases-clusters
 - as: azure-ipi-arm-f28-ota
   cron: 12 23 4 * *
   steps:
@@ -1156,10 +1187,10 @@ tests:
     env:
       COMPUTE_DISK_TYPE: hyperdisk-balanced
       COMPUTE_NODE_TYPE: n4-standard-2
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
       CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
       CONTROL_PLANE_NODE_TYPE: n4-standard-4
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - ref: cucushift-installer-check-cluster-health
@@ -1181,8 +1212,8 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - ref: cucushift-installer-check-cluster-health
@@ -1193,8 +1224,8 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
@@ -1271,8 +1302,8 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - ref: cucushift-installer-check-cluster-health
@@ -1284,8 +1315,8 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       XPN_MINIMAL_PERMISSIONS_WITHOUT_DNS: "yes"
     test:
     - ref: cucushift-installer-check-cluster-health
@@ -1297,8 +1328,8 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
       XPN_MINIMAL_PERMISSIONS_WITHOUT_DNS: "yes"
     test:
     - ref: cucushift-installer-check-cluster-health

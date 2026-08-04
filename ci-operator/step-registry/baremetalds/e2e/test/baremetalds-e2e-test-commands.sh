@@ -57,6 +57,8 @@ declare -a MIRRORED_IMAGES=(
   "registry.k8s.io/pause:3.10.1 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-25-registry-k8s-io-pause-3-10-1-a6__nK-VRxiifU0Z"
   # new image coming in k8s 1.35
   "registry.k8s.io/pause:3.10.1 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-22-registry-k8s-io-pause-3-10-1-a6__nK-VRxiifU0Z"
+  # new image coming in k8s 1.36
+  "registry.k8s.io/pause:3.10.2 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-22-registry-k8s-io-pause-3-10-2-Xnr_kb1i4Z5Tu7vt"
   # new image coming in k8s 1.29.11. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)
   "registry.k8s.io/etcd:3.5.16-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-16-0-ExW1ETJqOZa6gx2F"
   # new image coming in k8s 1.30.5. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)
@@ -65,10 +67,13 @@ declare -a MIRRORED_IMAGES=(
   "registry.k8s.io/e2e-test-images/sample-device-plugin:1.7 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-registry-k8s-io-e2e-test-images-sample-device-plugin-1-7-ULwza-sZKxhdAQs1"
   # nginx is switching indices in 1.35 - remove after origin 1.35 bump
   "registry.k8s.io/e2e-test-images/nginx:1.14-4 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-18-registry-k8s-io-e2e-test-images-nginx-1-14-4-20h7A1tgJp0m0c1_"
+  # agnhost:2.59 is not available in "openshift-tests images" command output, so we need to mirror it from source to avoid test failures
+  # remove after image is available in "openshift-tests images" command output
+  "quay.io/openshift/community-e2e-images:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-59-l6lMl0FrhVtCSA-8 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-59-l6lMl0FrhVtCSA-8"
 )
 
 function run-oc-image-mirror() {
-  oc image mirror -f /tmp/mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json || return 1
+  oc image mirror -f /tmp/mirror --keep-manifest-list --registry-config ${DS_WORKING_DIR}/pull_secret.json || return 1
   for image_pair in "\${MIRRORED_IMAGES[@]}"; do
     oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" \$image_pair || return 1
   done
@@ -318,10 +323,18 @@ function suite() {
     if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/auth/external-oidc" || "${TEST_SUITE}" ==  "openshift/two-node") ]]; then
         TESTS="$(openshift-tests run "${TEST_SUITE}" --dry-run --provider "${TEST_PROVIDER}" "${HYPERVISOR_ARGS[@]}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
-        echo "Skipping tests:" &&
+        echo "Tests to be skipped:" &&
         echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
         scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
+
+        # Warn about individual skip patterns that match nothing.
+        # Assumes \| is only used as a top-level OR (true for all known usages at the time of writing).
+        echo "${TEST_SKIPS}" | sed 's/\\|/\n/g' | while IFS= read -r pattern; do
+            [[ -z "${pattern}" ]] && continue
+            echo "${TESTS}" | grep "${pattern}" > /dev/null 2>&1 ||
+                echo "Warning: TEST_SKIPS pattern matched 0 tests (test renamed/removed or regex invalid): ${pattern}"
+        done
     fi
 
     set -x
@@ -360,6 +373,33 @@ packet|equinix*)
 
         # Mirroring test images is supported only for versions greater than or equal to 4.8
         mirror_test_images
+
+        # On disconnected clusters, create an IDMS for core networking test
+        # images (e.g. hello-sdn) so that pods referencing quay.io images by
+        # digest are transparently redirected to the local mirror registry.
+        # IDMS is GA from OCP 4.13; skip on older clusters.
+        echo "### IDMS check: DS_IP_STACK=${DS_IP_STACK} DS_OPENSHIFT_VERSION=${DS_OPENSHIFT_VERSION}"
+        if [[ "${DS_IP_STACK}" == "v6" ]] && is_openshift_version_gte "4.13"; then
+            echo "### Creating ImageDigestMirrorSet for test images on disconnected cluster"
+            ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${DEVSCRIPTS_TEST_IMAGE_REPO}" << 'IDMS_EOF'
+                set -euo pipefail
+                LOCAL_REPO="$1"
+                oc apply -f - <<EOF
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: test-image-idms
+spec:
+  imageDigestMirrors:
+  - source: quay.io/openshifttest/hello-sdn
+    mirrors:
+    - ${LOCAL_REPO}
+EOF
+                echo "Waiting for machine-config operator to reconcile IDMS..."
+                oc wait mcp --all --for=condition=Updating=True --timeout=5m || true
+                oc wait mcp --all --for=condition=Updated=true --timeout=10m
+IDMS_EOF
+        fi
     else
         export TEST_PROVIDER='{"type":"skeleton"}'
         use_minimal_test_list

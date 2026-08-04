@@ -24,6 +24,13 @@ releases:
         lower: 4.21.0-0
         stream: 4-stable
         upper: 4.22.0-0
+  signed-driver:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.21.14-0
+        stream: 4-stable
+        upper: 4.21.15-0
 resources:
   '*':
     limits:
@@ -34,6 +41,21 @@ resources:
 tests:
 - always_run: false
   as: nvidia-gpu-operator-e2e-master
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |
+      {{if eq .Status.State "success"}}
+        :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}}
+        :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+        {{if eq .Status.State "aborted"}}
+          The job was aborted, check for orphaned cloud resources.
+        {{end}}
+      {{end}}
   steps:
     cluster_profile: aws-edge-infra
     env:
@@ -42,6 +64,21 @@ tests:
     workflow: nvidia-gpu-operator-e2e-aws
 - always_run: false
   as: nvidia-gpu-operator-e2e-25-10-x
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |
+      {{if eq .Status.State "success"}}
+        :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}}
+        :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+        {{if eq .Status.State "aborted"}}
+          The job was aborted, check for orphaned cloud resources.
+        {{end}}
+      {{end}}
   steps:
     cluster_profile: aws-edge-infra
     env:
@@ -50,6 +87,21 @@ tests:
     workflow: nvidia-gpu-operator-e2e-aws
 - always_run: false
   as: nvidia-gpu-operator-e2e-26-3-x
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |
+      {{if eq .Status.State "success"}}
+        :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}}
+        :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+        {{if eq .Status.State "aborted"}}
+          The job was aborted, check for orphaned cloud resources.
+        {{end}}
+      {{end}}
   steps:
     cluster_profile: aws-edge-infra
     env:
@@ -58,6 +110,21 @@ tests:
     workflow: nvidia-gpu-operator-e2e-aws
 - always_run: false
   as: nvidia-gpu-operator-e2e-arm64
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |
+      {{if eq .Status.State "success"}}
+        :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}}
+        :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+        {{if eq .Status.State "aborted"}}
+          The job was aborted, check for orphaned cloud resources.
+        {{end}}
+      {{end}}
   steps:
     cluster_profile: aws-edge-infra
     dependencies:
@@ -68,6 +135,38 @@ tests:
       COMPUTE_NODE_TYPE: g5g.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
+    workflow: nvidia-gpu-operator-e2e-aws
+- always_run: false
+  as: nvidia-gpu-operator-signed-driver
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |
+      {{if eq .Status.State "success"}}
+        :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}}
+        :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+        {{if eq .Status.State "aborted"}}
+          The job was aborted, check for orphaned cloud resources.
+        {{end}}
+      {{end}}
+  steps:
+    cluster_profile: aws-edge-infra
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:signed-driver
+    env:
+      AWS_SECUREBOOT_ENABLED: "true"
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      MERGE_STAGE_REGISTRY_CREDENTIALS: "true"
+      NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH: '[{"op": "add", "path": "/spec/driver/usePrecompiled",
+        "value": true}, {"op": "add", "path": "/spec/driver/repository", "value":
+        "registry.stage.redhat.io/nvidia"}, {"op": "add", "path": "/spec/driver/image",
+        "value": "gpu-driver-rhel9"}, {"op": "add", "path": "/spec/driver/version",
+        "value": "580.159.03"}]'
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v26.3
     workflow: nvidia-gpu-operator-e2e-aws
 zz_generated_metadata:
   branch: main

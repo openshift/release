@@ -36,11 +36,11 @@ jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '
 
 # MIRROR IMAGES
 oc image mirror -a "${new_pull_secret}" \
-    quay.io/yunjiang/c2s-instance-metadata:latest=${MIRROR_REGISTRY_HOST}/yunjiang/c2s-instance-metadata:latest \
+    quay.io/openshift-install/c2s-instance-metadata:latest=${MIRROR_REGISTRY_HOST}/openshift-install/c2s-instance-metadata:latest \
     --insecure=true --skip-missing=true --skip-verification=true
 
 oc image mirror -a "${new_pull_secret}" \
-    quay.io/yunjiang/cap-token-refresh:latest=${MIRROR_REGISTRY_HOST}/yunjiang/cap-token-refresh:latest \
+    quay.io/openshift-install/cap-token-refresh:latest=${MIRROR_REGISTRY_HOST}/openshift-install/cap-token-refresh:latest \
     --insecure=true --skip-missing=true --skip-verification=true
 
 rm -f "${new_pull_secret}"

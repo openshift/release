@@ -101,11 +101,13 @@ canary-openshift-ingress-canary.apps.${CLUSTER_NAME}.${BASE_DOMAIN}
 api.openshift.com
 console.redhat.com
 mirror.openshift.com
+openshift-mirror-list.ci-systems.workers.dev
 quayio-production-s3.s3.amazonaws.com
 rhcos.mirror.openshift.com
 sso.redhat.com
 storage.googleapis.com/openshift-release
 .r2.cloudflarestorage.com
+.workers.dev
 EOF
 
 # # optional third-party content

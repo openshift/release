@@ -12,18 +12,20 @@ images:
     to: csi-external-attacher
 promotion:
   to:
-  - name: 4.16-priv
-    namespace: ocp-private
+  - name: "4.16"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.16-priv
-      namespace: ocp-private
+      name: "4.16"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.16-priv
-      namespace: ocp-private
+      name: "4.16"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -34,13 +36,15 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e-aws-csi
+- always_run: false
+  as: e2e-aws-csi
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
-- as: e2e-gcp-csi
+- always_run: false
+  as: e2e-gcp-csi
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-csi
 - as: verify-deps
   steps:

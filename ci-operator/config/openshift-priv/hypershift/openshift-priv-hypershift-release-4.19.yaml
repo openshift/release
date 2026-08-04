@@ -1,7 +1,7 @@
 base_images:
   cli:
-    name: 4.19-priv
-    namespace: ocp-private
+    name: "4.19"
+    namespace: ocp-priv
     tag: cli
   dev-scripts:
     name: test
@@ -11,34 +11,38 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  hypershift-operator-init:
+  hypershift-operator-419-latest:
     name: hypershift-operator
     namespace: hypershift
-    tag: latest
+    tag: "4.19"
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  manila-csi-driver-operator-test:
-    name: 4.19-priv
-    namespace: ocp-private
-    tag: manila-csi-driver-operator-test
-  openstack-cinder-csi-driver-operator-test:
-    name: 4.19-priv
-    namespace: ocp-private
-    tag: openstack-cinder-csi-driver-operator-test
 build_root:
   from_repository: true
   use_build_cache: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
   items:
+  - to: hypershift-operator-pr
   - dockerfile_path: Dockerfile.control-plane
     to: hypershift
 promotion:
   to:
-  - name: 4.19-priv
-    namespace: ocp-private
+  - excluded_images:
+    - hypershift-operator-pr
+    name: "4.19"
+    namespace: ocp-priv
+  - additional_images:
+      hypershift-operator: hypershift-operator-pr
+    disabled: true
+    excluded_images:
+    - '*'
+    namespace: hypershift
+    tag: "4.19"
+prowgen:
+  private: true
 releases:
   initial:
     candidate:
@@ -54,8 +58,8 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
-      namespace: ocp-private
+      name: "4.19"
+      namespace: ocp-priv
   latest-415:
     candidate:
       product: ocp
@@ -188,7 +192,8 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+      CI_HYPERSHIFT_OPERATOR: hypershift-operator-pr
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-419-latest
     env:
       CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
       INSTALL_FROM_LATEST: "true"
@@ -208,14 +213,17 @@ tests:
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      E2E_TEST_REGEX: ^TestCreateCluster$|TestAutoscaling
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
-      SKIP_E2E_LOCAL: "true"
-    workflow: hypershift-kubevirt-e2e-nested
+      RUN_EXTERNAL_INFRA_TEST: "false"
+    workflow: hypershift-kubevirt-e2e-aws
 - always_run: false
   as: e2e-kubevirt-aws-ovn
   optional: true
@@ -280,74 +288,6 @@ tests:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
       SNYK_ENABLE_DEPS_SCAN: "false"
     workflow: openshift-ci-security
-- always_run: false
-  as: e2e-openstack-aws
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vexxhost-quota-slice
-    test:
-    - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-nested
-- always_run: false
-  as: e2e-openstack-aws-nfv
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-nfv
-      NFV_NODEPOOLS: "true"
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-nfv-quota-slice
-    workflow: hypershift-openstack-aws-nfv
-- always_run: false
-  as: e2e-openstack-aws-conformance
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
-      TECH_PREVIEW_NO_UPGRADE: "true"
-      TEST_SUITE: experimental/reliability/minimal
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vexxhost-quota-slice
-    workflow: hypershift-openstack-aws-conformance
-- always_run: false
-  as: e2e-openstack-aws-csi-cinder
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
-      TECH_PREVIEW_NO_UPGRADE: "true"
-      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-cinder.yaml
-      TEST_SUITE: openshift/csi
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vh-mecha-central-quota-slice
-    workflow: hypershift-openstack-aws-conformance
-- always_run: false
-  as: e2e-openstack-aws-csi-manila
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
-      TECH_PREVIEW_NO_UPGRADE: "true"
-      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-manila.yaml
-      TEST_SUITE: openshift/csi
-    leases:
-    - env: OPENSTACK_CLOUD
-      resource_type: openstack-vh-mecha-central-quota-slice
-    workflow: hypershift-openstack-aws-conformance
 - always_run: false
   as: e2e-aws-karpenter-core
   optional: true

@@ -46,7 +46,7 @@ fi
 # Install oc if not available
 if ! command -v oc &> /dev/null; then
     echo "oc not found, installing..."
-    curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz -o /tmp/oc.tar.gz
+    curl -sL https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz -o /tmp/oc.tar.gz
     tar -xzf /tmp/oc.tar.gz -C /tmp oc
     chmod +x /tmp/oc
     export PATH="/tmp:${PATH}"
@@ -162,12 +162,219 @@ oc adm policy add-scc-to-user anyuid -z cost-onprem -n "${NAMESPACE}" || true
 
 echo "SecurityContextConstraints configured"
 
+echo "========== Determining Chart Source =========="
+
+# ============================================================================
+# Chart Source Resolution
+# ============================================================================
+# CHART_REF controls which chart version to test:
+# - "release": Latest released chart from Helm repo (non-RC)
+# - "rc": Latest RC - tries --devel flag first, falls back to git tag checkout
+# - Not set: Use local chart from current source (for PR testing)
+#
+# For nightly/periodic jobs: CHART_REF is set
+# For PR presubmit jobs: CHART_REF is not set, uses local source (USE_LOCAL_CHART=true)
+
+# Check if deploy script supports --devel flag
+check_devel_support() {
+    if [[ -f "./scripts/deploy-test-cost-onprem.sh" ]]; then
+        if grep -q -- '--devel' ./scripts/deploy-test-cost-onprem.sh 2>/dev/null; then
+            echo "true"
+        else
+            echo "false"
+        fi
+    else
+        echo "false"
+    fi
+}
+
+# Ensure git origin remote exists and tags are fetched
+ensure_git_setup() {
+    if ! git remote get-url origin &>/dev/null; then
+        echo "Adding origin remote for tag fetch..." >&2
+        git remote add origin https://github.com/insights-onprem/cost-onprem-chart.git
+    fi
+    git fetch --tags origin 2>/dev/null
+}
+
+# Get chart version from Helm repo
+# Args: $1 = "stable" or "devel"
+get_helm_chart_version() {
+    local mode="${1:-stable}"
+    local helm_args=("search" "repo" "cost-onprem/cost-onprem" "--output" "json")
+    
+    if [[ "$mode" == "devel" ]]; then
+        helm_args+=("--devel")
+    fi
+    
+    # Add the Helm repo if not already added
+    if ! helm repo list 2>/dev/null | grep -q "cost-onprem"; then
+        echo "Adding cost-onprem Helm repo..." >&2
+        helm repo add cost-onprem https://insights-onprem.github.io/cost-onprem-chart >&2
+        helm repo update >&2
+    fi
+    
+    local version
+    version=$(helm "${helm_args[@]}" 2>/dev/null | jq -r '.[0].version // empty')
+    echo "$version"
+}
+
+# Checkout git tag matching chart version
+# Args: $1 = chart version (e.g., "0.2.19" or "0.2.20-rc4")
+checkout_matching_tag() {
+    local chart_version="$1"
+    local tag_name="cost-onprem-${chart_version}"
+    
+    ensure_git_setup
+    
+    if git rev-parse "${tag_name}" &>/dev/null; then
+        echo "Checking out test code matching chart version: ${tag_name}"
+        git checkout "${tag_name}"
+        echo "Test code now at: $(git describe --tags --always)"
+        return 0
+    else
+        echo "ERROR: Git tag ${tag_name} not found for chart version ${chart_version}" >&2
+        echo "Available tags:" >&2
+        git tag -l "cost-onprem-*" | tail -10 >&2
+        return 1
+    fi
+}
+
+# Resolve latest RC tag from git (fallback when Helm lookup fails)
+get_latest_rc_tag() {
+    ensure_git_setup
+    
+    # Find latest RC tag (e.g., cost-onprem-0.2.20-rc1)
+    local latest_rc
+    latest_rc=$(git tag -l "cost-onprem-*-rc*" 2>/dev/null | sort -V | tail -1)
+    echo "$latest_rc"
+}
+
+USE_HELM_DEVEL="false"
+USE_LOCAL_CHART="true"  # Default for PR runs
+CHART_REF_RESOLVED=""
+
+if [[ -n "${CHART_REF:-}" ]]; then
+    case "${CHART_REF}" in
+        release)
+            echo "Testing latest RELEASED chart from Helm repo"
+            
+            # Get the chart version that Helm will deploy
+            CHART_VERSION=$(get_helm_chart_version "stable")
+            if [[ -z "$CHART_VERSION" ]]; then
+                echo "ERROR: Could not determine chart version from Helm repo"
+                exit 1
+            fi
+            echo "Helm repo has stable version: ${CHART_VERSION}"
+            
+            # Checkout matching git tag so tests align with chart version
+            if ! checkout_matching_tag "$CHART_VERSION"; then
+                echo "ERROR: Cannot checkout matching tag for release ${CHART_VERSION}"
+                exit 1
+            fi
+            
+            # Deploy from Helm repo (tests real published artifact)
+            USE_LOCAL_CHART="false"
+            CHART_REF_RESOLVED="${CHART_VERSION}"
+            ;;
+        rc)
+            echo "Testing latest RC chart..."
+            DEVEL_SUPPORTED=$(check_devel_support)
+            
+            if [[ "$DEVEL_SUPPORTED" == "true" ]]; then
+                # Deploy script supports --devel, use Helm repo
+                echo "Deploy script supports --devel flag - will use Helm repo with pre-release resolution"
+                
+                # Get the RC version that Helm will deploy
+                CHART_VERSION=$(get_helm_chart_version "devel")
+                if [[ -z "$CHART_VERSION" ]]; then
+                    echo "WARNING: Could not determine RC version from Helm repo, falling back to git"
+                    DEVEL_SUPPORTED="false"
+                elif [[ "$CHART_VERSION" != *-* ]]; then
+                    # helm --devel returns stable versions when no prerelease exists
+                    echo "WARNING: Helm returned stable version ${CHART_VERSION} (no prerelease available), falling back to git"
+                    DEVEL_SUPPORTED="false"
+                else
+                    echo "Helm repo has RC version: ${CHART_VERSION}"
+                    
+                    # Checkout matching git tag so tests align with chart version
+                    if ! checkout_matching_tag "$CHART_VERSION"; then
+                        echo "WARNING: Cannot checkout matching tag, falling back to git RC tag"
+                        DEVEL_SUPPORTED="false"
+                    else
+                        USE_LOCAL_CHART="false"
+                        USE_HELM_DEVEL="true"
+                        CHART_REF_RESOLVED="${CHART_VERSION}"
+                    fi
+                fi
+            fi
+            
+            # Fallback: checkout latest RC tag and use local chart
+            if [[ "$DEVEL_SUPPORTED" != "true" ]]; then
+                echo "Falling back to git tag checkout for RC"
+                LATEST_RC_TAG=$(get_latest_rc_tag)
+                
+                if [[ -n "$LATEST_RC_TAG" ]]; then
+                    echo "Found latest RC tag: $LATEST_RC_TAG"
+                    git checkout "$LATEST_RC_TAG"
+                    echo "Checked out: $(git describe --tags --always)"
+                    USE_LOCAL_CHART="true"  # Use local source from the checked-out tag
+                    CHART_REF_RESOLVED="$LATEST_RC_TAG"
+                else
+                    echo "WARNING: No RC tags found in repository"
+                    echo "Skipping RC test - no RC available"
+                    # Write skip status and exit gracefully
+                    _artifact_dir="${ARTIFACT_DIR:-/tmp/artifacts}"
+                    mkdir -p "$_artifact_dir"
+                    echo "skipped - no RC tags found" > "${_artifact_dir}/test_status.txt"
+                    exit 0
+                fi
+            fi
+            ;;
+        *)
+            echo "Testing explicit chart reference: ${CHART_REF}"
+            # Could be a specific version like "0.2.19" or "0.2.20-rc1"
+            # Assume it's a git tag, checkout and use local
+            ensure_git_setup
+            if git rev-parse "cost-onprem-${CHART_REF}" &>/dev/null; then
+                git checkout "cost-onprem-${CHART_REF}"
+                echo "Checked out: $(git describe --tags --always)"
+            elif git rev-parse "${CHART_REF}" &>/dev/null; then
+                git checkout "${CHART_REF}"
+                echo "Checked out: $(git describe --tags --always)"
+            else
+                echo "ERROR: Could not find tag cost-onprem-${CHART_REF} or ${CHART_REF}"
+                echo "Available tags:" >&2
+                git tag -l "cost-onprem-*" | tail -10 >&2
+                exit 1
+            fi
+            USE_LOCAL_CHART="true"
+            CHART_REF_RESOLVED="${CHART_REF}"
+            ;;
+    esac
+else
+    echo "No CHART_REF set - using LOCAL chart from current source (PR testing mode)"
+fi
+
+export USE_LOCAL_CHART
+export USE_HELM_DEVEL
+export CHART_REF_RESOLVED
+echo "USE_LOCAL_CHART=${USE_LOCAL_CHART}"
+echo "USE_HELM_DEVEL=${USE_HELM_DEVEL}"
+echo "CHART_REF_RESOLVED=${CHART_REF_RESOLVED}"
+
+# Persist chart resolution state to SHARED_DIR for downstream steps (e.g., ReportPortal)
+# Environment variables don't persist across Prow steps, so we write to files
+echo "${CHART_REF_RESOLVED}" > "${SHARED_DIR}/chart_ref_resolved"
+echo "${USE_HELM_DEVEL}" > "${SHARED_DIR}/use_helm_devel"
+echo "${USE_LOCAL_CHART}" > "${SHARED_DIR}/use_local_chart"
+
 echo "========== Running E2E Tests =========="
 
 # Export environment variables for the deployment script
 export NAMESPACE="${NAMESPACE:-cost-onprem}"
 export VERBOSE="${VERBOSE:-true}"
-export USE_LOCAL_CHART="true"
+# USE_LOCAL_CHART is already set above based on CHART_REF
 export COST_MGMT_NAMESPACE="${NAMESPACE}"
 export COST_MGMT_RELEASE_NAME="${HELM_RELEASE_NAME:-cost-onprem}"
 
@@ -175,6 +382,7 @@ export COST_MGMT_RELEASE_NAME="${HELM_RELEASE_NAME:-cost-onprem}"
 DEPLOY_ARGS=(
     --namespace "${NAMESPACE}"
     --verbose
+    --save-versions
 )
 
 # Add S4 storage flags if enabled
@@ -183,6 +391,12 @@ if [ "${DEPLOY_S4:-false}" == "true" ]; then
     # Use the same namespace as the application for S4 if S4_NAMESPACE is not explicitly set
     # This ensures the storage credentials secret is created in the correct namespace
     DEPLOY_ARGS+=(--s4-namespace "${S4_NAMESPACE:-${NAMESPACE}}")
+fi
+
+# Add --devel flag if we're testing RC via Helm pre-release resolution
+if [ "${USE_HELM_DEVEL:-false}" == "true" ]; then
+    echo "Adding --devel flag for Helm pre-release (RC) chart resolution"
+    DEPLOY_ARGS+=(--devel)
 fi
 
 # Add IQE test flags if enabled
@@ -217,7 +431,10 @@ fi
 # Run the deployment script from the chart repo source
 # The step runs with from: src, so we're already in the chart repo
 # Use bash to execute since source may be read-only (can't chmod)
-bash ./scripts/deploy-test-cost-onprem.sh "${DEPLOY_ARGS[@]}"
+# Capture exit code but continue to artifact collection regardless of test results
+DEPLOY_EXIT_CODE=0
+bash ./scripts/deploy-test-cost-onprem.sh "${DEPLOY_ARGS[@]}" || DEPLOY_EXIT_CODE=$?
+echo "Deploy script exited with code: ${DEPLOY_EXIT_CODE}"
 
 # Copy test artifacts to CI artifact directory
 echo "========== Collecting Test Artifacts =========="
@@ -259,3 +476,50 @@ if [ -d "./tests/reports" ]; then
 else
     echo "No test reports directory found"
 fi
+
+# Copy JUnit files to SHARED_DIR for ReportPortal post step
+# (ARTIFACT_DIR is step-specific; SHARED_DIR persists across steps)
+# NOTE: SHARED_DIR has a 1MB limit, so we compress the files
+echo "Copying JUnit files to SHARED_DIR for ReportPortal..."
+if ls "${ARTIFACT_DIR}"/junit_*.xml &>/dev/null; then
+    # Compress to stay under 1MB SHARED_DIR limit
+    # Use subshell to expand glob inside ARTIFACT_DIR
+    (cd "${ARTIFACT_DIR}" && tar -czf "${SHARED_DIR}/junit_files.tar.gz" junit_*.xml)
+    if [[ -f "${SHARED_DIR}/junit_files.tar.gz" ]]; then
+        _compressed_size=$(stat -f%z "${SHARED_DIR}/junit_files.tar.gz" 2>/dev/null || stat -c%s "${SHARED_DIR}/junit_files.tar.gz" 2>/dev/null || echo "unknown")
+        echo "  - junit_files.tar.gz (compressed JUnit files, ${_compressed_size} bytes)"
+    fi
+else
+    echo "  (no junit files to copy)"
+fi
+
+# Copy version_info.json for ReportPortal metadata
+if [ -f "./version_info.json" ]; then
+    cp ./version_info.json "${ARTIFACT_DIR}/version_info.json"
+    # Also copy to SHARED_DIR for ReportPortal step
+    cp ./version_info.json "${SHARED_DIR}/version_info.json"
+    echo "  - version_info.json (component version metadata)"
+else
+    echo "No version_info.json found, skipping"
+fi
+
+# Capture IQE listener pod logs if IQE was run
+if [ "${RUN_IQE:-false}" == "true" ]; then
+    echo "Collecting IQE listener pod logs..."
+    IQE_LISTENER_POD=$(oc get pods -n "${NAMESPACE}" -l app=iqe-listener --no-headers -o name 2>/dev/null | head -1)
+    if [ -n "${IQE_LISTENER_POD}" ]; then
+        oc logs -n "${NAMESPACE}" "${IQE_LISTENER_POD}" \
+            > "${ARTIFACT_DIR}/iqe_listener.log" 2>/dev/null || true
+        echo "  - iqe_listener.log (IQE data listener output)"
+    else
+        echo "No IQE listener pod found, skipping log collection"
+    fi
+fi
+
+# Exit with the original deploy script exit code
+# This ensures Prow correctly reports test failures while still collecting artifacts
+echo "========== E2E Step Complete =========="
+if [ "${DEPLOY_EXIT_CODE}" -ne 0 ]; then
+    echo "Tests failed (exit code: ${DEPLOY_EXIT_CODE})"
+fi
+exit "${DEPLOY_EXIT_CODE}"

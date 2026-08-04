@@ -3,10 +3,6 @@ base_images:
     name: "2.16"
     namespace: acm-qe
     tag: acmqe-grc-test
-  application-ui-test:
-    name: "2.16"
-    namespace: acm-qe
-    tag: application-ui-test
   clc-ui-e2e:
     name: "2.16"
     namespace: acm-qe
@@ -15,6 +11,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: cli
+  console-e2e:
+    name: main
+    namespace: acm-qe
+    tag: console-e2e
   fetch-managed-clusters:
     name: autotest
     namespace: acm-qe
@@ -64,6 +64,16 @@ tests:
   capabilities:
   - intranet
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#opp-discussion'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: aws-cspi-qe
@@ -78,11 +88,13 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8969
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      IGNORE_SECONDARY_POLICIES: "true"
       ODF_VERSION_MAJOR_MINOR: "4.21"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      QUAY_OPERATOR_CHANNEL: stable-3.17
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability
       ZONES_COUNT: "3"
@@ -120,17 +132,29 @@ tests:
   capabilities:
   - intranet
   cron: 0 0 1,15 * *
+  reporter_config:
+    channel: '#opp-discussion'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: vsphere-connected-2
     env:
       COMPUTE_NODE_REPLICAS: "6"
+      DISABLE_ENVIRONMENT_CHECKER: "true"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-vsphere-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8969
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      IGNORE_SECONDARY_POLICIES: "true"
       ODF_VERSION_MAJOR_MINOR: "4.21"
       OPENSHIFT_REQUIRED_CORES: "72"
       OPENSHIFT_REQUIRED_MEMORY: "288"
@@ -138,6 +162,7 @@ tests:
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      QUAY_OPERATOR_CHANNEL: stable-3.17
       SIZE_VARIANT: large
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability

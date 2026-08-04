@@ -1,7 +1,7 @@
 base_images:
-  ocp_4.10_cli:
-    name: 4.15-priv
-    namespace: ocp-private
+  ocp_cli:
+    name: "4.15"
+    namespace: ocp-priv
     tag: cli
 build_root:
   from_repository: true
@@ -19,7 +19,7 @@ images:
       RUN mkdir /.cache -m 0777
     from: src
     inputs:
-      ocp_4.10_cli:
+      ocp_cli:
         paths:
         - destination_dir: .
           source_path: /usr/bin/oc
@@ -31,18 +31,20 @@ promotion:
     excluded_images:
     - installer
     - src-oc
-    name: 4.15-priv
-    namespace: ocp-private
+    name: "4.15"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -56,7 +58,7 @@ tests:
 - always_run: false
   as: e2e-aws-custom-security-groups
   optional: true
-  run_if_changed: aws
+  pipeline_run_if_changed: aws
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-custom-security-groups
@@ -74,7 +76,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-fips
   optional: true
-  run_if_changed: aws
+  pipeline_run_if_changed: aws
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -103,7 +105,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-public-subnets
   optional: true
-  run_if_changed: /aws/subnet.go
+  pipeline_run_if_changed: /aws/subnet.go
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-publicsubnets
@@ -116,7 +118,7 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true
-  run_if_changed: aws
+  pipeline_run_if_changed: aws
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
@@ -126,8 +128,9 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws-latestinstaller
-- as: e2e-aws-ovn-upi
-  run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
+- always_run: false
+  as: e2e-aws-ovn-upi
+  pipeline_run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-upi
@@ -172,6 +175,13 @@ tests:
 - always_run: false
   as: e2e-vsphere-ovn
   optional: true
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere

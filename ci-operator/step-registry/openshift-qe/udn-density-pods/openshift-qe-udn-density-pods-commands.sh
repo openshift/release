@@ -35,8 +35,24 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
     ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
 fi
 
+# Managment Kubeconfig for ROSA-HCP
+# Set this variable only for HCP clusters on AWS
+cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
+CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
+if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; then
+    if [[ -f "${SHARED_DIR}/hs-mc.kubeconfig" ]]; then
+        # Check if the cluster is accessible from prow environment, 
+        # Set this variable only if accessible
+        MC_CLUSTER_INFRA=$(oc --kubeconfig="${SHARED_DIR}/hs-mc.kubeconfig" get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
+        if [[ $MC_CLUSTER_INFRA == "AWS" ]]; then
+            export MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+            export ES_INDEX=ripsaw-kube-burner
+        fi
+    fi
+fi
+
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
@@ -62,23 +78,29 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 export EXTRA_FLAGS UUID
 
+set +o errexit
 ./run.sh
+RUN_EXIT_CODE=$?
+set -o errexit
 
 METRICS_FOLDER="collected-metrics-${UUID}"
-if [[ -f ${METRICS_FOLDER}/jobSummary.json ]]; then
+if [[ -d ${METRICS_FOLDER} ]]; then
   cp -r ${METRICS_FOLDER} "${ARTIFACT_DIR}/"
-  if [[ ${JOB_NAME} == *openshift-eng-ocp-qe-perfscale-ci* ]] && [[ ${JOB_TYPE} == "periodic" ]]; then
-    set +e
-    OCP_PERF_DASH_HOST=$(cat ${ES_SECRETS_PATH}/ocp-perf-dash-address)
-    OCP_PERF_DASH_DIR="/usr/share/ocp-perf-dash/${JOB_NAME}/${WORKLOAD}/${UUID}"
-    METRICS="${METRICS_FOLDER}/*QuantilesMeasurement*.json ${METRICS_FOLDER}/jobSummary.json"
-    SSH_ARGS="-i ${ES_SECRETS_PATH}/ocp-perf-dash-id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-    ssh ${SSH_ARGS} ${OCP_PERF_DASH_HOST} "mkdir -p ${OCP_PERF_DASH_DIR}"
-    scp ${SSH_ARGS} ${METRICS} ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}
-    set -e
-  fi
 fi
 
 if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
+
+if [[ "${RUN_EXIT_CODE}" -eq 2 ]]; then
+  echo "kube-burner returned exit code 2, which means the workload reached a timeout"
+  echo "Checking cluster health before exiting"
+  if /tmp/kube-burner-ocp cluster-health; then
+    echo "Cluster is still healthy. Ignoring workload timeout to run remaining workloads"
+    echo "Deleting any left-over test resources"
+    oc delete ns -l kube-burner.io/uuid
+    exit 0
+  fi
+fi
+
+exit ${RUN_EXIT_CODE}

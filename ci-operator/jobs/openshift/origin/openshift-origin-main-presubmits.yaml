@@ -1,6 +1,152 @@
 presubmits:
   openshift/origin:
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/agentic-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+    labels:
+      ci-operator.openshift.io/variant: agentic
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-main-agentic-images
+    rerun_command: /test agentic-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=agentic
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )agentic-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/e2e-agent-compact-ipv4-iso-no-registry
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-main-e2e-agent-compact-ipv4-iso-no-registry
+    optional: true
+    rerun_command: /test e2e-agent-compact-ipv4-iso-no-registry
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agent-compact-ipv4-iso-no-registry
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-compact-ipv4-iso-no-registry,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^main$
@@ -8,6 +154,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-agnostic-ovn-cmd
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -89,6 +241,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-csi
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -169,6 +327,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-disruptive
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -250,6 +414,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-etcd-certrotation
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -331,6 +501,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-etcd-recovery
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -414,6 +590,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-jenkins
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -494,6 +676,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -575,6 +763,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-cgroupsv2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -654,8 +848,101 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build09
+    context: ci/prow/e2e-aws-ovn-dra-example
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-main-e2e-aws-ovn-dra-example
+    optional: true
+    rerun_command: /test e2e-aws-ovn-dra-example
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-dra-example
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-dra-example,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-edge-zones
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -737,6 +1024,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-etcd-scaling
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -818,6 +1111,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-fips
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -900,6 +1199,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-image-registry
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -980,6 +1285,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-kube-apiserver-rollout
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1063,6 +1374,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-kubevirt
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1144,6 +1461,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-microshift
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1224,6 +1547,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-microshift-serial
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1304,6 +1633,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-serial-1of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1385,6 +1720,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-serial-2of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1466,6 +1807,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-serial-fast
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1547,6 +1894,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-serial-ipsec
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1628,6 +1981,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-serial-publicnet-1of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1710,6 +2069,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-serial-publicnet-2of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1792,6 +2157,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-single-node
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1873,6 +2244,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-single-node-serial
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1954,6 +2331,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-single-node-techpreview
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -2035,6 +2418,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-single-node-techpreview-serial
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -2116,6 +2505,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-single-node-upgrade
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -2197,6 +2592,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -2280,6 +2681,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade-rollback
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -2361,6 +2768,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-upi
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -2442,6 +2855,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-proxy
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -2521,8 +2940,275 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build09
+    context: ci/prow/e2e-aws-tls-observed-config
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-main-e2e-aws-tls-observed-config
+    optional: true
+    rerun_command: /test e2e-aws-tls-observed-config
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-tls-observed-config
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-tls-observed-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/e2e-aws-tls-observed-config-fips
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-main-e2e-aws-tls-observed-config-fips
+    optional: true
+    rerun_command: /test e2e-aws-tls-observed-config-fips
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-tls-observed-config-fips
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-tls-observed-config-fips,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/e2e-aws-tls-observed-config-hypershift
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
+    labels:
+      ci-operator.openshift.io/cloud: hypershift-aws
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-main-e2e-aws-tls-observed-config-hypershift
+    optional: true
+    rerun_command: /test e2e-aws-tls-observed-config-hypershift
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-tls-observed-config-hypershift
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-tls-observed-config-hypershift,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
     context: ci/prow/e2e-azure
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -2604,6 +3290,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-azure-ovn-etcd-scaling
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -2685,6 +3377,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -2768,6 +3466,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-baremetalds-kubevirt
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
@@ -2849,6 +3553,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-external-aws
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -2930,6 +3640,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-external-aws-ccm
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -3011,6 +3727,12 @@ presubmits:
     cluster: vsphere02
     context: ci/prow/e2e-external-vsphere-ccm
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
@@ -3092,9 +3814,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-csi
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-csi
@@ -3172,9 +3900,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-disruptive
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-disruptive
@@ -3253,9 +3987,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-fips-serial-1of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-fips-serial-1of2
@@ -3335,9 +4075,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-fips-serial-2of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-fips-serial-2of2
@@ -3417,9 +4163,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-ovn
@@ -3499,9 +4251,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn-builds
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-ovn-builds
@@ -3579,9 +4337,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn-etcd-scaling
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-ovn-etcd-scaling
@@ -3662,9 +4426,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn-image-ecosystem
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-ovn-image-ecosystem
@@ -3742,9 +4512,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn-kube-apiserver-rollout
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-ovn-kube-apiserver-rollout
@@ -3823,9 +4599,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn-rt-upgrade
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-ovn-rt-upgrade
@@ -3904,9 +4686,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-ovn-techpreview
@@ -3983,11 +4771,104 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build08
-    context: ci/prow/e2e-gcp-ovn-techpreview-serial-1of2
+    context: ci/prow/e2e-gcp-ovn-techpreview-pkiconfig
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-main-e2e-gcp-ovn-techpreview-pkiconfig
+    optional: true
+    rerun_command: /test e2e-gcp-ovn-techpreview-pkiconfig
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-gcp-ovn-techpreview-pkiconfig
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcp-ovn-techpreview-pkiconfig,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build08
+    context: ci/prow/e2e-gcp-ovn-techpreview-serial-1of2
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-ovn-techpreview-serial-1of2
@@ -4067,9 +4948,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn-techpreview-serial-2of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-ovn-techpreview-serial-2of2
@@ -4149,9 +5036,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-ovn-upgrade
@@ -4229,9 +5122,15 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn-usernamespace
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-main-e2e-gcp-ovn-usernamespace
@@ -4310,6 +5209,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-hypershift-conformance
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -4388,9 +5293,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -4470,9 +5381,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -4552,9 +5469,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -4634,9 +5557,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -4716,9 +5645,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -4798,9 +5733,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp-local-gw
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -4880,9 +5821,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-local-gateway
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -4962,9 +5909,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -5043,9 +5996,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-kube-apiserver-rollout
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -5125,9 +6084,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-serial-1of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -5208,9 +6173,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-serial-2of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -5291,9 +6262,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-serial-ovn-ipv6-1of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -5374,9 +6351,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-serial-ovn-ipv6-2of2
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -5457,9 +6440,15 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -5542,6 +6531,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-metal-ovn-single-node-live-iso
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: equinix-edge-enablement
       ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
@@ -5623,6 +6618,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-metal-ovn-single-node-with-worker-live-iso
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: equinix-edge-enablement
       ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
@@ -5698,12 +6699,20 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-metal-ovn-single-node-with-worker-live-iso,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/edge_topologies)
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ovn-two-node-arbiter
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-edge-enablement
@@ -5781,13 +6790,19 @@ presubmits:
   - agent: kubernetes
     always_run: false
     annotations:
-      pipeline_run_if_changed: (baremetal|metal3|ironic)
+      pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/edge_topologies)
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build10
     context: ci/prow/e2e-metal-ovn-two-node-fencing
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-edge-enablement
@@ -5864,12 +6879,109 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-metal-ovn-two-node-fencing,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/edge_topologies)
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/e2e-metal-ovn-two-node-fencing-recovery
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
+    labels:
+      capability/intranet: intranet
+      capability/nested-podman: nested-podman
+      ci-operator.openshift.io/cloud: equinix-edge-enablement
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-main-e2e-metal-ovn-two-node-fencing-recovery
+    optional: true
+    rerun_command: /test e2e-metal-ovn-two-node-fencing-recovery
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-metal-ovn-two-node-fencing-recovery
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-ovn-two-node-fencing-recovery,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build09
     context: ci/prow/e2e-openstack-dualstack-v6primary
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: openstack-hwoffload
       ci-operator.openshift.io/cloud-cluster-profile: openstack-hwoffload
@@ -5951,6 +7063,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-openstack-ovn
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
@@ -6032,6 +7150,12 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-openstack-serial
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
@@ -6113,6 +7237,12 @@ presubmits:
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
@@ -6193,6 +7323,12 @@ presubmits:
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn-etcd-scaling
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
@@ -6274,6 +7410,12 @@ presubmits:
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn-upi
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
@@ -6354,6 +7496,12 @@ presubmits:
     cluster: build09
     context: ci/prow/go-verify-deps
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -6432,6 +7580,12 @@ presubmits:
     cluster: build09
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -6486,6 +7640,12 @@ presubmits:
     cluster: build09
     context: ci/prow/lint
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -6549,7 +7709,8 @@ presubmits:
     context: ci/prow/okd-scos-e2e-aws-ovn
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -6634,7 +7795,8 @@ presubmits:
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - images/tests/Dockerfile.rhel
     labels:
       ci-operator.openshift.io/variant: okd-scos
       ci.openshift.io/generator: prowgen
@@ -6691,6 +7853,12 @@ presubmits:
     cluster: build09
     context: ci/prow/unit
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -6753,6 +7921,12 @@ presubmits:
     cluster: build09
     context: ci/prow/verify
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -6815,6 +7989,12 @@ presubmits:
     cluster: build09
     context: ci/prow/verify-deps
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -6877,6 +8057,12 @@ presubmits:
     cluster: build09
     context: ci/prow/verify-image-manifest-lists
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"

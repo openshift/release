@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.23
+    tag: rhel-9-release-golang-1.25-openshift-5.0
 images:
   items:
   - dockerfile_literal: |
@@ -29,12 +29,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.23"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.23"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -45,36 +45,69 @@ test_binary_build_commands: "echo \"no test commands\" \n"
 tests:
 - as: setup-periodic
   cron: 00 00 * * *
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     workflow: cri-o-setup
 - as: evented-pleg-periodic
   cron: 00 */6 * * *
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     env:
       EVENTED_PLEG: "true"
     workflow: cri-o-e2e
 - as: crio-node-e2e-conformance-periodic
   cron: 00 */12 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     workflow: cri-o-node-e2e-conformance
 - as: crio-node-e2e-nodefeature-periodic
   cron: 00 */12 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     workflow: cri-o-node-e2e-nodefeature
 - as: crio-node-e2e-nodeconformance-periodic
   cron: 00 */12 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: openshift-org-gcp
     workflow: cri-o-node-e2e-nodeconformance
 - as: setup-fedora-periodic
   cron: 00 00 * * *
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :volcano: {{end}}'
   steps:
-    cluster_profile: gcp-3
-    workflow: cri-o-setup-fedora
+    cluster_profile: openshift-org-gcp
+    env:
+      IMAGE_FAMILY: crio-setup-fedora
+      IMAGE_NAME: fedora-40-cloud-crio-ci
+    workflow: cri-o-setup
 zz_generated_metadata:
   branch: main
   org: cri-o

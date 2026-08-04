@@ -12,8 +12,7 @@ images:
     to: cluster-authentication-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.22"
+  - name: "4.22"
     namespace: ocp
 releases:
   initial:
@@ -51,7 +50,8 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: src
-- as: e2e-agnostic
+- always_run: false
+  as: e2e-agnostic
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
@@ -67,9 +67,10 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-operator
+- always_run: false
+  as: e2e-operator
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -80,13 +81,15 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-agnostic-upgrade
+- always_run: false
+  as: e2e-agnostic-upgrade
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
-- as: e2e-console-login
+- always_run: false
+  as: e2e-console-login
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -96,10 +99,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-operator-encryption
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+- always_run: false
+  as: e2e-operator-encryption
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -113,18 +117,18 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-operator-disruptive
-  optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       TEST_SUITE: openshift/cluster-authentication-operator/operator/disruptive
     test:
     - ref: openshift-e2e-test
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-rotation
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
+- always_run: false
+  as: e2e-gcp-operator-encryption-rotation
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -136,10 +140,11 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-perf
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
+- always_run: false
+  as: e2e-gcp-operator-encryption-perf
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -153,9 +158,9 @@ tests:
 - always_run: false
   as: e2e-gcp-operator-encryption-kms
   optional: true
-  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -169,10 +174,11 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-oidc-techpreview
-  run_if_changed: ^(pkg/controllers/externaloidc)|^(test/e2e-oidc)
+- always_run: false
+  as: e2e-oidc-techpreview
+  pipeline_run_if_changed: ^(pkg/controllers/externaloidc)|^(test/e2e-oidc)
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -186,9 +192,10 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-oidc
+- always_run: false
+  as: e2e-oidc
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -247,7 +254,7 @@ tests:
       TEST_SUITE: openshift/conformance/serial
     workflow: idp-external-oidc-keycloak-aws
   timeout: 8h0m0s
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-parallel-ote
   optional: true
   steps:
@@ -257,7 +264,7 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-serial-ote
   optional: true
   steps:
@@ -267,7 +274,7 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-encryption-serial-ote
   optional: true
   shard_count: 2
@@ -279,7 +286,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
   timeout: 4h0m0s
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-encryption-rotation-serial-ote
   optional: true
   shard_count: 2
@@ -291,7 +298,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
   timeout: 4h0m0s
-- always_run: true
+- always_run: false
   as: e2e-aws-operator-encryption-perf-serial-ote
   optional: true
   shard_count: 2
@@ -303,18 +310,6 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
   timeout: 2h0m0s
-- always_run: true
-  as: e2e-aws-operator-encryption-kms-serial-ote
-  optional: true
-  shard_count: 2
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      TEST_SUITE: openshift/cluster-authentication-operator/operator-encryption-kms/serial
-    test:
-    - ref: openshift-e2e-test
-    workflow: ipi-aws
-  timeout: 4h0m0s
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

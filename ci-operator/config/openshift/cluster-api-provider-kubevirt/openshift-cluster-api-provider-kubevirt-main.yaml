@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: base
   cli:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: cli
   hypershift-operator:
@@ -60,17 +60,17 @@ images:
     to: cluster-api-provider-kubevirt
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -93,8 +93,17 @@ tests:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
-      ODF_OPERATOR_CHANNEL: stable-4.19
+      E2E_TEST_REGEX: ^TestCreateCluster$|TestAutoscaling
+      ETCD_STORAGE_CLASS: gp3-csi
+      KUBEVIRT_CSI_INFRA: gp3-csi
+    pre:
+    - chain: ipi-aws-ovn-pre
+    - chain: ipi-install
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-install
+    - chain: hypershift-kubevirt-custom-capk
     workflow: hypershift-kubevirt-e2e-aws-capk
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift

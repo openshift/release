@@ -8,28 +8,25 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 canonical_go_repository: github.com/stolostron/klusterlet-addon-controller
 images:
   items:
   - dockerfile_path: build/Dockerfile
     from: base
     to: klusterlet-addon-controller
-promotion:
-  to:
-  - disabled: true
-    name: "2.17"
-    namespace: stolostron
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -48,14 +45,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: klusterlet-addon-controller
-    env:
-      IMAGE_REPO: klusterlet-addon-controller
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: openshift-priv

@@ -1,7 +1,7 @@
 base_images:
   base:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: base
 binary_build_commands: go build ./cmd/cloud-controller-manager
 build_root:
@@ -17,18 +17,20 @@ images:
     to: gcp-cloud-controller-manager
 promotion:
   to:
-  - name: 4.14-priv
-    namespace: ocp-private
+  - name: "4.14"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -45,12 +47,12 @@ tests:
   as: e2e-gcp-ovn-ccm
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-ccm
 - as: e2e-gcp-ovn-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
@@ -58,7 +60,7 @@ tests:
   as: openshift-e2e-gcp-ovn-techpreview-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp-upgrade

@@ -78,8 +78,8 @@ data "azurerm_storage_account_sas" "quayazure" {
     file  = true
   }
 
-  start  = "2022-07-24"
-  expiry = "2024-07-25"
+  start  = timestamp()
+  expiry = timeadd(timestamp(), "8760h")
 
   permissions {
     read    = true

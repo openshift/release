@@ -8,15 +8,14 @@ presubmits:
     cluster: build11
     context: ci/prow/ci
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci.openshift.io/generator: prowgen
       job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-release-4.20-ci
     rerun_command: /test ci
-    skip_if_only_changed: \.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*
+    skip_if_only_changed: ^docs/|^hack/.*\.md$|^cnf-tests/submodules/|^ztp/resource-generator/telco-reference$|^telco5g-konflux$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
@@ -73,8 +72,7 @@ presubmits:
     cluster: build10
     context: ci/prow/e2e-aws-ci-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-telco
@@ -83,7 +81,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-release-4.20-e2e-aws-ci-tests
     rerun_command: /test e2e-aws-ci-tests
-    skip_if_only_changed: ^ztp|\.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*
+    skip_if_only_changed: ^ztp|^docs/|^hack/.*\.md$|^cnf-tests/submodules/|^ztp/resource-generator/telco-reference$|^telco5g-konflux$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
@@ -157,8 +155,7 @@ presubmits:
     cluster: build10
     context: ci/prow/e2e-aws-ran-profile
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-telco
@@ -168,6 +165,7 @@ presubmits:
     name: pull-ci-openshift-kni-cnf-features-deploy-release-4.20-e2e-aws-ran-profile
     optional: true
     rerun_command: /test e2e-aws-ran-profile
+    skip_if_only_changed: ^docs/|^hack/.*\.md$|^cnf-tests/submodules/|^ztp/resource-generator/telco-reference$|^telco5g-konflux$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
@@ -242,7 +240,6 @@ presubmits:
     context: ci/prow/e2e-telco5g-cnftests
     decorate: true
     decoration_config:
-      skip_cloning: true
       timeout: 6h0m0s
     labels:
       capability/intranet: intranet
@@ -252,6 +249,7 @@ presubmits:
     name: pull-ci-openshift-kni-cnf-features-deploy-release-4.20-e2e-telco5g-cnftests
     optional: true
     rerun_command: /test e2e-telco5g-cnftests
+    skip_if_only_changed: ^docs/|^hack/.*\.md$|^cnf-tests/submodules/|^ztp/resource-generator/telco-reference$|^telco5g-konflux$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
@@ -323,100 +321,16 @@ presubmits:
     - ^release-4\.20$
     - ^release-4\.20-
     cluster: build11
-    context: ci/prow/e2e-telco5g-hcp-cnftests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      capability/intranet: intranet
-      ci.openshift.io/generator: prowgen
-      job-release: "4.20"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-cnf-features-deploy-release-4.20-e2e-telco5g-hcp-cnftests
-    optional: true
-    rerun_command: /test e2e-telco5g-hcp-cnftests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-telco5g-hcp-cnftests
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-telco5g-hcp-cnftests,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.20$
-    - ^release-4\.20-
-    cluster: build11
     context: ci/prow/images
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci.openshift.io/generator: prowgen
       job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-cnf-features-deploy-release-4.20-images
     rerun_command: /test images
-    skip_if_only_changed: \.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*
+    skip_if_only_changed: ^docs/|^hack/.*\.md$|^cnf-tests/submodules/|^ztp/resource-generator/telco-reference$|^telco5g-konflux$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
@@ -465,8 +379,7 @@ presubmits:
     cluster: build11
     context: ci/prow/security
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci.openshift.io/generator: prowgen
       job-release: "4.20"
@@ -474,7 +387,7 @@ presubmits:
     name: pull-ci-openshift-kni-cnf-features-deploy-release-4.20-security
     optional: true
     rerun_command: /test security
-    skip_if_only_changed: \.tekton/.*|^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*
+    skip_if_only_changed: ^docs/|^hack/.*\.md$|^cnf-tests/submodules/|^ztp/resource-generator/telco-reference$|^telco5g-konflux$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
     spec:
       containers:
       - args:
@@ -548,8 +461,7 @@ presubmits:
     cluster: build11
     context: ci/prow/ztp-ci
     decorate: true
-    decoration_config:
-      skip_cloning: true
+    decoration_config: {}
     labels:
       ci.openshift.io/generator: prowgen
       job-release: "4.20"

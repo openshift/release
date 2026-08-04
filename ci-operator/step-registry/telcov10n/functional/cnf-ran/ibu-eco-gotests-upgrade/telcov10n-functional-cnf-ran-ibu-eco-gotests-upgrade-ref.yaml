@@ -1,0 +1,49 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibu-eco-gotests-upgrade
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibu-eco-gotests-upgrade-commands.sh
+  documentation: |-
+    Prepare IBU target SNO and run eco-gotests upgrade suite against the target
+    spoke cluster managed by the target hub (kni-qe-109).
+
+    Flow:
+    1. Copy target hub inventory from SHARED_DIR (target-* prefixed files saved
+       by ibu-target-hub-deploy)
+    2. Run ibu-prepare-spoke-sno.yml to retrieve the target spoke kubeconfig
+       from the target hub ACM
+    3. Run eco-gotests IBU upgrade test suite using the retrieved spoke kubeconfig;
+       ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_SNO points to the target hub kubeconfig
+       at the standard telcov10n path on the target bastion
+
+    This step runs after the seed image has been mirrored to the target bastion
+    and is ready for use in upgrade testing.
+  timeout: 90m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+
+  env:
+  - name: TARGET_CLUSTER_NAME
+    default: "kni-qe-109"
+    documentation: Target hub cluster name (manages target spoke clusters via ACM)
+  - name: TARGET_SPOKE_CLUSTER
+    default: "ibu-target"
+    documentation: Target spoke SNO cluster name (the cluster being upgraded via IBU)
+  - name: ECO_GOTESTS_FEATURES
+    default: "upgrade"
+    documentation: Space-separated list of eco-gotests features (IBU tests)
+  - name: MIRROR_REGISTRY
+    default: "disconnected.registry.local:5000"
+    documentation: Disconnected mirror registry address for seed image
+  - name: VERSION
+    default: "4.20"
+    documentation: OCP version used to tag the seed image
+
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-kni-qe-109-spoke-master0
+    mount_path: /var/host_variables/kni-qe-109/spoke-master0

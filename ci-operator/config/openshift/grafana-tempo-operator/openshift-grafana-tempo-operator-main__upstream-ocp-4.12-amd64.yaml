@@ -4,9 +4,13 @@ base_images:
     namespace: ocp
     tag: cli
   operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  upi-installer:
     name: "4.12"
-    namespace: origin
-    tag: operator-sdk
+    namespace: ocp
+    tag: upi-installer
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -21,7 +25,7 @@ images:
     to: tempo-operator
   - context_dir: .
     dockerfile_path: tests/Dockerfile
-    to: tempo-tests-runner
+    to: obs-tests-runner
 operator:
   bundles:
   - as: tempo-bundle
@@ -32,9 +36,8 @@ operator:
     with: pipeline:tempo-operator
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.12"
 resources:
   '*':
@@ -42,16 +45,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: security-sast-tempo
-  steps:
-    env:
-      PROJECT_NAME: tempo-operator
-    workflow: openshift-ci-security
 - as: tempo-upstream-tests
   steps:
-    cluster_profile: gcp-observability
+    cluster_profile: aws-observability
     env:
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
@@ -65,7 +63,7 @@ tests:
       cli: latest
       commands: |
         oc create namespace openshift-tempo-operator
-        operator-sdk run bundle --timeout=10m --security-context-config restricted -n openshift-tempo-operator "$OO_BUNDLE"
+        cd /tmp && operator-sdk run bundle --timeout=10m --security-context-config restricted -n openshift-tempo-operator "$OO_BUNDLE"
         oc wait --for condition=Available -n openshift-tempo-operator deployment tempo-operator-controller
       dependencies:
       - env: OO_BUNDLE
@@ -77,7 +75,7 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-upstream
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

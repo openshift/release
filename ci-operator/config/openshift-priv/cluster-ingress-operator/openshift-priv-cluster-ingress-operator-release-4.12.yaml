@@ -1,7 +1,7 @@
 base_images:
   base:
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
     tag: base
 build_root:
   from_repository: true
@@ -12,18 +12,20 @@ images:
     to: cluster-ingress-operator
 promotion:
   to:
-  - name: 4.12-priv
-    namespace: ocp-private
+  - name: "4.12"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -38,7 +40,8 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
@@ -48,7 +51,8 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
-- as: e2e-aws-operator
+- always_run: false
+  as: e2e-aws-operator
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -64,7 +68,7 @@ tests:
   as: e2e-gcp-operator
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -88,13 +92,15 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: e2e-aws-ovn-upgrade
+- always_run: false
+  as: e2e-aws-ovn-upgrade
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-gcp-ovn-serial
+- always_run: false
+  as: e2e-gcp-ovn-serial
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-serial
 - always_run: false
   as: e2e-aws-ovn-single-node

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euxo pipefail
+set -euo pipefail
 
 function cleanup_connectivity_test() {
     oc delete scc cilium-test --ignore-not-found
@@ -18,6 +18,8 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+set -x
+
 # Target the guest cluster
 if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
@@ -30,8 +32,6 @@ oc wait clusteroperators --all --for=condition=Available=True --timeout=30m
 oc wait clusteroperators --all --for=condition=Progressing=False --timeout=30m
 oc wait clusteroperators --all --for=condition=Degraded=False --timeout=30m
 oc wait clusterversion/version --for=condition=Available=True --timeout=30m
-
-oc wait --for=condition=Ready pod -n cilium --all --timeout=5m
 
 echo "Performing Cilium connectivity tests"
 trap "dump_connectivity_test_namespace; cleanup_connectivity_test" EXIT

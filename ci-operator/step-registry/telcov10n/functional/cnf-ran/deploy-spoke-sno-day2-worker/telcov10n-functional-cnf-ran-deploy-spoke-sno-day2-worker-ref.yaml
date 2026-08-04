@@ -1,0 +1,57 @@
+ref:
+  as: telcov10n-functional-cnf-ran-deploy-spoke-sno-day2-worker
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-deploy-spoke-sno-day2-worker-commands.sh
+  documentation: |-
+    Expand a deployed SNO spoke cluster by switching the ZTP manifests branch
+    to provision an additional worker node via ArgoCD (day 2 operation)
+  timeout: 5h
+  resources:
+    requests:
+      cpu: 100m
+  env:
+    - name: VERSION
+      default: "4.20"
+      documentation: OCP version
+    - name: CLUSTER_NAME
+      default: "kni-qe-106"
+      documentation: |-
+        Hub cluster name. Only "kni-qe-106" is supported for now, because this step
+        mounts credentials specific to that hub (kni-qe-106 nodes, masters,
+        bastion, and shared fthub-01 hypervisor).
+    - name: SPOKE_CLUSTER
+      default: ""
+      documentation: |-
+        Spoke SNO cluster name (array format, e.g. \"['kni-qe-107']\")".
+        Only one spoke cluster is currently supported.
+    - name: ZTP_GIT_BRANCH_DAY2_WORKER
+      default: "day2-worker"
+      documentation: Git branch containing the worker node definition in the SiteConfig
+  credentials:
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-all
+      mount_path: /var/group_variables/common/all
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-bastions
+      mount_path: /var/group_variables/common/bastions
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-hypervisors
+      mount_path: /var/group_variables/common/hypervisors
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-kni-qe-106-nodes
+      mount_path: /var/group_variables/kni-qe-106/nodes
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-kni-qe-106-masters
+      mount_path: /var/group_variables/kni-qe-106/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-106-bastion
+      mount_path: /var/host_variables/kni-qe-106/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-106-master0
+      mount_path: /var/host_variables/kni-qe-106/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-hypervisors-hv16
+      mount_path: /var/host_variables/fthub-01/hypervisor

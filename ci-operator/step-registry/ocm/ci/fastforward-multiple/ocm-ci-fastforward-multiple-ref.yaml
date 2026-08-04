@@ -1,0 +1,44 @@
+ref:
+  as: ocm-ci-fastforward-multiple
+  from: src
+  commands: ocm-ci-fastforward-multiple-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - namespace: test-credentials
+      name: acm-cicd-github
+      mount_path: /etc/acm-cicd-github
+  env:
+    - name: GITHUB_USER
+      default: "acm-cicd-prow-bot"
+      documentation: |-
+        The GitHub user name.
+    - name: GITHUB_TOKEN_FILE
+      default: "/etc/acm-cicd-github/token"
+      documentation: |-
+        The file that stores the GitHub token. Should match credentials stanza
+        mount path.
+    - name: REPO_MAP_PATH
+      default: ""
+      documentation: |-
+        Required. Path to a YAML file containing a component mapping for fast-forwarding as:
+        .components[{
+          bundle: <product>-operator-bundle,
+          repository: https://github.com/<owner>/<repo>
+        }]
+    - name: DESTINATION_VERSIONS
+      default: ""
+      documentation: |-
+        Required. Space-separated version(s) to fast-forward TO in X.Y format (e.g., "5.0 5.1").
+    - name: LAST_RELEASE_VERSION
+      default: ""
+      documentation: |-
+        Optional. Version in X.Y format (e.g., "2.17") to use as template source when
+        creating Tekton files on a branch with no existing templates. Falls back to
+        fetching template files from the previous release branch (e.g., backplane-2.17
+        or release-2.17).
+  documentation: |-
+    This step fast forwards a source branch to a destination branch in a GitHub
+    repo.

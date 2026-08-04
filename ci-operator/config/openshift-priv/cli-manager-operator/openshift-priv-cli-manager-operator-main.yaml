@@ -1,3 +1,8 @@
+base_images:
+  cli-manager:
+    name: "5.0"
+    namespace: ocp-priv
+    tag: cli-manager
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cli-manager-operator
@@ -7,16 +12,18 @@ images:
     to: cli-manager-operator
 promotion:
   to:
-  - name: 4.22-priv
-    namespace: ocp-private
+  - name: "5.0"
+    namespace: ocp-priv
+prowgen:
+  private: true
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.22-priv
-  namespace: ocp-private
+  name: "5.0"
+  namespace: ocp-priv
 tests:
 - as: verify
   commands: make verify-gofmt
@@ -44,10 +51,36 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: cli-manager-operator
+      - env: OPERAND_IMAGE
+        name: pipeline:cli-manager
       from: src
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-operator-serial-ote
+  optional: true
+  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: cli-manager-operator
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/cli-manager-operator-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: cli-manager-operator
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/cli-manager-operator/operator/serial
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: cli-manager-install-krew
+    - ref: openshift-e2e-test
     workflow: ipi-aws
 - as: security
   optional: true

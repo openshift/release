@@ -55,16 +55,64 @@ function show_results() {
     "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-report.txt
 }
 
+function extract_container_logs() {
+  show_reader "Extracting container logs from OPCT archive"
+  local container_logs_dir="${ARTIFACT_DIR}/container-logs"
+  mkdir -p "${container_logs_dir}"
+
+  if [[ -z "${RESULT_FILE:-}" ]]; then
+    show_msg "# WARNING: RESULT_FILE is not set, skipping container log extraction."
+    return 0
+  fi
+
+  # Extract podlogs from the OPCT archive to a temporary directory.
+  local tmp_podlogs="/tmp/opct-podlogs"
+  mkdir -p "${tmp_podlogs}"
+  tar xvf "${RESULT_FILE}" -C "${tmp_podlogs}" --wildcards '*podlogs/*/logs/tests.txt' 2>/dev/null || true
+
+  # Copy each tests.txt log file, using the pod directory name as a prefix
+  # to distinguish between multiple conformance pods.
+  find "${tmp_podlogs}" -name 'tests.txt' -path '*podlogs/*/logs/*' | while read -r logfile; do
+    local pod_dir
+    pod_dir=$(basename "$(dirname "$(dirname "${logfile}")")")
+    cp -v "${logfile}" "${container_logs_dir}/${pod_dir}-tests.txt"
+  done
+
+  local log_count
+  log_count=$(find "${container_logs_dir}" -name '*-tests.txt' 2>/dev/null | wc -l)
+  show_msg "Extracted ${log_count} container log(s) to ${container_logs_dir}"
+
+  # Redact potentially sensitive data from extracted logs, following the
+  # same patterns used by other CI steps (e.g. baremetalds-devscripts-gather).
+  if [[ ${log_count} -gt 0 ]]; then
+    find "${container_logs_dir}" -name '*-tests.txt' -exec sed -i '
+      /auths/ s/.*/*** PULL_SECRET ***/;
+      s/password: .*/password: REDACTED/;
+      s/password=.*/password=REDACTED/;
+      s/token: .*/token: REDACTED/;
+      s/token=.*/token=REDACTED/;
+      s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+      s/Bearer .*/Bearer REDACTED/;
+      s/UserData:.*,/UserData: REDACTED,/;
+      ' {} +
+    show_msg "Redacted sensitive patterns from extracted logs"
+  fi
+
+  rm -rf "${tmp_podlogs}"
+}
+
 collect_inspect || true
 retrieve_artifact || true
 show_results || true
+extract_container_logs || true
 
-# Check if job is running in OPCT repo to skip upload results to
+# Check if job is running in OPCT workflow in allowed job ref to skip upload results to
 # OPCT storage.
 show_reader "Consolidating artifacts as Baseline Results"
 INVALID_OPCT_REPO="true"
 VALID_REPOS=("redhat-openshift-ecosystem-provider-certification-tool")
 VALID_REPOS+=("redhat-openshift-ecosystem-opct")
+VALID_REPOS+=("periodic-ci-openshift-release-main")
 show_msg "Checking if JOB name is allowed to upload results: ${JOB_NAME}"
 for VR in "${VALID_REPOS[@]}"; do
   if [[ $JOB_NAME == *"$VR"* ]]; then
@@ -72,7 +120,7 @@ for VR in "${VALID_REPOS[@]}"; do
   fi
 done
 
-# Ignore persisting data in non OPCT/repo jobs
+# Ignore persisting data from unexpected jobs
 if [[ "${INVALID_OPCT_REPO}" == "true" ]]; then
   show_msg "# WARNING: Job $JOB_NAME is not allowed to persist baseline results, ignoring it."
   exit 0

@@ -19,7 +19,7 @@ NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 export POWERVS_ZONE="${LEASED_RESOURCE}"
 POWERVS_REGION=$(
         case "$POWERVS_ZONE" in
-            ("dal10" | "dal12") echo "dal" ;;
+            ("dal10" | "dal12" | "dal14") echo "dal" ;;
             ("us-south") echo "us-south" ;;
             ("wdc06" | "wdc07") echo "wdc" ;;
             ("us-east") echo "us-east" ;;
@@ -37,7 +37,7 @@ POWERVS_REGION=$(
 export POWERVS_REGION
 VPC_REGION=$(
         case "$POWERVS_ZONE" in
-            ("dal10" | "dal12" | "us-south") echo "us-south" ;;
+            ("dal10" | "dal12" | "dal14" | "us-south") echo "us-south" ;;
             ("wdc06" | "wdc07" | "us-east") echo "us-east" ;;
             ("sao01" | "sao04") echo "br-sao" ;;
             ("tor01") echo "ca-tor" ;;
@@ -304,8 +304,8 @@ bastion   = { memory = "16", processors = "1", "count" = 1 }
 bootstrap = { memory = "16", processors = "1", "count" = 1 }
 master    = { memory = "16", processors = "1", "count" = 3 }
 worker    = { memory = "16", processors = "1", "count" = 2 }
-openshift_install_tarball = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-install-linux.tar.gz"
-openshift_client_tarball  = "https://mirror.openshift.com/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-client-linux.tar.gz"
+openshift_install_tarball = "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-install-linux.tar.gz"
+openshift_client_tarball  = "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-client-linux.tar.gz"
 release_image_override    = "${TARGET_VERSION}"
 
 use_zone_info_for_names    = true

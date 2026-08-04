@@ -5,11 +5,12 @@ presubmits:
     branches:
     - ^oadp-dev$
     - ^oadp-dev-
-    cluster: build11
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.ubi
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -61,11 +62,12 @@ presubmits:
     branches:
     - ^oadp-dev$
     - ^oadp-dev-
-    cluster: build04
+    cluster: build13
     context: ci/prow/unit-test
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.ubi
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -79,7 +81,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
         - --target=unit-test
         command:
         - ci-operator
@@ -101,9 +102,6 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -124,9 +122,6 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

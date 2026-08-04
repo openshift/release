@@ -20,7 +20,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.21
+    tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
   - build_args:
@@ -28,7 +28,7 @@ images:
       value: amd64
     - name: ldflags
     dockerfile_literal: |-
-      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.21 as toolchain
+      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.25-openshift-4.22 as toolchain
 
       # Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
       ARG goproxy=https://proxy.golang.org
@@ -92,8 +92,17 @@ tests:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
-      ODF_OPERATOR_CHANNEL: stable-4.19
+      E2E_TEST_REGEX: ^TestCreateCluster$|TestAutoscaling
+      ETCD_STORAGE_CLASS: gp3-csi
+      KUBEVIRT_CSI_INFRA: gp3-csi
+    pre:
+    - chain: ipi-aws-ovn-pre
+    - chain: ipi-install
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-install
+    - chain: hypershift-kubevirt-custom-capk
     workflow: hypershift-kubevirt-e2e-aws-capk
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

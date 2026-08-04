@@ -101,6 +101,10 @@ if [[ -n "${HYPERSHIFT_NETWORK_TYPE}" ]]; then
   EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE} "
 fi
 
+if [[ "${HYPERSHIFT_NP_AUTOREPAIR}" == "true" ]]; then
+  EXTRA_ARGS+=" --auto-repair"
+fi
+
 if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]; then
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
 fi

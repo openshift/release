@@ -66,7 +66,7 @@ skopeo copy "docker://${MCE_INDEX_IMAGE}" "oci:///home/mce-local-catalog" --remo
 
 echo "4: get oc-mirror from stable clients"
 if [[ ! -f /home/oc-mirror ]]; then
-    MIRROR2URL="https://mirror2.openshift.com/pub/openshift-v4"
+    MIRROR2URL="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4"
     # TODO: as for https://issues.redhat.com/browse/OCPBUGS-30859
     # the oc-mirror lost rhel8 compatibility with OCP 4.15.3 release
     # choose the appropriate rhel8/rhel9 binary at runtime once available.
@@ -144,9 +144,10 @@ END
 pushd /home
 # cleanup leftovers from previous executions
 rm -rf oc-mirror-workspace
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+for i in 1 2 3; do
+    echo "oc-mirror attempt ${i}/3"
+    /home/oc-mirror --v1 --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing --dest-skip-tls --source-use-http --source-skip-tls || true
+done
 popd
 
 echo "6. Create imageconentsourcepolicy and catalogsource"

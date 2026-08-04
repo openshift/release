@@ -54,7 +54,7 @@ x_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f1 -d. )
 y_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f2 -d. )
 ver="${x_ver}.${y_ver}"
 target_channel="${UPGRADE_CHANNEL}-${ver}"
-if ! oc adm upgrade channel ${target_channel}; then
+if ! oc adm upgrade channel ${target_channel} --allow-explicit-channel; then
     echo "Fail to change channel to ${target_channel}!"
     exit 1
 fi

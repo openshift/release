@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Apply Gangway overrides if set
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_ODF_OPERATOR_CHANNEL:-}" ]]; then
+    ODF_OPERATOR_CHANNEL="$MULTISTAGE_PARAM_OVERRIDE_ODF_OPERATOR_CHANNEL"
+fi
+
 #Deploy ODF Operator to OCP namespace 'openshift-storage'
 OO_INSTALL_NAMESPACE=openshift-storage
 

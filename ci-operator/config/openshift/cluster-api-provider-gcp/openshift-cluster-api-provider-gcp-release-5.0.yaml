@@ -21,7 +21,8 @@ images:
     to: gcp-cluster-api-controllers
 promotion:
   to:
-  - name: "5.0"
+  - disabled: true
+    name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -36,7 +37,7 @@ releases:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -46,22 +47,25 @@ tests:
   commands: openshift/unit-tests.sh
   container:
     from: src
-- as: e2e-gcp
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-ovn-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-ovn-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-capi-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -72,10 +76,11 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-serial
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-serial
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-serial
 - as: regression-clusterinfra-gcp-ipi-techpreview-capi
   optional: true
@@ -92,7 +97,7 @@ tests:
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: verify-commits
   commands: |
-    commitchecker --start ${PULL_BASE_SHA:-master}
+    commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
   optional: true

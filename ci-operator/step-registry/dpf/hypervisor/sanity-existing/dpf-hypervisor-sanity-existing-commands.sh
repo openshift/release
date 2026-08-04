@@ -1,8 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
+
 # Configuration
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
+
+CLUSTER_API_IP=$(cat "${CLUSTER_PROFILE_DIR}/cluster-api-ip")
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
@@ -15,9 +19,6 @@ chmod 600 /tmp/id_rsa
 # Define SSH command with explicit options (don't rely on ~/.ssh/config)
 SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
-### DEBUG: add a long timeout to troubleshoot from pod
-## echo "Sleeping for 999999999 seconds ...."
-## sleep 999999999
 
 # Test SSH connection
 echo "Testing SSH connection to ${REMOTE_HOST}..."
@@ -41,15 +42,87 @@ echo "SSH setup completed successfully for ${REMOTE_HOST}"
 echo "Remote host: ${REMOTE_HOST}"
 
 datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
+SANITY_TESTS_RESULT=""
+REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
-# Run dpf make target checks test
-REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
+# Extract the kubeconfig from the last DPF openshift-dpf install dir on hypervisor
+echo "=== SCP the kubeconfig from the last DPF openshift-dpf install dir on hypervisor ==="
+
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION} /tmp
+
+ls -ltr /tmp
+
+if [ -f /tmp/last-openshift-dpf-dir.sh ] ; then
+  cat /tmp/last-openshift-dpf-dir.sh
+  set -a
+  source /tmp/last-openshift-dpf-dir.sh
+  echo "last DPF openshift-dpf dir is: '${LAST_OPENSHIFT_DPF}'"
+else
+  echo "Failed to find scp-ed file '/tmp/last-openshift-dpf-dir.sh'"
+  exit 1
+fi
+
+# scp DPF managment cluster kubeconfig from last dpf install dir
+echo "SCP DPF managment cluster kubeconfig from last dpf install dir to /tmp locally"
+
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME} /tmp
+
+ls -ltr /tmp
+cp /tmp/kubeconfig.${CLUSTER_NAME} /tmp/kubeconfig.${CLUSTER_NAME}_ORIG
+
+echo " Substitute the hypervisor domain name 'api.${CLUSTER_NAME}.nvidia.eng.rdu2.dc.redhat.com' for cluster api ip address '${CLUSTER_API_IP}'"
+
+sed -i "s|server: https://api.${CLUSTER_NAME}.nvidia.eng.rdu2.dc.redhat.com:6443|server: https://${CLUSTER_API_IP}:6443|" /tmp/kubeconfig.${CLUSTER_NAME}
+
+cat /tmp/kubeconfig.${CLUSTER_NAME} | grep 6443
+
+export KUBECONFIG=/tmp/kubeconfig.${CLUSTER_NAME}
+
+
+
+# Containerfile is updated in openshift-dpf to dnf install oc client, and the openshift-dpf
+# latest main clone should be mounted in /root/dpf-ci
+echo "=== Checking if the openshift-dpf latest PR clone is mounted in /root/dpf-ci dir on this running pod"
+ls -ltr /root/dpf-ci
+
+which oc
+echo "=== Running oc commands on the DPF cluster from extracted kubeconfig"
+
+oc --insecure-skip-tls-verify=true get co
+oc --insecure-skip-tls-verify=true get nodes -o wide
+oc --insecure-skip-tls-verify=true get dpu -A
+oc --insecure-skip-tls-verify=true get dpuservice -A
+oc --insecure-skip-tls-verify=true get application -A
 
 echo "=== DPF Make Target checks on Existing Cluster ==="
 echo "Using openshift-dpf dir from last cluster-deploy: '${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}'"
 
-##if ssh ${SSH_OPTS} root@${REMOTE_HOST} "
+# update the .env file to shorten the VERIFY_MAX_RETRIES and VERIFY_SLEEP_SECONDS var values
+echo "Updating VERIFY_DEPLOYMENT, VERIFY_MAX_RETRIES and VERIFY_SLEEP_SECONDS variable values to true, 4 and 3 respectively in .env file"
+# Using delimiter '|' since we have '/' in the patterns
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -e;\
+    source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
+    echo \${LAST_OPENSHIFT_DPF}; \
+    cd \${LAST_OPENSHIFT_DPF}; \
+    pwd ; \
+    set -e; \
+    test -f .env ; \
+    cat .env | grep VERIFY ; \
+    cp .env .env_orig ; \
+    sed -i -E 's|^VERIFY_DEPLOYMENT=.*$|VERIFY_DEPLOYMENT=true|' .env ; \
+    sed -i -E 's|^VERIFY_MAX_RETRIES=.*$|VERIFY_MAX_RETRIES=4|' .env ; \
+    sed -i -E 's|^VERIFY_SLEEP_SECONDS=.*$|VERIFY_SLEEP_SECONDS=3|' .env ; \
+    grep -qx 'VERIFY_DEPLOYMENT=true' .env ; \
+    grep -qx 'VERIFY_MAX_RETRIES=4' .env ; \
+    grep -qx 'VERIFY_SLEEP_SECONDS=3' .env ; \
+    cat .env | grep VERIFY "; then
+  echo "VERIFY_DEPLOYMENT, VERIFY_MAX_RETRIES and VERIFY_SLEEP_SECONDS variables updated successfully in .env file"
+else
+  echo "ERROR: Failed to update VERIFY_DEPLOYMENT, VERIFY_MAX_RETRIES and VERIFY_SLEEP_SECONDS variables in .env file"
+  exit 1
+fi
 
+# Run dpf make target checks test
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -a; \
     pwd; \
     ls -ltr; \
@@ -59,29 +132,34 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -a; \
     env; \
     cd \${LAST_OPENSHIFT_DPF}; \
     pwd; \
-    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.doca8; \
+    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME}; \
+    oc get co; \
+    oc get nodes; \
     oc get dpu -A; \
+    oc get application -A; \
     echo \${KUBECONFIG}; \
     ls -ltr ; \
-    export VERIFY_DEPLOYMENT=true; \
+    cat .env | grep VERIFY ; \
+    set -e; \
     make verify-workers; \
     make verify-dpu-nodes; \
     make verify-deployment; \
-    make verify-dpudeployment"; then
+    make verify-dpudeployment; \
+    echo \$? > verification-result"; then
 
-  echo "DPF spot check tests Passed"; 
+  echo "DPF spot check tests Passed";
 
-else 
-  echo "DPF spot checks tests Failed"; 
+else
+  echo "DPF spot checks tests Failed";
   exit 1
 fi
-
 
 # Run dpf-sanity-checks sanity test
 echo "=== DPF Sanity Test on last Existing Cluster ==="
 echo "log file on hypervisor: log-dpf-sanity-checks-${datetime_string}"
 
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
+  ls -ltr; \
   env; \
   source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
   echo \${LAST_OPENSHIFT_DPF}; \
@@ -89,47 +167,48 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
   cd \${LAST_OPENSHIFT_DPF}; \
   pwd; \
   cat .env; \
-  make run-dpf-sanity 2>&1 | tee log-dpf-sanity-checks-${datetime_string}"; then 
-  
-  echo "Sanity Test Passed"; 
-  
-else 
-  echo "Sanity Test Failed";
+  cat verification-result; \
+  make run-dpf-sanity 2>&1 | tee log-dpf-sanity-checks-${datetime_string}"; then
+
+  # Note the above statement will return true if it get executed and even if it sanity fails
+  # Need to try a different approach to check pass/fail for sanity test
+
+  echo "Sanity Test Passed on hypervisor";
+  SANITY_TESTS_RESULT="PASS";
+else
+  echo "Sanity Test Failed on hypervisor";
 
 fi
 
-## echo "====== DPF Sanity Test Log file:"
-ssh ${SSH_OPTS} root@${REMOTE_HOST} "source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
+# if this does not work, try to scp the log file to the pod and store in the $SHARED_DIR/logs or /tmp
+echo "====== Retrieving DPF Sanity Test Log file:"
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
   echo \${LAST_OPENSHIFT_DPF}; \
   env; \
   cd \${LAST_OPENSHIFT_DPF}; \
-  cat log-dpf-sanity-checks-${datetime_string}"
+  cat log-dpf-sanity-checks-${datetime_string}"; then
 
-echo "=== DPF Kubernetes Traffic Flow Tests on Existing Cluster ==="
-# Run kubernetes traffic flow test
-# Need to discover worker node names after being renamed
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
-  env; \
-  source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
-  echo \${LAST_OPENSHIFT_DPF}; \
-  env; \
-  cd \${LAST_OPENSHIFT_DPF}; \
-  cat .env; \
-  export TFT_SERVER_NODE=worker-303ea712f378 ; \
-  export TFT_CLIENT_NODE=worker-303ea712f378; \
-  make run-traffic-flow-tests 2>&1 | tee log-traffic-flow-tests-${datetime_string}"; then
+  echo "Successfully output Sanity Test log file";
 
-  echo "Kubernetes Network Traffic Flow Iperf Tests Passed"; 
-
-else 
-  echo "Kubernetes Network Traffic Flow Iperf Tests Failed";
+else
+  echo "Failed to output Sanity Test log file";
 
 fi
 
-echo "====== DPF Kubernetes Traffic Flow Tests Log file:"
-ssh ${SSH_OPTS} root@${REMOTE_HOST} "source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
-  echo \${LAST_OPENSHIFT_DPF}; \
-  env; \
-  cd \${LAST_OPENSHIFT_DPF}; \
-  cat log-traffic-flow-tests-${datetime_string}"
-  
+# To Do: parse sanity test file and return pass/fail
+
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/log-dpf-sanity-checks-${datetime_string} /tmp
+
+if [ -f "/tmp/log-dpf-sanity-checks-${datetime_string}" ] ; then
+  cat /tmp/log-dpf-sanity-checks-${datetime_string}
+  # add parsing logic here, look for error messages, etc.
+else
+  echo "Failed to find scp-ed file /tmp/tmp/log-dpf-sanity-checks-${datetime_string}"
+
+fi
+
+if [ "${SANITY_TESTS_RESULT}" == "PASS" ]; then
+  exit 0
+fi
+
+exit 1

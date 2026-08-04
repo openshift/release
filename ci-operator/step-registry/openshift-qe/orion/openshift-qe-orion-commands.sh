@@ -5,17 +5,38 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
+MAX_RETRIES=5
+
 python --version
 pushd /tmp
+
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
+    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 else
     LATEST_TAG=$TAG
 fi
-git clone --branch $LATEST_TAG $ORION_REPO --depth 1
+
+for attempt in $(seq 1 "$MAX_RETRIES"); do
+  rm -rf orion
+  if git clone -q --branch "$LATEST_TAG" "$ORION_REPO" --depth 1; then
+    break
+  fi
+  if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
+    echo "git clone failed after $MAX_RETRIES attempts, exiting..." >&2
+    exit 1
+  fi
+  echo "git clone failed (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
+  sleep 10
+done
+
+pushd orion
+pip install -q --retries "$MAX_RETRIES" -r requirements.txt
+pip install -q --retries "$MAX_RETRIES" .
+popd
+
 pushd orion
 
 # Invoked from orion repo by the openshift-ci bot
@@ -25,13 +46,19 @@ if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
   git switch ${PULL_NUMBER}
 fi
 
-pip install -r requirements.txt
-
 case "$ES_TYPE" in
   qe)
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_TYPE}" == "periodic" ]] && [[ "${JOB_NAME}" == *"payload"* ]] && [[ -z "${PULL_NUMBER:-}" ]]; then
+        JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
+        JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
+        JIRA_URL=https://redhat.atlassian.net/
+        export JIRA_TOKEN JIRA_EMAIL JIRA_URL
+        # We use orion's default JIRA project and components
+        ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
+    fi
     ;;
   quay-qe)
     ES_PASSWORD=$(<"/secret/quay-qe/password")
@@ -57,56 +84,46 @@ esac
 
 export ES_SERVER
 
-pip install .
-
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    echo "Loading proxy settings from ${SHARED_DIR}/proxy-conf.sh"
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
-if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
-    # Get current worker count (excluding infra and workload nodes)
-    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
-    echo "Current worker count: $current_worker_count"
+EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
 
-    # Determine scale prefix based on worker count
-    if [[ $current_worker_count -ge 200 ]]; then
-        scale_prefix="large-scale"
-    elif [[ $current_worker_count -ge 100 ]]; then
-        scale_prefix="med-scale"
-    elif [[ $current_worker_count -ge 20 ]]; then
-        scale_prefix="small-scale"
-    else
-        scale_prefix="trt-external-payload"
-    fi
+if ! curl -fsSL --fail --retry 8 --retry-all-errors https://github.com/cloud-bulldozer/go-commons/releases/latest/download/ocp-metadata-linux-amd64 -o ocp-metadata; then
+    echo "Error: Failed to download ocp-metadata binary"
+    exit 1
+fi
+chmod +x ocp-metadata
+CLUSTER_METADATA=$(./ocp-metadata)
 
-    # Select orion config based on UDN layer mode
-    if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
-    else
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
-    fi
-    echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
+# HCP clusters have no visible master nodes, so ocp-metadata omits masterNodesType
+# and masterNodesCount. Inject defaults so Orion Jinja templates don't fail.
+if ! echo "${CLUSTER_METADATA}" | python -c "import sys,json; d=json.load(sys.stdin); d['masterNodesType']" 2>/dev/null; then
+    CLUSTER_METADATA=$(echo "${CLUSTER_METADATA}" | python -c "
+import sys, json
+d = json.load(sys.stdin)
+d.setdefault('masterNodesType', 'N/A')
+d.setdefault('masterNodesCount', 0)
+json.dump(d, sys.stdout, separators=(',', ':'))
+")
 fi
 
-VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
-export VERSION
+EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
+
+# Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
+if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
+    ORION_CONFIG="examples/${ORION_WORKLOAD_TYPE}.yaml"
+fi
+
+export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')}"
 
 # Unset proxy so we can pip install, reach sippy, etc.
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
 fi
 
-# Print Orion version
-orion_version=$(orion --version 2>&1)
-orion_version_exit=$?
-if [ "$orion_version_exit" -ne 0 ]; then
-  echo "orion version prior to v0.1.7"
-else
-  echo "Orion version: $orion_version"
-fi
-
-EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
     EXTRA_FLAGS+=" --output-format junit --save-output-path=junit.xml"
@@ -119,15 +136,13 @@ else
     exit 1
 fi
 
-if [[ -n "$ORION_CONFIG" ]]; then
-    if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
-        fileBasename="$(basename ${ORION_CONFIG})"
-        if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
-            ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
-        else
-            echo "Error: Failed to download $ORION_CONFIG" >&2
-            exit 1
-        fi
+if [[ -n "${ORION_CONFIG}" ]] && [[ "${ORION_CONFIG}" =~ ^https?:// ]]; then
+    fileBasename="$(basename ${ORION_CONFIG})"
+    if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
+        ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
+    else
+        echo "Error: Failed to download $ORION_CONFIG" >&2
+        exit 1
     fi
 fi
 
@@ -193,12 +208,11 @@ fi
 
 set +e
 set -o pipefail
-FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
 export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="${job_type}"
 if [[ -n $pull_number ]]; then
     export pull_number=${pull_number}
 fi
-orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/${FILENAME}.txt
+orion --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
 orion_exit_status=$?
 set -e
 
@@ -266,8 +280,8 @@ process_change_point() {
 
     echo "Owners loaded as JSON array: $OWNERS_JSON"
 
-    for f in junit*.json; do
-        [ -e "$f" ] || { echo "No junit*.json files found"; return; }
+    for f in output*.json; do
+        [ -e "$f" ] || { echo "No output*.json files found"; return; }
 
         echo "Processing file: $f"
 
@@ -299,9 +313,15 @@ process_change_point
 
 cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 
+
 if [ $orion_exit_status -eq 3 ]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."
   echo "Exiting zero since there were no regressions found."
+  exit 0
+fi
+
+if [ "${RUN_ORION}" == "deferred" ]; then
+  echo "RUN_ORION=deferred. Exit status $orion_exit_status deferred to report step."
   exit 0
 fi
 

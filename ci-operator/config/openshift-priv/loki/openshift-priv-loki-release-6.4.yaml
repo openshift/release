@@ -1,29 +1,25 @@
 base_images:
   base:
-    name: 4.20-priv
-    namespace: ocp-private
+    name: "4.20"
+    namespace: ocp-priv
     tag: base-rhel9
-  go_builder:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.23
   loki:
     name: loki
     namespace: logging
     tag: v3.6.5
   lokistack-gateway:
-    name: mirror-5.y
+    name: lokistack-gateway
     namespace: logging
-    tag: lokistack-gateway
+    tag: main
   opa-openshift:
-    name: mirror-5.y
+    name: opa-openshift
     namespace: logging
-    tag: opa-openshift
+    tag: main
 build_root:
   image_stream_tag:
-    name: builder-priv
-    namespace: ocp-private
-    tag: rhel-9-golang-1.24-openshift-4.23
+    name: builder
+    namespace: ocp-priv
+    tag: rhel-9-golang-1.26-openshift-4.23
   use_build_cache: true
 canonical_go_repository: github.com/openshift/loki
 images:
@@ -31,10 +27,6 @@ images:
   - context_dir: operator
     dockerfile_path: Dockerfile
     from: base
-    inputs:
-      go_builder:
-        as:
-        - golang:1.24.4
     to: loki-operator
   - dockerfile_literal: |
       FROM registry.redhat.io/ubi9/go-toolset:latest
@@ -65,6 +57,8 @@ promotion:
     disabled: true
     name: "6.4"
     namespace: logging
+prowgen:
+  private: true
 releases:
   latest:
     release:
@@ -135,7 +129,7 @@ tests:
       region: us-east-1
     owner: obs-logging
     product: ocp
-    timeout: 1h0m0s
+    timeout: 1h30m0s
     version: "4.20"
   steps:
     dependencies:

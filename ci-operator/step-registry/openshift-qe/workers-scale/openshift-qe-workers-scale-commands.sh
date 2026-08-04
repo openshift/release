@@ -15,7 +15,7 @@ ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/workers-scale
@@ -48,21 +48,98 @@ else
   echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
 fi
 
-EXTRA_FLAGS="${METRIC_PROFILES} --additional-worker-nodes ${ADDITIONAL_WORKER_NODES} --enable-autoscaler=${DEPLOY_AUTOSCALER}" 
-
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-if [ "$DEPLOY_AUTOSCALER" = "false" ] && [ -f "${SHARED_DIR}/workers_scale_event_epoch.txt" ] && [ -f "${SHARED_DIR}/workers_scale_end_epoch.txt" ]; then
-  START_TIME=$(cat "${SHARED_DIR}/workers_scale_event_epoch.txt")
-  export START_TIME
-  END_TIME=$(cat "${SHARED_DIR}/workers_scale_end_epoch.txt")
-  export END_TIME
-  EXTRA_FLAGS="${METRIC_PROFILES} --scale-event-epoch ${START_TIME}" 
-  rm -f "${SHARED_DIR}/workers_scale_event_epoch.txt"
-  rm -f "${SHARED_DIR}/workers_scale_end_epoch.txt"
+run_scale() {
+  local worker_count="$1"
+  EXTRA_FLAGS="${METRIC_PROFILES} --additional-worker-nodes ${worker_count} --enable-autoscaler=${DEPLOY_AUTOSCALER}"
+
+  if [ "$DEPLOY_AUTOSCALER" = "false" ] && [ -f "${SHARED_DIR}/workers_scale_event_epoch.txt" ] && [ -f "${SHARED_DIR}/workers_scale_end_epoch.txt" ]; then
+    START_TIME=$(cat "${SHARED_DIR}/workers_scale_event_epoch.txt")
+    export START_TIME
+    END_TIME=$(cat "${SHARED_DIR}/workers_scale_end_epoch.txt")
+    export END_TIME
+    EXTRA_FLAGS="${METRIC_PROFILES} --scale-event-epoch ${START_TIME}"
+    rm -f "${SHARED_DIR}/workers_scale_event_epoch.txt"
+    rm -f "${SHARED_DIR}/workers_scale_end_epoch.txt"
+  fi
+
+  export EXTRA_FLAGS
+  ES_INDEX="workers-scale-results" ./run.sh
+}
+
+wait_for_ipsec_tunnels() {
+  set +x
+  local expected_tunnels
+  expected_tunnels=$(( $(oc get nodes --no-headers | wc -l) - 1 ))
+  echo "Expecting each ovn-ipsec-host pod to report $expected_tunnels tunnels Up"
+
+  declare -A pod_node_map
+  while IFS= read -r line; do
+    local pod node
+    pod=$(echo "$line" | awk '{print $1}')
+    node=$(echo "$line" | awk '{print $7}')
+    pod_node_map["$pod"]="$node"
+  done < <(oc get pods -n openshift-ovn-kubernetes -l app=ovn-ipsec -o wide --no-headers)
+
+  declare -A wait_counts
+  local status_file="${ARTIFACT_DIR}/ipsec-tunnel-status.txt"
+  local deadline all_up
+  all_up=false
+
+  echo "Waiting 120s for ipsec daemonset pods to initialize..."
+  sleep 120
+
+  deadline=$(( $(date +%s) + ${IPSEC_WAIT_TIMEOUT:-600} ))
+  while [[ $(date +%s) -lt $deadline ]]; do
+    all_up=true
+    : > "$status_file"
+    echo "=== IPsec Tunnel Status ($(date -u)) ===" >> "$status_file"
+
+    for pod in "${!pod_node_map[@]}"; do
+      local node
+      node="${pod_node_map[$pod]}"
+      if oc logs "$pod" -n openshift-ovn-kubernetes -c ovn-ipsec 2>/dev/null | grep -q "Connections for all(${expected_tunnels}) configured tunnels are Up"; then
+        echo "UP    | pod=$pod | node=$node" >> "$status_file"
+        unset "wait_counts[$node]" 2>/dev/null || true
+      else
+        wait_counts[$node]=$(( ${wait_counts[$node]:-0} + 1 ))
+        echo "WAIT  | pod=$pod | node=$node | attempts=${wait_counts[$node]}" >> "$status_file"
+        all_up=false
+      fi
+    done
+
+    cat "$status_file"
+
+    if $all_up; then
+      break
+    fi
+
+    echo "Waiting 30s before next check..."
+    sleep 30
+  done
+
+  if $all_up; then
+    echo "######################################################################################"
+    echo "#          All ovn-ipsec-host pods report all tunnels are Up!                        #"
+    echo "######################################################################################"
+  else
+    echo "######################################################################################"
+    echo "#   TIMEOUT: Not all ovn-ipsec-host pods reported tunnels Up within timeout          #"
+    echo "######################################################################################"
+    echo "" >> "$status_file"
+    echo "=== Final pod logs (last 10 lines each) ===" >> "$status_file"
+    for pod in "${!pod_node_map[@]}"; do
+      local node
+      node="${pod_node_map[$pod]}"
+      echo "--- $pod (node=$node) ---" >> "$status_file"
+      oc logs "$pod" -n openshift-ovn-kubernetes --tail=10 2>/dev/null >> "$status_file" || true
+    done
+  fi
+  set -x
+}
+
+run_scale "${ADDITIONAL_WORKER_NODES}"
+if [[ "${JOB_NAME}" == *ipsec* ]]; then
+  wait_for_ipsec_tunnels
 fi
-
-export EXTRA_FLAGS
-
-# Hardcoding workers-scale ES_INDEX as its only used by OCP perfscale team for now.
-ES_INDEX="workers-scale-results" ./run.sh
