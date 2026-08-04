@@ -27,12 +27,16 @@ ROX_ADMIN_PASSWORD="$(cat "${SHARED_DIR}/ROX_ADMIN_PASSWORD")"
 
 echo "[smoke] Connection details loaded from SHARED_DIR"
 
+# Allow pinning to a known-good ref for reproducibility
+STACKROX_REF="${STACKROX_REF:-main}"
+SCANNER_REF="${SCANNER_REF:-main}"
+
 # ---------------------------------------------------------------------------
 # Sparse clone of stackrox/stackrox (qa-tests-backend + proto)
 # ---------------------------------------------------------------------------
 echo "[smoke] Sparse-cloning stackrox/stackrox..."
 cd /tmp
-git clone --depth 1 --filter=blob:none --sparse \
+git clone --depth 1 --filter=blob:none --sparse --branch "${STACKROX_REF}" \
     https://github.com/stackrox/stackrox.git stackrox
 cd stackrox
 git sparse-checkout set qa-tests-backend/ proto/
@@ -41,7 +45,7 @@ git sparse-checkout set qa-tests-backend/ proto/
 # Fetch scanner protos (no Go toolchain needed)
 # ---------------------------------------------------------------------------
 echo "[smoke] Fetching scanner protos..."
-git clone --depth 1 --filter=blob:none --sparse \
+git clone --depth 1 --filter=blob:none --sparse --branch "${SCANNER_REF}" \
     https://github.com/stackrox/scanner.git /tmp/scanner
 cd /tmp/scanner
 git sparse-checkout set proto/scanner
