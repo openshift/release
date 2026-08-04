@@ -298,6 +298,9 @@ function render_osc_operands_chart() {
     "--set" "namespaceOverride=${OSC_NAMESPACE}"
   )
 
+  # openshift-tests-private expects kataconfig named "example-kataconfig"
+  helm_args+=("--set" "kataconfig.name=example-kataconfig")
+
   # Workload-specific settings
   if [[ "${WORKLOAD_TO_TEST}" == "coco" ]]; then
     helm_args+=("--set" "confidential.enabled=true")
@@ -327,8 +330,8 @@ function render_osc_operands_chart() {
       local vxlan_port proxy_timeout
       vxlan_port=$(echo "${cm_data}" | jq -r '.data.VXLAN_PORT // ""')
       proxy_timeout=$(echo "${cm_data}" | jq -r '.data.PROXY_TIMEOUT // ""')
-      [[ -n "${vxlan_port}" ]] && helm_args+=("--set" "peerpods.providersConfigs.all.VXLAN_PORT=${vxlan_port}")
-      [[ -n "${proxy_timeout}" ]] && helm_args+=("--set" "peerpods.providersConfigs.all.PROXY_TIMEOUT=${proxy_timeout}")
+      [[ -n "${vxlan_port}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.all.VXLAN_PORT=${vxlan_port}")
+      [[ -n "${proxy_timeout}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.all.PROXY_TIMEOUT=${proxy_timeout}")
 
       case "${provider}" in
         azure)
@@ -338,12 +341,11 @@ function render_osc_operands_chart() {
           azure_resource_group=$(echo "${cm_data}" | jq -r '.data.AZURE_RESOURCE_GROUP // ""')
           azure_region=$(echo "${cm_data}" | jq -r '.data.AZURE_REGION // ""')
           azure_instance_size=$(echo "${cm_data}" | jq -r '.data.AZURE_INSTANCE_SIZE // ""')
-          [[ -n "${azure_subnet_id}" ]] && helm_args+=("--set" "peerpods.providersConfigs.azure.AZURE_SUBNET_ID=${azure_subnet_id}")
-          [[ -n "${azure_nsg_id}" ]] && helm_args+=("--set" "peerpods.providersConfigs.azure.AZURE_NSG_ID=${azure_nsg_id}")
-          [[ -n "${azure_resource_group}" ]] && helm_args+=("--set" "peerpods.providersConfigs.azure.AZURE_RESOURCE_GROUP=${azure_resource_group}")
-          [[ -n "${azure_region}" ]] && helm_args+=("--set" "peerpods.providersConfigs.azure.AZURE_REGION=${azure_region}")
-          # Let chart auto-set AZURE_INSTANCE_SIZE based on confidential mode if not explicitly set
-          [[ -n "${azure_instance_size}" ]] && helm_args+=("--set" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZE=${azure_instance_size}")
+          [[ -n "${azure_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_SUBNET_ID=${azure_subnet_id}")
+          [[ -n "${azure_nsg_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_NSG_ID=${azure_nsg_id}")
+          [[ -n "${azure_resource_group}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_RESOURCE_GROUP=${azure_resource_group}")
+          [[ -n "${azure_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_REGION=${azure_region}")
+          [[ -n "${azure_instance_size}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZE=${azure_instance_size}")
           ;;
         aws)
           local aws_region aws_subnet_id aws_vpc_id aws_sg_ids podvm_instance_type
@@ -352,11 +354,11 @@ function render_osc_operands_chart() {
           aws_vpc_id=$(echo "${cm_data}" | jq -r '.data.AWS_VPC_ID // ""')
           aws_sg_ids=$(echo "${cm_data}" | jq -r '.data.AWS_SG_IDS // ""')
           podvm_instance_type=$(echo "${cm_data}" | jq -r '.data.PODVM_INSTANCE_TYPE // ""')
-          [[ -n "${aws_region}" ]] && helm_args+=("--set" "peerpods.providersConfigs.aws.AWS_REGION=${aws_region}")
-          [[ -n "${aws_subnet_id}" ]] && helm_args+=("--set" "peerpods.providersConfigs.aws.AWS_SUBNET_ID=${aws_subnet_id}")
-          [[ -n "${aws_vpc_id}" ]] && helm_args+=("--set" "peerpods.providersConfigs.aws.AWS_VPC_ID=${aws_vpc_id}")
-          [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids}")
-          [[ -n "${podvm_instance_type}" ]] && helm_args+=("--set" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPE=${podvm_instance_type}")
+          [[ -n "${aws_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_REGION=${aws_region}")
+          [[ -n "${aws_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SUBNET_ID=${aws_subnet_id}")
+          [[ -n "${aws_vpc_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_VPC_ID=${aws_vpc_id}")
+          [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids}")
+          [[ -n "${podvm_instance_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPE=${podvm_instance_type}")
           ;;
         gcp)
           local gcp_project_id gcp_zone gcp_network gcp_machine_type
@@ -364,10 +366,10 @@ function render_osc_operands_chart() {
           gcp_zone=$(echo "${cm_data}" | jq -r '.data.GCP_ZONE // ""')
           gcp_network=$(echo "${cm_data}" | jq -r '.data.GCP_NETWORK // ""')
           gcp_machine_type=$(echo "${cm_data}" | jq -r '.data.GCP_MACHINE_TYPE // ""')
-          [[ -n "${gcp_project_id}" ]] && helm_args+=("--set" "peerpods.providersConfigs.gcp.GCP_PROJECT_ID=${gcp_project_id}")
-          [[ -n "${gcp_zone}" ]] && helm_args+=("--set" "peerpods.providersConfigs.gcp.GCP_ZONE=${gcp_zone}")
-          [[ -n "${gcp_network}" ]] && helm_args+=("--set" "peerpods.providersConfigs.gcp.GCP_NETWORK=${gcp_network}")
-          [[ -n "${gcp_machine_type}" ]] && helm_args+=("--set" "peerpods.providersConfigs.gcp.GCP_MACHINE_TYPE=${gcp_machine_type}")
+          [[ -n "${gcp_project_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_PROJECT_ID=${gcp_project_id}")
+          [[ -n "${gcp_zone}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_ZONE=${gcp_zone}")
+          [[ -n "${gcp_network}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_NETWORK=${gcp_network}")
+          [[ -n "${gcp_machine_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_MACHINE_TYPE=${gcp_machine_type}")
           ;;
       esac
     else
