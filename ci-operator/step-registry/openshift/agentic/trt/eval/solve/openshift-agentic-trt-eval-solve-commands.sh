@@ -37,6 +37,10 @@ echo "Installing Claude Code..."
 curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
 export PATH="${HOME}/.local/bin:${PATH}"
 
+echo "Installing plugins..."
+claude plugin install jira@ai-helpers || true
+claude plugin install openshift-developer@ai-helpers || true
+
 # --- Artifact collection ---
 REAL_SHARED_DIR="${SHARED_DIR}"
 copy_artifacts() {

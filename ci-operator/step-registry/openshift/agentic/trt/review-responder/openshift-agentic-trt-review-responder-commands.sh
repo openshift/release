@@ -45,6 +45,10 @@ echo "Installing Claude Code..."
 curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
 export PATH="${HOME}/.local/bin:${PATH}"
 
+echo "Installing plugins..."
+claude plugin install jira@ai-helpers || true
+claude plugin install openshift-developer@ai-helpers || true
+
 mkdir -p /workspace/artifacts
 
 copy_artifacts() {
@@ -110,12 +114,17 @@ while true; do
     sleep 300
 
     # Lightweight check: count comments and CI failures without full processing
-    inline_count=$(gh api "repos/${UPSTREAM_REPO}/pulls/${PR_NUM}/comments" --paginate --jq 'length' 2>/dev/null || echo "0")
-    review_count=$(gh api "repos/${UPSTREAM_REPO}/pulls/${PR_NUM}/reviews" --paginate --jq '[.[] | select(.state != "APPROVED" and .state != "PENDING")] | length' 2>/dev/null || echo "0")
-    issue_comment_count=$(gh api "repos/${UPSTREAM_REPO}/issues/${PR_NUM}/comments" --jq 'length' 2>/dev/null || echo "0")
+    # --paginate --jq evaluates per page, so sum the per-page counts
+    inline_count=$(gh api "repos/${UPSTREAM_REPO}/pulls/${PR_NUM}/comments" --paginate --jq 'length' 2>/dev/null | awk '{s+=$1}END{print s+0}') \
+        || { echo "Warning: failed to fetch inline comments"; inline_count=0; }
+    review_count=$(gh api "repos/${UPSTREAM_REPO}/pulls/${PR_NUM}/reviews" --paginate --jq '[.[] | select(.state != "APPROVED" and .state != "PENDING")] | length' 2>/dev/null | awk '{s+=$1}END{print s+0}') \
+        || { echo "Warning: failed to fetch reviews"; review_count=0; }
+    issue_comment_count=$(gh api "repos/${UPSTREAM_REPO}/issues/${PR_NUM}/comments" --paginate --jq 'length' 2>/dev/null | awk '{s+=$1}END{print s+0}') \
+        || { echo "Warning: failed to fetch issue comments"; issue_comment_count=0; }
     comment_total=$(( inline_count + review_count + issue_comment_count ))
 
-    checks_json=$(gh pr checks "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json name,state 2>/dev/null || echo "[]")
+    checks_json=$(gh pr checks "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json name,state 2>/dev/null) \
+        || { echo "Warning: failed to fetch PR checks"; checks_json="[]"; }
     failing_checks=$(echo "${checks_json}" | jq '[.[] | select(.state == "FAIL" or .state == "FAILURE" or .state == "fail" or .state == "failure")]')
     failing_count=$(echo "${failing_checks}" | jq 'length')
     current_failing_names=$(echo "${failing_checks}" | jq -r '.[].name' 2>/dev/null | sort | tr '\n' ' ' | xargs)
