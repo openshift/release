@@ -68,8 +68,8 @@ export CI="true"
 echo "[smoke] Running testSMOKE..."
 cd /tmp/stackrox/qa-tests-backend
 
+TEST_EXIT=0
 ./gradlew testSMOKE -i --no-daemon || TEST_EXIT=$?
-TEST_EXIT="${TEST_EXIT:-0}"
 
 # ---------------------------------------------------------------------------
 # Copy JUnit XML results to ARTIFACT_DIR
