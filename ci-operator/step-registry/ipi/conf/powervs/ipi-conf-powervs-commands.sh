@@ -152,8 +152,8 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-PLATFORM_ARGS_COMPUTE=( )
-PLATFORM_ARGS_WORKER=( )
+PLATFORM_ARGS_COMPUTE=( "sysType" "${POWERVS_SYS_TYPE}" )
+PLATFORM_ARGS_WORKER=( "sysType" "${POWERVS_SYS_TYPE}" )
 POWERVS_ZONE=${LEASED_RESOURCE}
 PERSISTENT_TG=""
 PERSISTENT_VPC=""
@@ -187,9 +187,6 @@ case "${LEASED_RESOURCE}" in
       POWERVS_REGION=eu-de
       POWERVS_ZONE=eu-de-1
       VPCREGION=eu-de
-      # Override sysType for this leased resource
-      PLATFORM_ARGS_COMPUTE+=( "sysType" "s1022" )
-      PLATFORM_ARGS_WORKER+=( "sysType" "s1022" )
    ;;
    "fran-powervs-8-quota-slice-1")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-1")
@@ -374,12 +371,6 @@ case "${LEASED_RESOURCE}" in
       VPCREGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/VPCREGION")
    ;;
 esac
-
-# For OCP 5.0+, override sysType to s1022 for all leased resources
-if printf '%s\n' "${BRANCH}" | awk -F. '{ if ($1 >= 5) { exit 0 } else { exit 1 } }'; then
-  PLATFORM_ARGS_COMPUTE+=( "sysType" "s1022" )
-  PLATFORM_ARGS_WORKER+=( "sysType" "s1022" )
-fi
 
 echo "POWERVS_SERVICE_INSTANCE_ID=${POWERVS_SERVICE_INSTANCE_ID}"
 echo "POWERVS_REGION=${POWERVS_REGION}"
