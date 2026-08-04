@@ -22,6 +22,9 @@ export LOGIN
 if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
   OCPINV=$(cat ${CLUSTER_PROFILE_DIR}/ocp_inventory_path)
   export OCPINV
+else
+  OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+  export OCPINV
 fi
 
 # Pre-reqs
@@ -38,7 +41,7 @@ if [[ "$OCP_INVENTORY_OVERRIDE" == "true" ]]; then
     HOSTS=$(jq -r ".nodes[1:2][].name" ${OCPINV})
   fi
 else
-  OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+  OCPINV=${OCPINV}
   USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
   PWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
   if [[ "$TYPE" == "mno" ]]; then
@@ -99,7 +102,7 @@ if [[ "$PRE_UEFI" == "true" ]]; then
   done
 fi
 EOF
-envsubst '${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${OCP_INVENTORY_OVERRIDE},${OCPINV},${PRE_PXE_LOADER},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_PXE_LOADER},${PRE_UEFI},${QUADS_INSTANCE},${TYPE},${OCP_INVENTORY_OVERRIDE},${OCPINV}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Generate the foreman_config.yml file
 if [[ "$PRE_PXE_LOADER" == "true" ]]; then
