@@ -2,14 +2,9 @@ workflow:
   as: openshift-e2e-libvirt-vpn-heterogeneous
   steps:
     allow_best_effort_post_steps: true
-    env:
-      # Same-arch compute during initial VPN install; day-2 workers come from
-      # upi-install-libvirt-heterogeneous. Jobs must set ARCH + ADDITIONAL_WORKER_ARCHITECTURE:
-      #   ZX (multi-z-xz): ARCH=s390x, ADDITIONAL_WORKER_ARCHITECTURE=x86_64
-      #   XZ (multi-x-xz): ARCH=amd64, ADDITIONAL_WORKER_ARCHITECTURE=s390x
-      COMPUTE_COUNT: "0"
     pre:
     - ref: upi-libvirt-cleanup-pre
+    - ref: upi-libvirt-cleanup-heterogeneous
     - chain: upi-conf-libvirt
     - ref: ipi-debug-missing-static-pod-controller-degraded
     - ref: ipi-conf-etcd-on-ramfs
@@ -21,18 +16,20 @@ workflow:
     - ref: ipi-conf-debug-kdump-gather-logs
     - chain: gather
     - ref: upi-libvirt-cleanup-post
+    - ref: upi-libvirt-cleanup-heterogeneous
   documentation: |-
-    VPN-based heterogeneous libvirt e2e for IBM Z Orange Zone / intranet.
-    Installs a control-plane cluster via the homogeneous VPN UPI path
-    (leases file, USE_EXTERNAL_DNS, cleanup pre/post), then adds opposite-
-    architecture workers with upi-install-libvirt-heterogeneous.
+    VPN-based heterogeneous libvirt e2e for IBM Z (intranet / Orange Zone).
 
-    Supports both on-prem topologies that replace today's jobs:
-      ZX — ocp-e2e-ovn-remote-libvirt-multi-z-xz
-           (was libvirt-s390x-amd64 / openshift-e2e-libvirt-upi-heterogeneous)
-      XZ — ocp-e2e-ovn-remote-libvirt-multi-x-xz
-           (was ibmcloud ocp-e2e-ibmcloud-ovn-multi-x-xz /
-            openshift-e2e-ibmcloud-heterogeneous)
+    Reuses the homogeneous openshift-e2e-libvirt-vpn path unchanged
+    (upi-libvirt-cleanup-*, upi-conf-libvirt, upi-install-libvirt), then adds
+    day-2 opposite-architecture workers via upi-install-libvirt-heterogeneous.
+
+    Jobs must set:
+      ZX (multi-z-xz): ARCH=s390x, ADDITIONAL_WORKER_ARCHITECTURE=x86_64
+      XZ (multi-x-xz): ARCH=amd64, ADDITIONAL_WORKER_ARCHITECTURE=s390x
+
+    Optional: COMPUTE_COUNT=0 to skip same-arch workers at install time
+    (leases must still provide compute[0]/1] for the shared network.xml step).
 
     Intended cluster_profile: libvirt-s390x-amd64-vpn.
-    Jobs must set ARCH and ADDITIONAL_WORKER_ARCHITECTURE appropriately.
+    Does not modify shared homogeneous VPN steps.

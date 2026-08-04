@@ -12,118 +12,94 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
   exit 1
 fi
 
-LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
-
-# Primary control-plane hostname is required. Additional-arch hypervisors are optional
-# (heterogeneous VPN leases: hostname-additional / hostname-amd64 / hostname-s390x).
-HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${LEASE_CONF}")"
-if [[ -z "${HOSTNAME}" || "${HOSTNAME}" == "null" ]]; then
+# ensure hostname can be found
+HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
+if [[ -z "${HOSTNAME}" ]]; then
   echo "Couldn't retrieve hostname from lease config"
   exit 1
 fi
 
-HOSTNAMES=("${HOSTNAME}")
-for key in hostname-additional hostname-amd64 hostname-s390x; do
-  extra="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".\"${key}\"" "${LEASE_CONF}")"
-  if [[ -n "${extra}" && "${extra}" != "null" ]]; then
-    already=false
-    for existing in "${HOSTNAMES[@]}"; do
-      if [[ "${existing}" == "${extra}" ]]; then
-        already=true
-        break
-      fi
-    done
-    if [[ "${already}" == "false" ]]; then
-      HOSTNAMES+=("${extra}")
-    fi
-  fi
+REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
+VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
+echo "Using libvirt connection for $REMOTE_LIBVIRT_URI"
+
+# Test the remote connection
+mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
+
+set +e
+
+# Remove stale domains
+echo "Removing stale domains..."
+for DOMAIN in $(${VIRSH} list --all --name | grep "${LEASED_RESOURCE}")
+do
+  ${VIRSH} destroy "${DOMAIN}"
+  sleep 1s
+  ${VIRSH} undefine "${DOMAIN}"
 done
 
-cleanup_host () {
-  local host="$1"
-  local REMOTE_LIBVIRT_URI="qemu+tcp://${host}/system"
-  local VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
-  echo "Using libvirt connection for $REMOTE_LIBVIRT_URI"
-
-  # Test the remote connection
-  mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
-
-  set +e
-
-  # Remove stale domains
-  echo "Removing stale domains on ${host}..."
-  for DOMAIN in $(${VIRSH} list --all --name | grep "${LEASED_RESOURCE}")
+# Remove stale volumes
+echo "Removing stale ci pool volumes..."
+if [[ ! -z "$(${VIRSH} pool-list | grep ${POOL_NAME})" ]]; then
+  for VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
   do
-    ${VIRSH} destroy "${DOMAIN}"
-    sleep 1s
-    ${VIRSH} undefine "${DOMAIN}"
+    ${VIRSH} vol-delete --pool ${POOL_NAME} ${VOLUME}
   done
+fi
 
-  # Remove stale volumes
-  echo "Removing stale ci pool volumes on ${host}..."
-  if [[ ! -z "$(${VIRSH} pool-list | grep ${POOL_NAME})" ]]; then
-    for VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
-    do
-      ${VIRSH} vol-delete --pool ${POOL_NAME} ${VOLUME}
-    done
-  fi
-
-  # Remove stale httpd volumes
-  echo "Removing stale httpd volumes on ${host}..."
-  if [[ ! -z "$(${VIRSH} pool-list | grep ${HTTPD_POOL_NAME})" ]]; then
-    for VOLUME in $(${VIRSH} vol-list --pool ${HTTPD_POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
-    do
-      ${VIRSH} vol-delete --pool ${HTTPD_POOL_NAME} ${VOLUME}
-    done
-  fi
-
-  echo "Removing obsolete source volume on ${host}..."
-  SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | awk '{ print $1 }' | grep -E '^rhcos' || true)
-  if [[ ! -z "${SOURCE_VOLUME}" ]]; then
-    ${VIRSH} vol-delete --pool ${POOL_NAME} "${SOURCE_VOLUME}"
-  fi
-
-  echo "Removing obsolete pools on ${host}..."
-  for POOL in $(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
+# Remove stale httpd volumes
+echo "Removing stale httpd volumes..."
+if [[ ! -z "$(${VIRSH} pool-list | grep ${HTTPD_POOL_NAME})" ]]; then
+  for VOLUME in $(${VIRSH} vol-list --pool ${HTTPD_POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
   do
-    ${VIRSH} pool-destroy "${POOL}"
-    ${VIRSH} pool-delete "${POOL}"
-    ${VIRSH} pool-undefine "${POOL}"
+    ${VIRSH} vol-delete --pool ${HTTPD_POOL_NAME} ${VOLUME}
   done
+fi
 
-  # Remove conflicting networks
-  echo "Removing stale networks on ${host}..."
-  for NET in $(${VIRSH} net-list --all --name | grep "${LEASED_RESOURCE}")
-  do
-    ${VIRSH} net-destroy "${NET}"
-    ${VIRSH} net-undefine "${NET}"
-  done
+# Old behavior; Uncomment the following line to always remove the source volume regardless of its naming format.
+#echo "Removing the source volume..."
+#${VIRSH} vol-delete --pool ${POOL_NAME} "$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)"
+echo "Removing obsolete source volume..."
+SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | awk '{ print $1 }' | grep -E '^rhcos' || true)
+if [[ ! -z "${SOURCE_VOLUME}" ]]; then
+  ${VIRSH} vol-delete --pool ${POOL_NAME} "${SOURCE_VOLUME}"
+fi
 
-  # Detect conflicts
-  CONFLICTING_DOMAINS=$(${VIRSH} list --all --name | grep "${LEASED_RESOURCE}")
-  CONFLICTING_VOLUMES=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep -E "${LEASED_RESOURCE}-(bootstrap|master|worker|compute|control)" | awk '{ print $1 }' || true)
-  STALE_IPI_VOLUMES=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | grep -Ev "(bootstrap|master|worker|compute|control)" | awk '{ print $1 }' || true)
-  CONFLICTING_POOLS=$(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
-  CONFLICTING_NETWORKS=$(${VIRSH} net-list --all --name | grep "${LEASED_RESOURCE}")
-
-  set -e
-
-  echo "Checking for remaining resource conflicts on ${host}..."
-  if [ ! -z "${CONFLICTING_DOMAINS}" ] || [ ! -z "${CONFLICTING_VOLUMES}" ] || [ ! -z "${CONFLICTING_POOLS}" ] || [ ! -z "${CONFLICTING_NETWORKS}" ]; then
-    echo "Could not ensure clean state for lease ${LEASED_RESOURCE} on ${host}"
-    echo "Conflicting domains: $CONFLICTING_DOMAINS"
-    echo "Conflicting volumes: $CONFLICTING_VOLUMES"
-    echo "Conflicting pools: $CONFLICTING_POOLS"
-    echo "Conflicting networks: $CONFLICTING_NETWORKS"
-    exit 1
-  fi
-
-  if [ ! -z "${STALE_IPI_VOLUMES}" ]; then
-    echo "Stale IPI volumes remain on ${host}..."
-    echo "Stale volumes: ${STALE_IPI_VOLUMES}"
-  fi
-}
-
-for host in "${HOSTNAMES[@]}"; do
-  cleanup_host "${host}"
+echo "Removing obsolete pools..."
+for POOL in $(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
+do
+  ${VIRSH} pool-destroy "${POOL}"
+  ${VIRSH} pool-delete "${POOL}"
+  ${VIRSH} pool-undefine "${POOL}"
 done
+
+# Remove conflicting networks
+echo "Removing stale networks..."
+for NET in $(${VIRSH} net-list --all --name | grep "${LEASED_RESOURCE}")
+do
+  ${VIRSH} net-destroy "${NET}"
+  ${VIRSH} net-undefine "${NET}"
+done
+
+# Detect conflicts
+CONFLICTING_DOMAINS=$(${VIRSH} list --all --name | grep "${LEASED_RESOURCE}")
+CONFLICTING_VOLUMES=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep -E "${LEASED_RESOURCE}-(bootstrap|master|worker|compute|control)" | awk '{ print $1 }' || true)
+STALE_IPI_VOLUMES=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | grep -Ev "(bootstrap|master|worker|compute|control)" | awk '{ print $1 }' || true)
+CONFLICTING_POOLS=$(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
+CONFLICTING_NETWORKS=$(${VIRSH} net-list --all --name | grep "${LEASED_RESOURCE}")
+
+set -e
+
+echo "Checking for remaining resource conflicts..."
+if [ ! -z "${CONFLICTING_DOMAINS}" ] || [ ! -z "${CONFLICTING_VOLUMES}" ] || [ ! -z "${CONFLICTING_POOLS}" ] || [ ! -z "${CONFLICTING_NETWORKS}" ]; then
+  echo "Could not ensure clean state for lease ${LEASED_RESOURCE}"
+  echo "Conflicting domains: $CONFLICTING_DOMAINS"
+  echo "Conflicting volumes: $CONFLICTING_VOLUMES"
+  echo "Conflicting pools: $CONFLICTING_POOLS"
+  echo "Conflicting networks: $CONFLICTING_NETWORKS"
+  exit 1
+fi
+
+if [ ! -z "${STALE_IPI_VOLUMES}" ]; then
+  echo "Stale IPI volumes remain..."
+  echo "Stale volumes: ${STALE_IPI_VOLUMES}"
+fi
