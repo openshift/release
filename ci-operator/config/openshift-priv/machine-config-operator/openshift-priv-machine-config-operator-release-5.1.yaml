@@ -39,6 +39,10 @@ base_images:
     name: "5.1"
     namespace: ocp-priv
     tag: rhel-coreos
+  tls-scanner-tool:
+    name: "5.1"
+    namespace: ocp-priv
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/machine-config-operator
@@ -171,7 +175,7 @@ tests:
     workflow: ipi-aws
 - always_run: false
   as: e2e-aws-ovn
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
@@ -252,7 +256,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-op-part1
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -270,7 +274,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-op-part2
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -289,7 +293,7 @@ tests:
   timeout: 4h0m0s
 - always_run: false
   as: e2e-gcp-op-ocl-part1
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -304,7 +308,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-op-ocl-part2
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -336,7 +340,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-aws-ovn-upgrade
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
@@ -404,6 +408,44 @@ tests:
   optional: true
   steps:
     cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-zones
+- always_run: false
+  as: e2e-vsphere-mco-bootimages
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      TEST_ARGS: --run=MCO.Bootimages
+      TEST_SKIPS: ""
+      TEST_SUITE: openshift/machine-config-operator/longduration
+    workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-vsphere-zones-mco-bootimages
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      MAX_VCENTERS: "1"
+      OS_IMAGE_STREAM: rhel-9
+      TEST_ARGS: --run=MCO.Bootimages
+      TEST_SKIPS: ""
+      TEST_SUITE: openshift/machine-config-operator/longduration
+    workflow: openshift-e2e-vsphere-zones
+- always_run: false
+  as: e2e-vsphere-multi-vcenter-mco-bootimages
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      MAX_VCENTERS: "3"
+      OS_IMAGE_STREAM: rhel-9
+      TEST_ARGS: --run=MCO.Bootimages
+      TEST_SKIPS: ""
+      TEST_SUITE: openshift/machine-config-operator/longduration
     workflow: openshift-e2e-vsphere-zones
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
@@ -505,7 +547,7 @@ tests:
     workflow: openshift-e2e-gcp-single-node
 - always_run: false
   as: e2e-gcp-op-single-node
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -554,7 +596,7 @@ tests:
     workflow: openshift-e2e-openstack-external-lb
 - always_run: false
   as: e2e-hypershift
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
@@ -769,6 +811,19 @@ tests:
       DISK_SETUP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
+- always_run: false
+  as: tls-pqc-readiness
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-machine-config-operator
+      SCANNER_CPU: "2"
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-5.1
   org: openshift-priv

@@ -19,9 +19,11 @@ CONSOLE_URLS = {
     "build09": "https://console-openshift-console.apps.build09.ci.devcluster.openshift.com",
     "build10": "https://console-openshift-console.apps.build10.ci.devcluster.openshift.com",
     "build11": "https://console-openshift-console.apps.build11.ci.devcluster.openshift.com",
+    "build12": "https://console-openshift-console.apps.build12.ci.devcluster.openshift.com",
+    "build13": "https://console.build13.ci.openshift.org",
 }
 
-BUILD_ORDER = [f"build{i:02d}" for i in range(1, 13)]
+BUILD_ORDER = [f"build{i:02d}" for i in range(1, 14)]
 
 
 def splice(path, begin, end, body):
@@ -73,6 +75,34 @@ def monitor_entry(cluster_name: str, console_url: str) -> str:
       artifact_url_style: "gcs"
       history_runs: 5
       failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "{cluster_name}"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "{cluster_name}"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{{namespace=\\"openshift-machine-api\\",deployment=\\"cluster-autoscaler-default\\"}} > 0 or absent(kube_deployment_status_replicas_available{{namespace=\\"openshift-machine-api\\",deployment=\\"cluster-autoscaler-default\\"}})"
+          failure_query: "kube_deployment_status_replicas_available{{namespace=\\"openshift-machine-api\\",deployment=\\"cluster-autoscaler-default\\"}}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}} > 0 or absent(kube_deployment_status_replicas_available{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}})"
+          failure_query: "kube_deployment_status_replicas_available{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
 """
 
 

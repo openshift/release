@@ -1,9 +1,24 @@
+base_images:
+  cli:
+    name: "5.1"
+    namespace: ocp-priv
+    tag: cli
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/oauth-apiserver
 images:
   items:
+  - dockerfile_literal: |
+      FROM replaced-by-from
+      COPY oc /usr/bin/oc
+    from: bin
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: oauth-apiserver-bin-with-oc
   - dockerfile_path: images/Dockerfile.rhel7
     to: oauth-apiserver
 promotion:
@@ -30,10 +45,18 @@ resources:
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: verify
-  commands: |
-    make verify -k --warn-undefined-variables
-  container:
-    from: bin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: verify
+      commands: |
+        make verify -k --warn-undefined-variables
+      from: oauth-apiserver-bin-with-oc
+      resources:
+        requests:
+          cpu: "3"
+          memory: 6Gi
 - as: unit
   commands: |
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables

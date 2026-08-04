@@ -1,3 +1,8 @@
+base_images:
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -23,6 +28,7 @@ releases:
 resources:
   '*':
     limits:
+      cpu: "2"
       memory: 4Gi
     requests:
       cpu: 100m
@@ -67,6 +73,29 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+- as: e2e-vsphere-vcf-migration
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      VCF_MIGRATION_OPERATOR_IMAGE: pipeline:vcf-migration-operator
+    env:
+      CSI_MANAGEMENT_REMOVED: "true"
+      PERSISTENT_MONITORING: "false"
+      SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
+    workflow: vcf-migration-e2e
+- as: e2e-vsphere-vcf-migration-periodic
+  cron: 0 6 * * 1,4
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      VCF_MIGRATION_OPERATOR_IMAGE: pipeline:vcf-migration-operator
+    env:
+      CSI_MANAGEMENT_REMOVED: "true"
+      PERSISTENT_MONITORING: "false"
+      SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
+    workflow: vcf-migration-e2e
 zz_generated_metadata:
   branch: main
   org: openshift

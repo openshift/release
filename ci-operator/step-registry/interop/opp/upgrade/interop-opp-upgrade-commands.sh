@@ -9,6 +9,10 @@ POLL_INTERVAL="${POLL_INTERVAL:-60}"
 STALL_WINDOW="${STALL_WINDOW:-10}"
 OPP_OPERATORS="${OPP_OPERATORS:-advanced-cluster-management,rhacs-operator,odf-operator,quay-operator}"
 
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman
@@ -359,7 +363,7 @@ ValidateOppOperators() {
 
     typeset phase=""
     for op in "${operatorsArr[@]}"; do
-        phase="$(echo "${allCsvsJson}" | jq -r --arg op "${op}" '[.items[] | select(.metadata.name | contains($op))][0].status.phase // empty')" || true
+        phase="$(echo "${allCsvsJson}" | jq -r --arg op "${op}" '[.items[] | select(.metadata.name | startswith($op))][0].status.phase // empty')" || true
         if [[ -z "${phase}" ]]; then
             : "CSV not found for operator: ${op}"
             (( failCount += 1 ))
@@ -382,7 +386,7 @@ ValidateOppOperators() {
 
     : "Checking pod readiness for OPP operator namespaces"
     typeset oppNamespaces=""
-    oppNamespaces="$(echo "${allCsvsJson}" | jq -r --arg ops "${OPP_OPERATORS}" '($ops | split(",")) as $opArr | [.items[] | select(.metadata.name as $n | $opArr | any(. as $op | $n | contains($op))) | .metadata.namespace] | unique | .[]')"
+    oppNamespaces="$(echo "${allCsvsJson}" | jq -r --arg ops "${OPP_OPERATORS}" '($ops | split(",")) as $opArr | [.items[] | select(.metadata.name as $n | $opArr | any(. as $op | $n | startswith($op))) | .metadata.namespace] | unique | .[]')"
     typeset notReady="" ns=""
     for ns in ${oppNamespaces}; do
         notReady="$(oc get pods -n "${ns}" --no-headers | grep -v 'Completed' | grep -v 'Running' | grep -v 'Succeeded')" || true

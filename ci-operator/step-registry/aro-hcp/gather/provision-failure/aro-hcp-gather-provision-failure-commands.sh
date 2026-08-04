@@ -21,7 +21,7 @@ echo "MGMT_RESOURCEGROUP: ${MGMT_RESOURCEGROUP}"
 echo "REGIONAL_RESOURCEGROUP: ${REGIONAL_RESOURCEGROUP}"
 
 # Check if provisioning completed successfully
-if [[ -f "${SHARED_DIR}/provision-complete" ]]; then
+if [[ -f "${SHARED_DIR}/provision-complete" || -f "${SHARED_DIR}/provision-from-main-complete" ]]; then
   echo "Provisioning completed successfully, skipping failure data gathering"
   exit 0
 fi

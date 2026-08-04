@@ -1,4 +1,12 @@
 base_images:
+  aro-hcp-e2e-tests:
+    name: aro-hcp-e2e-tests
+    namespace: aro-hcp
+    tag: latest
+  aro-hcp-e2e-tools:
+    name: aro-hcp-e2e-tools
+    namespace: aro-hcp
+    tag: latest
   claude-ai-helpers:
     name: claude-ai-helpers
     namespace: ci
@@ -29,12 +37,25 @@ build_root:
 canonical_go_repository: github.com/openshift/hypershift
 images:
   items:
-  - to: hypershift-operator
-  - dockerfile_path: Dockerfile.control-plane
+  - additional_architectures:
+    - arm64
+    to: hypershift-operator
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.control-plane
     to: hypershift
-  - dockerfile_path: Dockerfile.e2e
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.e2e
     to: hypershift-tests
   - dockerfile_literal: |
+      FROM base
+      RUN dnf install -y python3-pip
+    from: src
+    to: custom-verify-src
+  - additional_architectures:
+    - arm64
+    dockerfile_literal: |
       FROM hypershift-operator
       RUN yum install -y jq && yum clean all
     from: hypershift-operator
@@ -42,6 +63,7 @@ images:
 promotion:
   to:
   - excluded_images:
+    - custom-verify-src
     - hypershift-cli
     - hypershift-operator
     - hypershift-tests
@@ -97,7 +119,30 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  unit:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 4000m
+      memory: 8Gi
+  verify:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 4000m
+      memory: 8Gi
 tests:
+- as: verify
+  commands: make verify-ci
+  container:
+    from: custom-verify-src
+  timeout: 1h0m0s
+- as: unit
+  commands: make test
+  container:
+    from: src
 - always_run: false
   as: agentic-qe-aws
   optional: true
@@ -144,6 +189,17 @@ tests:
       NODEPOOL_N3_VERSION: "4.19"
       NODEPOOL_N4_VERSION: "4.18"
     workflow: hypershift-azure-aks-e2e
+- always_run: false
+  as: e2e-aro-hcp
+  optional: true
+  steps:
+    cluster_profile: aro-hcp-dev
+    env:
+      ALLOWED_SUBSCRIPTIONS: Hypershift Managed Azure
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      MULTISTAGE_PARAM_OVERRIDE_LOCATION: westus3
+    workflow: aro-hcp-hypershift-e2e
 - as: e2e-aks-override
   run_if_changed: (/overrides\.yaml$)
   steps:
@@ -180,6 +236,15 @@ tests:
     env:
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-v2
+- always_run: false
+  as: e2e-v2-aws-techpreview-osimagestream
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      GUEST_FEATURE_SET: TechPreviewNoUpgrade
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-v2-osimagestream
 - always_run: false
   as: e2e-v2-aws-backuprestore
   optional: true
@@ -232,7 +297,7 @@ tests:
       OADP_OPERATOR_SUB_SOURCE: oadp-operator-fbc-1.6.0-20260327171703-konflux
     workflow: hypershift-mce-agent-metal3-backuprestore
 - always_run: false
-  as: e2e-azure-v2-self-managed
+  as: e2e-v2-azure-self-managed
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
   steps:
     cluster_profile: hypershift-azure

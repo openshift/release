@@ -35,10 +35,10 @@ releases:
 resources:
   '*':
     limits:
-      memory: 8Gi
+      memory: 16Gi
     requests:
       cpu: 1000m
-      memory: 8Gi
+      memory: 16Gi
 tests:
 - as: go-tests
   commands: |
@@ -60,6 +60,11 @@ tests:
 - as: translations
   commands: |
     make test-translations
+  container:
+    from: monitoring-plugin-test
+- as: test-frontend-unit
+  commands: |
+    make test-frontend-unit
   container:
     from: monitoring-plugin-test
 - always_run: false
@@ -276,6 +281,25 @@ tests:
     cluster_profile: openshift-org-aws
     test:
     - ref: monitoring-plugin-tests-perses-ui-ivt
+    workflow: ipi-aws
+- always_run: true
+  as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: monitoring-plugin
+    workflow: openshift-ci-security
+- as: e2e-agnostic-cmo
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: stable:cluster-monitoring-operator-src
+      resources:
+        requests:
+          cpu: 100m
     workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.23

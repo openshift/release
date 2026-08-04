@@ -4,7 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+collect_operator_logs() {
+    local ns="${OPERATOR_NAMESPACE:-openshift-${OPERATOR_NAME:-unknown}}"
+    if [[ -n "${ARTIFACT_DIR:-}" ]] && oc get namespace "${ns}" &>/dev/null; then
+        for deploy in $(oc get deployment -n "${ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
+            oc logs "deployment/${deploy}" -n "${ns}" --all-containers --tail=500 \
+                > "${ARTIFACT_DIR}/${deploy}-logs.txt" 2>&1 || true
+        done
+        oc get events -n "${ns}" --sort-by='.lastTimestamp' \
+            > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
+    fi
+}
+
+trap 'collect_operator_logs; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM EXIT
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
@@ -84,6 +96,15 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
     oc rollout restart deployment -n openshift-package-operator 2>/dev/null || true
     oc rollout status deployment -n openshift-package-operator --timeout=120s 2>/dev/null || true
     log "PKO restarted with CI pull secret"
+
+    # Add CI pull secret to the operator namespace so operator pods can pull
+    # CI-built images without waiting for MCO to propagate the global secret.
+    oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+    oc create secret docker-registry ci-pull-secret \
+        -n "${OPERATOR_NAMESPACE}" \
+        --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
+        --dry-run=client -o yaml | oc apply -f -
+    log "CI pull secret added to operator namespace ${OPERATOR_NAMESPACE}"
 else
     log "WARNING: Could not get CI registry credentials, PKO may fail to pull images"
 fi
@@ -186,6 +207,11 @@ if [[ "${CLUSTER_PACKAGE_NAME}" != "${OPERATOR_NAME}" ]]; then
 fi
 
 # Create the ClusterPackage CR
+PKO_CONFIG="    image: ${OPERATOR_IMAGE}"
+if [[ -n "${PKO_CONFIG_NAMESPACE:-}" ]]; then
+    PKO_CONFIG="${PKO_CONFIG}
+    namespace: ${PKO_CONFIG_NAMESPACE}"
+fi
 cat <<EOF | oc apply -f -
 apiVersion: package-operator.run/v1alpha1
 kind: ClusterPackage
@@ -196,7 +222,7 @@ metadata:
 spec:
   image: ${OPERATOR_PKO_IMAGE}
   config:
-    image: ${OPERATOR_IMAGE}
+${PKO_CONFIG}
 EOF
 
 # Save the ClusterPackage name for cleanup
@@ -220,12 +246,42 @@ for i in $(seq 1 30); do
     sleep 10
 done
 
-# Wait for the operator deployment to be available
+# Wait for the operator deployment to be available. During PKO
+# reconciliation the deployment can briefly vanish, so retry oc wait
+# on NotFound instead of failing immediately. Patch the SA with CI
+# pull secret on the first stable sighting of the deployment.
+SA_PATCHED=""
 log "Waiting for deployment ${OPERATOR_DEPLOYMENT_NAME} to be ready..."
-oc wait deployment "${OPERATOR_DEPLOYMENT_NAME}" \
-    -n "${OPERATOR_NAMESPACE}" \
-    --for=condition=Available \
-    --timeout=300s
+for attempt in $(seq 1 30); do
+    if ! oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+        sleep 10
+        continue
+    fi
+
+    if [[ -z "${SA_PATCHED}" ]] && oc get secret ci-pull-secret -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+        SA_NAME=$(oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" \
+            -o jsonpath='{.spec.template.spec.serviceAccountName}' 2>/dev/null || echo "${OPERATOR_NAME}")
+        if oc get sa "${SA_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+            oc patch sa "${SA_NAME}" -n "${OPERATOR_NAMESPACE}" \
+                --type json -p '[{"op":"add","path":"/imagePullSecrets/-","value":{"name":"ci-pull-secret"}}]' 2>/dev/null || true
+            log "CI pull secret added to ServiceAccount ${SA_NAME}"
+            oc delete pods -n "${OPERATOR_NAMESPACE}" -l app="${OPERATOR_DEPLOYMENT_NAME}" 2>/dev/null || true
+            SA_PATCHED=1
+        fi
+    fi
+
+    if oc wait deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" \
+        --for=condition=Available --timeout=30s 2>/dev/null; then
+        break
+    fi
+
+    if [[ ${attempt} -eq 30 ]]; then
+        log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} not ready after 5 minutes"
+        oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
+        oc get pods -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
+        exit 1
+    fi
+done
 
 log "${OPERATOR_NAME} installed and ready in ${OPERATOR_NAMESPACE}"
 
@@ -238,3 +294,33 @@ for backup in "${CR_BACKUP_DIR}"/*.yaml; do
         oc apply -f "${backup}" 2>/dev/null || true
     fi
 done
+
+# Wait for additional operator-managed deployments to become ready.
+# Some operators create secondary deployments (e.g., ocm-agent-operator
+# creates an ocm-agent Deployment) after reconciling their CRs.
+if [[ -n "${OPERATOR_WAIT_DEPLOYMENTS:-}" ]]; then
+    IFS=',' read -ra WAIT_DEPS <<< "${OPERATOR_WAIT_DEPLOYMENTS}"
+    for dep in "${WAIT_DEPS[@]}"; do
+        dep=$(echo "${dep}" | xargs)
+        log "Waiting for secondary deployment ${dep} to exist..."
+        for _i in $(seq 1 30); do
+            if oc get deployment "${dep}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+                break
+            fi
+            sleep 10
+        done
+        if oc get deployment "${dep}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+            log "Waiting for deployment ${dep} to be ready..."
+            if ! oc wait deployment "${dep}" -n "${OPERATOR_NAMESPACE}" \
+                --for=condition=Available --timeout=300s; then
+                log "ERROR: deployment ${dep} not ready after 5 minutes"
+                oc get deployment "${dep}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
+                oc get pods -n "${OPERATOR_NAMESPACE}" -l app="${dep}" 2>/dev/null || true
+                exit 1
+            fi
+        else
+            log "ERROR: deployment ${dep} not found after 5 minutes"
+            exit 1
+        fi
+    done
+fi
