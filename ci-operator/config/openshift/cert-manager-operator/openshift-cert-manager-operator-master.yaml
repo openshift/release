@@ -448,19 +448,56 @@ tests:
     - as: deploy-operand
       cli: latest
       commands: |-
-        oc apply -f - <<EOF
-        apiVersion: operator.openshift.io/v1alpha1
-        kind: CertManager
-        metadata:
-          name: cluster
-        spec:
-          logLevel: Normal
-          managementState: Managed
-        EOF
-        echo "Waiting for cert-manager operand deployments..."
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        echo "Waiting for default cert-manager operand deployments..."
         oc wait --for=condition=Available -n cert-manager deployment/cert-manager --timeout=5m
         oc wait --for=condition=Available -n cert-manager deployment/cert-manager-webhook --timeout=5m
         oc wait --for=condition=Available -n cert-manager deployment/cert-manager-cainjector --timeout=5m
+
+        echo "Enabling TrustManager feature gate via subscription..."
+        oc -n cert-manager-operator patch subscription cert-manager-operator \
+          --type='merge' \
+          -p '{"spec":{"config":{"env":[{"name":"UNSUPPORTED_ADDON_FEATURES","value":"TrustManager=true"}]}}}'
+
+        echo "Waiting for TrustManager feature gate on operator pod args and rollout..."
+        FOUND=false
+        for _ in $(seq 1 60); do
+          ARGS=$(oc -n cert-manager-operator get deploy/cert-manager-operator-controller-manager \
+            -o jsonpath='{.spec.template.spec.containers[0].args[*]}' 2>/dev/null || true)
+          if echo "${ARGS}" | grep -q -- '--unsupported-addon-features=TrustManager=true'; then
+            echo "Found TrustManager feature gate in operator args: ${ARGS}"
+            FOUND=true
+            break
+          fi
+          sleep 5
+        done
+        if [[ "${FOUND}" != "true" ]]; then
+          echo "Timed out waiting for --unsupported-addon-features=TrustManager=true on operator deployment"
+          exit 1
+        fi
+        oc -n cert-manager-operator rollout status deployment/cert-manager-operator-controller-manager --timeout=5m
+
+        echo "Creating TrustManager CR..."
+        oc apply -f - <<EOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: TrustManager
+        metadata:
+          name: cluster
+        spec:
+          trustManagerConfig:
+            logLevel: 1
+            logFormat: text
+            trustNamespace: cert-manager
+            defaultCAPackage:
+              policy: Enabled
+        EOF
+
+        echo "Waiting for trust-manager deployment..."
+        oc wait --for=create -n cert-manager deployment/trust-manager --timeout=5m
+        oc wait --for=condition=Available -n cert-manager deployment/trust-manager --timeout=5m
       from: src
       resources:
         requests:
