@@ -63,10 +63,10 @@ CENTRAL_NS=""
 SC_NS=""
 
 wait_for "Central CR namespace discovery" discover_central_ns
-echo "[readiness] Central namespace: ${CENTRAL_NS}"
+echo "[readiness] Central namespace discovered"
 
 wait_for "SecuredCluster CR namespace discovery" discover_sc_ns
-echo "[readiness] SecuredCluster namespace: ${SC_NS}"
+echo "[readiness] SecuredCluster namespace discovered"
 
 # ---------------------------------------------------------------------------
 # Check 1: Central route exists
@@ -78,7 +78,7 @@ check_central_route() {
 wait_for "Central route" check_central_route
 
 CENTRAL_URL="$(oc get route central -n "${CENTRAL_NS}" -o jsonpath='{.spec.host}')"
-echo "[readiness] Central URL: ${CENTRAL_URL}"
+echo "[readiness] Central route discovered"
 
 # ---------------------------------------------------------------------------
 # Check 2: Central API health (v1/metadata returns 200)
@@ -101,8 +101,7 @@ check_clusters_connected() {
     local cluster_count
     cluster_count="$(curl -sk -u "admin:${ROX_ADMIN_PASSWORD}" \
         "https://${CENTRAL_URL}/v1/clusters" --max-time 10 \
-        | jq '.clusters | length' 2>/dev/null)" || { set -x 2>/dev/null || true; return 1; }
-    set -x 2>/dev/null || true
+        | jq '.clusters | length' 2>/dev/null)" || return 1
     [[ "${cluster_count}" -ge 1 ]]
 }
 
@@ -114,7 +113,6 @@ ROX_ADMIN_PASSWORD=""
 set +x
 ROX_ADMIN_PASSWORD="$(oc get secret -n "${CENTRAL_NS}" central-htpasswd \
     -o json | jq -r '.data.password' | base64 -d)"
-set -x 2>/dev/null || true
 
 if [[ -z "${ROX_ADMIN_PASSWORD}" ]]; then
     echo "[readiness] FATAL: could not extract ROX_ADMIN_PASSWORD"
@@ -168,8 +166,7 @@ check_policies_loaded() {
     local policy_count
     policy_count="$(curl -sk -u "admin:${ROX_ADMIN_PASSWORD}" \
         "https://${CENTRAL_URL}/v1/policies?query=" --max-time 10 \
-        | jq '.policies | length' 2>/dev/null)" || { set -x 2>/dev/null || true; return 1; }
-    set -x 2>/dev/null || true
+        | jq '.policies | length' 2>/dev/null)" || return 1
     echo "[readiness]   policy count: ${policy_count}"
     [[ "${policy_count}" -gt 80 ]]
 }
@@ -183,7 +180,6 @@ echo "[readiness] Writing connection details to SHARED_DIR..."
 
 set +x
 echo "${ROX_ADMIN_PASSWORD}" > "${SHARED_DIR}/ROX_ADMIN_PASSWORD"
-set -x 2>/dev/null || true
 
 echo "${CENTRAL_URL}"  > "${SHARED_DIR}/CENTRAL_URL"
 echo "${CENTRAL_NS}"   > "${SHARED_DIR}/CENTRAL_NS"

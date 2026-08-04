@@ -21,16 +21,11 @@ fi
 echo "[smoke] Reading connection details from SHARED_DIR..."
 
 CENTRAL_URL="$(cat "${SHARED_DIR}/CENTRAL_URL")"
-CENTRAL_NS="$(cat "${SHARED_DIR}/CENTRAL_NS")"
-SC_NS="$(cat "${SHARED_DIR}/SC_NS")"
 
 set +x
 ROX_ADMIN_PASSWORD="$(cat "${SHARED_DIR}/ROX_ADMIN_PASSWORD")"
-set -x 2>/dev/null || true
 
-echo "[smoke] Central URL : ${CENTRAL_URL}"
-echo "[smoke] Central NS  : ${CENTRAL_NS}"
-echo "[smoke] SC NS       : ${SC_NS}"
+echo "[smoke] Connection details loaded from SHARED_DIR"
 
 # ---------------------------------------------------------------------------
 # Sparse clone of stackrox/stackrox (qa-tests-backend + proto)
