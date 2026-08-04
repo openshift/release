@@ -15,7 +15,11 @@ export ROLE_WORKER_CNF=worker-cnf
 TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
 NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
 NTO_BRANCH=$(git ls-remote --heads ${NTO_REPO} main | grep -q 'refs/heads/main'  && echo 'main' || echo 'master')
-GINKGO_LABEL="tier-0 || tier-1 || tier-2 || uncore-cache"
+if [[ -n "${TEST_RUN_FEATURES:-}" ]]; then
+    GINKGO_LABEL="${TEST_RUN_FEATURES}"
+else
+    GINKGO_LABEL="tier-0 || tier-1 || tier-2 || uncore-cache"
+fi
 GINKGO_SUITES="test/e2e/performanceprofile/functests"
 
 [[ -f "${SHARED_DIR}"/main.env ]] && source "${SHARED_DIR}"/main.env || echo "No main.env file found"
