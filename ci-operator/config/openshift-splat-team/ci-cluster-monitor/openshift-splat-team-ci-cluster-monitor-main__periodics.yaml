@@ -26,6 +26,23 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: ci-cluster-monitor-github-token
+- as: vm-orphan-monitor
+  commands: |
+    make build
+    ./bin/vm-monitor --config config/nutanix.yaml --credentials-dir /tmp/nutanix-secret --cleanup
+  container:
+    from: src
+  cron: 0 */4 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: VM Orphan Monitor detected orphaned VMs. <{{.Status.URL}}|View
+      logs>
+  secret:
+    mount_path: /tmp/nutanix-secret
+    name: ci-cluster-monitor-nutanix-creds
 zz_generated_metadata:
   branch: main
   org: openshift-splat-team
