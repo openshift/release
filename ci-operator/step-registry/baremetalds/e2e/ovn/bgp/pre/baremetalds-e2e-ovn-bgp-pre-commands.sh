@@ -313,6 +313,15 @@ if [ -n "${FRR_IMAGE:-}" ]; then
   done
 fi
 
+# The RouteAdvertisements CRD is created by CNO while reconciling the
+# routeAdvertisements enablement. On clusters where frr-k8s is already
+# deployed (e.g. BGP-based VIP management) the daemonset rollout waits above
+# return immediately, so wait for the CRD explicitly before applying CRs.
+echo "Waiting for the RouteAdvertisements CRD..."
+until oc wait --for condition=Established crd/routeadvertisements.k8s.ovn.org --timeout 2m &> /dev/null; do
+  sleep 5
+done
+
 # set up BGP peering of the cluster with the external FRR instance container
 # peer is setup on the default VRF and also on each extra network VRF
 for network in "${!vrf_neighbors[@]}"; do
