@@ -57,7 +57,7 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -e; \
         echo 'PR job detected: checking out PR #${PULL_NUMBER} on the remote host'; \
         git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER}; \
         git checkout pr-${PULL_NUMBER}; \
-        git rebase ${OPENSHIFT_DPF_BRANCH}; \
+        git rebase origin/${OPENSHIFT_DPF_BRANCH}; \
     fi; \
     pwd ; \
     set -e; \
