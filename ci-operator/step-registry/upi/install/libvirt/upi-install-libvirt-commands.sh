@@ -80,7 +80,7 @@ LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 
 # Returns true when BRANCH is a numeric OCP version older than 4.16.
-# Non-numeric/unset BRANCH returns false (preserve 4.16+ behavior).
+# Used only for s390x ≤4.15 etcd gating. Non-numeric/unset returns false.
 branch_known_older_than_4_16() {
   local branch="${BRANCH:-}"
   branch="${branch#release-}"
@@ -96,8 +96,8 @@ branch_known_older_than_4_16() {
 
 RHCOS_RESIZED_LOCALLY=false
 
-# Resize RHCOS locally when qemu-img is available; otherwise upload as-is
-# and let the caller resize on the hypervisor with virsh vol-resize.
+# s390x-only: resize RHCOS locally when qemu-img exists; otherwise upload as-is
+# and resize on the hypervisor with virsh vol-resize.
 ensure_rhcos_resized() {
   local image_path=$1
   local capacity=$2
@@ -341,8 +341,14 @@ else
         exit 1
       fi
     fi
-    # Resize the rhcos image to match the volume capacity
-    ensure_rhcos_resized "${INSTALL_DIR}/${VOLUME_NAME}" "${VOLUME_CAPACITY}"
+    # Resize the rhcos image to match the volume capacity.
+    # s390x ≤4.15 may lack qemu-img; other arches keep the original path.
+    if [[ "${ARCH}" == "s390x" ]]; then
+      ensure_rhcos_resized "${INSTALL_DIR}/${VOLUME_NAME}" "${VOLUME_CAPACITY}"
+    else
+      echo "Resizing rhcos image to match volume capacity..."
+      qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
+    fi
 
     # Create the new source volume
     echo "Creating source volume..."
@@ -359,8 +365,8 @@ else
       --pool ${POOL_NAME} \
       ${INSTALL_DIR}/${VOLUME_NAME}
 
-    # If local qemu-img was unavailable, resize on the hypervisor after upload.
-    if [[ "${RHCOS_RESIZED_LOCALLY}" != "true" ]]; then
+    # s390x-only: if local qemu-img was unavailable, resize on the hypervisor.
+    if [[ "${ARCH}" == "s390x" && "${RHCOS_RESIZED_LOCALLY}" != "true" ]]; then
       if ! ${VIRSH} vol-resize --pool "${POOL_NAME}" "${VOLUME_NAME}" "${VOLUME_CAPACITY}"; then
         echo "ERROR: virsh vol-resize failed for ${VOLUME_NAME}; cannot reach capacity ${VOLUME_CAPACITY} without qemu-img" >&2
         exit 1
@@ -693,9 +699,9 @@ for i in {1..30}; do
   sleep 15
 done
 
-# Patch etcd for slower disks. Skip on known BRANCH < 4.16 (API unavailable).
+# Patch etcd for slower disks. On s390x, skip when BRANCH is known < 4.16 (API unavailable).
 if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
-  if branch_known_older_than_4_16; then
+  if [[ "${ARCH}" == "s390x" ]] && branch_known_older_than_4_16; then
     echo "Skipping etcd controlPlaneHardwareSpeed patch: BRANCH=${BRANCH} is older than 4.16"
   else
     echo "Patching etcd cluster operator..."
