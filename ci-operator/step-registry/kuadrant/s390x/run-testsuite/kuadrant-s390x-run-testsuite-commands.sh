@@ -596,6 +596,44 @@ flags='${PYTEST_PLUGIN_FLAGS}' make kuadrant || rc=1
 "
 fi
 CONTAINER_SCRIPT+="make polish-junit || true
+# Debug summary before JUnit dump (survives even if follow logs drop mid-run).
+echo '===KUADRANT_SUMMARY_BEGIN==='
+echo \"rc=\${rc}\"
+echo \"pwd=\$(pwd)\"
+echo \"resultsdir=\${resultsdir}\"
+ls -la \"\${resultsdir}\" 2>/dev/null || true
+if command -v python3 >/dev/null 2>&1; then
+  python3 - \"\${resultsdir}\" <<'PY' || true
+import sys, xml.etree.ElementTree as ET, glob, os
+rd = sys.argv[1]
+for path in sorted(glob.glob(os.path.join(rd, \"junit-*.xml\"))):
+    print(f\"--- {os.path.basename(path)} ---\")
+    try:
+        root = ET.parse(path).getroot()
+    except Exception as exc:  # noqa: BLE001
+        print(f\"parse_error: {exc}\")
+        continue
+    for s in root.iter(\"testsuite\"):
+        print(
+            \"suite\", s.get(\"name\"),
+            \"tests\", s.get(\"tests\"),
+            \"failures\", s.get(\"failures\"),
+            \"errors\", s.get(\"errors\"),
+            \"skipped\", s.get(\"skipped\"),
+            \"time\", s.get(\"time\"),
+        )
+    for tc in root.iter(\"testcase\"):
+        bad = tc.find(\"failure\")
+        err = tc.find(\"error\")
+        if bad is None and err is None:
+            continue
+        node = bad if bad is not None else err
+        kind = \"FAILURE\" if bad is not None else \"ERROR\"
+        msg = (node.get(\"message\") or \"\").replace(\"\\n\", \" \")[:300]
+        print(f\"{kind} {tc.get('classname')}::{tc.get('name')} :: {msg}\")
+PY
+fi
+echo '===KUADRANT_SUMMARY_END==='
 # Stream JUnit back to the step log (no tar/oc-cp dependency in the image).
 for f in \"\${resultsdir}\"/junit-*.xml; do
   [ -e \"\$f\" ] || continue
@@ -716,6 +754,10 @@ cat "${JOB_FILE}"
 # ---------------------------------------------------------------------------
 # 5. Launch the Job, stream logs, collect results
 # ---------------------------------------------------------------------------
+# Long s390x runs frequently drop `oc logs -f` (http2: client connection lost),
+# which previously left ARTIFACT_DIR with a truncated Job log and no JUnit.
+# We follow with restarts, periodically snapshot full logs, and dump pod
+# termination diagnostics before cleanup.
 extract_junit_from_log() {
   local logfile="$1" dest="$2"
   python3 - "$logfile" "$dest" <<'PY'
@@ -748,8 +790,88 @@ with open(logfile, "r", errors="replace") as fh:
 PY
 }
 
+extract_summary_from_log() {
+  local logfile="$1" dest="$2"
+  python3 - "$logfile" "$dest" <<'PY'
+import os
+import sys
+
+logfile, dest = sys.argv[1], sys.argv[2]
+os.makedirs(dest, exist_ok=True)
+out_path = os.path.join(dest, "kuadrant-testrunner-summary.txt")
+capturing = False
+buf = []
+rc_line = None
+with open(logfile, "r", errors="replace") as fh:
+    for line in fh:
+        raw = line.rstrip("\n")
+        if raw.startswith("===KUADRANT_RC "):
+            rc_line = raw
+        if raw == "===KUADRANT_SUMMARY_BEGIN===":
+            capturing = True
+            buf = [raw]
+            continue
+        if capturing:
+            buf.append(raw)
+            if raw == "===KUADRANT_SUMMARY_END===":
+                capturing = False
+if buf or rc_line:
+    with open(out_path, "w", encoding="utf-8") as out:
+        if buf:
+            out.write("\n".join(buf) + "\n")
+        if rc_line:
+            out.write(rc_line + "\n")
+    print(f"wrote {out_path}")
+else:
+    print("no KUADRANT_SUMMARY/RC markers found in log", file=sys.stderr)
+PY
+}
+
+snapshot_job_logs() {
+  local dest="$1"
+  # Full snapshot (not follow): recovers content after follow drops mid-stream.
+  oc -n "${TEST_RUNNER_NAMESPACE}" logs "job/${JOB_NAME}" --timestamps=true 2>/dev/null \
+    >"${dest}.tmp" || true
+  if [[ -s "${dest}.tmp" ]]; then
+    # Keep the larger of follow-captured vs full snapshot.
+    if [[ ! -s "${dest}" ]] || [[ "$(wc -c <"${dest}.tmp")" -gt "$(wc -c <"${dest}")" ]]; then
+      mv -f "${dest}.tmp" "${dest}"
+    else
+      rm -f "${dest}.tmp"
+    fi
+  else
+    rm -f "${dest}.tmp"
+  fi
+}
+
+dump_runner_diagnostics() {
+  local pod="$1"
+  echo "=== Test-runner diagnostics (pod=${pod:-none}) ==="
+  oc -n "${TEST_RUNNER_NAMESPACE}" get pods -o wide 2>&1 \
+    | tee "${ARTIFACT_DIR}/kuadrant-testrunner-pods.txt" || true
+  oc -n "${TEST_RUNNER_NAMESPACE}" get job "${JOB_NAME}" -o yaml 2>&1 \
+    | tee "${ARTIFACT_DIR}/kuadrant-testrunner-job.yaml" || true
+  oc -n "${TEST_RUNNER_NAMESPACE}" describe job "${JOB_NAME}" 2>&1 \
+    | tee "${ARTIFACT_DIR}/kuadrant-testrunner-job-describe.txt" || true
+  if [[ -n "${pod}" ]]; then
+    oc -n "${TEST_RUNNER_NAMESPACE}" get pod "${pod}" -o yaml 2>&1 \
+      | tee "${ARTIFACT_DIR}/kuadrant-testrunner-pod.yaml" || true
+    oc -n "${TEST_RUNNER_NAMESPACE}" describe pod "${pod}" 2>&1 \
+      | tee "${ARTIFACT_DIR}/kuadrant-testrunner-pod-describe.txt" || true
+    # Termination reason / exit code / OOM (best-effort).
+    oc -n "${TEST_RUNNER_NAMESPACE}" get pod "${pod}" -o jsonpath='{range .status.containerStatuses[*]}{.name}{" ready="}{.ready}{" state="}{.state}{" lastState="}{.lastState}{"\n"}{end}' 2>&1 \
+      | tee "${ARTIFACT_DIR}/kuadrant-testrunner-container-status.txt" || true
+    oc -n "${TEST_RUNNER_NAMESPACE}" logs "${pod}" -c testsuite --timestamps=true --tail=-1 2>&1 \
+      | tee "${ARTIFACT_DIR}/kuadrant-testrunner-pod-logs-final.txt" || true
+    # Previous instance (if restarted); usually empty with backoffLimit=0.
+    oc -n "${TEST_RUNNER_NAMESPACE}" logs "${pod}" -c testsuite --previous --timestamps=true --tail=-1 2>&1 \
+      | tee "${ARTIFACT_DIR}/kuadrant-testrunner-pod-logs-previous.txt" || true
+  fi
+}
+
 FAILED=0
 JOB_LOG="${ARTIFACT_DIR}/kuadrant-testrunner-job.log"
+: >"${JOB_LOG}"
 
 echo "=== Launching test-runner Job ==="
 oc apply -f "${JOB_FILE}"
@@ -764,21 +886,43 @@ for _ in $(seq 1 60); do
 done
 if [[ -z "${RUNNER_POD}" ]]; then
   echo "ERROR: test-runner pod never appeared" >&2
-  oc -n "${TEST_RUNNER_NAMESPACE}" describe job "${JOB_NAME}" >&2 || true
+  dump_runner_diagnostics ""
   FAILED=1
 fi
 
 if [[ -n "${RUNNER_POD}" ]]; then
-  echo "=== Streaming logs from ${RUNNER_POD} ==="
+  echo "=== Streaming logs from ${RUNNER_POD} (resilient follow) ==="
   # Wait until the container is running (image pull can take a while), then follow.
   oc -n "${TEST_RUNNER_NAMESPACE}" wait --for=condition=Ready \
     "pod/${RUNNER_POD}" --timeout=600s 2>/dev/null || true
 
-  oc -n "${TEST_RUNNER_NAMESPACE}" logs -f "job/${JOB_NAME}" 2>&1 | tee "${JOB_LOG}" || true
+  # Follow with restarts: a single `oc logs -f` often dies on long s390x runs
+  # ("http2: client connection lost") and previously left us blind.
+  follow_rounds=0
+  while true; do
+    if [[ "$(oc -n "${TEST_RUNNER_NAMESPACE}" get job "${JOB_NAME}" -o jsonpath='{.status.succeeded}' 2>/dev/null)" == "1" ]]; then
+      break
+    fi
+    if [[ "$(oc -n "${TEST_RUNNER_NAMESPACE}" get job "${JOB_NAME}" -o jsonpath='{.status.failed}' 2>/dev/null)" =~ ^[1-9] ]]; then
+      break
+    fi
+    phase="$(oc -n "${TEST_RUNNER_NAMESPACE}" get pod "${RUNNER_POD}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    if [[ "${phase}" == "Succeeded" || "${phase}" == "Failed" ]]; then
+      break
+    fi
+
+    follow_rounds=$((follow_rounds + 1))
+    echo "=== log follow round ${follow_rounds} (pod phase=${phase:-unknown}) ===" | tee -a "${JOB_LOG}"
+    # Append follow output; ignore follow transport errors and continue.
+    oc -n "${TEST_RUNNER_NAMESPACE}" logs -f "pod/${RUNNER_POD}" -c testsuite --timestamps=true 2>&1 \
+      | tee -a "${JOB_LOG}" || true
+
+    # Refresh full snapshot after each follow drop so we do not keep a tiny prefix.
+    snapshot_job_logs "${JOB_LOG}"
+    sleep 5
+  done
 
   echo "=== Waiting for Job completion ==="
-  # No Job activeDeadlineSeconds; wait until the Job reports terminal status
-  # (step timeout is the outer bound).
   job_state=""
   while true; do
     if [[ "$(oc -n "${TEST_RUNNER_NAMESPACE}" get job "${JOB_NAME}" -o jsonpath='{.status.succeeded}' 2>/dev/null)" == "1" ]]; then
@@ -792,22 +936,36 @@ if [[ -n "${RUNNER_POD}" ]]; then
   echo "Job state: ${job_state}"
   [[ "${job_state}" == "succeeded" ]] || FAILED=1
 
-  # Recover JUnit reports from the captured log stream.
-  extract_junit_from_log "${JOB_LOG}" "${RESULTS_DIR}" || true
+  # Final full log snapshot + diagnostics while the pod still exists.
+  snapshot_job_logs "${JOB_LOG}"
+  dump_runner_diagnostics "${RUNNER_POD}"
+
+  # Prefer the largest available log source for JUnit/summary extraction.
+  FINAL_LOG="${JOB_LOG}"
+  if [[ -f "${ARTIFACT_DIR}/kuadrant-testrunner-pod-logs-final.txt" ]] \
+    && [[ "$(wc -c <"${ARTIFACT_DIR}/kuadrant-testrunner-pod-logs-final.txt")" -gt "$(wc -c <"${JOB_LOG}")" ]]; then
+    FINAL_LOG="${ARTIFACT_DIR}/kuadrant-testrunner-pod-logs-final.txt"
+    cp -f "${FINAL_LOG}" "${JOB_LOG}" || true
+  fi
+  extract_junit_from_log "${FINAL_LOG}" "${RESULTS_DIR}" || true
+  extract_summary_from_log "${FINAL_LOG}" "${ARTIFACT_DIR}" || true
 fi
 
 echo "=== Test-runner Job status ==="
 oc -n "${TEST_RUNNER_NAMESPACE}" get pods -o wide 2>&1 || true
-oc -n "${TEST_RUNNER_NAMESPACE}" describe job "${JOB_NAME}" 2>&1 \
-  | tee "${ARTIFACT_DIR}/kuadrant-testrunner-job-describe.txt" || true
 
 echo "=== Copying test artifacts to ${ARTIFACT_DIR} ==="
 if ls "${RESULTS_DIR}"/junit-*.xml >/dev/null 2>&1; then
   cp "${RESULTS_DIR}"/junit-*.xml "${ARTIFACT_DIR}/" || true
 fi
+ls -la "${ARTIFACT_DIR}"/kuadrant-testrunner-* "${ARTIFACT_DIR}"/junit-*.xml 2>/dev/null || true
 
 if [[ "${FAILED}" -ne 0 ]]; then
   echo "Testsuite finished with failures." >&2
+  if [[ -f "${ARTIFACT_DIR}/kuadrant-testrunner-summary.txt" ]]; then
+    echo "=== Captured KUADRANT summary (for RCA) ===" >&2
+    cat "${ARTIFACT_DIR}/kuadrant-testrunner-summary.txt" >&2 || true
+  fi
   exit 1
 fi
 
