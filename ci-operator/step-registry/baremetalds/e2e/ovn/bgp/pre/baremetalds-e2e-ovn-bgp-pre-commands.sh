@@ -261,7 +261,9 @@ fi
 deploy_frr_external_container vrf_neighbors
 
 # apply FRR-K8s overrides to enable debug logging
-oc create namespace openshift-frr-k8s
+# (idempotent: the namespace may already exist when frr-k8s is pre-deployed,
+# e.g. by BGP-based VIP management static pods)
+oc create namespace openshift-frr-k8s --dry-run=client -o yaml | oc apply -f -
 oc apply -f - <<EOF
 kind: ConfigMap
 apiVersion: v1
