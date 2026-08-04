@@ -1,0 +1,94 @@
+ref:
+  as: p2p-create-hub-spoke-test-vms
+  from: cli
+  commands: p2p-create-hub-spoke-test-vms-commands.sh
+  timeout: 2h0m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Create multiple CNV test VirtualMachines on the ACM hub cluster and on a spoke cluster
+    for bi-directional hub↔spoke MTV live migration testing.
+
+    Creates P2P_HS_VM_COUNT VMs on the hub (prefix P2P_HS_HUB_VM_PREFIX, e.g. hub-vm-1..N)
+    using KUBECONFIG (the hub cluster), and P2P_HS_VM_COUNT VMs on the spoke (prefix
+    P2P_HS_SPOKE_VM_PREFIX, e.g. spoke-vm-1..N) using the spoke admin kubeconfig from
+    SHARED_DIR. Hub VMs become the source for hub→spoke migration; spoke VMs become the
+    source for spoke→hub migration.
+
+    Hub and spoke may use different ODF StorageClasses (P2P_HS_HUB_STORAGE_CLASS and
+    P2P_HS_SPOKE_STORAGE_CLASS respectively). Both must support ReadWriteMany.
+
+    Requires:
+      - CNV (KubeVirt/HCO) and ODF installed on the hub.
+      - p2p-acm-cnv-install-policy and p2p-install-odf-spokes on the spoke.
+      - RHEL images: ODF virt StorageClass cloneStrategy=copy (applied automatically).
+
+    Spoke kubeconfig defaults to SHARED_DIR/managed-cluster-kubeconfig-${P2P_HS_SPOKE_INDEX}.
+
+    Writes ${ARTIFACT_DIR}/hub-spoke-vm-create-status.txt; diagnostics on failure under
+    ${ARTIFACT_DIR}/hub-spoke-vm-create-diagnostics/.
+  env:
+  - name: P2P_HS_VM_COUNT
+    default: "2"
+    documentation: Number of VMs to create on each cluster (hub and spoke).
+  - name: P2P_HS_HUB_VM_PREFIX
+    default: "hub-vm"
+    documentation: Name prefix for VMs on the hub (e.g. hub-vm-1, hub-vm-2). These are migrated hub→spoke.
+  - name: P2P_HS_SPOKE_VM_PREFIX
+    default: "spoke-vm"
+    documentation: Name prefix for VMs on the spoke (e.g. spoke-vm-1, spoke-vm-2). These are migrated spoke→hub.
+  - name: P2P_HS_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Namespace for all test VMs and DataVolumes on both hub and spoke.
+  - name: P2P_HS_VM_IMAGE_TYPE
+    default: "rhel"
+    documentation: OS image type — cirros (HTTP import, fast) or rhel (DataSource clone from CNV catalog).
+  - name: P2P_HS_HUB_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: ODF StorageClass for hub VM root disks (must support ReadWriteMany).
+  - name: P2P_HS_SPOKE_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: ODF StorageClass for spoke VM root disks (must support ReadWriteMany).
+  - name: P2P_HS_VM_DISK_SIZE
+    default: "32Gi"
+    documentation: Root disk size for all VMs. Use 32Gi for rhel9 DataSource clone; 1Gi for cirros.
+  - name: P2P_HS_VM_MEMORY
+    default: "2Gi"
+    documentation: Guest memory for each VirtualMachine.
+  - name: P2P_HS_VM_CPUS
+    default: "2"
+    documentation: Number of CPU cores for each VirtualMachine.
+  - name: P2P_HS_VM_DATA_SOURCE_NAME
+    default: "rhel9"
+    documentation: DataSource name when P2P_HS_VM_IMAGE_TYPE=rhel (same for hub and spoke).
+  - name: P2P_HS_VM_DATA_SOURCE_NAMESPACE
+    default: "openshift-virtualization-os-images"
+    documentation: DataSource namespace when P2P_HS_VM_IMAGE_TYPE=rhel.
+  - name: P2P_HS_VM_CIRROS_IMAGE_URL
+    default: "https://download.cirros-cloud.net/0.6.3/cirros-0.6.3-x86_64-disk.img"
+    documentation: HTTP URL for cirros image import (P2P_HS_VM_IMAGE_TYPE=cirros).
+  - name: P2P_HS_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based SHARED_DIR kubeconfig index for the spoke cluster.
+  - name: P2P_HS_SPOKE_KUBECONFIG
+    default: ""
+    documentation: |-
+      Optional explicit kubeconfig path for the spoke cluster. When empty, uses
+      SHARED_DIR/managed-cluster-kubeconfig-${P2P_HS_SPOKE_INDEX}.
+  - name: P2P_HS_VM_DATAVOLUME_WAIT_TIMEOUT
+    default: "30m"
+    documentation: oc wait timeout for DataVolume Ready condition per VM.
+  - name: P2P_HS_VM_VMI_WAIT_TIMEOUT
+    default: "15m"
+    documentation: oc wait timeout for VMI Running phase per VM.
+  - name: P2P_HS_VM_CLEAN
+    default: "false"
+    documentation: Set to "true" to delete prior VM/DV/prime-* PVCs before create (idempotent re-run).
+  - name: P2P_CCLM_DEBUG_MODE
+    default: "false"
+    documentation: |-
+      When true, log failures and exit 0 so downstream debug steps can run.
+      Set P2P_CCLM_DEBUG_MODE=true in the job env during CCLM investigation.

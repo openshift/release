@@ -3,19 +3,35 @@
 # Step 3 of 3: Submariner Connectivity Verification
 #
 # Responsibilities:
-#   - Install subctl to /tmp/bin/ (step-local; NOT in SHARED_DIR)
-#   - Show tunnel connection status on each spoke
+#   - Install subctl to /tmp/bin/ (step-local; only when SUBMARINER_RUN_SUBCTL_VERIFY=true)
+#   - Show tunnel connection status on each spoke (and hub when SUBMARINER_VERIFY_HUB_SPOKE=true)
 #   - Wait for all IPsec tunnels to reach "connected" state
+#   - Apply CCLM sync ingress NetworkPolicy (after tunnels are confirmed connected)
+#   - Assert no Globalnet subnets (242.x)
 #   - Pre-warm the Lighthouse service-discovery pipeline before subctl verify
-#   - Run 'subctl verify' for connectivity and service-discovery tests
+#   - Run 'subctl verify' when SUBMARINER_RUN_SUBCTL_VERIFY=true
+#   - Probe bidirectional CCLM sync TCP paths (when SUBMARINER_VERIFY_CCLM_SYNC=true):
+#       spoke↔spoke pairs (always, matching upstream main)
+#       hub↔spoke (only when SUBMARINER_VERIFY_HUB_SPOKE=true)
+#
+# SPOKE CLUSTERS (spoke-to-spoke and hub-spoke jobs):
+#   All spoke steps are identical to the upstream main branch.
+#
+# HUB CLUSTER (hub-spoke jobs only, SUBMARINER_VERIFY_HUB_SPOKE=true):
+#   Hub-specific checks are added at each phase, gated by verifyHubSpoke.
 #
 # Globalnet is NOT used: warmup exports a Service and waits for ServiceImport
 # plus EndpointSlice propagation (pod IPs), not GlobalIngressIP allocation.
 #
-# WHY subctl is downloaded here (not read from SHARED_DIR):
-#   Storing large binaries in SHARED_DIR causes CI operator to fail with
-#   "Request entity too large" when serialising SHARED_DIR into a Kubernetes
-#   Secret between steps (3 MB limit).  Each step installs its own copy.
+# WHY subctl is optional:
+#   subctl is large (~50 MB). When SUBMARINER_RUN_SUBCTL_VERIFY=false (default
+#   for spoke-to-spoke jobs), subctl is not installed and functions that require
+#   it (WarmUpServiceDiscovery, VerifyConnectivity) are skipped.  Gateway status
+#   and tunnel checks via oc and CCLM sync probes run without subctl.
+#
+# WHY binaries are NOT stored in SHARED_DIR:
+#   Kubernetes Secrets have a 3 MB limit; subctl exceeds it.  Each step installs
+#   its own copy.
 #
 
 set -euxo pipefail; shopt -s inherit_errexit
@@ -28,12 +44,15 @@ eval "$(
 # ── Constants ─────────────────────────────────────────────────────────────────
 typeset -r subctlBin="/tmp/bin/subctl"
 typeset -i spokeCount="${ACM_SPOKE_CLUSTER_COUNT}"
+typeset runSubctlVerify="${SUBMARINER_RUN_SUBCTL_VERIFY}"
+typeset verifyHubSpoke="${SUBMARINER_VERIFY_HUB_SPOKE}"
 
 typeset -a spokeKubeconfigsArr=()
 typeset -a spokeNamesArr=()
 
-# ── InstallSubctl — install subctl to /tmp/bin/ ───────────────────────────────
+# ── InstallSubctl — install subctl to /tmp/bin/ (only when opt-in) ───────────
 InstallSubctl() {
+    [[ "${runSubctlVerify}" == "true" ]] || return 0
     mkdir -p /tmp/bin
     if [[ -x "${subctlBin}" ]]; then
         return 0
@@ -60,15 +79,144 @@ LoadSpokeConfig() {
     true
 }
 
-# ── ShowConnections — display tunnel connection status on one spoke ───────────
+# ── EnsureNonGatewayOvnRoutes — inject missing OVN cluster-router routes ──────
+# Belt-and-suspenders repeat of the same function in broker-join.
+# Submariner's routeagent in OCP 4.22 OVN-K IC mode only programs spoke-CIDR
+# routes on the gateway node's local OVN NB DB.  Non-gateway nodes have NO
+# ovn_cluster_router routes for remote CIDRs, causing Ncat: TIMEOUT in
+# subctl verify connectivity tests even when tunnels show "connected".
+# Called here after WaitForConnectionsEstablished so the tunnel state is
+# confirmed stable before the injection.
+EnsureNonGatewayOvnRoutes() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+
+    : "EnsureNonGatewayOvnRoutes: injecting missing OVN routes on non-gateway nodes of '${clusterName}'"
+
+    typeset -i ngrCount=0 ngrWait=0
+    until (( ngrCount > 0 || ngrWait >= 120 )); do
+        ngrCount=$(KUBECONFIG="${kubeconfig}" oc get nongatewayroutes.submariner.io \
+            -n submariner-operator --no-headers 2>/dev/null | wc -l || true)
+        (( ngrCount > 0 )) && break
+        sleep 10
+        (( ngrWait += 10 ))
+        : "  Waiting for NonGatewayRoute CRs on '${clusterName}' (${ngrWait}/120 s)"
+    done
+
+    if (( ngrCount == 0 )); then
+        : "  No NonGatewayRoute CRs on '${clusterName}' after 120 s — skipping"
+        return 0
+    fi
+
+    typeset nextHop ngrJson
+    typeset -a remoteCIDRs=()
+    ngrJson=$(KUBECONFIG="${kubeconfig}" oc get nongatewayroutes.submariner.io \
+        -n submariner-operator -o json 2>/dev/null)
+    nextHop=$(echo "${ngrJson}" | jq -r '.items[0].spec.nextHops[0] // empty')
+    mapfile -t remoteCIDRs < <(
+        echo "${ngrJson}" | jq -r '.items[].spec.remoteCIDRs[]' 2>/dev/null | sort -u || true
+    )
+
+    if [[ -z "${nextHop}" ]] || (( ${#remoteCIDRs[@]} == 0 )); then
+        : "  NGR data incomplete (nextHop='${nextHop}', CIDRs=${#remoteCIDRs[@]}) — skipping"
+        return 0
+    fi
+
+    : "  Remote CIDRs: ${remoteCIDRs[*]}"
+    : "  IC transit next-hop: ${nextHop}"
+
+    typeset -a nonGwNodes=()
+    mapfile -t nonGwNodes < <(
+        KUBECONFIG="${kubeconfig}" oc get nodes \
+            -l '!submariner.io/gateway' \
+            -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true
+    )
+
+    (( ${#nonGwNodes[@]} == 0 )) && { : "  No non-gateway nodes — nothing to patch"; return 0; }
+
+    typeset node ovnkubePod cidr addOk
+    typeset -i _injFailed=0 _injTotal=0
+    for node in "${nonGwNodes[@]}"; do
+        ovnkubePod=$(KUBECONFIG="${kubeconfig}" oc get pod \
+            -n openshift-ovn-kubernetes \
+            -l app=ovnkube-node \
+            --field-selector "spec.nodeName=${node}" \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+        [[ -z "${ovnkubePod}" ]] && { : "  No ovnkube-node pod on '${node}'"; continue; }
+
+        for cidr in "${remoteCIDRs[@]}"; do
+            (( _injTotal++ ))
+            : "  ${node}: ovn_cluster_router ${cidr} → ${nextHop}"
+            addOk=false
+            if KUBECONFIG="${kubeconfig}" oc exec \
+                    -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                    -c ovnkube-controller -- \
+                    ovn-nbctl --no-leader-only --may-exist lr-route-add \
+                    ovn_cluster_router "${cidr}" "${nextHop}" 2>/dev/null; then
+                addOk=true
+            elif KUBECONFIG="${kubeconfig}" oc exec \
+                    -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                    -c ovnkube-node -- \
+                    ovn-nbctl --no-leader-only --may-exist lr-route-add \
+                    ovn_cluster_router "${cidr}" "${nextHop}" 2>/dev/null; then
+                addOk=true
+            fi
+
+            if [[ "${addOk}" != "true" ]]; then
+                (( _injFailed++ ))
+                echo "  ERROR: ovn-nbctl lr-route-add failed for ${cidr} on '${node}'" >&2
+                continue
+            fi
+
+            # Read-back: verify the route is actually present in the local NB DB after
+            # injection.  --may-exist exits 0 even if a reconciliation loop cleared the
+            # route between subshells; a read-back confirms the route survived.
+            typeset _routePresent
+            _routePresent=$(KUBECONFIG="${kubeconfig}" oc exec \
+                -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                -c ovnkube-controller -- \
+                ovn-nbctl --no-leader-only find Logical_Router_Static_Route \
+                "ip_prefix=${cidr}" 2>/dev/null \
+                | grep -c "${nextHop}" || \
+                KUBECONFIG="${kubeconfig}" oc exec \
+                -n openshift-ovn-kubernetes "${ovnkubePod}" \
+                -c ovnkube-node -- \
+                ovn-nbctl --no-leader-only find Logical_Router_Static_Route \
+                "ip_prefix=${cidr}" 2>/dev/null \
+                | grep -c "${nextHop}" || echo "0")
+
+            if (( _routePresent == 0 )); then
+                (( _injFailed++ ))
+                echo "  ERROR: route ${cidr}→${nextHop} missing from NB DB after injection on '${node}' — cleared by reconciliation loop" >&2
+            else
+                : "  ${node}: route ${cidr}→${nextHop} confirmed present in NB DB"
+            fi
+        done
+    done
+
+    : "EnsureNonGatewayOvnRoutes '${clusterName}': ${_injFailed} failed of ${_injTotal} route-node pairs"
+    (( _injFailed == 0 ))
+}
+
+# ── ShowConnections — display gateway tunnel status ───────────────────────────
 ShowConnections() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterLabel="${1:-cluster}"; (($#)) && shift
 
-    KUBECONFIG="${kubeconfig}" "${subctlBin}" show connections || true
+    : "Gateway connections on '${clusterLabel}':"
+    KUBECONFIG="${kubeconfig}" oc get gateways.submariner.io \
+        -n submariner-operator -o wide || true
+
+    if [[ "${runSubctlVerify}" == "true" && -x "${subctlBin}" ]]; then
+        KUBECONFIG="${kubeconfig}" "${subctlBin}" show connections || true
+    fi
     true
 }
 
 # ── WaitForConnectionsEstablished — poll until all tunnels show "connected" ───
+# SPOKE PATH: identical to upstream main (polls only spoke gateways).
+# HUB ADDITION: when verifyHubSpoke=true, also polls the hub gateway CR.
 WaitForConnectionsEstablished() {
     typeset -i timeoutSecs="${1:-600}"; (($#)) && shift
 
@@ -106,6 +254,27 @@ WaitForConnectionsEstablished() {
                 fi
             done
 
+            # Hub gateway check — hub is a full Submariner participant in hub↔spoke jobs.
+            if [[ "${verifyHubSpoke}" == "true" ]]; then
+                typeset -i hubNonConnected hubTotalConnections
+                hubNonConnected="$(
+                    oc get gateways.submariner.io \
+                        -n submariner-operator \
+                        -o 'jsonpath-as-json={.items[?(@.status.haStatus=="active")].status.connections[*].status}' |
+                    jq '[.[] | select(. != "connected")] | length'
+                )"
+                hubTotalConnections="$(
+                    oc get gateways.submariner.io \
+                        -n submariner-operator \
+                        -o 'jsonpath-as-json={.items[?(@.status.haStatus=="active")].status.connections[*].status}' |
+                    jq 'length'
+                )"
+                : "hub: ${hubTotalConnections} connection(s), ${hubNonConnected} not yet connected (${SECONDS}/${timeoutSecs}s)"
+                if (( hubNonConnected > 0 || hubTotalConnections == 0 )); then
+                    allConnected=0
+                fi
+            fi
+
             if (( allConnected )); then
                 : "All Submariner tunnels are connected"
                 exit 0
@@ -114,19 +283,146 @@ WaitForConnectionsEstablished() {
             sleep "${interval}"
         done
 
-        : "Submariner tunnels did not reach 'connected' on all spokes within ${timeoutSecs}s"
+        : "Submariner tunnels did not reach 'connected' on all clusters within ${timeoutSecs}s"
         typeset -i i
         for ((i = 0; i < spokeCount; i++)); do
             : "Connection status on '${spokeNamesArr[i]}'"
-            KUBECONFIG="${spokeKubeconfigsArr[i]}" "${subctlBin}" show connections || true
+            [[ -x "${subctlBin}" ]] && \
+                KUBECONFIG="${spokeKubeconfigsArr[i]}" "${subctlBin}" show connections || true
         done
+        if [[ "${verifyHubSpoke}" == "true" && -x "${subctlBin}" ]]; then
+            "${subctlBin}" show connections || true
+        fi
         exit 1
+    ) || return 1
+}
+
+# ── AllowCclmSyncIngress — NetworkPolicy: cross-cluster pod CIDRs → CNV port ──
+# Creates (or updates) a NetworkPolicy in the CNV namespace on each cluster so
+# that cross-cluster pod IPs (advertised by the Submariner gateway) are allowed
+# to reach all pods in the namespace on SUBMARINER_CCLM_SYNC_PORT (default 8443).
+#
+# WHY THIS IS CALLED HERE (not in broker-join):
+#   broker-join also attempts this but IPsec tunnels are not yet established at
+#   that point, so gateways.submariner.io has no connection entries and the function
+#   silently skips (no remote CIDRs).  By the time verify runs,
+#   WaitForConnectionsEstablished has confirmed all tunnels are "connected" and
+#   gateways.submariner.io contains full CIDR data.
+#
+# CRITICAL — WHY WE INCLUDE THE MACHINE NETWORK CIDR IN THE INGRESS ALLOW LIST:
+#   Using `podSelector: {}` selects ALL pods in the CNV namespace.  In Kubernetes,
+#   once any NetworkPolicy selects a pod via an Ingress rule, ALL ingress not
+#   explicitly listed is DENIED.  The kube-apiserver runs in host-network on
+#   control-plane nodes (not a pod CIDR), so adding only remote cluster CIDRs to
+#   the allow list blocks kube-apiserver → cdi-apiserver and kube-apiserver →
+#   virt-api on port 8443, breaking ALL CNV admission webhooks (DataVolume,
+#   VirtualMachine mutators).  Including the local machine network CIDR ensures
+#   control-plane host-network traffic is preserved.
+AllowCclmSyncIngress() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+
+    typeset cnvNs="${SUBMARINER_CCLM_CNV_NAMESPACE:-openshift-cnv}"
+    typeset cclmPort="${SUBMARINER_CCLM_SYNC_PORT:-8443}"
+
+    # Collect remote pod/service CIDRs from active Submariner gateway connections.
+    typeset -a allowCidrs=()
+    typeset cidr
+    while IFS= read -r cidr; do
+        [[ -n "${cidr}" ]] || continue
+        allowCidrs+=("${cidr}")
+    done < <(
+        KUBECONFIG="${kubeconfig}" oc get gateways.submariner.io \
+            -n submariner-operator -o json 2>/dev/null \
+            | jq -r '.items[].status.connections[].endpoint.subnets[]?' \
+            || true
     )
-    true
+
+    if (( ${#allowCidrs[@]} == 0 )); then
+        : "No Submariner remote CIDRs found on '${clusterName}' — skipping CCLM NetworkPolicy"
+        return 0
+    fi
+
+    # Also include the local machine network CIDR so that kube-apiserver
+    # (running in host-network on control-plane nodes) can still reach
+    # cdi-apiserver and virt-api webhooks on port 8443.
+    typeset machineCidr
+    machineCidr=$(KUBECONFIG="${kubeconfig}" oc get network.config.openshift.io cluster \
+        -o jsonpath='{.spec.machineNetwork[0].cidr}' 2>/dev/null || true)
+    if [[ -n "${machineCidr}" ]]; then
+        : "Including machine network CIDR '${machineCidr}' to preserve kube-apiserver webhook access"
+        allowCidrs+=("${machineCidr}")
+    else
+        : "WARNING: could not read machine network CIDR — kube-apiserver webhook access may be blocked"
+    fi
+
+    : "Creating CCLM ingress NetworkPolicy on '${clusterName}' ns='${cnvNs}' port=${cclmPort} cidrs=[${allowCidrs[*]}]"
+
+    KUBECONFIG="${kubeconfig}" oc apply -f - < <(
+        jq -n \
+            --arg  ns   "${cnvNs}" \
+            --arg  port "${cclmPort}" \
+            --argjson cidrs "$(printf '%s\n' "${allowCidrs[@]}" | jq -R . | jq -s .)" \
+            '{
+                apiVersion: "networking.k8s.io/v1",
+                kind: "NetworkPolicy",
+                metadata: {name: "allow-submariner-cclm-sync", namespace: $ns},
+                spec: {
+                    podSelector: {},
+                    policyTypes: ["Ingress"],
+                    ingress: [{
+                        from: ($cidrs | map({ipBlock: {cidr: .}})),
+                        ports: [{protocol: "TCP", port: ($port | tonumber)}]
+                    }]
+                }
+            }'
+    ) || {
+        : "WARNING: could not apply CCLM sync NetworkPolicy on '${clusterName}' (ns may not exist yet)"
+        true
+    }
+}
+
+# ── AssertNoGlobalnetSubnets — fail if Globalnet 242.x routes are advertised ──
+# Uses oc to read gateway endpoint subnets — no subctl needed.
+# Uses _gnFailed tracking: explicit failure propagation in ( ) || ... context.
+AssertNoGlobalnetSubnets() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+    typeset -i _gnFailed=0
+
+    typeset remoteSubnets
+    remoteSubnets="$(
+        KUBECONFIG="${kubeconfig}" oc get gateways.submariner.io \
+            -n submariner-operator -o json \
+            | jq -r '.items[].status.connections[].endpoint.subnets[]?' || true
+    )"
+
+    if grep -E '^242\.' <<< "${remoteSubnets}"; then
+        : "Globalnet subnets (242.x.x.x) in gateway connections on '${clusterName}' — incompatible with CCLM"
+        _gnFailed=1
+    fi
+
+    if [[ "${runSubctlVerify}" == "true" && -x "${subctlBin}" ]]; then
+        typeset connOutput
+        connOutput="$(KUBECONFIG="${kubeconfig}" "${subctlBin}" show connections || true)"
+        if grep -E '242\.[0-9]+\.[0-9]+\.[0-9]+' <<< "${connOutput}"; then
+            : "Globalnet subnets (242.x.x.x) via subctl on '${clusterName}' — incompatible with CCLM"
+            _gnFailed=1
+        fi
+    fi
+
+    if (( _gnFailed == 0 )); then
+        : "No Globalnet subnets on '${clusterName}'"
+    fi
+    (( _gnFailed == 0 ))
 }
 
 # ── WarmUpServiceDiscovery — prime Lighthouse before verify (no Globalnet) ────
+# Requires subctl ('subctl export service'). Skip entirely when
+# SUBMARINER_RUN_SUBCTL_VERIFY=false to avoid 300s polling loop timeouts caused
+# by calling a missing /tmp/bin/subctl binary.
 WarmUpServiceDiscovery() {
+    [[ "${runSubctlVerify}" == "true" ]] || return 0
     typeset kcSource="${1:?}"; (($#)) && shift
     typeset kcTarget="${1:?}"; (($#)) && shift
     typeset srcName="${1:?}"; (($#)) && shift
@@ -218,8 +514,7 @@ EOF
             fi
             sleep "${siExistInterval}"
         done
-        true
-    )
+    ) || return 1
 
     (
         typeset -i esMax=300 esInterval=10
@@ -243,30 +538,127 @@ EOF
             fi
         done
         : "Service-discovery warmup complete: EndpointSlice address '${esAddr}' visible on '${tgtName}'"
-        true
-    )
+    ) || return 1
 
     KUBECONFIG="${kcSource}" oc delete namespace "${warmupNs}" \
         --ignore-not-found 1>/dev/null &
     KUBECONFIG="${kcTarget}" oc delete namespace "${warmupNs}" \
         --ignore-not-found 1>/dev/null &
-
-    true
 }
 
-# ── AssertNoGlobalnetSubnets — fail if Globalnet 242.x routes are advertised ──
-AssertNoGlobalnetSubnets() {
+# ── _RunNodePinnedProbe — TCP probe from a pod pinned to a named node ────────────
+# Uses oc create with a full pod manifest (not oc run --overrides) so nodeName,
+# tolerations, and restartPolicy are set cleanly.  The pod is placed in the
+# 'submariner-operator' namespace so OVN-K's PBR rules for cross-cluster routing
+# are already programmed (avoids the namespace reconciliation race).
+# Returns 0 (probe succeeded) or 1 (probe failed / pod not Succeeded).
+_RunNodePinnedProbe() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset spokeName="${1:?}"; (($#)) && shift
+    typeset podName="${1:?}"; (($#)) && shift
+    typeset nodeName="${1:?}"; (($#)) && shift
+    typeset destIp="${1:?}"; (($#)) && shift
+    typeset destPort="${1:?}"; (($#)) && shift
 
-    typeset connOutput
-    connOutput="$(KUBECONFIG="${kubeconfig}" "${subctlBin}" show connections || true)"
+    typeset -r probeNs="submariner-operator"
 
-    if grep -E '242\.[0-9]+\.[0-9]+\.[0-9]+' <<< "${connOutput}"; then
-        : "Globalnet subnets (242.x.x.x) advertised on '${spokeName}' — incompatible with CCLM pod IP sync"
-        false
+    KUBECONFIG="${kubeconfig}" oc delete pod "${podName}" \
+        -n "${probeNs}" --ignore-not-found --wait=true --timeout=30s 1>/dev/null 2>&1 || true
+
+    KUBECONFIG="${kubeconfig}" oc create -f - 1>/dev/null <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${podName}
+  namespace: ${probeNs}
+spec:
+  nodeName: ${nodeName}
+  restartPolicy: Never
+  tolerations:
+  - operator: Exists
+  containers:
+  - name: probe
+    image: registry.redhat.io/ubi9/ubi-minimal:latest
+    command: ["timeout", "20", "bash", "-c", "echo >/dev/tcp/${destIp}/${destPort}"]
+EOF
+
+    KUBECONFIG="${kubeconfig}" oc wait "pod/${podName}" \
+        -n "${probeNs}" \
+        --for=jsonpath='{.status.phase}'=Succeeded \
+        --timeout=90s 1>/dev/null 2>&1 || true
+
+    typeset phase exitCode
+    phase="$(KUBECONFIG="${kubeconfig}" oc get "pod/${podName}" -n "${probeNs}" \
+        -o jsonpath='{.status.phase}' 2>/dev/null || echo 'Unknown')"
+    exitCode="$(KUBECONFIG="${kubeconfig}" oc get "pod/${podName}" -n "${probeNs}" \
+        -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' \
+        2>/dev/null || echo '1')"
+
+    KUBECONFIG="${kubeconfig}" oc delete pod "${podName}" \
+        -n "${probeNs}" --ignore-not-found --wait=false 1>/dev/null &
+
+    [[ "${phase}" == "Succeeded" && "${exitCode}" == "0" ]]
+}
+
+# ── DiagnoseGatewayVsWorkerConnectivity — isolate GW vs non-GW datapath ──────
+# Runs a TCP probe from a GATEWAY-PINNED pod and from a WORKER-PINNED pod to
+# the same remote pod IP.  Outcome map:
+#
+#   GW OK  / Worker OK   → OVN routes correct on both node types; fix working.
+#   GW OK  / Worker FAIL → OVN reroute policy or table-150 gap on non-GW nodes;
+#                          EnsureNonGatewayOvnRoutes injection may need revisiting.
+#   GW FAIL/ Worker FAIL → Upstream issue (IPsec tunnel, XFRM, gateway OVN routes).
+#   GW FAIL/ Worker OK   → Unexpected; indicates OVN mis-routing via the gateway.
+#
+# This is DIAGNOSTIC ONLY — never fails the CI step.
+DiagnoseGatewayVsWorkerConnectivity() {
+    typeset srcKubeconfig="${1:?}"; (($#)) && shift
+    typeset srcName="${1:?}"; (($#)) && shift
+    typeset destIp="${1:?}"; (($#)) && shift
+    typeset destPort="${1:?}"; (($#)) && shift
+    typeset diagSuffix="${1:?}"; (($#)) && shift
+
+    typeset gwNode workerNode
+    gwNode=$(KUBECONFIG="${srcKubeconfig}" oc get nodes \
+        -l 'submariner.io/gateway=true' \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    workerNode=$(KUBECONFIG="${srcKubeconfig}" oc get nodes \
+        -l '!submariner.io/gateway' \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+    if [[ -z "${gwNode}" ]]; then
+        : "DiagnoseGatewayVsWorkerConnectivity: no gateway node on '${srcName}' — skipping"
+        return 0
+    fi
+    if [[ -z "${workerNode}" ]]; then
+        : "DiagnoseGatewayVsWorkerConnectivity: no non-gateway node on '${srcName}' — skipping"
+        return 0
     fi
 
+    : "DiagnoseGatewayVsWorkerConnectivity '${srcName}' → ${destIp}:${destPort}"
+    : "  GW node:     ${gwNode}"
+    : "  Worker node: ${workerNode}"
+
+    typeset gwResult="FAIL" wkResult="FAIL"
+    _RunNodePinnedProbe "${srcKubeconfig}" "diag-gw-${diagSuffix}" \
+        "${gwNode}" "${destIp}" "${destPort}" \
+        && gwResult="OK" \
+        || gwResult="FAIL"
+    _RunNodePinnedProbe "${srcKubeconfig}" "diag-wk-${diagSuffix}" \
+        "${workerNode}" "${destIp}" "${destPort}" \
+        && wkResult="OK" \
+        || wkResult="FAIL"
+
+    : "DiagnoseGatewayVsWorkerConnectivity '${srcName}': GW=${gwResult} Worker=${wkResult}"
+
+    if [[ "${gwResult}" == "OK" && "${wkResult}" == "OK" ]]; then
+        : "  → OVN routes correct on both node types; EnsureNonGatewayOvnRoutes fix confirmed working"
+    elif [[ "${gwResult}" == "OK" && "${wkResult}" == "FAIL" ]]; then
+        : "  → OVN reroute policy or host table-150 gap on non-GW nodes; route injection may need revisiting"
+    elif [[ "${gwResult}" == "FAIL" && "${wkResult}" == "FAIL" ]]; then
+        : "  → Upstream failure (IPsec tunnel down, XFRM policy, or gateway OVN routes missing)"
+    else
+        : "  → Unexpected asymmetry (GW=FAIL, Worker=OK); inspect OVN policies on gateway"
+    fi
     true
 }
 
@@ -284,70 +676,120 @@ GetSyncControllerPodIp() {
         )'
 }
 
-# ── ProbeCclmSyncPort — TCP probe to sync-controller pod IP:8443 from a spoke ─
+# ── ProbeCclmSyncPort — TCP probe to sync-controller pod IP:8443 ──────────────
+# Does NOT use `oc run --rm -i` because `-i` masks non-zero container exit codes
+# in some oc versions — the pod terminates with Error but oc returns 0.
+# Instead: creates pod without --rm, waits for Succeeded phase via `oc wait`,
+# then reads exit code from pod status before cleanup.
+#
+# NAMESPACE CHOICE — submariner-operator (not a freshly-created namespace):
+#   OVN-K programs cross-cluster PBR rules per namespace. A brand-new namespace
+#   gets PBR rules only after OVN reconciles the new logical switch (several seconds).
+#   A probe pod in a fresh namespace can race against this reconciliation and miss
+#   the Submariner gateway route (exit 124) even though the IPsec tunnel is up.
+#   Using 'submariner-operator' — an existing namespace — guarantees OVN-K has
+#   already programmed the cross-cluster PBR rules. Only the probe pod is deleted.
 ProbeCclmSyncPort() {
     typeset srcKubeconfig="${1:?}"; (($#)) && shift
     typeset destIp="${1:?}"; (($#)) && shift
     typeset probeLabel="${1:?}"; (($#)) && shift
 
-    typeset -r probeNs="submariner-cclm-probe"
+    typeset -r probeNs="submariner-operator"
     typeset probePod="cclm-sync-probe-${probeLabel}"
 
-    KUBECONFIG="${srcKubeconfig}" oc create namespace "${probeNs}" \
-        --dry-run=client -o yaml --save-config | KUBECONFIG="${srcKubeconfig}" oc apply -f - 1>/dev/null
+    # Remove any stale pod from a prior run.
+    KUBECONFIG="${srcKubeconfig}" oc delete pod "${probePod}" \
+        -n "${probeNs}" --ignore-not-found --wait=true --timeout=30s 1>/dev/null 2>&1 || true
 
-    # bash ships in ubi9-minimal; no extra package install needed.
+    # Create probe pod without --rm so we can read its exit code from status.
     KUBECONFIG="${srcKubeconfig}" oc run "${probePod}" \
         -n "${probeNs}" \
-        --rm -i --restart=Never \
+        --restart=Never \
         --image=registry.redhat.io/ubi9/ubi-minimal:latest \
         --command -- \
-        timeout "${SUBMARINER_CCLM_SYNC_PROBE_TIMEOUT}" bash -c "echo >/dev/tcp/${destIp}/${SUBMARINER_CCLM_SYNC_PORT}" \
+        timeout "${SUBMARINER_CCLM_SYNC_PROBE_TIMEOUT}" bash -c \
+            "echo >/dev/tcp/${destIp}/${SUBMARINER_CCLM_SYNC_PORT}" \
         1>/dev/null
 
-    KUBECONFIG="${srcKubeconfig}" oc delete namespace "${probeNs}" \
-        --ignore-not-found --wait=false 1>/dev/null &
+    # Wait for pod to reach Succeeded (probe timeout + 60s scheduling buffer).
+    typeset -i waitSecs=$(( SUBMARINER_CCLM_SYNC_PROBE_TIMEOUT + 60 ))
+    KUBECONFIG="${srcKubeconfig}" oc wait "pod/${probePod}" \
+        -n "${probeNs}" \
+        --for=jsonpath='{.status.phase}'=Succeeded \
+        --timeout="${waitSecs}s" 1>/dev/null 2>&1 || true
+
+    # Read pod phase and container exit code reliably from pod status.
+    typeset phase exitCode
+    phase="$(KUBECONFIG="${srcKubeconfig}" oc get "pod/${probePod}" \
+        -n "${probeNs}" \
+        -o jsonpath='{.status.phase}' 2>/dev/null || echo 'Unknown')"
+    exitCode="$(KUBECONFIG="${srcKubeconfig}" oc get "pod/${probePod}" \
+        -n "${probeNs}" \
+        -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' \
+        2>/dev/null || echo '1')"
+
+    # Delete only the probe pod; leave the submariner-operator namespace untouched.
+    KUBECONFIG="${srcKubeconfig}" oc delete pod "${probePod}" \
+        -n "${probeNs}" --ignore-not-found --wait=false 1>/dev/null &
+
+    if [[ "${phase}" != "Succeeded" || "${exitCode}" != "0" ]]; then
+        : "CCLM sync probe FAILED → ${destIp}:${SUBMARINER_CCLM_SYNC_PORT} (phase=${phase}, exitCode=${exitCode:-unknown})" >&2
+        return 1
+    fi
     true
 }
 
 # ── VerifyCclmSyncPath — bidirectional sync-controller TCP reachability ───────
+# Uses _probesFailed tracking so both directions are always attempted before
+# returning failure (better diagnostics when one direction is broken).
 VerifyCclmSyncPath() {
     typeset kcSource="${1:?}"; (($#)) && shift
     typeset kcTarget="${1:?}"; (($#)) && shift
     typeset srcName="${1:?}"; (($#)) && shift
     typeset tgtName="${1:?}"; (($#)) && shift
 
-    typeset srcSyncIp tgtSyncIp
-
     [[ "${SUBMARINER_VERIFY_CCLM_SYNC}" == "true" ]] || return 0
 
+    typeset srcSyncIp tgtSyncIp
     srcSyncIp="$(GetSyncControllerPodIp "${kcSource}")"
     tgtSyncIp="$(GetSyncControllerPodIp "${kcTarget}")"
 
     [[ -n "${srcSyncIp}" ]] || {
         : "No Running virt-synchronization-controller pod IP on '${srcName}'"
-        false
+        return 1
     }
     [[ -n "${tgtSyncIp}" ]] || {
         : "No Running virt-synchronization-controller pod IP on '${tgtName}'"
-        false
+        return 1
     }
 
+    # Run both probe directions before returning — explicit tracking ensures
+    # both results are logged even when the first probe fails.
+    typeset -i _probesFailed=0
+
     : "CCLM sync probe ${srcName} -> ${tgtName} (${tgtSyncIp}:${SUBMARINER_CCLM_SYNC_PORT})"
-    ProbeCclmSyncPort "${kcSource}" "${tgtSyncIp}" "${srcName}-to-${tgtName}"
+    ProbeCclmSyncPort "${kcSource}" "${tgtSyncIp}" "${srcName}-to-${tgtName}" \
+        || _probesFailed=1
 
     : "CCLM sync probe ${tgtName} -> ${srcName} (${srcSyncIp}:${SUBMARINER_CCLM_SYNC_PORT})"
-    ProbeCclmSyncPort "${kcTarget}" "${srcSyncIp}" "${tgtName}-to-${srcName}"
+    ProbeCclmSyncPort "${kcTarget}" "${srcSyncIp}" "${tgtName}-to-${srcName}" \
+        || _probesFailed=1
 
-    true
+    (( _probesFailed == 0 ))
 }
 
-# ── VerifyConnectivity — run subctl verify between two spokes ─────────────────
+# ── VerifyConnectivity — run subctl verify between two clusters (opt-in) ──────
+# Skipped when SUBMARINER_RUN_SUBCTL_VERIFY=false (subctl not installed).
 VerifyConnectivity() {
     typeset kc1="${1:?}"; (($#)) && shift
     typeset kc2="${1:?}"; (($#)) && shift
     typeset name1="${1:?}"; (($#)) && shift
     typeset name2="${1:?}"; (($#)) && shift
+
+    [[ "${runSubctlVerify}" == "true" ]] || {
+        : "Skipping subctl verify for '${name1}↔${name2}' (SUBMARINER_RUN_SUBCTL_VERIFY=false)"
+        return 0
+    }
 
     typeset ctx1="${name1}-admin"
     typeset ctx2="${name2}-admin"
@@ -400,26 +842,122 @@ VerifyConnectivity() {
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 command -v oc 1>/dev/null
-command -v curl 1>/dev/null
+[[ "${runSubctlVerify}" == "true" ]] && command -v curl 1>/dev/null
 
 LoadSpokeConfig
 InstallSubctl
 
 typeset -i submarinerStepRc=0
 (
+    # bash set -e is suppressed inside ( ... ) || ... — use explicit || _stepFailed=1
+    # on every critical call and make (( _stepFailed == 0 )) the LAST command so
+    # the subshell exit code accurately reflects any failure.
+    typeset -i _stepFailed=0
     typeset -i i j
+
+    # ── Show initial gateway status ───────────────────────────────────────────
     for ((i = 0; i < spokeCount; i++)); do
-        ShowConnections "${spokeKubeconfigsArr[i]}"
+        ShowConnections "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
     done
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        ShowConnections "${KUBECONFIG}" "hub"
+    fi
 
-    WaitForConnectionsEstablished 600
+    # ── Wait for all tunnels to be connected ──────────────────────────────────
+    WaitForConnectionsEstablished 600 || _stepFailed=1
 
+    # ── Re-inject missing OVN cluster-router routes (belt-and-suspenders) ─────
+    # OCP 4.22 OVN-K IC mode: each node has its own local OVN NB DB.  The
+    # routeagent only programs spoke-CIDR routes on the gateway node's DB;
+    # worker nodes have no routes for remote CIDRs, causing Ncat: TIMEOUT.
+    # This mirrors the injection done in broker-join and ensures the routes are
+    # present immediately before subctl verify runs, in case anything cleared
+    # them between steps (routeagent reconciliation, pod restarts, etc.).
+    for ((i = 0; i < spokeCount; i++)); do
+        EnsureNonGatewayOvnRoutes \
+            "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}" || true
+    done
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        EnsureNonGatewayOvnRoutes "${KUBECONFIG}" "hub" || true
+    fi
+
+    # ── Dataplane symmetry diagnostic (GW-pinned vs worker-pinned probe) ────────
+    # Non-blocking: always runs after OVN route injection to confirm whether the
+    # fix worked and to isolate the failure layer if it did not.
+    # Uses the first virt-synchronization-controller pod IP on each remote cluster
+    # as the cross-cluster TCP target (same target used by VerifyCclmSyncPath).
+    # Spoke-to-spoke: probe from spoke[i] → sync-controller IP on spoke[j].
+    # Hub-spoke: probe from hub → sync-controller IP on spoke[i] and vice versa.
+    if [[ "${SUBMARINER_VERIFY_CCLM_SYNC}" == "true" ]]; then
+        for ((i = 0; i < spokeCount; i++)); do
+            for ((j = i + 1; j < spokeCount; j++)); do
+                typeset _diagDest
+                _diagDest="$(GetSyncControllerPodIp "${spokeKubeconfigsArr[j]}" || true)"
+                if [[ -n "${_diagDest}" ]]; then
+                    DiagnoseGatewayVsWorkerConnectivity \
+                        "${spokeKubeconfigsArr[i]}" \
+                        "${spokeNamesArr[i]}" \
+                        "${_diagDest}" \
+                        "${SUBMARINER_CCLM_SYNC_PORT:-8443}" \
+                        "s${i}to${j}" || true
+                fi
+                _diagDest="$(GetSyncControllerPodIp "${spokeKubeconfigsArr[i]}" || true)"
+                if [[ -n "${_diagDest}" ]]; then
+                    DiagnoseGatewayVsWorkerConnectivity \
+                        "${spokeKubeconfigsArr[j]}" \
+                        "${spokeNamesArr[j]}" \
+                        "${_diagDest}" \
+                        "${SUBMARINER_CCLM_SYNC_PORT:-8443}" \
+                        "s${j}to${i}" || true
+                fi
+            done
+        done
+        if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+            for ((i = 0; i < spokeCount; i++)); do
+                typeset _diagDest
+                _diagDest="$(GetSyncControllerPodIp "${spokeKubeconfigsArr[i]}" || true)"
+                if [[ -n "${_diagDest}" ]]; then
+                    DiagnoseGatewayVsWorkerConnectivity \
+                        "${KUBECONFIG}" \
+                        "hub" \
+                        "${_diagDest}" \
+                        "${SUBMARINER_CCLM_SYNC_PORT:-8443}" \
+                        "hubtospoke${i}" || true
+                fi
+                _diagDest="$(GetSyncControllerPodIp "${KUBECONFIG}" || true)"
+                if [[ -n "${_diagDest}" ]]; then
+                    DiagnoseGatewayVsWorkerConnectivity \
+                        "${spokeKubeconfigsArr[i]}" \
+                        "${spokeNamesArr[i]}" \
+                        "${_diagDest}" \
+                        "${SUBMARINER_CCLM_SYNC_PORT:-8443}" \
+                        "spoke${i}tohub" || true
+                fi
+            done
+        fi
+    fi
+
+    # ── Apply CCLM sync ingress NetworkPolicy (after tunnels confirmed up) ────
+    # Best-effort: a missing openshift-cnv namespace must not block verification.
+    for ((i = 0; i < spokeCount; i++)); do
+        AllowCclmSyncIngress "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
+    done
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        AllowCclmSyncIngress "${KUBECONFIG}" "hub"
+    fi
+
+    # ── Assert no Globalnet subnets ───────────────────────────────────────────
     for ((i = 0; i < spokeCount; i++)); do
         AssertNoGlobalnetSubnets \
             "${spokeKubeconfigsArr[i]}" \
-            "${spokeNamesArr[i]}"
+            "${spokeNamesArr[i]}" \
+            || _stepFailed=1
     done
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        AssertNoGlobalnetSubnets "${KUBECONFIG}" "hub" || _stepFailed=1
+    fi
 
+    # ── Service-discovery warmup (spoke↔spoke) ────────────────────────────────
     for ((i = 0; i < spokeCount; i++)); do
         for ((j = i + 1; j < spokeCount; j++)); do
             WarmUpServiceDiscovery \
@@ -430,26 +968,64 @@ typeset -i submarinerStepRc=0
         done
     done
 
+    # ── Service-discovery warmup (hub↔spoke) ──────────────────────────────────
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        for ((i = 0; i < spokeCount; i++)); do
+            WarmUpServiceDiscovery \
+                "${KUBECONFIG}" \
+                "${spokeKubeconfigsArr[i]}" \
+                "hub" \
+                "${spokeNamesArr[i]}"
+        done
+    fi
+
+    # ── subctl verify + CCLM sync probe (spoke↔spoke) ─────────────────────────
     for ((i = 0; i < spokeCount; i++)); do
         for ((j = i + 1; j < spokeCount; j++)); do
             VerifyConnectivity \
                 "${spokeKubeconfigsArr[i]}" \
                 "${spokeKubeconfigsArr[j]}" \
                 "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}"
+                "${spokeNamesArr[j]}" \
+                || _stepFailed=1
             VerifyCclmSyncPath \
                 "${spokeKubeconfigsArr[i]}" \
                 "${spokeKubeconfigsArr[j]}" \
                 "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}"
+                "${spokeNamesArr[j]}" \
+                || _stepFailed=1
         done
     done
 
-    : "Final connection status after verify"
+    # ── subctl verify + CCLM sync probe (hub↔spoke) ───────────────────────────
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        for ((i = 0; i < spokeCount; i++)); do
+            VerifyConnectivity \
+                "${KUBECONFIG}" \
+                "${spokeKubeconfigsArr[i]}" \
+                "hub" \
+                "${spokeNamesArr[i]}" \
+                || _stepFailed=1
+            VerifyCclmSyncPath \
+                "${KUBECONFIG}" \
+                "${spokeKubeconfigsArr[i]}" \
+                "hub" \
+                "${spokeNamesArr[i]}" \
+                || _stepFailed=1
+        done
+    fi
+
+    # ── Final gateway connection status ───────────────────────────────────────
+    : "Final gateway connection status"
     for ((i = 0; i < spokeCount; i++)); do
-        ShowConnections "${spokeKubeconfigsArr[i]}"
+        ShowConnections "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
     done
-    true
+    if [[ "${verifyHubSpoke}" == "true" && -r "${KUBECONFIG}" ]]; then
+        ShowConnections "${KUBECONFIG}" "hub"
+    fi
+
+    # LAST command: propagate any failure as the subshell exit code.
+    (( _stepFailed == 0 ))
 ) || submarinerStepRc=$?
 
 if (( submarinerStepRc != 0 )); then

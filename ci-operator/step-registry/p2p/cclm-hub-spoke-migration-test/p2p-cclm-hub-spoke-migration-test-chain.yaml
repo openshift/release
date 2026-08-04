@@ -1,0 +1,50 @@
+chain:
+  as: p2p-cclm-hub-spoke-migration-test
+  steps:
+    - ref: p2p-create-hub-spoke-test-vms
+    - ref: p2p-mtv-create-hub-spoke-maps
+    - ref: p2p-mtv-execute-hub-spoke-migration
+  documentation: |-
+    End-to-end bi-directional hub↔spoke CCLM migration test: create CNV VMs on both the ACM
+    hub cluster and a spoke cluster, create MTV migration maps for both directions, then execute
+    live migration hub→spoke and spoke→hub sequentially — all orchestrated by ACM-managed MTV
+    running on the hub.
+
+    Step 1 (p2p-create-hub-spoke-test-vms):
+      Creates P2P_HS_VM_COUNT ODF-backed RWX VMs on the hub (prefix P2P_HS_HUB_VM_PREFIX,
+      using KUBECONFIG) and P2P_HS_VM_COUNT VMs on the spoke (prefix P2P_HS_SPOKE_VM_PREFIX,
+      using SHARED_DIR spoke kubeconfig). Hub and spoke may use different ODF storage classes.
+
+    Step 2 (p2p-mtv-create-hub-spoke-maps):
+      Creates four MTV resources on the hub:
+        Hub→Spoke: NetworkMap + StorageMap (hub "host" provider → spoke provider).
+        Spoke→Hub: NetworkMap + StorageMap (spoke provider → hub "host" provider).
+      The MTV "host" provider (MTV_HS_HUB_PROVIDER) is auto-created by MTV at install time
+      and represents the hub cluster — no separate registration is needed.
+
+    Step 3 (p2p-mtv-execute-hub-spoke-migration):
+      Runs full CCLM preflights and executes:
+        Hub→Spoke: migrates hub VMs (MTV_HS_HUB_VM_PREFIX-1..N) from the hub cluster to the spoke.
+        Spoke→Hub: migrates spoke VMs (MTV_HS_SPOKE_VM_PREFIX-1..N) from the spoke to the hub cluster.
+      Both directions use MTV Plans and Migrations created on the ACM hub. Verifies all VMs
+      Running on the destination after each direction. Emits JUnit XML for Prow/Firewatch.
+
+    ACM integration:
+      MTV runs on the ACM hub. The hub itself participates as a KubeVirt endpoint via the
+      auto-created "host" provider. Spoke clusters are registered as OpenShift providers by
+      p2p-mtv-register-providers using ACM ManifestWork for RBAC. Submariner provides
+      cross-cluster pod-to-pod connectivity between hub and spoke.
+
+    Requires (in the workflow pre phase, in order):
+      - p2p-install-odf-hub (ODF on hub for RWX storage — must run before p2p-install-cnv-hub
+        so ODF can create the virt StorageClass after KubeVirt CRDs are registered)
+      - p2p-install-cnv-hub (CNV/KubeVirt on the hub cluster via direct OLM; enables
+        DecentralizedLiveMigration featureGate and waits for virt-synchronization-controller)
+      - p2p-acm-cnv-install-policy (CNV/HCO on spoke clusters via ACM ConfigurationPolicy;
+        does NOT install on the hub — that is handled by p2p-install-cnv-hub above)
+      - p2p-install-odf-spokes (ODF on spoke clusters for RWX storage)
+      - p2p-mtv-additional-config (ForkliftController with feature_ocp_live_migration=true)
+      - p2p-mtv-register-providers (spoke registered as MTV provider, Ready)
+      - acm-interop-p2p-submariner-install (pod-to-pod connectivity hub↔spoke, no Globalnet)
+
+    Debug mode: set P2P_CCLM_DEBUG_MODE=true so all steps log failures and exit 0.

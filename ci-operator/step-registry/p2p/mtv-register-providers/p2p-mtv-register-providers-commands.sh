@@ -66,7 +66,15 @@ ResolveSpokeInputs() {
         managedClusterNamesArr+=("$(tr -d '[:space:]' < "${SHARED_DIR}/managed-cluster-name")")
         [[ -n "${managedClusterNamesArr[0]}" ]]
         if [[ -n "${MTV_PROVIDER_NAME}" ]]; then
-            providerNamesArr+=("${MTV_PROVIDER_NAME}")
+            # Explicit single-spoke override (MTV_PROVIDER_NAME takes precedence).
+            providerNamesArr+=("$(tr -d '[:space:]' <<< "${MTV_PROVIDER_NAME}")")
+        elif [[ -n "${MTV_PROVIDER_NAMES}" ]]; then
+            # MTV_PROVIDER_NAMES (plural) also works for a single spoke — extract first entry.
+            typeset _firstName
+            IFS=',' read -r _firstName _ <<< "${MTV_PROVIDER_NAMES}"
+            _firstName="$(tr -d '[:space:]' <<< "${_firstName}")"
+            [[ -n "${_firstName}" ]]
+            providerNamesArr+=("${_firstName}")
         else
             providerNamesArr+=("${managedClusterNamesArr[0]}")
         fi
