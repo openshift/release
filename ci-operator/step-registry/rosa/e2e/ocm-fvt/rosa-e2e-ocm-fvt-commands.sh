@@ -126,12 +126,7 @@ umask "${old_umask}"
 } > "${podman_env_file}"
 
 if [[ -n "${hive_kubeconfig}" ]]; then
-  # --env preserves kubeconfig newlines (env-file cannot); disable tracing.
-  [[ $- == *x* ]] && WAS_TRACING_BP=true || WAS_TRACING_BP=false
-  set +x
-  export AWS_ACCOUNT_OPERATOR_KUBECONFIG
-  AWS_ACCOUNT_OPERATOR_KUBECONFIG="$(cat "${hive_kubeconfig}")"
-  $WAS_TRACING_BP && set -x
+  # Proxy for Hive reachability; AAO identity comes from vault, not elevate.
   echo "PATH=/usr/local/backplane-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >> "${podman_env_file}"
   echo "HOME=/home/ci-user" >> "${podman_env_file}"
   echo "HTTPS_PROXY=${backplane_proxy_url}" >> "${podman_env_file}"
@@ -157,12 +152,16 @@ fi
 
 osdfm_qe_creds_dir=/usr/local/osdfm-qe-credentials
 aao_kubeconfig_env=()
-# Prefer backplane-derived kubeconfig when enabled; do not override with the vault file.
-if [[ -z "${hive_kubeconfig}" && -f "${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig" ]]; then
+# Vault consumer kubeconfig (Tekton parity): live per-MC/SC AAO secrets, all regions.
+if [[ -f "${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig" ]]; then
   [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
   set +x
   aao_kubeconfig_env=("-e" "AWS_ACCOUNT_OPERATOR_KUBECONFIG=$(<"${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig")")
   $WAS_TRACING && set -x
+elif [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && -n "${hive_kubeconfig}" ]]; then
+  echo "ERROR: osdfm AAO tests need ${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig" >&2
+  echo "Elevated backplane kubeconfig cannot get secrets in osd-fleet-manager-aao." >&2
+  exit 1
 fi
 
 # DR_AWS_CREDENTIALS lets DR-account validation tests (e.g. OSDFM disaster_recovery_test.go,
@@ -194,7 +193,6 @@ podman_args=(
 
 if [[ -n "${hive_kubeconfig}" ]]; then
   podman_args+=(
-    --env AWS_ACCOUNT_OPERATOR_KUBECONFIG
     "-v" "${hive_kubeconfig}:/credentials-hive/kubeconfig:ro,z"
     "-v" "${backplane_bin_dir}:/usr/local/backplane-bin:ro,z"
     "-v" "${HOME}/.config:/home/ci-user/.config:ro,z"
