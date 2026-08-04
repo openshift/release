@@ -17,6 +17,7 @@ fi
 
 # Prow-only: Hive via ocm-backplane when OCM_FVT_USE_BACKPLANE=true (Jenkins/Tekton skip this).
 hive_kubeconfig=""
+hive_kubeconfig_src=""
 backplane_bin_dir=""
 backplane_proxy_url=""
 if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
@@ -78,6 +79,11 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   mkdir -p "${HOME}/.config/backplane"
   printf '{"proxy-url":"%s"}\n' "${backplane_proxy_url}" > "${HOME}/.config/backplane/config.json"
 
+  # Pin kubeconfig path — Prow may set KUBECONFIG elsewhere; sed must read the same file login writes.
+  hive_kubeconfig_src="$(mktemp /tmp/backplane-kubeconfig.XXXXXX)"
+  rm -f "${hive_kubeconfig_src}"
+  export KUBECONFIG="${hive_kubeconfig_src}"
+
   # Disable tracing due to client-secret handling on ocm login.
   [[ $- == *x* ]] && WAS_TRACING_BP=true || WAS_TRACING_BP=false
   set +x
@@ -87,8 +93,12 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
     --url="${backplane_ocm_url}"
   ocm-backplane login "${backplane_cluster_id}"
   $WAS_TRACING_BP && set -x
-  # Warm elevate: args after -- are oc verbs (not a shell command).
   ocm-backplane elevate "${backplane_elevate_reason}" -- whoami
+
+  if [[ ! -f "${KUBECONFIG}" ]]; then
+    echo "ERROR: backplane login did not write kubeconfig at ${KUBECONFIG}" >&2
+    exit 1
+  fi
 
   hive_kubeconfig="$(mktemp /tmp/hive-kubeconfig.XXXXXX)"
   chmod 0600 "${hive_kubeconfig}"
@@ -96,7 +106,7 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   sed -E \
     -e 's|command:[[:space:]]*ocm-backplane([[:space:]]*$)|command: /usr/local/backplane-bin/ocm-backplane\1|' \
     -e 's|command:[[:space:]]*ocm([[:space:]]*$)|command: /usr/local/backplane-bin/ocm\1|' \
-    "${HOME}/.kube/config" > "${hive_kubeconfig}"
+    "${KUBECONFIG}" > "${hive_kubeconfig}"
   echo "Backplane kubeconfig ready for cluster ${backplane_cluster_id}"
   echo "================================"
 fi
@@ -104,7 +114,7 @@ fi
 old_umask=$(umask)
 umask 077
 podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
-trap 'rm -f "${podman_env_file}"; rm -f "${hive_kubeconfig:-}"' EXIT
+trap 'rm -f "${podman_env_file}"; rm -f "${hive_kubeconfig:-}" "${hive_kubeconfig_src:-}"' EXIT
 umask "${old_umask}"
 
 {
@@ -116,10 +126,7 @@ umask "${old_umask}"
 } > "${podman_env_file}"
 
 if [[ -n "${hive_kubeconfig}" ]]; then
-  # Current ocmci image expects kubeconfig YAML content in the env var.
-  # Pass via --env (preserves newlines); env-file cannot. Path mount is
-  # available for newer ocm-backend-tests that accept a file path.
-  # Disable tracing while loading kubeconfig content into the env var.
+  # --env preserves kubeconfig newlines (env-file cannot); disable tracing.
   [[ $- == *x* ]] && WAS_TRACING_BP=true || WAS_TRACING_BP=false
   set +x
   export AWS_ACCOUNT_OPERATOR_KUBECONFIG
