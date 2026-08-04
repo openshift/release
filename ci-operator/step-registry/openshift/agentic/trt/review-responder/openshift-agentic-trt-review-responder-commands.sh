@@ -100,6 +100,18 @@ if [[ -f /workspace/.agentic/followup-config.md ]]; then
     cat /workspace/.agentic/followup-config.md >> "${SYSTEM_PROMPT}"
 fi
 
+# Append the address-review-pr skill instructions from the ai-helpers plugin
+REVIEW_SKILL="/opt/ai-helpers/plugins/openshift-developer/skills/address-review-pr/SKILL.md"
+REVIEW_SKILL_DIR="/opt/ai-helpers/plugins/openshift-developer/skills/address-review-pr"
+if [[ -f "${REVIEW_SKILL}" ]]; then
+    echo "" >> "${SYSTEM_PROMPT}"
+    echo "# Review Response Process" >> "${SYSTEM_PROMPT}"
+    echo "" >> "${SYSTEM_PROMPT}"
+    echo "Follow the implementation steps below to address PR review comments." >> "${SYSTEM_PROMPT}"
+    echo "" >> "${SYSTEM_PROMPT}"
+    sed "s|\${CLAUDE_SKILL_DIR}|${REVIEW_SKILL_DIR}|g" "${REVIEW_SKILL}" >> "${SYSTEM_PROMPT}"
+fi
+
 # --- Poll for review comments and CI failures ---
 echo "=== Watching PR #${PR_NUM} for review comments and CI failures ==="
 
@@ -146,7 +158,7 @@ while true; do
     [[ "${has_new_failures}" == "true" ]] && has_work=true
 
     if [[ "${has_work}" == "true" ]]; then
-        echo "New activity detected. Invoking /openshift-developer:address-review-pr..."
+        echo "New activity detected. Invoking Claude to address review comments..."
         idle_streak=0
         LAST_COMMENT_COUNT="${comment_total}"
 
@@ -155,7 +167,7 @@ while true; do
             --allowedTools "${ALLOWED_TOOLS}" \
             --output-format stream-json \
             --append-system-prompt-file "${SYSTEM_PROMPT}" \
-            -p "/openshift-developer:address-review-pr ${PR_NUM} --ci" \
+            -p "Address review comments on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. This is CI mode (--ci): do not ask interactive questions, make autonomous decisions." \
             --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
 
     else

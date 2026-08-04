@@ -93,7 +93,19 @@ if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
     cat "${WORKDIR}/.agentic/solve-config.md" >> "${SYSTEM_PROMPT}"
 fi
 
-# --- Run Claude with /jira:solve skill ---
+# Append the jira-solve skill instructions from the ai-helpers plugin
+SOLVE_SKILL="/opt/ai-helpers/plugins/openshift-developer/skills/jira-solve/SKILL.md"
+if [[ -f "${SOLVE_SKILL}" ]]; then
+    echo "" >> "${SYSTEM_PROMPT}"
+    echo "# Solve Process" >> "${SYSTEM_PROMPT}"
+    echo "" >> "${SYSTEM_PROMPT}"
+    echo "Follow the implementation steps below to solve the Jira issue." >> "${SYSTEM_PROMPT}"
+    echo "The Jira issue data is already provided above — skip the curl fetch in Step 1." >> "${SYSTEM_PROMPT}"
+    echo "" >> "${SYSTEM_PROMPT}"
+    cat "${SOLVE_SKILL}" >> "${SYSTEM_PROMPT}"
+fi
+
+# --- Run Claude to solve the issue ---
 echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
 
 CLAUDE_EXIT=0
@@ -102,7 +114,7 @@ timeout 5400 claude \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
     --append-system-prompt-file "${SYSTEM_PROMPT}" \
-    -p "/jira:solve ${JIRA_ISSUE_KEY} fork --ci" \
+    -p "Solve Jira issue ${JIRA_ISSUE_KEY}. Push to the fork remote. This is CI mode (--ci): skip interactive prompts, skip PR creation, and proceed automatically." \
     --verbose 2>&1 | tee "${WORKDIR}/artifacts/claude-output.log" || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
