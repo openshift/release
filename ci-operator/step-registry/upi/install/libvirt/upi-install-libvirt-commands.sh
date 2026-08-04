@@ -57,14 +57,13 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
   export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
-# oc may be provided via cli: latest; fail early with a clear message if still missing.
+# Fail early if oc is missing (cli: latest injects it for ≤4.15 images).
 if ! command -v oc >/dev/null 2>&1; then
   echo "ERROR: oc not found in PATH (needed to extract openshift-install from the payload)." >&2
-  echo "Ensure the step declares cli: latest or the libvirt-installer image includes oc." >&2
   exit 1
 fi
 
-# download openshift-install from the payload (version matches OPENSHIFT_INSTALL_TARGET, not the step image)
+# download openshift-install from the payload
 echo "Extracting openshift-install from the payload..."
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
   --command=openshift-install --to="${INSTALL_DIR}"
@@ -80,10 +79,8 @@ LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 # Simplify the virsh command
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 
-# True only when BRANCH is a known numeric OCP version older than 4.16.
-# Used to skip APIs that do not exist on ≤4.15. Unset/non-numeric BRANCH
-# (main/master) returns false so 4.16+ jobs keep their existing behavior.
-# Optional "release-" prefix is stripped.
+# Returns true when BRANCH is a numeric OCP version older than 4.16.
+# Non-numeric/unset BRANCH returns false (preserve 4.16+ behavior).
 branch_known_older_than_4_16() {
   local branch="${BRANCH:-}"
   branch="${branch#release-}"
@@ -97,11 +94,10 @@ branch_known_older_than_4_16() {
   }'
 }
 
-# Set when ensure_rhcos_resized successfully resized locally with qemu-img.
 RHCOS_RESIZED_LOCALLY=false
 
-# Resize RHCOS qcow before upload. 4.16+ images have qemu-img (same as before).
-# ocp/4.15:libvirt-installer often lacks it; caller then uses virsh vol-resize.
+# Resize RHCOS locally when qemu-img is available; otherwise upload as-is
+# and let the caller resize on the hypervisor with virsh vol-resize.
 ensure_rhcos_resized() {
   local image_path=$1
   local capacity=$2
@@ -116,7 +112,7 @@ ensure_rhcos_resized() {
   return 0
 }
 
-# Domain XML for guests when virt-install is absent (≤4.15 images).
+# Write guest domain XML for the virsh fallback path (no virt-install).
 write_upi_domain_xml() {
   local name=$1
   local mac=$2
@@ -380,8 +376,7 @@ else
       --pool ${POOL_NAME} \
       ${INSTALL_DIR}/${VOLUME_NAME}
 
-    # If local qemu-img was unavailable, expand the uploaded volume on the hypervisor.
-    # This is the only resize path in that case — fail loudly rather than proceed undersized.
+    # If local qemu-img was unavailable, resize on the hypervisor after upload.
     if [[ "${RHCOS_RESIZED_LOCALLY}" != "true" ]]; then
       if ! ${VIRSH} vol-resize --pool "${POOL_NAME}" "${VOLUME_NAME}" "${VOLUME_CAPACITY}"; then
         echo "ERROR: virsh vol-resize failed for ${VOLUME_NAME}; cannot reach capacity ${VOLUME_CAPACITY} without qemu-img" >&2
@@ -576,8 +571,7 @@ create_node () {
     clone_volume ${NAME}-volume
 
     echo "Creating ${NAME} vm..."
-    # 4.16+ libvirt-installer images include virt-install (unchanged path).
-    # ≤4.15 images typically do not; fall back to virsh define/start.
+    # Prefer virt-install (4.16+ images). Fall back to virsh when it is missing.
     if command -v virt-install >/dev/null 2>&1; then
       virt-install \
         --connect ${LIBVIRT_CONNECTION} \
@@ -592,10 +586,9 @@ create_node () {
         --noautoconsole \
         --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
     else
-      echo "virt-install not found; defining ${NAME} with virsh (≤4.15 libvirt-installer fallback)"
+      echo "virt-install not found; defining ${NAME} with virsh"
       DOMAIN_XML="${INSTALL_DIR}/${NAME}.xml"
       write_upi_domain_xml "${NAME}" "${MAC_ADDRESS}" "${IGNITION_VOLUME}" "${DOMAIN_XML}"
-      # Domain may not exist yet on first create; silence expected "failed to get domain" noise.
       ${VIRSH} destroy "${NAME}" >/dev/null 2>&1 || true
       ${VIRSH} undefine "${NAME}" >/dev/null 2>&1 || true
       ${VIRSH} define "${DOMAIN_XML}"
@@ -714,8 +707,7 @@ for i in {1..30}; do
   sleep 15
 done
 
-# Patch etcd for allowing slower disks (controlPlaneHardwareSpeed exists from 4.16+).
-# Skip only when BRANCH is known < 4.16 so existing 4.16+ VPN/UPI jobs are unchanged.
+# Patch etcd for slower disks. Skip on known BRANCH < 4.16 (API unavailable).
 if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
   if branch_known_older_than_4_16; then
     echo "Skipping etcd controlPlaneHardwareSpeed patch: BRANCH=${BRANCH} is older than 4.16"
