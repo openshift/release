@@ -67,7 +67,8 @@ mapt azure aks create \
   --spot \
   --spot-eviction-tolerance "low" \
   --spot-excluded-regions "centralindia" \
-  --enable-app-routing
+  --enable-app-routing \
+  --tags app-code=rhdh-003,service-phase=dev,cost-center=726,scenario=aks
 if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
   echo "[ERROR] ❌ kubeconfig file not found at ${SHARED_DIR}/kubeconfig"
   echo "[ERROR] ❌ Failed to create MAPT AKS cluster"
