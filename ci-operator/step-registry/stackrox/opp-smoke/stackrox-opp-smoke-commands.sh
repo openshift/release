@@ -32,11 +32,29 @@ STACKROX_REF="${STACKROX_REF:-main}"
 SCANNER_REF="${SCANNER_REF:-main}"
 
 # ---------------------------------------------------------------------------
+# Retry wrapper for network-dependent operations
+# ---------------------------------------------------------------------------
+retry_clone() {
+    local max_attempts=3
+    local attempt=1
+    while [[ $attempt -le $max_attempts ]]; do
+        if "$@"; then
+            return 0
+        fi
+        echo "[smoke] Clone attempt $attempt/$max_attempts failed, retrying in 10s..."
+        sleep 10
+        attempt=$((attempt + 1))
+    done
+    echo "[smoke] ERROR: Clone failed after $max_attempts attempts"
+    return 1
+}
+
+# ---------------------------------------------------------------------------
 # Sparse clone of stackrox/stackrox (qa-tests-backend + proto)
 # ---------------------------------------------------------------------------
 echo "[smoke] Sparse-cloning stackrox/stackrox..."
 cd /tmp
-git clone --depth 1 --filter=blob:none --sparse --branch "${STACKROX_REF}" \
+retry_clone git clone --depth 1 --filter=blob:none --sparse --branch "${STACKROX_REF}" \
     https://github.com/stackrox/stackrox.git stackrox
 cd stackrox
 git sparse-checkout set qa-tests-backend/ proto/
@@ -45,7 +63,7 @@ git sparse-checkout set qa-tests-backend/ proto/
 # Fetch scanner protos (no Go toolchain needed)
 # ---------------------------------------------------------------------------
 echo "[smoke] Fetching scanner protos..."
-git clone --depth 1 --filter=blob:none --sparse --branch "${SCANNER_REF}" \
+retry_clone git clone --depth 1 --filter=blob:none --sparse --branch "${SCANNER_REF}" \
     https://github.com/stackrox/scanner.git /tmp/scanner
 cd /tmp/scanner
 git sparse-checkout set proto/scanner
@@ -69,23 +87,21 @@ echo "[smoke] Running testSMOKE..."
 cd /tmp/stackrox/qa-tests-backend
 
 TEST_EXIT=0
-./gradlew testSMOKE -i --no-daemon || TEST_EXIT=$?
+./gradlew testSMOKE -i --no-daemon -Dorg.gradle.jvmargs="-Xmx3g" || TEST_EXIT=$?
 
 # ---------------------------------------------------------------------------
 # Copy JUnit XML results to ARTIFACT_DIR
 # ---------------------------------------------------------------------------
-echo "[smoke] Copying JUnit results to ARTIFACT_DIR..."
-if [[ -d build/test-results/testSMOKE ]]; then
-    cp -v build/test-results/testSMOKE/*.xml "${ARTIFACT_DIR}/" 2>/dev/null || true
-else
-    echo "[smoke] WARNING: No test results directory found at build/test-results/testSMOKE/"
-fi
-
-# Also copy HTML report if available
-if [[ -d build/reports/tests/testSMOKE ]]; then
-    mkdir -p "${ARTIFACT_DIR}/smoke-report"
-    cp -r build/reports/tests/testSMOKE/* "${ARTIFACT_DIR}/smoke-report/" 2>/dev/null || true
-fi
+collect_artifacts() {
+    if [[ -d build/test-results/testSMOKE ]]; then
+        cp -v build/test-results/testSMOKE/*.xml "${ARTIFACT_DIR}/" 2>/dev/null || true
+    fi
+    if [[ -d build/reports/tests/testSMOKE ]]; then
+        mkdir -p "${ARTIFACT_DIR}/smoke-report" 2>/dev/null || true
+        cp -r build/reports/tests/testSMOKE/* "${ARTIFACT_DIR}/smoke-report/" 2>/dev/null || true
+    fi
+}
+collect_artifacts || true
 
 echo "[smoke] Test run finished with exit code: ${TEST_EXIT}"
 exit "${TEST_EXIT}"
