@@ -58,7 +58,6 @@ roxie:
 central:
   namespace: stackrox
   earlyReadiness: false
-  exposure: loadbalancer
   spec:
     central:
       resources:
