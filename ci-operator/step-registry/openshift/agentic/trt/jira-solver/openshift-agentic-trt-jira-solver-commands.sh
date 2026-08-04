@@ -127,6 +127,11 @@ if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "
     exit 1
 fi
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
+    BASE_BRANCH=$(cat "${SHARED_DIR}/eval-base-branch" 2>/dev/null || echo "")
+    if [[ -n "${BASE_BRANCH}" && "${BRANCH_NAME}" == "${BASE_BRANCH}" ]]; then
+        echo "ERROR: Claude did not create a feature branch (still on base branch ${BASE_BRANCH})."
+        exit 1
+    fi
     EVAL_BRANCH="${BRANCH_NAME}-eval-$(date +%Y%m%d-%H%M%S)"
     echo "Eval mode: renaming branch ${BRANCH_NAME} -> ${EVAL_BRANCH}"
     git branch -m "${BRANCH_NAME}" "${EVAL_BRANCH}"
