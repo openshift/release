@@ -7,16 +7,25 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.24-linux
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 build_root:
   from_repository: true
 images:
   items:
   - dockerfile_path: Dockerfile
     from: base
+    inputs:
+      stolostron_builder_go1.25-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
     to: search-mcp-server
 promotion:
   to:
-  - name: "0.2"
+  - disabled: true
+    name: "0.2"
     namespace: stolostron
 resources:
   '*':
@@ -24,35 +33,55 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: search-mcp-server
-    env:
-      IMAGE_REPO: search-mcp-server
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: git-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-0.2
-    workflow: ocm-ci-fastforward
 - as: lint
   commands: |
     GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
   container:
     from: src
+- as: image-mirror-postsubmit
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-mcp-server
+    env:
+      IMAGE_REPO: search-mcp-server
+      IMAGE_TAG: v0.2.0
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow unit-test
   container:
     from: src
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-mcp-server
+    env:
+      IMAGE_REPO: search-mcp-server
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
-    go clean -cache -modcache
+    export SONAR_GO_TEST_ARGS="./... -coverpkg=./..."
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
@@ -62,7 +91,7 @@ tests:
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
-    go clean -cache -modcache
+    export SONAR_GO_TEST_ARGS="./... -coverpkg=./..."
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
@@ -71,6 +100,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-0.2
   org: stolostron
   repo: search-mcp-server
