@@ -408,6 +408,11 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
+    # Heterogeneous (s390x CP + amd64 workers) VPN profile replacing libvirt-s390x-amd64.
+    # TODO: expand/replace placeholder leases once Orange Zone x86 hypervisor inventory is known.
+    'libvirt-s390x-amd64-vpn-quota-slice': {
+        'libvirt-s390x-amd64-vpn-0-0': 1
+    },
     'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-s390x-vpn-oz-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
