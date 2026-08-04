@@ -5,13 +5,194 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-build_images(){
-oc delete namespace openshift-ptp || true
-oc create namespace openshift-ptp -o yaml | oc label -f - pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged || true
-# copy pull secrets in openshift-ptp namespace
-oc get secret pull-secret --namespace=openshift-config -oyaml | grep -v '^\s*namespace:\s' | oc apply --namespace=openshift-ptp -f -
-echo $KUBECONFIG
-jobdefinition='---
+# ===========================================================================
+# CONFIGURATION
+# Override any of these environment variables to customize the CI run.
+# All have sensible defaults — no changes needed for standard nightly CI.
+# ===========================================================================
+
+# --- OCP version under test ---
+# In CI this is set by the job definition. For local/manual runs, set it
+# to the release you are testing against (e.g. "4.22", "5.0").
+export T5CI_VERSION="${T5CI_VERSION:-5.0}"
+
+# --- Source repos and branches ---
+# Test code: repo and branch for the conformance test suite
+export TEST_REPO="${TEST_REPO:-https://github.com/k8snetworkplumbingwg/ptp-operator.git}"
+export TEST_BRANCH="${TEST_BRANCH:-main}"
+
+# Product under test: repo and branch for the operator being deployed
+if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
+  export PTP_REPO="${PTP_REPO:-https://github.com/k8snetworkplumbingwg/ptp-operator.git}"
+  export PTP_UNDER_TEST_BRANCH="${PTP_UNDER_TEST_BRANCH:-main}"
+  export DAEMON_REPO="${DAEMON_REPO:-https://github.com/k8snetworkplumbingwg/linuxptp-daemon.git}"
+  export CEP_REPO="${CEP_REPO:-https://github.com/redhat-cne/cloud-event-proxy.git}"
+else
+  export PTP_REPO="${PTP_REPO:-https://github.com/openshift/ptp-operator.git}"
+  export PTP_UNDER_TEST_BRANCH="${PTP_UNDER_TEST_BRANCH:-release-${T5CI_VERSION}}"
+fi
+
+# --- Test settings ---
+export PTP_LOG_LEVEL="${PTP_LOG_LEVEL:-debug}"
+export SKIP_INTERFACES="${SKIP_INTERFACES:-eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12399}"
+export COLLECT_POD_LOGS="${COLLECT_POD_LOGS:-true}"
+
+# --- Event API, consumer image, and test modes (version-dependent) ---
+# Event API and feature flags by release:
+#   Release  | EVENT_API_VERSION | ENABLE_V1_REGRESSION | Consumer image
+#   ---------+-------------------+----------------------+--------------------------
+#   4.12-4.15| 1.0               | false                | cloud-event-consumer:release-4.18
+#   4.16-4.17| 2.0               | true                 | cloud-event-consumer:release-4.18
+#   4.18     | 2.0               | false                | cloud-event-consumer:release-4.18
+#   4.19+    | 2.0               | false                | cloud-event-consumer:latest
+if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
+  export EVENT_API_VERSION="1.0"
+else
+  export EVENT_API_VERSION="2.0"
+fi
+
+if [[ "$T5CI_VERSION" =~ 4.1[6-7]+ ]]; then
+  export ENABLE_V1_REGRESSION="true"
+else
+  export ENABLE_V1_REGRESSION="false"
+fi
+
+# Test modes by release:
+#   Release  | oc | bc | dualnicbc | dualnicbcha | dualfollower | tbc | tgm
+#   ---------+----+----+-----------+-------------+--------------+-----+----
+#   4.12     | Y  | Y  |           |             |              |     |
+#   4.13-4.15| Y  | Y  | Y         |             |              |     |
+#   4.16-4.18| Y  | Y  | Y         | Y           |              |     |
+#   4.19     | Y  | Y  | Y         | Y           | Y            |     | Y
+#   4.20+    | Y  | Y  | Y         | Y           | Y            | Y   | Y
+if [[ "$T5CI_VERSION" == 4.12 ]]; then
+  export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:release-4.18}"
+  TEST_MODES=("bc" "oc")
+elif [[ "$T5CI_VERSION" =~ 4.1[3-5] ]]; then
+  export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:release-4.18}"
+  TEST_MODES=("dualnicbc" "bc" "oc")
+elif [[ "$T5CI_VERSION" =~ 4.1[6-8] ]]; then
+  export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:release-4.18}"
+  TEST_MODES=("dualnicbc" "dualnicbcha" "bc" "oc")
+elif [[ "$T5CI_VERSION" == 4.19 ]]; then
+  export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:latest}"
+  TEST_MODES=("tgm" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+else
+  # 4.20+
+  export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:latest}"
+  TEST_MODES=("tgm" "tbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+fi
+
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Build script that runs inside the podman builder pod.
+# Clones, builds, and pushes PTP operator / daemon / sidecar images.
+# Placeholder tokens (PTP_IMAGE, OPERATOR_VERSION, etc.) are substituted
+# by build_pod_definition() before the pod is created.
+# ---------------------------------------------------------------------------
+build_script() {
+  cat <<'BUILDSCRIPT'
+set -xe
+yum install jq git wget podman-docker -y
+yum group install "development-tools" -y
+wget https://go.dev/dl/go1.20.4.linux-amd64.tar.gz
+rm -rf /usr/local/go && tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+go version
+
+# set +x here to hide pass from log
+set +xe
+
+echo "podman login with serviceaccount"
+
+# Used for 4.16 and newer releases.
+pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".auth /var/run/secrets/openshift.io/push/.dockercfg )
+pass=`echo ${pass:1:-1} | base64 -d`
+podman login -u serviceaccount -p ${pass:8} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
+
+# Used for 4.15 and older releases.
+if ! podman login --get-login image-registry.openshift-image-registry.svc:5000 &> /dev/null; then
+  pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".password /var/run/secrets/openshift.io/push/.dockercfg )
+  podman login -u serviceaccount -p ${pass:1:-1} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
+fi
+
+set -xe
+
+export IMG=PTP_IMAGE
+export DAEMON_IMG="DAEMON_IMAGE"
+export SIDECAR_IMG="SIDECAR_IMAGE"
+
+export T5CI_VERSION="T5CI_VERSION_VAL"
+export USE_UPSTREAM="USE_UPSTREAM_VAL"
+
+# run latest release on upstream main branch
+if [[ "${USE_UPSTREAM:-false}" == "true" ]]; then
+  echo "Running on upstream main branch"
+  git clone --single-branch --branch main PTP_REPO_URL
+else
+  git clone --single-branch --branch OPERATOR_VERSION PTP_REPO_URL
+fi
+cd ptp-operator
+# OCPBUGS-52327 fix build due to libresolv.so link error
+sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
+# For UPSTREAM use Dockerfile for upstream contents
+if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ || "${USE_UPSTREAM:-false}" == "true" ]]; then
+  sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
+  make docker-build
+else
+  # Dockerfile is updated to upstream in 4.19+. Use .ocp or .ci versions for non-UPSTREAM runs
+  if [ -f "Dockerfile.ocp" ]; then
+    DOCKERFILE="Dockerfile.ocp"
+  else
+    DOCKERFILE="Dockerfile.ci"
+  fi
+  sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" "$DOCKERFILE"
+  podman build -t "${IMG}" -f "$DOCKERFILE"
+fi
+podman push ${IMG} --tls-verify=false
+cd ..
+
+if [[ "${USE_UPSTREAM:-false}" == "false" ]]; then
+  # If we a running a downstream run we are done
+  exit 0
+fi
+
+# If were running upstream we should also use the upstream daemon!
+echo "Running on upstream main branch of linuxptp-daemon"
+git clone --single-branch --branch main DAEMON_REPO_URL
+cd linuxptp-daemon
+# Split DAEMON_IMG into IMAGE_TAG_BASE and VERSION because
+# hack/build-image.sh unconditionally overwrites IMG from these two vars.
+IMAGE_TAG_BASE="${DAEMON_IMG%:*}" VERSION="${DAEMON_IMG##*:}" make image
+podman push ${DAEMON_IMG} --tls-verify=false
+cd ..
+
+echo "Running on main branch of cloud-event-proxy"
+git clone --single-branch --branch main CEP_REPO_URL
+cd cloud-event-proxy
+IMG=${SIDECAR_IMG} make podman-build
+podman push ${SIDECAR_IMG} --tls-verify=false
+cd ..
+BUILDSCRIPT
+}
+
+# ---------------------------------------------------------------------------
+# Assemble the RBAC + Pod YAML for the builder pod.
+# Substitutes all placeholder tokens and returns the final manifest on stdout.
+# Requires: dockercfg_secret (name of the builder-dockercfg-* secret)
+# ---------------------------------------------------------------------------
+build_pod_definition() {
+  local dockercfg_secret=$1
+  local script
+  script=$(build_script)
+
+  # Indent the build script to fit inside the YAML command block (10 spaces)
+  local indented_script
+  indented_script=$(echo "$script" | sed 's/^/          /')
+
+  cat <<EOF
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -57,88 +238,7 @@ spec:
         - /bin/bash
         - -c
         - |
-          set -xe
-          yum install jq git wget podman-docker -y
-          yum group install "development-tools" -y
-          wget https://go.dev/dl/go1.20.4.linux-amd64.tar.gz
-          rm -rf /usr/local/go && tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz
-          export PATH=$PATH:/usr/local/go/bin
-          go version
-
-          # set +x here to hide pass from log
-          set +xe
-
-          echo "podman login with serviceaccount"
-
-          # Used for 4.16 and newer releases.
-          pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".auth /var/run/secrets/openshift.io/push/.dockercfg )
-          pass=`echo ${pass:1:-1} | base64 -d`
-          podman login -u serviceaccount -p ${pass:8} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
-
-          # Used for 4.15 and older releases.
-          if ! podman login --get-login image-registry.openshift-image-registry.svc:5000 &> /dev/null; then
-            pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".password /var/run/secrets/openshift.io/push/.dockercfg )
-            podman login -u serviceaccount -p ${pass:1:-1} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
-          fi
-
-          set -x
-
-          export IMG=PTP_IMAGE
-          export DAEMON_IMG="DAEMON_IMAGE"
-          export SIDECAR_IMG="SIDECAR_IMAGE"
-
-          export T5CI_VERSION="T5CI_VERSION_VAL"
-          export USE_UPSTREAM="USE_UPSTREAM_VAL"
-
-          # run latest release on upstream main branch
-          if [[ "${USE_UPSTREAM:-false}" == "true" ]]; then
-            echo "Running on upstream main branch"
-            git clone --single-branch --branch main https://github.com/k8snetworkplumbingwg/ptp-operator.git
-          else
-            git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
-          fi
-          cd ptp-operator
-          # OCPBUGS-52327 fix build due to libresolv.so link error
-          sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
-          # For UPSTREAM use Dockerfile for upstream contents
-          if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ || "${USE_UPSTREAM:-false}" == "true" ]]; then
-            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
-            make docker-build
-          else
-            # Dockerfile is updated to upstream in 4.19+. Use .ocp or .ci versions for non-UPSTREAM runs
-            if [ -f "Dockerfile.ocp" ]; then
-              DOCKERFILE="Dockerfile.ocp"
-            else
-              DOCKERFILE="Dockerfile.ci"
-            fi
-            sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" "$DOCKERFILE"
-            podman build -t "${IMG}" -f "$DOCKERFILE"
-          fi
-          podman push ${IMG} --tls-verify=false
-          cd ..
-
-          if [[ "${USE_UPSTREAM:-false}" == "false" ]]; then
-            # If we a running a downstream run we are done
-            exit 0
-          fi
-
-          # If were running upstream we should also use the upstream daemon!
-          echo "Running on upstream main branch of linuxptp-daemon"
-          git clone --single-branch --branch main https://github.com/k8snetworkplumbingwg/linuxptp-daemon.git
-          cd linuxptp-daemon
-          # Split DAEMON_IMG into IMAGE_TAG_BASE and VERSION because
-          # hack/build-image.sh unconditionally overwrites IMG from these two vars.
-          IMAGE_TAG_BASE="${DAEMON_IMG%:*}" VERSION="${DAEMON_IMG##*:}" make image
-          podman push ${DAEMON_IMG} --tls-verify=false
-          cd ..
-
-          echo "Running on main branch of cloud-event-proxy"
-          git clone --single-branch --branch main https://github.com/redhat-cne/cloud-event-proxy.git
-          cd cloud-event-proxy
-          IMG=${SIDECAR_IMG} make podman-build
-          podman push ${SIDECAR_IMG} --tls-verify=false
-          cd ..
-
+${indented_script}
       securityContext:
         privileged: true
       volumeMounts:
@@ -154,23 +254,30 @@ spec:
         items:
         - key: .dockerconfigjson
           path: config.json
-
     - name: dockercfg
       secret:
-        secretName: BUILDER_DOCKERCFG
+        secretName: ${dockercfg_secret}
         defaultMode: 384
-'
+EOF
+}
 
-  jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<<"$jobdefinition")
-  jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<<"$jobdefinition")
-  jobdefinition=$(sed "s#DAEMON_IMAGE#${DAEMON_IMG}#" <<<"$jobdefinition")
-  jobdefinition=$(sed "s#SIDECAR_IMAGE#${SIDECAR_IMG}#" <<<"$jobdefinition")
-  jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<<"$jobdefinition")
-  jobdefinition=$(sed "s#USE_UPSTREAM_VAL#${T5CI_DEPLOY_UPSTREAM:-false}#" <<<"$jobdefinition")
-  #oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
+# ---------------------------------------------------------------------------
+# Build PTP images: create namespace, RBAC, builder pod, wait for completion.
+# ---------------------------------------------------------------------------
+build_images() {
+  oc delete namespace openshift-ptp || true
+  oc create namespace openshift-ptp -o yaml | oc label -f - \
+    pod-security.kubernetes.io/enforce=privileged \
+    pod-security.kubernetes.io/audit=privileged \
+    pod-security.kubernetes.io/warn=privileged || true
+  oc get secret pull-secret --namespace=openshift-config -oyaml \
+    | grep -v '^\s*namespace:\s' | oc apply --namespace=openshift-ptp -f -
+  echo "$KUBECONFIG"
 
   retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
-  dockercgf=""
+
+  # Wait for builder-dockercfg secret
+  local dockercgf=""
   for i in $(seq 1 80); do
     dockercgf=$(oc --request-timeout=10s -n openshift-ptp get secret \
       -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
@@ -185,14 +292,25 @@ spec:
     echo "[ERROR] builder-dockercfg secret not found after 400s"
     exit 1
   fi
-  jobdefinition=${jobdefinition//BUILDER_DOCKERCFG/${dockercgf}}
+
+  # Generate pod definition with all tokens substituted
+  local jobdefinition
+  jobdefinition=$(build_pod_definition "${dockercgf}")
+  jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#PTP_REPO_URL#${PTP_REPO}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#DAEMON_REPO_URL#${DAEMON_REPO:-}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#CEP_REPO_URL#${CEP_REPO:-}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#DAEMON_IMAGE#${DAEMON_IMG}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#SIDECAR_IMAGE#${SIDECAR_IMG}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#USE_UPSTREAM_VAL#${T5CI_DEPLOY_UPSTREAM:-false}#" <<<"$jobdefinition")
+
   echo "$jobdefinition"
   echo "$jobdefinition" | oc apply -f -
 
-  success=0
-  iterations=0
-  sleep_time=10
-  max_iterations=72 # results in 12 minutes timeout
+  # Wait for builder pod to complete
+  local success=0 iterations=0 sleep_time=10 max_iterations=72
   until [[ $success -eq 1 ]] || [[ $iterations -eq $max_iterations ]]; do
     run_status=$(oc -n openshift-ptp get pod podman -o json | jq '.status.phase' | tr -d '"')
     if [ "$run_status" == "Succeeded" ]; then
@@ -203,7 +321,6 @@ spec:
     sleep $sleep_time
   done
 
-  # print the build logs
   oc -n openshift-ptp logs podman
 
   if [[ $success -eq 1 ]]; then
@@ -255,6 +372,9 @@ set_events_output_file() {
   sed -i -E 's@(event_output_file:\s*)(.*)@event_output_file: '"${ARTIFACT_DIR}"'/event_log_'"${PTP_TEST_MODE}"'.csv@g' "${SHARED_DIR}"/test-config.yaml
 }
 
+# ---------------------------------------------------------------------------
+# Parse E2E test config overrides
+# ---------------------------------------------------------------------------
 echo "************ telco5g cnf-tests commands ************"
 
 if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
@@ -272,20 +392,13 @@ fi
 
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
-# always use the latest test code
-export TEST_BRANCH="main"
-
-# run latest release on upstream main branch
-if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
-  export PTP_UNDER_TEST_BRANCH="main"
-else
-  export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
-fi
 export IMG_VERSION="release-${T5CI_VERSION}"
 
+# ---------------------------------------------------------------------------
+# Pre-flight checks
+# ---------------------------------------------------------------------------
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
-# Fail fast if any node is not Ready
 echo "************ Checking node readiness ************"
 oc get nodes -owide
 NOT_READY_NODES=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | grep -v "True$" || true)
@@ -303,9 +416,13 @@ fi
 echo "[INFO] All ${TOTAL_NODES} nodes are Ready."
 echo "***************************************************"
 
-# Set go version
+# ---------------------------------------------------------------------------
+# Build and deploy PTP operator
+# ---------------------------------------------------------------------------
 if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
   source "$HOME"/golang-1.20
+elif [[ "$T5CI_VERSION" =~ ^[5-9]\. ]]; then
+  source "$HOME"/golang-1.25.0
 else
   source "$HOME"/golang-1.22.4
 fi
@@ -332,13 +449,8 @@ export PATH=$HOME/bin:$PATH
 
 oc version --client
 
-# deploy ptp-operator
-if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
-  echo "Running on upstream main branch"
-  git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
-else
-  git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
-fi
+echo "Cloning ptp-operator from ${PTP_REPO} branch ${PTP_UNDER_TEST_BRANCH}"
+git clone "${PTP_REPO}" -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 
 cd ptp-operator-under-test
 
@@ -358,60 +470,23 @@ fi
 # wait until the linuxptp-daemon pods are ready
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
 
-# patching to add events
-if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
-  export EVENT_API_VERSION="1.0"
+# ---------------------------------------------------------------------------
+# Enable PTP events on the cluster
+# ---------------------------------------------------------------------------
+if [[ "$EVENT_API_VERSION" == "1.0" ]]; then
   oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 else
-  export EVENT_API_VERSION="2.0"
   oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "apiVersion":"2.0"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 fi
 
-if [[ "$T5CI_VERSION" =~ 4.1[6-7]+ ]]; then
-  export ENABLE_V1_REGRESSION="true"
-else
-  export ENABLE_V1_REGRESSION="false"
-fi
-
-if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
-  echo "Version is less than 4.19"
-  # release-4.18 consumer image supports event API v1
-  export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:release-4.18"
-  TEST_MODES=("dualnicbc" "dualnicbcha" "bc" "oc")
-
-  # DualNICBoundaryClockHA test mode is only supported from 4.16 onwards,
-  # so if the version is less than 4.16, remove it from the list
-  if [[ "$T5CI_VERSION" =~ 4.1[2-5] ]]; then
-    TEST_MODES=("${TEST_MODES[@]/dualnicbcha}")
-  fi
-
-  # DualNICBoundaryClock test mode is only supported from 4.13 onwards,
-  # so if the version is less than 4.13, remove it from the list
-  if [[ "$T5CI_VERSION" == 4.12 ]]; then
-    TEST_MODES=("${TEST_MODES[@]/dualnicbc}")
-  fi
-
-else
-  echo "Version is 4.19 or greater"
-  export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
-  # Only run tgm and dualfollower tests from 4.19 onwards
-  TEST_MODES=("tgm" "tbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
-
-  # T-BC test mode is only supported from 4.20 onwards,
-  # so if the version is 4.19 then, remove it from the list
-  if [[ "$T5CI_VERSION" == 4.19 ]]; then
-    TEST_MODES=("${TEST_MODES[@]/tbc}")
-  fi
-fi
-
-# wait for the linuxptp-daemon to be deployed
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
 
-# Run ptp conformance test
+# ---------------------------------------------------------------------------
+# Clone test code and run conformance tests
+# ---------------------------------------------------------------------------
 cd -
-echo "running conformance tests from branch ${TEST_BRANCH}"
-# always run test from latest upstream
-git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+echo "running conformance tests from ${TEST_REPO} branch ${TEST_BRANCH}"
+git clone "${TEST_REPO}" -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
@@ -465,27 +540,20 @@ soaktest:
 EOF
 
 
-# Setup log collection with test markers
-export COLLECT_POD_LOGS=${COLLECT_POD_LOGS:-true}
+# --- Log collection and output directories ---
 export LOG_TEST_MARKERS=true
 export LOG_ARTIFACTS_DIR="${ARTIFACT_DIR}/pod-logs"
-mkdir -p $LOG_ARTIFACTS_DIR
-
-# Set output directory
+mkdir -p "$LOG_ARTIFACTS_DIR"
 export JUNIT_OUTPUT_DIR=${ARTIFACT_DIR}
-
-export PTP_LOG_LEVEL=debug
-export SKIP_INTERFACES=eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12399
 export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
 
-# wait before first run
-# wait more to let openshift complete initialization
-sleep 300
+# ---------------------------------------------------------------------------
+# Run test suites for each mode
+# ---------------------------------------------------------------------------
+sleep 300  # wait for openshift to complete initialization
 
-# get RTC logs
-print_time
+print_time  # RTC logs
 
-# Run tests
 for mode in "${TEST_MODES[@]}"; do
   echo "Running tests for PTP_TEST_MODE=${mode}"
 
@@ -502,8 +570,10 @@ for mode in "${TEST_MODES[@]}"; do
   print_time
 done
 
+# ---------------------------------------------------------------------------
+# Collect results and determine exit status
+# ---------------------------------------------------------------------------
 status=0
-# Display all statuses
 for mode in "${TEST_MODES[@]}"; do
   temp_status="temp_status_${mode}"
   # If the variable is not set return an error
@@ -522,13 +592,11 @@ for mode in "${TEST_MODES[@]}"; do
   fi
 done
 
-# allows commands to fail without returning
+# ---------------------------------------------------------------------------
+# Cleanup and publish results
+# ---------------------------------------------------------------------------
 set +e
-
-# clean up, undeploy ptp-operator
 make undeploy
-
-# publishing results
 cd -
 
 python3 -m venv "${SHARED_DIR}"/myenv
