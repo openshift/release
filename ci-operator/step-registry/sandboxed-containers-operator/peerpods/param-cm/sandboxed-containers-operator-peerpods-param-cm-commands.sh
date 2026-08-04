@@ -248,10 +248,12 @@ create_osc_managed_identity() {
     echo "Assigning roles to managed identity..."
     for ROLE in "Reader" "Virtual Machine Contributor" "Network Contributor" "Storage Account Contributor" "Compute Gallery Artifacts Publisher"; do
         echo "Assigning role: ${ROLE}"
-        az role assignment create \
+        ASSIGNMENT_ID=$(az role assignment create \
             --role "${ROLE}" \
             --assignee "${OSC_IDENTITY_PRINCIPAL_ID}" \
-            --scope "${SUBSCRIPTION_SCOPE}"
+            --scope "${SUBSCRIPTION_SCOPE}" \
+            --query id -o tsv)
+        echo "${ASSIGNMENT_ID}" >> "${SHARED_DIR}/osc-azure-role-assignment-ids"
     done
 
     # Get OIDC issuer URL from cluster
