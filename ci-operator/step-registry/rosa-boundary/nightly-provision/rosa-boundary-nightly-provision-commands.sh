@@ -13,7 +13,8 @@ chmod +x /tmp/terraform
 echo "Installing AWS CLI v2..."
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
 unzip -q /tmp/awscliv2.zip -d /tmp/
-/tmp/aws/install
+/tmp/aws/install --install-dir /tmp/aws-cli --bin-dir /tmp/bin
+export PATH="/tmp/bin:${PATH}"
 
 # AWS credentials come from mounted secret via AWS_CONFIG_FILE env var
 # Default to us-east-1 if no region specified

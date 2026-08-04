@@ -2,12 +2,19 @@
 
 set -euo pipefail
 
-# Install terraform (same as provision)
+# Install terraform
 TERRAFORM_VERSION="1.9.5"
 echo "Installing Terraform ${TERRAFORM_VERSION}..."
 curl -L -o /tmp/terraform.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
 unzip /tmp/terraform.zip -d /tmp/
 chmod +x /tmp/terraform
+
+# Install AWS CLI v2 (needed for terraform AWS provider)
+echo "Installing AWS CLI v2..."
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+unzip -q /tmp/awscliv2.zip -d /tmp/
+/tmp/aws/install --install-dir /tmp/aws-cli --bin-dir /tmp/bin
+export PATH="/tmp/bin:${PATH}"
 
 # AWS credentials come from mounted secret via AWS_CONFIG_FILE env var
 # Default to us-east-1 if no region specified
