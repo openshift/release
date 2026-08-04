@@ -15,8 +15,8 @@ export ROLE_WORKER_CNF=worker-cnf
 TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
 NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
 NTO_BRANCH=$(git ls-remote --heads ${NTO_REPO} main | grep -q 'refs/heads/main'  && echo 'main' || echo 'master')
-GINKGO_LABEL="uncore-cache"
-GINKGO_SUITES="test/e2e/performanceprofile/functests/13_llc"
+GINKGO_LABEL="tier-0 || tier-1 || tier-2 || uncore-cache"
+GINKGO_SUITES="test/e2e/performanceprofile/functests"
 
 [[ -f "${SHARED_DIR}"/main.env ]] && source "${SHARED_DIR}"/main.env || echo "No main.env file found"
 
@@ -132,6 +132,7 @@ export GOPATH="${HOME}"/go
 export GOBIN="${GOPATH}"/bin
 export IMAGE_REGISTRY=quay.io/openshift-kni/
 export CNF_TESTS_IMAGE=cnf-tests:latest
+export BUSY_CPUS_IMAGE=cnf-tests:latest
 
 ## Print the nodes in the cluster
 oc get nodes
@@ -174,11 +175,10 @@ pip install -r "${SHARED_DIR}"/telco5gci/requirements.txt
 
 for junit_file in "${ARTIFACT_DIR}"/*.xml; do
     if [ ! -e "${junit_file}" ]; then
-        echo "No XML files found in ${ARTIFACTS_DIR}."
+        echo "No XML files found in ${ARTIFACT_DIR}."
         exit 0
     fi
     output_file="${junit_file%.xml}.html"
-    # Run j2html.py on the XML file
     echo "Processing ${junit_file} -> ${output_file}"
     python "${SHARED_DIR}"/telco5gci/j2html.py "${junit_file}" -o "${output_file}"
     if [[ $? -ne 0 ]]; then
@@ -186,17 +186,13 @@ for junit_file in "${ARTIFACT_DIR}"/*.xml; do
          exit 1;
     fi
 
-    # create json reports
     json_output_file="${junit_file%.xml}.json"
     python "${SHARED_DIR}"/telco5gci/junit2json.py "${junit_file}" -o "${json_output_file}"
 done
 
-# Run junitparser merge
-
 xml_files=("$ARTIFACT_DIR"/*.xml)
 output_file="${ARTIFACT_DIR}"/junit.xml
 
-# Merge XML files using junitparser
 echo "Merging XML files into ${output_file}"
 junitparser merge "${xml_files[@]}" "${output_file}"
 
