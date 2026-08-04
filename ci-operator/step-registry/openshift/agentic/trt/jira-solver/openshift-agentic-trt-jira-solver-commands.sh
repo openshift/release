@@ -114,7 +114,14 @@ timeout 5400 claude \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
     --append-system-prompt-file "${SYSTEM_PROMPT}" \
-    -p "Solve Jira issue ${JIRA_ISSUE_KEY}. Push to the fork remote. This is CI mode (--ci): skip interactive prompts, skip PR creation, and proceed automatically." \
+    -p "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
+
+Key requirements:
+1. Create a feature branch (e.g. fix-${JIRA_ISSUE_KEY}) — do NOT commit on the current branch.
+2. Push the branch to the fork remote.
+3. Write the PR description to ${WORKDIR}/artifacts/pr-description.md.
+
+This is CI mode (--ci): skip interactive prompts, skip PR creation, and proceed automatically." \
     --verbose 2>&1 | tee "${WORKDIR}/artifacts/claude-output.log" || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
