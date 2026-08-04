@@ -226,6 +226,47 @@ podman inspect \
   || echo "WARNING: failed to get ocmci image digest"
 echo "=========================="
 
+# Temporary AAO/Hive reachability probe (remove after ROSAENG-62716 diagnosis).
+# Uses the same nested container env as ocmtest. Keep xtrace off while aao
+# kubeconfig is on argv; never cat/echo the kubeconfig or copy it to ARTIFACT_DIR.
+# Prefer process substitution over a named kubeconfig file so the SA token is
+# not left on disk (tests already materialize it via SetupHiveAAOKubeconfig).
+if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && ${#aao_kubeconfig_env[@]} -gt 0 ]]; then
+  echo "=== AAO Hive reachability probe ==="
+  [[ $- == *x* ]] && WAS_TRACING_PROBE=true || WAS_TRACING_PROBE=false
+  set +x
+  podman run --rm \
+    "${podman_args[@]}" \
+    "${aao_kubeconfig_env[@]}" \
+    quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
+    bash -lc '
+      echo "--- proxy env ---"
+      env | grep -iE "^(HTTPS?_PROXY|https?_proxy|NO_PROXY|no_proxy)=" || echo "(no proxy env)"
+      echo "--- DNS ---"
+      getent hosts api.hivei01ue1.f7i5.p1.openshiftapps.com || true
+      echo "--- curl via HTTPS_PROXY ---"
+      if [[ -n "${HTTPS_PROXY:-}" ]]; then
+        curl -v -x "${HTTPS_PROXY}" --connect-timeout 10 \
+          "https://api.hivei01ue1.f7i5.p1.openshiftapps.com:6443/" || true
+      else
+        echo "HTTPS_PROXY unset; skipping curl"
+      fi
+      echo "--- oc with consumer kubeconfig ---"
+      if [[ -z "${AWS_ACCOUNT_OPERATOR_KUBECONFIG:-}" ]]; then
+        echo "AWS_ACCOUNT_OPERATOR_KUBECONFIG unset; skipping oc"
+      elif ! command -v oc >/dev/null 2>&1; then
+        echo "oc not in PATH; skipping oc"
+      else
+        # /dev/fd process substitution — no named file under /tmp
+        oc --kubeconfig <(printf "%s" "$AWS_ACCOUNT_OPERATOR_KUBECONFIG") \
+          --request-timeout=15s \
+          get secrets -n osd-fleet-manager-aao 2>&1 | head -20 || true
+      fi
+    ' || echo "WARNING: AAO Hive reachability probe failed"
+  $WAS_TRACING_PROBE && set -x
+  echo "=== end probe ==="
+fi
+
 echo "Running ocmtest: ${ocmtest_args[*]}"
 exit_code=0
 # aao_kubeconfig_env / dr_aws_creds_env may hold raw secret contents as literal
