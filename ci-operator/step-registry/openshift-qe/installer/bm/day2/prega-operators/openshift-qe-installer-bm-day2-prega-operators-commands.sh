@@ -13,17 +13,28 @@ bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 get_idms_manifest() {
   echo "Getting the ImageDigestMirrorSet manifest from the PREGA build server"
   QUAY_URL="https://quay.io/api/v1/repository/prega/prega-operator-index/tag/?limit=100&page=1"
-  OCP_VERSION=$(oc get clusterversion --no-headers | grep -o '[4].[0-9][0-9]' | head -1 | awk '{print "v"$0}')
+  OCP_VERSION=$(oc get clusterversion --no-headers | grep -oE '[0-9]+\.[0-9]+' | head -1 | awk '{print "v"$0}')
   DIGEST=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg tag "$OCP_VERSION" '.tags[] | select(.name == $tag) | .manifest_digest' | head -1)
   OPERATOR_PREGA_VERSION=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg digest "$DIGEST" --arg tag "$OCP_VERSION" '.tags[] | select(.manifest_digest == $digest and .name != $tag) | .name' | sort -u)
+  if [[ -z "${OPERATOR_PREGA_VERSION}" ]]; then
+    echo "OPERATOR_PREGA_VERSION could not be resolved from Quay; falling back to OCP_VERSION: ${OCP_VERSION}"
+    OPERATOR_PREGA_VERSION="${OCP_VERSION}"
+  fi
   echo "PREGA Operator Version: ${OPERATOR_PREGA_VERSION} for OCP Version: ${OCP_VERSION}"
   ssh ${SSH_ARGS} root@${bastion} "
     set -e
     set -o pipefail
-    export OPERATOR_PREGA_VERSION=v4.22-20260709T152629
     curl -k -o /tmp/idms.yaml https://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
   "
   scp -q ${SSH_ARGS} root@${bastion}:/tmp/idms.yaml /tmp/idms.yaml
+
+  if ! python3 -c 'import yaml,sys; yaml.safe_load(open("/tmp/idms.yaml"))' 2>/dev/null; then
+    echo "Downloaded /tmp/idms.yaml is not valid YAML; falling back to bastion artifact for ${OCP_VERSION}"
+    scp -q ${SSH_ARGS} root@${bastion}:/root/prega_artifacts/idms_${OCP_VERSION}.yaml /tmp/idms.yaml
+    python3 -c 'import yaml,sys; yaml.safe_load(open("/tmp/idms.yaml"))' \
+      || { echo "Fallback IDMS /root/prega_artifacts/idms_${OCP_VERSION}.yaml is also invalid or missing"; exit 1; }
+  fi
+
   echo "ImageDigestMirrorSet manifest saved to /tmp/idms.yaml"
 }
 
