@@ -4,9 +4,10 @@ workflow:
     allow_best_effort_post_steps: true
     env:
       # Same-arch compute during initial VPN install; day-2 workers come from
-      # upi-install-libvirt-heterogeneous (ZX: s390x CP + x86_64 workers).
+      # upi-install-libvirt-heterogeneous. Jobs must set ARCH + ADDITIONAL_WORKER_ARCHITECTURE:
+      #   ZX (multi-z-xz): ARCH=s390x, ADDITIONAL_WORKER_ARCHITECTURE=x86_64
+      #   XZ (multi-x-xz): ARCH=amd64, ADDITIONAL_WORKER_ARCHITECTURE=s390x
       COMPUTE_COUNT: "0"
-      ADDITIONAL_WORKER_ARCHITECTURE: "x86_64"
     pre:
     - ref: upi-libvirt-cleanup-pre
     - chain: upi-conf-libvirt
@@ -22,11 +23,16 @@ workflow:
     - ref: upi-libvirt-cleanup-post
   documentation: |-
     VPN-based heterogeneous libvirt e2e for IBM Z Orange Zone / intranet.
-    Installs an s390x control-plane cluster via the homogeneous VPN UPI path
-    (leases file, USE_EXTERNAL_DNS, cleanup pre/post), then adds additional
+    Installs a control-plane cluster via the homogeneous VPN UPI path
+    (leases file, USE_EXTERNAL_DNS, cleanup pre/post), then adds opposite-
     architecture workers with upi-install-libvirt-heterogeneous.
 
-    Intended cluster_profile: libvirt-s390x-amd64-vpn (replaces libvirt-s390x-amd64).
-    Replaces openshift-e2e-libvirt-upi-heterogeneous for on-prem ZX jobs.
-    XZ (amd64 CP + s390x workers, today ocp-e2e-ibmcloud-ovn-multi-x-xz) is out of
-    scope for v1 of this workflow.
+    Supports both on-prem topologies that replace today's jobs:
+      ZX — ocp-e2e-ovn-remote-libvirt-multi-z-xz
+           (was libvirt-s390x-amd64 / openshift-e2e-libvirt-upi-heterogeneous)
+      XZ — ocp-e2e-ovn-remote-libvirt-multi-x-xz
+           (was ibmcloud ocp-e2e-ibmcloud-ovn-multi-x-xz /
+            openshift-e2e-ibmcloud-heterogeneous)
+
+    Intended cluster_profile: libvirt-s390x-amd64-vpn.
+    Jobs must set ARCH and ADDITIONAL_WORKER_ARCHITECTURE appropriately.

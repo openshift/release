@@ -9,7 +9,9 @@ ref:
   - name: ADDITIONAL_WORKER_ARCHITECTURE
     default: "x86_64"
     documentation: |-
-      Heterogeneous worker architecture. v1 supports x86_64 only (ZX: s390x CP + amd64 workers).
+      Architecture of day-2 workers.
+      ZX (s390x CP + amd64 workers): x86_64 or amd64
+      XZ (amd64 CP + s390x workers): s390x
   - name: DOMAIN_MEMORY
     documentation: The memory to allocate for each additional guest, in KiB
     default: "25156824"
@@ -36,11 +38,16 @@ ref:
     Adds day-2 multi-architecture compute nodes to an already-installed VPN libvirt
     cluster using lease metadata from ${CLUSTER_PROFILE_DIR}/leases.
 
+    Supports both topologies:
+      ZX — ARCH=s390x, ADDITIONAL_WORKER_ARCHITECTURE=x86_64|amd64
+      XZ — ARCH=amd64, ADDITIONAL_WORKER_ARCHITECTURE=s390x
+
     Expected lease fields for ${LEASED_RESOURCE} (in addition to homogeneous VPN fields):
-      hostname-amd64: libvirt connection host[:port] for the amd64 hypervisor
-      httpd-ip: IP used for coreos.inst.ignition_url / rootfs HTTP base (often on the Z host)
-      httpd-port: HTTP port for ignition/rootfs (default 8080 if omitted)
-      additional-compute: list of {mac, ip, gateway, prefix, interface?} for amd64 workers
+      hostname: control-plane hypervisor (httpd/rootfs host)
+      hostname-additional: preferred generic key for the additional-arch hypervisor
+        (fallback: hostname-amd64 for x86 workers, hostname-s390x for s390x workers)
+      httpd-ip / httpd-port: ignition + rootfs HTTP endpoint
+      additional-compute: list of {mac, ip, gateway, prefix?, interface?, nameserver?, network?}
 
     Homogeneous fields still required for the control-plane install that precedes this step
-    (hostname, subnet, bootstrap, control-plane, …).
+    (subnet, bootstrap, control-plane, …).

@@ -14,18 +14,30 @@ fi
 
 LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
 
-# Primary Z hostname is required. hostname-amd64 is optional (heterogeneous VPN leases).
+# Primary control-plane hostname is required. Additional-arch hypervisors are optional
+# (heterogeneous VPN leases: hostname-additional / hostname-amd64 / hostname-s390x).
 HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${LEASE_CONF}")"
 if [[ -z "${HOSTNAME}" || "${HOSTNAME}" == "null" ]]; then
   echo "Couldn't retrieve hostname from lease config"
   exit 1
 fi
 
-HOSTNAME_AMD64="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".\"hostname-amd64\"" "${LEASE_CONF}")"
 HOSTNAMES=("${HOSTNAME}")
-if [[ -n "${HOSTNAME_AMD64}" && "${HOSTNAME_AMD64}" != "null" && "${HOSTNAME_AMD64}" != "${HOSTNAME}" ]]; then
-  HOSTNAMES+=("${HOSTNAME_AMD64}")
-fi
+for key in hostname-additional hostname-amd64 hostname-s390x; do
+  extra="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".\"${key}\"" "${LEASE_CONF}")"
+  if [[ -n "${extra}" && "${extra}" != "null" ]]; then
+    already=false
+    for existing in "${HOSTNAMES[@]}"; do
+      if [[ "${existing}" == "${extra}" ]]; then
+        already=true
+        break
+      fi
+    done
+    if [[ "${already}" == "false" ]]; then
+      HOSTNAMES+=("${extra}")
+    fi
+  fi
+done
 
 cleanup_host () {
   local host="$1"

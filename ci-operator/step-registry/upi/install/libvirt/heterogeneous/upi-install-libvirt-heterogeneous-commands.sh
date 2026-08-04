@@ -4,14 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# VPN-aware heterogeneous worker bring-up (ZX: s390x CP + x86_64 workers).
-# Replaces hardcoded libvirt-s390x-amd64-0-0 / xkvmocp04 / lnxocp10 values from
-# upi-libvirt-install-heterogeneous with lease lookups.
-
-if [ "${ADDITIONAL_WORKER_ARCHITECTURE}" != "x86_64" ]; then
-  echo "upi-install-libvirt-heterogeneous currently only supports x86_64 as ADDITIONAL_WORKER_ARCHITECTURE (ZX)"
-  exit 1
-fi
+# VPN-aware heterogeneous worker bring-up for both topologies:
+#   ZX: ARCH=s390x  + ADDITIONAL_WORKER_ARCHITECTURE=x86_64 (or amd64)
+#   XZ: ARCH=amd64  + ADDITIONAL_WORKER_ARCHITECTURE=s390x
+# Lease-driven replacement for hardcoded upi-libvirt-install-heterogeneous.
 
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
@@ -44,8 +40,36 @@ function leaseLookupOptional () {
   echo "$lookup"
 }
 
-HOSTNAME_Z="$(leaseLookup 'hostname')"
-HOSTNAME_AMD64="$(leaseLookup 'hostname-amd64')"
+# Normalize worker arch to RHCOS stream / libvirt guest arch names.
+case "${ADDITIONAL_WORKER_ARCHITECTURE}" in
+  x86_64|amd64)
+    WORKER_GUEST_ARCH="x86_64"
+    WORKER_STREAM_ARCH="x86_64"
+    ;;
+  s390x)
+    WORKER_GUEST_ARCH="s390x"
+    WORKER_STREAM_ARCH="s390x"
+    ;;
+  *)
+    echo "Unsupported ADDITIONAL_WORKER_ARCHITECTURE=${ADDITIONAL_WORKER_ARCHITECTURE}"
+    echo "Supported: x86_64|amd64 (ZX workers) or s390x (XZ workers)"
+    exit 1
+    ;;
+esac
+
+# Control-plane hypervisor hosts httpd/rootfs in the current design.
+HOSTNAME_CP="$(leaseLookup 'hostname')"
+
+# Additional-arch hypervisor: prefer generic hostname-additional, then arch-specific keys.
+HOSTNAME_ADDITIONAL="$(leaseLookupOptional 'hostname-additional')"
+if [[ -z "${HOSTNAME_ADDITIONAL}" ]]; then
+  if [[ "${WORKER_GUEST_ARCH}" == "x86_64" ]]; then
+    HOSTNAME_ADDITIONAL="$(leaseLookup 'hostname-amd64')"
+  else
+    HOSTNAME_ADDITIONAL="$(leaseLookup 'hostname-s390x')"
+  fi
+fi
+
 HTTPD_IP="$(leaseLookup 'httpd-ip')"
 HTTPD_PORT="$(leaseLookupOptional 'httpd-port')"
 HTTPD_PORT="${HTTPD_PORT:-8080}"
@@ -163,7 +187,11 @@ function delete_from_pool_if_exists {
   fi
 }
 
-DOMAIN_TEMPLATE_XML=$(cat <<EOF
+# Domain XML differs by guest architecture (x86_64 q35 vs s390-ccw-virtio).
+if [[ "${WORKER_GUEST_ARCH}" == "x86_64" ]]; then
+  DEFAULT_NETWORK_SOURCE="macvtap"
+  DEFAULT_INTERFACE="enp1s0"
+  DOMAIN_TEMPLATE_XML=$(cat <<EOF
 <domain type="kvm">
   <name></name>
   <metadata>
@@ -233,18 +261,63 @@ DOMAIN_TEMPLATE_XML=$(cat <<EOF
 </domain>
 EOF
 )
+else
+  DEFAULT_NETWORK_SOURCE="bridge"
+  DEFAULT_INTERFACE="enc224"
+  DOMAIN_TEMPLATE_XML=$(cat <<EOF
+<domain type="kvm">
+  <name></name>
+  <metadata>
+    <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
+      <libosinfo:os id="http://redhat.com/rhel/9.2"/>
+    </libosinfo:libosinfo>
+  </metadata>
+  <memory></memory>
+  <vcpu></vcpu>
+  <os>
+    <type arch="s390x" machine="s390-ccw-virtio">hvm</type>
+  </os>
+  <clock offset="utc"/>
+  <devices>
+    <emulator>/usr/libexec/qemu-kvm</emulator>
+    <disk type="file" device="disk">
+      <driver name="qemu" type="qcow2" discard="unmap"/>
+      <source file=""/>
+      <target dev="vda" bus="virtio"/>
+    </disk>
+    <interface type="network">
+      <source network="bridge"/>
+      <mac address=""/>
+      <model type="virtio"/>
+    </interface>
+    <console type="pty">
+      <target type="sclp"/>
+    </console>
+    <channel type="unix">
+      <source mode="bind"/>
+      <target type="virtio" name="org.qemu.guest_agent.0"/>
+    </channel>
+    <memballoon model="virtio"/>
+    <rng model="virtio">
+      <backend model="random">/dev/urandom</backend>
+    </rng>
+  </devices>
+</domain>
+EOF
+)
+fi
 
 HTTPD_BASE_URL="http://${HTTPD_IP}:${HTTPD_PORT}/"
 
 echo "Preparing heterogeneous workers for cluster ${CLUSTER_DOMAIN}"
-echo "  Z hostname (httpd/rootfs): ${HOSTNAME_Z}"
-echo "  amd64 hostname: ${HOSTNAME_AMD64}"
+echo "  control-plane hostname (httpd/rootfs): ${HOSTNAME_CP}"
+echo "  additional-arch hostname (${WORKER_GUEST_ARCH}): ${HOSTNAME_ADDITIONAL}"
+echo "  ADDITIONAL_WORKER_ARCHITECTURE=${ADDITIONAL_WORKER_ARCHITECTURE} (stream=${WORKER_STREAM_ARCH})"
 echo "  additional-compute count: ${ADDITIONAL_COUNT}"
 
-# Prepare boot artifacts: upload rootfs via Z hypervisor httpd pool, kernel/initramfs via amd64.
-KERNEL_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.$ADDITIONAL_WORKER_ARCHITECTURE.artifacts.metal.formats.pxe.kernel.location")
-INITRAMFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.$ADDITIONAL_WORKER_ARCHITECTURE.artifacts.metal.formats.pxe.initramfs.location")
-ROOTFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.$ADDITIONAL_WORKER_ARCHITECTURE.artifacts.metal.formats.pxe.rootfs.location")
+KERNEL_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${WORKER_STREAM_ARCH}.artifacts.metal.formats.pxe.kernel.location")
+INITRAMFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${WORKER_STREAM_ARCH}.artifacts.metal.formats.pxe.initramfs.location")
+ROOTFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${WORKER_STREAM_ARCH}.artifacts.metal.formats.pxe.rootfs.location")
 
 echo "Found kernel=${KERNEL_URL}, initrd=${INITRAMFS_URL}, and rootfs=${ROOTFS_URL}"
 
@@ -260,7 +333,8 @@ if [[ $(dirname "$KERNEL_URL") != $(dirname "$INITRAMFS_URL") ]]; then
   exit 1
 fi
 
-export LIBVIRT_DEFAULT_URI="qemu+tcp://${HOSTNAME_Z}/system"
+# Upload rootfs via control-plane hypervisor httpd pool.
+export LIBVIRT_DEFAULT_URI="qemu+tcp://${HOSTNAME_CP}/system"
 if check_exists_in_pool httpd "$ROOTFS_FILENAME"; then
   echo "rootfs ($ROOTFS_FILENAME) already exists on httpd, skipping transfer"
 else
@@ -269,7 +343,8 @@ else
   upload_to_pool httpd "/tmp/$ROOTFS_FILENAME" "/var/www/html/$ROOTFS_FILENAME"
 fi
 
-export LIBVIRT_DEFAULT_URI="qemu+tcp://${HOSTNAME_AMD64}/system"
+# Kernel/initramfs live on the additional-architecture hypervisor.
+export LIBVIRT_DEFAULT_URI="qemu+tcp://${HOSTNAME_ADDITIONAL}/system"
 HOST_BOOT_ARTIFACT_BASE=/var/lib/libvirt/boot/
 HOST_PATH_KERNEL=${HOST_BOOT_ARTIFACT_BASE}${KERNEL_FILENAME}
 HOST_PATH_INITRAMFS=${HOST_BOOT_ARTIFACT_BASE}${INITRAMFS_FILENAME}
@@ -290,7 +365,6 @@ else
   upload_to_pool boot-scratch "/tmp/$INITRAMFS_FILENAME" "$HOST_PATH_INITRAMFS"
 fi
 
-# Boot additional-architecture workers from lease metadata.
 for (( i=0; i<ADDITIONAL_COUNT; i++ )); do
   node_mac=$(leaseLookup "\"additional-compute\"[$i].mac")
   node_ip=$(leaseLookup "\"additional-compute\"[$i].ip")
@@ -298,9 +372,11 @@ for (( i=0; i<ADDITIONAL_COUNT; i++ )); do
   node_prefix=$(leaseLookupOptional "\"additional-compute\"[$i].prefix")
   node_prefix="${node_prefix:-255.255.255.0}"
   node_iface=$(leaseLookupOptional "\"additional-compute\"[$i].interface")
-  node_iface="${node_iface:-enp1s0}"
+  node_iface="${node_iface:-$DEFAULT_INTERFACE}"
   node_nameserver=$(leaseLookupOptional "\"additional-compute\"[$i].nameserver")
   node_nameserver="${node_nameserver:-$HTTPD_IP}"
+  node_network=$(leaseLookupOptional "\"additional-compute\"[$i].network")
+  node_network="${node_network:-$DEFAULT_NETWORK_SOURCE}"
 
   node_name="worker-hetero-${i}-${LIBVIRT_DOMAIN_NAME_SUFFIX}"
 
@@ -318,7 +394,7 @@ for (( i=0; i<ADDITIONAL_COUNT; i++ )); do
     --format qcow2
   domain_qcow2_image_host_path=/var/lib/libvirt/images/${node_name}.qcow2
 
-  echo "Preparing XML for ${node_name}"
+  echo "Preparing XML for ${node_name} (${WORKER_GUEST_ARCH}, network=${node_network})"
   domain_xml_path=$(mktemp --tmpdir domain-"${node_name}".xml.XXXXX)
   <<<"$DOMAIN_TEMPLATE_XML" yq-v4 -p=xml -o=xml \
     ".domain.name=\"${node_name}\" |
@@ -328,6 +404,7 @@ for (( i=0; i<ADDITIONAL_COUNT; i++ )); do
     .domain.os.initrd=\"${HOST_PATH_INITRAMFS}\" |
     .domain.os.cmdline=\"${domain_cmdline}\" |
     .domain.devices.disk.source.+@file=\"${domain_qcow2_image_host_path}\" |
+    .domain.devices.interface.source.+@network=\"${node_network}\" |
     .domain.devices.interface.mac.+@address=\"${node_mac}\" |
     .domain.on_reboot=\"destroy\"" \
     > "$domain_xml_path"
@@ -345,6 +422,7 @@ for (( i=0; i<ADDITIONAL_COUNT; i++ )); do
     .domain.vcpu=\"${DOMAIN_VCPUS}\" |
     .domain.os.boot.+@dev=\"hd\" |
     .domain.devices.disk.source.+@file=\"${domain_qcow2_image_host_path}\" |
+    .domain.devices.interface.source.+@network=\"${node_network}\" |
     .domain.devices.interface.mac.+@address=\"${node_mac}\"" \
     > "$domain_xml_path"
 
