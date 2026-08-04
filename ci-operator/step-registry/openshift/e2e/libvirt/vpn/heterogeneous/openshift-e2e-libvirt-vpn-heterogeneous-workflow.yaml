@@ -1,0 +1,32 @@
+workflow:
+  as: openshift-e2e-libvirt-vpn-heterogeneous
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      # Same-arch compute during initial VPN install; day-2 workers come from
+      # upi-install-libvirt-heterogeneous (ZX: s390x CP + x86_64 workers).
+      COMPUTE_COUNT: "0"
+      ADDITIONAL_WORKER_ARCHITECTURE: "x86_64"
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+    - ref: upi-install-libvirt-heterogeneous
+    test:
+    - chain: openshift-e2e-libvirt-test
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+  documentation: |-
+    VPN-based heterogeneous libvirt e2e for IBM Z Orange Zone / intranet.
+    Installs an s390x control-plane cluster via the homogeneous VPN UPI path
+    (leases file, USE_EXTERNAL_DNS, cleanup pre/post), then adds additional
+    architecture workers with upi-install-libvirt-heterogeneous.
+
+    Intended cluster_profile: libvirt-s390x-amd64-vpn (replaces libvirt-s390x-amd64).
+    Replaces openshift-e2e-libvirt-upi-heterogeneous for on-prem ZX jobs.
+    XZ (amd64 CP + s390x workers, today ocp-e2e-ibmcloud-ovn-multi-x-xz) is out of
+    scope for v1 of this workflow.

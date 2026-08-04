@@ -43,7 +43,17 @@ else
 fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
-echo "Creating the libvirt network.xml file..."
+COMPUTE_COUNT="${COMPUTE_COUNT:-2}"
+
+# Build optional same-architecture compute DHCP host entries.
+# Heterogeneous ZX VPN installs use COMPUTE_COUNT=0 and add workers via
+# upi-install-libvirt-heterogeneous instead.
+COMPUTE_DHCP_HOSTS=""
+for (( i=0; i<COMPUTE_COUNT; i++ )); do
+  COMPUTE_DHCP_HOSTS+="      <host mac='$(leaseLookup "compute[$i].mac")' name='compute-${i}.${BASE_URL}' ip='$(leaseLookup "compute[$i].ip")'/>"$'\n'
+done
+
+echo "Creating the libvirt network.xml file (COMPUTE_COUNT=${COMPUTE_COUNT})..."
 
 # This network xml forces the IP address of the rendezvous host to use the bootstrap IP.
 # We do this so that we can debug agent-based clusters by taking advantage of the open
@@ -79,9 +89,7 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
       <host mac='$(leaseLookup '"control-plane"[0].mac')' name='control-0.${BASE_URL}' ip='$(leaseLookup 'bootstrap[0].ip')'/>
       <host mac='$(leaseLookup '"control-plane"[1].mac')' name='control-1.${BASE_URL}' ip='$(leaseLookup '"control-plane"[0].ip')'/>
       <host mac='$(leaseLookup '"control-plane"[2].mac')' name='control-2.${BASE_URL}' ip='$(leaseLookup '"control-plane"[1].ip')'/>
-      <host mac='$(leaseLookup 'compute[0].mac')' name='compute-0.${BASE_URL}' ip='$(leaseLookup 'compute[0].ip')'/>
-      <host mac='$(leaseLookup 'compute[1].mac')' name='compute-1.${BASE_URL}' ip='$(leaseLookup 'compute[1].ip')'/>
-    </dhcp>
+${COMPUTE_DHCP_HOSTS}    </dhcp>
   </ip>
   <dnsmasq:options>
     <dnsmasq:option value='address=/.apps.${BASE_URL}/192.168.$(leaseLookup "subnet").1'/>
@@ -125,9 +133,7 @@ else
       <host mac='$(leaseLookup '"control-plane"[0].mac')' name='control-0.${BASE_URL}' ip='$(leaseLookup '"control-plane"[0].ip')'/>
       <host mac='$(leaseLookup '"control-plane"[1].mac')' name='control-1.${BASE_URL}' ip='$(leaseLookup '"control-plane"[1].ip')'/>
       <host mac='$(leaseLookup '"control-plane"[2].mac')' name='control-2.${BASE_URL}' ip='$(leaseLookup '"control-plane"[2].ip')'/>
-      <host mac='$(leaseLookup 'compute[0].mac')' name='compute-0.${BASE_URL}' ip='$(leaseLookup 'compute[0].ip')'/>
-      <host mac='$(leaseLookup 'compute[1].mac')' name='compute-1.${BASE_URL}' ip='$(leaseLookup 'compute[1].ip')'/>
-    </dhcp>
+${COMPUTE_DHCP_HOSTS}    </dhcp>
   </ip>
   <dnsmasq:options>
     <dnsmasq:option value='address=/.apps.${BASE_URL}/192.168.$(leaseLookup "subnet").1'/>
