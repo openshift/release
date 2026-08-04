@@ -1,8 +1,6 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: tectonic-console-builder-v29
+  project_image:
+    dockerfile_path: Dockerfile.builder
 images:
   items:
   - dockerfile_path: Dockerfile
@@ -22,29 +20,44 @@ resources:
     limits:
       memory: 6Gi
     requests:
-      cpu: 1000m
-      memory: 6Gi
+      cpu: "1"
+      memory: 3Gi
 tests:
 - as: lint
-  steps:
-    test:
-    - as: lint
-      commands: yarn install && yarn run lint && yarn run build
-      from: src
-      resources:
-        requests:
-          cpu: 200m
-          memory: 300Mi
+  commands: make lint
+  container:
+    from: src
+  skip_if_only_changed: \.md$|^docs/|^demo/|^\.claude/|^\.github/|^\.vscode/|^\.husky/|^hack/|^\.tekton/|^(LICENSE|OWNERS)$
 - as: unit
+  commands: make unit
+  container:
+    from: src
+  skip_if_only_changed: \.md$|^docs/|^demo/|^\.claude/|^\.github/|^\.vscode/|^\.husky/|^hack/|^\.tekton/|^(LICENSE|OWNERS)$
+- as: e2e-aws
+  pipeline_skip_if_only_changed: \.md$|^docs/|^demo/|^\.claude/|^\.github/|^\.vscode/|^\.husky/|^hack/|^\.tekton/|^(LICENSE|OWNERS)$
   steps:
+    cluster_profile: openshift-org-aws
+    env:
+      OPERATORS: |
+        [
+          {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group": "openshift-serverless"},
+          {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}
+        ]
     test:
-    - as: unit
-      commands: yarn install && yarn run test
+    - ref: install-operators
+    - as: e2e
+      cli: latest
+      commands: make e2e
+      dependencies:
+      - env: PLUGIN_PULL_SPEC
+        name: faas-console-plugin
       from: src
+      grace_period: 30m0s
       resources:
         requests:
-          cpu: 200m
-          memory: 300Mi
+          cpu: 500m
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift
