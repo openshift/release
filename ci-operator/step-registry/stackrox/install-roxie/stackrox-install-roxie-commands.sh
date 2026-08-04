@@ -11,15 +11,32 @@ export KUBECONFIG
 SCRATCH=$(mktemp -d)
 trap 'rm -rf "${SCRATCH}"' EXIT
 
-ROXIE_VERSION=${ROXIE_VERSION:-0.4.2}
+ROXIE_VERSION=${ROXIE_VERSION:-latest}
 
 function install_roxie() {
   local roxie_path="${SCRATCH}/roxie"
   echo ">>> Installing roxie ${ROXIE_VERSION}"
+  if [[ $ROXIE_VERSION = latest ]]; then
+    roxie_url_part="latest/download"
+  else
+    roxie_url_part="download/v${ROXIE_VERSION}"
+  fi
+  local os arch
+  case "$(uname -s)" in
+    Linux*)  os=linux ;;
+    Darwin*) os=darwin ;;
+    *)       echo "Unsupported OS: $(uname -s)"; exit 1 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64)       arch=amd64 ;;
+    arm64|aarch64) arch=arm64 ;;
+    *)             echo "Unsupported arch: $(uname -m)"; exit 1 ;;
+  esac
   curl -fsSL --retry 5 --retry-all-errors -o "${roxie_path}" \
-    "https://github.com/stackrox/roxie/releases/download/v${ROXIE_VERSION}/roxie-linux-amd64"
+    "https://github.com/stackrox/roxie/releases/${roxie_url_part}/roxie-${os}-${arch}"
   chmod +x "${roxie_path}"
   export PATH="${SCRATCH}:${PATH}"
+  roxie version
 }
 
 install_roxie
