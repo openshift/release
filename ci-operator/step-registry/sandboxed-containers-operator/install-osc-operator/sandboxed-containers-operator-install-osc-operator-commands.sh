@@ -225,12 +225,6 @@ function fetch_osc_charts() {
     result_dir="${charts_dir}"
   fi
 
-  # DEBUG until https://github.com/confidential-devhub/charts/pull/3 merges
-  if grep -q 'startingCSV' "${result_dir}/osc-operator/templates/subscription.yaml" 2>/dev/null; then
-    sed -i '/startingCSV/d' "${result_dir}/osc-operator/templates/subscription.yaml"
-    echo ">>> DEBUG: subscription.yaml patched (removed startingCSV line). PR 3 not merged yet." >&2
-  fi
-
   echo "${result_dir}"
 }
 
@@ -269,14 +263,12 @@ function render_osc_operator_chart() {
     "--set" "namespaceOverride=${OSC_NAMESPACE}"
   )
 
-  # DEBUG until https://github.com/confidential-devhub/charts/pull/4 merges
   if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
     helm_args+=("--set" "dev.enabled=true" "--set" "dev.image=${CATALOG_SOURCE_IMAGE}")
     echo ">>> Helm: dev.enabled=true, dev.image=${CATALOG_SOURCE_IMAGE}" >&2
   else
     helm_args+=("--set" "dev.enabled=false")
   fi
-  echo ">>> DEBUG: Helm renders source=redhat-operators (patched via sed after render). PR 4 not merged yet." >&2
 
   local helm_output
   if ! helm_output=$(helm template "${helm_args[@]}" 2>&1); then
@@ -413,12 +405,6 @@ function install_osc_operator() {
     return 1
   fi
 
-  # TODO: remove sed workaround once https://github.com/confidential-devhub/charts/pull/4 merges
-  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
-    echo ">>> Patching Subscription source: redhat-operators -> ${OSC_DEV_CATALOG_NAME}"
-    sed -i "s/source: redhat-operators/source: ${OSC_DEV_CATALOG_NAME}/" "${operator_yaml}"
-  fi
-
   echo ">>> Rendered operator objects:"
   oc apply -f "${operator_yaml}" --dry-run=client -o name || true
 
@@ -539,13 +525,6 @@ function install_osc_operands() {
   if ! render_osc_operands_chart "${charts_dir}" > "${operands_yaml}"; then
     echo ">>> ERROR: Failed to render operands chart"
     return 1
-  fi
-
-  # DEBUG until https://github.com/confidential-devhub/charts/pull/4 merges
-  # openshift-tests-private expects kataconfig name to be "example-kataconfig". Rename to match the test expectation.
-  if grep -qE '^\s+name: kataconfig$' "${operands_yaml}" 2>/dev/null; then
-    sed -i -E 's/^([[:space:]]*)name: kataconfig$/\1name: example-kataconfig/' "${operands_yaml}"
-    echo ">>> DEBUG: kataconfig.yaml patched (renamed to example-kataconfig). PR 4 not merged yet." >&2
   fi
 
   echo ">>> Rendered operands objects:"
