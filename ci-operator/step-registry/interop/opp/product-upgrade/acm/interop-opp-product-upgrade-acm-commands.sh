@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -euxo pipefail
 shopt -s inherit_errexit
 
 ACM_TARGET_CHANNEL="${ACM_TARGET_CHANNEL:-}"
@@ -11,10 +11,10 @@ ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
 
 # shellcheck disable=SC2034
-typeset -i exit_code=0
+typeset -i exitCode=0
 
-collect_diagnostics() {
-    local artifact_file="${ARTIFACT_DIR}/acm-upgrade-diagnostics.txt"
+function CollectDiagnostics () {
+    local artifactFile="${ARTIFACT_DIR}/acm-upgrade-diagnostics.txt"
     {
         printf '=== ACM Operator Upgrade Diagnostics ===\n\n'
         printf '=== Subscription ===\n'
@@ -28,147 +28,147 @@ collect_diagnostics() {
         printf '\n=== Pods not Ready ===\n'
         oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" --field-selector=status.phase!=Running,status.phase!=Succeeded 2>&1 || true
         oc get pods -n multicluster-engine --field-selector=status.phase!=Running,status.phase!=Succeeded 2>&1 || true
-    } > "${artifact_file}"
+    } > "${artifactFile}"
 }
 
-trap 'exit_code=$?; if (( exit_code != 0 )); then collect_diagnostics; fi' EXIT
+trap 'exitCode=$?; if (( exitCode != 0 )); then CollectDiagnostics; fi' EXIT
 
-get_current_csv() {
+function GetCurrentCsv () {
     oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.currentCSV}' 2>/dev/null || true
+        -o jsonpath='{.status.currentCSV}' || true
 }
 
-get_csv_phase() {
-    local csv_name="$1"
-    oc get csv "${csv_name}" \
+function GetCsvPhase () {
+    local csvName="$1"
+    oc get csv "${csvName}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.phase}' 2>/dev/null || true
+        -o jsonpath='{.status.phase}' || true
 }
 
-get_installed_version() {
-    local csv_name
-    csv_name="$(get_current_csv)"
-    if [[ -z "${csv_name}" ]]; then
+function GetInstalledVersion () {
+    local csvName
+    csvName="$(GetCurrentCsv)"
+    if [[ -z "${csvName}" ]]; then
         return 1
     fi
-    oc get csv "${csv_name}" \
+    oc get csv "${csvName}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.version}' 2>/dev/null || true
+        -o jsonpath='{.spec.version}' || true
 }
 
-get_current_channel() {
+function GetCurrentChannel () {
     oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.channel}' 2>/dev/null || true
+        -o jsonpath='{.spec.channel}' || true
 }
 
-resolve_target_channel() {
+function ResolveTargetChannel () {
     if [[ -n "${ACM_TARGET_CHANNEL}" ]]; then
         echo "${ACM_TARGET_CHANNEL}"
         return 0
     fi
 
-    local current_channel
-    current_channel="$(get_current_channel)"
-    if [[ -z "${current_channel}" ]]; then
+    local currentChannel
+    currentChannel="$(GetCurrentChannel)"
+    if [[ -z "${currentChannel}" ]]; then
         echo >&2 "ERROR: Cannot determine current subscription channel"
         return 3
     fi
 
-    local catalog_namespace
-    catalog_namespace="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    local catalogNamespace
+    catalogNamespace="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.sourceNamespace}' 2>/dev/null || true)"
+        -o jsonpath='{.spec.sourceNamespace}' || true)"
 
-    local package_name
-    package_name="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    local packageName
+    packageName="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.name}' 2>/dev/null || true)"
+        -o jsonpath='{.spec.name}' || true)"
 
     local channels
-    channels="$(oc get packagemanifest "${package_name}" \
-        -n "${catalog_namespace}" \
-        -o jsonpath='{.status.channels[*].name}' 2>/dev/null || true)"
+    channels="$(oc get packagemanifest "${packageName}" \
+        -n "${catalogNamespace}" \
+        -o jsonpath='{.status.channels[*].name}' || true)"
 
     if [[ -z "${channels}" ]]; then
-        echo >&2 "ERROR: No channels found in packagemanifest for ${package_name}"
+        echo >&2 "ERROR: No channels found in packagemanifest for ${packageName}"
         return 3
     fi
 
-    local current_version next_channel=""
-    current_version="$(echo "${current_channel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
+    local currentVersion nextChannel=""
+    currentVersion="$(echo "${currentChannel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
 
     for ch in ${channels}; do
-        local ch_version
-        ch_version="$(echo "${ch}" | grep -oE '[0-9]+\.[0-9]+' || true)"
-        if [[ -z "${ch_version}" ]]; then
+        local chVersion
+        chVersion="$(echo "${ch}" | grep -oE '[0-9]+\.[0-9]+' || true)"
+        if [[ -z "${chVersion}" ]]; then
             continue
         fi
-        if [[ -z "${current_version}" ]]; then
-            next_channel="${ch}"
+        if [[ -z "${currentVersion}" ]]; then
+            nextChannel="${ch}"
             break
         fi
-        local current_major current_minor ch_major ch_minor
-        current_major="${current_version%%.*}"
-        current_minor="${current_version##*.}"
-        ch_major="${ch_version%%.*}"
-        ch_minor="${ch_version##*.}"
+        local currentMajor currentMinor chMajor chMinor
+        currentMajor="${currentVersion%%.*}"
+        currentMinor="${currentVersion##*.}"
+        chMajor="${chVersion%%.*}"
+        chMinor="${chVersion##*.}"
 
-        if (( ch_major > current_major )) || \
-           (( ch_major == current_major && ch_minor > current_minor )); then
-            if [[ -z "${next_channel}" ]]; then
-                next_channel="${ch}"
+        if (( chMajor > currentMajor )) || \
+           (( chMajor == currentMajor && chMinor > currentMinor )); then
+            if [[ -z "${nextChannel}" ]]; then
+                nextChannel="${ch}"
             else
-                local next_version next_major next_minor
-                next_version="$(echo "${next_channel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
-                next_major="${next_version%%.*}"
-                next_minor="${next_version##*.}"
-                if (( ch_major < next_major )) || \
-                   (( ch_major == next_major && ch_minor < next_minor )); then
-                    next_channel="${ch}"
+                local nextVersion nextMajor nextMinor
+                nextVersion="$(echo "${nextChannel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
+                nextMajor="${nextVersion%%.*}"
+                nextMinor="${nextVersion##*.}"
+                if (( chMajor < nextMajor )) || \
+                   (( chMajor == nextMajor && chMinor < nextMinor )); then
+                    nextChannel="${ch}"
                 fi
             fi
         fi
     done
 
-    if [[ -z "${next_channel}" ]]; then
-        echo >&2 "ERROR: No upgrade channel found newer than ${current_channel}"
+    if [[ -z "${nextChannel}" ]]; then
+        echo >&2 "ERROR: No upgrade channel found newer than ${currentChannel}"
         return 3
     fi
 
-    echo "${next_channel}"
+    echo "${nextChannel}"
 }
 
-wait_for_csv_succeeded() {
-    local previous_csv="$1"
-    local timeout_seconds
-    timeout_seconds="$(parse_timeout "${ACM_UPGRADE_TIMEOUT}")"
-    local start_time elapsed new_csv phase
-    start_time="$(date +%s)"
+function WaitForCsvSucceeded () {
+    local previousCsv="$1"
+    local timeoutSeconds
+    timeoutSeconds="$(ParseTimeout "${ACM_UPGRADE_TIMEOUT}")"
+    local startTime elapsed newCsv phase
+    startTime="$(date +%s)"
 
     while true; do
-        elapsed="$(( $(date +%s) - start_time ))"
-        if (( elapsed > timeout_seconds )); then
+        elapsed="$(( $(date +%s) - startTime ))"
+        if (( elapsed > timeoutSeconds )); then
             echo >&2 "ERROR: Timeout (${ACM_UPGRADE_TIMEOUT}) waiting for CSV upgrade"
             return 2
         fi
 
-        new_csv="$(get_current_csv)"
-        if [[ -z "${new_csv}" || "${new_csv}" == "${previous_csv}" ]]; then
+        newCsv="$(GetCurrentCsv)"
+        if [[ -z "${newCsv}" || "${newCsv}" == "${previousCsv}" ]]; then
             sleep 10
             continue
         fi
 
-        phase="$(get_csv_phase "${new_csv}")"
-        echo "  CSV: ${new_csv}  Phase: ${phase}  (${elapsed}s elapsed)"
+        phase="$(GetCsvPhase "${newCsv}")"
+        echo "  CSV: ${newCsv}  Phase: ${phase}  (${elapsed}s elapsed)"
 
         case "${phase}" in
             Succeeded)
                 return 0
                 ;;
             Failed)
-                echo >&2 "ERROR: CSV ${new_csv} entered Failed phase"
+                echo >&2 "ERROR: CSV ${newCsv} entered Failed phase"
                 return 1
                 ;;
             *)
@@ -178,7 +178,7 @@ wait_for_csv_succeeded() {
     done
 }
 
-parse_timeout() {
+function ParseTimeout () {
     local input="$1"
     local minutes=0 seconds=0
     if [[ "${input}" =~ ^([0-9]+)m$ ]]; then
@@ -196,37 +196,37 @@ parse_timeout() {
     echo "$(( minutes * 60 + seconds ))"
 }
 
-validate_mce_upgrade() {
+function ValidateMceUpgrade () {
     echo "Validating MCE (MultiCluster Engine) upgrade..."
-    local mce_csv
-    mce_csv="$(oc get csv -n multicluster-engine \
+    local mceCsv
+    mceCsv="$(oc get csv -n multicluster-engine \
         -o jsonpath='{.items[?(@.spec.displayName=="multicluster engine for Kubernetes")].metadata.name}' \
-        2>/dev/null || true)"
+        || true)"
 
-    if [[ -z "${mce_csv}" ]]; then
-        mce_csv="$(oc get csv -n multicluster-engine \
+    if [[ -z "${mceCsv}" ]]; then
+        mceCsv="$(oc get csv -n multicluster-engine \
             -l operators.coreos.com/multicluster-engine.multicluster-engine= \
-            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+            -o jsonpath='{.items[0].metadata.name}' || true)"
     fi
 
-    if [[ -z "${mce_csv}" ]]; then
+    if [[ -z "${mceCsv}" ]]; then
         echo "WARNING: MCE CSV not found; skipping MCE validation"
         return 0
     fi
 
-    local mce_phase
-    mce_phase="$(oc get csv "${mce_csv}" -n multicluster-engine \
-        -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    local mcePhase
+    mcePhase="$(oc get csv "${mceCsv}" -n multicluster-engine \
+        -o jsonpath='{.status.phase}' || true)"
 
-    echo "  MCE CSV: ${mce_csv}  Phase: ${mce_phase}"
-    if [[ "${mce_phase}" != "Succeeded" ]]; then
-        echo "WARNING: MCE CSV phase is ${mce_phase}, not Succeeded"
-        local timeout_end
-        timeout_end="$(( $(date +%s) + 300 ))"
-        while (( $(date +%s) < timeout_end )); do
-            mce_phase="$(oc get csv "${mce_csv}" -n multicluster-engine \
-                -o jsonpath='{.status.phase}' 2>/dev/null || true)"
-            if [[ "${mce_phase}" == "Succeeded" ]]; then
+    echo "  MCE CSV: ${mceCsv}  Phase: ${mcePhase}"
+    if [[ "${mcePhase}" != "Succeeded" ]]; then
+        echo "WARNING: MCE CSV phase is ${mcePhase}, not Succeeded"
+        local timeoutEnd
+        timeoutEnd="$(( $(date +%s) + 300 ))"
+        while (( $(date +%s) < timeoutEnd )); do
+            mcePhase="$(oc get csv "${mceCsv}" -n multicluster-engine \
+                -o jsonpath='{.status.phase}' || true)"
+            if [[ "${mcePhase}" == "Succeeded" ]]; then
                 echo "  MCE CSV reached Succeeded phase"
                 return 0
             fi
@@ -238,47 +238,47 @@ validate_mce_upgrade() {
     return 0
 }
 
-validate_hub_health() {
+function ValidateHubHealth () {
     echo "Validating ACM hub health post-upgrade..."
 
-    local mch_status
-    mch_status="$(oc get multiclusterhub -A \
-        -o jsonpath='{.items[0].status.phase}' 2>/dev/null || true)"
-    echo "  MultiClusterHub phase: ${mch_status}"
+    local mchStatus
+    mchStatus="$(oc get multiclusterhub -A \
+        -o jsonpath='{.items[0].status.phase}' || true)"
+    echo "  MultiClusterHub phase: ${mchStatus}"
 
-    if [[ "${mch_status}" != "Running" ]]; then
+    if [[ "${mchStatus}" != "Running" ]]; then
         echo "  Waiting for MCH to reach Running phase (timeout: 5m)..."
-        local timeout_end
-        timeout_end="$(( $(date +%s) + 300 ))"
-        while (( $(date +%s) < timeout_end )); do
-            mch_status="$(oc get multiclusterhub -A \
-                -o jsonpath='{.items[0].status.phase}' 2>/dev/null || true)"
-            if [[ "${mch_status}" == "Running" ]]; then
+        local timeoutEnd
+        timeoutEnd="$(( $(date +%s) + 300 ))"
+        while (( $(date +%s) < timeoutEnd )); do
+            mchStatus="$(oc get multiclusterhub -A \
+                -o jsonpath='{.items[0].status.phase}' || true)"
+            if [[ "${mchStatus}" == "Running" ]]; then
                 break
             fi
             sleep 15
         done
-        if [[ "${mch_status}" != "Running" ]]; then
+        if [[ "${mchStatus}" != "Running" ]]; then
             echo >&2 "ERROR: MultiClusterHub did not reach Running phase"
             return 1
         fi
     fi
 
     echo "  Checking policy propagator..."
-    local propagator_ready
-    propagator_ready="$(oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+    local propagatorReady
+    propagatorReady="$(oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -l name=governance-policy-propagator \
         -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' \
-        2>/dev/null || true)"
-    echo "  Policy propagator ready: ${propagator_ready}"
+        || true)"
+    echo "  Policy propagator ready: ${propagatorReady}"
 
     echo "  Checking managed clusters..."
-    local cluster_count available_count
-    cluster_count="$(oc get managedclusters --no-headers 2>/dev/null | wc -l || echo 0)"
-    available_count="$(oc get managedclusters \
+    local clusterCount availableCount
+    clusterCount="$(oc get managedclusters --no-headers | wc -l || echo 0)"
+    availableCount="$(oc get managedclusters \
         -o jsonpath='{.items[?(@.status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status=="True")].metadata.name}' \
-        2>/dev/null | wc -w || echo 0)"
-    echo "  Managed clusters: ${available_count}/${cluster_count} available"
+        | wc -w || echo 0)"
+    echo "  Managed clusters: ${availableCount}/${clusterCount} available"
 
     echo "ACM hub health validation complete"
     return 0
@@ -291,70 +291,70 @@ echo "Namespace: ${ACM_SUBSCRIPTION_NAMESPACE}"
 echo "Subscription: ${ACM_SUBSCRIPTION_NAME}"
 echo "Timeout: ${ACM_UPGRADE_TIMEOUT}"
 
-current_csv="$(get_current_csv)"
-if [[ -z "${current_csv}" ]]; then
+currentCsv="$(GetCurrentCsv)"
+if [[ -z "${currentCsv}" ]]; then
     echo >&2 "ERROR: No ACM subscription found or no currentCSV set"
     exit 3
 fi
 
-current_version="$(get_installed_version)"
-current_channel="$(get_current_channel)"
-echo "Current: CSV=${current_csv} Version=${current_version} Channel=${current_channel}"
+currentVersion="$(GetInstalledVersion)"
+currentChannel="$(GetCurrentChannel)"
+echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
 
-target_channel="$(resolve_target_channel)"
-echo "Target channel: ${target_channel}"
+targetChannel="$(ResolveTargetChannel)"
+echo "Target channel: ${targetChannel}"
 
-if [[ "${target_channel}" == "${current_channel}" ]]; then
-    echo "Already on target channel ${target_channel}; checking if upgrade is available..."
-    install_plan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+if [[ "${targetChannel}" == "${currentChannel}" ]]; then
+    echo "Already on target channel ${targetChannel}; checking if upgrade is available..."
+    installPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null || true)"
-    if [[ -z "${install_plan}" ]]; then
+        -o jsonpath='{.status.installPlanRef.name}' || true)"
+    if [[ -z "${installPlan}" ]]; then
         echo "No pending upgrade on current channel; nothing to do"
         exit 0
     fi
-    plan_phase="$(oc get installplan "${install_plan}" \
+    planPhase="$(oc get installplan "${installPlan}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.phase}' 2>/dev/null || true)"
-    if [[ "${plan_phase}" == "Complete" ]]; then
-        echo "InstallPlan ${install_plan} already complete; no pending upgrade"
+        -o jsonpath='{.status.phase}' || true)"
+    if [[ "${planPhase}" == "Complete" ]]; then
+        echo "InstallPlan ${installPlan} already complete; no pending upgrade"
         exit 0
     fi
 fi
 
-echo "Patching subscription channel: ${current_channel} -> ${target_channel}"
+echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
 oc patch subscription "${ACM_SUBSCRIPTION_NAME}" \
     -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
     --type merge \
-    -p "{\"spec\":{\"channel\":\"${target_channel}\"}}"
+    -p "{\"spec\":{\"channel\":\"${targetChannel}\"}}"
 
 echo "Waiting for InstallPlan to be created..."
 sleep 10
 
-install_plan=""
+installPlan=""
 for _ in $(seq 1 12); do
-    install_plan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    installPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null || true)"
-    if [[ -z "${install_plan}" ]]; then
-        install_plan="$(oc get installplan -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.status.installPlanRef.name}' || true)"
+    if [[ -z "${installPlan}" ]]; then
+        installPlan="$(oc get installplan -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
             --sort-by=.metadata.creationTimestamp \
-            -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null || true)"
+            -o jsonpath='{.items[-1:].metadata.name}' || true)"
     fi
-    if [[ -n "${install_plan}" ]]; then
+    if [[ -n "${installPlan}" ]]; then
         break
     fi
     sleep 10
 done
 
-if [[ -n "${install_plan}" ]]; then
-    echo "InstallPlan: ${install_plan}"
-    local_approval="$(oc get installplan "${install_plan}" \
+if [[ -n "${installPlan}" ]]; then
+    echo "InstallPlan: ${installPlan}"
+    localApproval="$(oc get installplan "${installPlan}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.approval}' 2>/dev/null || true)"
-    if [[ "${local_approval}" == "Manual" ]]; then
+        -o jsonpath='{.spec.approval}' || true)"
+    if [[ "${localApproval}" == "Manual" ]]; then
         echo "Approving manual InstallPlan..."
-        oc patch installplan "${install_plan}" \
+        oc patch installplan "${installPlan}" \
             -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
             --type merge \
             -p '{"spec":{"approved":true}}'
@@ -362,25 +362,26 @@ if [[ -n "${install_plan}" ]]; then
 fi
 
 echo "Waiting for ACM CSV to reach Succeeded phase..."
-wait_for_csv_succeeded "${current_csv}"
-new_csv="$(get_current_csv)"
-new_version="$(get_installed_version)"
-echo "Upgrade complete: ${current_version} -> ${new_version} (CSV: ${new_csv})"
+WaitForCsvSucceeded "${currentCsv}"
+newCsv="$(GetCurrentCsv)"
+newVersion="$(GetInstalledVersion)"
+echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
 
-validate_mce_upgrade
-validate_hub_health
+ValidateMceUpgrade
+ValidateHubHealth
 
 {
     printf '=== ACM Operator Upgrade Summary ===\n'
-    printf 'Previous: %s (%s)\n' "${current_version}" "${current_channel}"
-    printf 'Current:  %s (%s)\n' "${new_version}" "${target_channel}"
-    printf 'CSV:      %s\n' "${new_csv}"
+    printf 'Previous: %s (%s)\n' "${currentVersion}" "${currentChannel}"
+    printf 'Current:  %s (%s)\n' "${newVersion}" "${targetChannel}"
+    printf 'CSV:      %s\n' "${newCsv}"
     printf 'Status:   SUCCESS\n'
 } > "${ARTIFACT_DIR}/acm-upgrade-summary.txt"
 
 if [[ -n "${SHARED_DIR:-}" ]]; then
-    echo "${new_version}" > "${SHARED_DIR}/acm-upgraded-version"
-    echo "${target_channel}" > "${SHARED_DIR}/acm-upgraded-channel"
+    echo "${newVersion}" > "${SHARED_DIR}/acm-upgraded-version"
+    echo "${targetChannel}" > "${SHARED_DIR}/acm-upgraded-channel"
 fi
 
 echo "=== ACM Operator Upgrade: SUCCESS ==="
+true
