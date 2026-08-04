@@ -1,0 +1,246 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  flowlogs-pipeline:
+    name: flowlogs-pipeline
+    namespace: netobserv
+    tag: ci
+  netobserv-ebpf-agent:
+    name: netobserv-ebpf-agent
+    namespace: netobserv
+    tag: ci
+  netobserv-web-console:
+    name: netobserv-web-console
+    namespace: netobserv
+    tag: ci
+  ubi:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi
+    to: netobserv-operator
+  - context_dir: integration-tests/backend
+    dockerfile_path: Dockerfile
+    from: ubi
+    to: e2etests
+operator:
+  bundles:
+  - as: noo-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/netobserv/network-observability-operator:.*
+    with: netobserv-operator
+  - pullspec: quay.io/netobserv/flowlogs-pipeline:.*
+    with: pipeline:flowlogs-pipeline
+  - pullspec: quay.io/netobserv/netobserv-ebpf-agent:.*
+    with: pipeline:netobserv-ebpf-agent
+  - pullspec: quay.io/netobserv/network-observability-console-plugin:.*
+    with: pipeline:netobserv-web-console
+promotion:
+  to:
+  - namespace: netobserv
+    tag: ci
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  e2etests:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  e2etests-lint-fmt:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: e2e-operator
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: noo-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-netobserv-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc wait deployment --for condition=Available --timeout=120s netobserv-controller-manager -n openshift-netobserv-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: noo-e2e-flowcollector
+      cli: latest
+      commands: |2
+
+        export PATH=$PATH:$HOME
+
+        if ! which kubectl; then
+          ln -s "$(which oc)" ${HOME}/kubectl
+        fi
+
+        export NAMESPACE=netobserv
+        PORT_FWD=false make deploy-loki
+        oc apply -f /go/src/github.com/netobserv/netobserv-operator/config/samples/flows_v1beta2_flowcollector.yaml
+
+        sleep 30
+        echo "====> Waiting for flowlogs-pipeline daemonset to be created"
+        while :; do
+          oc get deployment flowlogs-pipeline -n ${NAMESPACE} && break
+          sleep 1
+        done
+
+        echo "====> Waiting for netobserv-ebpf-agent daemonset to be created"
+        while :; do
+          oc get daemonset netobserv-ebpf-agent -n ${NAMESPACE}-privileged && break
+          sleep 1
+        done
+
+        echo "====> Waiting for console-plugin deployment to be created"
+        while :; do
+          oc get deployment netobserv-plugin -n ${NAMESPACE} && break
+          sleep 1
+        done
+
+        echo "====> Waiting for flowcollector to be ready"
+        timeout=0
+        rc=1
+        while [ $timeout -lt 180 ]; do
+          status=$(oc get flowcollector/cluster -o jsonpath='{.status.conditions[0].reason}')
+          if [[ $status == "Ready" ]]; then
+            rc=0
+            break
+          fi
+          sleep 30
+          timeout=$((timeout+30))
+        done
+        if [ "${rc}" == 1 ]; then
+          echo "flowcollector did not become Ready after 180 secs!!!"
+          exit $rc
+        fi
+
+
+        # Query metrics from Prometheus using in-cluster service URL
+        THANOS_URL=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
+
+        timeout=0
+        rc=1
+        while [ $timeout -lt 180 ]; do
+          result=$(curl -s -k -H "Authorization: Bearer $(oc create token prometheus-k8s -n openshift-monitoring)" "https://${THANOS_URL}/api/v1/query?query=netobserv_ingest_flows_processed" | jq -r '.data.result[0].value[1]')
+          if [[ -n "$result" && "$result" != "null" ]]; then
+            echo "Metric netobserv_ingest_flows_processed found: $result"
+            rc=0
+            break
+          fi
+          sleep 10
+          timeout=$((timeout+10))
+        done
+        if [ "${rc}" == 1 ]; then
+          echo "Metric netobserv_ingest_flows_processed not found after 180 secs!!!"
+          exit $rc
+        fi
+
+        echo "====> Deleting flowcollector"
+        oc delete flowcollector/cluster
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: e2etests-lint-fmt
+  commands: |
+    export HOME=/tmp/home
+    export GOCACHE=/tmp/gocache
+    export GOPATH=/tmp/gopath
+    export GOLANGCI_LINT_CACHE=/tmp/golangci-lint-cache
+    export GOWORK=off
+    export GOFLAGS=-mod=mod
+    cd integration-tests/backend/
+    go mod tidy
+    make prereqs
+    make lint
+    echo -e "\n###############  gofmt  ####################"
+    bad_gofmt_files=$(gofmt -s -l ./)
+    if [[ -n "${bad_gofmt_files}" ]]; then
+        echo "ERROR:"
+        echo "!!! gofmt needs to be run on the listed files"
+        echo "${bad_gofmt_files}"
+        echo "Try running 'gofmt -s [file_path]' Or autocorrect with 'gofmt -s -w [file_path]'"
+        exit 1
+    else
+        echo "gofmt SUCCESS"
+    fi
+
+    echo -e "\n###############  yamllint  ####################"
+    export PATH=$GOPATH/bin:$PATH
+    go install github.com/google/yamlfmt/cmd/yamlfmt@latest
+    find testdata/ -name '*.yaml' -o -name '*.yml' | while read -r f; do
+      if ! yamlfmt -lint "$f" 2>&1; then
+        echo "ERROR: YAML lint failed for $f"
+        exit 1
+      fi
+    done
+    echo "yamllint SUCCESS"
+  container:
+    from: src
+  run_if_changed: integration-tests/backend/.*\.(yaml|go)
+- as: e2etest
+  run_if_changed: integration-tests/backend/.*\.(yaml|go)
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: noo-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-netobserv-operator
+      OO_SECURITY_CONTEXT: restricted
+      TEST_RUN_MODE: premerge
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc wait deployment --for condition=Available --timeout=120s netobserv-controller-manager -n openshift-netobserv-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: compute-changed-tests
+      commands: |
+        git diff --name-only HEAD~1 -- integration-tests/backend/ > "${SHARED_DIR}/changed_files"
+        echo "Changed files:"
+        cat "${SHARED_DIR}/changed_files"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: netobserv-ginkgo-tests
+    workflow: optional-operators-ci-operator-sdk-aws
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: netobserv
+  repo: netobserv-operator

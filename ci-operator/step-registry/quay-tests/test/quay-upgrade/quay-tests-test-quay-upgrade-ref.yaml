@@ -1,0 +1,66 @@
+ref:
+  as: quay-tests-test-quay-upgrade
+  cli: latest
+  # from: quay-test-operator
+  from_image:
+    name: quay-test-operator
+    namespace: ci
+    tag: latest
+  commands: quay-tests-test-quay-upgrade-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 10h0m0s
+  grace_period: 15m0s
+  credentials:
+  - namespace: test-credentials
+    name: quay-qe-quay-secret
+    mount_path: /var/run/quay-qe-quay-secret
+  - namespace: test-credentials  
+    name: quay-qe-brew-secret
+    mount_path: /var/run/quay-qe-brew-secret
+  documentation: |-
+    Deploy Quay Operator and execute Quay upgrade test
+  env:
+  - name: QUAY_OPERATOR_CHANNEL
+    documentation: The quay operator channel
+    default: "stable-3.13"
+  - name: QUAY_OPERATOR_SOURCE
+    documentation: The quay operator source
+    default: "redhat-operators"
+  - name: QUAY_VERSION
+    documentation: Target Quay version upgrade to
+    default: "3.13"
+  - name: QUAY_INDEX_IMAGE_BUILD
+    documentation: FBC Index image to test
+    default: "quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-19@sha256:38bb11bb2c6a0b864efc8e528c5c8370a132f42208350b88546b2ab567cd0202"
+  - name: CSO_INDEX_IMAGE_BUILD
+    documentation: CSO Index image to test
+    default: "quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-19@sha256:38bb11bb2c6a0b864efc8e528c5c8370a132f42208350b88546b2ab567cd0202"  
+  - name: QBO_INDEX_IMAGE_BUILD
+    documentation: QBO Index image to test
+    default: "quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-19@sha256:38bb11bb2c6a0b864efc8e528c5c8370a132f42208350b88546b2ab567cd0202"    
+  - name: QUAY_UPGRADE_TESTCASE
+    documentation: |-
+      TestCase to run:
+        Quay-Upgrade-High
+        Quay-Upgrade-Medium
+        Quay-QBO-Upgrade-High
+        Quay-CSO-Upgrade-High
+    default: "Quay-Upgrade-High|Quay-Upgrade-Medium"
+  - name: MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE
+    documentation: |-
+      Optional. Overrides QUAY_INDEX_IMAGE_BUILD via Gangway API:
+      "pod_spec_options": { "envs": { "MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE": "quay.io/redhat-user-workloads/..." } }
+    default: ""
+  - name: MULTISTAGE_PARAM_OVERRIDE_QUAY_OPERATOR_CHANNEL
+    documentation: |-
+      Optional. Overrides QUAY_OPERATOR_CHANNEL via Gangway API:
+      "pod_spec_options": { "envs": { "MULTISTAGE_PARAM_OVERRIDE_QUAY_OPERATOR_CHANNEL": "stable-3.15" } }
+    default: ""
+  - name: MULTISTAGE_PARAM_OVERRIDE_QUAY_VERSION
+    documentation: |-
+      Optional. Overrides QUAY_VERSION via Gangway API:
+      "pod_spec_options": { "envs": { "MULTISTAGE_PARAM_OVERRIDE_QUAY_VERSION": "3.15" } }
+    default: ""

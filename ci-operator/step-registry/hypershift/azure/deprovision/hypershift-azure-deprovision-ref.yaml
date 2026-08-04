@@ -1,0 +1,36 @@
+ref:
+  as: hypershift-azure-deprovision
+  cli: latest
+  from_image:
+    namespace: hypershift
+    name: hypershift-tests
+    tag: latest
+  commands: hypershift-azure-deprovision-commands.sh
+  credentials:
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+      name: hypershift-ci-jobs-self-managed-azure
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-kubeconfig-azure
+      name: azure-hypershift-ci
+      namespace: test-credentials
+  env:
+    - name: CLUSTER_TTL
+      default: "4 hours ago"
+      documentation: Age threshold for resource cleanup, passed to GNU date --date.
+    - name: PHASE1_TIMEOUT
+      default: "14400"
+      documentation: Max wall-clock seconds for Phase 1 HC pruning. Prevents stuck destroys from starving Phases 2/3.
+    - name: DRY_RUN
+      default: "false"
+      documentation: Set to true to log actions without deleting resources.
+  resources:
+    requests:
+      cpu: "1"
+      memory: 300Mi
+  grace_period: 30m0s
+  timeout: 8h0m0s
+  documentation: |-
+    Deprovisions orphaned Azure resources from self-managed HyperShift CI.
+    Phase 1 prunes stale HostedClusters from the root cluster.
+    Phase 2 sweeps orphaned CI resource groups by naming pattern and age.
+    Phase 3 sweeps orphaned DNS records in CI zones.

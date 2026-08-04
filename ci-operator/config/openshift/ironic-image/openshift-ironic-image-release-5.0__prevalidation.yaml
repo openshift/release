@@ -1,0 +1,75 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_5.0_base-rhel9:
+    name: "5.0"
+    namespace: ocp
+    tag: base-rhel9
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: prevalidation-base
+    inputs:
+      prevalidation-base:
+        as:
+        - registry.ci.openshift.org/ocp/4.22:base-rhel9
+        - registry.ci.openshift.org/ocp/5.0:base-rhel9
+    to: ironic
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      #NOTE(elfosardo): use ironic repos, cause we're special
+      curl http://base-5-0-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.art/ci/base-5-0-rhel-9-ironic-prevalidation.repo
+    from: ocp_5.0_base-rhel9
+    to: prevalidation-base
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-ipi-ovn-ipv4-prevalidation
+  capabilities:
+  - intranet
+  run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-virtualmedia-prevalidation
+  capabilities:
+  - intranet
+  run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- as: e2e-metal-ipi-ovn-ipv6-prevalidation
+  capabilities:
+  - intranet
+  run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift
+  repo: ironic-image
+  variant: prevalidation

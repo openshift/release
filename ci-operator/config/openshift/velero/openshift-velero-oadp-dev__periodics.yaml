@@ -1,0 +1,50 @@
+base_images:
+  rebasebot:
+    name: rebasebot
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rebasebot
+  cron: 0 2 * * Tue,Thu,Sat
+  steps:
+    test:
+    - as: rebasebot
+      commands: |
+        source <(curl --silent https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/refs/heads/oadp-dev/rebase-configs/openshift_velero_oadp-dev.env.sh)
+        rebasebot --source "$SOURCE_UPSTREAM_REPO" \
+                  --dest "$DESTINATION_DOWNSTREAM_REPO" \
+                  --rebase "$REBASE_REPO" \
+                  --github-app-id 1810299 \
+                  --github-cloner-id 1810272 \
+                  --github-app-key /secrets/oadp-rebase-bot/oadp-rebasebot-app-key \
+                  --github-cloner-key /secrets/oadp-rebase-bot/oadp-rebasebot-cloner-key \
+                  --git-username oadp-team-rebase-bot \
+                  --git-email oadp-maintainers@redhat.com \
+                  ${HOOK_SCRIPTS:+$HOOK_SCRIPTS} \
+                  ${EXTRA_REBASEBOT_ARGS:+$EXTRA_REBASEBOT_ARGS}
+      credentials:
+      - mount_path: /secrets/oadp-rebase-bot
+        name: oadp-team-rebasebot-credentials
+        namespace: test-credentials
+      from_image:
+        name: rebasebot
+        namespace: ci
+        tag: latest
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: oadp-dev
+  org: openshift
+  repo: velero
+  variant: periodics

@@ -1,0 +1,44 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
+canonical_go_repository: github.com/stolostron/volsync-addon-controller
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: volsync-addon-controller
+promotion:
+  to:
+  - disabled: true
+    name: "5.0"
+    namespace: stolostron
+prowgen:
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    export SELF="make -f Makefile"
+    export HOME="/tmp"
+    make -f Makefile test
+  container:
+    from: src
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    export HOME="/tmp"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift-priv
+  repo: stolostron-volsync-addon-controller

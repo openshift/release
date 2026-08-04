@@ -1,0 +1,44 @@
+ref:
+  as: assisted-aws-cleanup
+  from: assisted-test-infra-internal
+  grace_period: 1m0s
+  commands: assisted-aws-cleanup-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 600Mi
+    limits:
+      memory: 2Gi
+  env:
+  - name: AWS_REGION
+    default: us-east-1
+    documentation: |-
+      AWS region to run the cleanup in.
+  - name: LEAK_THRESHOLD_SECONDS
+    default: '21600'
+    documentation: |-
+      The maximum age of resources to be cleaned up in seconds.
+  - name: SLACK_CHANNEL
+    default: '#assisted-deployment-ci'
+    documentation: |-
+      Slack channel to send notifications to.
+  - name: SLACK_MENTION
+    default: '<@U03RVHD1RA9>'
+    documentation: |-
+      Slack user ID to mention in notifications.
+  - name: TERMINATE_LEAKED_INSTANCES_FLAG
+    default: 'true'
+    documentation: |-
+      If set to true, leaked instances will be terminated.
+      If not set or false, leaked instances will be left running.
+  - name: ANSIBLE_PLAYBOOK_DIRECTORY
+    default: "ansible_files"
+    documentation: Directory where the Ansible playbooks are stored.
+  - name: ANSIBLE_CLEANUP_PLAYBOOK
+    default: "aws_ec2_region_cleanup.yml"
+    documentation: Ansible playbook to be used.
+  documentation: |-
+    This step is responsible for cleaning up AWS resources that are no longer needed.
+    It will look for resources that are older than the specified LEAK_THRESHOLD_SECONDS
+    and clean them up. It will also send notifications to Slack if configured.
+    The cleanup will run in the specified AWS region.

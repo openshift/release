@@ -1,0 +1,167 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  must-gather:
+    name: "4.19"
+    namespace: ocp
+    tag: must-gather
+  ocp_4.19_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+binary_build_commands: make build build-vgmanager
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+images:
+  items:
+  - dockerfile_literal: |-
+      FROM ocp_4.19_base-rhel9
+      RUN dnf install -y make git python3 python3-pip patch nodejs npm
+      RUN pip3 install pre-commit
+
+      COPY --from=root:current /usr/lib/golang /usr/local/go
+      ENV PATH=$PATH:/usr/local/go/bin
+
+      ENV GOPATH=/tmp/go
+      ENV GOTOOLCHAIN=auto
+      ENV GOTOOLDIR=/tmp/gotools
+
+      RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
+      RUN mkdir /.local && chmod 777 /.local
+      RUN mkdir /tmp/gotools && chmod 777 /tmp/gotools
+
+      ENV PRE_COMMIT_HOME=/.cache/precommit
+      ENV GOLANGCI_LINT_CACHE=/.cache/golangci
+
+      COPY .pre-commit-config.yaml /tmp/pre-commit-config.yaml
+      RUN cd /tmp && git init && \
+          pre-commit install-hooks -c /tmp/pre-commit-config.yaml && \
+          rm -rf /tmp/.git && \
+          rm -rf /.cache/golangci && mkdir /.cache/golangci && \
+          chmod -R 777 /.cache
+    from: ocp_4.19_base-rhel9
+    inputs:
+      root:
+        as:
+        - root:current
+    to: lvms-pre-commit
+  - dockerfile_path: Dockerfile
+    inputs:
+      ocp_4.19_base-rhel9:
+        as:
+        - fedora:latest
+    to: lvm-operator
+  - context_dir: must-gather/
+    dockerfile_path: Dockerfile
+    from: must-gather
+    to: lvms-must-gather
+operator:
+  bundles:
+  - as: lvm-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/lvms_dev/lvms-operator:latest
+    with: pipeline:lvm-operator
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  precommit-check:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+test_binary_build_commands: |
+  go mod vendor
+  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
+  mkdir /.local && chmod 777 /.local
+tests:
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    export GOMEMLIMIT=3500MiB
+    export GOGC=50
+    pre-commit run --all-files --show-diff-on-failure --verbose
+  container:
+    clone: true
+    from: lvms-pre-commit
+- as: unit-test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make test
+  container:
+    from: test-bin
+  secret:
+    mount_path: /tmp/secret
+    name: lvm-operator-codecov-token
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+- as: post-unit-test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make test
+  container:
+    from: test-bin
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: lvm-operator-codecov-token
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+- as: e2e-aws-single-node
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-storage
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make e2e
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws-sno
+- as: e2e-aws
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-storage
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: DISK_INSTALL=true make e2e
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: lvm-operator

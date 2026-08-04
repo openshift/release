@@ -1,0 +1,38 @@
+ref:
+  as: telcov10n-verify-junit-reports-bastion
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-verify-junit-reports-bastion-commands.sh
+  documentation: |-
+    Verify JUnit reports on the bastion host instead of the CI pod to avoid the
+    1 MB Kubernetes secret size limit of SHARED_DIR.
+    Runs fail_if_any_test_failed.py on the bastion against JUNIT_REPORT_DIR.
+  grace_period: 10s
+  timeout: 30m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CLUSTER_NAME
+    default: ""
+    documentation: Hub cluster name (used to locate bastion host variables)
+  - name: JUNIT_REPORT_DIR
+    default: "/tmp/test_reports/junit"
+    documentation: Directory on the bastion containing JUnit XML reports to verify
+  - name: KNOWN_FAILURES
+    default: "[]"
+    documentation: |-
+      Test cases that are known to fail. JSON array of test identifiers to skip.
+      Examples:
+      - Simple array: ["TestCaseA", "TestCaseB"]
+      - With URLs: [{"test_id": "TestCaseA", "url": "https://issues.example.com/123"}]
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-group-all
+    mount_path: /var/group_variables/common/all
+  - namespace: test-credentials
+    name: telcov10n-ansible-kni-qe-111-bastion
+    mount_path: /var/host_variables/kni-qe-111/bastion
