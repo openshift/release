@@ -16,7 +16,8 @@ function cleanup() {
   # Capture both stdout and stderr to check for errors
   output=$(mapt azure aks destroy \
     --project-name "aks" \
-    --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" 2>&1)
+    --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" \
+    --force-destroy 2>&1)
   exit_code=$?
 
   # Re-enable exit on error
