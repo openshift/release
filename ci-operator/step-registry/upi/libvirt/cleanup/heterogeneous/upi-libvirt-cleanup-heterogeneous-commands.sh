@@ -7,7 +7,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ -z "${LEASED_RESOURCE}" ]]; then
+if [[ -z "${LEASED_RESOURCE:-}" ]]; then
   echo "Failed to acquire lease"
   exit 1
 fi
@@ -40,24 +40,38 @@ if [[ "${HOSTNAME_ADDITIONAL}" == "${HOSTNAME_CP}" ]]; then
 fi
 
 REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME_ADDITIONAL}/system"
-VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
+VIRSH=(mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}")
 echo "Cleaning additional-architecture hypervisor ${REMOTE_LIBVIRT_URI}"
 
-mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" list
+"${VIRSH[@]}" list
 
-set +e
+# Domains/volumes are named worker-hetero-<n>-${LEASED_RESOURCE}[.qcow2].
+# Match on the install naming delimiter as a suffix to avoid substring hits
+# (e.g. lease "foo" matching "foo2") and regex metacharacters in lease IDs.
+owned_domain() {
+  [[ "${1}" == *"-${LEASED_RESOURCE}" ]]
+}
 
-for DOMAIN in $(${VIRSH} list --all --name | grep "${LEASED_RESOURCE}" || true); do
-  ${VIRSH} destroy "${DOMAIN}"
+owned_volume() {
+  [[ "${1}" == *"-${LEASED_RESOURCE}.qcow2" || "${1}" == *"-${LEASED_RESOURCE}" ]]
+}
+
+while IFS= read -r DOMAIN; do
+  [[ -z "${DOMAIN}" ]] && continue
+  owned_domain "${DOMAIN}" || continue
+  # destroy/undefine are expected no-ops when the domain is already gone.
+  "${VIRSH[@]}" destroy "${DOMAIN}" || true
   sleep 1s
-  ${VIRSH} undefine "${DOMAIN}"
-done
+  "${VIRSH[@]}" undefine "${DOMAIN}" || true
+done < <("${VIRSH[@]}" list --all --name)
 
-if [[ -n "$(${VIRSH} pool-list | grep ${POOL_NAME} || true)" ]]; then
-  for VOLUME in $(${VIRSH} vol-list --pool "${POOL_NAME}" | grep "${LEASED_RESOURCE}" | awk '{ print $1 }' || true); do
-    ${VIRSH} vol-delete --pool "${POOL_NAME}" "${VOLUME}"
-  done
+POOLS="$("${VIRSH[@]}" pool-list --all --name)"
+if printf '%s\n' "${POOLS}" | grep -Fxq -- "${POOL_NAME}"; then
+  while IFS= read -r VOLUME; do
+    [[ -z "${VOLUME}" || "${VOLUME}" == "Name" ]] && continue
+    owned_volume "${VOLUME}" || continue
+    "${VIRSH[@]}" vol-delete --pool "${POOL_NAME}" "${VOLUME}" || true
+  done < <("${VIRSH[@]}" vol-list --pool "${POOL_NAME}" | awk '{ print $1 }')
 fi
 
-set -e
 echo "Additional-architecture cleanup complete for ${HOSTNAME_ADDITIONAL}"

@@ -9,7 +9,7 @@ set -o pipefail
 #   XZ: ARCH=amd64  + ADDITIONAL_WORKER_ARCHITECTURE=s390x
 # Lease-driven replacement for hardcoded upi-libvirt-install-heterogeneous.
 
-if [[ -z "${LEASED_RESOURCE}" ]]; then
+if [[ -z "${LEASED_RESOURCE:-}" ]]; then
   echo "Failed to acquire lease"
   exit 1
 fi
@@ -315,6 +315,8 @@ echo "  additional-arch hostname (${WORKER_GUEST_ARCH}): ${HOSTNAME_ADDITIONAL}"
 echo "  ADDITIONAL_WORKER_ARCHITECTURE=${ADDITIONAL_WORKER_ARCHITECTURE} (stream=${WORKER_STREAM_ARCH})"
 echo "  additional-compute count: ${ADDITIONAL_COUNT}"
 
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
 KERNEL_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${WORKER_STREAM_ARCH}.artifacts.metal.formats.pxe.kernel.location")
 INITRAMFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${WORKER_STREAM_ARCH}.artifacts.metal.formats.pxe.initramfs.location")
 ROOTFS_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -o jsonpath='{.data.stream}' | yq-v4 -oy ".architectures.${WORKER_STREAM_ARCH}.artifacts.metal.formats.pxe.rootfs.location")
@@ -435,7 +437,6 @@ done
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_HETEROGENEOUS_INSTALL_START_TIME"
 
 echo "Approving pending CSRs"
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
 approve_csrs &
 
 echo "Waiting for cluster operators to become ready."
