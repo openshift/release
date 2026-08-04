@@ -1,0 +1,24 @@
+ref:
+  as: rosa-boundary-nightly-teardown
+  from: src
+  commands: rosa-boundary-nightly-teardown-commands.sh
+  timeout: 1800s
+  best_effort: true
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+  - namespace: test-credentials
+    name: rosa-regional-platform-ephemeral-creds
+    mount_path: /var/run/rosa-credentials
+  env:
+  - name: AWS_CONFIG_FILE
+    default: "/var/run/rosa-credentials/aws_config"
+    documentation: |-
+      Path to the AWS CLI config file with named profiles from the mounted
+      credential secret.
+  documentation: |-
+    Tears down rosa-boundary AWS infrastructure provisioned by the provision step.
+    Destroys both regional and network terraform modules in reverse order.
+    Marked as best_effort so it does not block other post steps if it fails.

@@ -1,0 +1,24 @@
+ref:
+  as: rosa-boundary-nightly-provision
+  from: src
+  commands: rosa-boundary-nightly-provision-commands.sh
+  timeout: 3600s
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+  - namespace: test-credentials
+    name: rosa-regional-platform-ephemeral-creds
+    mount_path: /var/run/rosa-credentials
+  env:
+  - name: AWS_CONFIG_FILE
+    default: "/var/run/rosa-credentials/aws_config"
+    documentation: |-
+      Path to the AWS CLI config file with named profiles from the mounted
+      credential secret.
+  documentation: |-
+    Provisions rosa-boundary AWS infrastructure using terraform.
+    Deploys both network (deploy/network/) and regional (deploy/regional/)
+    terraform modules. Uses rosa-regional-platform-ephemeral-creds for AWS access.
+    Saves terraform outputs to SHARED_DIR for use by test steps.
