@@ -35,6 +35,7 @@ OSC_CHARTS_REPO=${OSC_CHARTS_REPO:-https://github.com/confidential-devhub/charts
 OSC_CHARTS_REF=${OSC_CHARTS_REF:-main}
 ENABLEPEERPODS=${ENABLEPEERPODS:-false}
 WORKLOAD_TO_TEST=${WORKLOAD_TO_TEST:-kata}
+OSC_DEV_CATALOG_NAME="osc-operator-dev-catalog"
 
 # Early exit if installation disabled
 if [[ "${OSC_INSTALL}" != "true" ]]; then
@@ -165,8 +166,6 @@ function latest_catsrc_image_tag() {
     echo "WARNING: No X.Y.Z-unix_epoch tag found, using :latest" >&2
     echo "latest"
 }
-
-OSC_DEV_CATALOG_NAME="osc-operator-dev-catalog"
 
 function setup_catalog_source() {
   if [[ -z "${CATALOG_SOURCE_IMAGE}" ]]; then
