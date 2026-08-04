@@ -18,15 +18,35 @@ echo "Using AWS region: ${AWS_REGION}"
 # Disable tracing for terraform operations
 set +x
 
+# Track teardown failures
+TEARDOWN_FAILED=0
+
 # Destroy in reverse order - regional first, then network
 echo "Destroying regional infrastructure..."
 cd deploy/regional/
-/tmp/terraform init || echo "Regional terraform init failed, continuing..."
-/tmp/terraform destroy -auto-approve || echo "Regional destroy failed, continuing..."
+if ! /tmp/terraform init; then
+  echo "Regional terraform init failed, continuing..."
+  TEARDOWN_FAILED=1
+fi
+if ! /tmp/terraform destroy -auto-approve; then
+  echo "Regional destroy failed, continuing..."
+  TEARDOWN_FAILED=1
+fi
 
 echo "Destroying network infrastructure..."
 cd ../network/
-/tmp/terraform init || echo "Network terraform init failed, continuing..."
-/tmp/terraform destroy -auto-approve || echo "Network destroy failed, continuing..."
+if ! /tmp/terraform init; then
+  echo "Network terraform init failed, continuing..."
+  TEARDOWN_FAILED=1
+fi
+if ! /tmp/terraform destroy -auto-approve; then
+  echo "Network destroy failed, continuing..."
+  TEARDOWN_FAILED=1
+fi
 
-echo "Infrastructure teardown complete"
+if [[ ${TEARDOWN_FAILED} -eq 1 ]]; then
+  echo "Infrastructure teardown completed with failures"
+  exit 1
+else
+  echo "Infrastructure teardown completed successfully"
+fi
