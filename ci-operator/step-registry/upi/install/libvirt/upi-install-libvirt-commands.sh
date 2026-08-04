@@ -80,19 +80,19 @@ LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 # Simplify the virsh command
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 
-# True when BRANCH is 4.16 or newer (used to gate APIs introduced in 4.16).
-# Non-numeric values (main/master) are treated as older than 4.16 with a warning,
-# not coerced to 0.0 via awk. Optional "release-" prefix is stripped.
-branch_at_least_4_16() {
+# True only when BRANCH is a known numeric OCP version older than 4.16.
+# Used to skip APIs that do not exist on ≤4.15. Unset/non-numeric BRANCH
+# (main/master) returns false so 4.16+ jobs keep their existing behavior.
+# Optional "release-" prefix is stripped.
+branch_known_older_than_4_16() {
   local branch="${BRANCH:-}"
   branch="${branch#release-}"
   if [[ -z "${branch}" || ! "${branch}" =~ ^[0-9]+(\.[0-9]+)*([.-].*)?$ ]]; then
-    echo "WARNING: BRANCH='${BRANCH:-unset}' is not a numeric OCP version; treating as older than 4.16 for API gates" >&2
     return 1
   fi
   echo "${branch}" | awk -F. '{
     major=$1+0; minor=$2+0;
-    if (major > 4 || (major == 4 && minor >= 16)) exit 0;
+    if (major < 4 || (major == 4 && minor < 16)) exit 0;
     exit 1
   }'
 }
@@ -100,16 +100,15 @@ branch_at_least_4_16() {
 # Set when ensure_rhcos_resized successfully resized locally with qemu-img.
 RHCOS_RESIZED_LOCALLY=false
 
-# Resize RHCOS qcow before upload. ocp/4.15:libvirt-installer often lacks qemu-img;
-# do not dnf-install it (prior attempts failed on missing libaio deps). Caller falls
-# back to virsh vol-resize on the hypervisor after upload when needed.
+# Resize RHCOS qcow before upload. 4.16+ images have qemu-img (same as before).
+# ocp/4.15:libvirt-installer often lacks it; caller then uses virsh vol-resize.
 ensure_rhcos_resized() {
   local image_path=$1
   local capacity=$2
   RHCOS_RESIZED_LOCALLY=false
   if command -v qemu-img >/dev/null 2>&1; then
-    echo "Resizing rhcos image with qemu-img to ${capacity}..."
-    qemu-img resize "${image_path}" "${capacity}"
+    echo "Resizing rhcos image to match volume capacity..."
+    qemu-img resize ${image_path} ${capacity}
     RHCOS_RESIZED_LOCALLY=true
     return 0
   fi
@@ -578,21 +577,21 @@ create_node () {
     clone_volume ${NAME}-volume
 
     echo "Creating ${NAME} vm..."
-    # virt-install ships in 4.16+ libvirt-installer images (MULTIARCH-4111).
-    # ocp/4.15:libvirt-installer does not; use ACPI-free virsh define/start instead.
+    # 4.16+ libvirt-installer images include virt-install (unchanged path).
+    # ≤4.15 images typically do not; fall back to ACPI-free virsh define/start.
     if command -v virt-install >/dev/null 2>&1; then
       virt-install \
-        --connect "${LIBVIRT_CONNECTION}" \
-        --name "${NAME}" \
-        --memory "${DOMAIN_MEMORY}" \
-        --vcpus "${DOMAIN_VCPUS}" \
-        --network "network=${CLUSTER_NAME},mac=${MAC_ADDRESS}" \
+        --connect ${LIBVIRT_CONNECTION} \
+        --name ${NAME} \
+        --memory ${DOMAIN_MEMORY} \
+        --vcpus ${DOMAIN_VCPUS} \
+        --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
         --disk="vol=${POOL_NAME}/${NAME}-volume" \
-        --osinfo "${VIRT_INSTALL_OSINFO}" \
+        --osinfo ${VIRT_INSTALL_OSINFO} \
         --graphics=none \
         --import \
         --noautoconsole \
-        --disk "vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional"
+        --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
     else
       echo "virt-install not found; defining ${NAME} with virsh (≤4.15 libvirt-installer fallback, no ACPI)"
       DOMAIN_XML="${INSTALL_DIR}/${NAME}.xml"
@@ -716,10 +715,11 @@ for i in {1..30}; do
   sleep 15
 done
 
-# Patch etcd for allowing slower disks (controlPlaneHardwareSpeed exists from 4.16+)
+# Patch etcd for allowing slower disks (controlPlaneHardwareSpeed exists from 4.16+).
+# Skip only when BRANCH is known < 4.16 so existing 4.16+ VPN/UPI jobs are unchanged.
 if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
-  if ! branch_at_least_4_16; then
-    echo "Skipping etcd controlPlaneHardwareSpeed patch: BRANCH=${BRANCH:-unset} is older than 4.16"
+  if branch_known_older_than_4_16; then
+    echo "Skipping etcd controlPlaneHardwareSpeed patch: BRANCH=${BRANCH} is older than 4.16"
   else
     echo "Patching etcd cluster operator..."
     oc patch etcd cluster --type=merge --patch '{"spec":{"controlPlaneHardwareSpeed":"Slower"}}'
