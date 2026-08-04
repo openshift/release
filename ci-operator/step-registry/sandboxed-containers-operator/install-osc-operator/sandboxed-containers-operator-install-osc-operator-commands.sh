@@ -31,7 +31,6 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 OSC_INSTALL=${OSC_INSTALL:-false}
 OSC_NAMESPACE=${OSC_NAMESPACE:-openshift-sandboxed-containers-operator}
 CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE:-}
-CATALOG_SOURCE_NAME=${CATALOG_SOURCE_NAME:-redhat-operators}
 OSC_CHARTS_REPO=${OSC_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 OSC_CHARTS_REF=${OSC_CHARTS_REF:-main}
 ENABLEPEERPODS=${ENABLEPEERPODS:-false}
@@ -55,7 +54,7 @@ echo ">>> Namespace: ${OSC_NAMESPACE}"
 echo ">>> Workload: ${WORKLOAD_TO_TEST}"
 echo ">>> Peer-pods: ${ENABLEPEERPODS}"
 if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
-  echo ">>> Catalog source: ${CATALOG_SOURCE_NAME} (image: ${CATALOG_SOURCE_IMAGE})"
+  echo ">>> Catalog source: ${OSC_DEV_CATALOG_NAME} (image: ${CATALOG_SOURCE_IMAGE})"
 else
   echo ">>> Catalog source: redhat-operators (using existing catalog)"
 fi
@@ -167,57 +166,7 @@ function latest_catsrc_image_tag() {
     echo "latest"
 }
 
-function create_catsrc() {
-  local catsrc_name="$1"
-  local catsrc_image="$2"
-  local catsrc_path="${SHARED_DIR}/catsrc_${catsrc_name}.yaml"
-
-  echo ">>> Create a custom CatalogSource named ${catsrc_name} for internal builds"
-
-  cat<<-EOF | tee "${catsrc_path}"
-  apiVersion: operators.coreos.com/v1alpha1
-  kind: CatalogSource
-  metadata:
-    name: "${catsrc_name}"
-    namespace: openshift-marketplace
-  spec:
-    displayName: QE
-    image: "${catsrc_image}"
-    publisher: QE
-    sourceType: grpc
-EOF
-
-  oc apply -f "${catsrc_path}"
-}
-
-function wait_for_catsrc() {
-  local catsrc_name="$1"
-  local timeout=300
-  echo ">>> Waiting for CatalogSource ${catsrc_name} to be READY..."
-
-  local deadline=$(( SECONDS + timeout ))
-  while (( SECONDS < deadline )); do
-    local state
-    state="$(oc get catalogsource -n openshift-marketplace \
-        "${catsrc_name}" -o jsonpath='{.status.connectionState.lastObservedState}' \
-        2>/dev/null || echo "")"
-    if [[ "${state}" == "READY" ]]; then
-      echo ">>> CatalogSource ${catsrc_name} is READY"
-      return 0
-    fi
-    sleep 10
-  done
-
-  state="$(oc get catalogsource -n openshift-marketplace "${catsrc_name}" \
-      -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")"
-  if [[ "${state}" != "READY" ]]; then
-    echo ">>> ERROR: CatalogSource ${catsrc_name} not READY after ${timeout}s (state: ${state})" >&2
-    oc get catalogsource -n openshift-marketplace "${catsrc_name}" -o yaml || true
-    return 1
-  fi
-  echo ">>> CatalogSource ${catsrc_name} is READY"
-  return 0
-}
+OSC_DEV_CATALOG_NAME="osc-operator-dev-catalog"
 
 function setup_catalog_source() {
   if [[ -z "${CATALOG_SOURCE_IMAGE}" ]]; then
@@ -225,7 +174,7 @@ function setup_catalog_source() {
     return 0
   fi
 
-  echo ">>> Setting up CatalogSource for Pre-GA install"
+  echo ">>> Setting up catalog source image for Pre-GA install"
 
   mirror_konflux
 
@@ -239,17 +188,15 @@ function setup_catalog_source() {
     echo ">>> Using provided catalog image: ${CATALOG_SOURCE_IMAGE}"
   fi
 
-  create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
-  wait_for_catsrc "${CATALOG_SOURCE_NAME}"
-
   echo "CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE}" > "${SHARED_DIR}/catalog-source-image.env"
   echo ">>> Saved resolved CATALOG_SOURCE_IMAGE to ${SHARED_DIR}/catalog-source-image.env"
+  echo ">>> Helm chart will create CatalogSource ${OSC_DEV_CATALOG_NAME} with this image"
 
-  # Update osc-config ConfigMap with the resolved catalog source name
+  # Update osc-config ConfigMap with the chart's catalog name
   if oc get configmap osc-config -n default &>/dev/null; then
     oc patch configmap osc-config -n default --type merge \
-      -p "{\"data\":{\"catalogsourcename\":\"${CATALOG_SOURCE_NAME}\"}}" || true
-    echo ">>> Patched osc-config with catalogsourcename=${CATALOG_SOURCE_NAME}"
+      -p "{\"data\":{\"catalogsourcename\":\"${OSC_DEV_CATALOG_NAME}\"}}" || true
+    echo ">>> Patched osc-config with catalogsourcename=${OSC_DEV_CATALOG_NAME}"
   fi
 }
 
@@ -324,6 +271,12 @@ function render_osc_operator_chart() {
   )
 
   # DEBUG until https://github.com/confidential-devhub/charts/pull/4 merges
+  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
+    helm_args+=("--set" "dev.enabled=true" "--set" "dev.image=${CATALOG_SOURCE_IMAGE}")
+    echo ">>> Helm: dev.enabled=true, dev.image=${CATALOG_SOURCE_IMAGE}" >&2
+  else
+    helm_args+=("--set" "dev.enabled=false")
+  fi
   echo ">>> DEBUG: Helm renders source=redhat-operators (patched via sed after render). PR 4 not merged yet." >&2
 
   local helm_output
@@ -462,9 +415,9 @@ function install_osc_operator() {
   fi
 
   # TODO: remove sed workaround once https://github.com/confidential-devhub/charts/pull/4 merges
-  if [[ -n "${CATALOG_SOURCE_IMAGE}" && "${CATALOG_SOURCE_NAME}" != "redhat-operators" ]]; then
-    echo ">>> Patching Subscription source: redhat-operators -> ${CATALOG_SOURCE_NAME}"
-    sed -i "s/source: redhat-operators/source: ${CATALOG_SOURCE_NAME}/" "${operator_yaml}"
+  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
+    echo ">>> Patching Subscription source: redhat-operators -> ${OSC_DEV_CATALOG_NAME}"
+    sed -i "s/source: redhat-operators/source: ${OSC_DEV_CATALOG_NAME}/" "${operator_yaml}"
   fi
 
   echo ">>> Rendered operator objects:"
@@ -518,12 +471,12 @@ function wait_for_operator() {
     return 1
   fi
 
-  # Stage 1: Wait for the custom CatalogSource (e.g. brew-catalog)
-  if [[ -n "${CATALOG_SOURCE_IMAGE}" && "${CATALOG_SOURCE_NAME}" != "redhat-operators" ]]; then
-    if ! wait_until "CatalogSource ${CATALOG_SOURCE_NAME} READY" 60 5 \
-      "[[ \"\$(oc get catalogsource -n openshift-marketplace '${CATALOG_SOURCE_NAME}' -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
+  # Stage 1: Wait for the dev CatalogSource created by the helm chart
+  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
+    if ! wait_until "CatalogSource ${OSC_DEV_CATALOG_NAME} READY" 300 5 \
+      "[[ \"\$(oc get catalogsource -n openshift-marketplace '${OSC_DEV_CATALOG_NAME}' -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
       oc get catalogsource -n openshift-marketplace || true
-      oc describe catalogsource -n openshift-marketplace "${CATALOG_SOURCE_NAME}" || true
+      oc describe catalogsource -n openshift-marketplace "${OSC_DEV_CATALOG_NAME}" || true
       return 1
     fi
   fi
