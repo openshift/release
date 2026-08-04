@@ -18,14 +18,14 @@ access_ip=$(<"${SHARED_DIR}"/access_ip)
 # shellcheck disable=SC1090
 . <(yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")' < "${SHARED_DIR}"/external_vips.yaml)
 # shellcheck disable=SC2154
-if [ ${#api_vip} -eq 0 ] || [ ${#ingress_vip} -eq 0 ] || [ ${#api_int} -eq 0 ]; then
-  echo "Unable to parse VIPs"
-  exit 1
-fi
+if [ "${ipv4_enabled:-false}" == "true" ] && [ -z "${api_vip:-}" ]; then echo "Missing IPv4 VIPs"; exit 1; fi
+if [ "${ipv6_enabled:-false}" == "true" ] && [ -z "${api_vip_v6:-}" ]; then echo "Missing IPv6 VIPs"; exit 1; fi
+
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 DNS_FORWARD=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
 
-if [ "${ipv4_enabled:-}" == "true" ]; then
+if [ "${ipv4_enabled:-false}" == "true" ]; then
+  # shellcheck disable=SC2154
   DNS_FORWARD="${DNS_FORWARD}
 access.${CLUSTER_NAME} IN A ${access_ip}
 api.${CLUSTER_NAME} IN A ${api_vip}
@@ -33,14 +33,8 @@ provisioner.${CLUSTER_NAME} IN A ${INTERNAL_NET_IP}
 api-int.${CLUSTER_NAME} IN A ${api_int}
 *.apps.${CLUSTER_NAME} IN A ${ingress_vip}"
 fi
-
-if [ "${ipv6_enabled:-}" == "true" ]; then
+if [ "${ipv6_enabled:-false}" == "true" ]; then
   # shellcheck disable=SC2154
-  if [ ${#api_vip_v6} -eq 0 ] || [ ${#ingress_vip_v6} -eq 0 ] || [ ${#api_int_v6} -eq 0 ]; then
-    echo "Unable to parse IPv6 VIPs"
-    exit 1
-  fi
-
   DNS_FORWARD="${DNS_FORWARD}
 provisioner.${CLUSTER_NAME} IN AAAA ${INTERNAL_NET_IPV6}
 api.${CLUSTER_NAME} IN AAAA ${api_vip_v6}
@@ -54,19 +48,18 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   # shellcheck disable=SC2154
-  if [ ${#name} -eq 0 ] || [ ${#ip} -eq 0 ]; then
-    echo "Error when parsing the Bare Metal Host metadata"
-    exit 1
-  fi
-
-  if [ "${ipv4_enabled:-}" == "true" ]; then
+  if [ "${ipv4_enabled:-false}" == "true" ]; then
+    if [ ${#name} -eq 0 ] || [ ${#ip} -eq 0 ]; then
+        echo "Error when parsing the Bare Metal Host metadata"
+        exit 1
+    fi
     DNS_FORWARD="${DNS_FORWARD}
 ${name}.${CLUSTER_NAME} IN A ${ip}"
     DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
 $(echo "${ip}." | ( rip=""; while read -r -d . b; do rip="$b${rip+.}${rip}"; done; echo "$rip" ))in-addr.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}."
   fi
 
-  if [ "${ipv6_enabled:-}" == "true" ]; then
+  if [ "${ipv6_enabled:-false}" == "true" ]; then
     # shellcheck disable=SC2154
     if [ ${#ipv6} -eq 0 ]; then
       echo "Error when parsing the Bare Metal Host metadata"
@@ -77,6 +70,7 @@ ${name}.${CLUSTER_NAME} IN AAAA ${ipv6}"
 
     expanded_ipv6=$(printf "%s" "$ipv6" | awk -F ':' '{for (i=1; i<=NF; i++) printf("%04s", $i); print ""}')
     reversed_ipv6=$(echo "$expanded_ipv6" | rev)
+    # shellcheck disable=SC2001
     reversed_ipv6_with_dots=$(echo "$reversed_ipv6" | sed 's/\(.\{1\}\)/\1./g')
     reversed_ipv6="${reversed_ipv6_with_dots}ip6.arpa."
     DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
