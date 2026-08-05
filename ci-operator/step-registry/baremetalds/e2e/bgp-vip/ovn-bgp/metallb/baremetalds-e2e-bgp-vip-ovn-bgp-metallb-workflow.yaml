@@ -1,0 +1,48 @@
+workflow:
+  as: baremetalds-e2e-bgp-vip-ovn-bgp-metallb
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=2
+        ENABLE_BGP_TOR=true
+        BGP_VIP_MANAGEMENT=true
+      FEATURE_SET: DevPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+      TEST_SKIPS: Services should fallback to local terminating endpoints when there
+        are no ready endpoints with externalTrafficPolicy=Local\| CPU Partitioning
+        cluster platform workloads should be annotated correctly for Deployments
+    pre:
+      - ref: baremetalds-devscripts-conf-featureset
+      - chain: baremetalds-ofcir-pre
+      - ref: baremetalds-e2e-ovn-bgp-pre
+      - ref: baremetalds-e2e-bgp-vip-metallb-pre
+    test:
+      - ref: baremetalds-e2e-bgp-vip-verify
+      - ref: baremetalds-e2e-bgp-vip-ovn-bgp-verify
+      - ref: baremetalds-e2e-bgp-vip-metallb-verify
+      - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    Full three-producer coexistence lane for BGP-based VIP management
+    (enhancement 1982): one cluster runs all three FRRConfiguration
+    producers sharing the same frr-k8s instances (static pods on the
+    control plane, DaemonSet on workers) — the VIP configuration rendered
+    by CNO, OVN-Kubernetes route advertisements (external route reflector,
+    RouteAdvertisements CRs), and a day-2 MetalLB operator in
+    frr-k8s-external mode peering with the same top-of-rack speaker that
+    serves the VIPs. The three verify steps assert, in order: the VIP
+    acceptance criteria, the OVN-K coexistence criteria (per-node sessions
+    to the route reflector, pod subnets advertised, imported-route
+    datapath), and the MetalLB coexistence criteria (same-neighbor merge
+    at the ToR with no session duplication, LoadBalancer /32 advertised
+    from every node and reachable); the conformance suite then runs
+    against the combined configuration. The exact producer combination was
+    validated end to end on a live dev-scripts cluster before this lane
+    was added. Security notes: see the baremetalds-e2e-bgp-vip-ovn-bgp
+    workflow — EXTRA_MG_ARGS=--host-network scopes to the post-run
+    must-gather pod only, and the privileged FRR/agnhost containers of the
+    shared ovn-bgp-pre step run on the ephemeral CI hypervisor, not the
+    cluster.
