@@ -48,6 +48,8 @@ tests:
       ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
       ACM_SPOKE_CP_TYPE: m6a.2xlarge
       ACM_SPOKE_WORKER_TYPE: c5n.metal
+      CNV_POLICY_CHANNEL: stable
+      CNV_POLICY_INSTALL_MAJOR_MINOR: "4.21"
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       CNV_ENABLE_CCLM: "true"
       COMPUTE_NODE_TYPE: c5n.metal
@@ -79,7 +81,8 @@ tests:
               {"step": "p2p-mtv-execute-live-migration-return", "failure_type": "all", "classification": "MTV CCLM return live migration failure (spoke-2 back to spoke-1)", "jira_project": "!default", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "acm-interop-p2p-submariner-diag", "failure_type": "all", "classification": "Submariner diagnostics collection failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 3}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
                       {"step": "acm-mch", "failure_type": "all", "classification": "ACM MCH install", "jira_project": "!default", "group": {"name": "interop-p2p-tests", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
-              {"step": "p2p-debug-sleep", "failure_type": "all", "classification": "Debug sleep step failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]}
+              {"step": "p2p-debug-sleep", "failure_type": "all", "classification": "Debug sleep step failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
+              {"step": "p2p-cnv-restore-virt-operator", "failure_type": "all", "classification": "virt-operator restore failure (post-migration)", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]}
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/cr/lp-interop.json
@@ -111,6 +114,7 @@ tests:
       env: MANAGED_CLUSTER_LEASED_RESOURCE
       resource_type: aws-cspi-qe-quota-slice
     post:
+    - ref: p2p-cnv-restore-virt-operator
     - ref: acm-fetch-operator-versions
     - ref: acm-must-gather
     - ref: acm-inspector
