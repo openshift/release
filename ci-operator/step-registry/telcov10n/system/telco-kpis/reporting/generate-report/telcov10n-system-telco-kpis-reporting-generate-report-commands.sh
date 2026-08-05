@@ -9,6 +9,7 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 # fi
 
 export_env_vars_from_json 'generate_report' "${REPORTING_SETTINGS:-}" "${REPORTING_SETTINGS_DEFAULTS:-}"
+export_env_vars_from_json 'splunk' "${REPORTING_SETTINGS:-}" "${REPORTING_SETTINGS_DEFAULTS:-}"
 setup_continue_on_fail
 setup_debug_on_fail
 
@@ -36,7 +37,28 @@ main() {
         FILTER_FLAG="-e test_filter=${TEST_FILTER}"
     fi
 
-    echo "Running generate-report playbook (development_mode: ${DEVELOPMENT_MODE})"
+    SPLUNK_FLAG=""
+    if [ "${PUSH_ENABLED:-false}" = "true" ]; then
+        SPLUNK_FLAG="-e splunk_push_enabled=true"
+        if [ -f /var/splunk/splunk_hec_url ]; then
+            [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
+            set +x
+            SPLUNK_FLAG="${SPLUNK_FLAG} -e splunk_hec_url=$(cat /var/splunk/splunk_hec_url)"
+            SPLUNK_FLAG="${SPLUNK_FLAG} -e splunk_hec_token=$(cat /var/splunk/splunk_hec_token)"
+            $_was_tracing && set -x
+        else
+            echo "WARNING: Splunk push enabled but credentials not found at /var/splunk/"
+            SPLUNK_FLAG=""
+        fi
+        if [ -n "${SPLUNK_FLAG}" ]; then
+            SPLUNK_FLAG="${SPLUNK_FLAG} -e formal_test=${FORMAL_TEST:-false}"
+            SPLUNK_FLAG="${SPLUNK_FLAG} -e splunk_ci_type=prow"
+            SPLUNK_FLAG="${SPLUNK_FLAG} -e splunk_ci_job_name=${JOB_NAME:-unknown}"
+            SPLUNK_FLAG="${SPLUNK_FLAG} -e splunk_ci_build_number=${BUILD_ID:-unknown}"
+        fi
+    fi
+
+    echo "Running generate-report playbook (development_mode: ${DEVELOPMENT_MODE}, splunk: ${PUSH_ENABLED:-false})"
     ansible-playbook ./playbooks/telco-kpis/generate-report.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e spoke_cluster="${SPOKE_CLUSTER}" \
@@ -44,6 +66,7 @@ main() {
         -e timestamp="${TIMESTAMP}" \
         -e development_mode="${DEVELOPMENT_MODE}" \
         ${FILTER_FLAG} \
+        ${SPLUNK_FLAG} \
         ${DEBUG_FLAG}
 
     echo "Report generation completed for ${SPOKE_CLUSTER}"
