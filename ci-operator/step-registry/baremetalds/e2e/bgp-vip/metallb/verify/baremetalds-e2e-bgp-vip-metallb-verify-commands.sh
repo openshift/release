@@ -66,7 +66,7 @@ echo "[2/4] same-neighbor merge: still exactly one Established ToR session per n
 check_sessions() {
     local established
     established="$(${CLI} exec bgp-tor vtysh -c 'show bgp ipv4 unicast summary json' 2>/dev/null \
-        | jq '[.peers[] | select(.state=="Established")] | length')"
+        | jq '[(.ipv4Unicast.peers // .peers // {})[] | select(.state=="Established")] | length')"
     [[ "${established:-0}" -eq "${nodes}" ]]
 }
 if ! poll 300 check_sessions; then
@@ -100,7 +100,10 @@ fi
 echo "[4/4] datapath: the LB service answers over the BGP-routed path"
 # success is the curl exit code (HTTP success), not any response-body literal
 if [[ -n "${lb_ip}" ]]; then
-    if curl --fail --show-error --max-time 20 -s "http://${lb_ip}:8080/hostname"; then
+    check_datapath() {
+        curl --fail --show-error --max-time 20 -s -o /dev/null "http://${lb_ip}:8080/hostname"
+    }
+    if poll 300 check_datapath; then
         echo "LB service reachable over BGP"
     else
         ip route get "${lb_ip}" || true

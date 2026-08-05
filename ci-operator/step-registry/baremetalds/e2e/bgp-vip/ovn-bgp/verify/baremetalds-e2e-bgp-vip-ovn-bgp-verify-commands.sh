@@ -61,7 +61,7 @@ echo "[2/4] every node has an Established BGP session to the route reflector"
 check_sessions() {
     local established
     established="$(${CLI} exec frr vtysh -c 'show bgp ipv4 unicast summary json' \
-        | jq '[.peers[] | select(.state=="Established")] | length')"
+        | jq '[(.ipv4Unicast.peers // .peers // {})[] | select(.state=="Established")] | length')"
     [[ "${established:-0}" -eq "${nodes}" ]]
 }
 if ! poll 300 check_sessions; then
@@ -73,7 +73,15 @@ echo "[3/4] every node's pod subnet is advertised to the route reflector"
 # assert the exact per-node OVN subnets, not a route count: the reflector's
 # table also carries unrelated prefixes (e.g. the agnhost network)
 check_pod_subnets() {
-    local rr_routes subnet missing=0
+    local rr_routes subnet expected missing=0
+    # every node must contribute exactly one IPv4 pod subnet; an absent or
+    # empty node-subnets annotation must fail the check, not shrink the loop
+    expected="$(oc get nodes -o jsonpath='{.items[*].metadata.annotations.k8s\.ovn\.org/node-subnets}' \
+        | { jq -r -s '.[].default[]' 2>/dev/null || true; } | { grep -c -F . || true; })"
+    if [[ "${expected:-0}" -ne "${nodes}" ]]; then
+        echo "expected ${nodes} IPv4 pod subnets from node annotations, found ${expected:-0}"
+        return 1
+    fi
     rr_routes="$(${CLI} exec frr vtysh -c 'show bgp ipv4 unicast json' | jq -r '.routes | keys[]')"
     for subnet in $(oc get nodes -o jsonpath='{.items[*].metadata.annotations.k8s\.ovn\.org/node-subnets}' \
         | jq -r -s '.[].default[]' | grep -F . ); do
@@ -96,7 +104,7 @@ echo "[4/4] pod-network datapath over BGP: pod reaches the external agnhost"
 oc delete pod bgp-ra-datapath-check --ignore-not-found
 if oc run bgp-ra-datapath-check --restart=Never --attach --rm --pod-running-timeout=5m \
     --image=registry.k8s.io/e2e-test-images/agnhost:2.53 --command -- \
-    curl --max-time 20 -s --fail --show-error http://172.20.0.100:8000/hostname; then
+    curl --max-time 20 -s --fail --show-error -o /dev/null http://172.20.0.100:8000/hostname; then
     echo "agnhost reachable from pod network"
 else
     fail "pod could not reach agnhost 172.20.0.100:8000 over the BGP-imported route"

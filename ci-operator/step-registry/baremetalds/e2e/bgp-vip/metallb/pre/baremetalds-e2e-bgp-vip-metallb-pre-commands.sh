@@ -130,7 +130,9 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-  - 192.168.111.30-192.168.111.50
+  # off the dev-scripts DHCP range (192.168.111.20-192.168.111.60) and the
+  # API/ingress VIP allocations
+  - 192.168.111.70-192.168.111.90
 ---
 apiVersion: metallb.io/v1beta2
 kind: BGPPeer
@@ -157,4 +159,6 @@ oc create deployment lb-echo -n default --image=registry.k8s.io/e2e-test-images/
   --replicas=2 --dry-run=client -o yaml -- /agnhost netexec --http-port=8080 | oc apply -f -
 oc expose deployment lb-echo -n default --type=LoadBalancer --port=8080 --name=lb-echo \
   --dry-run=client -o yaml | oc apply -f -
+# the verify step curls the service; do not hand it an LB with no Ready backend
+oc rollout status -n default deploy/lb-echo --timeout=5m
 EOF
