@@ -2,6 +2,34 @@
 
 set -euo pipefail
 
+retry() {
+  local attempts="$1"
+  local delay="$2"
+  shift 2
+
+  local attempt
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if "$@"; then
+      return 0
+    fi
+    if ((attempt == attempts)); then
+      echo "Command failed after ${attempts} attempts: $*" >&2
+      return 1
+    fi
+    echo "Attempt ${attempt}/${attempts} failed; retrying in ${delay} seconds"
+    sleep "${delay}"
+  done
+}
+
+deleted_hsm_exists() {
+  local count
+  count="$(az keyvault list-deleted \
+    --resource-type hsm \
+    --query "[?name=='${HSM_NAME}'] | length(@)" \
+    -o tsv)"
+  [[ "${count}" == "1" ]]
+}
+
 if [[ "${HYPERSHIFT_AZURE_MANAGED_HSM}" != "true" ]]; then
   echo "Managed HSM deprovisioning is disabled"
   exit 0
@@ -31,11 +59,24 @@ az login \
   --output none
 az account set --subscription "${AZURE_AUTH_SUBSCRIPTION_ID}"
 
+PURGE_HSM=true
 if az keyvault show --hsm-name "${HSM_NAME}" --output none 2>/dev/null; then
   echo "Deleting Managed HSM ${HSM_NAME}"
   az keyvault delete --hsm-name "${HSM_NAME}" --output none
+  retry 20 30 deleted_hsm_exists
+elif deleted_hsm_exists; then
+  echo "Managed HSM ${HSM_NAME} is already soft-deleted"
 else
-  echo "Managed HSM ${HSM_NAME} does not exist or is already deleted"
+  echo "Managed HSM ${HSM_NAME} was not created; nothing to purge"
+  PURGE_HSM=false
+fi
+
+if [[ "${PURGE_HSM}" == "true" ]]; then
+  echo "Purging Managed HSM ${HSM_NAME}"
+  az keyvault purge \
+    --hsm-name "${HSM_NAME}" \
+    --location "${HYPERSHIFT_AZURE_MANAGED_HSM_LOCATION}" \
+    --output none
 fi
 
 if az group show --name "${RESOURCE_GROUP}" --output none 2>/dev/null; then
