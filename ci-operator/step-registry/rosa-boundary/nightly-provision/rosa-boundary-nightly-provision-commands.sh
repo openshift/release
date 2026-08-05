@@ -16,28 +16,18 @@ unzip -q /tmp/awscliv2.zip -d /tmp/
 /tmp/aws/install --install-dir /tmp/aws-cli --bin-dir /tmp/bin
 export PATH="/tmp/bin:${PATH}"
 
-# AWS credentials come from mounted secret via AWS_CONFIG_FILE env var
-if [[ -n "${AWS_CONFIG_FILE:-}" ]] && [[ -r "${AWS_CONFIG_FILE}" ]]; then
-  echo "AWS credential file: ${AWS_CONFIG_FILE}"
-  echo "File size: $(wc -c < "${AWS_CONFIG_FILE}") bytes"
-  echo "Section headers:"
-  grep '^\[' "${AWS_CONFIG_FILE}" || echo "  (no section headers found)"
-  echo "Key names present:"
-  grep -oE '^[a-z_]+' "${AWS_CONFIG_FILE}" || echo "  (no keys found)"
-  echo "All mount contents:"
-  ls -la "$(dirname "${AWS_CONFIG_FILE}")"
-
-  export AWS_SHARED_CREDENTIALS_FILE="${AWS_CONFIG_FILE}"
-  echo "AWS credentials configured via: ${AWS_SHARED_CREDENTIALS_FILE}"
-else
-  echo "ERROR: AWS_CONFIG_FILE not set or not readable: ${AWS_CONFIG_FILE:-not set}"
-  exit 1
-fi
+# AWS credentials from cluster_profile: aws
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 # Default to us-east-1 if no region specified
 export AWS_REGION="${AWS_REGION:-us-east-1}"
 
 echo "Using AWS region: ${AWS_REGION}"
+
+# Discover AWS account ID for Terraform's allowed_account_ids guard
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export TF_VAR_aws_account_id="${AWS_ACCOUNT_ID}"
+echo "AWS account ID: ${AWS_ACCOUNT_ID}"
 
 # Deploy network infrastructure first
 echo "Deploying network infrastructure..."
