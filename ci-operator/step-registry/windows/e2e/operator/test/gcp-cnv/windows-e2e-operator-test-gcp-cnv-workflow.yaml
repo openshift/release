@@ -1,0 +1,20 @@
+workflow:
+  as: windows-e2e-operator-test-gcp-cnv
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: ovn-conf
+    - ref: ovn-conf-hybrid-manifest
+    - chain: ipi-install
+    - ref: interop-tests-deploy-cnv
+    - ref: windows-cnv-provision
+    post:
+    - ref: windows-cnv-deprovision
+    - chain: ipi-deprovision
+  documentation: |-
+    Provisions a GCP IPI cluster with hybrid OVN networking, installs
+    OpenShift Virtualization (CNV), and creates a Windows Server KubeVirt
+    VM configured for WMCO BYOH testing. Test steps (BYOH e2e) are
+    injected by the job configuration. Post-steps clean up KubeVirt VMs
+    and deprovision the cluster.
