@@ -1,0 +1,28 @@
+ref:
+  as: openshift-pipelines-ginkgo-tests
+  from: openshift-pipelines-ginkgo-runner
+  commands: openshift-pipelines-ginkgo-tests-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  credentials:
+    - mount_path: /usr/local/ci-secrets/osp-ci-secrets
+      name: osp-ci-secrets
+      namespace: test-credentials
+  env:
+    - name: GINKGO_LABEL_FILTER
+      default: "e2e && !disconnected"
+      documentation: |-
+        Ginkgo label filter expression to select which tests to run.
+        Examples: "sanity", "e2e && !disconnected", "pipelines"
+    - name: GINKGO_TIMEOUT
+      default: "120m"
+      documentation: |-
+        Timeout for the overall ginkgo test run.
+  documentation: |-
+    Runs OpenShift Pipelines Ginkgo v2 e2e tests from the release-tests-ginkgo repo.
+    Expects the operator to already be installed on the cluster.
+    Vault secrets from kv/selfservice/openshift-pipelines/osp-ci-secrets are
+    mounted at /usr/local/ci-secrets/osp-ci-secrets and exported as env vars.
