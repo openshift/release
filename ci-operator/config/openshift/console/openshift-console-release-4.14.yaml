@@ -80,6 +80,18 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     test:
+    - as: wait-for-catalogsources
+      cli: latest
+      commands: |
+        echo "Waiting for default catalog sources to be ready..."
+        oc wait catalogsource/redhat-operators -n openshift-marketplace \
+          --for=jsonpath='{.status.connectionState.lastObservedState}'=READY \
+          --timeout=600s
+        echo "redhat-operators catalog source is READY"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: ./test-prow-e2e.sh
