@@ -67,7 +67,8 @@ function DebugOnExit () {
     true
 }
 
-trap '{( exitCode=$?; DebugOnExit; )}' EXIT TERM
+trap 'exitCode=$?; DebugOnExit' EXIT
+trap 'exitCode=143; DebugOnExit; trap - EXIT; exit 143' TERM
 
 set +x
 KUBECONFIG="" oc registry login
@@ -126,9 +127,16 @@ function AdminAck () {
     fi
 
     typeset gates=""
-    gates="$(oc -n openshift-config-managed get configmap admin-gates -o go-template='{{range $k, $v := .data}}{{$k}}{{"\n"}}{{end}}')" || true
+    if ! gates="$(oc -n openshift-config-managed get configmap admin-gates -o go-template='{{range $k, $v := .data}}{{$k}}{{"\n"}}{{end}}' 2>&1)"; then
+        if [[ "${gates}" == *"NotFound"* ]]; then
+            : "No admin-gates configmap; no acks required"
+            return 0
+        fi
+        : "Failed to query admin-gates configmap: ${gates}"
+        return 1
+    fi
     if [[ -z "${gates}" ]]; then
-        : "No admin gates found"
+        : "admin-gates configmap exists but has no data keys"
         return 0
     fi
     : "Admin gates: ${gates}"
@@ -390,7 +398,11 @@ function ValidateOppOperators () {
     : "Checking pod readiness for OPP operator namespaces"
     typeset notReady="" ns="" podList=""
     for ns in $(awk -F'\t' -v ops="${OPP_OPERATORS}" 'BEGIN{n=split(ops,arr,",")} {for(i=1;i<=n;i++) if(index($2,arr[i])==1){ns[$1]=1;break}} END{for(k in ns) print k}' <<< "${allCsvsJson}"); do
-        podList="$(oc get pods -n "${ns}" --no-headers)" || true
+        if ! podList="$(oc get pods -n "${ns}" --no-headers)"; then
+            : "Failed to list pods in ${ns}"
+            (( failCount += 1 ))
+            continue
+        fi
         notReady="$(awk '!/Completed/ && !/Running/ && !/Succeeded/' <<< "${podList}")"
         if [[ -n "${notReady}" ]]; then
             : "WARNING: Non-running pods in ${ns}:"
