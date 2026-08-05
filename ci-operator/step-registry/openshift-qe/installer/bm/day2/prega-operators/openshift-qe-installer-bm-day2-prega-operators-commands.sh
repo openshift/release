@@ -24,18 +24,28 @@ get_idms_manifest() {
   ssh ${SSH_ARGS} root@${bastion} "
     set -e
     set -o pipefail
-    curl -k -o /tmp/idms.yaml https://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
+    curl -k -o /tmp/idms_${OCP_VERSION}.yaml https://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
   "
-  scp -q ${SSH_ARGS} root@${bastion}:/tmp/idms.yaml /tmp/idms.yaml
+  scp -q ${SSH_ARGS} root@${bastion}:/tmp/idms_${OCP_VERSION}.yaml /tmp/idms_${OCP_VERSION}.yaml
 
-  if ! python3 -c 'import yaml,sys; yaml.safe_load(open("/tmp/idms.yaml"))' 2>/dev/null; then
-    echo "Downloaded /tmp/idms.yaml is not valid YAML; falling back to bastion artifact for ${OCP_VERSION}"
-    scp -q ${SSH_ARGS} root@${bastion}:/root/prega_artifacts/idms_${OCP_VERSION}.yaml /tmp/idms.yaml
-    python3 -c 'import yaml,sys; yaml.safe_load(open("/tmp/idms.yaml"))' \
+  validate_yaml() {
+    local f="$1"
+    [[ -s "$f" ]] || return 1
+    if command -v yq &>/dev/null; then
+      yq eval 'has("kind") and has("apiVersion")' "$f" 2>/dev/null | grep -q '^true$'
+    else
+      grep -qE '^(apiVersion|kind):' "$f"
+    fi
+  }
+
+  if ! validate_yaml /tmp/idms_${OCP_VERSION}.yaml; then
+    echo "Downloaded /tmp/idms_${OCP_VERSION}.yaml is not valid YAML; falling back to bastion artifact for ${OCP_VERSION}"
+    scp -q ${SSH_ARGS} root@${bastion}:/root/prega_artifacts/idms_${OCP_VERSION}.yaml /tmp/idms_${OCP_VERSION}.yaml
+    validate_yaml /tmp/idms_${OCP_VERSION}.yaml \
       || { echo "Fallback IDMS /root/prega_artifacts/idms_${OCP_VERSION}.yaml is also invalid or missing"; exit 1; }
   fi
 
-  echo "ImageDigestMirrorSet manifest saved to /tmp/idms.yaml"
+  echo "ImageDigestMirrorSet manifest saved to /tmp/idms_${OCP_VERSION}.yaml"
 }
 
 oc config view
@@ -55,7 +65,7 @@ if [ ${OCP_BUILD} == "dev" ]; then
 
   echo "Applying the ImageDigestMirrorSet manifest"
   get_idms_manifest
-  oc apply -f /tmp/idms.yaml
+  oc apply -f /tmp/idms_${OCP_VERSION}.yaml
   sleep 300
   oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=40m
 
