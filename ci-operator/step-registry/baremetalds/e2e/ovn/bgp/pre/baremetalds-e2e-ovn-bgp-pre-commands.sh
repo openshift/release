@@ -277,6 +277,22 @@ EOF
 # enable route advertisement with FRR
 oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
 
+# The RouteAdvertisements CRD is created by CNO while reconciling the
+# routeAdvertisements enablement. On clusters where frr-k8s is already
+# deployed (e.g. BGP-based VIP management) the daemonset rollout waits below
+# return immediately, so wait for the CRD explicitly (and before a possible
+# FRR_IMAGE managementState=Unmanaged transition stops CNO reconciliation).
+echo "Waiting for the RouteAdvertisements CRD..."
+crd_deadline=$((SECONDS + 600))
+until oc wait --for condition=Established crd/routeadvertisements.k8s.ovn.org --timeout 10s &> /dev/null; do
+  if (( SECONDS >= crd_deadline )); then
+    oc get crd/routeadvertisements.k8s.ovn.org -o yaml || true
+    echo "Timed out waiting for routeadvertisements.k8s.ovn.org" >&2
+    exit 1
+  fi
+  sleep 5
+done
+
 echo "Waiting for daemonset 'frr-k8s' to be created..."
 until oc rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /dev/null; do
   sleep 5
@@ -312,15 +328,6 @@ if [ -n "${FRR_IMAGE:-}" ]; then
     sleep 5
   done
 fi
-
-# The RouteAdvertisements CRD is created by CNO while reconciling the
-# routeAdvertisements enablement. On clusters where frr-k8s is already
-# deployed (e.g. BGP-based VIP management) the daemonset rollout waits above
-# return immediately, so wait for the CRD explicitly before applying CRs.
-echo "Waiting for the RouteAdvertisements CRD..."
-until oc wait --for condition=Established crd/routeadvertisements.k8s.ovn.org --timeout 2m &> /dev/null; do
-  sleep 5
-done
 
 # set up BGP peering of the cluster with the external FRR instance container
 # peer is setup on the default VRF and also on each extra network VRF
