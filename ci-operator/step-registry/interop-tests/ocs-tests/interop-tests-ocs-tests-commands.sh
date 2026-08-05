@@ -118,7 +118,7 @@ fi
 
 START_TIME=$(date "+%s")
 
-run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
+run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k "${OCS_TEST_FILTER}" \
   --ocsci-conf "${LOGS_CONFIG}" \
   --collect-logs \
   --ocs-version  "${OCS_VERSION}"                    \
