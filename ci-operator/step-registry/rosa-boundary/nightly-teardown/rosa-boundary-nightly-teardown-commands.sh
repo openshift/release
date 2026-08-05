@@ -23,13 +23,14 @@ if [[ -n "${AWS_CONFIG_FILE:-}" ]] && [[ -r "${AWS_CONFIG_FILE}" ]]; then
 
   # Try simple key=value format first (like .awscred files)
   # Format: aws_access_key_id=VALUE
-  AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id" "${AWS_CONFIG_FILE}" | cut -d'=' -f2 | tr -d ' ')
-  AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key" "${AWS_CONFIG_FILE}" | cut -d'=' -f2 | tr -d ' ')
+  # Use xargs to trim all leading/trailing whitespace including newlines
+  AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id" "${AWS_CONFIG_FILE}" | cut -d'=' -f2 | xargs)
+  AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key" "${AWS_CONFIG_FILE}" | cut -d'=' -f2 | xargs)
 
   # If empty, try AWS CLI config format with [default] section
   if [[ -z "${AWS_ACCESS_KEY_ID}" ]]; then
-    AWS_ACCESS_KEY_ID=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_access_key_id" | cut -d'=' -f2 | tr -d ' ')
-    AWS_SECRET_ACCESS_KEY=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_secret_access_key" | cut -d'=' -f2 | tr -d ' ')
+    AWS_ACCESS_KEY_ID=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_access_key_id" | cut -d'=' -f2 | xargs)
+    AWS_SECRET_ACCESS_KEY=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_secret_access_key" | cut -d'=' -f2 | xargs)
   fi
 
   if [[ -z "${AWS_ACCESS_KEY_ID}" ]] || [[ -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
