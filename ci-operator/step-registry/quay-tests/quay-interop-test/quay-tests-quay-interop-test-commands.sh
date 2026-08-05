@@ -39,14 +39,20 @@ npm install || true
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
         typeset -a _fURL=()
-        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        type -t wget 1>/dev/null && _fURL=(wget --timeout=30 -qO-) || _fURL=(curl --connect-timeout 10 --max-time 30 -fsSL)
         "${_fURL[@]}" \
             https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-    )"; trap '
-        copyArtifacts
-        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
-            ExitTrap--PostProcessPrep
-    ' EXIT
+    )"
+    if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
+        trap '
+            copyArtifacts
+            LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+                ExitTrap--PostProcessPrep
+        ' EXIT
+    else
+        echo "WARNING: ExitTrap--PostProcessPrep not available, falling back to copyArtifacts only" >&2
+        trap copyArtifacts EXIT
+    fi
 else
     trap copyArtifacts EXIT
 fi
