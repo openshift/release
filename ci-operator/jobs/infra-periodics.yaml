@@ -2296,7 +2296,7 @@ periodics:
 - agent: kubernetes
   annotations:
     ci.openshift.io/description: This runs the check-gh-automation tool to verify
-      that all repos with CI configured are accessible by test-platform's bots
+      that stolostron repos with CI configured are accessible by test-platform's bots
     ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
   cluster: app.ci
   cron: 0 3 * * 1
@@ -2310,7 +2310,144 @@ periodics:
     workdir: true
   labels:
     ci.openshift.io/role: infra
-  name: periodic-check-gh-automation
+  name: periodic-check-gh-automation-stolostron
+  spec:
+    containers:
+    - args:
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --supplemental-prow-config-dir=./core-services/prow/02_config
+      - --plugin-config=./core-services/prow/02_config/_plugins.yaml
+      - --supplemental-plugin-config-dir=./core-services/prow/02_config
+      - --job-config-path=./ci-operator/jobs
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-hourly-tokens=600
+      - --github-allowed-burst=600
+      - --app=openshift-ci
+      - --app-check-mode=standard
+      - --bot=openshift-merge-robot
+      - --bot=openshift-ci-robot
+      - --check-branch-protection=false
+      - --only-org=stolostron
+      command:
+      - ./hack/check-gh-automation.sh
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+      imagePullPolicy: Always
+      name: check-gh-automation
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  annotations:
+    ci.openshift.io/description: This runs the check-gh-automation tool to verify
+      that openshift-* org repos with CI configured are accessible by test-platform's
+      bots
+    ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
+  cluster: app.ci
+  cron: 0 3 * * 1
+  decorate: true
+  decoration_config:
+    timeout: 6h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-check-gh-automation-openshift-orgs
+  spec:
+    containers:
+    - args:
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --supplemental-prow-config-dir=./core-services/prow/02_config
+      - --plugin-config=./core-services/prow/02_config/_plugins.yaml
+      - --supplemental-plugin-config-dir=./core-services/prow/02_config
+      - --job-config-path=./ci-operator/jobs
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-hourly-tokens=600
+      - --github-allowed-burst=600
+      - --app=openshift-ci
+      - --app-check-mode=standard
+      - --bot=openshift-merge-robot
+      - --bot=openshift-ci-robot
+      - --check-branch-protection=false
+      - --only-org=openshift-assisted
+      - --only-org=openshift-cnv
+      - --only-org=openshift-eng
+      - --only-org=openshift-hyperfleet
+      - --only-org=openshift-knative
+      - --only-org=openshift-kni
+      - --only-org=openshift-metal3
+      - --only-org=openshift-online
+      - --only-org=openshift-pipelines
+      - --only-org=openshift-power-monitoring
+      - --only-org=openshift-psap
+      - --only-org=openshift-qe
+      - --only-org=openshift-s2i
+      - --only-org=openshift-service-mesh
+      - --only-org=openshift-splat-team
+      - --only-org=openshift-virtualization
+      command:
+      - ./hack/check-gh-automation.sh
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+      imagePullPolicy: Always
+      name: check-gh-automation
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  annotations:
+    ci.openshift.io/description: This runs the check-gh-automation tool to verify
+      that community org repos with CI configured are accessible by test-platform's
+      bots
+    ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
+  cluster: app.ci
+  cron: 0 3 * * 1
+  decorate: true
+  decoration_config:
+    timeout: 6h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-check-gh-automation-community
   spec:
     containers:
     - args:
@@ -2333,7 +2470,23 @@ periodics:
       - --warn-only
       - --ignore=openshift
       - --ignore=openshift-priv
-      - --ignore=Azure/ARO-HCP
+      - --ignore=stolostron
+      - --ignore=openshift-assisted
+      - --ignore=openshift-cnv
+      - --ignore=openshift-eng
+      - --ignore=openshift-hyperfleet
+      - --ignore=openshift-knative
+      - --ignore=openshift-kni
+      - --ignore=openshift-metal3
+      - --ignore=openshift-online
+      - --ignore=openshift-pipelines
+      - --ignore=openshift-power-monitoring
+      - --ignore=openshift-psap
+      - --ignore=openshift-qe
+      - --ignore=openshift-s2i
+      - --ignore=openshift-service-mesh
+      - --ignore=openshift-splat-team
+      - --ignore=openshift-virtualization
       - --ignore=kata-containers/kata-containers
       - --ignore=containers/gvisor-tap-vsock
       - --ignore=containers/podman-py
@@ -2373,7 +2526,7 @@ periodics:
 - agent: kubernetes
   annotations:
     ci.openshift.io/description: This runs the check-gh-automation tool to verify
-      that all repos with tide configured allow access to openshift-merge-bot
+      that stolostron repos with tide configured allow access to openshift-merge-bot
     ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
   cluster: app.ci
   cron: 0 3 * * 2
@@ -2385,7 +2538,130 @@ periodics:
     workdir: true
   labels:
     ci.openshift.io/role: infra
-  name: periodic-check-gh-automation-tide
+  name: periodic-check-gh-automation-tide-stolostron
+  spec:
+    containers:
+    - args:
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --supplemental-prow-config-dir=./core-services/prow/02_config
+      - --job-config-path=./ci-operator/jobs
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-hourly-tokens=600
+      - --github-allowed-burst=600
+      - --app=openshift-merge-bot
+      - --app-check-mode=tide
+      - --check-branch-protection=false
+      - --only-org=stolostron
+      command:
+      - ./hack/check-gh-automation.sh
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-merge-bot
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+      imagePullPolicy: Always
+      name: check-gh-automation
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-merge-bot
+- agent: kubernetes
+  annotations:
+    ci.openshift.io/description: This runs the check-gh-automation tool to verify
+      that openshift-* org repos with tide configured allow access to openshift-merge-bot
+    ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
+  cluster: app.ci
+  cron: 0 3 * * 2
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-check-gh-automation-tide-openshift-orgs
+  spec:
+    containers:
+    - args:
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --supplemental-prow-config-dir=./core-services/prow/02_config
+      - --job-config-path=./ci-operator/jobs
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-hourly-tokens=600
+      - --github-allowed-burst=600
+      - --app=openshift-merge-bot
+      - --app-check-mode=tide
+      - --check-branch-protection=false
+      - --only-org=openshift-assisted
+      - --only-org=openshift-cnv
+      - --only-org=openshift-eng
+      - --only-org=openshift-hyperfleet
+      - --only-org=openshift-knative
+      - --only-org=openshift-kni
+      - --only-org=openshift-metal3
+      - --only-org=openshift-online
+      - --only-org=openshift-pipelines
+      - --only-org=openshift-power-monitoring
+      - --only-org=openshift-psap
+      - --only-org=openshift-qe
+      - --only-org=openshift-s2i
+      - --only-org=openshift-service-mesh
+      - --only-org=openshift-splat-team
+      - --only-org=openshift-virtualization
+      command:
+      - ./hack/check-gh-automation.sh
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-merge-bot
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+      imagePullPolicy: Always
+      name: check-gh-automation
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-merge-bot
+- agent: kubernetes
+  annotations:
+    ci.openshift.io/description: This runs the check-gh-automation tool to verify
+      that community org repos with tide configured allow access to openshift-merge-bot
+    ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
+  cluster: app.ci
+  cron: 0 3 * * 2
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-check-gh-automation-tide-community
   spec:
     containers:
     - args:
@@ -2404,6 +2680,23 @@ periodics:
       - --warn-only
       - --ignore=openshift
       - --ignore=openshift-priv
+      - --ignore=stolostron
+      - --ignore=openshift-assisted
+      - --ignore=openshift-cnv
+      - --ignore=openshift-eng
+      - --ignore=openshift-hyperfleet
+      - --ignore=openshift-knative
+      - --ignore=openshift-kni
+      - --ignore=openshift-metal3
+      - --ignore=openshift-online
+      - --ignore=openshift-pipelines
+      - --ignore=openshift-power-monitoring
+      - --ignore=openshift-psap
+      - --ignore=openshift-qe
+      - --ignore=openshift-s2i
+      - --ignore=openshift-service-mesh
+      - --ignore=openshift-splat-team
+      - --ignore=openshift-virtualization
       - --ignore=kata-containers/kata-containers
       - --ignore=containers/gvisor-tap-vsock
       - --ignore=containers/podman-py
