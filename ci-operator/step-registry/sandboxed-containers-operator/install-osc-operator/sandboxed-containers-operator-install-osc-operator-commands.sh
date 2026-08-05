@@ -667,28 +667,6 @@ function wait_for_kataconfig() {
   oc get kataconfig "${kataconfig_name}" -o jsonpath='{.status}' 2>/dev/null | jq . || true
 }
 
-function verify_peerpod_pods() {
-  echo ">>> Verifying peer-pod control pods"
-
-  # Wait for cloud-api-adaptor daemonset pods
-  if ! wait_until "cloud-api-adaptor pods running" 600 10 \
-    "oc get daemonset -n '${OSC_NAMESPACE}' -l app=cloud-api-adaptor -o jsonpath='{.items[0].status.numberReady}' 2>/dev/null | grep -qE '^[1-9]'"; then
-    echo ">>> WARNING: cloud-api-adaptor daemonset not ready"
-    oc get daemonset -n "${OSC_NAMESPACE}" || true
-    oc get pods -n "${OSC_NAMESPACE}" -l app=cloud-api-adaptor || true
-  fi
-
-  # Wait for peerpodconfig-ctrl-caa-daemon
-  if ! wait_until "peerpodconfig webhook pod running" 300 10 \
-    "oc get pods -n '${OSC_NAMESPACE}' -l app=peerpodconfig-ctrl-caa-daemon -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q 'Running'"; then
-    echo ">>> WARNING: peerpodconfig webhook pod not running"
-    oc get pods -n "${OSC_NAMESPACE}" || true
-  fi
-
-  echo ">>> Peer-pod pods:"
-  oc get pods -n "${OSC_NAMESPACE}" || true
-}
-
 #========================================
 # Update Shared State
 #========================================
@@ -735,10 +713,6 @@ fi
 
 install_osc_operands "${CHARTS_DIR}"
 wait_for_kataconfig
-
-if [[ "${ENABLEPEERPODS}" == "true" ]]; then
-  verify_peerpod_pods
-fi
 
 # Phase 5: Update shared state
 update_osc_config
