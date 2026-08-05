@@ -62,12 +62,12 @@ main() {
     if [ "${PUSH_ENABLED:-false}" = "true" ]; then
         SPLUNK_FLAG=(-e splunk_push_enabled=true)
         if [ -z "${HEC_URL:-}" ]; then
-            echo "WARNING: HEC_URL is unset; Splunk push will likely fail"
+            echo "WARNING: HEC_URL is unset or empty; Splunk push will likely fail"
         fi
         if [ -f /var/splunk/splunk_hec_token ]; then
             set +x
             {
-                echo "splunk_hec_url: \"$(_yaml_quote "${HEC_URL}")\""
+                echo "splunk_hec_url: \"$(_yaml_quote "${HEC_URL:-}")\""
                 echo "splunk_hec_token: \"$(_yaml_quote "$(cat /var/splunk/splunk_hec_token)")\""
             } >> "${SENSITIVE_VARS_FILE}"
             $_was_tracing && set -x
