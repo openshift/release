@@ -100,7 +100,7 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
     exit 1
   fi
 
-  # Temporary probe: compare plain `oc get secret` vs `elevate -- oc get secret`.
+  # Temporary probe: plain vs elevate-wrapped secret get (elevate args are oc subcommands).
   if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
     aao_probe_secret="${OCM_FVT_AAO_PROBE_SECRET:-d4ncjp595tqc73dupto0-account-creds}"
     echo "=== elevate-wrapped AAO secret probe ==="
@@ -109,16 +109,16 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
     echo "--- plain oc get secret (expect Forbidden) ---"
     oc --request-timeout=30s get secret "${aao_probe_secret}" \
       -n osd-fleet-manager-aao -o name 2>&1 || true
-    echo "--- elevate -- oc whoami ---"
+    echo "--- elevate -- whoami ---"
     ocm-backplane elevate "${backplane_elevate_reason}" -- \
-      oc --request-timeout=30s whoami 2>&1 || true
-    echo "--- elevate -- oc get secret (name only; no data) ---"
+      whoami 2>&1 || true
+    echo "--- elevate -- get secret (name only; no data) ---"
     ocm-backplane elevate "${backplane_elevate_reason}" -- \
-      oc --request-timeout=30s get secret "${aao_probe_secret}" \
-      -n osd-fleet-manager-aao -o name 2>&1 || true
-    echo "--- elevate -- oc get secrets | head (ns list) ---"
+      get secret "${aao_probe_secret}" \
+      -n osd-fleet-manager-aao -o name --request-timeout=30s 2>&1 || true
+    echo "--- elevate -- get secrets | head (ns list) ---"
     ocm-backplane elevate "${backplane_elevate_reason}" -- \
-      oc --request-timeout=30s get secrets -n osd-fleet-manager-aao 2>&1 | head -20 || true
+      get secrets -n osd-fleet-manager-aao --request-timeout=30s 2>&1 | head -20 || true
     echo "=== end elevate-wrapped AAO secret probe ==="
   fi
 
