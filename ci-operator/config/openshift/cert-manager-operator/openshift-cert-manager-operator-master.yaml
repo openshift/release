@@ -462,7 +462,17 @@ tests:
         oc wait --for=condition=Available -n cert-manager deployment/cert-manager-cainjector --timeout=5m
 
         echo "Enabling TrustManager feature gate via subscription..."
-        oc -n cert-manager-operator patch subscription cert-manager-operator \
+        # operator-sdk run bundle creates a versioned Subscription name
+        # (e.g. cert-manager-operator-v1-20-0-sub), not a fixed cert-manager-operator.
+        # Match e2e getCertManagerOperatorSubscription: list and patch the one present.
+        SUB=$(oc -n cert-manager-operator get subscriptions.operators.coreos.com -o jsonpath='{.items[0].metadata.name}')
+        if [[ -z "${SUB}" ]]; then
+          echo "No Subscription found in cert-manager-operator namespace"
+          oc -n cert-manager-operator get subscriptions.operators.coreos.com -o yaml || true
+          exit 1
+        fi
+        echo "Patching Subscription ${SUB}"
+        oc -n cert-manager-operator patch subscription "${SUB}" \
           --type='merge' \
           -p '{"spec":{"config":{"env":[{"name":"UNSUPPORTED_ADDON_FEATURES","value":"TrustManager=true"}]}}}'
 
