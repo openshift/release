@@ -177,28 +177,50 @@ if [[ ! -d "${SHARED_DIR}"/telco5gci ]]; then
 fi
 pip install -r "${SHARED_DIR}"/telco5gci/requirements.txt
 
-for junit_file in "${ARTIFACT_DIR}"/*.xml; do
-    if [ ! -e "${junit_file}" ]; then
+# Report generation strategy:
+# 1. Filter: ginkgo with --keep-separate-reports produces per-directory XMLs, but
+#    directories with no tests matching our label filter produce empty XMLs (0 test
+#    cases). Remove those to avoid cluttering artifacts with empty reports.
+# 2. Merge: combine only non-empty XMLs into a single junit.xml so the merged
+#    report reflects only directories where tests actually ran.
+# 3. Reports: generate HTML and JSON for all remaining XMLs including the merged
+#    junit.xml, giving us both per-directory and consolidated reports.
+non_empty_xml=()
+for xml_file in "${ARTIFACT_DIR}"/*.xml; do
+    if [ ! -e "${xml_file}" ]; then
         echo "No XML files found in ${ARTIFACT_DIR}."
         exit 0
     fi
+    test_count=$(grep -o 'tests="[0-9]*"' "${xml_file}" | head -1 | grep -o '[0-9]*')
+    if [[ -z "${test_count}" || "${test_count}" -eq 0 ]]; then
+        echo "Removing empty XML: ${xml_file}"
+        rm -f "${xml_file}"
+    else
+        non_empty_xml+=("${xml_file}")
+    fi
+done
+
+if [ ${#non_empty_xml[@]} -eq 0 ]; then
+    echo "No non-empty XML files found."
+    exit 0
+fi
+
+# Merge non-empty XMLs into junit.xml
+echo "Merging ${#non_empty_xml[@]} XML files into ${ARTIFACT_DIR}/junit.xml"
+junitparser merge "${non_empty_xml[@]}" "${ARTIFACT_DIR}"/junit.xml
+
+# Generate HTML and JSON reports for all XMLs including the merged junit.xml
+for junit_file in "${ARTIFACT_DIR}"/*.xml; do
     output_file="${junit_file%.xml}.html"
     echo "Processing ${junit_file} -> ${output_file}"
-    python "${SHARED_DIR}"/telco5gci/j2html.py "${junit_file}" -o "${output_file}"
-    if [[ $? -ne 0 ]]; then
-         echo "Error: Failed to process ${junit_file}."
-         exit 1;
+    if ! python "${SHARED_DIR}"/telco5gci/j2html.py "${junit_file}" -o "${output_file}"; then
+        echo "Error: Failed to process ${junit_file}."
+        exit 1
     fi
 
     json_output_file="${junit_file%.xml}.json"
     python "${SHARED_DIR}"/telco5gci/junit2json.py "${junit_file}" -o "${json_output_file}"
 done
-
-xml_files=("$ARTIFACT_DIR"/*.xml)
-output_file="${ARTIFACT_DIR}"/junit.xml
-
-echo "Merging XML files into ${output_file}"
-junitparser merge "${xml_files[@]}" "${output_file}"
 
 rm -rf "${SHARED_DIR}"/myenv "${SHARED_DIR}"/telco5gci
 set +x
