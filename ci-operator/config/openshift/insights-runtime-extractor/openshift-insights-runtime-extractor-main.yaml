@@ -102,7 +102,17 @@ tests:
 - as: soak-test
   capabilities:
   - intranet
-  cron: 30 4 1-7,15-21 * 1
+  cron: 30 4 * * 1
+  reporter_config:
+    channel: '#ccx-io-notifications'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-observability
     env:
@@ -111,7 +121,7 @@ tests:
     - as: soak-test
       cli: latest
       commands: |
-        GIT_SSL_NO_VERIFY=true git clone -b ci-migration https://gitlab.cee.redhat.com/ikanse/soak-test.git /tmp/soak-test
+        GIT_SSL_NO_VERIFY=true git clone https://gitlab.cee.redhat.com/insights-runtime-extractor-qe/soak-test.git /tmp/soak-test
         cd /tmp/soak-test
         ./ci/run-soak-test.sh
       dependencies:
