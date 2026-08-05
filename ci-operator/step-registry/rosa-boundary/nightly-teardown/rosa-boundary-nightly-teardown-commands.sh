@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Install terraform
-TERRAFORM_VERSION="1.9.5"
+TERRAFORM_VERSION="1.15.8"
 echo "Installing Terraform ${TERRAFORM_VERSION}..."
 curl -L -o /tmp/terraform.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
 unzip /tmp/terraform.zip -d /tmp/
