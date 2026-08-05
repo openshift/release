@@ -604,7 +604,6 @@ function create_peer_pods_secret() {
         local subscription_id
         subscription_id=$(oc get secret azure-credentials -n kube-system -o jsonpath='{.data.azure_subscription_id}' 2>/dev/null | base64 -d || echo "")
 
-        [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
         set +x
         oc create secret generic peer-pods-secret \
           -n "${OSC_NAMESPACE}" \
@@ -612,7 +611,6 @@ function create_peer_pods_secret() {
           --from-literal="AZURE_CLIENT_SECRET=${client_secret}" \
           --from-literal="AZURE_TENANT_ID=${tenant_id}" \
           --from-literal="AZURE_SUBSCRIPTION_ID=${subscription_id}"
-        $WAS_TRACING && set -x
       else
         echo ">>> WARNING: Could not extract Azure credentials from peerpods-param-secret"
       fi
