@@ -606,8 +606,10 @@ flags='${PYTEST_PLUGIN_FLAGS}' make smoke || rc=1
 "
 fi
 if [[ "${RUN_KUADRANT}" == "true" ]]; then
-  CONTAINER_SCRIPT+="echo '=== make kuadrant (runs even if smoke failed) ==='
-flags='${PYTEST_PLUGIN_FLAGS}' make kuadrant || rc=1
+  # Makefile PYTEST defaults to --reruns 3; force --reruns 0 for kuadrant so
+  # failures fail once (last --reruns on the pytest CLI wins).
+  CONTAINER_SCRIPT+="echo '=== make kuadrant (runs even if smoke failed; --reruns 0) ==='
+flags='${PYTEST_PLUGIN_FLAGS} --reruns 0' make kuadrant || rc=1
 "
 fi
 CONTAINER_SCRIPT+="make polish-junit || true
