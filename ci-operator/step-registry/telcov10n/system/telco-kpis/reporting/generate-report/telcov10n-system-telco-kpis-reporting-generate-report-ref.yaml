@@ -2,6 +2,7 @@ ref:
   as: telcov10n-system-telco-kpis-reporting-generate-report
   from: root
   commands: telcov10n-system-telco-kpis-reporting-generate-report-commands.sh
+  grace_period: 10s
   timeout: 30m
   resources:
     requests:
@@ -30,11 +31,15 @@ ref:
             "test_filter": "",
             "output_filename": "",
             "development_mode": false,
+            "report_repo_url": "https://gitlab.cee.redhat.com/telcov10n/kpi",
+            "report_repo_branch": "telco-kpis-reports",
+            "force_report": false,
             "debug": false
           },
           "splunk": {
             "push_enabled": true,
-            "formal_test": false
+            "formal_test": false,
+            "hec_url": "https://splunk-hec.corp.redhat.com:8088/services/collector"
           }
         }
       documentation: >-
@@ -43,11 +48,15 @@ ref:
         continue_on_fail (bool) - when true, failures exit 0 so the pipeline continues;
         test_filter (string) - filter tests to include in report (empty for all);
         output_filename (string) - output filename for report (empty to auto-generate);
-        development_mode (bool) - when true, publishes report to Gitea repository on bastion;
+        development_mode (bool) - when true, publishes report to Gitea repository on bastion (takes precedence over production repo);
+        report_repo_url (string) - production git repo URL for publishing reports (used when development_mode is false);
+        report_repo_branch (string) - branch in the production repo to publish to;
+        force_report (bool) - when true, bypass freshness check and regenerate report even if no new test data;
         debug (bool) - when true, enables Ansible -vvv verbose output.
         The "splunk" key supports:
         push_enabled (bool) - when true, push test results to Splunk HEC (default true);
-        formal_test (bool) - when true, marks events as formal test results.
+        formal_test (bool) - when true, marks events as formal test results;
+        hec_url (string) - Splunk HEC endpoint URL.
         Values are exported as uppercase env vars, overriding ref.yaml defaults.
 
   credentials:
@@ -55,6 +64,11 @@ ref:
     - namespace: test-credentials
       name: telcov10n-splunk-hec
       mount_path: /var/splunk
+
+    # Production report repository token
+    - namespace: test-credentials
+      name: telcov10n-telco-kpis-reports-repo
+      mount_path: /var/reports-repo
 
     # Common hypervisor (shared across all spokes)
     - namespace: test-credentials
