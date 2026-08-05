@@ -13,6 +13,10 @@ export_env_vars_from_json 'splunk' "${REPORTING_SETTINGS:-}" "${REPORTING_SETTIN
 setup_continue_on_fail
 setup_debug_on_fail
 
+# Generate a telco-kpis Markdown report for a spoke cluster.
+# Aggregates test artifacts, optionally publishes to a git repo
+# and pushes results to Splunk. Sensitive credentials (tokens, URLs)
+# are passed via a temporary vars file to avoid leaking into logs.
 main() {
     echo "Generating report for spoke: ${SPOKE_CLUSTER}"
 
@@ -37,18 +41,28 @@ main() {
         FILTER_FLAG=(-e "test_filter=${TEST_FILTER}")
     fi
 
+    FORCE_REPORT_FLAG=()
+    if [ "${FORCE_REPORT:-false}" = "true" ]; then
+        FORCE_REPORT_FLAG=(-e force_report=true)
+    fi
+
+    # Write sensitive credentials to a temporary extra-vars file so they
+    # never appear in command-line expansions or xtrace output.
     # If rotating splunk_hec_token or git_repo_token, also update the
     # hypervisor vaults (teams/telco-kpis/hypervisors/) to keep Jenkins in sync.
+    SENSITIVE_VARS_FILE=$(mktemp /tmp/sensitive-vars-XXXXXX.yml)
+    trap 'rm -f "${SENSITIVE_VARS_FILE}"' EXIT
+    echo "---" > "${SENSITIVE_VARS_FILE}"
 
     SPLUNK_FLAG=()
     if [ "${PUSH_ENABLED:-false}" = "true" ]; then
         SPLUNK_FLAG=(-e splunk_push_enabled=true)
         if [ -f /var/splunk/splunk_hec_token ]; then
-            [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
             set +x
-            SPLUNK_FLAG+=(-e "splunk_hec_url=${HEC_URL}")
-            SPLUNK_FLAG+=(-e "splunk_hec_token=$(cat /var/splunk/splunk_hec_token)")
-            $_was_tracing && set -x
+            {
+                echo "splunk_hec_url: \"${HEC_URL}\""
+                echo "splunk_hec_token: \"$(cat /var/splunk/splunk_hec_token)\""
+            } >> "${SENSITIVE_VARS_FILE}"
         else
             echo "WARNING: Splunk push enabled but splunk_hec_token not found at /var/splunk/"
             SPLUNK_FLAG=()
@@ -61,38 +75,37 @@ main() {
         fi
     fi
 
-    REPORT_REPO_FLAG=()
+    _has_report_repo=false
     if [ "${DEVELOPMENT_MODE}" != "true" ] && [ -n "${REPORT_REPO_URL:-}" ]; then
-        REPORT_REPO_FLAG=(-e "report_repo_url=${REPORT_REPO_URL}")
-        REPORT_REPO_FLAG+=(-e "report_repo_branch=${REPORT_REPO_BRANCH:-telco-kpis-reports}")
         if [ -f /var/reports-repo/git_repo_token ]; then
-            [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
             set +x
-            REPORT_REPO_FLAG+=(-e "report_repo_token=$(cat /var/reports-repo/git_repo_token)")
-            $_was_tracing && set -x
+            {
+                echo "report_repo_url: \"${REPORT_REPO_URL}\""
+                echo "report_repo_branch: \"${REPORT_REPO_BRANCH:-telco-kpis-reports}\""
+                echo "report_repo_token: \"$(cat /var/reports-repo/git_repo_token)\""
+            } >> "${SENSITIVE_VARS_FILE}"
+            _has_report_repo=true
         else
             echo "WARNING: Production report repo URL set but token not found at /var/reports-repo/git_repo_token"
-            REPORT_REPO_FLAG=()
         fi
     fi
 
-    FORCE_REPORT_FLAG=()
-    if [ "${FORCE_REPORT:-false}" = "true" ]; then
-        FORCE_REPORT_FLAG=(-e force_report=true)
-    fi
+    echo "Running generate-report playbook (development_mode: ${DEVELOPMENT_MODE}, splunk: ${PUSH_ENABLED:-false}, report_repo: ${_has_report_repo}, force: ${FORCE_REPORT:-false})"
 
-    echo "Running generate-report playbook (development_mode: ${DEVELOPMENT_MODE}, splunk: ${PUSH_ENABLED:-false}, report_repo: ${REPORT_REPO_URL:-none}, force: ${FORCE_REPORT:-false})"
+    [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
+    set +x
     ansible-playbook ./playbooks/telco-kpis/generate-report.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e spoke_cluster="${SPOKE_CLUSTER}" \
         -e output_filename="${OUTPUT_FILENAME}" \
         -e timestamp="${TIMESTAMP}" \
         -e development_mode="${DEVELOPMENT_MODE}" \
+        -e "@${SENSITIVE_VARS_FILE}" \
         "${FILTER_FLAG[@]}" \
         "${SPLUNK_FLAG[@]}" \
-        "${REPORT_REPO_FLAG[@]}" \
         "${FORCE_REPORT_FLAG[@]}" \
         ${DEBUG_FLAG}
+    $_was_tracing && set -x
 
     echo "Report generation completed for ${SPOKE_CLUSTER}"
 }
