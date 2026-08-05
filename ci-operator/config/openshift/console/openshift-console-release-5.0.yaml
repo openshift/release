@@ -114,6 +114,21 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     test:
+    - as: wait-for-catalogsources
+      cli: latest
+      commands: |
+        echo "Waiting for redhat-operators catalog source to be created..."
+        oc wait catalogsource/redhat-operators -n openshift-marketplace \
+          --for=create --timeout=300s
+        echo "Waiting for redhat-operators catalog source to be READY..."
+        oc wait catalogsource/redhat-operators -n openshift-marketplace \
+          --for=jsonpath='{.status.connectionState.lastObservedState}'=READY \
+          --timeout=600s
+        echo "redhat-operators catalog source is READY"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: |
