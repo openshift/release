@@ -1,14 +1,12 @@
 ref:
-  as: openshift-microshift-rebase
-  from: src
+  as: openshift-microshift-rebase-cryptoscan
+  from: rebase-cryptoscan-src
   cli: latest
   grace_period: 30m
-  commands: openshift-microshift-rebase-commands.sh
+  commands: openshift-microshift-rebase-cryptoscan-commands.sh
   env:
   - name: DRY_RUN
     default: ""
-  - name: SKIP_CRYPTOSCAN
-    default: "true"
   dependencies:
   - name: "release:nightly-amd64"
     env: "OPENSHIFT_RELEASE_IMAGE"
@@ -26,4 +24,5 @@ ref:
       namespace: test-credentials
       mount_path: /secrets/pr-creds
   documentation: |-
-    This step rebases MicroShift to release:nightly-amd64 and release:nightly-arm64, respectively. Requires a pull-secret for the app.ci registry and credentials to push a branch and create a PR on MicroShift repository.
+    This step rebases MicroShift and runs the Red Hat crypto scanner.
+    Uses a custom image with podman and jq to support crypto scanning.
