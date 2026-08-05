@@ -316,6 +316,18 @@ for ((i=1; SECONDS < MGR_WAIT_DEADLINE; i++)); do
     break
   fi
   echo "Attempt ${i}: MGR=${MGR_READY_COUNT:-?} ${MGR_POD_STATUS:-?}, waiting 15s..."
+  if (( i % 5 == 0 )); then
+    echo "--- MGR diagnostics (attempt ${i}) ---"
+    oc adm top pod -n openshift-storage -l app=rook-ceph-mgr --containers 2>/dev/null || true
+    MGR_POD_NAME=$(echo "${MGR_STATUS}" | awk '{print $1}')
+    if [[ -n "${MGR_POD_NAME}" ]]; then
+      oc describe pod "${MGR_POD_NAME}" -n openshift-storage 2>/dev/null \
+        | grep -A5 -E '(State:|Last State:|Reason:|Exit Code:|Restart Count:)' || true
+      echo "--- mgr-sidecar logs (last 20 lines) ---"
+      oc logs "${MGR_POD_NAME}" -n openshift-storage -c mgr-sidecar --tail=20 2>/dev/null || true
+    fi
+    echo "--- End MGR diagnostics ---"
+  fi
   sleep 15
 done
 
