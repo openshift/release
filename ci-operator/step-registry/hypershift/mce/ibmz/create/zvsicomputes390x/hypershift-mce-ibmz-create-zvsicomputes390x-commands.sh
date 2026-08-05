@@ -287,17 +287,13 @@ create_sg_rule() {
 
 patch_nested_kubeconfig_for_ci() {
     local hosted_kubeconfig="${SHARED_DIR}/nested_kubeconfig"
-    local nodeport="${API_NODEPORT:-}"
+
+    local nodeport
+    nodeport=$(oc get svc kube-apiserver -n "${hcp_ns}" \
+        -o jsonpath="{.spec.ports[?(@.port==6443)].nodePort}" 2>/dev/null || true)
 
     if [[ -z "${nodeport}" ]]; then
-        nodeport=$(oc get svc kube-apiserver -n "${hcp_ns}" \
-            -o jsonpath="{.spec.ports[?(@.port==6443)].nodePort}" 2>/dev/null || true)
-    fi
-    if [[ -z "${nodeport}" ]]; then
-        nodeport=$(grep -E 'server:' "${hosted_kubeconfig}" | sed -n 's/.*:\([0-9]*\)".*/\1/p' | head -1)
-    fi
-    if [[ -z "${nodeport}" ]]; then
-        echo "ERROR: could not determine kube-apiserver NodePort"
+        echo "ERROR: could not determine kube-apiserver NodePort from svc kube-apiserver in namespace ${hcp_ns}"
         exit 1
     fi
 
@@ -494,16 +490,37 @@ for i in $(seq 1 "$HUB_COMPUTE_COUNT"); do
 done
 
 cat <<HAPROXY_CFG >> haproxy.cfg
-listen hcp-console
+frontend hcp-http
     mode tcp
-    bind ${BASTION_RIP}:443
+    option tcplog
     bind ${BASTION_RIP}:80
+    default_backend hcp-http-backend
+backend hcp-http-backend
+    mode tcp
+    balance source
 HAPROXY_CFG
 
-# Append hypershift nodes
+# Append hypershift nodes for HTTP (port 80)
 for i in $(seq 1 ${HYPERSHIFT_NODE_COUNT}); do
   index=$((i - 1))
   echo "   server ${HC_NAME}-compute-${i} ${ZVSI_COMPUTE_RIP[$index]}:80" >> haproxy.cfg
+done
+
+cat <<HAPROXY_CFG >> haproxy.cfg
+frontend hcp-https
+    mode tcp
+    option tcplog
+    bind ${BASTION_RIP}:443
+    default_backend hcp-https-backend
+backend hcp-https-backend
+    mode tcp
+    balance source
+HAPROXY_CFG
+
+# Append hypershift nodes for HTTPS (port 443)
+for i in $(seq 1 ${HYPERSHIFT_NODE_COUNT}); do
+  index=$((i - 1))
+  echo "   server ${HC_NAME}-compute-${i}-ssl ${ZVSI_COMPUTE_RIP[$index]}:443" >> haproxy.cfg
 done
 
 
@@ -664,7 +681,14 @@ patch_nested_kubeconfig_for_ci
 echo "$(date) Checking the compute nodes in the hosted control plane"
 oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
 oc get co --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
-oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=90m
+if ! oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co \
+      --for=condition=Available=True --timeout=90m; then
+  echo "$(date) ERROR: Some cluster operators did not become Available within 90m"
+  oc get co --kubeconfig="${SHARED_DIR}/nested_kubeconfig" || true
+  oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+    get co -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .status.conditions[*]}{.type}={.status}{" "}{end}{"\n"}{end}' || true
+  exit 1
+fi
 oc get co --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
 
 # Sourcing the proxy settings for the next steps
