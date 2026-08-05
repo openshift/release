@@ -23,14 +23,17 @@ if [[ -n "${AWS_CONFIG_FILE:-}" ]] && [[ -r "${AWS_CONFIG_FILE}" ]]; then
 
   # Read credentials from the config file
   # Format: [default]\naws_access_key_id = ...\naws_secret_access_key = ...
-  export AWS_ACCESS_KEY_ID=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_access_key_id" | cut -d'=' -f2 | tr -d ' ')
-  export AWS_SECRET_ACCESS_KEY=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_secret_access_key" | cut -d'=' -f2 | tr -d ' ')
+  # Declare and assign separately to avoid masking return values (SC2155)
+  AWS_ACCESS_KEY_ID=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_access_key_id" | cut -d'=' -f2 | tr -d ' ')
+  AWS_SECRET_ACCESS_KEY=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_secret_access_key" | cut -d'=' -f2 | tr -d ' ')
 
   if [[ -z "${AWS_ACCESS_KEY_ID}" ]] || [[ -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
     echo "ERROR: Failed to extract AWS credentials from config file"
     exit 1
   fi
 
+  export AWS_ACCESS_KEY_ID
+  export AWS_SECRET_ACCESS_KEY
   echo "AWS credentials extracted successfully"
 else
   echo "ERROR: AWS_CONFIG_FILE not set or not readable: ${AWS_CONFIG_FILE:-not set}"
