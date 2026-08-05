@@ -23,6 +23,10 @@ base_images:
     name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -533,6 +537,31 @@ tests:
       OS_IMAGE_STREAM: rhel-10
     workflow: openshift-e2e-aws
 - always_run: false
+  as: e2e-gcd-ovn-private-techpreview
+  optional: true
+  steps:
+    cluster_profile: gcd
+    env:
+      BASE_DOMAIN: ci.gcd.devcluster.openshift.com
+      BASTION_IMAGE_NAME: fedora-coreos-41-20241122-3-0-gcp-x86-64
+      BASTION_IMAGE_PROJECT: eu0:openshift
+      BASTION_MACHINE_TYPE: c3-standard-4
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c3-standard-4
+      CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
+      CONTROL_PLANE_NODE_TYPE: c3-standard-8
+      DEFAULT_MACHINE_OSIMAGE: projects/eu0:openshift/images/rhcos10
+      FEATURE_SET: TechPreviewNoUpgrade
+      PUBLISH: Internal
+      TEST_SKIPS: Ensure HTTPRoute object is created\|The HAProxy router should pass
+        the http2 tests\|The HAProxy router should pass the h2spec conformance tests\|should
+        serve a basic image on each replica with a private image\|Validate user is
+        able to extract rhel8 and rhel9 oc from the ocp payload\|regional PD should
+        store data and sync across zones\|L2 primary UDN with custom network, cluster-networked
+        pods, NodePort service\|cluster-config-operator should report complete ClusterOperator
+        status
+    workflow: openshift-e2e-gcd
+- always_run: false
   as: e2e-gcp-ovn
   pipeline_run_if_changed: (gcp|google)
   steps:
@@ -588,6 +617,12 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-secureboot
+- always_run: false
+  as: e2e-gcp-kms-encryption
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    workflow: openshift-e2e-gcp-kms-encryption
 - always_run: false
   as: e2e-gcp-ovn-byo-vpc
   optional: true
@@ -814,6 +849,14 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
+- always_run: false
+  as: e2e-metal-ipi-bgp-vip
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-bgp-vip
 - always_run: false
   as: e2e-metal-ipi-ovn-swapped-hosts
   capabilities:
@@ -1584,6 +1627,12 @@ tests:
       CONTROL_PLANE_AMI: ami-0b78302f83217d149
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: installer-review-agent-trigger
 zz_generated_metadata:
   branch: release-5.1
   org: openshift

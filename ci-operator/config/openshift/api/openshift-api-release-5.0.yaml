@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -91,7 +95,8 @@ tests:
     cp -Rf ./ $dir/api/
     rm -rf $dir/api/vendor
     cd $dir
-    echo "replace github.com/openshift/api => ./api" >> go.mod
+    go mod edit -dropreplace github.com/openshift/api
+    go mod edit -replace github.com/openshift/api=./api
     echo "# github.com/openshift/api => ./api" >> vendor/modules.txt
     sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/api/" vendor/modules.txt
     go mod vendor
@@ -114,8 +119,10 @@ tests:
     rm -rf $dir/openshift-api/vendor
     rm -rf $dir/openshift-client-go/vendor
     cd $dir
-    echo "replace github.com/openshift/api => ./openshift-api" >> go.mod
-    echo "replace github.com/openshift/client-go => ./openshift-client-go" >> go.mod
+    go mod edit -dropreplace github.com/openshift/api
+    go mod edit -dropreplace github.com/openshift/client-go
+    go mod edit -replace github.com/openshift/api=./openshift-api
+    go mod edit -replace github.com/openshift/client-go=./openshift-client-go
     echo "# github.com/openshift/api => ./openshift-api" >> vendor/modules.txt
     echo "# github.com/openshift/client-go => ./openshift-client-go" >> vendor/modules.txt
     sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/openshift-api/" vendor/modules.txt
@@ -209,6 +216,14 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
+- always_run: false
+  as: api-review
+  optional: true
+  steps:
+    env:
+      EVAL_SKIP_LINT: "1"
+      REVIEW_MODEL: claude-opus-4-6
+    workflow: openshift-api-review
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

@@ -21,7 +21,7 @@ then
   gcloud config set project "${GOOGLE_PROJECT_ID}"
 fi
 
-LOCATION="global"
+LOCATION="${LEASED_RESOURCE}"
 KEY_RING_NAME="openshift-ci"
 KEY_NAME="openshift-ci-e2e"
 

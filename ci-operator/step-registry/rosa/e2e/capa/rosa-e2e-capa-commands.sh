@@ -93,7 +93,15 @@ export DEPLOYMENT_MODE
 # Generate a unique 4-char prefix per run to avoid IAM role name collisions
 NAME_PREFIX="ci$(head -c 2 /dev/urandom | od -An -tx1 | tr -d ' ')"
 
+EXTRA_VARS=("-e" "name_prefix=${NAME_PREFIX}")
+if [[ -n "${OPENSHIFT_VERSION}" ]]; then
+  EXTRA_VARS+=("-e" "openshift_version=${OPENSHIFT_VERSION}")
+fi
+if [[ -n "${CHANNEL_GROUP}" ]]; then
+  EXTRA_VARS+=("-e" "channel_group=${CHANNEL_GROUP}")
+fi
+
 echo "Running rosa-hcp-e2e tests (name_prefix=${NAME_PREFIX})..."
-"${PYTHON}" run-test-suite.py ${TEST_SUITE} --ai-agent -e name_prefix="${NAME_PREFIX}" 2>&1 | tee "${ARTIFACT_DIR}/rosa-hcp-e2e-test.log"
+"${PYTHON}" run-test-suite.py ${TEST_SUITE} --ai-agent "${EXTRA_VARS[@]}" 2>&1 | tee "${ARTIFACT_DIR}/rosa-hcp-e2e-test.log"
 
 echo "Tests complete. Results at ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log"

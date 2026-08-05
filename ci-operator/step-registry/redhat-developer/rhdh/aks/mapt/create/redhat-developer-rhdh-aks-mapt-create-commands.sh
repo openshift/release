@@ -16,7 +16,8 @@ function cleanup() {
   # Capture both stdout and stderr to check for errors
   output=$(mapt azure aks destroy \
     --project-name "aks" \
-    --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" 2>&1)
+    --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" \
+    --force-destroy 2>&1)
   exit_code=$?
 
   # Re-enable exit on error
@@ -67,7 +68,8 @@ mapt azure aks create \
   --spot \
   --spot-eviction-tolerance "low" \
   --spot-excluded-regions "centralindia" \
-  --enable-app-routing
+  --enable-app-routing \
+  --tags app-code=rhdh-003,service-phase=dev,cost-center=726,scenario=aks
 if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
   echo "[ERROR] ❌ kubeconfig file not found at ${SHARED_DIR}/kubeconfig"
   echo "[ERROR] ❌ Failed to create MAPT AKS cluster"
