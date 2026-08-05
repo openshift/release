@@ -100,6 +100,28 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
     exit 1
   fi
 
+  # Temporary probe: compare plain `oc get secret` vs `elevate -- oc get secret`.
+  if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
+    aao_probe_secret="${OCM_FVT_AAO_PROBE_SECRET:-d4ncjp595tqc73dupto0-account-creds}"
+    echo "=== elevate-wrapped AAO secret probe ==="
+    echo "--- plain oc whoami (expect non-elevated SA) ---"
+    oc --request-timeout=30s whoami 2>&1 || true
+    echo "--- plain oc get secret (expect Forbidden) ---"
+    oc --request-timeout=30s get secret "${aao_probe_secret}" \
+      -n osd-fleet-manager-aao -o name 2>&1 || true
+    echo "--- elevate -- oc whoami ---"
+    ocm-backplane elevate "${backplane_elevate_reason}" -- \
+      oc --request-timeout=30s whoami 2>&1 || true
+    echo "--- elevate -- oc get secret (name only; no data) ---"
+    ocm-backplane elevate "${backplane_elevate_reason}" -- \
+      oc --request-timeout=30s get secret "${aao_probe_secret}" \
+      -n osd-fleet-manager-aao -o name 2>&1 || true
+    echo "--- elevate -- oc get secrets | head (ns list) ---"
+    ocm-backplane elevate "${backplane_elevate_reason}" -- \
+      oc --request-timeout=30s get secrets -n osd-fleet-manager-aao 2>&1 | head -20 || true
+    echo "=== end elevate-wrapped AAO secret probe ==="
+  fi
+
   hive_kubeconfig="$(mktemp /tmp/hive-kubeconfig.XXXXXX)"
   chmod 0600 "${hive_kubeconfig}"
   # Rewrite exec plugin command to the path mounted inside the ocmci container.
@@ -226,52 +248,11 @@ podman inspect \
   || echo "WARNING: failed to get ocmci image digest"
 echo "=========================="
 
-# Temporary AAO/Hive reachability probe (remove after ROSAENG-62716 diagnosis).
-# Uses the same nested container env as ocmtest. Keep xtrace off while aao
-# kubeconfig is on argv; never cat/echo the kubeconfig or copy it to ARTIFACT_DIR.
-# Prefer process substitution over a named kubeconfig file so the SA token is
-# not left on disk (tests already materialize it via SetupHiveAAOKubeconfig).
-if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && ${#aao_kubeconfig_env[@]} -gt 0 ]]; then
-  echo "=== AAO Hive reachability probe ==="
-  [[ $- == *x* ]] && WAS_TRACING_PROBE=true || WAS_TRACING_PROBE=false
-  set +x
-  podman run --rm \
-    "${podman_args[@]}" \
-    "${aao_kubeconfig_env[@]}" \
-    quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
-    bash -lc '
-      echo "--- proxy env ---"
-      env | grep -iE "^(HTTPS?_PROXY|https?_proxy|NO_PROXY|no_proxy)=" || echo "(no proxy env)"
-      echo "--- DNS ---"
-      getent hosts api.hivei01ue1.f7i5.p1.openshiftapps.com || true
-      echo "--- curl via HTTPS_PROXY ---"
-      if [[ -n "${HTTPS_PROXY:-}" ]]; then
-        curl -v -x "${HTTPS_PROXY}" --connect-timeout 10 \
-          "https://api.hivei01ue1.f7i5.p1.openshiftapps.com:6443/" || true
-      else
-        echo "HTTPS_PROXY unset; skipping curl"
-      fi
-      echo "--- oc with consumer kubeconfig ---"
-      if [[ -z "${AWS_ACCOUNT_OPERATOR_KUBECONFIG:-}" ]]; then
-        echo "AWS_ACCOUNT_OPERATOR_KUBECONFIG unset; skipping oc"
-      elif ! command -v oc >/dev/null 2>&1; then
-        echo "oc not in PATH; skipping oc"
-      else
-        # /dev/fd process substitution — no named file under /tmp
-        oc --kubeconfig <(printf "%s" "$AWS_ACCOUNT_OPERATOR_KUBECONFIG") \
-          --request-timeout=15s \
-          get secrets -n osd-fleet-manager-aao 2>&1 | head -20 || true
-      fi
-    ' || echo "WARNING: AAO Hive reachability probe failed"
-  $WAS_TRACING_PROBE && set -x
-  echo "=== end probe ==="
-fi
+# Elevate-wrapped AAO secret probe runs above (after backplane login).
 
 echo "Running ocmtest: ${ocmtest_args[*]}"
 exit_code=0
-# aao_kubeconfig_env / dr_aws_creds_env may hold raw secret contents as literal
-# "-e KEY=VALUE" args; keep xtrace off while they are expanded so the values
-# are never printed to the (public) build log.
+# Keep xtrace off while secret env args are expanded.
 [[ $- == *x* ]] && WAS_TRACING_RUN=true || WAS_TRACING_RUN=false
 set +x
 podman run \
