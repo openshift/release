@@ -211,6 +211,41 @@ if [[ -f "${osdfm_qe_creds_dir}/aws_dr_cred" ]]; then
   $WAS_TRACING && set -x
 fi
 
+# ZERO_EGRESS_ECR_CONFIG (@id_76488): generate AppSRE ecr-config.yml shape for Prow.
+# Keep in sync with app-interface namespaces/{integration,stage}.yml (public account/region data).
+zero_egress_env=()
+if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
+  ecr_account=""
+  ecr_regions=()
+  case "${OCM_FVT_OCM_ENV:-}" in
+    integration|int)
+      ecr_account="816069139099"
+      ecr_regions=("us-west-2")
+      ;;
+    stage|staging)
+      ecr_account="122610517469"
+      ecr_regions=("us-east-1" "us-west-2")
+      ;;
+    production|prod) ;; # test skips
+    *)
+      echo "WARNING: ZERO_EGRESS_ECR_CONFIG not generated for OCM_FVT_OCM_ENV=${OCM_FVT_OCM_ENV:-<empty>}" >&2
+      ;;
+  esac
+  if [[ -n "${ecr_account}" ]]; then
+    ecr_replicas=(ocp-mirror-1 ocp-mirror-2 ocp-mirror-3 ocp-mirror-4 ocp-mirror-5
+      ocp-mirror-6 ocp-mirror-7 ocp-mirror-8 ocp-mirror-9 ocp-mirror-10 app-sre)
+    ecr_cfg="ecr_regions:"
+    for ecr_region in "${ecr_regions[@]}"; do
+      ecr_cfg+=$'\n'"- region: ${ecr_region}"
+      ecr_cfg+=$'\n'"  urls:"
+      for ecr_replica in "${ecr_replicas[@]}"; do
+        ecr_cfg+=$'\n'"    - ${ecr_account}.dkr.ecr.${ecr_region}.amazonaws.com/${ecr_replica}"
+      done
+    done
+    zero_egress_env=("-e" "ZERO_EGRESS_ECR_CONFIG=${ecr_cfg}")
+  fi
+fi
+
 cred_sources='source /usr/local/cs-qe-credentials/ocm-tokens'
 if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
   cred_sources="${cred_sources}; source /usr/local/cs-qe-credentials/jira-cred"
@@ -252,6 +287,24 @@ if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
   ocmtest_args+=(--reportJiraTicket)
 fi
 
+# TEMP DEBUG: Prometheus reachability (remove after confirming). No auth headers.
+if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
+  prom_route="${OCM_FVT_PROMETHEUS_ROUTE:-https://prometheus.app-sre-stage-01.devshift.net}"
+  prom_proxy="${HTTPS_PROXY:-${backplane_proxy_url:-http://squid.corp.redhat.com:3128}}"
+  echo "=== Prometheus reachability probe (osdfm) ==="
+  echo "Direct .svc:"
+  code_svc="$(curl -sS -o /tmp/prom-svc.out -w '%{http_code}' --max-time 5 \
+    "http://prometheus-app-sre.openshift-customer-monitoring.svc.cluster.local:9090/api/v1/query?query=up" \
+    || echo err)"
+  echo "HTTP ${code_svc}; body: $(head -c 80 /tmp/prom-svc.out 2>/dev/null | tr '\n' ' ')"
+  echo "Route ${prom_route} via proxy:"
+  code_route="$(curl -sS -o /tmp/prom-route.out -w '%{http_code}' --max-time 15 --proxy "${prom_proxy}" \
+    "${prom_route}/api/v1/query?query=up" \
+    || echo err)"
+  echo "HTTP ${code_route}; body: $(head -c 80 /tmp/prom-route.out 2>/dev/null | tr '\n' ' ')"
+  echo "============================================"
+fi
+
 echo "=== ocmci image digest ==="
 podman pull \
   --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
@@ -271,6 +324,7 @@ podman run \
   "${podman_args[@]}" \
   "${aao_kubeconfig_env[@]}" \
   "${dr_aws_creds_env[@]}" \
+  "${zero_egress_env[@]}" \
   quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 $WAS_TRACING_RUN && set -x
