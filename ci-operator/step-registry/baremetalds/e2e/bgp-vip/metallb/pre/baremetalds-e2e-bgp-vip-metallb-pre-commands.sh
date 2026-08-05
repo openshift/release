@@ -60,10 +60,10 @@ YAML
     sleep 15
   done
 else
-  echo "metallb-operator not in any catalog: deploying upstream manifests (${METALLB_OPERATOR_REF})"
+  echo "metallb-operator not in any catalog: deploying openshift/metallb-operator manifests (${METALLB_OPERATOR_REF})"
   # frrk8s.metallb.io CRDs already exist on this cluster (openshift-frr-k8s):
   # the apply reports them "configured" instead of "created" - that is fine.
-  oc apply -f "https://raw.githubusercontent.com/metallb/metallb-operator/${METALLB_OPERATOR_REF}/bin/metallb-operator.yaml"
+  oc apply -f "https://raw.githubusercontent.com/openshift/metallb-operator/${METALLB_OPERATOR_REF}/bin/metallb-operator.yaml"
 
   # SCC fix: the webhook-server pod (serviceAccount "controller", uid/fsGroup
   # 65534) is rejected by restricted-v2; grant nonroot-v2 as soon as the SA
