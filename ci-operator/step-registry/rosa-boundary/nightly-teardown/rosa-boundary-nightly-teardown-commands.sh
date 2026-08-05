@@ -17,33 +17,11 @@ unzip -q /tmp/awscliv2.zip -d /tmp/
 export PATH="/tmp/bin:${PATH}"
 
 # AWS credentials come from mounted secret via AWS_CONFIG_FILE env var
-# Extract credentials from AWS config file for Terraform
+# Point the AWS SDK (used by Terraform) at the credential file directly
+# rather than extracting values manually which can corrupt them
 if [[ -n "${AWS_CONFIG_FILE:-}" ]] && [[ -r "${AWS_CONFIG_FILE}" ]]; then
-  echo "Extracting AWS credentials from ${AWS_CONFIG_FILE}"
-
-  # Try simple key=value format first (like .awscred files)
-  # Format: aws_access_key_id=VALUE
-  # Use xargs to trim all leading/trailing whitespace including newlines
-  AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id" "${AWS_CONFIG_FILE}" | cut -d'=' -f2 | xargs)
-  AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key" "${AWS_CONFIG_FILE}" | cut -d'=' -f2 | xargs)
-
-  # If empty, try AWS CLI config format with [default] section
-  if [[ -z "${AWS_ACCESS_KEY_ID}" ]]; then
-    AWS_ACCESS_KEY_ID=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_access_key_id" | cut -d'=' -f2 | xargs)
-    AWS_SECRET_ACCESS_KEY=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_secret_access_key" | cut -d'=' -f2 | xargs)
-  fi
-
-  if [[ -z "${AWS_ACCESS_KEY_ID}" ]] || [[ -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
-    echo "ERROR: Failed to extract AWS credentials from config file"
-    echo "Config file format not recognized. Expected either:"
-    echo "  1. Simple: aws_access_key_id=VALUE"
-    echo "  2. Profile: [default] section with aws_access_key_id = VALUE"
-    exit 1
-  fi
-
-  export AWS_ACCESS_KEY_ID
-  export AWS_SECRET_ACCESS_KEY
-  echo "AWS credentials extracted successfully"
+  export AWS_SHARED_CREDENTIALS_FILE="${AWS_CONFIG_FILE}"
+  echo "AWS credentials configured: ${AWS_SHARED_CREDENTIALS_FILE}"
 else
   echo "ERROR: AWS_CONFIG_FILE not set or not readable: ${AWS_CONFIG_FILE:-not set}"
   exit 1
