@@ -331,6 +331,7 @@ CONFIG = {
     'aro-hcp-dev-shard3-slot': {},
     'aro-hcp-dev-hypershift-westus3-slot': {},
     'aro-hcp-int-shard0-slot': {},
+    'aro-hcp-int-westus3-shard0-slot': {},
     'aro-hcp-prod-shard0-slot': {},
     'aro-hcp-prod-shard1-slot': {},
     'aro-hcp-prod-testtenant-slot': {},
@@ -822,6 +823,8 @@ for i in range(1):
     CONFIG['aro-hcp-dev-hypershift-westus3-slot']['aro-hcp-dev-hypershift-westus3-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-int-shard0-slot']['aro-hcp-int-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-int-westus3-shard0-slot']['aro-hcp-int-westus3-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(3):
     CONFIG['aro-hcp-prod-shard0-slot']['aro-hcp-prod-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(3):
