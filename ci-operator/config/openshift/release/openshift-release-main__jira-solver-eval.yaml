@@ -31,7 +31,11 @@ images:
           chmod -R g=u /etc/subuid /etc/subgid /etc/passwd /etc/group && \
           chmod +rx /entrypoint.sh
       COPY --from=ai-helpers /opt/ai-helpers /opt/ai-helpers
-      RUN chgrp -R 0 /opt/ai-helpers && chmod -R g=u /opt/ai-helpers
+      RUN mkdir -p /home/vscode/.claude/plugins
+      COPY --from=ai-helpers /home/claude/.claude/plugins/known_marketplaces.json \
+           /home/vscode/.claude/plugins/known_marketplaces.json
+      RUN chgrp -R 0 /opt/ai-helpers /home/vscode/.claude && \
+          chmod -R g=u /opt/ai-helpers /home/vscode/.claude
       COPY ci-operator/step-registry/openshift/agentic/trt/jira-solver/openshift-agentic-trt-jira-solver-commands.sh /opt/scripts/solve.sh
       RUN chmod +x /opt/scripts/solve.sh
       RUN mkdir -p /workspace && chgrp 0 /workspace && chmod g=u /workspace
