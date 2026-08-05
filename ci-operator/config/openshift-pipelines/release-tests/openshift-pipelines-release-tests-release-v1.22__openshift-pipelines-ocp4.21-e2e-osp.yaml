@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.21
+    tag: rhel-9-release-golang-1.25-openshift-4.21
 images:
   items:
   - context_dir: .
@@ -29,26 +29,20 @@ resources:
 tests:
 - as: openshift-pipelines-e2e-osp
   cron: 0 23 31 2 *
-  reporter_config:
-    channel: '#tektoncd-pipeline-ci'
-    job_states_to_report:
-    - success
-    - failure
-    - error
-    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{end}}'
   steps:
     cluster_profile: aws-osp-qe
     env:
       BASE_DOMAIN: psi.ospqa.com
+      CATALOG_INDEX_IMAGE: quay.io/openshift-pipeline/pipelines-index-4.21:v1.23.0
+      CATALOG_SOURCE_NAME: custom-operators
     test:
+    - ref: openshift-pipelines-catalog-source
     - ref: openshift-pipelines-install
     - ref: openshift-pipelines-tests
     workflow: ipi-aws
+  timeout: 3h0m0s
 zz_generated_metadata:
-  branch: release-v1.21
+  branch: release-v1.22
   org: openshift-pipelines
   repo: release-tests
   variant: openshift-pipelines-ocp4.21-e2e-osp
