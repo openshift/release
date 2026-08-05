@@ -1,0 +1,22 @@
+chain:
+  as: vsphere-acm-virt
+  steps:
+  - ref: vsphere-acm-virt-install-operators
+  - ref: vsphere-acm-virt-create-source-vm
+  - ref: vsphere-acm-virt-cold-migration
+  documentation: |-
+    Chain that installs CNV and MTV operators, creates a source RHEL9 VM on vSphere,
+    and performs a cold migration to the OCP cluster using MTV.
+
+    Step 1 (vsphere-acm-virt-install-operators): Install CNV and MTV via OLM, create
+    HyperConverged and ForkliftController CRs, wait for both to be Available.
+
+    Step 2 (vsphere-acm-virt-create-source-vm): Clone a RHEL9 VM from a vSphere
+    template using govc, power it on, record metadata to SHARED_DIR.
+
+    Step 3 (vsphere-acm-virt-cold-migration): Create MTV Provider, NetworkMap,
+    StorageMap, Plan, and Migration CRs. Power off source VM, execute cold migration,
+    validate the VM is Running on OCP/CNV.
+
+    Cleanup of the vSphere source VM is handled separately by
+    vsphere-acm-virt-cleanup-vsphere-vm (placed in the post phase of a workflow).

@@ -1,0 +1,32 @@
+ref:
+  as: vsphere-acm-virt-install-operators
+  from: cli
+  commands: vsphere-acm-virt-install-operators-commands.sh
+  timeout: 45m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  documentation: |-
+    Installs OpenShift Virtualization (CNV) and Migration Toolkit for Virtualization (MTV)
+    operators on the target OCP cluster via OLM Subscriptions.
+
+    Creates namespaces, OperatorGroups, Subscriptions, waits for CSVs to succeed,
+    then creates the HyperConverged CR (CNV) and ForkliftController CR (MTV).
+    Validates both operators are healthy before exiting.
+
+    Targets KUBECONFIG from ci-operator (the AWS-provisioned cluster).
+  env:
+  - name: CNV_CHANNEL
+    default: "stable"
+    documentation: OLM channel for the kubevirt-hyperconverged Subscription.
+  - name: CNV_SOURCE
+    default: "redhat-operators"
+    documentation: CatalogSource for CNV operator.
+  - name: MTV_CHANNEL
+    default: "release-v2.7"
+    documentation: OLM channel for the mtv-operator Subscription.
+  - name: MTV_SOURCE
+    default: "redhat-operators"
+    documentation: CatalogSource for MTV operator.

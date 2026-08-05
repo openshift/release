@@ -1,0 +1,43 @@
+ref:
+  as: vsphere-acm-virt-cold-migration
+  from: cli
+  commands: vsphere-acm-virt-cold-migration-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m0s
+  credentials:
+  - mount_path: /var/run/vsphere-credentials
+    name: vsphere-elastic
+    namespace: test-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  documentation: |-
+    Executes a cold migration of a VM from vSphere to OpenShift Virtualization
+    using MTV (Migration Toolkit for Virtualization).
+
+    Creates Provider (vSphere source + OCP host destination), NetworkMap,
+    StorageMap, Plan, and Migration CRs. Powers off the source VM on vSphere
+    before migration. Waits for the migration to succeed and validates the VM
+    is Running on the OCP cluster.
+
+    Reads source VM metadata from ${SHARED_DIR}/vsphere-source-vm.json
+    (written by vsphere-acm-virt-create-source-vm).
+
+    On failure, dumps MTV controller logs, Plan/Migration status, and events
+    to ${ARTIFACT_DIR}/mtv-cold-migration-diagnostics/.
+  env:
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV operator and CRs live.
+  - name: MIGRATION_NAMESPACE
+    default: "mtv-poc-migration"
+    documentation: Target namespace for the migrated VM on OCP.
+  - name: MIGRATION_TIMEOUT
+    default: "1800"
+    documentation: Timeout in seconds to wait for migration to complete.
+  - name: DESTINATION_STORAGE_CLASS
+    default: "gp3-csi"
+    documentation: |-
+      OCP StorageClass for the migrated VM disks. Use gp3-csi for AWS clusters.
+      FIXME: Adjust if the cluster uses a different default StorageClass.

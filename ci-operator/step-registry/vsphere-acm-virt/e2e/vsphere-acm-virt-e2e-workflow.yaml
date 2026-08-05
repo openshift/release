@@ -1,0 +1,19 @@
+workflow:
+  as: vsphere-acm-virt-e2e
+  steps:
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - chain: vsphere-acm-virt
+    post:
+    - ref: vsphere-acm-virt-cleanup-vsphere-vm
+    - chain: ipi-aws-post
+  documentation: |-
+    End-to-end workflow for vSphere-to-OCP cold migration POC using MTV.
+
+    Provisions an OCP cluster on AWS via IPI, installs CNV and MTV operators,
+    creates a RHEL9 VM on vSphere, migrates it to OCP via MTV cold migration,
+    then cleans up the vSphere source VM and tears down the AWS cluster.
+
+    The vSphere cleanup step runs as best_effort in the post phase so it
+    executes even if the migration test fails.

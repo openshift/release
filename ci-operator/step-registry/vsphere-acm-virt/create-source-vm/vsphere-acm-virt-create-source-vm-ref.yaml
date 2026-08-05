@@ -1,0 +1,54 @@
+ref:
+  as: vsphere-acm-virt-create-source-vm
+  from: cli
+  commands: vsphere-acm-virt-create-source-vm-commands.sh
+  timeout: 30m0s
+  grace_period: 5m0s
+  credentials:
+  - mount_path: /var/run/vsphere-credentials
+    name: vsphere-elastic
+    namespace: test-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  documentation: |-
+    Creates a RHEL9 virtual machine on vSphere using govc CLI.
+    The VM is cloned from a template and powered on.
+
+    vSphere credentials are mounted from the vsphere-elastic secret.
+    VM details (name, path, IP, datacenter, datastore, network) are saved
+    to ${SHARED_DIR}/vsphere-source-vm.json for use by migration and cleanup steps.
+    govc environment variables are saved to ${SHARED_DIR}/govc-env.sh.
+  env:
+  - name: VM_NAME_PREFIX
+    default: "mtv-poc-rhel9"
+    documentation: Prefix for the VM name on vSphere. A timestamp suffix is appended.
+  - name: VM_MEMORY_MB
+    default: "4096"
+    documentation: Memory in MB for the source VM.
+  - name: VM_CPU_COUNT
+    default: "2"
+    documentation: Number of CPUs for the source VM.
+  - name: VM_DISK_GB
+    default: "40"
+    documentation: Disk size in GB for the source VM.
+  - name: VSPHERE_TEMPLATE
+    default: "rhel9-template"
+    documentation: |-
+      vSphere template to clone for the source VM.
+      FIXME: Adjust to match the actual RHEL9 template available in the
+      vsphere-elastic environment.
+  - name: VSPHERE_NETWORK
+    default: "VM Network"
+    documentation: |-
+      vSphere network to attach to the source VM.
+      FIXME: Adjust to match the actual network in the vsphere-elastic environment.
+  - name: VSPHERE_RESOURCE_POOL
+    default: ""
+    documentation: |-
+      vSphere resource pool for VM placement. Empty string uses the default.
+  - name: VSPHERE_FOLDER
+    default: ""
+    documentation: |-
+      vSphere folder for VM placement. Empty string uses the datacenter root.
