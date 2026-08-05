@@ -17,7 +17,11 @@ setup_debug_on_fail
 # Aggregates test artifacts, optionally publishes to a git repo
 # and pushes results to Splunk. Sensitive credentials (tokens, URLs)
 # are passed via a temporary vars file to avoid leaking into logs.
+_yaml_quote() { local v="${1//\\/\\\\}"; v="${v//\"/\\\"}"; printf '%s' "$v"; }
+
 main() {
+    [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
+
     echo "Generating report for spoke: ${SPOKE_CLUSTER}"
 
     setup_ansible_inventory "${SPOKE_CLUSTER}" "${HUB_CLUSTER}"
@@ -57,12 +61,16 @@ main() {
     SPLUNK_FLAG=()
     if [ "${PUSH_ENABLED:-false}" = "true" ]; then
         SPLUNK_FLAG=(-e splunk_push_enabled=true)
+        if [ -z "${HEC_URL:-}" ]; then
+            echo "WARNING: HEC_URL is unset; Splunk push will likely fail"
+        fi
         if [ -f /var/splunk/splunk_hec_token ]; then
             set +x
             {
-                echo "splunk_hec_url: \"${HEC_URL}\""
-                echo "splunk_hec_token: \"$(cat /var/splunk/splunk_hec_token)\""
+                echo "splunk_hec_url: \"$(_yaml_quote "${HEC_URL}")\""
+                echo "splunk_hec_token: \"$(_yaml_quote "$(cat /var/splunk/splunk_hec_token)")\""
             } >> "${SENSITIVE_VARS_FILE}"
+            $_was_tracing && set -x
         else
             echo "WARNING: Splunk push enabled but splunk_hec_token not found at /var/splunk/"
             SPLUNK_FLAG=()
@@ -80,19 +88,23 @@ main() {
         if [ -f /var/reports-repo/git_repo_token ]; then
             set +x
             {
-                echo "report_repo_url: \"${REPORT_REPO_URL}\""
-                echo "report_repo_branch: \"${REPORT_REPO_BRANCH:-telco-kpis-reports}\""
-                echo "report_repo_token: \"$(cat /var/reports-repo/git_repo_token)\""
+                echo "report_repo_url: \"$(_yaml_quote "${REPORT_REPO_URL}")\""
+                echo "report_repo_branch: \"$(_yaml_quote "${REPORT_REPO_BRANCH:-telco-kpis-reports}")\""
+                echo "report_repo_token: \"$(_yaml_quote "$(cat /var/reports-repo/git_repo_token)")\""
             } >> "${SENSITIVE_VARS_FILE}"
+            $_was_tracing && set -x
             _has_report_repo=true
         else
             echo "WARNING: Production report repo URL set but token not found at /var/reports-repo/git_repo_token"
         fi
     fi
 
+    if [ -n "${DEBUG_FLAG}" ] && [ "$(wc -l < "${SENSITIVE_VARS_FILE}")" -gt 1 ]; then
+        echo "WARNING: -vvv is active with sensitive credentials in vars file; ensure tasks use no_log: true"
+    fi
+
     echo "Running generate-report playbook (development_mode: ${DEVELOPMENT_MODE}, splunk: ${PUSH_ENABLED:-false}, report_repo: ${_has_report_repo}, force: ${FORCE_REPORT:-false})"
 
-    [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
     set +x
     ansible-playbook ./playbooks/telco-kpis/generate-report.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
