@@ -2,6 +2,38 @@
 
 set -euo pipefail
 
+#Create Artifact Directory
+ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
+mkdir -p $ARTIFACT_DIR
+
+function copyArtifacts {
+    typeset junitPrefix="junit_"
+    cp -r ./cypress/results/* $ARTIFACT_DIR
+
+    for file in "$ARTIFACT_DIR"/*; do
+        if [[ ! "$(basename "$file")" =~ ^"$JUNIT_PREFIX" ]]; then
+            result_file="$ARTIFACT_DIR"/"$JUNIT_PREFIX""$(basename "$file")"
+            mv "$file" $result_file
+        fi
+    done
+    cp -r ./cypress/videos/* $ARTIFACT_DIR
+}
+
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        CopyArtifacts
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--quay-tests__test-quay-e2e__quay-tests-test-quay-e2e.xml
+    ' EXIT
+else
+    trap CopyArtifacts EXIT
+fi
+
 #Set Kubeconfig:
 echo "Quay version is ${QUAY_VERSION}"
 QUAY_VERSION_THRESHOLD="3.16"
@@ -18,72 +50,6 @@ skopeo -v
 oc version
 terraform version
 (cp -L $KUBECONFIG /tmp/kubeconfig || true) && export KUBECONFIG_PATH=/tmp/kubeconfig
-
-#Create Artifact Directory:
-ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
-mkdir -p $ARTIFACT_DIR
-original_results="${ARTIFACT_DIR}/original_results/"
-mkdir "${original_results}" || true
-
-function install_yq() {
-    # Install yq manually if not found in image
-    echo "Installing yq"
-    mkdir -p /tmp/bin
-    export PATH=$PATH:/tmp/bin/
-    curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-     -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-
-    # Verify installation
-    cmd_yq="$(/tmp/bin/yq --version 2>/dev/null || true)"
-    if [ -n "$cmd_yq" ]; then
-      echo "yq version: $cmd_yq"
-    else
-      # Skip test mapping since yq isn't available
-      export MAP_TESTS="false"
-    fi
-}
-
-function mapTestsForComponentReadiness() {
-    if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${1}"
-        echo "Patching Tests Result File: ${results_file}"
-        if [ -f "${results_file}" ]; then
-            echo "Mapping Test Suite Name To: Quay-lp-interop"
-            /tmp/bin/yq eval -px -ox -iI0 '.testsuites.testsuite[]."+@name"="Quay-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
-        fi
-    fi
-}
-
-
-function copyArtifacts {
-    JUNIT_PREFIX="junit_"
-    cp -r ./cypress/results/* $ARTIFACT_DIR
-
-    if [[ $MAP_TESTS == "true" ]]; then
-      # If needed, install yq before loop
-      install_yq
-    fi
-
-    for file in "$ARTIFACT_DIR"/*; do
-        if [[ ! "$(basename "$file")" =~ ^"$JUNIT_PREFIX" ]]; then
-            result_file="$ARTIFACT_DIR"/"$JUNIT_PREFIX""$(basename "$file")"
-            mv "$file" $result_file
-
-            if [[ $MAP_TESTS == "true" ]]; then
-              echo "Collecting original results in ${original_results}"
-              # Keep a copy of all the original Junit files before modifying them
-              cp -r $result_file "${original_results}" || echo "Warning: couldn't copy original file ${results_file}" >&2
-
-              # Map tests if needed for related use cases
-              mapTestsForComponentReadiness "${result_file}"
-
-              # Send junit file to shared dir for Data Router Reporter step
-              cp -r $result_file $SHARED_DIR || echo "Warning: couldn't send result file to SHARED_DIR" >&2
-            fi
-        fi
-    done
-    cp -r ./cypress/videos/* $ARTIFACT_DIR
-}
 
 # Install Dependcies defined in packages.json
 npm install || true
