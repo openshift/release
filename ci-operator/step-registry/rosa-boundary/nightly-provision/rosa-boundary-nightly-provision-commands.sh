@@ -54,16 +54,20 @@ export AWS_REGION="${AWS_REGION:-us-east-1}"
 
 echo "Using AWS region: ${AWS_REGION}"
 
+# Deploy network infrastructure first
+echo "Deploying network infrastructure..."
+cd deploy/network/
+
 # Disable tracing for terraform operations (security best practice)
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
 
-# Deploy network infrastructure first
-echo "Deploying network infrastructure..."
-cd deploy/network/
 /tmp/terraform init
 /tmp/terraform plan
 /tmp/terraform apply -auto-approve
+
+# Restore tracing temporarily for output operations
+$WAS_TRACING && set -x
 
 # Save network outputs
 /tmp/terraform output -json > "${SHARED_DIR}/rosa-boundary-network-outputs.json"
@@ -75,7 +79,7 @@ cd ../regional/
 
 # Extract network outputs for regional module
 VPC_ID=$(jq -r '.vpc_id.value' "${SHARED_DIR}/rosa-boundary-network-outputs.json")
-SUBNET_IDS=$(jq -r '.subnet_ids.value | @json' "${SHARED_DIR}/rosa-boundary-network-outputs.json")
+SUBNET_IDS=$(jq -r '.private_subnet_ids.value | @json' "${SHARED_DIR}/rosa-boundary-network-outputs.json")
 
 # Set placeholder values for application variables (CI testing only)
 # These satisfy Terraform validation but aren't used by infrastructure-only e2e tests
@@ -85,6 +89,16 @@ export TF_VAR_container_image="quay.io/openshift-online/rosa-boundary:latest"
 export TF_VAR_keycloak_issuer_url="https://auth.redhat.com/auth/realms/EmployeeIDP"
 export TF_VAR_keycloak_thumbprint="0000000000000000000000000000000000000000"
 export TF_VAR_required_groups='["nightly-e2e"]'
+
+# Debug: Show that variables are set
+echo "Terraform variables set:"
+echo "  TF_VAR_vpc_id=${TF_VAR_vpc_id}"
+echo "  TF_VAR_subnet_ids=${TF_VAR_subnet_ids}"
+echo "  TF_VAR_container_image=${TF_VAR_container_image}"
+echo "  TF_VAR_required_groups=${TF_VAR_required_groups}"
+
+# Disable tracing again for terraform
+set +x
 
 /tmp/terraform init
 /tmp/terraform plan

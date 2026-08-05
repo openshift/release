@@ -63,6 +63,29 @@ TEARDOWN_FAILED=0
 # Destroy in reverse order - regional first, then network
 echo "Destroying regional infrastructure..."
 cd deploy/regional/
+
+# Set Terraform variables for destroy (required even though values come from state)
+# Try to read from provision outputs if available, otherwise use placeholders
+if [[ -f "${SHARED_DIR}/rosa-boundary-network-outputs.json" ]]; then
+  echo "Reading network outputs from provision step..."
+  VPC_ID=$(jq -r '.vpc_id.value // "vpc-placeholder"' "${SHARED_DIR}/rosa-boundary-network-outputs.json")
+  SUBNET_IDS=$(jq -r '.private_subnet_ids.value // [] | @json' "${SHARED_DIR}/rosa-boundary-network-outputs.json")
+else
+  echo "Network outputs not found, using placeholders for variable validation..."
+  VPC_ID="vpc-placeholder"
+  SUBNET_IDS='["subnet-placeholder"]'
+fi
+
+# Export all required variables (Terraform requires them even for destroy)
+export TF_VAR_vpc_id="${VPC_ID}"
+export TF_VAR_subnet_ids="${SUBNET_IDS}"
+export TF_VAR_container_image="quay.io/openshift-online/rosa-boundary:placeholder"
+export TF_VAR_keycloak_issuer_url="https://placeholder.example.com"
+export TF_VAR_keycloak_thumbprint="0000000000000000000000000000000000000000"
+export TF_VAR_required_groups='["placeholder"]'
+
+echo "Terraform variables set for destroy operation"
+
 if ! /tmp/terraform init; then
   echo "Regional terraform init failed, continuing..."
   TEARDOWN_FAILED=1
