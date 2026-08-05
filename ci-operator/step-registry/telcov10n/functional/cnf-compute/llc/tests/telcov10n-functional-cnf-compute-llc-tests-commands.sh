@@ -13,8 +13,8 @@ export ROLE_WORKER_CNF=worker-cnf
 
 # local variables
 TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
-NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
-NTO_BRANCH=$(git ls-remote --heads ${NTO_REPO} main | grep -q 'refs/heads/main'  && echo 'main' || echo 'master')
+NTO_REPO="https://github.com/mrniranjan/cluster-node-tuning-operator.git"
+NTO_BRANCH="all_fixes"
 if [[ -n "${TEST_RUN_FEATURES:-}" ]]; then
     GINKGO_LABEL="${TEST_RUN_FEATURES}"
 else
