@@ -69,88 +69,83 @@ else
   fetch_last_nightly_tag
 fi
 
-cat > "${SCRATCH}/roxie-config.yaml" <<'EOF'
+CENTRAL_MAX_WAIT_SECONDS="${CENTRAL_MAX_WAIT_SECONDS:-7200}"
+ROX_SCANNER_V4_ENABLED="${ROX_SCANNER_V4_ENABLED:-true}"
+case ${ROX_SCANNER_V4_ENABLED} in
+true)
+  SCANNER_V4_COMPONENT="Default" # effectively means "Enabled" in Central and "AutoSense" in SecuredCluster
+  ;;
+*)
+  SCANNER_V4_COMPONENT="Disabled"
+  ;;
+esac
+declare -A central_env_vars
+if [[ -n "${SCANNER_V4_MATCHER_READINESS:-}" ]]; then
+  central_env_vars[SCANNER_V4_MATCHER_READINESS]="${SCANNER_V4_MATCHER_READINESS}"
+fi
+if [[ -n "${SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST:-}" ]]; then
+  central_env_vars[SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST]="${SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST}"
+fi
+
+cat > "${SCRATCH}/roxie-config.yaml" <<EOF
 roxie:
   # TODO(https://github.com/stackrox/roxie/issues/216)
   clusterType: InfraOpenShift4
-  featureFlags:
-    ROX_SCANNER_V4_ENABLED: true
 
 central:
   namespace: stackrox
   earlyReadiness: false
+  exposure: none
   spec:
-    central:
-      resources:
-        requests:
-          cpu: "1"
-          memory: 1Gi
-        limits:
-          cpu: "1"
-          memory: 4Gi
-      db:
-        resources:
-          requests:
-            cpu: 500m
-            memory: 1Gi
-          limits:
-            cpu: "1"
-            memory: 4Gi
-    scanner:
-      scannerComponent: Enabled
-      analyzer:
-        scaling:
-          autoScaling: Disabled
-          replicas: 1
-        resources:
-          requests:
-            cpu: 500m
-            memory: 500Mi
-          limits:
-            cpu: "2"
-            memory: 2500Mi
-      db:
-        resources:
-          requests:
-            cpu: 200m
-            memory: 512Mi
-          limits:
-            cpu: "2"
-            memory: 4Gi
-    scannerV4:
-      db:
-        resources:
-          requests:
-            cpu: 200m
-            memory: 2Gi
-          limits:
-            cpu: "1"
-            memory: 2500Mi
-      indexer:
-        resources:
-          requests:
-            cpu: 600m
-            memory: 1500Mi
-          limits:
-            cpu: "1"
-            memory: 2Gi
-      matcher:
-        resources:
-          requests:
-            cpu: 600m
-            memory: 5Gi
-          limits:
-            cpu: "1"
-            memory: 5500Mi
     customize:
       envVars:
-      - name: SCANNER_V4_MATCHER_READINESS
-        value: vulnerability
+$(for v in "${!central_env_vars[@]}"; do echo "- name: $v"; echo "  value: \"${central_env_vars[$v]}\""; done | sed "s,^,      ,")
+    scannerV4:
+      scannerComponent: ${SCANNER_V4_COMPONENT}
 
 securedCluster:
   namespace: stackrox
   earlyReadiness: false
+  spec:
+    scannerV4:
+      scannerComponent: ${SCANNER_V4_COMPONENT}
 EOF
+
+extra_flags=()
+if [[ "${SMALL_INSTALL:-true}" == "true" ]]; then
+  extra_flags+=('--set' 'central.spec.central.resources.requests.memory=1Gi')
+  extra_flags+=('--set' 'central.spec.central.resources.requests.cpu=1')
+  extra_flags+=('--set' 'central.spec.central.resources.limits.memory=4Gi')
+  extra_flags+=('--set' 'central.spec.central.resources.limits.cpu=1')
+  extra_flags+=('--set' 'central.spec.central.db.resources.requests.memory=1Gi')
+  extra_flags+=('--set' 'central.spec.central.db.resources.requests.cpu=500m')
+  extra_flags+=('--set' 'central.spec.central.db.resources.limits.memory=4Gi')
+  extra_flags+=('--set' 'central.spec.central.db.resources.limits.cpu=1')
+  extra_flags+=('--set' 'central.spec.scanner.analyzer.scaling.autoScaling=Disabled')
+  extra_flags+=('--set' 'central.spec.scanner.analyzer.scaling.replicas=1')
+  extra_flags+=('--set' 'central.spec.scanner.analyzer.resources.requests.memory=500Mi')
+  extra_flags+=('--set' 'central.spec.scanner.analyzer.resources.requests.cpu=500m')
+  extra_flags+=('--set' 'central.spec.scanner.analyzer.resources.limits.memory=2500Mi')
+  extra_flags+=('--set' 'central.spec.scanner.analyzer.resources.limits.cpu=2000m')
+  if [[ "${ROX_SCANNER_V4_ENABLED}" == "true" ]]; then
+    extra_flags+=('--set' 'central.spec.scannerV4.indexer.scaling.autoScaling=Disabled')
+    extra_flags+=('--set' 'central.spec.scannerV4.indexer.scaling.replicas=1')
+    extra_flags+=('--set' 'central.spec.scannerV4.indexer.resources.requests.cpu=600m')
+    extra_flags+=('--set' 'central.spec.scannerV4.indexer.resources.requests.memory=1500Mi')
+    extra_flags+=('--set' 'central.spec.scannerV4.indexer.resources.limits.cpu=1000m')
+    extra_flags+=('--set' 'central.spec.scannerV4.indexer.resources.limits.memory=2Gi')
+    extra_flags+=('--set' 'central.spec.scannerV4.matcher.scaling.autoScaling=Disabled')
+    extra_flags+=('--set' 'central.spec.scannerV4.matcher.scaling.replicas=1')
+    extra_flags+=('--set' 'central.spec.scannerV4.matcher.resources.requests.cpu=600m')
+    extra_flags+=('--set' 'central.spec.scannerV4.matcher.resources.requests.memory=5Gi')
+    extra_flags+=('--set' 'central.spec.scannerV4.matcher.resources.limits.cpu=1000m')
+    extra_flags+=('--set' 'central.spec.scannerV4.matcher.resources.limits.memory=5500Mi')
+    extra_flags+=('--set' 'central.spec.scannerV4.db.resources.requests.cpu=200m')
+    extra_flags+=('--set' 'central.spec.scannerV4.db.resources.requests.memory=2Gi')
+    extra_flags+=('--set' 'central.spec.scannerV4.db.resources.limits.cpu=1000m')
+    extra_flags+=('--set' 'central.spec.scannerV4.db.resources.limits.memory=2500Mi')
+  fi
+fi
 
 ROXIE_ENVRC="${SCRATCH}/roxie-envrc"
 
@@ -158,10 +153,12 @@ PUBLIC_REGISTRY="quay.io/stackrox-io"
 
 echo ">>> Deploying ACS with roxie (tag: ${ACS_VERSION_TAG})"
 roxie deploy \
+  --verbose \
   --config "${SCRATCH}/roxie-config.yaml" \
   --tag "${ACS_VERSION_TAG}" \
   --envrc "${ROXIE_ENVRC}" \
-  --central-wait 120m \
+  `# TODO(https://github.com/stackrox/roxie/issues/216): abort early if central pod is unhappy` \
+  --central-wait "${CENTRAL_MAX_WAIT_SECONDS}s" \
   --secured-cluster-wait 75m \
   `# TODO(ROX-35434): simplify once roxie has 1st class support for community-branded repo` \
   --operator-env "RELATED_IMAGE_MAIN=${PUBLIC_REGISTRY}/main:${ACS_VERSION_TAG}" \
@@ -173,7 +170,8 @@ roxie deploy \
   --operator-env "RELATED_IMAGE_COLLECTOR=${PUBLIC_REGISTRY}/collector:${ACS_VERSION_TAG}" \
   --operator-env "RELATED_IMAGE_SCANNER_V4=${PUBLIC_REGISTRY}/scanner-v4:${ACS_VERSION_TAG}" \
   --operator-env "RELATED_IMAGE_SCANNER_V4_DB=${PUBLIC_REGISTRY}/scanner-v4-db:${ACS_VERSION_TAG}" \
-  --operator-env "RELATED_IMAGE_FACT=${PUBLIC_REGISTRY}/fact:${ACS_VERSION_TAG}"
+  --operator-env "RELATED_IMAGE_FACT=${PUBLIC_REGISTRY}/fact:${ACS_VERSION_TAG}" \
+  "${extra_flags[@]+"${extra_flags[@]}"}"
 
 echo ">>> Verifying deployment"
 # shellcheck disable=SC1090
