@@ -21,14 +21,22 @@ export PATH="/tmp/bin:${PATH}"
 if [[ -n "${AWS_CONFIG_FILE:-}" ]] && [[ -r "${AWS_CONFIG_FILE}" ]]; then
   echo "Extracting AWS credentials from ${AWS_CONFIG_FILE}"
 
-  # Read credentials from the config file
-  # Format: [default]\naws_access_key_id = ...\naws_secret_access_key = ...
-  # Declare and assign separately to avoid masking return values (SC2155)
-  AWS_ACCESS_KEY_ID=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_access_key_id" | cut -d'=' -f2 | tr -d ' ')
-  AWS_SECRET_ACCESS_KEY=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_secret_access_key" | cut -d'=' -f2 | tr -d ' ')
+  # Try simple key=value format first (like .awscred files)
+  # Format: aws_access_key_id=VALUE
+  AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id" "${AWS_CONFIG_FILE}" | cut -d'=' -f2 | tr -d ' ')
+  AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key" "${AWS_CONFIG_FILE}" | cut -d'=' -f2 | tr -d ' ')
+
+  # If empty, try AWS CLI config format with [default] section
+  if [[ -z "${AWS_ACCESS_KEY_ID}" ]]; then
+    AWS_ACCESS_KEY_ID=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_access_key_id" | cut -d'=' -f2 | tr -d ' ')
+    AWS_SECRET_ACCESS_KEY=$(grep -A10 "\[default\]" "${AWS_CONFIG_FILE}" | grep "aws_secret_access_key" | cut -d'=' -f2 | tr -d ' ')
+  fi
 
   if [[ -z "${AWS_ACCESS_KEY_ID}" ]] || [[ -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
     echo "ERROR: Failed to extract AWS credentials from config file"
+    echo "Config file format not recognized. Expected either:"
+    echo "  1. Simple: aws_access_key_id=VALUE"
+    echo "  2. Profile: [default] section with aws_access_key_id = VALUE"
     exit 1
   fi
 
