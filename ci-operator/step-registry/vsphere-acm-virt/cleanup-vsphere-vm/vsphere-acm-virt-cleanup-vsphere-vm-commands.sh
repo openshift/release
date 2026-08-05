@@ -1,67 +1,80 @@
 #!/bin/bash
-#
-# Clean up vSphere source VM created for MTV cold migration testing.
-# Runs as best_effort — errors are logged but do not fail the job.
-#
-set -euxo pipefail
+set -euxo pipefail; shopt -s inherit_errexit
 
-if [[ -n "${SHARED_DIR:-}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
+# Source proxy config if present (SHARED_DIR is guaranteed in CI).
+[[ -s "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
 
 # --------------------------------------------------------------------------
-# Load govc environment (credentials — tracing disabled)
+# Load non-sensitive govc context from SHARED_DIR (no credentials inside).
 # --------------------------------------------------------------------------
 if [[ ! -f "${SHARED_DIR}/govc-env.sh" ]]; then
-    echo "No govc-env.sh found in SHARED_DIR — nothing to clean up"
+    : "No govc-env.sh found in SHARED_DIR — nothing to clean up"
     exit 0
 fi
 
-_was_tracing=false
-[[ $- == *x* ]] && _was_tracing=true
-set +x
 # shellcheck disable=SC1090
 source "${SHARED_DIR}/govc-env.sh"
-$_was_tracing && set -x
-
-# TLS CA certs (optional — re-mount from credentials)
-CREDS_DIR="/var/run/vsphere-credentials"
-if [[ -f "${CREDS_DIR}/cacert" ]]; then
-    export GOVC_TLS_CA_CERTS="${CREDS_DIR}/cacert"
-fi
 
 # --------------------------------------------------------------------------
-# Read VM name
+# Read credentials from the mounted secret (never stored in SHARED_DIR).
+# --------------------------------------------------------------------------
+typeset credsDir='/var/run/vsphere-credentials'
+typeset _wasTracing=false
+[[ $- == *x* ]] && _wasTracing=true
+set +x
+
+[[ -f "${credsDir}/.vsphere_user"     ]] \
+    && export GOVC_USERNAME="$(< "${credsDir}/.vsphere_user")"     \
+    || { [[ -f "${credsDir}/user"     ]] && export GOVC_USERNAME="$(< "${credsDir}/user")"; } \
+    || true
+[[ -f "${credsDir}/.vsphere_password" ]] \
+    && export GOVC_PASSWORD="$(< "${credsDir}/.vsphere_password")" \
+    || { [[ -f "${credsDir}/password" ]] && export GOVC_PASSWORD="$(< "${credsDir}/password")"; } \
+    || true
+
+[[ "${_wasTracing}" == 'true' ]] && set -x
+
+[[ -f "${credsDir}/cacert" ]] && export GOVC_TLS_CA_CERTS="${credsDir}/cacert"
+
+# --------------------------------------------------------------------------
+# Read VM name from metadata written by vsphere-acm-virt-create-source-vm.
 # --------------------------------------------------------------------------
 if [[ ! -f "${SHARED_DIR}/vsphere-source-vm.json" ]]; then
-    echo "No vsphere-source-vm.json found — nothing to clean up"
+    : "No vsphere-source-vm.json found — nothing to clean up"
     exit 0
 fi
 
-VM_NAME="$(jq -r '.vm_name' "${SHARED_DIR}/vsphere-source-vm.json")"
-if [[ -z "${VM_NAME}" || "${VM_NAME}" == "null" ]]; then
-    echo "No VM name found in metadata — nothing to clean up"
+typeset vmName=''
+vmName="$(jq -r '.vm_name' "${SHARED_DIR}/vsphere-source-vm.json")"
+
+if [[ -z "${vmName}" || "${vmName}" == 'null' ]]; then
+    : "No VM name found in metadata — nothing to clean up"
     exit 0
 fi
 
-echo "=== Cleaning up vSphere VM: ${VM_NAME} ==="
+# --------------------------------------------------------------------------
+# Power off (tolerate errors — VM may already be off or partially deleted).
+# --------------------------------------------------------------------------
+govc vm.power -off -force "${vmName}" 2>/dev/null || true
+
+# Poll until the VM is powered off before issuing destroy.
+(
+    typeset -i wInt=5 wMax=60
+    SECONDS=0
+    while (( SECONDS < wMax )); do
+        typeset powerState
+        powerState="$(govc vm.info -json "${vmName}" \
+            | jq -r '.virtualMachines[0].runtime.powerState // empty' 2>/dev/null || true)"
+        [[ "${powerState}" == 'poweredOff' ]] && break
+        : "Waiting for VM power-off (${SECONDS}/${wMax}s)"
+        sleep "${wInt}"
+    done
+    true
+)
 
 # --------------------------------------------------------------------------
-# Power off (ignore errors — VM may already be off or deleted)
+# Destroy VM (tolerate not-found — migration may have removed it already).
 # --------------------------------------------------------------------------
-echo "Powering off VM..."
-govc vm.power -off -force "${VM_NAME}" 2>/dev/null || true
-sleep 5
+govc vm.destroy "${vmName}" 2>/dev/null || true
 
-# --------------------------------------------------------------------------
-# Destroy VM
-# --------------------------------------------------------------------------
-echo "Destroying VM..."
-if govc vm.destroy "${VM_NAME}" 2>/dev/null; then
-    echo "VM ${VM_NAME} destroyed successfully"
-else
-    echo "WARNING: Could not destroy VM ${VM_NAME} (may already be deleted)"
-fi
-
-echo "=== vSphere cleanup complete ==="
+true

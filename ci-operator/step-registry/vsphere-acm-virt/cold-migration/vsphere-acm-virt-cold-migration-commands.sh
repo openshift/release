@@ -1,138 +1,161 @@
 #!/bin/bash
-#
-# Execute cold migration from vSphere to OCP/CNV using MTV.
-#
-# Creates Provider, NetworkMap, StorageMap, Plan, and Migration CRs.
-# Waits for the migration to succeed and validates the VM is Running on OCP.
-#
-set -euxo pipefail
+set -euxo pipefail; shopt -s inherit_errexit
 
-if [[ -n "${SHARED_DIR:-}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
+# Source proxy config if present (SHARED_DIR is guaranteed in CI).
+[[ -s "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
 
 [[ -n "${KUBECONFIG}" ]]
 [[ -r "${KUBECONFIG}" ]]
 
 # --------------------------------------------------------------------------
-# Read source VM metadata
+# Read source VM metadata written by vsphere-acm-virt-create-source-vm
 # --------------------------------------------------------------------------
 [[ -f "${SHARED_DIR}/vsphere-source-vm.json" ]]
-VM_NAME="$(jq -r '.vm_name' "${SHARED_DIR}/vsphere-source-vm.json")"
-VM_ID="$(jq -r '.vm_moid // .vm_name' "${SHARED_DIR}/vsphere-source-vm.json")"
-VCENTER_HOST="$(jq -r '.vcenter_host' "${SHARED_DIR}/vsphere-source-vm.json")"
-VSPHERE_DATACENTER="$(jq -r '.datacenter' "${SHARED_DIR}/vsphere-source-vm.json")"
-VSPHERE_DATASTORE="$(jq -r '.datastore' "${SHARED_DIR}/vsphere-source-vm.json")"
-VSPHERE_NETWORK="$(jq -r '.network' "${SHARED_DIR}/vsphere-source-vm.json")"
-
-echo "Migrating VM: ${VM_NAME} from vCenter: ${VCENTER_HOST}"
+typeset vmName vcenterHost vsphereDatacenter vsphereDatastore vsphereNetwork vmId
+vmName="$(         jq -r '.vm_name'               "${SHARED_DIR}/vsphere-source-vm.json")"
+vmId="$(           jq -r '.vm_moid // .vm_name'   "${SHARED_DIR}/vsphere-source-vm.json")"
+vcenterHost="$(    jq -r '.vcenter_host'           "${SHARED_DIR}/vsphere-source-vm.json")"
+vsphereDatacenter="$(jq -r '.datacenter'           "${SHARED_DIR}/vsphere-source-vm.json")"
+vsphereDatastore="$( jq -r '.datastore'            "${SHARED_DIR}/vsphere-source-vm.json")"
+vsphereNetwork="$(   jq -r '.network'              "${SHARED_DIR}/vsphere-source-vm.json")"
 
 # --------------------------------------------------------------------------
-# Read vSphere credentials (tracing disabled)
+# Read vSphere credentials from the mounted secret (never logged)
 # --------------------------------------------------------------------------
-_was_tracing=false
-[[ $- == *x* ]] && _was_tracing=true
+typeset credsDir='/var/run/vsphere-credentials'
+typeset _wasTracing=false
+[[ $- == *x* ]] && _wasTracing=true
 set +x
 
-CREDS_DIR="/var/run/vsphere-credentials"
-if [[ -f "${CREDS_DIR}/.vsphere_user" ]]; then
-    VSPHERE_USER="$(< "${CREDS_DIR}/.vsphere_user")"
-elif [[ -f "${CREDS_DIR}/user" ]]; then
-    VSPHERE_USER="$(< "${CREDS_DIR}/user")"
+typeset vsphereUser='' vspherePassword='' vsphereThumbprint=''
+if [[ -f "${credsDir}/.vsphere_user" ]]; then
+    vsphereUser="$(< "${credsDir}/.vsphere_user")"
+elif [[ -f "${credsDir}/user" ]]; then
+    vsphereUser="$(< "${credsDir}/user")"
 fi
-if [[ -f "${CREDS_DIR}/.vsphere_password" ]]; then
-    VSPHERE_PASSWORD="$(< "${CREDS_DIR}/.vsphere_password")"
-elif [[ -f "${CREDS_DIR}/password" ]]; then
-    VSPHERE_PASSWORD="$(< "${CREDS_DIR}/password")"
+if [[ -f "${credsDir}/.vsphere_password" ]]; then
+    vspherePassword="$(< "${credsDir}/.vsphere_password")"
+elif [[ -f "${credsDir}/password" ]]; then
+    vspherePassword="$(< "${credsDir}/password")"
 fi
+[[ -f "${credsDir}/thumbprint" ]] && vsphereThumbprint="$(< "${credsDir}/thumbprint")"
 
-# Also read the vSphere SHA1 thumbprint if available
-VSPHERE_THUMBPRINT=""
-if [[ -f "${CREDS_DIR}/thumbprint" ]]; then
-    VSPHERE_THUMBPRINT="$(< "${CREDS_DIR}/thumbprint")"
-fi
-
-$_was_tracing && set -x
-
-# --------------------------------------------------------------------------
-# Power off source VM on vSphere before cold migration
-# --------------------------------------------------------------------------
-echo "=== Powering off source VM on vSphere ==="
-if [[ -f "${SHARED_DIR}/govc-env.sh" ]]; then
-    _was_tracing=false
-    [[ $- == *x* ]] && _was_tracing=true
-    set +x
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/govc-env.sh"
-    $_was_tracing && set -x
-    govc vm.power -off -force "${VM_NAME}" 2>/dev/null || true
-    # Wait for VM to be fully powered off
-    sleep 10
-    govc vm.info "${VM_NAME}" || true
-fi
+[[ "${_wasTracing}" == 'true' ]] && set -x
 
 # --------------------------------------------------------------------------
 # DumpDiagnostics — write MTV state to ARTIFACT_DIR on failure
 # --------------------------------------------------------------------------
 DumpDiagnostics() {
-    [[ -n "${ARTIFACT_DIR:-}" ]] || return 0
-    local diagDir="${ARTIFACT_DIR}/mtv-cold-migration-diagnostics"
+    typeset diagDir="${ARTIFACT_DIR}/mtv-cold-migration-diagnostics"
     mkdir -p "${diagDir}"
     oc get plan,migration,networkmap,storagemap,provider -n "${MTV_NAMESPACE}" \
-        > "${diagDir}/mtv-resources.txt" 2>&1 || true
-    oc describe plan/vsphere-cold-plan -n "${MTV_NAMESPACE}" \
-        > "${diagDir}/plan-describe.txt" 2>&1 || true
-    oc describe migration/vsphere-cold-run -n "${MTV_NAMESPACE}" \
-        > "${diagDir}/migration-describe.txt" 2>&1 || true
-    oc get events -n "${MTV_NAMESPACE}" --sort-by='.lastTimestamp' \
-        > "${diagDir}/mtv-events.txt" 2>&1 || true
-    oc get events -n "${MIGRATION_NAMESPACE}" --sort-by='.lastTimestamp' \
+        > "${diagDir}/mtv-resources.txt"       2>&1 || true
+    oc describe plan/vsphere-cold-plan         -n "${MTV_NAMESPACE}" \
+        > "${diagDir}/plan-describe.txt"       2>&1 || true
+    oc describe migration/vsphere-cold-run     -n "${MTV_NAMESPACE}" \
+        > "${diagDir}/migration-describe.txt"  2>&1 || true
+    oc get events -n "${MTV_NAMESPACE}"        --sort-by='.lastTimestamp' \
+        > "${diagDir}/mtv-events.txt"          2>&1 || true
+    oc get events -n "${MIGRATION_NAMESPACE}"  --sort-by='.lastTimestamp' \
         > "${diagDir}/migration-ns-events.txt" 2>&1 || true
     oc logs deployment/forklift-controller -n "${MTV_NAMESPACE}" --tail=200 \
         > "${diagDir}/forklift-controller.log" 2>&1 || true
     oc get virtualmachine,virtualmachineinstance,datavolume,pvc \
-        -n "${MIGRATION_NAMESPACE}" -o wide \
-        > "${diagDir}/dest-vm-resources.txt" 2>&1 || true
+        -n "${MIGRATION_NAMESPACE}" -o wide    \
+        > "${diagDir}/dest-vm-resources.txt"   2>&1 || true
+    true
 }
 trap DumpDiagnostics ERR
 
 # --------------------------------------------------------------------------
-# Create migration namespace
+# Power off source VM on vSphere before cold migration
 # --------------------------------------------------------------------------
-oc apply -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: ${MIGRATION_NAMESPACE}
-EOF
+if [[ -f "${SHARED_DIR}/govc-env.sh" ]]; then
+    # govc-env.sh contains only non-sensitive context; no set +x needed.
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/govc-env.sh"
+
+    # Reload credentials from mount since they are not in govc-env.sh.
+    typeset _wasTracing2=false
+    [[ $- == *x* ]] && _wasTracing2=true
+    set +x
+    [[ -f "${credsDir}/.vsphere_user"     ]] && export GOVC_USERNAME="$(< "${credsDir}/.vsphere_user")"     || \
+    [[ -f "${credsDir}/user"              ]] && export GOVC_USERNAME="$(< "${credsDir}/user")"              || true
+    [[ -f "${credsDir}/.vsphere_password" ]] && export GOVC_PASSWORD="$(< "${credsDir}/.vsphere_password")" || \
+    [[ -f "${credsDir}/password"          ]] && export GOVC_PASSWORD="$(< "${credsDir}/password")"          || true
+    [[ "${_wasTracing2}" == 'true' ]] && set -x
+
+    govc vm.power -off -force "${vmName}" 2>/dev/null || true
+
+    # Poll until the VM is powered off before proceeding.
+    (
+        typeset -i wInt=5 wMax=120
+        SECONDS=0
+        while (( SECONDS < wMax )); do
+            typeset powerState
+            powerState="$(govc vm.info -json "${vmName}" \
+                | jq -r '.virtualMachines[0].runtime.powerState // empty' 2>/dev/null || true)"
+            [[ "${powerState}" == 'poweredOff' ]] && break
+            : "Waiting for VM power-off (${SECONDS}/${wMax}s)"
+            sleep "${wInt}"
+        done
+        true
+    )
+    govc vm.info "${vmName}" || true
+fi
 
 # --------------------------------------------------------------------------
-# Create vSphere Provider secret (credentials never logged)
+# Create migration target namespace
 # --------------------------------------------------------------------------
-echo "=== Creating vSphere Provider secret ==="
-_was_tracing=false
-[[ $- == *x* ]] && _was_tracing=true
+oc create namespace "${MIGRATION_NAMESPACE}" \
+    --dry-run=client -o yaml --save-config | oc apply -f -
+
+# --------------------------------------------------------------------------
+# Create vSphere Provider secret (credentials written via process substitution)
+# --------------------------------------------------------------------------
+typeset _wasTracing3=false
+[[ $- == *x* ]] && _wasTracing3=true
 set +x
 
 oc -n "${MTV_NAMESPACE}" create secret generic vsphere-provider-secret \
-    --from-literal=user="${VSPHERE_USER}" \
-    --from-literal=password="${VSPHERE_PASSWORD}" \
-    ${VSPHERE_THUMBPRINT:+--from-literal=thumbprint="${VSPHERE_THUMBPRINT}"} \
-    --dry-run=client -o yaml | oc apply -f -
+    --from-literal=user="${vsphereUser}" \
+    --from-literal=password="${vspherePassword}" \
+    ${vsphereThumbprint:+--from-literal=thumbprint="${vsphereThumbprint}"} \
+    --dry-run=client -o yaml --save-config | oc apply -f -
 
-$_was_tracing && set -x
+[[ "${_wasTracing3}" == 'true' ]] && set -x
+
+# Create the OCP host provider secret using a short-lived in-cluster token.
+typeset _wasTracing4=false
+[[ $- == *x* ]] && _wasTracing4=true
+set +x
+
+typeset hostToken=''
+hostToken="$(oc whoami -t 2>/dev/null || true)"
+if [[ -z "${hostToken}" ]]; then
+    hostToken="$(oc create token forklift-controller \
+        -n "${MTV_NAMESPACE}" --duration=24h 2>/dev/null || true)"
+fi
+if [[ -z "${hostToken}" ]]; then
+    # Fallback: dedicated SA with cluster-admin.
+    oc -n "${MTV_NAMESPACE}" create serviceaccount mtv-host-sa \
+        --dry-run=client -o yaml --save-config | oc apply -f -
+    oc adm policy add-cluster-role-to-user cluster-admin -z mtv-host-sa -n "${MTV_NAMESPACE}"
+    hostToken="$(oc create token mtv-host-sa -n "${MTV_NAMESPACE}" --duration=24h)"
+fi
+oc -n "${MTV_NAMESPACE}" create secret generic ocp-host-secret \
+    --from-literal=token="${hostToken}" \
+    --dry-run=client -o yaml --save-config | oc apply -f -
+
+[[ "${_wasTracing4}" == 'true' ]] && set -x
 
 # --------------------------------------------------------------------------
 # Create vSphere source Provider
+# FIXME: Adjust SDK URL if vCenter uses a non-standard port.
 # --------------------------------------------------------------------------
-echo "=== Creating vSphere source Provider ==="
-VSPHERE_SDK_URL="https://${VCENTER_HOST}/sdk"
-# FIXME: If the vCenter uses a non-standard port, adjust the URL accordingly.
-
-# Build the Provider spec; include vddkInitImage only if VDDK is available.
-# MTV can fall back to NBD transfer without VDDK, but it is slower.
-oc apply -f - <<EOF
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<ocEOF | oc apply -f -
 apiVersion: forklift.konveyor.io/v1beta1
 kind: Provider
 metadata:
@@ -140,17 +163,16 @@ metadata:
   namespace: ${MTV_NAMESPACE}
 spec:
   type: vsphere
-  url: "${VSPHERE_SDK_URL}"
+  url: "https://${vcenterHost}/sdk"
   secret:
     name: vsphere-provider-secret
     namespace: ${MTV_NAMESPACE}
-EOF
+ocEOF
 
-# --------------------------------------------------------------------------
-# Create OCP host (destination) Provider
-# --------------------------------------------------------------------------
-echo "=== Creating OCP host Provider ==="
-oc apply -f - <<EOF
+# Create the OCP host (destination) Provider.
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<ocEOF | oc apply -f -
 apiVersion: forklift.konveyor.io/v1beta1
 kind: Provider
 metadata:
@@ -162,48 +184,21 @@ spec:
   secret:
     name: ocp-host-secret
     namespace: ${MTV_NAMESPACE}
-EOF
+ocEOF
 
-# Create the OCP host provider secret using the in-cluster SA token
-_was_tracing=false
-[[ $- == *x* ]] && _was_tracing=true
-set +x
-
-# Use the ci-operator service account token for the host provider.
-# MTV needs a token to inventory the local cluster.
-HOST_TOKEN="$(oc whoami -t 2>/dev/null || true)"
-if [[ -z "${HOST_TOKEN}" ]]; then
-    HOST_TOKEN="$(oc create token forklift-controller -n "${MTV_NAMESPACE}" --duration=24h 2>/dev/null || true)"
-fi
-if [[ -z "${HOST_TOKEN}" ]]; then
-    # Fallback: create a dedicated SA and token
-    oc -n "${MTV_NAMESPACE}" create serviceaccount mtv-host-sa --dry-run=client -o yaml | oc apply -f -
-    oc adm policy add-cluster-role-to-user cluster-admin -z mtv-host-sa -n "${MTV_NAMESPACE}"
-    HOST_TOKEN="$(oc create token mtv-host-sa -n "${MTV_NAMESPACE}" --duration=24h)"
-fi
-
-oc -n "${MTV_NAMESPACE}" create secret generic ocp-host-secret \
-    --from-literal=token="${HOST_TOKEN}" \
-    --dry-run=client -o yaml | oc apply -f -
-
-$_was_tracing && set -x
-
-# --------------------------------------------------------------------------
-# Wait for both Providers to become Ready
-# --------------------------------------------------------------------------
-echo "=== Waiting for Providers to become Ready ==="
 oc wait provider/vsphere-source -n "${MTV_NAMESPACE}" \
     --for=condition=Ready --timeout=10m
-oc wait provider/ocp-host -n "${MTV_NAMESPACE}" \
+oc wait provider/ocp-host       -n "${MTV_NAMESPACE}" \
     --for=condition=Ready --timeout=10m
 
 oc get provider -n "${MTV_NAMESPACE}" -o wide
 
 # --------------------------------------------------------------------------
-# Create NetworkMap
+# Create NetworkMap and StorageMap
 # --------------------------------------------------------------------------
-echo "=== Creating NetworkMap ==="
-oc apply -f - <<EOF
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<ocEOF | oc apply -f -
 apiVersion: forklift.konveyor.io/v1beta1
 kind: NetworkMap
 metadata:
@@ -212,7 +207,7 @@ metadata:
 spec:
   map:
   - source:
-      name: "${VSPHERE_NETWORK}"
+      name: "${vsphereNetwork}"
     destination:
       type: pod
   provider:
@@ -222,13 +217,11 @@ spec:
     destination:
       name: ocp-host
       namespace: ${MTV_NAMESPACE}
-EOF
+ocEOF
 
-# --------------------------------------------------------------------------
-# Create StorageMap
-# --------------------------------------------------------------------------
-echo "=== Creating StorageMap ==="
-oc apply -f - <<EOF
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<ocEOF | oc apply -f -
 apiVersion: forklift.konveyor.io/v1beta1
 kind: StorageMap
 metadata:
@@ -237,7 +230,7 @@ metadata:
 spec:
   map:
   - source:
-      name: "${VSPHERE_DATASTORE}"
+      name: "${vsphereDatastore}"
     destination:
       storageClass: "${DESTINATION_STORAGE_CLASS}"
   provider:
@@ -247,19 +240,19 @@ spec:
     destination:
       name: ocp-host
       namespace: ${MTV_NAMESPACE}
-EOF
+ocEOF
 
-# Wait for maps to become Ready
 oc wait networkmap/vsphere-network-map -n "${MTV_NAMESPACE}" \
     --for=condition=Ready --timeout=10m
 oc wait storagemap/vsphere-storage-map -n "${MTV_NAMESPACE}" \
     --for=condition=Ready --timeout=10m
 
 # --------------------------------------------------------------------------
-# Create Migration Plan (cold)
+# Create cold migration Plan
 # --------------------------------------------------------------------------
-echo "=== Creating cold migration Plan ==="
-oc apply -f - <<EOF
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<ocEOF | oc apply -f -
 apiVersion: forklift.konveyor.io/v1beta1
 kind: Plan
 metadata:
@@ -282,23 +275,22 @@ spec:
       name: vsphere-storage-map
       namespace: ${MTV_NAMESPACE}
   vms:
-  - id: "${VM_ID}"
-    name: "${VM_NAME}"
+  - id: "${vmId}"
+    name: "${vmName}"
   type: cold
-EOF
+ocEOF
 
-# Wait for Plan to become Ready
 oc wait plan/vsphere-cold-plan -n "${MTV_NAMESPACE}" \
     --for=condition=Ready --timeout=15m
 
-echo "Plan is Ready"
 oc get plan/vsphere-cold-plan -n "${MTV_NAMESPACE}" -o wide
 
 # --------------------------------------------------------------------------
-# Create Migration (triggers execution)
+# Start Migration
 # --------------------------------------------------------------------------
-echo "=== Starting Migration ==="
-oc apply -f - <<EOF
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<ocEOF | oc apply -f -
 apiVersion: forklift.konveyor.io/v1beta1
 kind: Migration
 metadata:
@@ -308,45 +300,40 @@ spec:
   plan:
     name: vsphere-cold-plan
     namespace: ${MTV_NAMESPACE}
-EOF
+ocEOF
 
 # --------------------------------------------------------------------------
 # Wait for Migration to succeed
 # --------------------------------------------------------------------------
-echo "=== Waiting for Migration to complete ==="
-deadline=$(( SECONDS + MIGRATION_TIMEOUT ))
+typeset succeeded='' failed=''
+typeset -i deadline=$(( SECONDS + MIGRATION_TIMEOUT ))
 while (( SECONDS < deadline )); do
     succeeded="$(oc get migration/vsphere-cold-run -n "${MTV_NAMESPACE}" \
         -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' 2>/dev/null || true)"
     failed="$(oc get migration/vsphere-cold-run -n "${MTV_NAMESPACE}" \
         -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null || true)"
 
-    if [[ "${succeeded}" == "True" ]]; then
-        echo "Migration Succeeded!"
-        break
-    fi
+    [[ "${succeeded}" == 'True' ]] && break
 
-    if [[ "${failed}" == "True" ]]; then
-        echo "ERROR: Migration Failed!" >&2
+    if [[ "${failed}" == 'True' ]]; then
         oc get migration/vsphere-cold-run -n "${MTV_NAMESPACE}" \
             -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}' >&2 || true
-        # Print pipeline status
         oc get migration/vsphere-cold-run -n "${MTV_NAMESPACE}" -o json \
             | jq -r '.status.vms[]? | "\(.name): \([.pipeline[]? | "\(.name)=\(.phase)"] | join(", "))"' >&2 || true
         DumpDiagnostics
         exit 1
     fi
 
-    # Print progress
+    # Emit pipeline progress (xtrace will show this command's expansion).
     oc get migration/vsphere-cold-run -n "${MTV_NAMESPACE}" -o json \
         | jq -r '.status.vms[]? | "\(.name): \([.pipeline[]? | "\(.name)=\(.phase)"] | join(", "))"' \
         2>/dev/null || true
-    echo "Migration in progress... (${SECONDS}s / ${MIGRATION_TIMEOUT}s)"
+
     sleep 30
 done
 
-if [[ "${succeeded}" != "True" ]]; then
-    echo "ERROR: Migration timed out after ${MIGRATION_TIMEOUT}s" >&2
+if [[ "${succeeded}" != 'True' ]]; then
+    : "Migration timed out after ${MIGRATION_TIMEOUT}s"
     DumpDiagnostics
     exit 1
 fi
@@ -354,49 +341,35 @@ fi
 # --------------------------------------------------------------------------
 # Validate migrated VM is Running on OCP
 # --------------------------------------------------------------------------
-echo "=== Validating migrated VM ==="
-
-# Wait for VMI to appear and reach Running
-vmi_deadline=$(( SECONDS + 300 ))
-while (( SECONDS < vmi_deadline )); do
-    vmi_phase="$(oc get virtualmachineinstance -n "${MIGRATION_NAMESPACE}" \
+typeset vmiPhase=''
+typeset -i vmiDeadline=$(( SECONDS + 300 ))
+while (( SECONDS < vmiDeadline )); do
+    vmiPhase="$(oc get virtualmachineinstance -n "${MIGRATION_NAMESPACE}" \
         -o jsonpath='{.items[0].status.phase}' 2>/dev/null || true)"
-    if [[ "${vmi_phase}" == "Running" ]]; then
-        echo "Migrated VM is Running on OCP!"
-        break
-    fi
-    echo "VMI phase: ${vmi_phase:-not-found} (waiting...)"
+    [[ "${vmiPhase}" == 'Running' ]] && break
+    : "VMI phase: ${vmiPhase:-not-found} (${SECONDS}s / 300s)"
     sleep 10
 done
 
-if [[ "${vmi_phase}" != "Running" ]]; then
-    echo "WARNING: Migrated VMI did not reach Running within 5 min"
-    echo "VMI phase: ${vmi_phase:-not-found}"
+if [[ "${vmiPhase}" != 'Running' ]]; then
+    echo "ERROR: Migrated VMI did not reach Running — phase: ${vmiPhase:-not-found}" >&2
+    oc get virtualmachine,virtualmachineinstance,pvc -n "${MIGRATION_NAMESPACE}" -o wide >&2 || true
+    DumpDiagnostics
+    exit 1
 fi
 
 # --------------------------------------------------------------------------
-# Save results to artifacts
+# Save final status to artifacts
 # --------------------------------------------------------------------------
-if [[ -n "${ARTIFACT_DIR:-}" ]]; then
-    mkdir -p "${ARTIFACT_DIR}"
-    {
-        echo "=== Migration Status ==="
-        oc get plan,migration -n "${MTV_NAMESPACE}" -o wide
-        echo ""
-        echo "=== Plan Conditions ==="
-        oc get plan/vsphere-cold-plan -n "${MTV_NAMESPACE}" \
-            -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}'
-        echo ""
-        echo "=== Migration Conditions ==="
-        oc get migration/vsphere-cold-run -n "${MTV_NAMESPACE}" \
-            -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}'
-        echo ""
-        echo "=== Migrated VM ==="
-        oc get virtualmachine,virtualmachineinstance -n "${MIGRATION_NAMESPACE}" -o wide
-        echo ""
-        echo "=== DataVolumes/PVCs ==="
-        oc get datavolume,pvc -n "${MIGRATION_NAMESPACE}" -o wide
-    } > "${ARTIFACT_DIR}/mtv-cold-migration-status.txt" 2>&1 || true
-fi
+mkdir -p "${ARTIFACT_DIR}"
+{
+    oc get plan,migration              -n "${MTV_NAMESPACE}"      -o wide
+    oc get plan/vsphere-cold-plan      -n "${MTV_NAMESPACE}" \
+        -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}'
+    oc get migration/vsphere-cold-run  -n "${MTV_NAMESPACE}" \
+        -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}'
+    oc get virtualmachine,virtualmachineinstance -n "${MIGRATION_NAMESPACE}" -o wide
+    oc get datavolume,pvc              -n "${MIGRATION_NAMESPACE}" -o wide
+} > "${ARTIFACT_DIR}/mtv-cold-migration-status.txt" 2>&1 || true
 
-echo "=== Cold migration complete ==="
+true

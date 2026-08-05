@@ -1,62 +1,47 @@
 #!/bin/bash
-#
-# Install CNV (OpenShift Virtualization) and MTV (Migration Toolkit for Virtualization)
-# operators on the target OCP cluster via OLM.
-#
-set -euxo pipefail
+set -euxo pipefail; shopt -s inherit_errexit
 
-if [[ -n "${SHARED_DIR:-}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
+# Source proxy config if present (SHARED_DIR is guaranteed in CI).
+[[ -s "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
 
 [[ -n "${KUBECONFIG}" ]]
 [[ -r "${KUBECONFIG}" ]]
 
-# WaitForCsv — poll until a CSV in the given namespace reaches Succeeded.
+# WaitForCsv — poll Subscription for installedCSV name, then wait for Succeeded.
+# The CSV name is not known at install time; derive it from Subscription status.
 WaitForCsv() {
-    local ns="${1:?}" package="${2:?}"
-    local -i deadline=$(( SECONDS + 1200 ))  # 20 min
-    local csv phase
+    typeset ns="${1:?}"; shift
+    typeset subName="${1:?}"; shift
 
-    while (( SECONDS < deadline )); do
-        csv="$(oc get csv -n "${ns}" -o jsonpath="{.items[?(@.spec.displayName)].metadata.name}" 2>/dev/null \
-            | tr ' ' '\n' | grep "^${package}" | head -1 || true)"
-        if [[ -z "${csv}" ]]; then
-            csv="$(oc get subscription -n "${ns}" -o jsonpath='{.items[0].status.installedCSV}' 2>/dev/null || true)"
-        fi
-        if [[ -n "${csv}" ]]; then
-            phase="$(oc get csv "${csv}" -n "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
-            if [[ "${phase}" == "Succeeded" ]]; then
-                echo "CSV ${csv} reached Succeeded"
-                return 0
-            fi
-            echo "CSV ${csv} phase: ${phase:-pending} (waiting...)"
-        else
-            echo "No CSV found yet for ${package} in ${ns} (waiting...)"
-        fi
-        sleep 15
-    done
-    echo "ERROR: CSV for ${package} did not reach Succeeded within timeout" >&2
-    oc get csv -n "${ns}" -o wide 2>&1 || true
-    return 1
+    (
+        typeset csvName=''
+        typeset -i wInt=10 wMax=300
+        SECONDS=0
+        while (( SECONDS < wMax )); do
+            csvName="$(oc get subscription "${subName}" -n "${ns}" \
+                -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+            [[ -n "${csvName}" ]] && break
+            : "Waiting for installedCSV (${SECONDS}/${wMax}s)"
+            sleep "${wInt}"
+        done
+        (( SECONDS >= wMax )) && { : "Timed out waiting for installedCSV for ${subName}"; exit 1; }
+        oc -n "${ns}" wait "clusterserviceversion/${csvName}" \
+            --for=jsonpath='{.status.phase}'=Succeeded --timeout=15m 1>/dev/null
+        true
+    )
+    true
 }
 
 # --------------------------------------------------------------------------
 # 1. Install CNV (OpenShift Virtualization)
 # --------------------------------------------------------------------------
-echo "=== Installing CNV operator ==="
+oc create namespace openshift-cnv \
+    --dry-run=client -o yaml --save-config | oc apply -f -
+oc label namespace openshift-cnv openshift.io/cluster-monitoring=true --overwrite
 
-oc apply -f - <<'EOF'
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: openshift-cnv
-  labels:
-    openshift.io/cluster-monitoring: "true"
-EOF
-
-oc apply -f - <<'EOF'
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<'ocEOF' | oc apply -f -
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -65,9 +50,11 @@ metadata:
 spec:
   targetNamespaces:
   - openshift-cnv
-EOF
+ocEOF
 
-oc apply -f - <<EOF
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<ocEOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -79,39 +66,33 @@ spec:
   name: kubevirt-hyperconverged
   source: "${CNV_SOURCE}"
   sourceNamespace: openshift-marketplace
-EOF
+ocEOF
 
 WaitForCsv openshift-cnv kubevirt-hyperconverged
 
-echo "=== Creating HyperConverged CR ==="
-oc apply -f - <<'EOF'
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<'ocEOF' | oc apply -f -
 apiVersion: hco.kubevirt.io/v1beta1
 kind: HyperConverged
 metadata:
   name: kubevirt-hyperconverged
   namespace: openshift-cnv
 spec: {}
-EOF
+ocEOF
 
-# Wait for HyperConverged to report Available
 oc wait hyperconverged kubevirt-hyperconverged -n openshift-cnv \
     --for=condition=Available --timeout=20m
-
-echo "CNV operator installed and HyperConverged is Available"
 
 # --------------------------------------------------------------------------
 # 2. Install MTV (Migration Toolkit for Virtualization)
 # --------------------------------------------------------------------------
-echo "=== Installing MTV operator ==="
+oc create namespace openshift-mtv \
+    --dry-run=client -o yaml --save-config | oc apply -f -
 
-oc apply -f - <<'EOF'
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: openshift-mtv
-EOF
-
-oc apply -f - <<'EOF'
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<'ocEOF' | oc apply -f -
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -120,9 +101,11 @@ metadata:
 spec:
   targetNamespaces:
   - openshift-mtv
-EOF
+ocEOF
 
-oc apply -f - <<EOF
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<ocEOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -134,12 +117,13 @@ spec:
   name: mtv-operator
   source: "${MTV_SOURCE}"
   sourceNamespace: openshift-marketplace
-EOF
+ocEOF
 
 WaitForCsv openshift-mtv mtv-operator
 
-echo "=== Creating ForkliftController CR ==="
-oc apply -f - <<'EOF'
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0<<'ocEOF' | oc apply -f -
 apiVersion: forklift.konveyor.io/v1beta1
 kind: ForkliftController
 metadata:
@@ -150,29 +134,22 @@ spec:
   feature_ui_plugin: "true"
   feature_validation: "true"
   feature_volume_populator: "true"
-EOF
+ocEOF
 
-# Wait for the forklift-controller deployment to become Available.
-if ! oc wait --for=create deployment/forklift-controller \
-        -n openshift-mtv --timeout=10m 2>/dev/null; then
-    echo "Waiting for forklift-controller deployment to be created..."
-    sleep 30
-    oc wait --for=create deployment/forklift-controller \
-        -n openshift-mtv --timeout=5m
-fi
-
+oc wait --for=create deployment/forklift-controller \
+    -n openshift-mtv --timeout=15m
 oc wait deployment/forklift-controller -n openshift-mtv \
     --for=condition=Available --timeout=10m
 
-echo "MTV operator installed and ForkliftController is Available"
-
 # --------------------------------------------------------------------------
-# 3. Final validation
+# Final validation — emit resource state to artifacts
 # --------------------------------------------------------------------------
-echo "=== Final validation ==="
-oc get csv -n openshift-cnv -o wide
-oc get csv -n openshift-mtv -o wide
-oc get hyperconverged -n openshift-cnv -o wide
-oc get forkliftcontroller -n openshift-mtv -o wide
+mkdir -p "${ARTIFACT_DIR}"
+{
+    oc get csv         -n openshift-cnv -o wide
+    oc get csv         -n openshift-mtv -o wide
+    oc get hyperconverged   -n openshift-cnv -o wide
+    oc get forkliftcontroller -n openshift-mtv -o wide
+} > "${ARTIFACT_DIR}/operator-install-status.txt" 2>&1 || true
 
-echo "Both CNV and MTV operators are installed and healthy"
+true
