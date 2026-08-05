@@ -37,7 +37,7 @@ fi
 if [[ -f "${credsDir}/.vsphere_password" ]]; then
     GOVC_PASSWORD="$(< "${credsDir}/.vsphere_password")"
 elif [[ -f "${credsDir}/password" ]]; then
-    GOVC_PASSWORD="$(< "${credsDir}/.vsphere_password")"
+    GOVC_PASSWORD="$(< "${credsDir}/password")"
 else
     echo "ERROR: Cannot find vSphere password in credentials mount" >&2
     exit 1

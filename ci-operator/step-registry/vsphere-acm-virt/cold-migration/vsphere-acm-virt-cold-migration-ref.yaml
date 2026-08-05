@@ -1,8 +1,8 @@
 ref:
   as: vsphere-acm-virt-cold-migration
-  from: cli
+  from: upi-installer
   commands: vsphere-acm-virt-cold-migration-commands.sh
-  timeout: 1h0m0s
+  timeout: 1h30m0s
   grace_period: 10m0s
   credentials:
   - mount_path: /var/run/vsphere-credentials
@@ -41,3 +41,12 @@ ref:
     documentation: |-
       OCP StorageClass for the migrated VM disks. Use gp3-csi for AWS clusters.
       FIXME: Adjust if the cluster uses a different default StorageClass.
+  - name: VDDK_INIT_IMAGE
+    default: ""
+    documentation: |-
+      VDDK (VMware Virtual Disk Development Kit) init image for MTV disk transfer.
+      When set, MTV uses VDDK for significantly faster cold migration instead of the
+      NBD fallback. Build a VDDK init image per
+      https://access.redhat.com/articles/6966373 and set this to the image reference,
+      e.g. quay.io/my-org/vddk-init:latest.
+      Leave empty (default) to use NBD transfer — acceptable for a POC run.

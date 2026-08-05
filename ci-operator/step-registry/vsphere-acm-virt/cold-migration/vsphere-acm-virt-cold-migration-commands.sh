@@ -75,14 +75,12 @@ if [[ -f "${SHARED_DIR}/govc-env.sh" ]]; then
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/govc-env.sh"
 
-    # Reload credentials from mount since they are not in govc-env.sh.
+    # Export already-resolved credentials — no need to re-read the mount.
     typeset _wasTracing2=false
     [[ $- == *x* ]] && _wasTracing2=true
     set +x
-    [[ -f "${credsDir}/.vsphere_user"     ]] && export GOVC_USERNAME="$(< "${credsDir}/.vsphere_user")"     || \
-    [[ -f "${credsDir}/user"              ]] && export GOVC_USERNAME="$(< "${credsDir}/user")"              || true
-    [[ -f "${credsDir}/.vsphere_password" ]] && export GOVC_PASSWORD="$(< "${credsDir}/.vsphere_password")" || \
-    [[ -f "${credsDir}/password"          ]] && export GOVC_PASSWORD="$(< "${credsDir}/password")"          || true
+    export GOVC_USERNAME="${vsphereUser}"
+    export GOVC_PASSWORD="${vspherePassword}"
     [[ "${_wasTracing2}" == 'true' ]] && set -x
 
     govc vm.power -off -force "${vmName}" 2>/dev/null || true
@@ -111,50 +109,49 @@ oc create namespace "${MIGRATION_NAMESPACE}" \
     --dry-run=client -o yaml --save-config | oc apply -f -
 
 # --------------------------------------------------------------------------
-# Create vSphere Provider secret (credentials written via process substitution)
+# Create vSphere Provider secret
+# No parent-scope variable update needed — subshell keeps xtrace suppressed
+# only for the duration of the oc call that expands credential values.
 # --------------------------------------------------------------------------
-typeset _wasTracing3=false
-[[ $- == *x* ]] && _wasTracing3=true
-set +x
-
-oc -n "${MTV_NAMESPACE}" create secret generic vsphere-provider-secret \
-    --from-literal=user="${vsphereUser}" \
-    --from-literal=password="${vspherePassword}" \
-    ${vsphereThumbprint:+--from-literal=thumbprint="${vsphereThumbprint}"} \
-    --dry-run=client -o yaml --save-config | oc apply -f -
-
-[[ "${_wasTracing3}" == 'true' ]] && set -x
+( set +x
+  oc -n "${MTV_NAMESPACE}" create secret generic vsphere-provider-secret \
+      --from-literal=user="${vsphereUser}" \
+      --from-literal=password="${vspherePassword}" \
+      ${vsphereThumbprint:+--from-literal=thumbprint="${vsphereThumbprint}"} \
+      --dry-run=client -o yaml --save-config | oc apply -f -
+true )
 
 # Create the OCP host provider secret using a short-lived in-cluster token.
-typeset _wasTracing4=false
-[[ $- == *x* ]] && _wasTracing4=true
-set +x
-
-typeset hostToken=''
-hostToken="$(oc whoami -t 2>/dev/null || true)"
-if [[ -z "${hostToken}" ]]; then
-    hostToken="$(oc create token forklift-controller \
-        -n "${MTV_NAMESPACE}" --duration=24h 2>/dev/null || true)"
-fi
-if [[ -z "${hostToken}" ]]; then
-    # Fallback: dedicated SA with cluster-admin.
-    oc -n "${MTV_NAMESPACE}" create serviceaccount mtv-host-sa \
-        --dry-run=client -o yaml --save-config | oc apply -f -
-    oc adm policy add-cluster-role-to-user cluster-admin -z mtv-host-sa -n "${MTV_NAMESPACE}"
-    hostToken="$(oc create token mtv-host-sa -n "${MTV_NAMESPACE}" --duration=24h)"
-fi
-oc -n "${MTV_NAMESPACE}" create secret generic ocp-host-secret \
-    --from-literal=token="${hostToken}" \
-    --dry-run=client -o yaml --save-config | oc apply -f -
-
-[[ "${_wasTracing4}" == 'true' ]] && set -x
+# hostToken is only used within this block — subshell is sufficient.
+( set +x
+  typeset hostToken=''
+  hostToken="$(oc whoami -t 2>/dev/null || true)"
+  if [[ -z "${hostToken}" ]]; then
+      hostToken="$(oc create token forklift-controller \
+          -n "${MTV_NAMESPACE}" --duration=24h 2>/dev/null || true)"
+  fi
+  if [[ -z "${hostToken}" ]]; then
+      # Fallback: dedicated SA with cluster-admin.
+      oc -n "${MTV_NAMESPACE}" create serviceaccount mtv-host-sa \
+          --dry-run=client -o yaml --save-config | oc apply -f -
+      oc adm policy add-cluster-role-to-user cluster-admin -z mtv-host-sa -n "${MTV_NAMESPACE}"
+      hostToken="$(oc create token mtv-host-sa -n "${MTV_NAMESPACE}" --duration=24h)"
+  fi
+  oc -n "${MTV_NAMESPACE}" create secret generic ocp-host-secret \
+      --from-literal=token="${hostToken}" \
+      --dry-run=client -o yaml --save-config | oc apply -f -
+true )
 
 # --------------------------------------------------------------------------
 # Create vSphere source Provider
+# When VDDK_INIT_IMAGE is set, inject spec.settings.vddkInitImage for faster
+# disk transfer. Otherwise MTV falls back to NBD (slower but functional).
 # FIXME: Adjust SDK URL if vCenter uses a non-standard port.
 # --------------------------------------------------------------------------
 {
-    oc create -f - --dry-run=client -o yaml --save-config
+    oc create -f - --dry-run=client -o json --save-config |
+    jq -c --arg vddk "${VDDK_INIT_IMAGE}" \
+        'if $vddk != "" then .spec.settings = {"vddkInitImage": $vddk} else . end'
 } 0<<ocEOF | oc apply -f -
 apiVersion: forklift.konveyor.io/v1beta1
 kind: Provider
@@ -187,9 +184,9 @@ spec:
 ocEOF
 
 oc wait provider/vsphere-source -n "${MTV_NAMESPACE}" \
-    --for=condition=Ready --timeout=10m
+    --for=condition=Ready --timeout=5m
 oc wait provider/ocp-host       -n "${MTV_NAMESPACE}" \
-    --for=condition=Ready --timeout=10m
+    --for=condition=Ready --timeout=5m
 
 oc get provider -n "${MTV_NAMESPACE}" -o wide
 
@@ -243,9 +240,9 @@ spec:
 ocEOF
 
 oc wait networkmap/vsphere-network-map -n "${MTV_NAMESPACE}" \
-    --for=condition=Ready --timeout=10m
+    --for=condition=Ready --timeout=5m
 oc wait storagemap/vsphere-storage-map -n "${MTV_NAMESPACE}" \
-    --for=condition=Ready --timeout=10m
+    --for=condition=Ready --timeout=5m
 
 # --------------------------------------------------------------------------
 # Create cold migration Plan
@@ -341,13 +338,19 @@ fi
 # --------------------------------------------------------------------------
 # Validate migrated VM is Running on OCP
 # --------------------------------------------------------------------------
+# MTV lowercases the source VM name (and replaces non-[a-z0-9-] with '-')
+# when naming the destination VirtualMachine/VMI. Apply the same transform
+# so we query the specific object rather than relying on {.items[0]}.
+typeset vmiName
+vmiName="$(printf '%s' "${vmName,,}" | tr -cs 'a-z0-9-' '-' | sed 's/^-//;s/-$//')"
+
 typeset vmiPhase=''
 typeset -i vmiDeadline=$(( SECONDS + 300 ))
 while (( SECONDS < vmiDeadline )); do
-    vmiPhase="$(oc get virtualmachineinstance -n "${MIGRATION_NAMESPACE}" \
-        -o jsonpath='{.items[0].status.phase}' 2>/dev/null || true)"
+    vmiPhase="$(oc get virtualmachineinstance "${vmiName}" -n "${MIGRATION_NAMESPACE}" \
+        -o jsonpath='{.status.phase}' 2>/dev/null || true)"
     [[ "${vmiPhase}" == 'Running' ]] && break
-    : "VMI phase: ${vmiPhase:-not-found} (${SECONDS}s / 300s)"
+    : "VMI ${vmiName} phase: ${vmiPhase:-not-found} (${SECONDS}s / 300s)"
     sleep 10
 done
 
