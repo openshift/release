@@ -123,7 +123,6 @@ TOKENS_JSON=$(grep '"type":"result"' "${ARTIFACT_DIR}/claude-failure-analysis.js
     }' 2>/dev/null \
   || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}')
 
-COST=$(echo "$TOKENS_JSON" | jq -r '.total_cost_usd // 0')
 DURATION_MS=$(echo "$TOKENS_JSON" | jq -r '.duration_ms // 0')
 DURATION_S=$(printf '%.0f' "$(echo "${DURATION_MS} / 1000" | bc -l 2>/dev/null)" 2>/dev/null || echo 0)
 NUM_TURNS=$(echo "$TOKENS_JSON" | jq -r '.num_turns // 0')
