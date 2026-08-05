@@ -17,11 +17,18 @@ unzip -q /tmp/awscliv2.zip -d /tmp/
 export PATH="/tmp/bin:${PATH}"
 
 # AWS credentials come from mounted secret via AWS_CONFIG_FILE env var
-# Point the AWS SDK (used by Terraform) at the credential file directly
-# rather than extracting values manually which can corrupt them
 if [[ -n "${AWS_CONFIG_FILE:-}" ]] && [[ -r "${AWS_CONFIG_FILE}" ]]; then
+  echo "AWS credential file: ${AWS_CONFIG_FILE}"
+  echo "File size: $(wc -c < "${AWS_CONFIG_FILE}") bytes"
+  echo "Section headers:"
+  grep '^\[' "${AWS_CONFIG_FILE}" || echo "  (no section headers found)"
+  echo "Key names present:"
+  grep -oE '^[a-z_]+' "${AWS_CONFIG_FILE}" || echo "  (no keys found)"
+  echo "All mount contents:"
+  ls -la "$(dirname "${AWS_CONFIG_FILE}")"
+
   export AWS_SHARED_CREDENTIALS_FILE="${AWS_CONFIG_FILE}"
-  echo "AWS credentials configured: ${AWS_SHARED_CREDENTIALS_FILE}"
+  echo "AWS credentials configured via: ${AWS_SHARED_CREDENTIALS_FILE}"
 else
   echo "ERROR: AWS_CONFIG_FILE not set or not readable: ${AWS_CONFIG_FILE:-not set}"
   exit 1
