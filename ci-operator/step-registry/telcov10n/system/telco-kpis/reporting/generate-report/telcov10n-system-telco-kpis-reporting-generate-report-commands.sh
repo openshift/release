@@ -37,17 +37,20 @@ main() {
         FILTER_FLAG="-e test_filter=${TEST_FILTER}"
     fi
 
+    # If rotating splunk_hec_token or git_repo_token, also update the
+    # hypervisor vaults (teams/telco-kpis/hypervisors/) to keep Jenkins in sync.
+
     SPLUNK_FLAG=""
     if [ "${PUSH_ENABLED:-false}" = "true" ]; then
         SPLUNK_FLAG="-e splunk_push_enabled=true"
-        if [ -f /var/splunk/splunk_hec_url ]; then
+        if [ -f /var/splunk/splunk_hec_token ]; then
             [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
             set +x
-            SPLUNK_FLAG="${SPLUNK_FLAG} -e splunk_hec_url=$(cat /var/splunk/splunk_hec_url)"
+            SPLUNK_FLAG="${SPLUNK_FLAG} -e splunk_hec_url=${HEC_URL}"
             SPLUNK_FLAG="${SPLUNK_FLAG} -e splunk_hec_token=$(cat /var/splunk/splunk_hec_token)"
             $_was_tracing && set -x
         else
-            echo "WARNING: Splunk push enabled but credentials not found at /var/splunk/"
+            echo "WARNING: Splunk push enabled but splunk_hec_token not found at /var/splunk/"
             SPLUNK_FLAG=""
         fi
         if [ -n "${SPLUNK_FLAG}" ]; then
@@ -58,7 +61,27 @@ main() {
         fi
     fi
 
-    echo "Running generate-report playbook (development_mode: ${DEVELOPMENT_MODE}, splunk: ${PUSH_ENABLED:-false})"
+    REPORT_REPO_FLAG=""
+    if [ "${DEVELOPMENT_MODE}" != "true" ] && [ -n "${REPORT_REPO_URL:-}" ]; then
+        REPORT_REPO_FLAG="-e report_repo_url=${REPORT_REPO_URL}"
+        REPORT_REPO_FLAG="${REPORT_REPO_FLAG} -e report_repo_branch=${REPORT_REPO_BRANCH:-telco-kpis-reports}"
+        if [ -f /var/reports-repo/git_repo_token ]; then
+            [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
+            set +x
+            REPORT_REPO_FLAG="${REPORT_REPO_FLAG} -e report_repo_token=$(cat /var/reports-repo/git_repo_token)"
+            $_was_tracing && set -x
+        else
+            echo "WARNING: Production report repo URL set but token not found at /var/reports-repo/git_repo_token"
+            REPORT_REPO_FLAG=""
+        fi
+    fi
+
+    FORCE_REPORT_FLAG=""
+    if [ "${FORCE_REPORT:-false}" = "true" ]; then
+        FORCE_REPORT_FLAG="-e force_report=true"
+    fi
+
+    echo "Running generate-report playbook (development_mode: ${DEVELOPMENT_MODE}, splunk: ${PUSH_ENABLED:-false}, report_repo: ${REPORT_REPO_URL:-none}, force: ${FORCE_REPORT:-false})"
     ansible-playbook ./playbooks/telco-kpis/generate-report.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e spoke_cluster="${SPOKE_CLUSTER}" \
@@ -67,6 +90,8 @@ main() {
         -e development_mode="${DEVELOPMENT_MODE}" \
         ${FILTER_FLAG} \
         ${SPLUNK_FLAG} \
+        ${REPORT_REPO_FLAG} \
+        ${FORCE_REPORT_FLAG} \
         ${DEBUG_FLAG}
 
     echo "Report generation completed for ${SPOKE_CLUSTER}"
