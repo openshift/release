@@ -10,7 +10,7 @@ ref:
     requests:
       cpu: 100m
       memory: 200Mi
-  timeout: 20m0s
+  timeout: 35m0s
   env:
   - name: TOOLS_NAMESPACE
     default: "tools"
@@ -45,5 +45,11 @@ ref:
     images, and exposes Keycloak, Mockserver and the Jaeger query UI via Routes so
     the testsuite config can be generated dynamically. The Jaeger collector is
     reachable in-cluster at jaeger-collector.<TOOLS_NAMESPACE>.svc.cluster.local:4317.
+
+    Also enables OpenShift User Workload Monitoring (cluster-monitoring-config
+    enableUserWorkload) and writes SHARED_DIR/prometheus-url pointing at the
+    existing openshift-monitoring thanos-querier Service (same pattern as rhcl-mc1:
+    no separate Prometheus install). run-testsuite injects that URL into dynaconf.
+
     Tools that the testsuite self-deploys per test (httpbin, spicedb, llm_sim) are
     not created here; only their images are referenced in the generated config.

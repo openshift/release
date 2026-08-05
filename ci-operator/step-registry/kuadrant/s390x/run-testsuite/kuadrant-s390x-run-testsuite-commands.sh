@@ -49,6 +49,15 @@ KEYCLOAK_URL="$(cat "${SHARED_DIR}/keycloak-url")"
 MOCKSERVER_URL="$(cat "${SHARED_DIR}/mockserver-url")"
 JAEGER_QUERY_URL="$(cat "${SHARED_DIR}/jaeger-query-url")"
 JAEGER_COLLECTOR_URL="rpc://jaeger-collector.${TOOLS_NAMESPACE}.svc.cluster.local:4317"
+# Same as rhcl-mc1: use cluster thanos-querier (written by deploy-tools after UWM enable).
+PROMETHEUS_URL="${PROMETHEUS_URL:-}"
+if [[ -f "${SHARED_DIR}/prometheus-url" ]]; then
+  PROMETHEUS_URL="$(tr -d '[:space:]' <"${SHARED_DIR}/prometheus-url")"
+fi
+if [[ -z "${PROMETHEUS_URL}" ]]; then
+  PROMETHEUS_URL="https://thanos-querier.openshift-monitoring.svc.cluster.local:9091"
+  echo "WARNING: SHARED_DIR/prometheus-url missing; falling back to ${PROMETHEUS_URL}" >&2
+fi
 
 # In-cluster the testsuite reaches CoreDNS directly at its Service ClusterIP.
 # The getaddrinfo plugin only redirects *.COREDNS_ZONE lookups there; every
@@ -113,6 +122,12 @@ ${DNS_BLOCK}
     backend: "jaeger"
     collector_url: "${JAEGER_COLLECTOR_URL}"
     query_url: "${JAEGER_QUERY_URL}"
+  # Cluster monitoring thanos-querier (UWM enabled in deploy-tools). Bearer token
+  # comes from the admin kubeconfig via the testsuite Prometheus fixture.
+  prometheus:
+    project: "openshift-monitoring"
+    service: "thanos-querier"
+    url: "${PROMETHEUS_URL}"
   mockserver:
     image: "${MOCKSERVER_IMAGE}"
     url: "${MOCKSERVER_URL}"

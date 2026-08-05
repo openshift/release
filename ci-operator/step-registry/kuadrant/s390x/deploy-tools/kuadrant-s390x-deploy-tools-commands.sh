@@ -6,9 +6,59 @@ TOOLS_NS="${TOOLS_NAMESPACE}"
 KEYCLOAK_URL_FILE="${SHARED_DIR}/keycloak-url"
 MOCKSERVER_URL_FILE="${SHARED_DIR}/mockserver-url"
 JAEGER_QUERY_URL_FILE="${SHARED_DIR}/jaeger-query-url"
+PROMETHEUS_URL_FILE="${SHARED_DIR}/prometheus-url"
 
 echo "=== Deploying testing tools into namespace ${TOOLS_NS} ==="
 oc get ns "${TOOLS_NS}" >/dev/null 2>&1 || oc create ns "${TOOLS_NS}"
+
+# ---------------------------------------------------------------------------
+# OpenShift cluster monitoring (same approach as rhcl-mc1): do NOT install a
+# separate Prometheus. Enable User Workload Monitoring so ServiceMonitors are
+# scraped, then point the testsuite at thanos-querier (openshift-monitoring).
+# ---------------------------------------------------------------------------
+echo "--- Enable OpenShift user workload monitoring ---"
+MONITORING_NS="openshift-monitoring"
+MONITORING_CM="cluster-monitoring-config"
+CURRENT_CFG="$(oc -n "${MONITORING_NS}" get cm "${MONITORING_CM}" \
+  -o jsonpath='{.data.config\.yaml}' 2>/dev/null || true)"
+if [[ -z "${CURRENT_CFG}" ]]; then
+  NEW_CFG=$'enableUserWorkload: true\n'
+elif echo "${CURRENT_CFG}" | grep -qE '^[[:space:]]*enableUserWorkload:'; then
+  NEW_CFG="$(printf '%s\n' "${CURRENT_CFG}" | sed -E 's/^([[:space:]]*enableUserWorkload:).*/\1 true/')"
+else
+  NEW_CFG="${CURRENT_CFG}"$'\n'$'enableUserWorkload: true\n'
+fi
+oc -n "${MONITORING_NS}" create configmap "${MONITORING_CM}" \
+  --from-literal=config.yaml="${NEW_CFG}" \
+  --dry-run=client -o yaml | oc apply -f -
+echo "cluster-monitoring-config:"
+oc -n "${MONITORING_NS}" get cm "${MONITORING_CM}" -o jsonpath='{.data.config\.yaml}'
+echo
+
+echo "--- Waiting for user-workload Prometheus ---"
+# Namespace + operands appear after the platform operator reconciles UWM.
+for _ in $(seq 1 60); do
+  if oc get ns openshift-user-workload-monitoring >/dev/null 2>&1 \
+    && oc -n openshift-user-workload-monitoring get prometheus prometheus-user-workload >/dev/null 2>&1; then
+    break
+  fi
+  sleep 5
+done
+oc -n openshift-user-workload-monitoring rollout status \
+  statefulset/prometheus-user-workload --timeout=300s || true
+oc -n openshift-user-workload-monitoring wait --for=condition=Ready pod \
+  -l app.kubernetes.io/name=prometheus --timeout=300s || true
+
+# Prefer in-cluster thanos-querier for the testsuite Job (runs on-cluster).
+# HTTPS + bearer token matches the testsuite Prometheus fixture (verify=False).
+PROMETHEUS_URL="https://thanos-querier.${MONITORING_NS}.svc.cluster.local:9091"
+THANOS_ROUTE_HOST="$(oc -n "${MONITORING_NS}" get route thanos-querier \
+  -o jsonpath='{.spec.host}' 2>/dev/null || true)"
+if [[ -n "${THANOS_ROUTE_HOST}" ]]; then
+  echo "thanos-querier route: https://${THANOS_ROUTE_HOST}"
+fi
+echo "${PROMETHEUS_URL}" > "${PROMETHEUS_URL_FILE}"
+echo "Prometheus (thanos-querier) URL for testsuite: ${PROMETHEUS_URL}"
 
 echo "--- Keycloak ---"
 # Disable tracing around password handling
@@ -261,3 +311,4 @@ echo "Keycloak URL:    ${KEYCLOAK_URL}"
 echo "Mockserver URL:  ${MOCKSERVER_URL}"
 echo "Jaeger query:    ${JAEGER_QUERY_URL}"
 echo "Jaeger collector: rpc://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4317"
+echo "Prometheus URL:  $(cat "${PROMETHEUS_URL_FILE}")"
