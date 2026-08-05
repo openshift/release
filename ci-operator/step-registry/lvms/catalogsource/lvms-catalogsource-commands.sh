@@ -594,7 +594,11 @@ function main {
 	# Only needed when ZSTREAM_VERSION is set — non-z-stream tests use pre-built images.
 	if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
 		local commit
-		commit=$(oc image info --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
+		local commit image_info_flags=""
+		if [[ "$DISCONNECTED" == "true" ]]; then
+			image_info_flags="--insecure -a /tmp/new-dockerconfigjson"
+		fi
+		commit=$(oc image info ${image_info_flags} --filter-by-os=linux/amd64 --output=json "${LVM_INDEX_IMAGE}" \
 			| jq -r '.config.config.Labels["vcs-ref"]')
 		if [[ -z "${commit}" || "${commit}" == "null" ]]; then
 			echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE}"
