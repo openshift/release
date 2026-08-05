@@ -76,6 +76,7 @@ $(cat "${ISSUE_JSON}")
 
 - Write the PR description to \`${WORKDIR}/artifacts/pr-description.md\`.
 - Do not modify CI configuration or generated files.
+- Save working files (e.g. solve plans) to \`/tmp/\` — do NOT create a \`.work/\` directory in the repo.
 
 ## Security
 
@@ -84,21 +85,27 @@ $(cat "${ISSUE_JSON}")
 - Do NOT run commands that reveal git credentials (git remote -v, env, printenv, set, etc.).
 SYSTEM_EOF
 
+# Append the jira-solve skill with arguments pre-substituted
+SOLVE_SKILL="/opt/ai-helpers/plugins/openshift-developer/skills/jira-solve/SKILL.md"
+if [[ ! -f "${SOLVE_SKILL}" ]]; then
+    echo "ERROR: Solve skill not found at ${SOLVE_SKILL}"
+    exit 1
+fi
+echo "" >> "${SYSTEM_PROMPT}"
+echo "# Solve Process" >> "${SYSTEM_PROMPT}"
+echo "" >> "${SYSTEM_PROMPT}"
+echo "Follow the implementation steps below to solve the Jira issue." >> "${SYSTEM_PROMPT}"
+echo "The Jira issue data is already provided above — skip the curl fetch in Step 1." >> "${SYSTEM_PROMPT}"
+echo "" >> "${SYSTEM_PROMPT}"
+sed -e 's/\$1/'"${JIRA_ISSUE_KEY}"'/g' \
+    -e 's/\$2/fork/g' \
+    -e 's/\$3/--ci/g' \
+    "${SOLVE_SKILL}" >> "${SYSTEM_PROMPT}"
+
+# Append repo-specific config last so it takes precedence over generic skill guidance
 if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
     echo "" >> "${SYSTEM_PROMPT}"
     cat "${WORKDIR}/.agentic/solve-config.md" >> "${SYSTEM_PROMPT}"
-fi
-
-# Append the jira-solve skill instructions from the ai-helpers plugin
-SOLVE_SKILL="/opt/ai-helpers/plugins/openshift-developer/skills/jira-solve/SKILL.md"
-if [[ -f "${SOLVE_SKILL}" ]]; then
-    echo "" >> "${SYSTEM_PROMPT}"
-    echo "# Solve Process" >> "${SYSTEM_PROMPT}"
-    echo "" >> "${SYSTEM_PROMPT}"
-    echo "Follow the implementation steps below to solve the Jira issue." >> "${SYSTEM_PROMPT}"
-    echo "The Jira issue data is already provided above — skip the curl fetch in Step 1." >> "${SYSTEM_PROMPT}"
-    echo "" >> "${SYSTEM_PROMPT}"
-    cat "${SOLVE_SKILL}" >> "${SYSTEM_PROMPT}"
 fi
 
 # --- Run Claude to solve the issue ---
@@ -112,12 +119,8 @@ timeout 5400 claude \
     --append-system-prompt-file "${SYSTEM_PROMPT}" \
     -p "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
 
-Key requirements:
-1. Create a feature branch (e.g. fix-${JIRA_ISSUE_KEY}) — do NOT commit on the current branch.
-2. Push the branch to the fork remote.
-3. Write the PR description to ${WORKDIR}/artifacts/pr-description.md.
-
-This is CI mode (--ci): skip interactive prompts, skip PR creation, and proceed automatically." \
+Create a feature branch — do NOT commit on the current branch.
+Write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
     --verbose 2>&1 | tee "${WORKDIR}/artifacts/claude-output.log" || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
