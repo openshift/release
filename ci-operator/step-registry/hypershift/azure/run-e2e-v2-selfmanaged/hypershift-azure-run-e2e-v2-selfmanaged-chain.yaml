@@ -10,6 +10,10 @@ chain:
     commands: |-
       set -xuo pipefail
       export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+      if [[ -s "${SHARED_DIR}/azure_managed_hsm_key_id" ]]; then
+        export AZURE_ENCRYPTION_KEY_ID
+        AZURE_ENCRYPTION_KEY_ID="$(<"${SHARED_DIR}/azure_managed_hsm_key_id")"
+      fi
       /hypershift/bin/run-tests
     timeout: 150m
     grace_period: 5m
