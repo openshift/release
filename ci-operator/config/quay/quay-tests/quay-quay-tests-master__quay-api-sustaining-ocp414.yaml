@@ -1,0 +1,50 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.19-openshift-4.14
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 200m
+      memory: 500Mi
+tests:
+- as: quay-e2e-tests-quay310-api-testing
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-sustaining-autorelease-412
+    env:
+      BASE_DOMAIN: sustaining-aws-412.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-14@sha256:d7d2d0962e5145c6fbb3b7d2e292f7344b9aee310872b1feec41a0865be209ea
+      QUAY_OPERATOR_CHANNEL: stable-3.10
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.10"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-api
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: quay-api-sustaining-ocp414

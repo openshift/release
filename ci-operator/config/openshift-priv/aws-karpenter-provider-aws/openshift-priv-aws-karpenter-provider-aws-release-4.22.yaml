@@ -1,0 +1,80 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+binary_build_commands: make binary
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/aws-karpenter-provider-aws
+images:
+  items:
+  - dockerfile_path: openshift/Containerfile.rhel
+    to: aws-karpenter-provider-aws
+promotion:
+  to:
+  - name: "4.22"
+    namespace: ocp-priv
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: "4.22"
+      namespace: ocp-priv
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.22"
+      namespace: ocp-priv
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.22"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws
+- as: e2e-hypershift
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AWS_MULTI_ARCH: "true"
+      CI_TESTS_RUN: ^TestKarpenter
+      RUN_KARPENTER_TESTS: "true"
+    workflow: hypershift-aws-e2e-nested
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.22
+  org: openshift-priv
+  repo: aws-karpenter-provider-aws

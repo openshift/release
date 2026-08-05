@@ -1,0 +1,70 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+  stolostron_builder_go1.24-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.24-linux
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/stolostron/search-indexer
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    inputs:
+      stolostron_builder_go1.25-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+    to: search-indexer
+promotion:
+  to:
+  - disabled: true
+    name: "5.1"
+    namespace: stolostron
+prowgen:
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-indexer
+    env:
+      IMAGE_REPO: search-indexer
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
+  container:
+    from: src
+- as: test-unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow unit-test
+  container:
+    from: src
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift-priv
+  repo: stolostron-search-indexer

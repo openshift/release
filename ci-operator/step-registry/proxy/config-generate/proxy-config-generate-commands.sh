@@ -1,0 +1,48 @@
+#!/bin/bash
+set -o errexit
+set -o nounset
+set -o pipefail
+
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
+proxy_public_url_file="${SHARED_DIR}/proxy_public_url"
+
+if [[ "${CLUSTER_TYPE}" == "nutanix" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/proxy_public_url" ]]; then
+    # shellcheck disable=SC1091
+    proxy_public_url_file="${CLUSTER_PROFILE_DIR}/proxy_public_url"
+fi
+
+if [ ! -f "${proxy_public_url_file}" ]; then
+    echo "Did not found proxy setting from ${proxy_public_url_file}"
+    exit 1
+else
+    PUBLIC_PROXY_URL=$(< "${proxy_public_url_file}")
+fi
+
+if [ -z "${PUBLIC_PROXY_URL}" ]; then
+    echo "Empty proxy setting!"
+    exit 1
+else
+    cat > "${SHARED_DIR}/proxy-conf.sh" << EOF
+export http_proxy=${PUBLIC_PROXY_URL}
+export https_proxy=${PUBLIC_PROXY_URL}
+export no_proxy="localhost,127.0.0.1"
+export HTTP_PROXY=${PUBLIC_PROXY_URL}
+export HTTPS_PROXY=${PUBLIC_PROXY_URL}
+export NO_PROXY="localhost,127.0.0.1"
+EOF
+    cat > "${SHARED_DIR}/unset-proxy.sh" << EOF
+unset http_proxy
+unset https_proxy
+unset no_proxy
+unset HTTP_PROXY
+unset HTTPS_PROXY
+unset NO_PROXY
+EOF
+fi

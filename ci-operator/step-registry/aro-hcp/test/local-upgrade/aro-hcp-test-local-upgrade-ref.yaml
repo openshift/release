@@ -1,0 +1,59 @@
+ref:
+  as: aro-hcp-test-local-upgrade
+  from: aro-hcp-e2e-tests
+  commands: aro-hcp-test-local-upgrade-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: aro-hcp-qe-pull-secret
+      mount_path: /var/run/aro-hcp-qe-pull-secret
+    - namespace: test-credentials
+      name: cluster-secrets-aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+  grace_period: 30s
+  timeout: 8h0m0s
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    - name: VAULT_SECRET_PROFILE
+      default: "dev"
+      documentation: Selects which environment's cluster secrets to use.
+    - name: AROHCP_ENV
+      default: "development"
+    - name: LOCATION
+      default: "westus3"
+      documentation: Azure region for the test environment.
+    - name: POOLED_IDENTITIES
+      default: "true"
+      documentation: Whether to use pooled identities for the test.
+    - name: ARO_HCP_DEPLOY_ENV
+      default: "ci01"
+      documentation: Config environment name.
+    - name: USE_OC_LOGIN_REGISTRIES
+      default: ""
+      documentation: Space-separated list of registries that require oc registry login for authentication
+    - name: COMPRESS_TIMING_METADATA
+      default: "true"
+      documentation: Whether to compress timing metadata files with gzip.
+  dependencies:
+  - name: "pipeline:aro-hcp-backend"
+    env: BACKEND_IMAGE
+  - name: "pipeline:aro-hcp-frontend"
+    env: FRONTEND_IMAGE
+  - name: "pipeline:aro-hcp-admin-api"
+    env: ADMIN_API_IMAGE
+  - name: "pipeline:aro-hcp-sessiongate"
+    env: SESSIONGATE_IMAGE
+  - name: "pipeline:aro-hcp-hcp-recovery"
+    env: HCP_RECOVERY_IMAGE
+  - name: "pipeline:aro-hcp-fleet"
+    env: FLEET_IMAGE
+  - name: "pipeline:aro-hcp-mgmt-agent"
+    env: MGMT_AGENT_IMAGE
+  - name: "pipeline:aro-hcp-kube-applier"
+    env: KUBE_APPLIER_IMAGE
+  documentation: |-
+    Builds PR pipeline and hypershift image overrides into OVERRIDE_CONFIG_FILE,
+    prepares svc/mgmt access for the test harness, then runs the upgrade/in-place
+    suite. Pipeline/RP.* upgrades are handled inside the suite via make.

@@ -1,0 +1,39 @@
+ref:
+  as: agent-qe-baremetal-install-ove-disconnected-create-catalogsource
+  from_image:
+    namespace: ci
+    name: tests-private-base
+    tag: latest
+  cli: latest
+  grace_period: 10m
+  commands: agent-qe-baremetal-install-ove-disconnected-create-catalogsource-commands.sh
+  credentials:
+  - mount_path: /var/run/secrets/ci-pull-credentials
+    name: ci-pull-credentials
+    namespace: ci
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: DISCONNECTED
+    default: "true"
+    documentation: |-
+      When "true", disables all default CatalogSources before creating the new one
+      (disconnected flow). When "false", keeps existing catalogs and adds the new
+      CatalogSource alongside them (connected flow with full upstream index).
+  - name: CATALOGSOURCE_NAME
+    default: redhat-operators-full
+    documentation: |-
+      Name of the CatalogSource to create for operator installations.
+  - name: OO_INDEX
+    default: ""
+    documentation: |-
+      Override for the operator index image URL. If empty, the index is auto-detected
+      from the cluster version as registry.redhat.io/redhat/redhat-operator-index:v<major>.<minor>.
+  documentation: |-
+    Create a CatalogSource from the Red Hat operator index image. Injects
+    registry.redhat.io credentials from CI pull secrets into the cluster's global
+    pull secret so the catalog pod can pull the index image. In disconnected mode,
+    disables default catalog sources first. In connected mode, adds the CatalogSource
+    alongside existing ones to provide access to the full upstream operator index.

@@ -1,0 +1,42 @@
+ref:
+  as: cucushift-upgrade-toimage
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  cli: target
+  timeout: 22h
+  grace_period: 10m
+  commands: cucushift-upgrade-toimage-commands.sh
+  resources:
+    limits:
+      cpu: "1"
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: DISABLE_BOOT_IMAGE_UPDATE
+    default: "false"
+    documentation: |-
+      To disable the updated boot image feature or not
+  - name: ENABLE_OTA_TEST
+    default: "false"
+    documentation: |-
+      Detemine if OTA test will be included
+  - name: TIMEOUT
+    default: "130"
+    documentation: Time to wait for upgrade finish
+  - name: UPGRADE_CCO_MANUAL_MODE
+    default: ""
+    documentation: |-
+      Detemine what's the cco manual mode of the cluster to be upgraded
+  - name: UPGRADE_RHEL_WORKER_BEFOREHAND
+    default: "false"
+    documentation: |-
+      In some cases the cluter(with RHEL workers) upgrade couldn't be finished unless we update the rpm packages on the RHEL worker in parallel, this parameter is being used for control if we want to run the RHEL worker upgrade playbooks along with the cluster upgrade or not.
+  - name: USE_ORIGINAL_OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+    default: "false"
+    documentation: "Use original payload image url from OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE instead of a build farm imagestream url"
+  dependencies:
+  - name: "release:target"
+    env: "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
