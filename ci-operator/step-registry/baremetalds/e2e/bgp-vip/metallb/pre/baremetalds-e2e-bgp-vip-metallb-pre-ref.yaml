@@ -1,0 +1,28 @@
+ref:
+  as: baremetalds-e2e-bgp-vip-metallb-pre
+  from: dev-scripts
+  commands: baremetalds-e2e-bgp-vip-metallb-pre-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  grace_period: 10m
+  env:
+  - name: METALLB_OPERATOR_REF
+    default: "194f9719d9c0631a3d1a105165692e0aafbbedcb"
+    documentation: |-
+      Git ref (pinned commit SHA) of metallb/metallb-operator whose
+      bin/metallb-operator.yaml is applied when no metallb-operator
+      packagemanifest exists in the cluster catalogs (e.g. pre-release OCP).
+      Pinned to a main-branch commit because released branches up to v0.14
+      lack the frr-k8s-external backend. Ignored when the OLM path is taken.
+  documentation: |-
+    Day-2 installs the MetalLB operator (OLM when the catalog carries it,
+    upstream manifests otherwise) on a cluster deployed with BGP-based VIP
+    management, configures MetalLB in frr-k8s-external mode against the
+    cluster's openshift-frr-k8s instance (frr-k8s static pods on the control
+    plane), creates an IPAddressPool/BGPPeer/BGPAdvertisement peering with
+    the same top-of-rack FRR speaker that serves the VIPs, and deploys a
+    LoadBalancer-type workload for the verify step. On the OLM path the
+    step fails (does not fall back) if the subscribed CSV never succeeds,
+    by design.
