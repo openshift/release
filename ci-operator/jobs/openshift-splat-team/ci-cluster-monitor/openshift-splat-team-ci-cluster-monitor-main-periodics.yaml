@@ -28,6 +28,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-cluster-monitor-github-token
       - --target=pr-age-monitor
       - --variant=periodics
       command:
@@ -47,6 +48,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /secrets/ci-cluster-monitor-github-token
+        name: ci-cluster-monitor-github-token
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -61,6 +65,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: ci-cluster-monitor-github-token
+      secret:
+        secretName: ci-cluster-monitor-github-token
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -98,6 +105,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-cluster-monitor-nutanix-creds
       - --target=vm-orphan-monitor
       - --variant=periodics
       command:
@@ -117,6 +125,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /secrets/ci-cluster-monitor-nutanix-creds
+        name: ci-cluster-monitor-nutanix-creds
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -131,6 +142,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: ci-cluster-monitor-nutanix-creds
+      secret:
+        secretName: ci-cluster-monitor-nutanix-creds
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
