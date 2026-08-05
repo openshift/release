@@ -541,7 +541,8 @@ install()
 PY
 
 # ---------------------------------------------------------------------------
-# 3. Build the in-container command (smoke and/or full kuadrant suite)
+# 3. Build the in-container command (smoke + authorino/limitador/dnstls/
+#    observability + optional catch-all kuadrant)
 # ---------------------------------------------------------------------------
 # protobuf ≥6.33.0 ships broken s390x upb wheels (protocolbuffers/protobuf#24103).
 # Image may pin 6.32.1, but `make` → poetry sync upgrades from an unlocked/
@@ -599,17 +600,37 @@ fi
 command -v cfssl
 cfssl version || true
 "
-# Smoke and kuadrant are independent: each records failure into rc but does not
-# skip the next target. Kuadrant always runs after smoke when enabled.
+# Make targets are independent: each records failure into rc but does not skip
+# the next target. Order: smoke → authorino → limitador → dnstls → observability
+# → kuadrant (catch-all single-cluster). Non-smoke targets use --reruns 0
+# (Makefile defaults to --reruns 3; last --reruns on the pytest CLI wins).
 if [[ "${RUN_SMOKE}" == "true" ]]; then
   CONTAINER_SCRIPT+="echo '=== make smoke ==='
 flags='${PYTEST_PLUGIN_FLAGS}' make smoke || rc=1
 "
 fi
+if [[ "${RUN_AUTHORINO:-true}" == "true" ]]; then
+  CONTAINER_SCRIPT+="echo '=== make authorino (runs even if prior targets failed; --reruns 0) ==='
+flags='${PYTEST_PLUGIN_FLAGS} --reruns 0' make authorino || rc=1
+"
+fi
+if [[ "${RUN_LIMITADOR:-true}" == "true" ]]; then
+  CONTAINER_SCRIPT+="echo '=== make limitador (runs even if prior targets failed; --reruns 0) ==='
+flags='${PYTEST_PLUGIN_FLAGS} --reruns 0' make limitador || rc=1
+"
+fi
+if [[ "${RUN_DNSTLS:-true}" == "true" ]]; then
+  CONTAINER_SCRIPT+="echo '=== make dnstls (runs even if prior targets failed; --reruns 0) ==='
+flags='${PYTEST_PLUGIN_FLAGS} --reruns 0' make dnstls || rc=1
+"
+fi
+if [[ "${RUN_OBSERVABILITY:-true}" == "true" ]]; then
+  CONTAINER_SCRIPT+="echo '=== make observability (runs even if prior targets failed; --reruns 0) ==='
+flags='${PYTEST_PLUGIN_FLAGS} --reruns 0' make observability || rc=1
+"
+fi
 if [[ "${RUN_KUADRANT}" == "true" ]]; then
-  # Makefile PYTEST defaults to --reruns 3; force --reruns 0 for kuadrant so
-  # failures fail once (last --reruns on the pytest CLI wins).
-  CONTAINER_SCRIPT+="echo '=== make kuadrant (runs even if smoke failed; --reruns 0) ==='
+  CONTAINER_SCRIPT+="echo '=== make kuadrant (runs even if prior targets failed; --reruns 0) ==='
 flags='${PYTEST_PLUGIN_FLAGS} --reruns 0' make kuadrant || rc=1
 "
 fi
