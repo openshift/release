@@ -10,11 +10,6 @@ resources:
       memory: 256Mi
 tests:
 - as: pr-age-monitor
-  commands: |
-    make build
-    GITHUB_TOKEN=$(cat /tmp/secret/token) ./bin/pr-monitor --config config/repos.yaml
-  container:
-    from: src
   cron: 0 9 * * 1-5
   reporter_config:
     channel: '#forum-ocp-splat-alerts'
@@ -23,15 +18,22 @@ tests:
     - error
     report_template: PR Age Monitor detected threshold violations. <{{.Status.URL}}|View
       logs>
-  secret:
-    mount_path: /tmp/secret
-    name: ci-cluster-monitor-github-token
+  steps:
+    test:
+    - as: monitor
+      commands: |
+        make build
+        GITHUB_TOKEN=$(cat /tmp/secret/token) ./bin/pr-monitor --config config/repos.yaml
+      credentials:
+      - mount_path: /tmp/secret
+        name: ci-cluster-monitor-github-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
 - as: vm-orphan-monitor
-  commands: |
-    make build
-    ./bin/vm-monitor --config config/nutanix.yaml --credentials-dir /tmp/nutanix-secret --cleanup
-  container:
-    from: src
   cron: 0 */4 * * *
   reporter_config:
     channel: '#forum-ocp-splat-alerts'
@@ -39,9 +41,21 @@ tests:
     - failure
     - error
     report_template: VM Orphan Monitor job failed. <{{.Status.URL}}|View logs>
-  secret:
-    mount_path: /tmp/nutanix-secret
-    name: ci-cluster-monitor-nutanix-creds
+  steps:
+    test:
+    - as: monitor
+      commands: |
+        make build
+        ./bin/vm-monitor --config config/nutanix.yaml --credentials-dir /tmp/nutanix-secret --cleanup
+      credentials:
+      - mount_path: /tmp/nutanix-secret
+        name: ci-cluster-monitor-nutanix-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
 zz_generated_metadata:
   branch: main
   org: openshift-splat-team
