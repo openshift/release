@@ -11,15 +11,6 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
-# Ensure jq is available (not shipped in the cli base image)
-if ! command -v jq &>/dev/null; then
-    echo "jq not found; installing..."
-    dnf install -y -q jq 2>/dev/null || yum install -y -q jq 2>/dev/null || {
-        echo >&2 "ERROR: failed to install jq"
-        exit 1
-    }
-fi
-
 REPORT_DIR="${ARTIFACT_DIR}/preflight"
 REPORT_FILE="${REPORT_DIR}/preflight-report.json"
 mkdir -p "${REPORT_DIR}"
@@ -88,11 +79,14 @@ EOFJSON
 
 append_check() {
     local name="${1}" status="${2}" details="${3}"
-    local tmp
-    tmp="$(mktemp)"
-    jq --arg n "${name}" --arg s "${status}" --arg d "${details}" \
-        '.preflight_checks += [{"check": $n, "status": $s, "details": $d}]' \
-        "${REPORT_FILE}" > "${tmp}" && mv "${tmp}" "${REPORT_FILE}"
+    python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+data['preflight_checks'].append({'check': sys.argv[2], 'status': sys.argv[3], 'details': sys.argv[4]})
+with open(sys.argv[1], 'w') as f:
+    json.dump(data, f, indent=2)
+" "${REPORT_FILE}" "${name}" "${status}" "${details}"
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -278,8 +272,20 @@ check_cluster_health() {
     local firing_alerts=""
     firing_alerts="$(oc -n openshift-monitoring exec -c prometheus prometheus-k8s-0 -- \
         curl -s 'http://localhost:9090/api/v1/alerts' 2>/dev/null | \
-        jq -r '.data.alerts[]? | select(.state=="firing") | select(.labels.alertname != "Watchdog") | select(.labels.alertname != "AlertmanagerReceiversNotConfigured") | .labels.alertname' 2>/dev/null | \
-        sort -u)" || true
+        python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    alerts = data.get('data', {}).get('alerts', [])
+    names = sorted(set(
+        a['labels']['alertname'] for a in alerts
+        if a.get('state') == 'firing'
+        and a.get('labels', {}).get('alertname') not in ('Watchdog', 'AlertmanagerReceiversNotConfigured')
+    ))
+    print('\n'.join(names))
+except Exception:
+    pass
+" 2>/dev/null)" || true
 
     if [[ -n "${firing_alerts}" ]]; then
         local alert_count
@@ -385,7 +391,7 @@ main() {
     KUBECONFIG="" oc registry login
 
     local target_version target_major target_minor
-    target_version="$(oc adm release info "${target}" --output=json | jq -r '.metadata.version')"
+    target_version="$(oc adm release info "${target}" -o jsonpath='{.metadata.version}')"
     target_major="$(echo "${target_version}" | cut -f1 -d.)"
     target_minor="$(echo "${target_version}" | cut -f2 -d.)"
     echo "Target OCP version: ${target_version} (major: ${target_major}, minor: ${target_minor})"
@@ -399,11 +405,17 @@ main() {
     init_report
 
     # Add metadata to report
-    local tmp
-    tmp="$(mktemp)"
-    jq --arg tv "${target_version}" --arg sv "${source_version}" --arg ti "${target}" \
-        '. + {"target_version": $tv, "source_version": $sv, "target_image": $ti, "timestamp": now | tostring}' \
-        "${REPORT_FILE}" > "${tmp}" && mv "${tmp}" "${REPORT_FILE}"
+    python3 -c "
+import json, sys, time
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+data['target_version'] = sys.argv[2]
+data['source_version'] = sys.argv[3]
+data['target_image'] = sys.argv[4]
+data['timestamp'] = str(time.time())
+with open(sys.argv[1], 'w') as f:
+    json.dump(data, f, indent=2)
+" "${REPORT_FILE}" "${target_version}" "${source_version}" "${target}"
 
     check_api_deprecations "${target_minor}" "${target_major}"
     check_opp_compatibility "${target_minor}" "${target_major}"
@@ -411,7 +423,7 @@ main() {
     check_mcp_readiness
 
     echo -e "\n=== Pre-flight summary ==="
-    jq '.' "${REPORT_FILE}"
+    python3 -m json.tool "${REPORT_FILE}"
 
     if (( CHECKS_FAILED > 0 )); then
         echo >&2 "Pre-flight validation FAILED: ${CHECKS_FAILED} check(s) did not pass"
