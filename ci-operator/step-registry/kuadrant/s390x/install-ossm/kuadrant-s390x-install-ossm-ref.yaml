@@ -48,6 +48,13 @@ ref:
       spec.version for the Sail Istio and IstioCNI CRs (e.g. "v1.28-latest").
       Matches the known-good RHCL s390x reference cluster. Set empty to use the
       operator default.
+  - name: ISTIO_PROXY_IMAGE
+    default: "quay.io/vray_rh/istio-proxy:1.30.3-s390x"
+    documentation: |-
+      Full container image for the Istio proxy / gateway dataplane (sidecar and
+      Gateway class=istio pods). When set to a value containing "/", it is applied
+      as spec.values.global.proxy.image on the Istio CR (Sail/Helm full-image
+      override). Set empty to use the Sail chart default for ISTIO_VERSION.
   - name: ISTIO_CONTROL_NAMESPACE
     default: "openshift-operators"
     documentation: |-
@@ -57,6 +64,7 @@ ref:
     Installs OpenShift Service Mesh 3.x (the Sail operator) via OLM on a provisioned
     s390x OCP cluster, then creates the IstioCNI and Istio custom resources (both
     in ISTIO_CONTROL_NAMESPACE, default openshift-operators) and waits for them to
-    become ready. Gateway API CRDs are installed only when not already present; on
+    become ready. Optionally overrides the Istio proxy image via ISTIO_PROXY_IMAGE
+    (s390x builds). Gateway API CRDs are installed only when not already present; on
     OpenShift they are managed by the Ingress Operator and installation is skipped
     automatically.

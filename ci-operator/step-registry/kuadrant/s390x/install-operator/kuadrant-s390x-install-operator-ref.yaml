@@ -30,7 +30,7 @@ ref:
     documentation: |-
       Subscription channel for the cert-manager operator.
   - name: KUADRANT_CATALOG_SOURCE_IMAGE
-    default: "quay.io/kuadrant/kuadrant-operator-catalog:v1.5.0"
+    default: "quay.io/kuadrant/kuadrant-operator-catalog:v1.5.2"
     documentation: |-
       Kuadrant operator catalog image. The quay.io/kuadrant/kuadrant-operator-catalog
       images are published multi-arch including linux/s390x. When set, a grpc
@@ -75,24 +75,25 @@ ref:
     documentation: |-
       Name of the cert-manager self-signed ClusterIssuer created for TLSPolicy tests.
   - name: RELATED_IMAGE_WASMSHIM
-    default: "oci://quay.io/vray_rh/wasm-shim:init-observability-skipped"
+    default: ""
     documentation: |-
-      Value for RELATED_IMAGE_WASMSHIM. Applied via Subscription.spec.config.env so
-      OLM persists it on kuadrant-operator-controller-manager (a direct Deployment
-      env patch is reconciled away). Set empty to keep the CSV/bundle default.
+      Optional override for RELATED_IMAGE_WASMSHIM via Subscription.spec.config.env.
+      Leave empty to use the wasm image shipped in the catalog CSV (recommended for
+      stable kuadrant releases, e.g. catalog v1.5.2). Set only when you need a
+      custom/OCI wasm build.
   - name: KUADRANT_OPERATOR_IMAGE
-    default: "quay.io/vray_rh/kuadrant:init-observability-skipped"
+    default: ""
     documentation: |-
-      Override for the kuadrant-operator-controller-manager container image. Newer
-      Kuadrant builds serve /wasm/plugin.wasm from the operator image itself, so
-      RELATED_IMAGE_WASMSHIM alone is not enough. Patched on the installed CSV
-      (and Deployment). Set empty to keep the catalog CSV image.
+      Optional override for the kuadrant-operator-controller-manager container image
+      (CSV + Deployment patch). Leave empty to use the catalog CSV image (recommended
+      for stable releases). Set only for experimental operator builds.
   documentation: |-
     Installs cert-manager and the Kuadrant operator (which deploys the Authorino,
-    Limitador and DNS operators) via OLM on a provisioned s390x OCP cluster,
-    sets RELATED_IMAGE_WASMSHIM via Subscription config.env when set, optionally
-    overrides the kuadrant-operator manager image (embeds wasm), ensures DNS is
-    Available before that restart, creates the bootstrap Kuadrant CR (required by
-    testsuite conftest), a self-signed ClusterIssuer, the test namespaces
+    Limitador and DNS operators) via OLM on a provisioned s390x OCP cluster.
+    By default uses the catalog CSV images as-is (no operator/wasm patches).
+    Optionally sets RELATED_IMAGE_WASMSHIM via Subscription config.env and/or
+    overrides the manager image when those env vars are non-empty. Ensures DNS is
+    Available before any image restart, creates the bootstrap Kuadrant CR (required
+    by testsuite conftest), a self-signed ClusterIssuer, the test namespaces
     (kuadrant, kuadrant2, tools) and the DNS provider Secret. Writes
     operator/wasm diagnostics to ARTIFACT_DIR.

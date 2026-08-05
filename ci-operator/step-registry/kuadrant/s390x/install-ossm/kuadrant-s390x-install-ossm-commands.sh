@@ -90,6 +90,20 @@ spec:
 $( [[ -n "${ISTIO_VERSION}" ]] && echo "  version: ${ISTIO_VERSION}" )
 EOF
 
+# When ISTIO_PROXY_IMAGE contains a "/", Sail/Helm treats it as a full image
+# reference (hub/tag are ignored) — required for s390x proxy builds.
+PROXY_VALUES=""
+if [[ -n "${ISTIO_PROXY_IMAGE:-}" ]]; then
+  echo "Istio proxy image override: ${ISTIO_PROXY_IMAGE}"
+  PROXY_VALUES=$(cat <<EOF
+  values:
+    global:
+      proxy:
+        image: ${ISTIO_PROXY_IMAGE}
+EOF
+)
+fi
+
 echo "=== Creating Istio control plane in ${ISTIO_CONTROL_NAMESPACE} ==="
 cat <<EOF | oc apply -f -
 apiVersion: sailoperator.io/v1
@@ -101,6 +115,7 @@ spec:
   updateStrategy:
     type: InPlace
 $( [[ -n "${ISTIO_VERSION}" ]] && echo "  version: ${ISTIO_VERSION}" )
+${PROXY_VALUES}
 EOF
 
 echo "=== Waiting for IstioCNI and Istio to become Ready ==="

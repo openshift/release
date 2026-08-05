@@ -312,3 +312,60 @@ echo "Mockserver URL:  ${MOCKSERVER_URL}"
 echo "Jaeger query:    ${JAEGER_QUERY_URL}"
 echo "Jaeger collector: rpc://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4317"
 echo "Prometheus URL:  $(cat "${PROMETHEUS_URL_FILE}")"
+
+# ---------------------------------------------------------------------------
+# Enable Kuadrant observability + control-plane OTEL (rhcl-mc1 pattern).
+# Must run AFTER Jaeger is Available so the collector endpoint resolves.
+# - Kuadrant CR.spec.observability.enable → ServiceMonitors / dataplane tracing
+# - Subscription OTEL_* env → control-plane tracing tests (OTEL_* on manager)
+# ---------------------------------------------------------------------------
+KUADRANT_NS="${KUADRANT_NAMESPACE:-kuadrant-system}"
+KUADRANT_SUB="${KUADRANT_SUBSCRIPTION_NAME:-kuadrant-operator}"
+JAEGER_COLLECTOR_ENDPOINT="rpc://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4317"
+# OTLP HTTP for operator logs/metrics; gRPC (rpc://) for traces — matches examples/otel.
+OTEL_HTTP_ENDPOINT="http://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4318"
+
+if oc get kuadrant/kuadrant -n "${KUADRANT_NS}" >/dev/null 2>&1; then
+  echo "=== Enabling Kuadrant CR observability (rhcl-mc1 pattern) ==="
+  oc patch kuadrant/kuadrant -n "${KUADRANT_NS}" --type merge -p "{
+    \"spec\": {
+      \"observability\": {
+        \"enable\": true,
+        \"tracing\": {
+          \"defaultEndpoint\": \"${JAEGER_COLLECTOR_ENDPOINT}\",
+          \"insecure\": true
+        }
+      }
+    }
+  }"
+  oc get kuadrant/kuadrant -n "${KUADRANT_NS}" -o jsonpath='{.spec.observability}' ; echo
+else
+  echo "WARNING: kuadrant/kuadrant not found in ${KUADRANT_NS}; skipping observability patch" >&2
+fi
+
+if oc get subscription "${KUADRANT_SUB}" -n "${KUADRANT_NS}" >/dev/null 2>&1; then
+  echo "=== Setting OTEL_* on Kuadrant Subscription (control-plane tracing) ==="
+  # Merge OTEL env into existing Subscription.config.env (preserve RELATED_IMAGE_WASMSHIM etc.).
+  oc get subscription "${KUADRANT_SUB}" -n "${KUADRANT_NS}" -o json \
+    | jq --arg http "${OTEL_HTTP_ENDPOINT}" --arg grpc_rpc "${JAEGER_COLLECTOR_ENDPOINT}" '
+      .spec.config = (.spec.config // {})
+      | .spec.config.env = (
+          ((.spec.config.env // [])
+            | map(select(.name | startswith("OTEL_") | not)))
+          + [
+              {"name":"OTEL_EXPORTER_OTLP_ENDPOINT","value":$http},
+              {"name":"OTEL_EXPORTER_OTLP_INSECURE","value":"true"},
+              {"name":"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT","value":$grpc_rpc},
+              {"name":"OTEL_SERVICE_NAME","value":"kuadrant-operator"}
+            ]
+        )
+      ' \
+    | oc apply -f -
+  oc rollout status deployment/kuadrant-operator-controller-manager \
+    -n "${KUADRANT_NS}" --timeout=300s || true
+  echo "Operator OTEL env:"
+  oc set env deployment/kuadrant-operator-controller-manager -n "${KUADRANT_NS}" --list \
+    | grep '^OTEL_' || echo "WARNING: no OTEL_* on deployment yet" >&2
+else
+  echo "WARNING: subscription ${KUADRANT_SUB} not found in ${KUADRANT_NS}; skipping OTEL env" >&2
+fi

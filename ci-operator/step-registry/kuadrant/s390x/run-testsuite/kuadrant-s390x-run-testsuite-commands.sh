@@ -123,7 +123,8 @@ ${DNS_BLOCK}
     collector_url: "${JAEGER_COLLECTOR_URL}"
     query_url: "${JAEGER_QUERY_URL}"
   # Cluster monitoring thanos-querier (UWM enabled in deploy-tools). Bearer token
-  # comes from the admin kubeconfig via the testsuite Prometheus fixture.
+  # comes from the SA token kubeconfig mounted into the Job (rhcl-mc1 pattern;
+  # installer kubeconfig is often cert-based and yields empty cluster.token).
   prometheus:
     project: "openshift-monitoring"
     service: "thanos-querier"
@@ -670,12 +671,60 @@ oc create namespace "${TEST_RUNNER_NAMESPACE}" --dry-run=client -o yaml | oc app
 # Explicit runAsUser requires anyuid; restricted SCC would otherwise reject it.
 oc adm policy add-scc-to-user anyuid -z default -n "${TEST_RUNNER_NAMESPACE}"
 
+# ---------------------------------------------------------------------------
+# Token kubeconfig for Prometheus/Thanos (rhcl-mc1 pattern).
+# SHARED_DIR/kubeconfig from libvirt UPI is often client-certificate auth, so
+# testsuite cluster.token is empty → Illegal header value b'Bearer '.
+# Mint a long-lived SA token kubeconfig like rhcl-mc1's admin kubeconfig.
+# ---------------------------------------------------------------------------
+TESTRUNNER_SA="kuadrant-testrunner"
+echo "=== Creating ${TESTRUNNER_SA} ServiceAccount with cluster-admin (for Thanos bearer) ==="
+oc -n "${TEST_RUNNER_NAMESPACE}" create sa "${TESTRUNNER_SA}" --dry-run=client -o yaml | oc apply -f -
+oc adm policy add-cluster-role-to-user cluster-admin \
+  -z "${TESTRUNNER_SA}" -n "${TEST_RUNNER_NAMESPACE}"
+
+TOKEN_KUBECONFIG="${WORK_DIR}/testrunner.kubeconfig"
+[[ $- == *x* ]] && WAS_TRACING_KC=true || WAS_TRACING_KC=false
+set +x  # Disable tracing due to token handling
+API_SERVER="$(oc whoami --show-server)"
+# Prefer bound token (OCP 4.11+); fall back to legacy sa secret token.
+TESTRUNNER_TOKEN="$(oc -n "${TEST_RUNNER_NAMESPACE}" create token "${TESTRUNNER_SA}" --duration=12h 2>/dev/null || true)"
+if [[ -z "${TESTRUNNER_TOKEN}" ]]; then
+  SA_SECRET="$(oc -n "${TEST_RUNNER_NAMESPACE}" get sa "${TESTRUNNER_SA}" -o jsonpath='{.secrets[0].name}' 2>/dev/null || true)"
+  if [[ -n "${SA_SECRET}" ]]; then
+    TESTRUNNER_TOKEN="$(oc -n "${TEST_RUNNER_NAMESPACE}" get secret "${SA_SECRET}" -o jsonpath='{.data.token}' | base64 -d)"
+  fi
+fi
+if [[ -z "${TESTRUNNER_TOKEN}" ]]; then
+  echo "ERROR: could not mint token for ${TESTRUNNER_SA}; Prometheus metrics tests will fail with empty Bearer" >&2
+  $WAS_TRACING_KC && set -x
+  exit 1
+fi
+# Build a token kubeconfig with oc (no jq/python dependency in the step image).
+# insecure-skip-tls-verify matches the testsuite Prometheus client (verify=False).
+rm -f "${TOKEN_KUBECONFIG}"
+oc --kubeconfig="${TOKEN_KUBECONFIG}" config set-cluster cluster \
+  --server="${API_SERVER}" --insecure-skip-tls-verify=true >/dev/null
+oc --kubeconfig="${TOKEN_KUBECONFIG}" config set-credentials testrunner \
+  --token="${TESTRUNNER_TOKEN}" >/dev/null
+oc --kubeconfig="${TOKEN_KUBECONFIG}" config set-context testrunner \
+  --cluster=cluster --user=testrunner >/dev/null
+oc --kubeconfig="${TOKEN_KUBECONFIG}" config use-context testrunner >/dev/null
+TOKEN_LEN="${#TESTRUNNER_TOKEN}"
+unset TESTRUNNER_TOKEN
+$WAS_TRACING_KC && set -x
+if [[ "${TOKEN_LEN}" -lt 16 ]]; then
+  echo "ERROR: testrunner kubeconfig token length=${TOKEN_LEN} (expected non-empty bearer)" >&2
+  exit 1
+fi
+echo "Testrunner kubeconfig ready (token length=${TOKEN_LEN}; not logged)."
+
 oc -n "${TEST_RUNNER_NAMESPACE}" delete job "${JOB_NAME}" --ignore-not-found=true --wait=true
 
-# Secret: dynaconf settings + admin kubeconfig (testsuite acts as cluster-admin).
+# Secret: dynaconf settings + token kubeconfig (Prometheus fixture uses cluster.token).
 oc -n "${TEST_RUNNER_NAMESPACE}" create secret generic kuadrant-testrunner-config \
   --from-file=secrets.yaml="${SECRETS_FILE}" \
-  --from-file=kubeconfig="${SHARED_DIR}/kubeconfig" \
+  --from-file=kubeconfig="${TOKEN_KUBECONFIG}" \
   --dry-run=client -o yaml | oc apply -f -
 
 # ConfigMap: CoreDNS getaddrinfo plugin + Velocity MockServer expectations

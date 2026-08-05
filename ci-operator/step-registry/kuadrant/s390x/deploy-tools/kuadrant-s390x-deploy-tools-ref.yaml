@@ -39,6 +39,15 @@ ref:
     default: "quay.io/jaegertracing/all-in-one:1.62.0"
     documentation: |-
       Jaeger all-in-one container image (must support s390x).
+  - name: KUADRANT_NAMESPACE
+    default: "kuadrant-system"
+    documentation: |-
+      Namespace of the Kuadrant operator / CR. Used to enable observability and
+      OTEL_* after Jaeger is ready (rhcl-mc1 pattern).
+  - name: KUADRANT_SUBSCRIPTION_NAME
+    default: "kuadrant-operator"
+    documentation: |-
+      Subscription name whose config.env receives OTEL_* for control-plane tracing.
   documentation: |-
     Deploys the Kuadrant testsuite tooling (Keycloak, Mockserver and Jaeger) into
     the tools namespace on a provisioned s390x OCP cluster using s390x-compatible
@@ -50,6 +59,11 @@ ref:
     enableUserWorkload) and writes SHARED_DIR/prometheus-url pointing at the
     existing openshift-monitoring thanos-querier Service (same pattern as rhcl-mc1:
     no separate Prometheus install). run-testsuite injects that URL into dynaconf.
+
+    After Jaeger is Available, patches kuadrant/kuadrant with
+    spec.observability.enable=true + tracing.defaultEndpoint (ServiceMonitors /
+    dataplane tracing) and merges OTEL_* into the Kuadrant Subscription
+    (control-plane tracing), matching the rhcl-mc1 reference cluster.
 
     Tools that the testsuite self-deploys per test (httpbin, spicedb, llm_sim) are
     not created here; only their images are referenced in the generated config.
