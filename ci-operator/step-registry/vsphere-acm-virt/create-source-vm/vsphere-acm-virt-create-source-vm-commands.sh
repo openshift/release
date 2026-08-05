@@ -27,6 +27,8 @@ fi
 
 if [[ -f "${credsDir}/.vsphere_user" ]]; then
     GOVC_USERNAME="$(< "${credsDir}/.vsphere_user")"
+elif [[ -f "${credsDir}/username" ]]; then
+    GOVC_USERNAME="$(< "${credsDir}/username")"
 elif [[ -f "${credsDir}/user" ]]; then
     GOVC_USERNAME="$(< "${credsDir}/user")"
 else

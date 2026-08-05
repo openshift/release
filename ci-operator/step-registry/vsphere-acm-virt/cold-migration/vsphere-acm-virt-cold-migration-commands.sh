@@ -30,6 +30,8 @@ set +x
 typeset vsphereUser='' vspherePassword='' vsphereThumbprint=''
 if [[ -f "${credsDir}/.vsphere_user" ]]; then
     vsphereUser="$(< "${credsDir}/.vsphere_user")"
+elif [[ -f "${credsDir}/username" ]]; then
+    vsphereUser="$(< "${credsDir}/username")"
 elif [[ -f "${credsDir}/user" ]]; then
     vsphereUser="$(< "${credsDir}/user")"
 fi

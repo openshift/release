@@ -23,10 +23,13 @@ typeset _wasTracing=false
 [[ $- == *x* ]] && _wasTracing=true
 set +x
 
-[[ -f "${credsDir}/.vsphere_user"     ]] \
-    && export GOVC_USERNAME="$(< "${credsDir}/.vsphere_user")"     \
-    || { [[ -f "${credsDir}/user"     ]] && export GOVC_USERNAME="$(< "${credsDir}/user")"; } \
-    || true
+if [[ -f "${credsDir}/.vsphere_user" ]]; then
+    export GOVC_USERNAME="$(< "${credsDir}/.vsphere_user")"
+elif [[ -f "${credsDir}/username" ]]; then
+    export GOVC_USERNAME="$(< "${credsDir}/username")"
+elif [[ -f "${credsDir}/user" ]]; then
+    export GOVC_USERNAME="$(< "${credsDir}/user")"
+fi
 [[ -f "${credsDir}/.vsphere_password" ]] \
     && export GOVC_PASSWORD="$(< "${credsDir}/.vsphere_password")" \
     || { [[ -f "${credsDir}/password" ]] && export GOVC_PASSWORD="$(< "${credsDir}/password")"; } \
