@@ -184,9 +184,12 @@ fi
 
 osdfm_qe_creds_dir=/usr/local/osdfm-qe-credentials
 aao_kubeconfig_env=()
-# Prow: elevated kubeconfig path. Else vault content (Tekton/Jenkins).
+# Prow: elevated kubeconfig via env. Else vault (Tekton/Jenkins).
 if [[ -n "${hive_kubeconfig}" && "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
-  echo "AWS_ACCOUNT_OPERATOR_KUBECONFIG=/credentials-hive/kubeconfig" >> "${podman_env_file}"
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
+  aao_kubeconfig_env=("-e" "AWS_ACCOUNT_OPERATOR_KUBECONFIG=$(<"${hive_kubeconfig}")")
+  $WAS_TRACING && set -x
 elif [[ -f "${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig" ]]; then
   [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
   set +x
