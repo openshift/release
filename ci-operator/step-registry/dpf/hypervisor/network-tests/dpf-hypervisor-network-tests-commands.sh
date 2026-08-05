@@ -55,6 +55,9 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -e; \
     cd \${LAST_OPENSHIFT_DPF}; \
     if [[ -n '${PULL_NUMBER:-}' ]] && [[ '${REPO_NAME:-}' == 'openshift-dpf' ]]; then \
         echo 'PR job detected: checking out PR #${PULL_NUMBER} on the remote host'; \
+        git rebase --abort 2>/dev/null || true; \
+        git checkout -f ${OPENSHIFT_DPF_BRANCH}; \
+        git branch -D pr-${PULL_NUMBER} 2>/dev/null || true; \
         git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER}; \
         git fetch origin ${OPENSHIFT_DPF_BRANCH}; \
         git checkout pr-${PULL_NUMBER}; \
