@@ -90,6 +90,11 @@ if [[ "${POD_CAPTURE_ENABLED:-true}" == "true" ]]; then
       oc get pods --all-namespaces -o wide > "${POD_STATE_DIR}/pods-${TIMESTAMP}.txt" 2>&1 || true
       oc get namespaces > "${POD_STATE_DIR}/namespaces-${TIMESTAMP}.txt" 2>&1 || true
       oc get daemonsets --all-namespaces > "${POD_STATE_DIR}/daemonsets-${TIMESTAMP}.txt" 2>&1 || true
+      for ns in $(oc get namespaces --no-headers -o custom-columns=':metadata.name' 2>/dev/null | grep '^berserker-' || true); do
+        oc get namespace "${ns}" -o yaml > "${POD_STATE_DIR}/namespace-${ns}-${TIMESTAMP}.yaml" 2>&1 || true
+        oc get serviceaccounts -n "${ns}" > "${POD_STATE_DIR}/sa-${ns}-${TIMESTAMP}.txt" 2>&1 || true
+        oc get rolebindings -n "${ns}" > "${POD_STATE_DIR}/rolebindings-${ns}-${TIMESTAMP}.txt" 2>&1 || true
+      done
       sleep ${POD_CAPTURE_INTERVAL}
     done
   ) &
