@@ -302,6 +302,27 @@ run_on_node "${SURVIVE_NODE}" "pcs resource status" || true
 collect_rbd_diagnostics "post-fencing"
 
 # -------------------------------------------------------------------------
+# Wait for ODF/Ceph to recover (MGR failover if needed)
+# -------------------------------------------------------------------------
+echo "--- Waiting for Ceph MGR pod to reach 2/2 Running on ${SURVIVE_NODE} ---"
+MGR_WAIT_DEADLINE=$((SECONDS + 900))
+for ((i=1; SECONDS < MGR_WAIT_DEADLINE; i++)); do
+  MGR_STATUS=$(oc get pods -n openshift-storage -l app=rook-ceph-mgr \
+      --no-headers --request-timeout=10s 2>/dev/null | grep -v Terminating | head -1 || true)
+  MGR_READY_COUNT=$(echo "${MGR_STATUS}" | awk '{print $2}')
+  MGR_POD_STATUS=$(echo "${MGR_STATUS}" | awk '{print $3}')
+  if [[ "${MGR_READY_COUNT}" == "2/2" && "${MGR_POD_STATUS}" == "Running" ]]; then
+    echo "Ceph MGR pod is 2/2 Running (attempt ${i})"
+    break
+  fi
+  echo "Attempt ${i}: MGR=${MGR_READY_COUNT:-?} ${MGR_POD_STATUS:-?}, waiting 15s..."
+  sleep 15
+done
+
+echo "ODF pod status after MGR wait:"
+oc get pods -n openshift-storage -o wide 2>&1 || true
+
+# -------------------------------------------------------------------------
 # Verify VM migrated to the surviving node
 # -------------------------------------------------------------------------
 echo "--- Verifying VM migration ---"
