@@ -50,20 +50,36 @@ ref:
     Synchronizing/WaitingForSync indefinitely.
     Affected: CNV 4.17+ / OCP 4.22 (as of 2026-08).
 
+    Additionally, OLM's CSV reconciler periodically scales virt-operator back to its
+    desired replica count even after this step scales it to 0.  Once virt-operator
+    is running again it immediately reconciles away the cert mount patch, undoing the
+    fix.  A background watchdog process in this step container would not survive
+    across subsequent CI step containers.  To address this, step 5 deploys an
+    in-cluster Deployment (cclm-watchdog) that continuously monitors and re-applies
+    the fix for the entire test window.
+
     What this step does (idempotent, safe to re-run):
-      1. Restarts virt-operator on each spoke and waits for its rollout to finish
-         (triggers DaemonSet reconciliation — usually sufficient to fix the mount).
-      2. Waits up to CNV_CCLM_WAIT_TIMEOUT seconds for the CCLM client cert to
-         appear in a virt-handler pod.
-      3. Fallback: if the cert is still absent, patches the virt-handler DaemonSet
-         directly to mount CNV_CCLM_VIRT_HANDLER_CERT_SECRET at
-         /etc/virt-handler/clientcertificates.  Collects diagnostics and fails the
-         step if the cert is still absent after the patch rollout.
-      4. Ensures a Service named virt-synchronization-controller on port
+      1. Checks whether /etc/virt-handler/clientcertificates/tls.crt is already
+         present in all Running virt-handler pods.  Skips to step 3 if so.
+      2. Applies the DaemonSet workaround patch (CNV-89129):
+         a. Scales virt-operator to 0 to prevent immediate reconciliation.
+         b. Patches virt-handler DaemonSet to mount CNV_CCLM_VIRT_HANDLER_CERT_SECRET
+            at /etc/virt-handler/clientcertificates.
+         c. Rollout-restarts the DaemonSet so all pods pick up the new mount.
+         d. Polls up to 300 s for the cert to appear in all Running pods.
+         e. Leaves virt-operator at 0 replicas — p2p-cnv-restore-virt-operator
+            (post chain) restores it after all migrations complete.
+      3. Ensures a Service named virt-synchronization-controller on port
          CNV_CCLM_SYNC_PORT (9185) exists in openshift-cnv.
-      5. Ensures a ServiceExport for that Service exists, allowing Submariner to
+      4. Ensures a ServiceExport for that Service exists, allowing Submariner to
          propagate it to other clusters for cross-cluster DNS resolution.  Skipped
          gracefully when the ServiceExport CRD (Submariner) is not yet installed.
+      5. Deploys an in-cluster watchdog Deployment (cclm-watchdog) in openshift-cnv
+         on each spoke.  The watchdog runs in a 30-second loop: if OLM has scaled
+         virt-operator back above 0 it re-scales it to 0; if the cert volume mount
+         has been removed from the virt-handler DaemonSet it re-patches and restarts
+         the DaemonSet.  The watchdog survives across all subsequent CI step containers
+         and is stopped and deleted by p2p-cnv-restore-virt-operator.
 
     Reads spoke names and kubeconfigs from ${SHARED_DIR} (managed-cluster-kubeconfig-N
     and managed-cluster-name-N files).
