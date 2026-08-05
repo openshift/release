@@ -138,6 +138,7 @@ run_tests() {
     export USE_INTERNAL_REGISTRY=\"false\"
     export PR_NUMBER=\"${PULL_NUMBER:-}\"
     export OLM=\"${OLM:-true}\"
+    export EXPECTED_REGISTRY=\"${EXPECTED_REGISTRY:-}\"
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
