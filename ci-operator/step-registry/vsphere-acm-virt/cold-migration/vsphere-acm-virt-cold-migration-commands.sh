@@ -68,6 +68,20 @@ DumpDiagnostics() {
 trap DumpDiagnostics ERR
 
 # --------------------------------------------------------------------------
+# Resolve destination StorageClass — use override or cluster default.
+# --------------------------------------------------------------------------
+typeset destStorageClass="${DESTINATION_STORAGE_CLASS}"
+if [[ -z "${destStorageClass}" ]]; then
+    destStorageClass=$(oc get storageclass \
+        -o jsonpath='{range .items[*]}{.metadata.annotations.storageclass\.kubernetes\.io/is-default-class}{"\t"}{.metadata.name}{"\n"}{end}' \
+        | awk -F'\t' '$1=="true"{print $2; exit}')
+    if [[ -z "${destStorageClass}" ]]; then
+        echo "ERROR: DESTINATION_STORAGE_CLASS is not set and no default StorageClass found on the cluster" >&2
+        exit 1
+    fi
+fi
+
+# --------------------------------------------------------------------------
 # Power off source VM on vSphere before cold migration
 # --------------------------------------------------------------------------
 if [[ -f "${SHARED_DIR}/govc-env.sh" ]]; then
@@ -229,7 +243,7 @@ spec:
   - source:
       name: "${vsphereDatastore}"
     destination:
-      storageClass: "${DESTINATION_STORAGE_CLASS}"
+      storageClass: "${destStorageClass}"
   provider:
     source:
       name: vsphere-source
