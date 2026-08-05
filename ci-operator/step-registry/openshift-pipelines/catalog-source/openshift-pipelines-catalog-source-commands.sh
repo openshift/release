@@ -25,7 +25,7 @@ EOF
 
 echo "Waiting for CatalogSource '${CATALOG_SOURCE_NAME}' to become READY..."
 for i in $(seq 1 60); do
-    STATE=$(oc get catalogsource "${CATALOG_SOURCE_NAME}" \
+    STATE=$(oc --request-timeout=12s get catalogsource "${CATALOG_SOURCE_NAME}" \
         -n openshift-marketplace \
         -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || echo "")
     if [[ "${STATE}" == "READY" ]]; then
@@ -38,11 +38,11 @@ done
 
 echo "ERROR: CatalogSource '${CATALOG_SOURCE_NAME}' did not become READY within 5 minutes"
 echo "CatalogSource status:"
-oc get catalogsource "${CATALOG_SOURCE_NAME}" -n openshift-marketplace \
+oc --request-timeout=12s get catalogsource "${CATALOG_SOURCE_NAME}" -n openshift-marketplace \
     -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true
 echo ""
 echo "CatalogSource conditions:"
-oc get catalogsource "${CATALOG_SOURCE_NAME}" -n openshift-marketplace \
+oc --request-timeout=12s get catalogsource "${CATALOG_SOURCE_NAME}" -n openshift-marketplace \
     -o jsonpath='{.status.conditions[*].message}' 2>/dev/null || true
 echo ""
 exit 1
