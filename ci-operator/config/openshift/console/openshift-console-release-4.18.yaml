@@ -87,7 +87,10 @@ tests:
     - as: wait-for-catalogsources
       cli: latest
       commands: |
-        echo "Waiting for default catalog sources to be ready..."
+        echo "Waiting for redhat-operators catalog source to be created..."
+        oc wait catalogsource/redhat-operators -n openshift-marketplace \
+          --for=create --timeout=300s
+        echo "Waiting for redhat-operators catalog source to be READY..."
         oc wait catalogsource/redhat-operators -n openshift-marketplace \
           --for=jsonpath='{.status.connectionState.lastObservedState}'=READY \
           --timeout=600s
