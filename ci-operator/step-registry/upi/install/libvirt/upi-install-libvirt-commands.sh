@@ -6,7 +6,8 @@ set -o pipefail
 
 # Two-cluster support: CLUSTER_ROLE=infra redirects to the infra lease and a
 # separate SHARED_DIR subdirectory so mgmt and infra files never collide.
-# The kubeconfig is saved as kubeconfig (mgmt) or infra/kubeconfig (infra).
+# The kubeconfig is saved as ${SHARED_DIR}/kubeconfig (mgmt) or
+# ${SHARED_DIR}/infra/kubeconfig (infra).
 if [[ "${CLUSTER_ROLE:-mgmt}" == "infra" ]]; then
   LEASED_RESOURCE="${LEASED_RESOURCE_INFRA}"
   SHARED_DIR="${SHARED_DIR}/infra"
@@ -44,6 +45,11 @@ function save_credentials () {
   fi
   cp ${INSTALL_DIR}/auth/kubeconfig ${SHARED_DIR}
   cp ${INSTALL_DIR}/auth/kubeadmin-password ${SHARED_DIR}
+  # ci-operator sets KUBECONFIG to ${SHARED_DIR}/kubeconfig (the original, not
+  # the infra subdirectory). When CLUSTER_ROLE=infra, SHARED_DIR was redirected
+  # to ${SHARED_DIR}/infra, so we must point KUBECONFIG at the freshly written
+  # file explicitly so that subsequent oc calls target the infra cluster.
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 }
 
 function prepare_next_steps () {
