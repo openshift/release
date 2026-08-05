@@ -18,6 +18,7 @@ fi
 # Prow-only: Hive via ocm-backplane when OCM_FVT_USE_BACKPLANE=true (Jenkins/Tekton skip this).
 hive_kubeconfig=""
 hive_kubeconfig_src=""
+hive_kubeconfig_raw=""
 backplane_bin_dir=""
 backplane_proxy_url=""
 if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
@@ -93,6 +94,7 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
     --url="${backplane_ocm_url}"
   ocm-backplane login "${backplane_cluster_id}"
   $WAS_TRACING_BP && set -x
+  # Warm elevate reason; Impersonate is only on elevate's temp kubeconfig.
   ocm-backplane elevate "${backplane_elevate_reason}" -- whoami
 
   if [[ ! -f "${KUBECONFIG}" ]]; then
@@ -100,43 +102,51 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
     exit 1
   fi
 
-  # Temporary probe: plain vs elevate-wrapped secret get (elevate args are oc subcommands).
-  if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
-    aao_probe_secret="${OCM_FVT_AAO_PROBE_SECRET:-d4ncjp595tqc73dupto0-account-creds}"
-    echo "=== elevate-wrapped AAO secret probe ==="
-    echo "--- plain oc whoami (expect non-elevated SA) ---"
-    oc --request-timeout=30s whoami 2>&1 || true
-    echo "--- plain oc get secret (expect Forbidden) ---"
-    oc --request-timeout=30s get secret "${aao_probe_secret}" \
-      -n osd-fleet-manager-aao -o name 2>&1 || true
-    echo "--- elevate -- whoami ---"
-    ocm-backplane elevate "${backplane_elevate_reason}" -- \
-      whoami 2>&1 || true
-    echo "--- elevate -- get secret (name only; no data) ---"
-    ocm-backplane elevate "${backplane_elevate_reason}" -- \
-      get secret "${aao_probe_secret}" \
-      -n osd-fleet-manager-aao -o name --request-timeout=30s 2>&1 || true
-    echo "--- elevate -- get secrets | head (ns list) ---"
-    ocm-backplane elevate "${backplane_elevate_reason}" -- \
-      get secrets -n osd-fleet-manager-aao --request-timeout=30s 2>&1 | head -20 || true
-    echo "=== end elevate-wrapped AAO secret probe ==="
+  # Dump elevate's Impersonate kubeconfig for AAO (do not log contents).
+  hive_kubeconfig="$(mktemp /tmp/hive-kubeconfig.XXXXXX)"
+  hive_kubeconfig_raw="$(mktemp /tmp/hive-kubeconfig-raw.XXXXXX)"
+  chmod 0600 "${hive_kubeconfig}" "${hive_kubeconfig_raw}"
+  [[ $- == *x* ]] && WAS_TRACING_ELEV=true || WAS_TRACING_ELEV=false
+  set +x
+  if ! ocm-backplane elevate "${backplane_elevate_reason}" -- \
+    config view --raw --minify > "${hive_kubeconfig_raw}"; then
+    $WAS_TRACING_ELEV && set -x
+    echo "ERROR: failed to dump elevated backplane kubeconfig" >&2
+    rm -f "${hive_kubeconfig_raw}"
+    exit 1
+  fi
+  $WAS_TRACING_ELEV && set -x
+  if ! grep -q 'backplane-cluster-admin' "${hive_kubeconfig_raw}"; then
+    echo "ERROR: elevated kubeconfig missing Impersonate backplane-cluster-admin" >&2
+    rm -f "${hive_kubeconfig_raw}"
+    exit 1
   fi
 
-  hive_kubeconfig="$(mktemp /tmp/hive-kubeconfig.XXXXXX)"
-  chmod 0600 "${hive_kubeconfig}"
-  # Rewrite exec plugin command to the path mounted inside the ocmci container.
+  # Host-path check before container exec rewrite; name only (no secret data).
+  if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
+    aao_probe_secret="${OCM_FVT_AAO_PROBE_SECRET:-d4ncjp595tqc73dupto0-account-creds}"
+    echo "=== elevated AAO kubeconfig check (name only) ==="
+    oc --kubeconfig "${hive_kubeconfig_raw}" --request-timeout=60s \
+      get secret "${aao_probe_secret}" -n osd-fleet-manager-aao -o name
+    echo "=== end elevated AAO kubeconfig check ==="
+  fi
+
+  # Point exec plugins at binaries mounted into the ocmci container.
   sed -E \
     -e 's|command:[[:space:]]*ocm-backplane([[:space:]]*$)|command: /usr/local/backplane-bin/ocm-backplane\1|' \
     -e 's|command:[[:space:]]*ocm([[:space:]]*$)|command: /usr/local/backplane-bin/ocm\1|' \
-    "${KUBECONFIG}" > "${hive_kubeconfig}"
-  echo "Backplane kubeconfig ready for cluster ${backplane_cluster_id}"
+    "${hive_kubeconfig_raw}" > "${hive_kubeconfig}"
+  chmod 0600 "${hive_kubeconfig}"
+  rm -f "${hive_kubeconfig_raw}"
+
+  echo "Elevated backplane kubeconfig ready for cluster ${backplane_cluster_id}"
   echo "================================"
 fi
 
 old_umask=$(umask)
 umask 077
 podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
-trap 'rm -f "${podman_env_file}"; rm -f "${hive_kubeconfig:-}" "${hive_kubeconfig_src:-}"' EXIT
+trap 'rm -f "${podman_env_file}"; rm -f "${hive_kubeconfig:-}" "${hive_kubeconfig_src:-}" "${hive_kubeconfig_raw:-}"' EXIT
 umask "${old_umask}"
 
 {
@@ -148,7 +158,7 @@ umask "${old_umask}"
 } > "${podman_env_file}"
 
 if [[ -n "${hive_kubeconfig}" ]]; then
-  # Proxy for Hive reachability; AAO identity comes from vault, not elevate.
+  # Corp proxy + backplane PATH/HOME for Hive/AAO from the farm.
   echo "PATH=/usr/local/backplane-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >> "${podman_env_file}"
   echo "HOME=/home/ci-user" >> "${podman_env_file}"
   echo "HTTPS_PROXY=${backplane_proxy_url}" >> "${podman_env_file}"
@@ -174,15 +184,16 @@ fi
 
 osdfm_qe_creds_dir=/usr/local/osdfm-qe-credentials
 aao_kubeconfig_env=()
-# Vault consumer kubeconfig (Tekton parity): live per-MC/SC AAO secrets, all regions.
-if [[ -f "${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig" ]]; then
+# Prow: elevated kubeconfig path. Else vault content (Tekton/Jenkins).
+if [[ -n "${hive_kubeconfig}" && "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
+  echo "AWS_ACCOUNT_OPERATOR_KUBECONFIG=/credentials-hive/kubeconfig" >> "${podman_env_file}"
+elif [[ -f "${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig" ]]; then
   [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
   set +x
   aao_kubeconfig_env=("-e" "AWS_ACCOUNT_OPERATOR_KUBECONFIG=$(<"${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig")")
   $WAS_TRACING && set -x
-elif [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && -n "${hive_kubeconfig}" ]]; then
-  echo "ERROR: osdfm AAO tests need ${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig" >&2
-  echo "Elevated backplane kubeconfig cannot get secrets in osd-fleet-manager-aao." >&2
+elif [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
+  echo "ERROR: osdfm AAO tests need elevated backplane kubeconfig or ${osdfm_qe_creds_dir}/aws_account_operator_kubeconfig" >&2
   exit 1
 fi
 
@@ -247,8 +258,6 @@ podman inspect \
   quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
   || echo "WARNING: failed to get ocmci image digest"
 echo "=========================="
-
-# Elevate-wrapped AAO secret probe runs above (after backplane login).
 
 echo "Running ocmtest: ${ocmtest_args[*]}"
 exit_code=0
