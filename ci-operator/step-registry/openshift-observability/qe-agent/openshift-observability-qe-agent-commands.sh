@@ -176,7 +176,7 @@ done < <(find "${ARTIFACT_DIR}" -name '*.md' -type f 2>/dev/null || true)
 if [[ -n "${JIRA_PROJECT:-}" && -f "${ARTIFACT_DIR}/jira-payload.json" ]]; then
   echo "jira-payload.json found — attempting Jira filing for project ${JIRA_PROJECT}..."
 
-  readonly _JIRA_CREDS_DIR="/var/run/claude-code-service-account"
+  readonly _JIRA_CREDS_DIR="/var/run/dt-secrets"
   _jira_token_file="${_JIRA_CREDS_DIR}/jira-pat"
   _jira_email_file="${_JIRA_CREDS_DIR}/jira-email"
 
