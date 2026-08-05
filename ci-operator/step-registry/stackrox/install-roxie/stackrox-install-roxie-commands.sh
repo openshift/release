@@ -95,7 +95,7 @@ roxie:
 central:
   namespace: stackrox
   earlyReadiness: false
-  exposure: none
+  # TODO(https://github.com/stackrox/roxie/issues/264): use exposure: none once roxie supports it
   spec:
     customize:
       envVars:
