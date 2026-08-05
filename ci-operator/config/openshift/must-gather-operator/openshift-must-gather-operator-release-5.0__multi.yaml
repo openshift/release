@@ -1,0 +1,139 @@
+base_images:
+  base-rhel9:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-enterprise-base-multi-openshift-4.19
+binary_build_commands: make go-build
+build_root:
+  from_repository: true
+images:
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.openshift
+    from: base-rhel9
+    to: must-gather-operator
+  - additional_architectures:
+    - arm64
+    dockerfile_literal: |
+      FROM quay.io/operator-framework/operator-sdk:v1.39.2 as osdk
+      FROM src
+      COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+    from: src
+    to: cli-operator-sdk
+operator:
+  bundles:
+  - as: must-gather-operator-bundle
+    context_dir: bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-support-log-gather-operator:latest
+    with: pipeline:must-gather-operator
+  - pullspec: quay.io/openshift/origin-must-gather:latest
+    with: stable:must-gather
+releases:
+  initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.0"
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make e2e-binary-build
+tests:
+- as: e2e-aws-operator-multi-art-fbc-weekly
+  cron: '@weekly'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependency_overrides:
+      OO_INDEX: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__5.0__ose-support-log-gather-rhel9-operator
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: m6g.xlarge
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      OO_CHANNEL: tech-preview
+      OO_INSTALL_NAMESPACE: must-gather-operator
+      OO_PACKAGE: support-log-gather-operator
+      OO_TARGET_NAMESPACES: '!all'
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ipi-install-heterogeneous
+    test:
+    - as: setup-konflux-image-access
+      cli: latest
+      commands: |
+        oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
+        jq -s '.[0].auths += .[1].auths | .[0]' /tmp/.dockerconfigjson /var/run/secrets/pull-secret/.dockerconfigjson > /tmp/merged-pullsecret.json
+        oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged-pullsecret.json
+        cat <<'EOF' | oc apply -f -
+        apiVersion: config.openshift.io/v1
+        kind: ImageDigestMirrorSet
+        metadata:
+          name: idms
+        spec:
+          imageDigestMirrors:
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-support-log-gather-rhel9-operator
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-support-log-gather-operator-bundle
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift4/ose-must-gather-rhel9
+        EOF
+        sleep 60
+        oc wait mcp/master --for condition=Updated --timeout=30m
+        oc wait mcp/worker --for condition=Updated --timeout=30m
+      credentials:
+      - mount_path: /var/run/secrets/pull-secret
+        name: deploy-konflux-operator-art-image-share
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: optional-operators-subscribe
+    - as: verify-install
+      cli: latest
+      commands: |
+        oc -n must-gather-operator rollout status deployment must-gather-operator --timeout=15m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift
+  repo: must-gather-operator
+  variant: multi
