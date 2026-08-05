@@ -8,15 +8,15 @@ mkdir -p $ARTIFACT_DIR
 
 function copyArtifacts {
     typeset junitPrefix="junit_"
-    cp -r ./cypress/results/* $ARTIFACT_DIR
+    cp -r ./cypress/results/* "$ARTIFACT_DIR" || true
 
     for file in "$ARTIFACT_DIR"/*; do
-        if [[ ! "$(basename "$file")" =~ ^"$JUNIT_PREFIX" ]]; then
-            result_file="$ARTIFACT_DIR"/"$JUNIT_PREFIX""$(basename "$file")"
-            mv "$file" $result_file
+        if [[ ! "$(basename "$file")" =~ ^"$junitPrefix" ]]; then
+            result_file="$ARTIFACT_DIR"/"$junitPrefix""$(basename "$file")"
+            mv "$file" "$result_file"
         fi
     done
-    cp -r ./cypress/videos/* $ARTIFACT_DIR
+    cp -r ./cypress/videos/* "$ARTIFACT_DIR" || true
 }
 
 if [ "${MAP_TESTS}" = "true" ]; then
@@ -26,12 +26,12 @@ if [ "${MAP_TESTS}" = "true" ]; then
         "${_fURL[@]}" \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"; trap '
-        CopyArtifacts
+        copyArtifacts
         LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
             ExitTrap--PostProcessPrep junit--quay-tests__test-quay-e2e__quay-tests-test-quay-e2e.xml
     ' EXIT
 else
-    trap CopyArtifacts EXIT
+    trap copyArtifacts EXIT
 fi
 
 #Set Kubeconfig:
@@ -53,9 +53,6 @@ terraform version
 
 # Install Dependcies defined in packages.json
 npm install || true
-
-#Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
-trap copyArtifacts EXIT
 
 # Cypress Doc https://docs.cypress.io/guides/references/proxy-configuration
 if [ "${QUAY_PROXY}" = "true" ]; then
