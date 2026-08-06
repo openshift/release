@@ -164,6 +164,25 @@ fi
 echo "Using Fedora snapshot: ${FEDORA_SNAP}"
 
 # -------------------------------------------------------------------------
+# Determine MGR node and force VM placement there for deterministic testing
+# -------------------------------------------------------------------------
+MGR_NODE=$(oc get pods -n openshift-storage -l app=rook-ceph-mgr \
+    --no-headers -o custom-columns=':spec.nodeName' 2>/dev/null | grep -v Terminating | head -1 || true)
+echo "Ceph MGR is running on: ${MGR_NODE}"
+
+if [[ "${MGR_NODE}" == "${NODE_0}" ]]; then
+  FENCE_NODE="${NODE_0}"
+  SURVIVE_NODE="${NODE_1}"
+else
+  FENCE_NODE="${NODE_1}"
+  SURVIVE_NODE="${NODE_0}"
+fi
+echo "Will fence ${FENCE_NODE} (MGR node), expect VM to migrate to ${SURVIVE_NODE}"
+
+echo "Cordoning ${SURVIVE_NODE} to force VM placement on MGR node ${FENCE_NODE}..."
+oc adm cordon "${SURVIVE_NODE}"
+
+# -------------------------------------------------------------------------
 # Create a test VM with LiveMigrate eviction on an RWX PVC
 # -------------------------------------------------------------------------
 echo "--- Creating test VM for HA validation ---"
@@ -220,14 +239,8 @@ oc wait vm/test-vm-ha -n default --for=condition=Ready --timeout=10m
 VMI_NODE=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.nodeName}')
 echo "VM is running on node: ${VMI_NODE}"
 
-if [[ "${VMI_NODE}" == "${NODE_0}" ]]; then
-  FENCE_NODE="${NODE_0}"
-  SURVIVE_NODE="${NODE_1}"
-else
-  FENCE_NODE="${NODE_1}"
-  SURVIVE_NODE="${NODE_0}"
-fi
-echo "Will fence ${FENCE_NODE}, expect VM to migrate to ${SURVIVE_NODE}"
+echo "Uncordoning ${SURVIVE_NODE}..."
+oc adm uncordon "${SURVIVE_NODE}"
 
 # -------------------------------------------------------------------------
 # Idempotent recovery: power on the fenced VM and restore STONITH action
@@ -240,6 +253,8 @@ recover_fenced_node() {
   fi
   echo "--- Recovery trap: restoring ${FENCE_NODE} ---"
   RECOVERY_NEEDED=false
+
+  oc adm uncordon "${SURVIVE_NODE}" 2>/dev/null || true
 
   local fence_vm="ostest_${FENCE_NODE//-/_}"
   ssh "${SSHOPTS[@]}" "root@${IP}" \
