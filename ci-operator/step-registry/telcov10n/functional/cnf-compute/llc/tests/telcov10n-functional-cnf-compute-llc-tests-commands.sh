@@ -183,8 +183,10 @@ pip install -r "${SHARED_DIR}"/telco5gci/requirements.txt
 #    cases). Remove those to avoid cluttering artifacts with empty reports.
 # 2. Merge: combine only non-empty XMLs into a single junit.xml so the merged
 #    report reflects only directories where tests actually ran.
-# 3. Reports: generate HTML and JSON for all remaining XMLs including the merged
-#    junit.xml, giving us both per-directory and consolidated reports.
+# 3. Reports: generate HTML and JSON for all XMLs including the merged junit.xml,
+#    giving us both per-directory and consolidated reports.
+# 4. Cleanup: remove per-directory XMLs after report generation so Prow only sees
+#    the merged junit.xml. Without this, Prow shows every test result twice.
 non_empty_xml=()
 for xml_file in "${ARTIFACT_DIR}"/*.xml; do
     if [ ! -e "${xml_file}" ]; then
@@ -220,6 +222,11 @@ for junit_file in "${ARTIFACT_DIR}"/*.xml; do
 
     json_output_file="${junit_file%.xml}.json"
     python "${SHARED_DIR}"/telco5gci/junit2json.py "${junit_file}" -o "${json_output_file}"
+done
+
+# Remove per-directory XMLs, keep only the merged junit.xml
+for xml_file in "${non_empty_xml[@]}"; do
+    rm -f "${xml_file}"
 done
 
 rm -rf "${SHARED_DIR}"/myenv "${SHARED_DIR}"/telco5gci
