@@ -14,7 +14,7 @@ mkdir -p "${ARTIFACT_DIR}"
 typeset -i exitCode=0
 
 function CollectDiagnostics () {
-    local artifactFile="${ARTIFACT_DIR}/acm-upgrade-diagnostics.txt"
+    typeset artifactFile="${ARTIFACT_DIR}/acm-upgrade-diagnostics.txt"
     {
         printf '=== ACM Operator Upgrade Diagnostics ===\n\n'
         printf '=== Subscription ===\n'
@@ -29,9 +29,10 @@ function CollectDiagnostics () {
         oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" --field-selector=status.phase!=Running,status.phase!=Succeeded 2>&1 || true
         oc get pods -n multicluster-engine --field-selector=status.phase!=Running,status.phase!=Succeeded 2>&1 || true
     } > "${artifactFile}"
+    true
 }
 
-trap 'exitCode=$?; if (( exitCode != 0 )); then CollectDiagnostics; fi' EXIT
+trap '{( exitCode=$?; if (( exitCode != 0 )); then CollectDiagnostics; fi )}' EXIT
 
 function GetCurrentCsv () {
     oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
@@ -40,14 +41,14 @@ function GetCurrentCsv () {
 }
 
 function GetCsvPhase () {
-    local csvName="$1"
+    typeset csvName="$1"
     oc get csv "${csvName}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.status.phase}' || true
 }
 
 function GetInstalledVersion () {
-    local csvName
+    typeset csvName
     csvName="$(GetCurrentCsv)"
     if [[ -z "${csvName}" ]]; then
         return 1
@@ -69,24 +70,24 @@ function ResolveTargetChannel () {
         return 0
     fi
 
-    local currentChannel
+    typeset currentChannel
     currentChannel="$(GetCurrentChannel)"
     if [[ -z "${currentChannel}" ]]; then
         echo >&2 "ERROR: Cannot determine current subscription channel"
         return 3
     fi
 
-    local catalogNamespace
+    typeset catalogNamespace
     catalogNamespace="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.sourceNamespace}' || true)"
 
-    local packageName
+    typeset packageName
     packageName="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.name}' || true)"
 
-    local channels
+    typeset channels
     channels="$(oc get packagemanifest "${packageName}" \
         -n "${catalogNamespace}" \
         -o jsonpath='{.status.channels[*].name}' || true)"
@@ -96,11 +97,13 @@ function ResolveTargetChannel () {
         return 3
     fi
 
-    local currentVersion nextChannel=""
+    typeset currentVersion nextChannel=""
     currentVersion="$(echo "${currentChannel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
 
-    for ch in ${channels}; do
-        local chVersion
+    typeset -a channelList
+    read -ra channelList <<< "${channels}"
+    for ch in "${channelList[@]}"; do
+        typeset chVersion
         chVersion="$(echo "${ch}" | grep -oE '[0-9]+\.[0-9]+' || true)"
         if [[ -z "${chVersion}" ]]; then
             continue
@@ -109,7 +112,7 @@ function ResolveTargetChannel () {
             nextChannel="${ch}"
             break
         fi
-        local currentMajor currentMinor chMajor chMinor
+        typeset currentMajor currentMinor chMajor chMinor
         currentMajor="${currentVersion%%.*}"
         currentMinor="${currentVersion##*.}"
         chMajor="${chVersion%%.*}"
@@ -120,7 +123,7 @@ function ResolveTargetChannel () {
             if [[ -z "${nextChannel}" ]]; then
                 nextChannel="${ch}"
             else
-                local nextVersion nextMajor nextMinor
+                typeset nextVersion nextMajor nextMinor
                 nextVersion="$(echo "${nextChannel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
                 nextMajor="${nextVersion%%.*}"
                 nextMinor="${nextVersion##*.}"
@@ -138,13 +141,14 @@ function ResolveTargetChannel () {
     fi
 
     echo "${nextChannel}"
+    true
 }
 
 function WaitForCsvSucceeded () {
-    local previousCsv="$1"
-    local timeoutSeconds
+    typeset previousCsv="$1"
+    typeset timeoutSeconds
     timeoutSeconds="$(ParseTimeout "${ACM_UPGRADE_TIMEOUT}")"
-    local startTime elapsed newCsv phase
+    typeset startTime elapsed newCsv phase
     startTime="$(date +%s)"
 
     while true; do
@@ -179,8 +183,8 @@ function WaitForCsvSucceeded () {
 }
 
 function ParseTimeout () {
-    local input="$1"
-    local minutes=0 seconds=0
+    typeset input="$1"
+    typeset minutes=0 seconds=0
     if [[ "${input}" =~ ^([0-9]+)m$ ]]; then
         minutes="${BASH_REMATCH[1]}"
     elif [[ "${input}" =~ ^([0-9]+)s$ ]]; then
@@ -194,11 +198,12 @@ function ParseTimeout () {
         minutes=30
     fi
     echo "$(( minutes * 60 + seconds ))"
+    true
 }
 
 function ValidateMceUpgrade () {
     echo "Validating MCE (MultiCluster Engine) upgrade..."
-    local mceCsv
+    typeset mceCsv
     mceCsv="$(oc get csv -n multicluster-engine \
         -o jsonpath='{.items[?(@.spec.displayName=="multicluster engine for Kubernetes")].metadata.name}' \
         || true)"
@@ -214,14 +219,14 @@ function ValidateMceUpgrade () {
         return 0
     fi
 
-    local mcePhase
+    typeset mcePhase
     mcePhase="$(oc get csv "${mceCsv}" -n multicluster-engine \
         -o jsonpath='{.status.phase}' || true)"
 
     echo "  MCE CSV: ${mceCsv}  Phase: ${mcePhase}"
     if [[ "${mcePhase}" != "Succeeded" ]]; then
         echo "WARNING: MCE CSV phase is ${mcePhase}, not Succeeded"
-        local timeoutEnd
+        typeset timeoutEnd
         timeoutEnd="$(( $(date +%s) + 300 ))"
         while (( $(date +%s) < timeoutEnd )); do
             mcePhase="$(oc get csv "${mceCsv}" -n multicluster-engine \
@@ -241,14 +246,14 @@ function ValidateMceUpgrade () {
 function ValidateHubHealth () {
     echo "Validating ACM hub health post-upgrade..."
 
-    local mchStatus
+    typeset mchStatus
     mchStatus="$(oc get multiclusterhub -A \
         -o jsonpath='{.items[0].status.phase}' || true)"
     echo "  MultiClusterHub phase: ${mchStatus}"
 
     if [[ "${mchStatus}" != "Running" ]]; then
         echo "  Waiting for MCH to reach Running phase (timeout: 5m)..."
-        local timeoutEnd
+        typeset timeoutEnd
         timeoutEnd="$(( $(date +%s) + 300 ))"
         while (( $(date +%s) < timeoutEnd )); do
             mchStatus="$(oc get multiclusterhub -A \
@@ -265,7 +270,7 @@ function ValidateHubHealth () {
     fi
 
     echo "  Checking policy propagator..."
-    local propagatorReady
+    typeset propagatorReady
     propagatorReady="$(oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -l name=governance-policy-propagator \
         -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' \
@@ -273,11 +278,16 @@ function ValidateHubHealth () {
     echo "  Policy propagator ready: ${propagatorReady}"
 
     echo "  Checking managed clusters..."
-    local clusterCount availableCount
-    clusterCount="$(oc get managedclusters --no-headers | wc -l || echo 0)"
-    availableCount="$(oc get managedclusters \
+    typeset clusterOutput=""
+    clusterOutput="$(oc get managedclusters --no-headers || true)"
+    typeset -i clusterCount=0
+    clusterCount="$(echo "${clusterOutput}" | grep -c . || true)"
+    typeset availableOutput=""
+    availableOutput="$(oc get managedclusters \
         -o jsonpath='{.items[?(@.status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status=="True")].metadata.name}' \
-        | wc -w || echo 0)"
+        || true)"
+    typeset -i availableCount=0
+    availableCount="$(echo "${availableOutput}" | wc -w)"
     echo "  Managed clusters: ${availableCount}/${clusterCount} available"
 
     echo "ACM hub health validation complete"
@@ -332,7 +342,7 @@ echo "Waiting for InstallPlan to be created..."
 sleep 10
 
 installPlan=""
-for _ in $(seq 1 12); do
+for _ in {1..12}; do
     installPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.status.installPlanRef.name}' || true)"
