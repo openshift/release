@@ -25,7 +25,7 @@ typeset -a tcMessagesArr=()
 # Helpers
 # ---------------------------------------------------------------------------
 
-AddResult() {
+function AddResult () {
     typeset name="${1:-}"; (($#)) && shift
     typeset result="${1:-}"; (($#)) && shift
     typeset message="${1:-}"; (($#)) && shift
@@ -35,7 +35,7 @@ AddResult() {
     true
 }
 
-XmlEscape() {
+function XmlEscape () {
     typeset text="${1:-}"; (($#)) && shift
     text="${text//&/&amp;}"
     text="${text//</&lt;}"
@@ -46,7 +46,7 @@ XmlEscape() {
     true
 }
 
-WriteJunit() {
+function WriteJunit () {
     typeset -i total=${#tcNamesArr[@]}
     typeset -i failCount=0
     typeset -i skipCount=0
@@ -82,7 +82,7 @@ WriteJunit() {
 }
 
 # shellcheck disable=SC2317
-CollectExitArtifacts() {
+function CollectExitArtifacts () {
     : "Collecting ODF diagnostics..."
     oc get csv -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/odf-csvs.yaml" || true
     oc get storagecluster -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/storagecluster.yaml" || true
@@ -97,7 +97,7 @@ trap CollectExitArtifacts EXIT
 # Check 1: ODF Operator CSV in Succeeded phase
 # ---------------------------------------------------------------------------
 
-CheckOdfCsv() {
+function CheckOdfCsv () {
     : "=== Check 1: ODF Operator CSV ==="
 
     typeset csvPhase=""
@@ -124,7 +124,7 @@ CheckOdfCsv() {
 # Check 2: StorageCluster phase == Ready
 # ---------------------------------------------------------------------------
 
-CheckStorageCluster() {
+function CheckStorageCluster () {
     : "=== Check 2: StorageCluster Ready ==="
 
     typeset scPhase=""
@@ -150,7 +150,7 @@ CheckStorageCluster() {
 # Check 3: CephCluster health == HEALTH_OK or HEALTH_WARN
 # ---------------------------------------------------------------------------
 
-CheckCephCluster() {
+function CheckCephCluster () {
     : "=== Check 3: CephCluster health ==="
 
     typeset cephHealth=""
@@ -176,7 +176,7 @@ CheckCephCluster() {
 # Check 4: Default StorageClasses available (ceph-rbd, cephfs)
 # ---------------------------------------------------------------------------
 
-CheckStorageClasses() {
+function CheckStorageClasses () {
     : "=== Check 4: StorageClasses ==="
     typeset failMsg=""
 
@@ -204,7 +204,7 @@ CheckStorageClasses() {
 # Check 5: PVC provisionable (create, bind, delete)
 # ---------------------------------------------------------------------------
 
-CheckPvcProvision() {
+function CheckPvcProvision () {
     : "=== Check 5: PVC provisioning ==="
 
     typeset pvcName="odf-health-check-pvc-$$"
@@ -257,7 +257,7 @@ EOF
 # Check 6: NooBaa system Ready + S3 put/get/delete functional check
 # ---------------------------------------------------------------------------
 
-CheckNoobaa() {
+function CheckNoobaa () {
     : "=== Check 6: NooBaa S3 functional ==="
 
     typeset nbPhase=""
@@ -355,7 +355,7 @@ EOF
 # Check 7: Ceph overall health (via toolbox or CephCluster status)
 # ---------------------------------------------------------------------------
 
-CheckCephHealth() {
+function CheckCephHealth () {
     : "=== Check 7: Ceph health detail ==="
 
     typeset cephDetail=""
@@ -389,7 +389,7 @@ CheckCephHealth() {
 # Main
 # ---------------------------------------------------------------------------
 
-Main() {
+function Main () {
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
