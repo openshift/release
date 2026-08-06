@@ -145,7 +145,10 @@ if [[ -n "${ORION_CONFIG}" ]] && [[ "${ORION_CONFIG}" =~ ^https?:// ]]; then
         exit 1
     fi
 fi
-
+if [[ -z "$VERSION" ]]; then
+    VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+fi
+export VERSION
 # Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-default-ack).
 if [[ -n "$ACK_FILE" ]] && [[ "$ACK_FILE" =~ ^https?:// ]]; then
     ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
@@ -159,6 +162,7 @@ fi
 if [ ${COLLAPSE} == "true" ]; then
     EXTRA_FLAGS+=" --collapse"
 fi
+
 
 if [[ -n "${ORION_ENVS}" ]]; then
     ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
