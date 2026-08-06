@@ -144,6 +144,7 @@ copy_artifacts() {
     if [[ -d "${CLAUDE_HOME}/projects" ]]; then
         tar -czf "${ARTIFACT_DIR}/claude-sessions.tar.gz" \
             -C "${CLAUDE_HOME}" projects/ 2>/dev/null || true
+        touch "${SHARED_DIR}/claude-session-available"
     fi
 }
 trap copy_artifacts EXIT TERM INT
@@ -165,6 +166,8 @@ CONFIGS_RUN=0
 JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-eval.xml"
 STEP_START=${SECONDS}
 STEP_TIMEOUT=10200  # 2h50m — leave margin within the 3h step limit
+SHARED_METRICS_DIR="${SHARED_DIR}/claude-session-metrics"
+mkdir -p "${SHARED_METRICS_DIR}"
 
 write_junit() {
     cat > "${JUNIT_FILE}" <<JEOF
@@ -234,6 +237,7 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
 
     EVAL_START=$(date +%s)
     THIS_EXIT=0
+    STREAM_LOG="${ARTIFACT_DIR}/claude-eval-${config_name}.log"
     timeout 7200 claude \
         --model "${CLAUDE_MODEL}" \
         --plugin-dir "${EVAL_HARNESS_DIR}" \
@@ -241,7 +245,22 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
         --output-format stream-json \
         --max-turns "${EVAL_MAX_TURNS}" \
         -p "/eval-run ${EVAL_RUN_ARGS}" \
-        --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-eval-${config_name}.log" || THIS_EXIT=$?
+        --verbose \
+        2>&1 | tee "${STREAM_LOG}" || THIS_EXIT=$?
+
+    # Pass the orchestrator stream and the eval harness aggregate to the shared
+    # post step. They represent separate spend: the /eval-run orchestrator and
+    # the Claude sessions that execute the individual eval cases.
+    if [[ -s "${STREAM_LOG}" ]]; then
+        cp "${STREAM_LOG}" "${SHARED_METRICS_DIR}/${config_name}.stream.jsonl"
+    fi
+    EVAL_RESULT=$(find "${AGENT_EVAL_RUNS_DIR:-eval/runs}" \
+        -path "*/${RUN_ID}/run_result.json" -type f -print -quit 2>/dev/null || true)
+    if [[ -n "${EVAL_RESULT}" ]]; then
+        cp "${EVAL_RESULT}" "${SHARED_METRICS_DIR}/${RUN_ID}.eval-run.json"
+    else
+        echo "WARNING: eval harness did not produce run_result.json for ${config_name}"
+    fi
     THIS_DURATION=$(( $(date +%s) - EVAL_START ))
     TOTAL_DURATION=$(( TOTAL_DURATION + THIS_DURATION ))
 
