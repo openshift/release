@@ -1,0 +1,72 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: rosa-e2e
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rosa-hcp-e2e-integration-stable-4-22
+  cron: 0 5 * * *
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      ADDITIONAL_PROPERTIES: skip_inflight_tests:true
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: hypershift-ci
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-west-2
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp
+- as: rosa-hcp-e2e-staging-stable-4-22
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: hypershift-ci
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-west-2
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-e2e
+  variant: hypershift-ci

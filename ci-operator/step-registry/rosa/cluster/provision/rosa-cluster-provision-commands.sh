@@ -541,6 +541,9 @@ if [[ "$HOSTED_CP" == "true" ]]; then
     fi
 
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
+    if [[ -n "${ADDITIONAL_PROPERTIES:-}" ]]; then
+      HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties ${ADDITIONAL_PROPERTIES}"
+    fi
     record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
   fi
 
