@@ -22,8 +22,6 @@ promotion:
   to:
   - namespace: konveyor
     tag: oadp-dev
-prowgen:
-  disable_sparse_checkout: true
 releases:
   latest:
     candidate:
@@ -60,6 +58,16 @@ tests:
         # unlike patching the Deployment directly (OLM reconciles that from
         # the CSV and would revert it).
         oc patch subscription "${SUB}" -n "${OO_INSTALL_NAMESPACE}" --type merge -p "$(jq -n --arg img "${KDM_CONTROLLER_IMAGE}" '{spec:{config:{env:[{name:"RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER",value:$img}]}}}')"
+        echo "Waiting for Deployment to observe RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER=${KDM_CONTROLLER_IMAGE}"
+        for i in $(seq 1 60); do
+          CURRENT=$(oc get deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" -o jsonpath="{.spec.template.spec.containers[?(@.name=='manager')].env[?(@.name=='RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER')].value}" 2>/dev/null || true)
+          [ "${CURRENT}" = "${KDM_CONTROLLER_IMAGE}" ] && break
+          sleep 5
+        done
+        if [ "${CURRENT}" != "${KDM_CONTROLLER_IMAGE}" ]; then
+          echo "Timed out waiting for Deployment spec to reflect the Subscription.spec.config.env override" >&2
+          exit 1
+        fi
         oc rollout status deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" --timeout=180s
       dependencies:
       - env: KDM_CONTROLLER_IMAGE
