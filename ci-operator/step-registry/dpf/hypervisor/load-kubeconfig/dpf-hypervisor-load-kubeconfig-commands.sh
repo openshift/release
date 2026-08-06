@@ -75,3 +75,33 @@ oc --kubeconfig=/tmp/kubeconfig.doca8 config unset "clusters.${CLUSTER_NAME}.cer
 
 cp /tmp/kubeconfig.doca8 "${SHARED_DIR}/kubeconfig"
 echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig successfully"
+
+# The *.apps wildcard DNS is internal to the hypervisor network and not
+# resolvable from CI pods. Resolve the ingress VIP from the hypervisor
+# and write /etc/hosts entries via proxy-conf.sh so downstream steps
+# pick them up automatically.
+APPS_DOMAIN="$(oc --kubeconfig=/tmp/kubeconfig.doca8 get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')"
+echo "Resolving apps domain '*.${APPS_DOMAIN}' from the hypervisor..."
+APPS_HOSTNAME="console-openshift-console.${APPS_DOMAIN}"
+APPS_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${APPS_HOSTNAME} | awk '{print \$1}'")"
+
+if [[ -z "${APPS_IP}" ]]; then
+    echo "WARNING: Failed to resolve '${APPS_HOSTNAME}' from the hypervisor, skipping apps DNS setup"
+else
+    echo "Resolved '${APPS_HOSTNAME}' to '${APPS_IP}'"
+    # /etc/hosts does not support wildcards so we enumerate the monitoring
+    # routes that kube-burner needs.
+    APPS_HOSTS=(
+        "prometheus-k8s-openshift-monitoring.${APPS_DOMAIN}"
+        "thanos-querier-openshift-monitoring.${APPS_DOMAIN}"
+        "alertmanager-main-openshift-monitoring.${APPS_DOMAIN}"
+        "console-openshift-console.${APPS_DOMAIN}"
+    )
+    {
+        echo "# Apps wildcard DNS entries resolved from the hypervisor"
+        for h in "${APPS_HOSTS[@]}"; do
+            echo "echo '${APPS_IP} ${h}' >> /etc/hosts"
+        done
+    } >> "${SHARED_DIR}/proxy-conf.sh"
+    echo "Wrote apps DNS entries to \${SHARED_DIR}/proxy-conf.sh"
+fi

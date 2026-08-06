@@ -4,6 +4,18 @@ set -o nounset
 set -o pipefail
 set -x
 cat /etc/os-release
+
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that curved quotes are used here because the file may be sourced by
+# the setup of the test container).
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    # shellcheck disable=SC1091
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 oc config view
 oc projects
 python --version
