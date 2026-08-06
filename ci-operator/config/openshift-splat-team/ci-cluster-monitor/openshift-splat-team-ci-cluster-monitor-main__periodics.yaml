@@ -54,16 +54,27 @@ tests:
       commands: |
         set +x
         source /tmp/nutanix-creds/secrets.sh
+        echo "=== Testing API with credentials ==="
+        HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" --connect-timeout 10 \
+          -u "${prism_central_username}:${prism_central_password}" \
+          "https://${prism_central_host}:${prism_central_port}/api/vmm/v4.0/ahv/config/vms?%24page=0&%24limit=1")
+        echo "API response code: ${HTTP_CODE}"
+        echo "=== Testing OPTIONS (what SDK does) ==="
+        HTTP_CODE2=$(curl -sk -o /dev/null -w "%{http_code}" --connect-timeout 10 \
+          -X OPTIONS \
+          "https://${prism_central_host}:${prism_central_port}/api/vmm/unversioned/info")
+        echo "OPTIONS response code: ${HTTP_CODE2}"
+        echo "=== OPTIONS response body ==="
+        curl -sk --connect-timeout 10 -X OPTIONS \
+          "https://${prism_central_host}:${prism_central_port}/api/vmm/unversioned/info" 2>&1 | head -20
+        echo "=== SSL_CERT_FILE test ==="
+        export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
+        HTTP_CODE3=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 \
+          -u "${prism_central_username}:${prism_central_password}" \
+          --cacert "${SSL_CERT_FILE}" \
+          "https://${prism_central_host}:${prism_central_port}/api/vmm/v4.0/ahv/config/vms?%24page=0&%24limit=1")
+        echo "API with CA cert response code: ${HTTP_CODE3}"
         set -x
-        echo "=== PC endpoint: ${prism_central_host}:${prism_central_port} ==="
-        echo "=== DNS lookup ==="
-        nslookup "${prism_central_host}" 2>&1 || echo "nslookup failed"
-        echo "=== Connectivity test ==="
-        curl -sk --connect-timeout 10 "https://${prism_central_host}:${prism_central_port}" && echo "Reachable" || echo "Unreachable"
-        echo "=== With cluster profile CA cert ==="
-        curl -s --cacert "${CLUSTER_PROFILE_DIR}/prismcentral.pem" --connect-timeout 10 "https://${prism_central_host}:${prism_central_port}" && echo "Reachable with cert" || echo "Unreachable with cert"
-        echo "=== VPN status ==="
-        ip route 2>/dev/null | head -10
         echo "=== Done ==="
       credentials:
       - mount_path: /tmp/nutanix-creds
