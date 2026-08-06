@@ -148,9 +148,20 @@ for f in "${ARTIFACT_DIR}/junit_eco_gotests/"*.xml; do
 done
 
 echo ""
-echo "=== Step 3: Power off seed spoke VM ==="
+echo "=== Step 3: Power off seed spoke node ==="
+
+grep ansible_ssh_private_key -A 100 \
+  "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/master-0" \
+  | sed 's/ansible_ssh_private_key: //g' \
+  | sed "s/'//g" \
+  | sed 's/^  //' \
+  | sed -n '/BEGIN/,/END/p' \
+  > /tmp/spoke-master-ssh-key
+chmod 600 /tmp/spoke-master-ssh-key
 ansible-playbook playbooks/ran/ibu-poweroff-seed-spoke.yml \
-  -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py"
+  -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
+  --private-key=/tmp/spoke-master-ssh-key
+rm -f /tmp/spoke-master-ssh-key
 
 echo ""
 echo "=== IBU Seed Eco-Gotests Complete ==="
