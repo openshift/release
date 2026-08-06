@@ -43,6 +43,7 @@ XmlEscape() {
     text="${text//\"/&quot;}"
     text="${text//\'/&apos;}"
     printf '%s' "${text}"
+    true
 }
 
 WriteJunit() {
@@ -116,6 +117,7 @@ CheckOdfCsv() {
     else
         AddResult "odf-csv-phase" "fail" "ODF CSV phase=${csvPhase} (expected Succeeded)"
     fi
+    true
 }
 
 # ---------------------------------------------------------------------------
@@ -141,6 +143,7 @@ CheckStorageCluster() {
     else
         AddResult "storagecluster-ready" "fail" "StorageCluster phase=${scPhase} (expected Ready)"
     fi
+    true
 }
 
 # ---------------------------------------------------------------------------
@@ -166,6 +169,7 @@ CheckCephCluster() {
     else
         AddResult "cephcluster-health" "fail" "CephCluster health=${cephHealth} (expected HEALTH_OK or HEALTH_WARN)"
     fi
+    true
 }
 
 # ---------------------------------------------------------------------------
@@ -193,6 +197,7 @@ CheckStorageClasses() {
     else
         AddResult "storageclasses-available" "fail" "${failMsg}"
     fi
+    true
 }
 
 # ---------------------------------------------------------------------------
@@ -245,6 +250,7 @@ EOF
     else
         AddResult "pvc-provision" "fail" "PVC did not bind within ${maxWait}s (phase=${phase:-unknown})"
     fi
+    true
 }
 
 # ---------------------------------------------------------------------------
@@ -288,52 +294,23 @@ CheckNoobaa() {
         .items[0].status.accounts.admin.secretRef.name // "noobaa-admin"
     ')" || true
 
+    set +x
     if ! accessKey="$(oc get secret "${secretName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"; then
+        set -x
         AddResult "noobaa-s3-functional" "fail" "Cannot read NooBaa admin credentials"
         return
     fi
     if ! secretKey="$(oc get secret "${secretName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"; then
+        set -x
         AddResult "noobaa-s3-functional" "fail" "Cannot read NooBaa admin credentials"
         return
     fi
 
-    typeset bucket="odf-health-check-$$"
     typeset testKey="health-check-test"
-    typeset testData="odf-health-$(date +%s)"
+    typeset testData=""
+    testData="odf-health-$(date +%s)"
 
-    typeset -i s3ok=1
-
-    # Use a temporary pod to run the S3 operations from inside the cluster
     typeset podName="odf-health-s3-check-$$"
-    typeset s3Script
-    s3Script=$(cat <<'EOSCRIPT'
-#!/bin/sh
-set -e
-export AWS_ACCESS_KEY_ID="$1"
-export AWS_SECRET_ACCESS_KEY="$2"
-S3_ENDPOINT="$3"
-BUCKET="$4"
-TEST_KEY="$5"
-TEST_DATA="$6"
-
-alias s3="aws --endpoint-url ${S3_ENDPOINT} --no-verify-ssl s3"
-alias s3api="aws --endpoint-url ${S3_ENDPOINT} --no-verify-ssl s3api"
-
-# Put
-echo "${TEST_DATA}" | aws --endpoint-url "${S3_ENDPOINT}" --no-verify-ssl s3 cp - "s3://first.bucket/${TEST_KEY}" 2>/dev/null
-# Get
-RETRIEVED=$(aws --endpoint-url "${S3_ENDPOINT}" --no-verify-ssl s3 cp "s3://first.bucket/${TEST_KEY}" - 2>/dev/null)
-# Delete
-aws --endpoint-url "${S3_ENDPOINT}" --no-verify-ssl s3 rm "s3://first.bucket/${TEST_KEY}" 2>/dev/null
-# Verify
-if [ "${RETRIEVED}" = "${TEST_DATA}" ]; then
-    echo "S3_CHECK_PASS"
-else
-    echo "S3_CHECK_FAIL: data mismatch"
-fi
-EOSCRIPT
-)
-
     typeset s3Result=""
     if s3Result="$(oc run "${podName}" -n "${ODF_NAMESPACE}" \
         --image=amazon/aws-cli:latest \
@@ -357,6 +334,7 @@ EOF
     else
         : "S3 check pod failed or timed out"
     fi
+    set -x
 
     oc delete pod "${podName}" -n "${ODF_NAMESPACE}" --ignore-not-found=true --wait=false 2>/dev/null || true
 
@@ -370,6 +348,7 @@ EOF
         fi
         AddResult "noobaa-s3-functional" "fail" "${s3Msg}"
     fi
+    true
 }
 
 # ---------------------------------------------------------------------------
@@ -403,6 +382,7 @@ CheckCephHealth() {
     else
         AddResult "ceph-health-detail" "fail" "Ceph health=${cephHealth}: ${cephDetail}"
     fi
+    true
 }
 
 # ---------------------------------------------------------------------------
