@@ -169,7 +169,6 @@ echo "[INFO] ARGO_TARGET_REVISION: ${ARGO_TARGET_REVISION:-<not found>}"
 # If this is an infra-deployments PR, merge the PR changes
 if [[ "${REPO_NAME:-}" == "infra-deployments" && -n "${PULL_NUMBER:-}" ]]; then
     pushd "$INFRA_DIR"
-    # TODO: Once this prow job is completely successful, this needs to switch back to fetch from origin
     git fetch upstream "refs/pull/${PULL_NUMBER}/head"
     git merge --no-edit FETCH_HEAD
     popd
