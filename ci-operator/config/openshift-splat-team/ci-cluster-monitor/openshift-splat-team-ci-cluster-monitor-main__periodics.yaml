@@ -45,11 +45,21 @@ tests:
     test:
     - as: monitor
       commands: |
+        set +x
+        source /var/run/vault/nutanix/secrets.sh
+        mkdir -p /tmp/nutanix-creds
+        echo -n "${prism_central_username}" > /tmp/nutanix-creds/nutanix-username
+        echo -n "${prism_central_password}" > /tmp/nutanix-creds/nutanix-password
+        set -x
         make build
-        ./bin/vm-monitor --config config/nutanix.yaml --credentials-dir /tmp/nutanix-secret --cleanup
+        ./bin/vm-monitor --config config/nutanix.yaml \
+          --credentials-dir /tmp/nutanix-creds \
+          --endpoint "${prism_central_host}" \
+          --port "${prism_central_port}" \
+          --cleanup
       credentials:
-      - mount_path: /tmp/nutanix-secret
-        name: ci-cluster-monitor-nutanix-creds
+      - mount_path: /var/run/vault/nutanix
+        name: nutanix-pc
         namespace: test-credentials
       from: src
       resources:
