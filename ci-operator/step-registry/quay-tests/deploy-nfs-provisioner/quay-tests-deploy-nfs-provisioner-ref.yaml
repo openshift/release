@@ -1,0 +1,22 @@
+ref:
+  as: quay-tests-deploy-nfs-provisioner
+  from: cli
+  commands: quay-tests-deploy-nfs-provisioner-commands.sh
+  timeout: 30m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Deploy an in-cluster NFS provisioner and create a default StorageClass.
+    This step creates the nfs-provisioner namespace, deploys an NFS server
+    pod pinned to a worker node using hostPath storage, sets up RBAC and
+    SecurityContextConstraints, creates an "nfs" StorageClass, and sets it
+    as the default if no other default exists.
+    Useful as a lightweight storage backend for Quay e2e tests on platforms
+    where no CSI driver is available (e.g. HyperShift on PowerVS with
+    Agent platform type).
+  env:
+    - name: NFS_PROVISIONER_IMAGE
+      documentation: "NFS provisioner image. Must support the target cluster architecture (e.g. ppc64le for PowerVS)."
+      default: "registry.k8s.io/sig-storage/nfs-provisioner:v4.0.8"
