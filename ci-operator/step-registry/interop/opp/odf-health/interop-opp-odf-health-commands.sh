@@ -280,7 +280,7 @@ function CheckNoobaa () {
 
     : "NooBaa phase=Ready, running S3 functional check..."
 
-    typeset s3Endpoint="" accessKey="" secretKey=""
+    typeset s3Endpoint=""
     s3Endpoint="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | jq -r '
         .items[0].status.services.serviceS3.internalDNS[0] // empty
     ')" || true
@@ -294,47 +294,52 @@ function CheckNoobaa () {
         .items[0].status.accounts.admin.secretRef.name // "noobaa-admin"
     ')" || true
 
-    set +x
-    if ! accessKey="$(oc get secret "${secretName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d)"; then
-        set -x
-        AddResult "noobaa-s3-functional" "fail" "Cannot read NooBaa admin credentials"
-        return
-    fi
-    if ! secretKey="$(oc get secret "${secretName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d)"; then
-        set -x
-        AddResult "noobaa-s3-functional" "fail" "Cannot read NooBaa admin credentials"
-        return
-    fi
-
     typeset testKey="health-check-test"
     typeset testData=""
     testData="odf-health-$(date +%s)"
 
     typeset podName="odf-health-s3-check-$$"
-    typeset s3Result=""
-    if s3Result="$(oc run "${podName}" -n "${ODF_NAMESPACE}" \
-        --image=amazon/aws-cli:latest \
-        --restart=Never \
-        --rm=true \
-        --attach=true \
-        --timeout="${NOOBAA_S3_TIMEOUT}s" \
-        --command -- sh -c "$(cat <<EOF
-export AWS_ACCESS_KEY_ID='${accessKey}'
-export AWS_SECRET_ACCESS_KEY='${secretKey}'
-S3_ENDPOINT='${s3Endpoint}'
-TEST_KEY='${testKey}'
-TEST_DATA='${testData}'
-echo "\${TEST_DATA}" | aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 cp - "s3://first.bucket/\${TEST_KEY}" 2>/dev/null && \
-RETRIEVED=\$(aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 cp "s3://first.bucket/\${TEST_KEY}" - 2>/dev/null) && \
-aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 rm "s3://first.bucket/\${TEST_KEY}" 2>/dev/null && \
-if [ "\${RETRIEVED}" = "\${TEST_DATA}" ]; then echo "S3_CHECK_PASS"; else echo "S3_CHECK_FAIL: data mismatch"; fi
+    typeset podManifest=""
+    podManifest=$(cat <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${podName}
+  namespace: ${ODF_NAMESPACE}
+spec:
+  restartPolicy: Never
+  containers:
+  - name: s3check
+    image: amazon/aws-cli:2.22.35
+    envFrom:
+    - secretRef:
+        name: ${secretName}
+    env:
+    - name: S3_ENDPOINT
+      value: "${s3Endpoint}"
+    - name: TEST_KEY
+      value: "${testKey}"
+    - name: TEST_DATA
+      value: "${testData}"
+    command:
+    - sh
+    - -c
+    - |
+      echo "\${TEST_DATA}" | aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 cp - "s3://first.bucket/\${TEST_KEY}" 2>/dev/null && \
+      RETRIEVED=\$(aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 cp "s3://first.bucket/\${TEST_KEY}" - 2>/dev/null) && \
+      aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 rm "s3://first.bucket/\${TEST_KEY}" 2>/dev/null && \
+      if [ "\${RETRIEVED}" = "\${TEST_DATA}" ]; then echo "S3_CHECK_PASS"; else echo "S3_CHECK_FAIL: data mismatch"; fi
+  activeDeadlineSeconds: ${NOOBAA_S3_TIMEOUT}
 EOF
-)" 2>/dev/null)"; then
-        : "S3 check pod completed"
-    else
-        : "S3 check pod failed or timed out"
+)
+
+    typeset s3Result=""
+    if echo "${podManifest}" | oc apply -f - 2>/dev/null; then
+        if ! oc wait pod "${podName}" -n "${ODF_NAMESPACE}" --for=condition=Ready --timeout="${NOOBAA_S3_TIMEOUT}s" 2>/dev/null; then
+            : "Pod did not reach Ready, checking logs anyway"
+        fi
+        s3Result="$(oc logs "${podName}" -n "${ODF_NAMESPACE}" 2>/dev/null || echo "")"
     fi
-    set -x
 
     oc delete pod "${podName}" -n "${ODF_NAMESPACE}" --ignore-not-found=true --wait=false 2>/dev/null || true
 
