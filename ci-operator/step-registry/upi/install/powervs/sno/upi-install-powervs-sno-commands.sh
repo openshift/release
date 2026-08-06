@@ -756,7 +756,7 @@ IBMCLOUD_API_KEY=$(cat ${CREDENTIALS_PATH}/.powercreds)
 POWERVS_SERVICE_INSTANCE_ID=$(echo ${POWERVS_INSTANCE_CRN} | cut -f8 -d":")
 POWERVS_REGION=$(echo ${POWERVS_INSTANCE_CRN} | cut -f6 -d":")
 POWERVS_ZONE=$(echo ${POWERVS_REGION} | sed 's/-*[0-9].*//')
-POWERVS_RESOURCE_GROUP=""
+POWERVS_RESOURCE_GROUP="${POWERVS_SNO_RESOURCE_GROUP:-}"
 cat > /tmp/powervs-config.json << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
