@@ -249,7 +249,7 @@ for result_file in result_files:
             "prompt": prompt[:500],
             "plugins_loaded": "agent-eval-harness",
             "analyzed_at": analyzed_at,
-            "duration_ms": str(int(duration_ms * duration_ratio)),
+            "duration_ms": str(max(1, int(duration_ms * duration_ratio))),
             "num_turns": str(turns or int(result.get("num_turns", 0) or 0)),
             "total_cost_usd": f"{cost:.6f}",
             "input_tokens": str(input_tokens),
