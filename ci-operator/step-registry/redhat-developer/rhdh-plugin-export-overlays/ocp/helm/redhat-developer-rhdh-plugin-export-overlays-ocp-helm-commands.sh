@@ -28,7 +28,7 @@ set -euo pipefail
 GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh-plugin-export-overlays"
 OVERLAY_BRANCH=""
-REHEARSE_PR_NUMBER=""  # Set overlay repo PR number for rehearse testing
+REHEARSE_PR_NUMBER="3052"  # Set overlay repo PR number for rehearse testing
 CATALOG_INDEX_IMAGE=""
 PLAYWRIGHT_VERSION=""
 
