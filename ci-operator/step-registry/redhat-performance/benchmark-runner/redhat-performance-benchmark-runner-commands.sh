@@ -8,6 +8,8 @@ USE_SHARED_DIR=false
 # Cluster access: ci-operator kubeconfig > SHARED_DIR SSH > Vault SSH > Vault bastion
 if [[ -s "${KUBECONFIG:-}" ]]; then
   USE_SHARED_DIR=true
+  # Write empty elasticsearch marker to SHARED_DIR so Vault ES config is not loaded
+  touch "${SHARED_DIR}/elasticsearch" 2>/dev/null || true
   if [[ -s "${KUBEADMIN_PASSWORD_FILE:-}" ]]; then
     KUBEADMIN_PASSWORD=$(<"${KUBEADMIN_PASSWORD_FILE}")
     KUBEADMIN_PASSWORD="${KUBEADMIN_PASSWORD%$'\n'}"
