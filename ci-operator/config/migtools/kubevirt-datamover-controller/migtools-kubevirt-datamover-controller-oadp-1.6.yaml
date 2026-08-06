@@ -1,3 +1,12 @@
+base_images:
+  oadp-operator-index:
+    name: oadp-operator-index
+    namespace: konveyor
+    tag: oadp-1.6
+  test-oadp-operator:
+    name: oadp-operator-e2e-tests
+    namespace: konveyor
+    tag: oadp-1.6
 build_root:
   image_stream_tag:
     name: builder
@@ -13,6 +22,12 @@ promotion:
   to:
   - name: kubevirt-datamover-controller
     namespace: konveyor
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -20,6 +35,61 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-test-aws
+  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|.sh
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: oadp-operator-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: set-related-image
+      cli: latest
+      commands: |
+        SUB=$(cat "${SHARED_DIR}/oo-subscription")
+        # Subscription.spec.config.env is OLM's supported override mechanism:
+        # it wins over same-named CSV env vars and survives reconciliation,
+        # unlike patching the Deployment directly (OLM reconciles that from
+        # the CSV and would revert it).
+        oc patch subscription "${SUB}" -n "${OO_INSTALL_NAMESPACE}" --type merge -p "$(jq -n --arg img "${KDM_CONTROLLER_IMAGE}" '{spec:{config:{env:[{name:"RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER",value:$img}]}}}')"
+        echo "Waiting for Deployment to observe RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER=${KDM_CONTROLLER_IMAGE}"
+        for i in $(seq 1 60); do
+          CURRENT=$(oc get deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" -o jsonpath="{.spec.template.spec.containers[?(@.name=='manager')].env[?(@.name=='RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER')].value}" 2>/dev/null || true)
+          [ "${CURRENT}" = "${KDM_CONTROLLER_IMAGE}" ] && break
+          sleep 5
+        done
+        if [ "${CURRENT}" != "${KDM_CONTROLLER_IMAGE}" ]; then
+          echo "Timed out waiting for Deployment spec to reflect the Subscription.spec.config.env override" >&2
+          exit 1
+        fi
+        oc rollout status deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" --timeout=180s
+      dependencies:
+      - env: KDM_CONTROLLER_IMAGE
+        name: kubevirt-datamover-controller-oadp-1.6
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: e2e
+      cli: latest
+      commands: make TEST_VIRT=true test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: oadp-1.6
   org: migtools
