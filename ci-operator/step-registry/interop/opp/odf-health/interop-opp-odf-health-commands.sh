@@ -205,11 +205,18 @@ function CheckStorageClasses () {
 # ---------------------------------------------------------------------------
 
 function CheckPvcProvision () {
-    : "=== Check 5: PVC provisioning ==="
+    : "=== Check 5: PVC provisioning (RBD + CephFS) ==="
 
-    typeset pvcName="odf-health-check-pvc-$$"
-    typeset pvcYaml
-    pvcYaml=$(cat <<EOF
+    typeset -a scTests=("ocs-storagecluster-ceph-rbd" "ocs-storagecluster-cephfs")
+    typeset -a scModes=("ReadWriteOnce" "ReadWriteMany")
+
+    for idx in "${!scTests[@]}"; do
+        typeset scName="${scTests[$idx]}"
+        typeset accessMode="${scModes[$idx]}"
+        typeset testId="pvc-provision-${scName##*-}"
+        typeset pvcName="odf-health-${scName##*-}-$$"
+        typeset pvcYaml
+        pvcYaml=$(cat <<EOF
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -217,39 +224,40 @@ metadata:
   namespace: ${ODF_NAMESPACE}
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ${accessMode}
   resources:
     requests:
       storage: 1Gi
-  storageClassName: ocs-storagecluster-ceph-rbd
+  storageClassName: ${scName}
 EOF
 )
 
-    if ! echo "${pvcYaml}" | oc apply -f - 2>/dev/null; then
-        AddResult "pvc-provision" "fail" "Failed to create test PVC"
-        return
-    fi
-
-    typeset -i maxWait=60
-    typeset -i elapsed=0
-    typeset phase=""
-    while (( elapsed < maxWait )); do
-        phase="$(oc get pvc "${pvcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")"
-        if [[ "${phase}" == "Bound" ]]; then
-            break
+        if ! echo "${pvcYaml}" | oc apply -f - 2>/dev/null; then
+            AddResult "${testId}" "fail" "Failed to create test PVC for ${scName}"
+            continue
         fi
-        sleep 5
-        (( elapsed += 5 )) || true
+
+        typeset -i maxWait=60
+        typeset -i elapsed=0
+        typeset phase=""
+        while (( elapsed < maxWait )); do
+            phase="$(oc get pvc "${pvcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")"
+            if [[ "${phase}" == "Bound" ]]; then
+                break
+            fi
+            sleep 5
+            (( elapsed += 5 )) || true
+        done
+
+        oc delete pvc "${pvcName}" -n "${ODF_NAMESPACE}" --wait=false 2>/dev/null || true
+
+        if [[ "${phase}" == "Bound" ]]; then
+            : "PASS: ${scName} PVC bound in ${elapsed}s"
+            AddResult "${testId}" "pass"
+        else
+            AddResult "${testId}" "fail" "${scName} PVC did not bind within ${maxWait}s (phase=${phase:-unknown})"
+        fi
     done
-
-    oc delete pvc "${pvcName}" -n "${ODF_NAMESPACE}" --wait=false 2>/dev/null || true
-
-    if [[ "${phase}" == "Bound" ]]; then
-        : "PASS: PVC provisioned and bound in ${elapsed}s"
-        AddResult "pvc-provision" "pass"
-    else
-        AddResult "pvc-provision" "fail" "PVC did not bind within ${maxWait}s (phase=${phase:-unknown})"
-    fi
     true
 }
 
@@ -278,23 +286,62 @@ function CheckNoobaa () {
         return
     fi
 
-    : "NooBaa phase=Ready, running S3 functional check..."
+    : "NooBaa phase=Ready, creating OBC for S3 functional check..."
+
+    typeset obcName="odf-health-obc-$$"
+    typeset obcYaml
+    obcYaml=$(cat <<EOF
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: ${obcName}
+  namespace: ${ODF_NAMESPACE}
+spec:
+  generateBucketName: odf-health-check
+  storageClassName: openshift-storage.noobaa.io
+EOF
+)
+
+    if ! echo "${obcYaml}" | oc apply -f - 2>/dev/null; then
+        AddResult "noobaa-s3-functional" "fail" "Failed to create ObjectBucketClaim"
+        return
+    fi
+
+    typeset -i maxWait=60
+    typeset -i elapsed=0
+    typeset obcPhase=""
+    while (( elapsed < maxWait )); do
+        obcPhase="$(oc get obc "${obcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")"
+        if [[ "${obcPhase}" == "Bound" ]]; then
+            break
+        fi
+        sleep 5
+        (( elapsed += 5 )) || true
+    done
+
+    if [[ "${obcPhase}" != "Bound" ]]; then
+        oc delete obc "${obcName}" -n "${ODF_NAMESPACE}" --ignore-not-found=true --wait=false 2>/dev/null || true
+        AddResult "noobaa-s3-functional" "fail" "OBC did not bind within ${maxWait}s (phase=${obcPhase:-unknown})"
+        return
+    fi
+
+    typeset bucketName=""
+    bucketName="$(oc get obc "${obcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.spec.bucketName}' 2>/dev/null)" || true
+    typeset secretRef=""
+    secretRef="$(oc get obc "${obcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.spec.secretName}' 2>/dev/null)"
+    if [[ -z "${secretRef}" ]]; then
+        secretRef="${obcName}"
+    fi
 
     typeset s3Endpoint=""
     s3Endpoint="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | jq -r '
         .items[0].status.services.serviceS3.internalDNS[0] // empty
     ')" || true
-
     if [[ -z "${s3Endpoint}" ]]; then
         s3Endpoint="https://s3.${ODF_NAMESPACE}.svc:443"
     fi
 
-    typeset secretName=""
-    secretName="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | jq -r '
-        .items[0].status.accounts.admin.secretRef.name // "noobaa-admin"
-    ')" || true
-
-    typeset testKey="health-check-test"
+    typeset testKey="health-check-$$"
     typeset testData=""
     testData="odf-health-$(date +%s)"
 
@@ -313,10 +360,12 @@ spec:
     image: amazon/aws-cli:2.22.35
     envFrom:
     - secretRef:
-        name: ${secretName}
+        name: ${secretRef}
     env:
     - name: S3_ENDPOINT
       value: "${s3Endpoint}"
+    - name: BUCKET_NAME
+      value: "${bucketName}"
     - name: TEST_KEY
       value: "${testKey}"
     - name: TEST_DATA
@@ -325,9 +374,9 @@ spec:
     - sh
     - -c
     - |
-      echo "\${TEST_DATA}" | aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 cp - "s3://first.bucket/\${TEST_KEY}" 2>/dev/null && \
-      RETRIEVED=\$(aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 cp "s3://first.bucket/\${TEST_KEY}" - 2>/dev/null) && \
-      aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 rm "s3://first.bucket/\${TEST_KEY}" 2>/dev/null && \
+      echo "\${TEST_DATA}" | aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 cp - "s3://\${BUCKET_NAME}/\${TEST_KEY}" 2>/dev/null && \
+      RETRIEVED=\$(aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 cp "s3://\${BUCKET_NAME}/\${TEST_KEY}" - 2>/dev/null) && \
+      aws --endpoint-url "\${S3_ENDPOINT}" --no-verify-ssl s3 rm "s3://\${BUCKET_NAME}/\${TEST_KEY}" 2>/dev/null && \
       if [ "\${RETRIEVED}" = "\${TEST_DATA}" ]; then echo "S3_CHECK_PASS"; else echo "S3_CHECK_FAIL: data mismatch"; fi
   activeDeadlineSeconds: ${NOOBAA_S3_TIMEOUT}
 EOF
@@ -342,6 +391,7 @@ EOF
     fi
 
     oc delete pod "${podName}" -n "${ODF_NAMESPACE}" --ignore-not-found=true --wait=false 2>/dev/null || true
+    oc delete obc "${obcName}" -n "${ODF_NAMESPACE}" --ignore-not-found=true --wait=false 2>/dev/null || true
 
     if echo "${s3Result}" | grep -q "S3_CHECK_PASS"; then
         : "PASS: NooBaa S3 put/get/delete cycle succeeded"
