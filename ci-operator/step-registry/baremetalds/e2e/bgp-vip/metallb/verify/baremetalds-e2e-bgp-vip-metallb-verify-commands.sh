@@ -43,6 +43,8 @@ poll() {
 
 nodes="$(oc get nodes -o name | wc -l)"
 
+is_v6() { [[ "$1" == *:* ]]; }
+
 echo "[1/4] MetalLB is deployed and produced FRRConfigurations in openshift-frr-k8s"
 # MetalLB-generated FRRConfigurations carry no labels; select by the
 # per-node name prefix 'metallb-'. grep -c returns non-zero on no match,
@@ -60,55 +62,72 @@ if ! poll 300 check_metallb; then
     fail "MetalLB not deployed or no MetalLB-owned FRRConfiguration in openshift-frr-k8s"
 fi
 
-echo "[2/4] same-neighbor merge: still exactly one Established ToR session per node"
+echo "[2/4] same-neighbor merge: still exactly one Established ToR session per node per family"
 # vtysh prints a harmless 'vtysh.conf' warning on stderr; drop stderr and
-# parse stdout only so pipefail is not tripped by the noise.
+# parse stdout only so pipefail is not tripped by the noise. On dual-stack
+# clusters every node holds one session per address family; MetalLB must
+# merge into these, not add or flap sessions.
+node_ips="$(oc get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}' | wc -w)"
 check_sessions() {
     local established
-    established="$(${CLI} exec bgp-tor vtysh -c 'show bgp ipv4 unicast summary json' 2>/dev/null \
-        | jq '[(.ipv4Unicast.peers // .peers // {})[] | select(.state=="Established")] | length')"
-    [[ "${established:-0}" -eq "${nodes}" ]]
+    established="$( { ${CLI} exec bgp-tor vtysh -c 'show bgp ipv4 unicast summary json' 2>/dev/null; \
+                      ${CLI} exec bgp-tor vtysh -c 'show bgp ipv6 unicast summary json' 2>/dev/null; } \
+        | jq -s '[.[] | (.ipv4Unicast.peers // .ipv6Unicast.peers // .peers // {}) | to_entries[] | select(.value.state=="Established") | .key] | unique | length')"
+    [[ "${established:-0}" -eq "${node_ips}" ]]
 }
 if ! poll 300 check_sessions; then
-    ${CLI} exec bgp-tor vtysh -c 'show bgp ipv4 unicast summary' || true
-    fail "ToR does not have exactly ${nodes} Established sessions (MetalLB must merge into the existing neighbor, not add or flap sessions)"
+    ${CLI} exec bgp-tor vtysh -c 'show bgp summary' || true
+    fail "ToR does not have exactly ${node_ips} Established sessions (one per node InternalIP; MetalLB must merge into the existing neighbors, not add or flap sessions)"
 fi
 
-echo "[3/4] the LoadBalancer service IP is advertised to the ToR from every frr-k8s node"
-lb_ip=""
-get_lb_ip() {
-    lb_ip="$(oc get svc lb-echo -n default -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)"
-    [[ -n "${lb_ip}" ]]
+echo "[3/4] every LoadBalancer service IP is advertised to the ToR from every frr-k8s node"
+# on dual-stack clusters the Service (ipFamilyPolicy: PreferDualStack) gets
+# one LoadBalancer IP per family; every one must be advertised
+lb_ips=""
+expected_lb_ips="$(oc get network.config cluster -o jsonpath='{.status.clusterNetwork[*].cidr}' | wc -w)"
+get_lb_ips() {
+    lb_ips="$(oc get svc lb-echo -n default -o jsonpath='{.status.loadBalancer.ingress[*].ip}' 2>/dev/null)"
+    [[ "$(echo "${lb_ips}" | wc -w)" -eq "${expected_lb_ips}" ]]
 }
-if ! poll 180 get_lb_ip; then
+if ! poll 180 get_lb_ips; then
     oc describe svc lb-echo -n default || true
-    fail "lb-echo never received a LoadBalancer IP from the pool"
+    fail "lb-echo did not receive ${expected_lb_ips} LoadBalancer IP(s) from the pool (got: '${lb_ips:-none}')"
 else
-    # ToR /32 convergence takes ~15-20s after advertisement; the poll absorbs it.
+    # ToR convergence takes ~15-20s after advertisement; the poll absorbs it.
+    paths_for_lb() {
+        local ip="$1" af=ipv4 plen=32
+        if is_v6 "${ip}"; then af=ipv6 plen=128; fi
+        ${CLI} exec bgp-tor vtysh -c "show bgp ${af} unicast ${ip}/${plen}" 2>/dev/null \
+            | sed -n 's/^Paths: (\([0-9]*\) available.*/\1/p'
+    }
     check_lb_paths() {
         local paths
-        paths="$(${CLI} exec bgp-tor vtysh -c "show ip bgp ${lb_ip}/32" 2>/dev/null \
-            | sed -n 's/^Paths: (\([0-9]*\) available.*/\1/p')"
+        paths="$(paths_for_lb "$1")"
         [[ "${paths:-0}" -eq "${nodes}" ]]
     }
-    if ! poll 300 check_lb_paths; then
-        ${CLI} exec bgp-tor vtysh -c "show ip bgp ${lb_ip}/32" || true
-        fail "LB IP ${lb_ip}/32 does not have ${nodes} BGP paths at the ToR"
-    fi
+    for ip in ${lb_ips}; do
+        if ! poll 300 check_lb_paths "${ip}"; then
+            fail "LB IP ${ip}: $(paths_for_lb "${ip}" || echo 0) BGP paths at the ToR, expected ${nodes}"
+        fi
+    done
 fi
 
-echo "[4/4] datapath: the LB service answers over the BGP-routed path"
+echo "[4/4] datapath: the LB service answers over the BGP-routed path (every family)"
 # success is the curl exit code (HTTP success), not any response-body literal
-if [[ -n "${lb_ip}" ]]; then
-    check_datapath() {
-        curl --fail --show-error --max-time 20 -s -o /dev/null "http://${lb_ip}:8080/hostname"
-    }
-    if poll 300 check_datapath; then
-        echo "LB service reachable over BGP"
-    else
-        ip route get "${lb_ip}" || true
-        fail "LB service ${lb_ip}:8080 not reachable from the hypervisor"
-    fi
+if [[ -n "${lb_ips}" ]]; then
+    for ip in ${lb_ips}; do
+        url="http://${ip}:8080/hostname"
+        if is_v6 "${ip}"; then url="http://[${ip}]:8080/hostname"; fi
+        check_datapath() {
+            curl -g --fail --show-error --max-time 20 -s -o /dev/null "${url}"
+        }
+        if poll 300 check_datapath; then
+            echo "LB service reachable over BGP via ${ip}"
+        else
+            ip route get "${ip}" 2>/dev/null || ip -6 route get "${ip}" 2>/dev/null || true
+            fail "LB service ${url} not reachable from the hypervisor"
+        fi
+    done
 else
     echo "skipping datapath check: no LB IP"
 fi

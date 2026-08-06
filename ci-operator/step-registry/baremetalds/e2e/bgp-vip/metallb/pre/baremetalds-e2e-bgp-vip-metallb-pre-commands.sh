@@ -85,6 +85,10 @@ else
   wait_operator_rollouts
   oc get crd servicemonitors.monitoring.coreos.com
   oc set env deploy/metallb-operator-controller-manager -n metallb-system DEPLOY_SERVICEMONITORS=true
+  # the dev manifest hardcodes METALLB_BGP_TYPE=native on the webhook server,
+  # which rejects IPv6 pools/advertisements; this deployment runs MetalLB in
+  # frr-k8s (external) mode where IPv6 is supported
+  oc set env deploy/metallb-operator-webhook-server -n metallb-system METALLB_BGP_TYPE=frr-k8s
   wait_operator_rollouts
 fi
 
@@ -116,7 +120,19 @@ until metallb_cr | oc apply --dry-run=server -f - &>/dev/null; do
 done
 metallb_cr | oc apply -f -
 # transient metallb-memberlist "secret not found" FailedMount events while the
-# controller comes up are benign - the controller creates that secret itself
+# controller comes up are benign - the controller creates that secret itself.
+# The operator creates the workloads asynchronously after the MetalLB CR is
+# accepted; wait for them to exist before waiting for their rollout.
+workload_deadline=$((SECONDS + 300))
+until oc get deploy -n metallb-system controller &>/dev/null \
+    && oc get ds -n metallb-system speaker &>/dev/null; do
+  if (( SECONDS >= workload_deadline )); then
+    oc get deploy,ds -n metallb-system || true
+    echo "Timed out waiting for the MetalLB operator to create controller/speaker" >&2
+    exit 1
+  fi
+  sleep 5
+done
 oc rollout status -n metallb-system deploy/controller --timeout=10m
 oc rollout status -n metallb-system ds/speaker --timeout=10m
 
@@ -130,9 +146,11 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-  # off the dev-scripts DHCP range (192.168.111.20-192.168.111.60) and the
-  # API/ingress VIP allocations
+  # off the dev-scripts DHCP range (192.168.111.20-192.168.111.60), the
+  # API/ingress VIP allocations, and their IPv6 counterparts on the
+  # external /120 (harmless surplus on single-stack clusters)
   - 192.168.111.70-192.168.111.90
+  - fd2e:6f44:5dd8:c956::70-fd2e:6f44:5dd8:c956::90
 ---
 apiVersion: metallb.io/v1beta2
 kind: BGPPeer
@@ -141,6 +159,16 @@ metadata:
   namespace: metallb-system
 spec:
   peerAddress: 192.168.111.1
+  peerASN: 64513
+  myASN: 64512
+---
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
+metadata:
+  name: tor-v6
+  namespace: metallb-system
+spec:
+  peerAddress: fd2e:6f44:5dd8:c956::1
   peerASN: 64513
   myASN: 64512
 ---
@@ -157,8 +185,22 @@ YAML
 # --- LoadBalancer workload the verify step curls
 oc create deployment lb-echo -n default --image=registry.k8s.io/e2e-test-images/agnhost:2.53 \
   --replicas=2 --dry-run=client -o yaml -- /agnhost netexec --http-port=8080 | oc apply -f -
-oc expose deployment lb-echo -n default --type=LoadBalancer --port=8080 --name=lb-echo \
-  --dry-run=client -o yaml | oc apply -f -
+oc apply -f - <<'YAML'
+apiVersion: v1
+kind: Service
+metadata:
+  name: lb-echo
+  namespace: default
+spec:
+  type: LoadBalancer
+  # dual-stack when the cluster supports it, single-stack otherwise
+  ipFamilyPolicy: PreferDualStack
+  selector:
+    app: lb-echo
+  ports:
+  - port: 8080
+    targetPort: 8080
+YAML
 # the verify step curls the service; do not hand it an LB with no Ready backend
 oc rollout status -n default deploy/lb-echo --timeout=5m
 EOF

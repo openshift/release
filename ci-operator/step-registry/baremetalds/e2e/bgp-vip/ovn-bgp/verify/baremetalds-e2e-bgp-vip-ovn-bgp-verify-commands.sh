@@ -42,6 +42,9 @@ poll() {
 }
 
 nodes="$(oc get nodes -o name | wc -l)"
+# on dual-stack clusters every node peers with the route reflector once per
+# address family, so the expected session count is one per node InternalIP
+node_ips="$(oc get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}' | wc -w)"
 
 echo "[1/4] both BGP consumers own FRRConfiguration CRs in openshift-frr-k8s"
 check_crs() {
@@ -59,35 +62,49 @@ echo "[2/4] every node has an Established BGP session to the route reflector"
 # DaemonSet does not run there), so established master sessions prove the
 # static-pod CR merge works alongside the VIP configuration.
 check_sessions() {
+    # count unique Established peers across both address-family summaries:
+    # a v4 peer and a v6 peer from the same node are two sessions, while a
+    # peer activated in both families is still one session
     local established
-    established="$(${CLI} exec frr vtysh -c 'show bgp ipv4 unicast summary json' \
-        | jq '[(.ipv4Unicast.peers // .peers // {})[] | select(.state=="Established")] | length')"
-    [[ "${established:-0}" -eq "${nodes}" ]]
+    established="$( { ${CLI} exec frr vtysh -c 'show bgp ipv4 unicast summary json' 2>/dev/null; \
+                      ${CLI} exec frr vtysh -c 'show bgp ipv6 unicast summary json' 2>/dev/null; } \
+        | jq -s '[.[] | (.ipv4Unicast.peers // .ipv6Unicast.peers // .peers // {}) | to_entries[] | select(.value.state=="Established") | .key] | unique | length')"
+    [[ "${established:-0}" -eq "${node_ips}" ]]
 }
 if ! poll 300 check_sessions; then
-    ${CLI} exec frr vtysh -c 'show bgp ipv4 unicast summary' || true
-    fail "route reflector does not have ${nodes} Established sessions (one per node)"
+    ${CLI} exec frr vtysh -c 'show bgp summary' || true
+    fail "route reflector does not have ${node_ips} Established sessions (one per node InternalIP, per address family)"
 fi
 
 echo "[3/4] every node's pod subnet is advertised to the route reflector"
 # assert the exact per-node OVN subnets, not a route count: the reflector's
 # table also carries unrelated prefixes (e.g. the agnhost network)
 check_pod_subnets() {
-    local rr_routes subnet expected missing=0
-    # every node must contribute exactly one IPv4 pod subnet; an absent or
-    # empty node-subnets annotation must fail the check, not shrink the loop
-    expected="$(oc get nodes -o jsonpath='{.items[*].metadata.annotations.k8s\.ovn\.org/node-subnets}' \
-        | { jq -r -s '.[].default[]' 2>/dev/null || true; } | { grep -c -F . || true; })"
-    if [[ "${expected:-0}" -ne "${nodes}" ]]; then
-        echo "expected ${nodes} IPv4 pod subnets from node annotations, found ${expected:-0}"
+    local all_subnets rr_routes_v4 rr_routes_v6 subnet expected missing=0
+    # every node must contribute one pod subnet per cluster address family;
+    # an absent or empty node-subnets annotation must fail the check, not
+    # shrink the loop
+    all_subnets="$(oc get nodes -o jsonpath='{.items[*].metadata.annotations.k8s\.ovn\.org/node-subnets}' \
+        | { jq -r -s '.[].default[]' 2>/dev/null || true; })"
+    expected="$(echo "${all_subnets}" | { grep -c . || true; })"
+    families="$(oc get network.config cluster -o jsonpath='{.status.clusterNetwork[*].cidr}' | wc -w)"
+    if [[ "${expected:-0}" -ne $(( nodes * families )) ]]; then
+        echo "expected $(( nodes * families )) pod subnets from node annotations (${nodes} nodes x ${families} families), found ${expected:-0}"
         return 1
     fi
-    rr_routes="$(${CLI} exec frr vtysh -c 'show bgp ipv4 unicast json' | jq -r '.routes | keys[]')"
-    for subnet in $(oc get nodes -o jsonpath='{.items[*].metadata.annotations.k8s\.ovn\.org/node-subnets}' \
-        | jq -r -s '.[].default[]' | grep -F . ); do
-        if ! grep -qx "${subnet}" <<< "${rr_routes}"; then
-            echo "pod subnet ${subnet} not (yet) at the route reflector"
-            missing=1
+    rr_routes_v4="$(${CLI} exec frr vtysh -c 'show bgp ipv4 unicast json' 2>/dev/null | jq -r '.routes | keys[]')"
+    rr_routes_v6="$(${CLI} exec frr vtysh -c 'show bgp ipv6 unicast json' 2>/dev/null | jq -r '.routes | keys[]')"
+    for subnet in ${all_subnets}; do
+        if [[ "${subnet}" == *:* ]]; then
+            if ! grep -qx "${subnet}" <<< "${rr_routes_v6}"; then
+                echo "pod subnet ${subnet} not (yet) at the route reflector (ipv6)"
+                missing=1
+            fi
+        else
+            if ! grep -qx "${subnet}" <<< "${rr_routes_v4}"; then
+                echo "pod subnet ${subnet} not (yet) at the route reflector (ipv4)"
+                missing=1
+            fi
         fi
     done
     [[ "${missing}" -eq 0 ]]
@@ -101,14 +118,21 @@ echo "[4/4] pod-network datapath over BGP: pod reaches the external agnhost"
 # 172.20.0.100 lives behind the route reflector (agnhost macvlan network);
 # the cluster imports it via the receive-filtered FRRConfiguration. A pod
 # reaching it proves the RA datapath works on a BGP-VIP-managed cluster.
-oc delete pod bgp-ra-datapath-check --ignore-not-found
-if oc run bgp-ra-datapath-check --restart=Never --attach --rm --pod-running-timeout=5m \
-    --image=registry.k8s.io/e2e-test-images/agnhost:2.53 --command -- \
-    curl --max-time 20 -s --fail --show-error -o /dev/null http://172.20.0.100:8000/hostname; then
-    echo "agnhost reachable from pod network"
-else
-    fail "pod could not reach agnhost 172.20.0.100:8000 over the BGP-imported route"
+agnhost_targets="http://172.20.0.100:8000/hostname"
+if [[ "$(oc get network.config cluster -o jsonpath='{.status.clusterNetwork[*].cidr}')" == *:* ]]; then
+    # dual-stack: the agnhost container also lives at 2001:db8:2::100
+    agnhost_targets="${agnhost_targets} http://[2001:db8:2::100]:8000/hostname"
 fi
+for target in ${agnhost_targets}; do
+    oc delete pod bgp-ra-datapath-check --ignore-not-found
+    if oc run bgp-ra-datapath-check --restart=Never --attach --rm --pod-running-timeout=5m \
+        --image=registry.k8s.io/e2e-test-images/agnhost:2.53 --command -- \
+        curl --max-time 20 -s --fail --show-error -o /dev/null "${target}"; then
+        echo "agnhost reachable from pod network via ${target}"
+    else
+        fail "pod could not reach agnhost ${target} over the BGP-imported route"
+    fi
+done
 
 if [[ "${FAILURES}" -ne 0 ]]; then
     echo "BGP VIP + OVN-K route advertisements coexistence verification failed with ${FAILURES} error(s)"

@@ -4,7 +4,9 @@ workflow:
     cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
+        IP_STACK=v4v6
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
         NUM_WORKERS=2
         ENABLE_BGP_TOR=true
         BGP_VIP_MANAGEMENT=true
@@ -37,7 +39,10 @@ workflow:
     static pods on the control plane (where the frr-k8s DaemonSet does not
     run), every node establishes a session to the route reflector, and pod
     network prefixes arrive at the reflector; the conformance suite then runs
-    against the combined configuration.
+    against the combined configuration. The cluster is dual-stack
+    (IP_STACK=v4v6): the verify steps assert both address families end to
+    end (per-family VIP advertisement, per-family route-reflector sessions
+    and pod subnets, and datapath over both families).
 
     Security notes (mirroring the existing baremetalds-e2e-ovn-bgp-* lanes
     this workflow composes): EXTRA_MG_ARGS=--host-network only makes the
