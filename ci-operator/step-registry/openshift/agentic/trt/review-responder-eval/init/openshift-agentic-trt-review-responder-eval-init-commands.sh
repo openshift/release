@@ -42,6 +42,10 @@ git fetch origin "${HEAD_BRANCH}" "${BASE_BRANCH}"
 git checkout -b "${EVAL_BRANCH}" "origin/${HEAD_BRANCH}"
 git push origin "${EVAL_BRANCH}"
 
+# Persist branch metadata immediately so cleanup can run if later steps fail
+echo "${EVAL_BRANCH}" > "${SHARED_DIR}/eval-head-branch"
+echo "${BASE_BRANCH}" > "${SHARED_DIR}/eval-base-branch"
+
 # --- Create PR ---
 JIRA_SUMMARY=$(jq -r '.fields.summary // "eval"' "${CASE_SRC}/jira-issue.json" 2>/dev/null || echo "eval")
 PR_TITLE="${JIRA_ISSUE_KEY}: ${JIRA_SUMMARY} [eval]"
@@ -59,6 +63,11 @@ PR_URL=$(gh pr create \
 
 PR_NUM=$(echo "${PR_URL}" | grep -o '[0-9]*$')
 echo "PR created: ${PR_URL} (#${PR_NUM})"
+echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
+
+# Record the fixture HEAD SHA so the judge can diff only responder changes
+FIXTURE_HEAD_SHA=$(git rev-parse HEAD)
+echo "${FIXTURE_HEAD_SHA}" > "${SHARED_DIR}/fixture-head-sha"
 
 # --- Post seeded comments ---
 COMMENTS_FILE="${CASE_SRC}/comments.json"
@@ -66,40 +75,33 @@ COMMENTS_FILE="${CASE_SRC}/comments.json"
 
 COMMENT_MAP="{"
 COMMENT_COUNT=$(jq 'length' "${COMMENTS_FILE}")
+POSTED=0
 
 for i in $(seq 0 $(( COMMENT_COUNT - 1 ))); do
     COMMENT_ID=$(jq -r ".[$i].id" "${COMMENTS_FILE}")
     COMMENT_TYPE=$(jq -r ".[$i].type" "${COMMENTS_FILE}")
     COMMENT_BODY=$(jq -r ".[$i].body" "${COMMENTS_FILE}")
 
-    if [[ "${COMMENT_TYPE}" == "issue_comment" ]]; then
-        GH_COMMENT_ID=$(gh api "repos/${UPSTREAM_REPO}/issues/${PR_NUM}/comments" \
-            -f body="${COMMENT_BODY}" \
-            --jq '.id' 2>&1) || {
-            echo "WARNING: Failed to post comment ${COMMENT_ID}: ${GH_COMMENT_ID}"
-            continue
-        }
-    else
-        echo "WARNING: Unsupported comment type '${COMMENT_TYPE}' for ${COMMENT_ID}, posting as issue comment"
-        GH_COMMENT_ID=$(gh api "repos/${UPSTREAM_REPO}/issues/${PR_NUM}/comments" \
-            -f body="${COMMENT_BODY}" \
-            --jq '.id' 2>&1) || {
-            echo "WARNING: Failed to post comment ${COMMENT_ID}: ${GH_COMMENT_ID}"
-            continue
-        }
+    if [[ "${COMMENT_TYPE}" != "issue_comment" ]]; then
+        echo "  Unsupported comment type '${COMMENT_TYPE}' for ${COMMENT_ID}, posting as issue comment"
     fi
+
+    GH_COMMENT_ID=$(gh api "repos/${UPSTREAM_REPO}/issues/${PR_NUM}/comments" \
+        -f body="${COMMENT_BODY}" \
+        --jq '.id' 2>&1) || {
+        echo "ERROR: Failed to post comment ${COMMENT_ID}: ${GH_COMMENT_ID}"
+        exit 1
+    }
 
     echo "  Posted ${COMMENT_ID} (type=${COMMENT_TYPE}) -> GitHub comment ${GH_COMMENT_ID}"
 
-    [[ "${i}" -gt 0 ]] && COMMENT_MAP="${COMMENT_MAP},"
+    [[ "${POSTED}" -gt 0 ]] && COMMENT_MAP="${COMMENT_MAP},"
     COMMENT_MAP="${COMMENT_MAP}\"${COMMENT_ID}\":${GH_COMMENT_ID}"
+    POSTED=$(( POSTED + 1 ))
 done
 COMMENT_MAP="${COMMENT_MAP}}"
 
-# --- Write metadata to SHARED_DIR ---
-echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
-echo "${EVAL_BRANCH}" > "${SHARED_DIR}/eval-head-branch"
-echo "${BASE_BRANCH}" > "${SHARED_DIR}/eval-base-branch"
+# --- Write remaining metadata to SHARED_DIR ---
 echo "${JIRA_ISSUE_KEY}" > "${SHARED_DIR}/jira-issue-key"
 echo "${COMMENT_MAP}" > "${SHARED_DIR}/comment-map.json"
 cp "${COMMENTS_FILE}" "${SHARED_DIR}/comments.json"
