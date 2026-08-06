@@ -531,5 +531,26 @@ HOST_PRIVATE_IP="$(aws --region "${REGION}" cloudformation describe-stacks --sta
 echo "${HOST_PUBLIC_IP}" > "${SHARED_DIR}/public_address"
 echo "${HOST_PRIVATE_IP}" > "${SHARED_DIR}/private_address"
 
-echo "Waiting up to 5 min for RHEL host to be available"
-timeout 5m aws --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
+echo "Waiting up to 10 min for RHEL host to be available"
+if ! timeout 10m aws --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"; then
+  echo "ERROR: aws ec2 wait timed out — instance ${INSTANCE_ID} did not reach status-ok within 10 minutes"
+  exit 1
+fi
+
+echo "Checking SSH connectivity to ${HOST_PUBLIC_IP}..."
+ssh_ok=0
+for i in $(seq 1 20); do
+  if ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+       -o LogLevel=ERROR -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
+       "ec2-user@${HOST_PUBLIC_IP}" true 2>/dev/null; then
+    echo "SSH connection established after $i attempt(s)"
+    ssh_ok=1
+    break
+  fi
+  echo "SSH not ready (attempt $i/20), waiting 10s..."
+  sleep 10
+done
+if [ "${ssh_ok}" -eq 0 ]; then
+  echo "ERROR: SSH not reachable after 20 attempts — instance ${INSTANCE_ID} is not accepting connections"
+  exit 1
+fi
