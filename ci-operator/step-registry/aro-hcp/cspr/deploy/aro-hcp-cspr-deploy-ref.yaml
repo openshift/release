@@ -1,8 +1,8 @@
 ref:
-  as: aro-hcp-cspr-services-svc
+  as: aro-hcp-cspr-deploy
   from: aro-hcp-e2e-tools
-  commands: aro-hcp-cspr-services-svc-commands.sh
-  timeout: 30m0s
+  commands: aro-hcp-cspr-deploy-commands.sh
+  timeout: 150m0s
   credentials:
     - namespace: test-credentials
       name: cluster-secrets-aro-hcp-dev
@@ -14,10 +14,10 @@ ref:
       Selects which environment's cluster secrets to use (dev, int, stg, prod).
   - name: DEPLOY_ENV
     default: "cspr"
-    documentation: The ARO HCP deploy environment for CSPR SVC cluster service deployment.
+    documentation: The ARO HCP deploy environment for CSPR deployment.
   - name: USE_OC_LOGIN_REGISTRIES
     default: ""
-    documentation: Space-separated list of registries that require oc registry login for authentication
+    documentation: Space-separated list of registries that require oc registry login for authentication.
   dependencies:
   - name: "pipeline:aro-hcp-backend"
     env: BACKEND_IMAGE
@@ -40,5 +40,6 @@ ref:
       cpu: "1"
       memory: 2Gi
   documentation: |-
-    Deploys services to the SVC cluster: backend, frontend, admin, sessiongate
-    (via CI image override + pipeline ImageMirror), maestro, tracing, and CS PR env deps.
+    Deploys CSPR regional infrastructure and services in topology order,
+    intentionally skipping the Cluster Service pipeline. All CI-built image
+    coordinates are supplied through one shared configuration override.
