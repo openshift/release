@@ -371,7 +371,8 @@ def add_harness_rows():
     if not isinstance(eval_params, dict):
         eval_params = {}
     skill = str(eval_params.get("skill", ""))
-    harness_prompt = f"/{skill}" if skill else prompt
+    skill_args = str(eval_params.get("skill_args", ""))
+    harness_prompt = f"/{skill} {skill_args}".strip() if skill else prompt
 
     for model, usage in usages.items():
         turns = int(model_turns.get(model, 0) or 0)
@@ -502,13 +503,11 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
     [[ -n "${EVAL_EXTRA_ARGS}" ]] && EVAL_RUN_ARGS="${EVAL_RUN_ARGS} ${EVAL_EXTRA_ARGS}"
 
     echo "Run ID: ${RUN_ID}"
-    echo "Config: ${config}; model: ${EVAL_MODEL}; parallelism: ${EVAL_PARALLELISM}"
+    echo "Args: ${EVAL_RUN_ARGS}"
 
     EVAL_START=$(date +%s)
     THIS_EXIT=0
-    # stream-json contains prompts, assistant text, and tool inputs/results.
-    # Keep it out of Prow logs and artifacts, then remove it after extraction.
-    STREAM_LOG=$(mktemp /tmp/claude-eval.XXXXXX)
+    STREAM_LOG="${ARTIFACT_DIR}/claude-eval-${config_name}.log"
     timeout 7200 claude \
         --model "${CLAUDE_MODEL}" \
         --plugin-dir "${EVAL_HARNESS_DIR}" \
@@ -516,20 +515,17 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
         --output-format stream-json \
         --max-turns "${EVAL_MAX_TURNS}" \
         -p "/eval-run ${EVAL_RUN_ARGS}" \
-        --verbose >"${STREAM_LOG}" 2>&1 || THIS_EXIT=$?
-    echo "Claude process completed with exit code ${THIS_EXIT}; extracting sanitized metrics."
+        --verbose 2>&1 | tee "${STREAM_LOG}" || THIS_EXIT=$?
 
     EVAL_RESULT=$(find "${AGENT_EVAL_RUNS_DIR:-eval/runs}" \
         -path "*/${RUN_ID}/run_result.json" -type f -print -quit 2>/dev/null || true)
     if [[ -z "${EVAL_RESULT}" ]]; then
         echo "WARNING: eval harness did not produce run_result.json for ${config_name}"
     fi
-    # Only allowlisted metadata is published in the AutoDL prompt field.
     if ! write_eval_metrics "${STREAM_LOG}" "${EVAL_RESULT}" "${RUN_ID}" \
-        "/eval-run --config ${config} --model ${EVAL_MODEL}"; then
+        "/eval-run ${EVAL_RUN_ARGS}"; then
         echo "WARNING: failed to write autodl eval metrics for ${config_name}"
     fi
-    rm -f -- "${STREAM_LOG}"
     THIS_DURATION=$(( $(date +%s) - EVAL_START ))
     TOTAL_DURATION=$(( TOTAL_DURATION + THIS_DURATION ))
 
