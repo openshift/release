@@ -318,8 +318,8 @@ def add_orchestrator_rows():
             "analyzed_at": analyzed_at,
             "duration_ms": str(int(int(result.get("duration_ms", 0) or 0) * duration_ratio)),
             "duration_api_ms": str(int(int(result.get("duration_api_ms", 0) or 0) * duration_ratio)),
-            "ttft_ms": str(result.get("ttft_ms", 0) if is_primary else 0),
-            "num_turns": str(result.get("num_turns", 0) if is_primary else 0),
+            "ttft_ms": str(int(result.get("ttft_ms", 0) or 0) if is_primary else 0),
+            "num_turns": str(int(result.get("num_turns", 0) or 0) if is_primary else 0),
             "total_cost_usd": f"{cost:.6f}",
             "input_tokens": str(input_tokens),
             "output_tokens": str(output_tokens),
@@ -371,13 +371,17 @@ def add_harness_rows():
     if not isinstance(eval_params, dict):
         eval_params = {}
     skill = str(eval_params.get("skill", ""))
-    skill_args = str(eval_params.get("skill_args", ""))
-    harness_prompt = f"/{skill} {skill_args}".strip() if skill else prompt
+    harness_prompt = f"/{skill}" if skill else prompt
 
     for model, usage in usages.items():
         turns = int(model_turns.get(model, 0) or 0)
         cost = float(usage.get("cost_usd", 0) or 0)
-        if cost <= 0:
+        input_tokens = int(usage.get("input", 0) or 0)
+        output_tokens = int(usage.get("output", 0) or 0)
+        cache_read = int(usage.get("cache_read", 0) or 0)
+        cache_create = int(usage.get("cache_creation", 0) or 0)
+        total_input = input_tokens + cache_read + cache_create
+        if cost <= 0 and total_input <= 0 and output_tokens <= 0 and turns <= 0:
             continue
         if total_turns:
             duration_ratio = turns / total_turns
@@ -385,11 +389,6 @@ def add_harness_rows():
             duration_ratio = cost / total_cost
         else:
             duration_ratio = 1 / len(usages)
-        input_tokens = int(usage.get("input", 0) or 0)
-        output_tokens = int(usage.get("output", 0) or 0)
-        cache_read = int(usage.get("cache_read", 0) or 0)
-        cache_create = int(usage.get("cache_creation", 0) or 0)
-        total_input = input_tokens + cache_read + cache_create
         cache_hit_rate = cache_read / total_input * 100 if total_input else 0
         exit_code = int(result.get("exit_code", 0) or 0)
         row = empty_row()
@@ -426,9 +425,17 @@ if not rows:
 
 output = pathlib.Path(output_path)
 if output.is_file():
-    with output.open() as stream:
-        document = json.load(stream)
-    document["rows"].extend(rows)
+    try:
+        with output.open() as stream:
+            document = json.load(stream)
+    except (json.JSONDecodeError, OSError) as error:
+        raise RuntimeError(f"cannot read existing AutoDL artifact: {error}") from error
+    if not isinstance(document, dict) or document.get("schema") != metrics.SCHEMA:
+        raise RuntimeError("existing AutoDL artifact has an incompatible schema")
+    existing_rows = document.setdefault("rows", [])
+    if not isinstance(existing_rows, list):
+        raise RuntimeError("existing AutoDL artifact rows must be a list")
+    existing_rows.extend(rows)
 else:
     document = metrics.build_autodl(rows[0])
     document["rows"] = rows
@@ -495,11 +502,13 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
     [[ -n "${EVAL_EXTRA_ARGS}" ]] && EVAL_RUN_ARGS="${EVAL_RUN_ARGS} ${EVAL_EXTRA_ARGS}"
 
     echo "Run ID: ${RUN_ID}"
-    echo "Args: ${EVAL_RUN_ARGS}"
+    echo "Config: ${config}; model: ${EVAL_MODEL}; parallelism: ${EVAL_PARALLELISM}"
 
     EVAL_START=$(date +%s)
     THIS_EXIT=0
-    STREAM_LOG="${ARTIFACT_DIR}/claude-eval-${config_name}.log"
+    # stream-json contains prompts, assistant text, and tool inputs/results.
+    # Keep it out of Prow logs and artifacts, then remove it after extraction.
+    STREAM_LOG=$(mktemp /tmp/claude-eval.XXXXXX)
     timeout 7200 claude \
         --model "${CLAUDE_MODEL}" \
         --plugin-dir "${EVAL_HARNESS_DIR}" \
@@ -507,17 +516,20 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
         --output-format stream-json \
         --max-turns "${EVAL_MAX_TURNS}" \
         -p "/eval-run ${EVAL_RUN_ARGS}" \
-        --verbose 2>&1 | tee "${STREAM_LOG}" || THIS_EXIT=$?
+        --verbose >"${STREAM_LOG}" 2>&1 || THIS_EXIT=$?
+    echo "Claude process completed with exit code ${THIS_EXIT}; extracting sanitized metrics."
 
     EVAL_RESULT=$(find "${AGENT_EVAL_RUNS_DIR:-eval/runs}" \
         -path "*/${RUN_ID}/run_result.json" -type f -print -quit 2>/dev/null || true)
     if [[ -z "${EVAL_RESULT}" ]]; then
         echo "WARNING: eval harness did not produce run_result.json for ${config_name}"
     fi
+    # Only allowlisted metadata is published in the AutoDL prompt field.
     if ! write_eval_metrics "${STREAM_LOG}" "${EVAL_RESULT}" "${RUN_ID}" \
-        "/eval-run ${EVAL_RUN_ARGS}"; then
+        "/eval-run --config ${config} --model ${EVAL_MODEL}"; then
         echo "WARNING: failed to write autodl eval metrics for ${config_name}"
     fi
+    rm -f -- "${STREAM_LOG}"
     THIS_DURATION=$(( $(date +%s) - EVAL_START ))
     TOTAL_DURATION=$(( TOTAL_DURATION + THIS_DURATION ))
 
