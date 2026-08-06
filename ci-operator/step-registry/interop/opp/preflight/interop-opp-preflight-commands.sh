@@ -283,8 +283,9 @@ try:
         and a.get('labels', {}).get('alertname') not in ('Watchdog', 'AlertmanagerReceiversNotConfigured')
     ))
     print('\n'.join(names))
-except Exception:
-    pass
+except Exception as e:
+    print(f'alert query failed: {e}', file=sys.stderr)
+    sys.exit(1)
 " 2>/dev/null)" || true
 
     if [[ -n "${firing_alerts}" ]]; then
