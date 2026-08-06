@@ -212,11 +212,13 @@ while true; do
     raw_reviews=$(gh api "repos/${UPSTREAM_REPO}/pulls/${PR_NUM}/reviews" --paginate 2>/dev/null || echo "[]")
     raw_issue_comments=$(gh api "repos/${UPSTREAM_REPO}/issues/${PR_NUM}/comments" --paginate 2>/dev/null || echo "[]")
 
-    # Filter to trusted users (skip in eval mode — comments are seeded by the eval harness)
+    # Filter to trusted users (in eval mode, filter to seeded comment IDs only)
     if [[ "${EVAL_MODE:-}" == "true" ]]; then
-        INLINE_JSON="${raw_inline_comments}"
-        REVIEWS_JSON="${raw_reviews}"
-        ISSUE_COMMENTS_JSON="${raw_issue_comments}"
+        SEEDED_IDS=$(cat "${SHARED_DIR}/comment-map.json" 2>/dev/null || echo "{}")
+        SEEDED_GH_IDS=$(echo "${SEEDED_IDS}" | jq '[.[] | tonumber]')
+        ISSUE_COMMENTS_JSON=$(echo "${raw_issue_comments}" | jq --argjson ids "${SEEDED_GH_IDS}" '[.[] | select(.id as $id | $ids | index($id))]')
+        INLINE_JSON="[]"
+        REVIEWS_JSON="[]"
     else
         all_users=$(echo "${raw_inline_comments}" "${raw_reviews}" "${raw_issue_comments}" | jq -r '.[].user.login' 2>/dev/null | sort -u)
         trusted_users=""
