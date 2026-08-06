@@ -3,9 +3,9 @@
 set -ex
 
 # Allow callers (e.g. the infra chain) to redirect oc commands to a different
-# cluster by setting KUBEVIRT_INSTALL_KUBECONFIG. Empty = use ci-operator default.
-if [[ -n "${KUBEVIRT_INSTALL_KUBECONFIG:-}" ]]; then
-  export KUBECONFIG="${KUBEVIRT_INSTALL_KUBECONFIG}"
+# cluster by setting INSTALL_KUBECONFIG. Empty = use ci-operator default.
+if [[ -n "${INSTALL_KUBECONFIG:-}" ]]; then
+  export KUBECONFIG="${INSTALL_KUBECONFIG}"
 fi
 
 function ocp_version() {
