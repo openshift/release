@@ -16,7 +16,8 @@ images:
     to: ptp-operator
 operator:
   bundles:
-  - dockerfile_path: bundleci.Dockerfile
+  - as: ptp-operator-bundle
+    dockerfile_path: bundleci.Dockerfile
   substitutions:
   - pullspec: quay.io/openshift/origin-ptp-operator:4.14
     with: pipeline:ptp-operator
@@ -60,7 +61,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-ptp-operator-bundle
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-ptp
@@ -75,6 +76,26 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: e2e-telco5g-ptp
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    dependencies:
+      OO_INDEX: ci-index-ptp-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-ptp
+      OO_PACKAGE: ptp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      T5CI_JOB_TYPE: ptp
+      T5CI_PTP_SKIP_DEPLOY: "true"
+      T5CI_VERSION: "4.14"
+    test:
+    - ref: ipi-install-rbac
+    - ref: optional-operators-subscribe
+    - ref: telco5g-ptp-tests
+    workflow: telco5g-ptp
 - as: security
   optional: true
   skip_if_only_changed: ^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
