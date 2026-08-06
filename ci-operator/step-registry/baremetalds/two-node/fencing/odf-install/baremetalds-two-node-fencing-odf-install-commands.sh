@@ -371,12 +371,12 @@ spec:
         memory: 2Gi
     mgr:
       requests:
-        cpu: 100m
-        memory: 250Mi
+        cpu: 500m
+        memory: 512Mi
     mgr-sidecar:
       requests:
-        cpu: 10m
-        memory: 75Mi
+        cpu: 100m
+        memory: 256Mi
     mon:
       requests:
         cpu: 100m

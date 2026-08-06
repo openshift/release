@@ -323,8 +323,8 @@ for ((i=1; SECONDS < MGR_WAIT_DEADLINE; i++)); do
     if [[ -n "${MGR_POD_NAME}" ]]; then
       oc describe pod "${MGR_POD_NAME}" -n openshift-storage 2>/dev/null \
         | grep -A5 -E '(State:|Last State:|Reason:|Exit Code:|Restart Count:)' || true
-      echo "--- mgr-sidecar logs (last 20 lines) ---"
-      oc logs "${MGR_POD_NAME}" -n openshift-storage -c mgr-sidecar --tail=20 2>/dev/null || true
+      echo "--- mgr container logs (last 20 lines) ---"
+      oc logs "${MGR_POD_NAME}" -n openshift-storage -c mgr --tail=20 2>/dev/null || true
     fi
     echo "--- End MGR diagnostics ---"
   fi
