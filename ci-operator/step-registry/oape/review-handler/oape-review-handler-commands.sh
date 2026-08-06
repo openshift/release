@@ -40,7 +40,8 @@ if [[ -f /var/run/github-app/app-id && -f /var/run/github-app/private-key.pem ]]
     T_CODE=$(echo "$TOKEN_RESPONSE" | tail -1)
     T_BODY=$(echo "$TOKEN_RESPONSE" | sed '$d')
     if [[ "$T_CODE" -eq 201 ]]; then
-      export GH_TOKEN=$(echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+      GH_TOKEN=$(echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+      export GH_TOKEN
       USE_APP_TOKEN="true"
       echo "[auth] GitHub App token generated successfully"
     else
