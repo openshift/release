@@ -5,6 +5,25 @@ set -o errexit
 set -o pipefail
 export PS4='+ $(date "+%T.%N") \011'
 
+# shellcheck disable=SC2154
+trap 'rc=$?; if [ $rc -ne 0 ]; then echo "ERROR: Step failed at line $LINENO with exit code $rc"; fi' EXIT
+
+ssh_retry() {
+  local retries=3 delay=10
+  for ((i=1; i<=retries; i++)); do
+    if "$@"; then return 0; fi
+    if ((i < retries)); then
+      echo "Attempt $i/$retries failed, retrying in ${delay}s..."
+      sleep "$delay"
+      delay=$((delay * 2))
+    else
+      echo "Attempt $i/$retries failed"
+    fi
+  done
+  echo "All $retries attempts failed"
+  return 1
+}
+
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
@@ -27,16 +46,20 @@ base_info=""
 findImage() {
     case ${2} in
       "ci")
-      base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep -F "${1}" | tail -n1)"
+      base_info="$(curl -s --retry 3 --retry-delay 5 --max-time 30 "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep -F "${1}" | tail -n1)"
       ;;
       "release")
-      base_info="$(curl -s "https://api.openshift.com/api/upgrades_info/graph?arch=amd64&channel=stable-${1}" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | tail -n1)"
+      base_info="$(curl -s --retry 3 --retry-delay 5 --max-time 30 "https://api.openshift.com/api/upgrades_info/graph?arch=amd64&channel=stable-${1}" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | tail -n1)"
       ;;
       *)
       echo "Unknown OCP image source '${2}'"
       exit 1
       ;;
     esac
+    if [[ -z "${base_info}" ]]; then
+      echo "ERROR: findImage failed to resolve version for ${1} from source ${2}"
+      exit 1
+    fi
 }
 
 findImage ${OCP_BASE_VERSION} ${OCP_BASE_IMAGE_SOURCE}
@@ -186,12 +209,19 @@ echo "Generating the seed image using OCP ${SEED_VERSION} as ${SEED_IMAGE}:${SEE
 SECONDS=0
 make trigger-seed-image-create SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
 
-echo "Waiting 5 minutes for seed creation to finish"
+echo "Waiting for seed creation to finish"
 # These timings are specific to this CI setup and subvert a bug that causes oc wait to never return
 # This results in a timeout on the job even though the process may finish successfully
-sleep 5m
+sleep 5s
+max_attempts=10
+attempt=0
 until oc --kubeconfig ${seed_kubeconfig} wait --timeout 5m seedgenerator seedimage --for=condition=SeedGenCompleted=true; do \
-  echo "Cluster unavailable. Waiting 5 minutes and then trying again..."; \
+  attempt=\$((attempt + 1)); \
+  if [ \$attempt -ge \$max_attempts ]; then \
+    echo "ERROR: Seed creation did not complete after \$max_attempts attempts"; \
+    exit 1; \
+  fi; \
+  echo "Cluster unavailable (attempt \$attempt/\$max_attempts). Waiting 1 minute and then trying again..."; \
   sleep 1m; \
 done;
 
@@ -206,9 +236,8 @@ EOF
 
 chmod +x ${SHARED_DIR}/create_seed.sh
 
-echo "Transfering seed script..."
-echo ${SHARED_DIR}
-scp "${SSHOPTS[@]}" ${SHARED_DIR}/create_seed.sh $ssh_host_ip:$remote_workdir
+echo "Transferring seed script from ${SHARED_DIR}..."
+ssh_retry scp "${SSHOPTS[@]}" "${SHARED_DIR}/create_seed.sh" "${ssh_host_ip}:${remote_workdir}"
 
 echo "Creating the seed..."
-ssh "${SSHOPTS[@]}" $ssh_host_ip "${remote_workdir}/create_seed.sh"
+ssh "${SSHOPTS[@]}" "${ssh_host_ip}" "${remote_workdir}/create_seed.sh"
