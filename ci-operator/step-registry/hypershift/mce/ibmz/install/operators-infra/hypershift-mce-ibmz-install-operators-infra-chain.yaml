@@ -1,40 +1,13 @@
 chain:
   as: hypershift-mce-ibmz-install-operators-infra
   steps:
-  - as: hypershift-kubevirt-install-infra
-    from: upi-installer
-    cli: latest
-    grace_period: 10m
-    env:
-    - name: CNV_SUBSCRIPTION_SOURCE
-      default: "redhat-operators"
-      documentation: |
-        Subscription source for kubevirt on the infra cluster.
-        Allowed values: redhat-operators or cnv-prerelease-catalog-source.
-    - name: BREW_IMAGE_REGISTRY_USERNAME
-      default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
-    - name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      default: /var/run/cnv-ci-brew-pull-secret/token
-    commands: hypershift-kubevirt-install-commands.sh
-    credentials:
-    - mount_path: /etc/cnv-nightly-pull-credentials
-      name: openshift-cnv-quay-credentials
-      namespace: test-credentials
-    - collection: ""
-      mount_path: /var/run/cnv-ci-brew-pull-secret
-      name: cnv-ci-brew-pull-secret
-      namespace: test-credentials
-    resources:
-      requests:
-        cpu: 100m
-        memory: 100Mi
+  - ref: hypershift-kubevirt-install
   env:
   - name: KUBEVIRT_INSTALL_KUBECONFIG
     default: "${SHARED_DIR}/infra-kubeconfig"
     documentation: |
-      Kubeconfig path for this chain. Defaults to the infra cluster kubeconfig.
-      The hypershift-kubevirt-install-commands.sh script reads this and exports
-      it as KUBECONFIG when non-empty.
+      Kubeconfig for this chain. Points to the infra cluster so the shared
+      hypershift-kubevirt-install script targets the infra cluster.
   documentation: |-
     Installs the KubeVirt / OpenShift Virtualization operator on the infra cluster.
     Sets KUBEVIRT_INSTALL_KUBECONFIG at the chain level so the shared script
