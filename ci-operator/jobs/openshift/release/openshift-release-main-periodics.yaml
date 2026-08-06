@@ -78239,12 +78239,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22-from-stable-4.21
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-aws-ovn-upgrade
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-from-stable-4.21-e2e-aws-ovn-upgrade
   spec:
     containers:
     - args:
@@ -78254,7 +78254,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-aws-ovn-upgrade
-      - --variant=ci-5.1-upgrade-from-stable-4.22
+      - --variant=ci-5.1-upgrade-from-stable-4.22-from-stable-4.21
       command:
       - ci-operator
       env:
@@ -78323,12 +78323,96 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-aws-ovn-uwm
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-aws-ovn-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-aws-ovn-upgrade
+      - --variant=ci-5.1-upgrade-from-stable-5.0
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+  interval: 168h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "5.1"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-aws-ovn-uwm
   spec:
     containers:
     - args:
@@ -78338,7 +78422,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-aws-ovn-uwm
-      - --variant=ci-5.1-upgrade-from-stable-4.22
+      - --variant=ci-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -78407,12 +78491,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-aws-runc-upgrade
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-aws-runc-upgrade
   spec:
     containers:
     - args:
@@ -78422,7 +78506,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-aws-runc-upgrade
-      - --variant=ci-5.1-upgrade-from-stable-4.22
+      - --variant=ci-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -78491,12 +78575,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-azure-ovn-upgrade
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-azure-ovn-upgrade
   spec:
     containers:
     - args:
@@ -78506,7 +78590,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-azure-ovn-upgrade
-      - --variant=ci-5.1-upgrade-from-stable-4.22
+      - --variant=ci-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -78575,12 +78659,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-azure-runc-upgrade
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-azure-runc-upgrade
   spec:
     containers:
     - args:
@@ -78590,7 +78674,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-azure-runc-upgrade
-      - --variant=ci-5.1-upgrade-from-stable-4.22
+      - --variant=ci-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -78659,12 +78743,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-gcp-ovn-rt-upgrade
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-gcp-ovn-rt-upgrade
   spec:
     containers:
     - args:
@@ -78674,7 +78758,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-gcp-ovn-rt-upgrade
-      - --variant=ci-5.1-upgrade-from-stable-4.22
+      - --variant=ci-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -78743,12 +78827,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-gcp-ovn-upgrade
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-gcp-ovn-upgrade
   spec:
     containers:
     - args:
@@ -78758,7 +78842,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-gcp-ovn-upgrade
-      - --variant=ci-5.1-upgrade-from-stable-4.22
+      - --variant=ci-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -78827,12 +78911,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-gcp-runc-upgrade
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-gcp-runc-upgrade
   spec:
     containers:
     - args:
@@ -78842,7 +78926,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-gcp-runc-upgrade
-      - --variant=ci-5.1-upgrade-from-stable-4.22
+      - --variant=ci-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -78911,12 +78995,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-metal-ovn-single-node-rt-upgrade-test
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-metal-ovn-single-node-rt-upgrade-test
   spec:
     containers:
     - args:
@@ -78926,7 +79010,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-metal-ovn-single-node-rt-upgrade-test
-      - --variant=ci-5.1-upgrade-from-stable-4.22
+      - --variant=ci-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -78995,12 +79079,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: vsphere
     ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-vsphere-ovn-upgrade
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-vsphere-ovn-upgrade
   spec:
     containers:
     - args:
@@ -79010,7 +79094,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-vsphere-ovn-upgrade
-      - --variant=ci-5.1-upgrade-from-stable-4.22
+      - --variant=ci-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -79079,12 +79163,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: vsphere
     ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-vsphere-ovn-upgrade-storage-data
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-vsphere-ovn-upgrade-storage-data
   spec:
     containers:
     - args:
@@ -79094,7 +79178,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-vsphere-ovn-upgrade-storage-data
-      - --variant=ci-5.1-upgrade-from-stable-4.22
+      - --variant=ci-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -79163,12 +79247,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: vsphere
     ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-e2e-vsphere-runc-upgrade
+  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-5.0-e2e-vsphere-runc-upgrade
   spec:
     containers:
     - args:
@@ -79178,91 +79262,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-vsphere-runc-upgrade
-      - --variant=ci-5.1-upgrade-from-stable-4.22
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build09
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: release
-  interval: 168h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-    ci-operator.openshift.io/variant: ci-5.1-upgrade-from-stable-4.22-from-stable-4.21
-    ci.openshift.io/generator: prowgen
-    ci.openshift.io/no-builds: "true"
-    job-release: "5.1"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-ci-5.1-upgrade-from-stable-4.22-from-stable-4.21-e2e-aws-ovn-upgrade
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-aws-ovn-upgrade
-      - --variant=ci-5.1-upgrade-from-stable-4.22-from-stable-4.21
+      - --variant=ci-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -324375,6 +324375,113 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
+  cluster: build09
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    timeout: 6h0m0s
+  name: periodic-ci-openshift-release-main-nightly-5.1-install-analysis-all
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/usr/local/pull-secret
+      - --target=release-payload-install-analysis
+      command:
+      - ci-operator
+      env:
+      - name: GOOGLE_SA_CREDENTIAL_FILE
+        value: /var/run/secrets/google-serviceaccount-credentials.json
+      - name: JOB_START_TIME
+      - name: PAYLOAD_TAG
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: release-payload-install-analysis
+            steps:
+              env:
+                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
+                JOB_START_TIME: "$(JOB_START_TIME)"
+                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
+                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
+                JOB_CONFIGURATION: |
+                  aws-proxy,1,--include-job-names=ovn-proxy
+                  aws-techpreview,1,--platform=aws --include-job-names=techpreview
+                  azure-ovn-ipi,1,--platform=azure --network=ovn --infrastructure=ipi --exclude-job-names=kubevirt
+                  azure-techpreview,1,--platform=azure --include-job-names=techpreview
+                  gcp-ovn-ipi,1,--platform=gcp --network=ovn --infrastructure=ipi
+                  gcp-techpreview,1,--platform=gcp --include-job-names=techpreview
+                  metal-ovn-ipi,1,--platform=metal --network=ovn --infrastructure=ipi
+                  vsphere-ovn-upi,1,--platform=vsphere --network=ovn --infrastructure=upi
+                  vsphere-techpreview,1,--platform=vsphere --include-job-names=techpreview
+                  single-node,1,--platform=aws --include-job-names=single-node
+              test:
+              - ref: openshift-release-analysis-test-case-analysis
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: aggregator-check-install
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
   cluster: build10
   cron: 0 13 * * *
   decorate: true
@@ -324738,6 +324845,107 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
+  cluster: build09
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    timeout: 6h0m0s
+  name: periodic-ci-openshift-release-main-nightly-5.1-overall-analysis-all
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/usr/local/pull-secret
+      - --target=release-payload-overall-analysis-all
+      command:
+      - ci-operator
+      env:
+      - name: GOOGLE_SA_CREDENTIAL_FILE
+        value: /var/run/secrets/google-serviceaccount-credentials.json
+      - name: JOB_START_TIME
+      - name: PAYLOAD_TAG
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: release-payload-overall-analysis-all
+            steps:
+              env:
+                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
+                JOB_START_TIME: "$(JOB_START_TIME)"
+                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
+                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-overall-all"
+                TEST_GROUP: "overall"
+                JOB_CONFIGURATION: |
+                  control-plane-machine-set-operator,1,--include-job-names=control-plane-machine-set-operator
+                  parallel-techpreview,1,--include-job-names=techpreview --exclude-job-names=serial
+                  serial-techpreview,1,--include-job-names=techpreview --include-job-names=serial
+              test:
+              - ref: openshift-release-analysis-test-case-analysis
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: aggregator-check-overall
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
   cluster: build10
   cron: 0 13 * * *
   decorate: true
@@ -325005,6 +325213,107 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build09
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    timeout: 6h0m0s
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-analysis-all
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/usr/local/pull-secret
+      - --target=release-payload-upgrade-analysis-all
+      command:
+      - ci-operator
+      env:
+      - name: GOOGLE_SA_CREDENTIAL_FILE
+        value: /var/run/secrets/google-serviceaccount-credentials.json
+      - name: JOB_START_TIME
+      - name: PAYLOAD_TAG
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: release-payload-upgrade-analysis-all
+            steps:
+              env:
+                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
+                JOB_START_TIME: "$(JOB_START_TIME)"
+                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
+                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-upgrade-all"
+                TEST_GROUP: "upgrade"
+                JOB_CONFIGURATION: |
+                  gcp-ovn-micro,1,--include-job-names=e2e-gcp-ovn-upgrade --exclude-job-names=from-stable
+                  metal-ovn-micro,1,--include-job-names=e2e-metal-ipi-ovn-upgrade --exclude-job-names=from-stable
+                  metal-ovn-ipv6-micro,1,--include-job-names=e2e-metal-ipi-upgrade-ovn-ipv6 --exclude-job-names=from-stable
+              test:
+              - ref: openshift-release-analysis-test-case-analysis
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: aggregator-check-upgrade
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -325100,12 +325409,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-aws-upgrade-ovn-single-node
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-aws-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -325115,7 +325424,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-aws-upgrade-ovn-single-node
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -325184,12 +325493,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-aws-upgrade-ovn-single-node-network-flow-matrix
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-aws-upgrade-ovn-single-node-network-flow-matrix
   spec:
     containers:
     - args:
@@ -325199,7 +325508,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-aws-upgrade-ovn-single-node-network-flow-matrix
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -325268,12 +325577,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-aws-upgrade-ovn-single-node-os-rhel10
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-aws-upgrade-ovn-single-node-os-rhel10
   spec:
     containers:
     - args:
@@ -325283,7 +325592,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-aws-upgrade-ovn-single-node-os-rhel10
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -325353,12 +325662,12 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-metal-ipi-ovn-upgrade
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-metal-ipi-ovn-upgrade
   spec:
     containers:
     - args:
@@ -325368,7 +325677,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-metal-ipi-ovn-upgrade
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -325438,12 +325747,12 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-metal-ipi-ovn-upgrade-network-flow-matrix
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-metal-ipi-ovn-upgrade-network-flow-matrix
   spec:
     containers:
     - args:
@@ -325453,7 +325762,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-metal-ipi-ovn-upgrade-network-flow-matrix
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -325523,12 +325832,12 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-metal-ipi-ovn-upgrade-runc
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-metal-ipi-ovn-upgrade-runc
   spec:
     containers:
     - args:
@@ -325538,7 +325847,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-metal-ipi-ovn-upgrade-runc
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -325608,12 +325917,12 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-metal-ipi-upgrade-ovn-ipv6
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-metal-ipi-upgrade-ovn-ipv6
   spec:
     containers:
     - args:
@@ -325623,7 +325932,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-metal-ipi-upgrade-ovn-ipv6
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -325692,12 +326001,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-metal-ovn-single-node-rt-upgrade
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-metal-ovn-single-node-rt-upgrade
   spec:
     containers:
     - args:
@@ -325707,7 +326016,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-metal-ovn-single-node-rt-upgrade
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -325777,12 +326086,12 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-edge-enablement
     ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-metal-ovn-two-node-arbiter-upgrade
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-metal-ovn-two-node-arbiter-upgrade
   spec:
     containers:
     - args:
@@ -325792,7 +326101,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-metal-ovn-two-node-arbiter-upgrade
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -325863,12 +326172,12 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-edge-enablement
     ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-metal-ovn-two-node-arbiter-upgrade-day-2-workers
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-metal-ovn-two-node-arbiter-upgrade-day-2-workers
   spec:
     containers:
     - args:
@@ -325878,7 +326187,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-metal-ovn-two-node-arbiter-upgrade-day-2-workers
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -325948,12 +326257,12 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-edge-enablement
     ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-metal-ovn-two-node-arbiter-upgrade-os-rhel10
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-metal-ovn-two-node-arbiter-upgrade-os-rhel10
   spec:
     containers:
     - args:
@@ -325963,7 +326272,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-metal-ovn-two-node-arbiter-upgrade-os-rhel10
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -326034,12 +326343,12 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-edge-enablement
     ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-metal-ovn-two-node-arbiter-upgrade-workers
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-metal-ovn-two-node-arbiter-upgrade-workers
   spec:
     containers:
     - args:
@@ -326049,7 +326358,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-metal-ovn-two-node-arbiter-upgrade-workers
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -326119,12 +326428,12 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-edge-enablement
     ci-operator.openshift.io/cloud-cluster-profile: equinix-edge-enablement
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-metal-ovn-two-node-fencing-upgrade-os-rhel10
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-metal-ovn-two-node-fencing-upgrade-os-rhel10
   spec:
     containers:
     - args:
@@ -326134,7 +326443,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-metal-ovn-two-node-fencing-upgrade-os-rhel10
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -326203,12 +326512,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: vsphere
     ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-vsphere-upgrade
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-vsphere-upgrade
   spec:
     containers:
     - args:
@@ -326218,7 +326527,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-vsphere-upgrade
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
@@ -326287,12 +326596,12 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: vsphere
     ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-4.22
+    ci-operator.openshift.io/variant: nightly-5.1-upgrade-from-stable-5.0
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-4.22-e2e-vsphere-zones-upgrade
+  name: periodic-ci-openshift-release-main-nightly-5.1-upgrade-from-stable-5.0-e2e-vsphere-zones-upgrade
   spec:
     containers:
     - args:
@@ -326302,7 +326611,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-vsphere-zones-upgrade
-      - --variant=nightly-5.1-upgrade-from-stable-4.22
+      - --variant=nightly-5.1-upgrade-from-stable-5.0
       command:
       - ci-operator
       env:
