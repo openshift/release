@@ -476,20 +476,21 @@ tests:
           --type='merge' \
           -p '{"spec":{"config":{"env":[{"name":"UNSUPPORTED_ADDON_FEATURES","value":"TrustManager=true"}]}}}'
 
-        echo "Waiting for TrustManager feature gate on operator pod args and rollout..."
+        echo "Waiting for TrustManager feature gate on operator deployment env and rollout..."
         FOUND=false
         for _ in $(seq 1 60); do
-          ARGS=$(oc -n cert-manager-operator get deploy/cert-manager-operator-controller-manager \
-            -o jsonpath='{.spec.template.spec.containers[0].args[*]}' 2>/dev/null || true)
-          if echo "${ARGS}" | grep -q -- '--unsupported-addon-features=TrustManager=true'; then
-            echo "Found TrustManager feature gate in operator args: ${ARGS}"
+          ENV_VAL=$(oc -n cert-manager-operator get deploy/cert-manager-operator-controller-manager \
+            -o jsonpath='{range .spec.template.spec.containers[0].env[?(@.name=="UNSUPPORTED_ADDON_FEATURES")]}{.value}{end}' 2>/dev/null || true)
+          if [[ "${ENV_VAL}" == "TrustManager=true" ]]; then
+            echo "Found UNSUPPORTED_ADDON_FEATURES=${ENV_VAL} on operator deployment"
             FOUND=true
             break
           fi
           sleep 5
         done
         if [[ "${FOUND}" != "true" ]]; then
-          echo "Timed out waiting for --unsupported-addon-features=TrustManager=true on operator deployment"
+          echo "Timed out waiting for UNSUPPORTED_ADDON_FEATURES=TrustManager=true on operator deployment"
+          oc -n cert-manager-operator get deploy/cert-manager-operator-controller-manager -o yaml || true
           exit 1
         fi
         oc -n cert-manager-operator rollout status deployment/cert-manager-operator-controller-manager --timeout=5m
