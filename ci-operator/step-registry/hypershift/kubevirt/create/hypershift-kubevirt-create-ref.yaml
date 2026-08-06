@@ -1,0 +1,87 @@
+ref:
+  as: hypershift-kubevirt-create
+  from: hypershift-operator
+  grace_period: 5m0s
+  timeout: 1h
+  cli: latest
+  env:
+    - name: HYPERSHIFT_NODE_COUNT
+      default: "3"
+      documentation: "The number nodes to automatically create and join to the cluster."
+    - name: HYPERSHIFT_NODE_MEMORY
+      default: "16"
+      documentation: "The amount of RAM that will be allocated for the kubevirt hosted cluster's nodes in Gi"
+    - name: HYPERSHIFT_NODE_CPU_CORES
+      default: "4"
+      documentation: "The number of CPU cores that will be assigned for the kubevirt hosted cluster's nodes."
+    - name: HYPERSHIFT_NETWORK_TYPE
+      default: "OVNKubernetes"
+      documentation: "Specifies the cluster SDN provider."
+    - name: RUN_HOSTEDCLUSTER_CREATION
+      default: "true"
+      documentation: |-
+        Indicates whether this step should be skipped. Useful when it is a part of a workflow used in various
+        branches, and some branches don't need to execute that step.
+    - name: KUBEVIRT_CSI_INFRA
+      default: ""
+      documentation: |-
+        The default storage class on the infra cluster to be used by the guest cluster with the
+        kubevirt csi-driver.
+    - name: HYPERSHIFT_HC_RELEASE_IMAGE
+      default: ""
+      documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
+    - name: ENABLE_ICSP
+      default: "false"
+      documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_iscp.yaml)"
+    - name: ATTACH_DEFAULT_NETWORK
+      default: ""
+      documentation: |-
+        if true, config additional network for hostedcluster and attach-default-network true;
+        if false, config additional network for hostedcluster and attach-default-network false
+        if the default empty string will skip all additional network config.
+    - name: ETCD_STORAGE_CLASS
+      default: ""
+      documentation: |-
+        The storage class that will be used for etcd on the hosted control plane.
+    - name: MCE_VERSION
+      default: ""
+      documentation: "version of the mce, if installed; if not the default empty string will skip all the MCE specific commands. (\"\", 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10)"
+    - name: DISCONNECTED
+      default: "false"
+      documentation: Should we work on top of a disconnected environment
+    - name: CONTROL_PLANE_AVAILABILITY
+      default: "SingleReplica"
+      documentation: "Availability policy for hosted cluster components"
+    - name: INFRA_AVAILABILITY
+      default: "SingleReplica"
+      documentation: "Availability policy for infrastructure services in guest cluster"
+    - name: HYPERSHIFT_CREATE_CLUSTER_RENDER
+      default: "false"
+      documentation: "If true, render artifacts to ${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+    - name: EXTRA_ARGS
+      default: ""
+      documentation: "Extra args to pass to the create cluster kubevirt command"
+    - name: IP_STACK
+      default: v4
+      documentation: |-
+        Configures the IP_STACK for the devscripts cluster. The possible values are v4, v6 or
+        v4v6 for dual stack. The default is v4.
+    - name: HYPERSHIFT_NP_AUTOREPAIR
+      default: "false"
+      documentation: "Enables machine autorepair with machine health checks."
+  commands: hypershift-kubevirt-create-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+  dependencies:
+    - name: "release:latest"
+      env: HOSTEDCLUSTER_RELEASE_IMAGE_LATEST
+    - name: "release:latest"
+      env: NODEPOOL_RELEASE_IMAGE_LATEST
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST

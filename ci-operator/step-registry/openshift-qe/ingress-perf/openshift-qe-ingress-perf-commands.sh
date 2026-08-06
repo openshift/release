@@ -1,0 +1,35 @@
+#!/bin/bash
+set -o errexit
+set -o nounset
+set -o pipefail
+set -x
+
+
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+pushd /tmp
+
+ES_PASSWORD=$(cat "/secret/password")
+ES_USERNAME=$(cat "/secret/username")
+
+# Clone the e2e repo
+REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
+LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
+TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
+git clone $REPO_URL $TAG_OPTION --depth 1
+pushd e2e-benchmarking/workloads/ingress-perf
+
+# ES Configuration
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+export ES_INDEX="ingress-performance"
+
+# Start the Workload
+./run.sh

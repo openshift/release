@@ -1,0 +1,51 @@
+base_images:
+  rebasebot:
+    name: rebasebot
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rebasebot
+  cron: 0 23 * * 1-5
+  steps:
+    test:
+    - as: rebasebot
+      commands: |
+        rebasebot --source https://github.com/grafana/tempo-operator:main \
+                  --dest openshift/grafana-tempo-operator:main \
+                  --rebase IshwarKanse/tempo-operator:rebase-bot-main \
+                  --github-app-key /secrets/rebasebot/cloud-team-rebase-bot-key \
+                  --github-cloner-key /secrets/dt-secrets/dt-cloner \
+                  --github-cloner-id 811756 \
+                  --git-username tracing-team-rebase-bot \
+                  --git-email tracing-team@redhat.com \
+                  --bot-emails tracing-team@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/dt-secrets
+        name: dt-secrets
+        namespace: test-credentials
+      - mount_path: /secrets/rebasebot
+        name: rebasebot-credentials
+        namespace: test-credentials
+      from_image:
+        name: rebasebot
+        namespace: ci
+        tag: latest
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: grafana-tempo-operator
+  variant: periodics

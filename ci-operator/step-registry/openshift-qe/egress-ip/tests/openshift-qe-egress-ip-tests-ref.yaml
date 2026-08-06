@@ -1,0 +1,42 @@
+ref:
+  as: openshift-qe-egress-ip-tests
+  from_image:
+    namespace: ocp
+    name: "4.20"
+    tag: cli
+  commands: openshift-qe-egress-ip-tests-commands.sh
+  resources:
+    requests:
+      cpu: 200m
+      memory: 500Mi
+  env:
+  - name: EIP_NAME
+    default: "egress-ip-test"
+    documentation: "Name of the egress IP to test"
+  - name: POD_KILL_RETRIES
+    default: "10"
+    documentation: "Number of OVN pod kill test iterations"
+  - name: REBOOT_RETRIES
+    default: "5" 
+    documentation: "Number of node reboot test iterations"
+  - name: EXPECTED_MIN_SNAT_RULES
+    default: "1"
+    documentation: "Minimum expected OVN SNAT rules per egress IP (conservative default, observed 10-11 in testing with 6 namespaces)"
+  - name: EXPECTED_MIN_LR_POLICIES
+    default: "0"
+    documentation: "Minimum expected OVN logical router policies (default 0 based on observed behavior, configurable per environment)"
+  documentation: >-
+    Executes comprehensive egress IP resilience testing using functional validation including:
+    - PRIMARY TEST: Source IP validation using external service to verify actual egress IP usage
+    - SECONDARY TEST: Internal OVN SNAT rule validation for additional confidence
+    - OVN Configuration Check: Validates logical router policies (configurable threshold, 0 observed in testing)
+    - OVN pod disruption testing with source IP verification before and after chaos
+    - Node reboot testing with egress IP functionality recovery validation
+    - Metrics collection and analysis of functional test results
+    - Artifact generation for test results
+    
+    Tests egress IP stability under infrastructure disruption scenarios using
+    real traffic flow validation via external service. The primary test validates
+    that external services see the configured egress IP as the source IP for
+    traffic from pods in egress-enabled namespaces. This provides true end-to-end
+    functional validation that egress IP functionality actually works as expected.

@@ -1,0 +1,28 @@
+ref:
+  as: rosa-operator-coverage-setup
+  from: rosa-aws-cli
+  grace_period: 2m
+  commands: rosa-operator-coverage-setup-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 8m0s
+  dependencies:
+  - name: COVERAGE_IMAGE
+    env: COVERAGE_IMAGE
+  env:
+  - name: OPERATOR_NAME
+    default: ""
+    documentation: Short name of the operator (e.g. route-monitor-operator).
+  - name: OPERATOR_NAMESPACE
+    default: ""
+    documentation: Namespace where the operator deploys. Defaults to openshift-<OPERATOR_NAME>.
+  - name: OPERATOR_DEPLOYMENT_NAME
+    default: ""
+    documentation: Name of the deployment to patch. Defaults to OPERATOR_NAME.
+  documentation: |-
+    Patches the operator deployment with a coverage-instrumented image.
+    Scales down PKO to prevent reconciliation reverting the patch, adds
+    GOCOVERDIR env var and emptyDir volume for coverage data collection.
+    Run after rosa-operator-install and before rosa-operator-e2e.

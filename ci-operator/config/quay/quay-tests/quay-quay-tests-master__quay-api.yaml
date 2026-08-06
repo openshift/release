@@ -1,0 +1,117 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.18
+prowgen:
+  expose: true
+  private: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: quay-e2e-tests-quay314-api-testing
+  cron: 0 12 * * 3
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-21@sha256:d662c3c76ec9a20a84a9383362fd98dcb64d610bb479c68b0945e6cf1b6f8e25
+      QUAY_OPERATOR_CHANNEL: stable-3.14
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.14"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-api
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay-ocp419-stage-api-testing
+  cron: 0 12 * * 3
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib-pub-pending:v4.19
+      QUAY_OPERATOR_CHANNEL: stable-3.15
+      QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_VERSION: "3.15"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-api
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay316-api-testing
+  cron: 0 0 6 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-21@sha256:3aeafd52282291071dee74c6614b21190a64425bdf3546b3ee014fae23e37afa
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.16"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-api
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay317-api-testing
+  cron: 0 0 6 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-21@sha256:b70ee5d5010f710ad3a7580f93889694f0b49c42c80282a3bb2d15bc2cfed184
+      QUAY_OPERATOR_CHANNEL: stable-3.17
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.17"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-api
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay318-api-testing
+  cron: 0 0 6 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-21@sha256:af5fa9bf1da12c9b001a31d79c3d0284ae9f7411035c4807c1e1949758dc9fc0
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.18"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-api
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: quay-api

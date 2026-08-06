@@ -1,0 +1,25 @@
+ref:
+  as: aro-hcp-ci-images-push
+  from: aro-hcp-e2e-tools
+  commands: aro-hcp-ci-images-push-commands.sh
+  grace_period: 1m0s
+  timeout: 20m0s
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aro-hcp-dev
+    mount_path: /var/run/aro-hcp-dev
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "dev"
+    documentation: |-
+      Selects which environment's cluster secrets to use (dev, int, stg, prod).
+  dependencies:
+  - name: aro-hcp-tenant-quota
+    env: ARO_HCP_TENANT_QUOTA
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+  documentation: |-
+    Pushes CI-built ARO-HCP tooling images to ACR for deployment.
+    Images are built by ci-operator and referenced as pipeline dependencies.
