@@ -1,0 +1,27 @@
+ref:
+  as: baremetalds-sno-add-worker
+  from: dev-scripts
+  grace_period: 10m
+  timeout: 1h30m0s
+  commands: baremetalds-sno-add-worker-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  env:
+  - name: WORKER_VCPU
+    default: "8"
+    documentation: Number of vCPUs for the worker VM
+  - name: WORKER_MEMORY
+    default: "8192"
+    documentation: Memory in MiB for the worker VM
+  - name: WORKER_DISK
+    default: "120"
+    documentation: Disk size in GiB for the worker VM
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE
+  documentation: |-
+    Adds a worker node to an existing SNO cluster as a day-2 operation.
+    Creates a libvirt VM with a RHCOS live-ISO containing embedded worker
+    ignition, boots it, approves CSRs, and waits for the node to become Ready.

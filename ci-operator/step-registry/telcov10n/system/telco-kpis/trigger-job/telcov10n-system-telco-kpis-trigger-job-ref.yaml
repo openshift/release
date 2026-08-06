@@ -1,0 +1,29 @@
+ref:
+  as: telcov10n-system-telco-kpis-trigger-job
+  from: root
+  commands: telcov10n-system-telco-kpis-trigger-job-commands.sh
+  timeout: 10m
+  best_effort: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-prow-trigger-token
+    mount_path: /var/prow-trigger-token
+  env:
+  - name: NEXT_JOB_NAME
+    default: ""
+    documentation: Full Prow periodic job name to trigger next in the chain
+  - name: JOB_TYPE
+    default: "1"
+    documentation: "Gangway job_execution_type: 1=periodic"
+  - name: SKIP_CHAIN_TRIGGER
+    default: "false"
+    documentation: Set to 'true' to skip triggering the next job in the chain
+  documentation: |-
+    Triggers the next Prow job in the telco-kpis 12hr test chain via the
+    Gangway API. Placed in the post phase so it fires regardless of test
+    outcome. Set NEXT_JOB_NAME to the full periodic job name of the next
+    step in the chain.

@@ -1,0 +1,82 @@
+ref:
+  as: interop-tests-openshift-virtualization-upgrade-tests
+  documentation: |-
+    CNV upgrade tests on the ACM spoke cluster (managed-cluster-kubeconfig).
+    Runs pytest --upgrade cnv per openshift-virtualization-tests INSTALL_AND_UPGRADE.md.
+    Reads CNV_TARGET_VERSION from ${SHARED_DIR}/cnv-target-version written by the preceding
+    interop-tests-openshift-virtualization-upgrade-prep step; uses the CI Operator-guaranteed
+    CNV_TARGET_VERSION env default when the file is absent.
+    Network upgrade tests are excluded via --ignore=tests/network/.
+  from: openshift-virtualization-tests-sshpass
+  commands: interop-tests-openshift-virtualization-upgrade-tests-commands.sh
+  timeout: 4h0m0s
+  grace_period: 15m
+  cli: latest
+  credentials:
+    - name: cluster-secrets-aws-interop-qe
+      namespace: test-credentials
+      mount_path: /secrets
+    - name: cnv-ci-brew-pull-secret
+      namespace: test-credentials
+      mount_path: /var/run/cnv-ci-brew-pull-secret
+    - name: openshift-virtualization-tests-credentials
+      namespace: test-credentials
+      mount_path: /bw
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CNV_VERSION_EXPLORER_URL
+    default: "https://cnv-version-explorer.apps.cnv2.engineering.redhat.com/"
+    documentation: Base URL for the CNV Version Explorer API (required by pytest --upgrade cnv).
+  - name: BW_PATH
+    default: "/bw"
+    documentation: Bitwarden folder
+  - name: OCP_VERSION
+    default: "4.13"
+    documentation: OpenShift Version (used for must-gather fallback image tag)
+  - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+    name: BREW_IMAGE_REGISTRY_USERNAME
+    documentation: Brew image registry username for authenticated image pulls.
+  - default: /var/run/cnv-ci-brew-pull-secret/token
+    name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+    documentation: Path to the file containing the Brew image registry authentication token.
+  - default: v0.59.0-alpha.0
+    name: KUBEVIRT_RELEASE
+    documentation: KubeVirt release version tag used for version-specific image resolution.
+  - default: /tmp/artifacts
+    name: ARTIFACTS_DIR
+    documentation: Directory path for storing test artifacts.
+  - default: openshift-cnv
+    name: TARGET_NAMESPACE
+    documentation: Namespace where the CNV / HCO operator is installed.
+  - name: MAP_TESTS
+    default: "false"
+    documentation: Specify whether to update the test suite name for reporting tools
+  - name: CNV_TARGET_MAJOR_MINOR
+    default: "4.21"
+    documentation: |-
+      Target CNV major.minor (e.g. 4.21). Used only by the upgrade-prep step to resolve
+      and write ${SHARED_DIR}/cnv-target-version; passed here so the job config sets it once.
+  - name: CNV_TARGET_VERSION
+    default: "4.21.0"
+    documentation: |-
+      Target CNV version for --upgrade cnv. Overridden at runtime by the value in
+      ${SHARED_DIR}/cnv-target-version (written by upgrade-prep). CI Operator guarantees
+      this env var is set; no shell-level fallback is needed.
+  - name: CNV_TARGET_IMAGE
+    default: ""
+    documentation: |-
+      Optional --cnv-image index path. Not required when CNV_SOURCE=production (GA from redhat-operators).
+  - name: CNV_SOURCE
+    default: "production"
+    documentation: CNV catalog source lane for upgrade (production, osbs, fbc).
+  - name: CNV_CHANNEL
+    default: "stable"
+    documentation: CNV subscription channel for upgrade (stable, candidate, nightly).
+  - name: CNV_TARGET_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: |-
+      StorageClass passed to pytest --storage-class-matrix. Must match the class configured
+      by the preceding interop-tests-openshift-virtualization-upgrade-prep step.

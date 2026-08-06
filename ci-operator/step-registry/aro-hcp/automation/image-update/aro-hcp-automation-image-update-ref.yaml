@@ -1,0 +1,74 @@
+ref:
+  as: aro-hcp-automation-image-update
+  from: aro-hcp-automation-image-update
+  commands: aro-hcp-automation-image-update-commands.sh
+  grace_period: 5m0s
+  timeout: 45m0s
+  env:
+  - name: AZURE_CREDENTIALS_DIR
+    default: /var/run/hcp-integration-credentials
+    documentation: |-
+      The directory where the Azure credentials are stored.
+  - name: GITHUB_REPO_ORG
+    default: Azure
+    documentation: |-
+      The organization of the GitHub repository.
+  - name: GITHUB_REPO_NAME
+    default: ARO-HCP
+    documentation: |-
+      The name of the GitHub repository.
+  - name: GITHUB_REPO_BRANCH
+    default: main
+    documentation: |-
+      The branch of the GitHub repository.
+  - name: GITHUB_APP_ID_PATH
+    default: /var/run/aro-hcp-robot/appid
+    documentation: |-
+      The path to the GitHub App ID file.
+  - name: GITHUB_APP_KEY_PATH
+    default: /var/run/aro-hcp-robot/cert
+    documentation: |-
+      The path to the GitHub App private key PEM file.
+  - name: GITHUB_PR_TITLE
+    default: Automated - Update component image digests
+    documentation: |-
+      The title of the GitHub pull request.
+  - name: GITHUB_PR_USER
+    default: aro-hcp-robot[bot]
+    documentation: |-
+      The git user name for commits and pull requests.
+  - name: GITHUB_PR_EMAIL
+    default: aro-hcp-robot[bot]@users.noreply.github.com
+    documentation: |-
+      The git email for commits and pull requests.
+  - name: SLACK_WEBHOOK_PATH
+    default: /var/run/slack-webhook/webhook
+    documentation: |-
+      The path to the Slack webhook file.
+  - name: PROW_JOB_URL
+    default: https://prow.ci.openshift.org/?job=periodic-ci-Azure-ARO-HCP-main-image-updater-image-updater-tooling
+    documentation: |-
+      The URL of the Prow job.
+  - name: VERBOSITY
+    default: "0"
+    documentation: |-
+      The debug level. 0 for no debug, 1 for debug, 2 for debug with verbose output.
+  credentials:
+  - collection: ""
+    mount_path: /var/run/aro-hcp-robot
+    name: aro-hcp-robot
+    namespace: test-credentials
+  - collection: ""
+    mount_path: /var/run/hcp-integration-credentials
+    name: hcp-integration-credentials
+    namespace: test-credentials
+  - collection: ""
+    mount_path: /var/run/slack-webhook
+    name: aro-hcp-image-bump-slack-webhook
+    namespace: test-credentials
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  documentation: |-
+    Fetches the latest image digests for all components and updates the image digests in the configuration.

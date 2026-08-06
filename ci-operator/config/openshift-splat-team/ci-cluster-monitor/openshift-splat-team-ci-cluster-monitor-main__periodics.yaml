@@ -1,0 +1,33 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-golang-1.26-openshift-4.23
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 256Mi
+tests:
+- as: pr-age-monitor
+  commands: |
+    make build
+    GITHUB_TOKEN=$(cat /tmp/secret/token) ./bin/pr-monitor --config config/repos.yaml
+  container:
+    from: src
+  cron: 0 9 * * 1-5
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: PR Age Monitor detected threshold violations. <{{.Status.URL}}|View
+      logs>
+  secret:
+    mount_path: /tmp/secret
+    name: ci-cluster-monitor-github-token
+zz_generated_metadata:
+  branch: main
+  org: openshift-splat-team
+  repo: ci-cluster-monitor
+  variant: periodics

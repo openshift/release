@@ -1,0 +1,31 @@
+ref:
+  as: hypershift-mce-power-create-nodepool
+  cli: latest
+  env:
+    - name: MCE_VERSION
+      default: "2.4"
+      documentation: "version of the mce.(2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10)"
+    - name: CLUSTERS_NAMESPACE
+      documentation: "The namespace where all hosted cluster related resources will be present"
+      default: ""
+    - name: AGENT_POWER_CREDENTIALS
+      default: /etc/hypershift-agent-power-credentials
+      documentation: Path to power agent related credentials.
+    - name: ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG
+      default: ""
+      documentation: Configuration parameters related to nodepool and infraenv creation.
+  commands: hypershift-mce-power-create-nodepool-commands.sh
+  from: dev-scripts
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 45m
+  credentials:
+    - mount_path: /etc/hypershift-agent-power-credentials
+      name: hypershift-agent-power-credentials
+      namespace: test-credentials
+  dependencies:
+    - env: OCP_IMAGE_MULTI
+      name: release:multi-latest

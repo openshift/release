@@ -1,0 +1,466 @@
+chain:
+  as: hypershift-azure-create
+  steps:
+  - as: create-hostedcluster
+    cli: latest
+    env:
+    - name: HYPERSHIFT_NODE_COUNT
+      default: "3"
+      documentation: "The number nodes to automatically create and join to the cluster."
+    - name: HYPERSHIFT_BASE_DOMAIN
+      default: "ci.azure.devcluster.openshift.com"
+      documentation: "The cluster's FQDN will be a subdomain of the base domain."
+    - name: HYPERSHIFT_HC_RELEASE_IMAGE
+      default: ""
+      documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
+    - name: HYPERSHIFT_AZURE_LOCATION
+      default: "eastus"
+      documentation: |-
+        Specifies the Azure location of the cluster. If intentionally left as an empty string, 
+        it defaults to that of the management cluster.
+    - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+      default: ""
+      documentation: "Specifies the external DNS domain. If left empty, external DNS is assumed to be disabled."
+    - name: HYPERSHIFT_DYNAMIC_DNS
+      default: ""
+      documentation: |-
+        Set custom DNS name for kube-apiserver. Must be a pre-existing DNS record in Azure DNS.
+        Example: 'hypershift-kas-dns.qe1.azure.devcluster.openshift.com'
+        The DNS record will be automatically updated to point to the cluster's Route after creation.
+        Leave empty to disable custom KAS DNS.
+    - name: ENABLE_ICSP
+      default: "false"
+      documentation: "If true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+    - name: GUEST_FEATURE_SET
+      default: ""
+      documentation: This field sets the cluster feature set. This is used to enable custom features such as tech preview features
+    - name: USE_HYPERSHIFT_AZURE_CREDS
+      default: "false"
+      documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters"
+    - name: HYPERSHIFT_AZURE_CP_MI
+      default: "false"
+      documentation: Specifies whether control plane components should authenticate to Azure using managed identities.
+    - name: HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE
+      default: ""
+      documentation: "Specifies the type of storage account for storing diagnostics data."
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER
+      default: ""
+      documentation: "The Azure Marketplace image offer."
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER
+      default: ""
+      documentation: "The Azure Marketplace image publisher."
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU
+      default: ""
+      documentation: "The Azure Marketplace image SKU."
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION
+      default: ""
+      documentation: "The Azure Marketplace image version."
+    - name: HYPERSHIFT_AZURE_SELF_MANAGED
+      default: "false"
+      documentation: "If true , a self-managed HCP will be installed in azure cloud provider."
+    - name: HYPERSHIFT_ETCD_ENCRYPTION
+      default: "false"
+      documentation: |-
+        If true, enable ETCD encryption by specifying --encryption-key-id="$(cat "${SHARED_DIR}/azure_active_key_url")".
+    - name: HYPERSHIFT_DISK_ENCRYPTION
+      default: "false"
+      documentation: |-
+        If true, enable OS disk encryption by specifying --disk-encryption-set-id="$(cat "${SHARED_DIR}/azure_des_id")".
+    - name: HYPERSHIFT_ENCRYPTION_AT_HOST
+      default: ""
+      documentation: |-
+        Set to true or false to enable or disable encryption at the host on Azure VMs. 
+        If left empty, the flag will be omitted, and the default behavior will apply.
+        Currently, the default is Enabled, see https://github.com/openshift/hypershift/blob/9f15114301ae6c1cd2a6ecf700cb8d7e626c14b4/vendor/github.com/openshift/hypershift/api/hypershift/v1beta1/nodepool_types.go#L1015
+    - name: HYPERSHIFT_CUSTOM_RESOURCE_GROUP
+      default: "false"
+      documentation: |-
+        If true, create hosted cluster infrastructure in the resource group specified in "${SHARED_DIR}/resourcegroup".
+    - name: HYPERSHIFT_CUSTOM_VNET
+      default: "false"
+      documentation: "If true, use BYO VNET specified in ${SHARED_DIR}/azure_vnet_id"
+    - name: HYPERSHIFT_CUSTOM_SUBNET
+      default: "false"
+      documentation: "If true, use BYO SUBNET specified in ${SHARED_DIR}/azure_subnet_id"
+    - name: HYPERSHIFT_CUSTOM_NSG
+      default: "false"
+      documentation: "If true, use BYO NSG specified in ${SHARED_DIR}/azure_nsg_id"
+    - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+      default: ""
+      documentation: "Availability policy for hosted cluster components"
+    - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
+      default: ""
+      documentation: "Availability policy for infrastructure services in guest cluster"
+    - name: HYPERSHIFT_OLM_CATALOG_PLACEMENT
+      default: ""
+      documentation: "OLM Catalog Placement for the HostedCluster. Options: management, guest. Defaults if empty. "
+    - name: HYPERSHIFT_NETWORK_TYPE
+      default: ""
+      documentation: "Specifies the cluster SDN provider."
+    - name: HYPERSHIFT_NODE_DRAIN_TIMEOUT
+      default: ""
+      documentation: "The NodeDrainTimeout on the NodePool created with the hosted cluster."
+    - name: HYPERSHIFT_NODE_VOLUME_DETACH_TIMEOUT
+      default: ""
+      documentation: "The NodeVolumeDetachTimeout on any created NodePools."
+    - name: HYPERSHIFT_NP_AUTOREPAIR
+      default: "false"
+      documentation: "Enables machine autorepair with machine health checks."
+    - name: HYPERSHIFT_CREATE_CLUSTER_RENDER
+      default: "false"
+      documentation: "If true, render artifacts to ${SHARED_DIR}/hypershift_create_cluster_render.yaml."
+    - name: HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE
+      default: "false"
+      documentation: "When used along --render it enables rendering of secrets."
+    - name: EXTRA_ARGS
+      default: ""
+      documentation: "Extra arguments to pass to the hypershift create cluster azure command."
+    - name: AZURE_OIDC_ISSUER_URL
+      default: ""
+      documentation: "OIDC Issuer URL to be used when creating azure cluster"
+    - name: AZURE_SA_TOKEN_ISSUER_KEY_PATH
+      default: ""
+      documentation: "The file location of the  private key for the service account token issuer"
+    - name: HYPERSHIFT_AZURE_FIPS
+      default: "false"
+      documentation: "Enable fips"
+    - name: ASSIGN_SERVICE_PRINCIPAL_ROLES
+      default: "false"
+      documentation: "Assign the service principal roles to the managed identities"
+    - name: AUTO_ASSIGN_ROLES
+      default: "false"
+      documentation: "assign required Azure RBAC roles to workload identities"    
+    - name: DNS_ZONE_RG_NAME
+      default: "os4-common"
+      documentation: "dns zone resource group"
+    - name: HYPERSHIFT_INSTANCE_TYPE
+      default: ""
+      documentation: "Instance type for the nodepool vm size"
+    - name: ADDITIONAL_CA_BUNDLE_FILE
+      default: ""
+      documentation: "The additional ca bundle file name in the shared directory"
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_ENABLED
+      default: "true"
+      documentation: "Enable marketplace flags"
+    - name: HYPERSHIFT_AZURE_IMAGE_GENERATION
+      default: ""
+      documentation: "image generation value" 
+    - name: CLI
+      default: ""
+      documentation: "hcp or hypershift cli path"
+    - name: CNI_PROVIDER
+      default: ""
+      documentation: "The CNI provider to use for the cluster. Supported values: cilium"
+    commands: |-
+      set -exuo pipefail
+
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+      echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
+
+      RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
+      
+      AZURE_CREDS=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+      if [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
+        AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+        AZURE_OIDC_ISSUER_URL_LOCATION="/etc/hypershift-ci-jobs-azurecreds/oidc-issuer-url.json"
+        AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-ci-jobs-azurecreds/serviceaccount-signer.private"
+            
+        while IFS= read -r line; do
+          if [[ $line == *"oidcIssuerURL"* ]]; then
+            AZURE_OIDC_ISSUER_URL=$(echo "$line" | awk -F'"' '{print $4}')
+            break
+          fi
+        done < "$AZURE_OIDC_ISSUER_URL_LOCATION"
+      else
+        AZURE_OIDC_ISSUER_URL="$(cat /etc/hypershift-aro-azurecreds/oidc-issuer-url)"
+        AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-aro-azurecreds/oidc-signer-private"
+      fi
+      
+      HC_LOCATION=${HYPERSHIFT_AZURE_LOCATION:-$LEASED_RESOURCE}
+      
+      PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
+      if [[ -f "${SHARED_DIR}/hypershift-pull-secret" ]]; then
+        PULL_SECRET_PATH="${SHARED_DIR}/hypershift-pull-secret"
+      fi
+      
+      ENCRYPTION_KEY_ID=""
+      KMS_CREDENTIALS_SECRET_NAME=""
+      if [[ $HYPERSHIFT_ETCD_ENCRYPTION == "true" ]]; then
+        if [[ -f "${SHARED_DIR}/azure_active_key_url" ]]; then
+          ENCRYPTION_KEY_ID="$(cat "${SHARED_DIR}/azure_active_key_url")"
+        else
+          ENCRYPTION_KEY_ID="$(cat "/etc/hypershift-aro-azurecreds/encryption-key-url")"
+        fi
+
+        # Get KMS credentials secret name
+        if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
+          KMS_SECRET_INFO_FILE="/etc/hypershift-ci-jobs-azurecreds/aks-kms-info.json"
+          while IFS= read -r line; do
+            if [[ $line == *"aks-kms-credentials-secret"* ]]; then
+              KMS_CREDENTIALS_SECRET_NAME=$(echo "$line" | awk -F'"' '{print $4}')
+              break
+            fi
+          done < "$AKS_KMS_INFO_LOCATION"
+        else
+          KMS_CREDENTIALS_SECRET_NAME="$(cat "/etc/hypershift-aro-azurecreds/kms-credentials-secret-name")"
+        fi
+      fi
+      
+      DISK_ENCRYPTION_SET_ID=""
+      if [[ $HYPERSHIFT_DISK_ENCRYPTION == "true" ]]; then
+        DISK_ENCRYPTION_SET_ID="$(cat "${SHARED_DIR}/azure_des_id")"
+      fi
+      
+      RESOURCE_GROUP_NAME=""
+      if [[ $HYPERSHIFT_CUSTOM_RESOURCE_GROUP == "true" ]]; then
+        RESOURCE_GROUP_NAME="$(cat "${SHARED_DIR}/resourcegroup")"
+      fi
+      
+      VNET_ID=""
+      if [[ $HYPERSHIFT_CUSTOM_VNET == "true" ]]; then
+        VNET_ID="$(cat "${SHARED_DIR}/azure_vnet_id")"
+      fi
+      
+      SUBNET_ID=""
+      if [[ $HYPERSHIFT_CUSTOM_SUBNET == "true" ]]; then
+        SUBNET_ID="$(cat "${SHARED_DIR}/azure_subnet_id")"
+      fi
+      
+      NSG_ID=""
+      if [[ $HYPERSHIFT_CUSTOM_NSG == "true" ]]; then
+        NSG_ID="$(cat "${SHARED_DIR}/azure_nsg_id")"
+      fi
+      
+      if [[  -z $CLI ]]; then
+      CLI="/usr/bin/hypershift"
+      fi
+      
+      COMMAND=(
+        "${CLI}" create cluster azure \
+        --name ${CLUSTER_NAME} \
+        --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
+        --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+        --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
+        --pull-secret ${PULL_SECRET_PATH} \
+        --azure-creds ${AZURE_CREDS} \
+        --location ${HC_LOCATION} \
+        --release-image ${RELEASE_IMAGE} \
+        --encryption-key-id=${ENCRYPTION_KEY_ID} \
+        --disk-encryption-set-id=${DISK_ENCRYPTION_SET_ID} \
+        --resource-group-name=${RESOURCE_GROUP_NAME} \
+        --vnet-id=${VNET_ID} \
+        --subnet-id=${SUBNET_ID} \
+        --network-security-group-id=${NSG_ID} \
+        --generate-ssh
+      )
+      
+      if [[ $ENABLE_ICSP == "true" ]]; then
+        COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
+      fi
+
+      if [[ $GUEST_FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
+        COMMAND+=(--feature-set=TechPreviewNoUpgrade)
+      fi
+      
+      if [[ $AZURE_OIDC_ISSUER_URL != "" ]]; then
+        COMMAND+=( --oidc-issuer-url $AZURE_OIDC_ISSUER_URL)
+      fi
+      
+      if [[ $HYPERSHIFT_AZURE_IMAGE_GENERATION != "" ]]; then
+        COMMAND+=(  --image-generation $HYPERSHIFT_AZURE_IMAGE_GENERATION)
+      fi
+
+      if [[ $AZURE_SA_TOKEN_ISSUER_KEY_PATH != "" ]]; then
+        COMMAND+=( --sa-token-issuer-private-key-path $AZURE_SA_TOKEN_ISSUER_KEY_PATH)
+      fi
+      
+      if [[ $HYPERSHIFT_AZURE_CP_MI == "true" ]]; then
+        if [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
+          COMMAND+=(--managed-identities-file "/etc/hypershift-ci-jobs-azurecreds/managed-identities.json" --data-plane-identities-file "/etc/hypershift-ci-jobs-azurecreds/dataplane-identities.json")
+        else
+          # using qe azure creds
+          COMMAND+=(--managed-identities-file "/etc/hypershift-aro-azurecreds/managed-identities.json" --data-plane-identities-file "/etc/hypershift-aro-azurecreds/dataplane-identities.json")
+        fi
+      fi
+      
+      HC_ANNOTATIONS_FILE="${SHARED_DIR}/hypershift_hc_annotations"
+      if [[ -f "$HC_ANNOTATIONS_FILE" ]]; then
+        while read -r line; do
+          if [[ -n "$line" ]]; then
+            EXTRA_ARGS+=" --annotations=${line}"
+          fi
+        done < "$HC_ANNOTATIONS_FILE"
+      fi
+      
+      if [[ -n $HYPERSHIFT_OLM_CATALOG_PLACEMENT ]]; then
+        EXTRA_ARGS+=" --olm-catalog-placement=${HYPERSHIFT_OLM_CATALOG_PLACEMENT}"
+      fi
+      if [[ $HYPERSHIFT_AZURE_MARKETPLACE_ENABLED == "true" ]];then 
+        if [[ -n $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER ]]; then
+          EXTRA_ARGS+=" --marketplace-offer=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER}"
+          EXTRA_ARGS+=" --marketplace-publisher=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER}"
+
+          if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU ]]; then
+            EXTRA_ARGS+=" --marketplace-sku=$(cat "${SHARED_DIR}/azure-marketplace-image-sku")"
+          else
+            EXTRA_ARGS+=" --marketplace-sku=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU}"
+          fi
+        
+          if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION ]]; then
+            EXTRA_ARGS+=" --marketplace-version=$(cat "${SHARED_DIR}/azure-marketplace-image-version")"
+          else
+            EXTRA_ARGS+=" --marketplace-version=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
+          fi
+        fi
+      fi
+      
+      if [[ -n $HYPERSHIFT_NETWORK_TYPE ]]; then
+        EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE}"
+      fi
+
+      # Add --kas-dns-name flag when HYPERSHIFT_DYNAMIC_DNS is set
+      # This enables dynamic external DNS name management and auto-generated custom kubeconfig
+      if [[ -n $HYPERSHIFT_DYNAMIC_DNS ]]; then
+        EXTRA_ARGS+=" --kas-dns-name=${HYPERSHIFT_DYNAMIC_DNS}"
+      fi
+
+      if [[ -n $HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE ]]; then
+        EXTRA_ARGS+=" --diagnostics-storage-account-type=${HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE}"
+        if [[ $HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE == "UserManaged" ]]; then
+          EXTRA_ARGS+=" --diagnostics-storage-account-uri=$(cat "${SHARED_DIR}"/azure_storage_account_blob_endpoint)"
+        fi
+      fi
+      
+      if [[ -n $HYPERSHIFT_CP_AVAILABILITY_POLICY ]]; then
+        EXTRA_ARGS+=" --control-plane-availability-policy=${HYPERSHIFT_CP_AVAILABILITY_POLICY}"
+      fi
+      
+      if [[ -n $HYPERSHIFT_INFRA_AVAILABILITY_POLICY ]]; then
+        EXTRA_ARGS+=" --infra-availability-policy=${HYPERSHIFT_INFRA_AVAILABILITY_POLICY}"
+      fi
+      
+      if [[ $HYPERSHIFT_NP_AUTOREPAIR == "true" ]]; then
+        EXTRA_ARGS+=" --auto-repair"
+      fi
+      
+      if [[ -n $HYPERSHIFT_NODE_DRAIN_TIMEOUT ]]; then
+        EXTRA_ARGS+=" --node-drain-timeout=${HYPERSHIFT_NODE_DRAIN_TIMEOUT}"
+      fi
+      
+      if [[ -n $HYPERSHIFT_NODE_VOLUME_DETACH_TIMEOUT ]]; then
+        EXTRA_ARGS+=" --node-volume-detach-timeout=${HYPERSHIFT_NODE_VOLUME_DETACH_TIMEOUT}"
+      fi
+      
+      if [[ $HYPERSHIFT_ENCRYPTION_AT_HOST == "true" ]]; then
+        EXTRA_ARGS+=" --encryption-at-host=Enabled"
+      elif [[ $HYPERSHIFT_ENCRYPTION_AT_HOST == "false" ]]; then
+        EXTRA_ARGS+=" --encryption-at-host=Disabled"
+      fi
+      
+      if [[ -n $EXTRA_ARGS ]]; then
+        COMMAND+=(${EXTRA_ARGS})
+      fi
+      
+      if [[ -n "${KMS_CREDENTIALS_SECRET_NAME}" ]]; then
+        COMMAND+=(--kms-credentials-secret-name=${KMS_CREDENTIALS_SECRET_NAME})
+      fi
+
+      if [[ $HYPERSHIFT_AZURE_FIPS == "true" ]]; then
+        COMMAND+=(--fips=true)
+      fi
+      
+      if [[ $ASSIGN_SERVICE_PRINCIPAL_ROLES == "true" ]]; then
+        COMMAND+=(--assign-service-principal-roles=true)
+        COMMAND+=(--dns-zone-rg-name=${DNS_ZONE_RG_NAME})
+      fi
+      
+      if [[ $AUTO_ASSIGN_ROLES == "true" ]]; then
+        COMMAND+=(--auto-assign-roles=true)
+        COMMAND+=(--dns-zone-rg-name=${DNS_ZONE_RG_NAME})
+      fi
+
+      if [[ -n "${HYPERSHIFT_INSTANCE_TYPE}" ]]; then
+        COMMAND+=(--instance-type=${HYPERSHIFT_INSTANCE_TYPE})
+      fi
+      
+      if [[ -n "${ADDITIONAL_CA_BUNDLE_FILE}" ]]; then
+        COMMAND+=(--additional-trust-bundle "${SHARED_DIR}/${ADDITIONAL_CA_BUNDLE_FILE}")
+      fi
+
+      if [[ $HYPERSHIFT_AZURE_SELF_MANAGED == "true" ]]; then
+          COMMAND+=(--workload-identities-file "/etc/hypershift-selfmanaged-azurecreds/workload-identities.json")
+      fi
+
+
+      if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
+        COMMAND+=(--render)
+        if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE == "true" ]]; then
+          COMMAND+=(--render-sensitive)
+        fi
+        "${COMMAND[@]}" > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+        exit 0
+      fi
+
+      # Required for Cilium, see OCPBUGS-85607.
+      if [[ "$CNI_PROVIDER" == "cilium" ]]; then
+        COMMAND+=(--annotations=hypershift.openshift.io/azure-load-balancer-health-probe-mode=servicenodeport)
+      fi
+      
+      "${COMMAND[@]}"
+      
+      # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
+      echo "Waiting for cluster to become available"
+      oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
+      echo "Cluster became available, creating kubeconfig"
+      bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+      echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+      
+      # In case of BYO CNI, the HC will never be ready before CNI components are up and running
+      if [[ $HYPERSHIFT_NETWORK_TYPE == "Other" || $HYPERSHIFT_NETWORK_TYPE == "Calico" ]]; then
+        echo "Waiting for nodes to join the hosted cluster"
+        num_nodes_expected=$(oc get np -A -o jsonpath='{.items[0].spec.replicas}')
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        set +e
+        while true; do
+          num_nodes=$(oc get nodes --no-headers | wc -l | xargs)
+          if (( num_nodes == num_nodes_expected )); then
+            break
+          fi
+          
+          echo "$num_nodes/$num_nodes_expected have joined the HC"
+          sleep 15s
+        done
+        exit 0
+      fi
+      
+      echo "Waiting for clusteroperators to be ready"
+      export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+      until \
+        oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
+          echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+          oc get clusterversion 2>/dev/null || true
+          sleep 10s
+      done
+    from: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 45m0s
+    credentials:
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-ci-jobs-azurecreds
+      name: hypershift-ci-jobs-azurecreds
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-aro-azurecreds
+      name: hypershift-aro-azurecreds
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-selfmanaged-azurecreds
+      name: hypershift-selfmanaged-azurecreds
+      namespace: test-credentials  
+    dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST

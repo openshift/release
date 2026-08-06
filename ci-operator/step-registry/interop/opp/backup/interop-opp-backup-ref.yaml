@@ -1,0 +1,23 @@
+ref:
+  as: interop-opp-backup
+  from: cli
+  grace_period: 1m
+  commands: interop-opp-backup-commands.sh
+  timeout: 15m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+    - name: BACKUP_TIMEOUT
+      default: "300"
+      documentation: Maximum seconds to wait for backup operations to complete
+    - name: OPP_OPERATORS
+      default: "advanced-cluster-management,rhacs-operator,odf-operator,quay-operator"
+      documentation: Comma-separated CSV name prefixes for OPP operators to include in backup state capture
+  documentation: |-
+    Captures a pre-upgrade cluster backup including etcd snapshot, control plane
+    resource state (ClusterVersion, ClusterOperators, Nodes, MCPs), and OPP
+    operator state (CSVs, Subscriptions, InstallPlans). Artifacts are stored in
+    $ARTIFACT_DIR/cluster-backup/ for post-mortem analysis if the subsequent
+    upgrade fails.

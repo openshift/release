@@ -1,0 +1,35 @@
+branch-protection:
+  orgs:
+    rh-ecosystem-edge:
+      repos:
+        assisted-chat:
+          branches:
+            main:
+              protect: true
+          protect: false
+slack_reporter_configs:
+  rh-ecosystem-edge/assisted-chat:
+    channel: '#assisted-chat-ops'
+    job_states_to_report:
+    - failure
+    - error
+    job_types_to_report:
+    - periodic
+    report_template: ':warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+tide:
+  merge_method:
+    rh-ecosystem-edge/assisted-chat: merge
+  queries:
+  - labels:
+    - approved
+    - lgtm
+    missingLabels:
+    - backports/unvalidated-commits
+    - do-not-merge/hold
+    - do-not-merge/invalid-owners-file
+    - do-not-merge/work-in-progress
+    - jira/invalid-bug
+    - needs-rebase
+    repos:
+    - rh-ecosystem-edge/assisted-chat

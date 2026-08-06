@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-upgrade-gcp-storage-symlinks
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-gcp-pre-stableinitial
+    test:
+    - ref: storage-disk-symlinks-save
+    - ref: openshift-e2e-test
+    - ref: storage-disk-symlinks-check
+    post:
+    - chain: ipi-gcp-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
+  documentation: |-
+    The Openshift E2E GCP workflow executes the upgrade end-to-end test suite on GCP with a default cluster configuration checking that root device symlinks are in place after upgrade. The purpose is make sure that udev rules are stable across upgrades.

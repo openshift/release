@@ -1,0 +1,21 @@
+workflow:
+  as: oadp-ipi-aws-sno-oadp-qe
+  steps:
+    env:
+        RE_TRIGGER_ON_FAILURE: "true"
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - chain: ipi-install
+    - ref: cucushift-installer-check-sno
+    - ref: optional-operators-configure-proxy-registry
+    - ref: optional-operators-cvp-common-apply-secrets
+    - ref: optional-operators-subscribe
+    - ref: oadp-s3-create
+    post:
+    - ref: oadp-s3-destroy
+    - chain: ipi-deprovision
+    - ref: job-re-trigger
+    - ref: send-results-to-reportportal
+  documentation: |-
+    Workflow (SNO variant) that adds the ability to deploy an unreleased operator, S3 bucket creation and destruction steps specific to the OADP testing scenario, and configures a Single Node OpenShift (SNO) cluster on AWS. 

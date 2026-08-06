@@ -1,0 +1,104 @@
+base_images:
+  base:
+    name: hi-go
+    namespace: ci
+    tag: 1.26-fips-builder
+build_root:
+  image_stream_tag:
+    name: hi-go
+    namespace: ci
+    tag: 1.26-fips-builder
+images:
+  items:
+  - dockerfile_literal: |
+      FROM base
+
+      # Install required tools
+      RUN dnf install -y which gawk tar gzip && \
+          dnf clean all
+
+      # Copy source code
+      # when building the image, the CI will mount the repo to /go/src/github.com/openshift/
+      COPY . /go/src/github.com/openshift/
+      WORKDIR /go/src/github.com/openshift/backplane-cli
+
+      # Grant read, write, and execute permissions to all users for repo directory
+      # This is because the CI job will run as a random user instead of root
+      RUN chmod -R 775 /go/src/github.com/openshift/backplane-cli
+
+      # Trust this repo directory in git
+      RUN git config --system --add safe.directory /go/src/github.com/openshift/backplane-cli
+
+      # Set environment variables for Go
+      # CI runs as a random user without HOME, use /tmp/ so it has permissions.
+      ENV HOME=/tmp/home
+      ENV GOPATH=/tmp/go
+    from: base
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/backplane-cli
+    to: backplane-ci-runner
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    unset GOFLAGS
+    make lint
+  container:
+    from: backplane-ci-runner
+- as: test
+  commands: |
+    make test
+  container:
+    from: backplane-ci-runner
+- as: scan-optional
+  commands: make scan
+  container:
+    from: backplane-ci-runner
+  optional: true
+- as: build
+  commands: |
+    make build
+  container:
+    from: backplane-ci-runner
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: backplane-ci-runner
+  secret:
+    mount_path: /tmp/secret
+    name: backplane-cli-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: backplane-ci-runner
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: backplane-cli-codecov-token
+- as: combined-release
+  commands: |
+    bash ci-release.sh
+    export GITHUB_TOKEN=$(cat /tmp/secret/GITHUB_TOKEN)
+    make release
+  container:
+    from: backplane-ci-runner
+  postsubmit: true
+  run_if_changed: ^VERSION.md$
+  secret:
+    mount_path: /tmp/secret
+    name: backplane-cli-release-token
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: backplane-cli
