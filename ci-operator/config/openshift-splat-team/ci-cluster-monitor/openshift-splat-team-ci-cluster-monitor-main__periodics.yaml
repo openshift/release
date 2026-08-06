@@ -53,7 +53,11 @@ tests:
     - as: monitor
       commands: |
         set +x
-        source "${CLUSTER_PROFILE_DIR}/secrets.sh"
+        if [[ -f "${CLUSTER_PROFILE_DIR}/secrets.sh" ]]; then
+          source "${CLUSTER_PROFILE_DIR}/secrets.sh"
+        else
+          source /var/run/vault/nutanix/secrets.sh
+        fi
         mkdir -p /tmp/nutanix-creds
         echo -n "${prism_central_username}" > /tmp/nutanix-creds/nutanix-username
         echo -n "${prism_central_password}" > /tmp/nutanix-creds/nutanix-password
