@@ -29,7 +29,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -54,7 +54,12 @@ tests:
     - as: set-related-image
       cli: latest
       commands: |
-        oc set env deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN="${KDM_PLUGIN_IMAGE}"
+        SUB=$(cat "${SHARED_DIR}/oo-subscription")
+        # Subscription.spec.config.env is OLM's supported override mechanism:
+        # it wins over same-named CSV env vars and survives reconciliation,
+        # unlike patching the Deployment directly (OLM reconciles that from
+        # the CSV and would revert it).
+        oc patch subscription "${SUB}" -n "${OO_INSTALL_NAMESPACE}" --type merge -p "$(jq -n --arg img "${KDM_PLUGIN_IMAGE}" '{spec:{config:{env:[{name:"RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN",value:$img}]}}}')"
         oc rollout status deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" --timeout=180s
       dependencies:
       - env: KDM_PLUGIN_IMAGE
