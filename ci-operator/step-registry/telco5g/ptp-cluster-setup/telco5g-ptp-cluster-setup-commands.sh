@@ -309,13 +309,11 @@ log_chronyd_status() {
 #Set status and run playbooks
 status=0
 
-if [[ "$SKIP_OCP_INSTALL" != "true" ]]; then
-  ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -e job_type=$JOB_TYPE -vv || status=$?
-fi
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -e job_type=$JOB_TYPE -vv || status=$?
 
 # Fetch kubeconfig and cluster information. Do not ignore failures: without kubeconfig the test
 # step has nothing to work with, and the job can spuriously pass the setup ref while the test
-# step then fails to upload artifacts (e.g. e2e-telco5g-ptp-upstream with SKIP_OCP_INSTALL=true).
+# step then fails to upload artifacts.
 if ! ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -e job_type=$JOB_TYPE -vv; then
   echo "ERROR: fetch-kubeconfig playbook failed; PTP e2e cannot run without a kubeconfig"
   status=1
@@ -336,7 +334,7 @@ if [[ -f "$SHARED_DIR/kubeconfig" ]]; then
   echo "****************************************************************"
 fi
 
-if [[ "$SKIP_OCP_INSTALL" != "true" && "$status" -eq 0 ]]; then
+if [[ "$status" -eq 0 ]]; then
   #installer has issues applying machine-configs with OCP 4.10, using manual way
   KUBECONFIG="$SHARED_DIR/kubeconfig" oc apply -f "$SHARED_DIR/disable_ntp.yml" || true
   wait_for_mcp "2700s" || true
