@@ -53,32 +53,24 @@ tests:
     - as: monitor
       commands: |
         set +x
-        source /tmp/nutanix-creds/secrets.sh
-        echo "=== Testing API with credentials ==="
-        HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" --connect-timeout 10 \
-          -u "${prism_central_username}:${prism_central_password}" \
-          "https://${prism_central_host}:${prism_central_port}/api/vmm/v4.0/ahv/config/vms?%24page=0&%24limit=1")
-        echo "API response code: ${HTTP_CODE}"
-        echo "=== Testing OPTIONS (what SDK does) ==="
-        HTTP_CODE2=$(curl -sk -o /dev/null -w "%{http_code}" --connect-timeout 10 \
-          -X OPTIONS \
-          "https://${prism_central_host}:${prism_central_port}/api/vmm/unversioned/info")
-        echo "OPTIONS response code: ${HTTP_CODE2}"
-        echo "=== OPTIONS response body ==="
-        curl -sk --connect-timeout 10 -X OPTIONS \
-          "https://${prism_central_host}:${prism_central_port}/api/vmm/unversioned/info" 2>&1 | head -20
-        echo "=== SSL_CERT_FILE test ==="
-        export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
-        HTTP_CODE3=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 \
-          -u "${prism_central_username}:${prism_central_password}" \
-          --cacert "${SSL_CERT_FILE}" \
-          "https://${prism_central_host}:${prism_central_port}/api/vmm/v4.0/ahv/config/vms?%24page=0&%24limit=1")
-        echo "API with CA cert response code: ${HTTP_CODE3}"
+        PC_HOST="prismcentral.sts2-cluster.internal.nutanix-dev.devcluster.openshift.com"
+        PC_PORT="9440"
+        USERNAME=$(cat /tmp/nutanix-creds/nutanix-username)
+        PASSWORD=$(cat /tmp/nutanix-creds/nutanix-password)
         set -x
+        echo "=== Connectivity to sts2 ==="
+        curl -sk --connect-timeout 10 "https://${PC_HOST}:${PC_PORT}" && echo "Base reachable" || echo "Base unreachable"
+        echo "=== API test ==="
+        set +x
+        HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" --connect-timeout 10 \
+          -u "${USERNAME}:${PASSWORD}" \
+          "https://${PC_HOST}:${PC_PORT}/api/vmm/v4.0/ahv/config/vms?%24page=0&%24limit=1")
+        set -x
+        echo "API response code: ${HTTP_CODE}"
         echo "=== Done ==="
       credentials:
       - mount_path: /tmp/nutanix-creds
-        name: nutanix-pc
+        name: ci-cluster-monitor-nutanix-creds
         namespace: test-credentials
       from: src
       resources:
