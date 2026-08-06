@@ -14,9 +14,10 @@ fi
 pip install --quiet ansible
 
 # Set up SSH key (add trailing newline if missing - Vault sync strips it)
-cat /var/run/secrets/jetson-ssh-key/id_rsa > /tmp/jetson_id_rsa
-echo "" >> /tmp/jetson_id_rsa
-chmod 600 /tmp/jetson_id_rsa
+SSH_KEY=$(mktemp)
+cat /var/run/secrets/jetson-ssh-key/id_rsa > "${SSH_KEY}"
+echo "" >> "${SSH_KEY}"
+chmod 600 "${SSH_KEY}"
 
 EXTRA_VARS_FILE=$(mktemp /tmp/ansible-extra-vars.XXXXXX.yml)
 trap 'rm -f "${EXTRA_VARS_FILE}"' EXIT
@@ -24,7 +25,7 @@ trap 'rm -f "${EXTRA_VARS_FILE}"' EXIT
 cat > "${EXTRA_VARS_FILE}" << EOF
 target_host: "${JETSON_HOSTNAME}"
 ansible_ssh_user: root
-ansible_ssh_private_key_file: /tmp/jetson_id_rsa
+ansible_ssh_private_key_file: ${SSH_KEY}
 ansible_become: false
 EOF
 
@@ -35,6 +36,7 @@ cp -r /opt/qe-rhel-jetson-ansible/. "${ANSIBLE_DIR}/"
 mkdir -p "${ANSIBLE_DIR}/vars"
 
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+# Disable tracing to prevent REGISTRY_USERNAME and REGISTRY_PASSWORD from leaking into logs
 set +x
 
 cat > "${ANSIBLE_DIR}/vars/secrets.yml" << EOF

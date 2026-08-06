@@ -1,9 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-cat /var/run/secrets/jetson-ssh-key/id_rsa > /tmp/jetson_id_rsa
-echo "" >> /tmp/jetson_id_rsa
-chmod 600 /tmp/jetson_id_rsa
+SSH_KEY=$(mktemp)
+cat /var/run/secrets/jetson-ssh-key/id_rsa > "${SSH_KEY}"
+echo "" >> "${SSH_KEY}"
+chmod 600 "${SSH_KEY}"
 
 EFFECTIVE_HOST="${JETSON_HOSTNAME}"
 EFFECTIVE_PORT=22
@@ -12,17 +13,17 @@ EFFECTIVE_PORT=22
 if [[ -n "${JUMPHOST:-}" ]]; then
     LOCAL_PORT=2222
     echo "=== Setting up SSH tunnel via jumphost ${JUMPHOST} ==="
-    ssh -o StrictHostKeyChecking=no \
+    ssh -o StrictHostKeyChecking=accept-new \
         -o ExitOnForwardFailure=yes \
-        -i /tmp/jetson_id_rsa \
+        -i ${SSH_KEY} \
         -N -L "${LOCAL_PORT}:${JETSON_HOSTNAME}:22" \
         "${JUMPHOST}" &
     TUNNEL_PID=$!
     trap 'kill ${TUNNEL_PID} 2>/dev/null || true' EXIT
     # Wait for tunnel to be ready
     for _ in $(seq 1 15); do
-        if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=2 \
-               -i /tmp/jetson_id_rsa \
+        if ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=2 \
+               -i ${SSH_KEY} \
                -p "${LOCAL_PORT}" root@127.0.0.1 true 2>/dev/null; then
             break
         fi
@@ -53,5 +54,5 @@ cd "${WORK_DIR}"
 JETSON_HOST="${EFFECTIVE_HOST}" \
 JETSON_PORT="${EFFECTIVE_PORT}" \
 JETSON_USERNAME="root" \
-JETSON_KEY_PATH="/tmp/jetson_id_rsa" \
+JETSON_KEY_PATH="${SSH_KEY}" \
 pytest "${TEST_SUITE}" -v
