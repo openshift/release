@@ -54,15 +54,18 @@ verify_bucket_encryption() {
 
   echo "$(date -u --rfc-3339=seconds) - Bucket exists, checking encryption configuration..."
 
+  # "gcloud storage buckets describe" exposes the KMS key as "default_kms_key",
+  # NOT "encryption.defaultKmsKeyName" (which is the GCS JSON API field name).
+  # Using --format="json(encryption)" returns null even on encrypted buckets.
   ENCRYPTION_CONFIG=$(gcloud storage buckets describe "gs://${bucket_name}" \
-    --format="json(encryption)" 2>&1) || {
+    --format="json(default_kms_key)" 2>&1) || {
     echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to describe bucket ${bucket_name}"
     echo "${ENCRYPTION_CONFIG}"
     return 1
   }
 
-  if echo "${ENCRYPTION_CONFIG}" | jq -e '.encryption.defaultKmsKeyName' &>/dev/null; then
-    ACTUAL_KMS_KEY=$(echo "${ENCRYPTION_CONFIG}" | jq -r '.encryption.defaultKmsKeyName')
+  if echo "${ENCRYPTION_CONFIG}" | jq -e '.default_kms_key' &>/dev/null; then
+    ACTUAL_KMS_KEY=$(echo "${ENCRYPTION_CONFIG}" | jq -r '.default_kms_key')
     echo "$(date -u --rfc-3339=seconds) - Actual KMS key: ${ACTUAL_KMS_KEY}"
 
     if [[ "${ACTUAL_KMS_KEY}" == "${EXPECTED_KMS_KEY}" ]]; then
