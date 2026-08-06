@@ -664,8 +664,8 @@ oc whoami --show-server >/dev/null
 
 # Verifying the compute nodes status
 echo "$(date) Checking the compute nodes in the hosted control plane"
-oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
-oc get co --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig" || true
+oc get co --kubeconfig="${SHARED_DIR}/nested_kubeconfig" || true
 if ! oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co \
       --for=condition=Available=True --timeout=90m; then
   echo "$(date) ERROR: Some cluster operators did not become Available within 90m"
