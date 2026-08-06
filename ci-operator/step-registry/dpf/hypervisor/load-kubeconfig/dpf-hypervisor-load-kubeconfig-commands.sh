@@ -53,7 +53,7 @@ scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.doca8 /tmp/
 CLUSTER_NAME="$(oc --kubeconfig=/tmp/kubeconfig.doca8 config view -o jsonpath='{.clusters[0].name}')"
 CLUSTER_API_SERVER_HOSTNAME="$(oc --kubeconfig=/tmp/kubeconfig.doca8 config view -o jsonpath='{.clusters[0].cluster.server}' | sed -E 's#https://([^:]+):.*#\1#')"
 echo "Resolving cluster API server hostname '${CLUSTER_API_SERVER_HOSTNAME}' from the hypervisor..."
-CLUSTER_API_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${CLUSTER_API_SERVER_HOSTNAME} | awk '{print \$1}'")"
+CLUSTER_API_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${CLUSTER_API_SERVER_HOSTNAME} | awk '{print \$1}'" | head -1)"
 
 if [[ -z "${CLUSTER_API_IP}" ]]; then
     echo "ERROR: Failed to resolve '${CLUSTER_API_SERVER_HOSTNAME}' from the hypervisor"
@@ -83,7 +83,7 @@ echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig successfully"
 APPS_DOMAIN="$(oc --kubeconfig=/tmp/kubeconfig.doca8 get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')"
 echo "Resolving apps domain '*.${APPS_DOMAIN}' from the hypervisor..."
 APPS_HOSTNAME="console-openshift-console.${APPS_DOMAIN}"
-APPS_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${APPS_HOSTNAME} | awk '{print \$1}'")"
+APPS_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${APPS_HOSTNAME} | awk '{print \$1}'" | head -1)"
 
 if [[ -z "${APPS_IP}" ]]; then
     echo "WARNING: Failed to resolve '${APPS_HOSTNAME}' from the hypervisor, skipping apps DNS setup"
