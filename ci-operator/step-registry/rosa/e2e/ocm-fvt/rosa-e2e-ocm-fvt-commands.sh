@@ -130,7 +130,16 @@ fi
 old_umask=$(umask)
 umask 077
 podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
-trap 'rm -f "${podman_env_file}"; rm -f "${hive_kubeconfig:-}" "${hive_kubeconfig_src:-}"' EXIT
+prom_pf_pid=""
+appsre_kubeconfig=""
+cleanup_ocm_fvt() {
+  if [[ -n "${prom_pf_pid}" ]]; then
+    kill "${prom_pf_pid}" 2>/dev/null || true
+    wait "${prom_pf_pid}" 2>/dev/null || true
+  fi
+  rm -f "${podman_env_file}" "${hive_kubeconfig:-}" "${hive_kubeconfig_src:-}" "${appsre_kubeconfig:-}"
+}
+trap cleanup_ocm_fvt EXIT
 umask "${old_umask}"
 
 {
@@ -268,171 +277,89 @@ if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
   ocmtest_args+=(--reportJiraTicket)
 fi
 
-# TEMP: AppSRE Prometheus reachability for osdfm post-alerts (remove after decision).
-# Short-term under test: ocm-backplane monitoring → prometheus-app-sre.
-# Out of scope: RHOBS / kube-state-metrics (long-term alternative).
-if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
-  prom_route="${OCM_FVT_PROMETHEUS_ROUTE:-https://prometheus.app-sre-stage-01.devshift.net}"
-  prom_proxy="${HTTPS_PROXY:-${backplane_proxy_url:-http://squid.corp.redhat.com:3128}}"
+# AppSRE prometheus-app-sre for osdfm post-alerts (Prow): keep oc port-forward up for ocmtest.
+# Tests hardcode http://prometheus-app-sre.openshift-customer-monitoring.svc.cluster.local:9090;
+# map that name to the build pod via --add-host=...:host-gateway (PF listens on 0.0.0.0:9090).
+# ocm-backplane monitoring returns 404 for this stack; RHOBS is the long-term alternative.
+prom_host_fqdn="prometheus-app-sre.openshift-customer-monitoring.svc.cluster.local"
+if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && "${OCM_FVT_USE_BACKPLANE:-false}" == "true" && -n "${backplane_bin_dir}" ]]; then
   prom_ns=openshift-customer-monitoring
   prom_svc=prometheus-app-sre
-  prom_selector="${OCM_FVT_PROMETHEUS_SELECTOR:-prometheus=app-sre}"
-  prom_listen_bp="127.0.0.1:19091"
-  prom_listen_pf="127.0.0.1:19090"
   prom_artifact_dir="${ARTIFACT_DIR:-/tmp}"
   prom_ocm_env="${OCM_FVT_OCM_ENV:-integration}"
   mkdir -p "${prom_artifact_dir}"
 
-  # Wait for listener → PromQL up; optional feature-alerts spot-check; dump log; kill.
-  # Pass mode=suite as $5 to also query fleet_manager_cluster_status_count + ALERTS.
-  prom_local_probe() {
-    local label="$1" listen="$2" pid="$3" log_file="$4" mode="${5:-}"
-    local out_file="${prom_artifact_dir}/prom-${label}.out"
-    rm -f "${out_file}"
-    local ready=false i
-    for i in $(seq 1 20); do
-      if ! kill -0 "${pid}" 2>/dev/null; then
-        echo "${label}: process exited early (pid ${pid})"
+  appsre_cluster_id="${OCM_FVT_APPSRE_BACKPLANE_CLUSTER_ID:-19mjrthsfn66bm22m574v2v1gt9a8r4q}"
+  appsre_kubeconfig="$(mktemp /tmp/appsre-kubeconfig.XXXXXX)"
+  rm -f "${appsre_kubeconfig}"
+  saved_kubeconfig="${KUBECONFIG:-}"
+  export KUBECONFIG="${appsre_kubeconfig}"
+  export PATH="${backplane_bin_dir}:${PATH}"
+
+  echo "=== AppSRE Prometheus port-forward (osdfm post-alerts) ==="
+  if ! ocm-backplane login "${appsre_cluster_id}"; then
+    echo "ERROR: backplane login to app-sre-stage-01 (${appsre_cluster_id}) failed" >&2
+    export KUBECONFIG="${saved_kubeconfig}"
+    rm -f "${appsre_kubeconfig}"
+    appsre_kubeconfig=""
+  else
+    chmod 0600 "${appsre_kubeconfig}"
+    echo "oc whoami: $(oc whoami 2>&1 || true)"
+    oc -n "${prom_ns}" get svc "${prom_svc}" -o name 2>&1 || true
+
+    pf_log="${prom_artifact_dir}/prom-port-forward.log"
+    # Bind 0.0.0.0 so podman --add-host=...:host-gateway can reach PF (127.0.0.1 alone is not enough).
+    # Scope is the build pod network namespace only (Prow); not exposed outside the CI pod.
+    oc -n "${prom_ns}" port-forward --address 0.0.0.0 "svc/${prom_svc}" 9090:9090 \
+      >"${pf_log}" 2>&1 &
+    prom_pf_pid=$!
+
+    ready=false
+    attempts=30
+    while (( attempts-- > 0 )); do
+      if ! kill -0 "${prom_pf_pid}" 2>/dev/null; then
+        echo "port-forward exited early (pid ${prom_pf_pid})"
         break
       fi
-      if curl -sS -o /dev/null --max-time 1 "http://${listen}/-/healthy" 2>/dev/null \
-        || curl -sS -o /dev/null --max-time 1 "http://${listen}/api/v1/query?query=up" 2>/dev/null; then
+      if curl -sS -o /dev/null --max-time 1 "http://127.0.0.1:9090/api/v1/query?query=up" 2>/dev/null; then
         ready=true
         break
       fi
       sleep 1
     done
-    local code="err"
-    if [[ "${ready}" == "true" ]]; then
-      code="$(curl -sS -o "${out_file}" -w '%{http_code}' --max-time 10 \
-        "http://${listen}/api/v1/query?query=up" || echo err)"
-    else
-      curl -sS -o "${out_file}" --max-time 2 "http://${listen}/api/v1/query?query=up" 2>/dev/null || true
-    fi
-    echo "${label}: ready=${ready} PromQL up HTTP ${code}; body: $(head -c 160 "${out_file}" 2>/dev/null | tr '\n' ' ')"
 
-    if [[ "${mode}" == "suite" && "${code}" == "200" ]]; then
-      local ns="osd-fleet-manager-${prom_ocm_env}" q out sc
+    if [[ "${ready}" != "true" ]]; then
+      echo "ERROR: Prometheus port-forward not ready" >&2
+      cat "${pf_log}" 2>/dev/null || true
+      kill "${prom_pf_pid}" 2>/dev/null || true
+      wait "${prom_pf_pid}" 2>/dev/null || true
+      prom_pf_pid=""
+    else
+      # Readiness + suite spot-check; truncate to build log only (avoid full PromQL in artifacts).
+      code="$(curl -sS -o /tmp/prom-up.out -w '%{http_code}' --max-time 10 \
+        "http://127.0.0.1:9090/api/v1/query?query=up" || echo err)"
+      echo "PromQL up HTTP ${code}; body: $(head -c 160 /tmp/prom-up.out 2>/dev/null | tr '\n' ' ')"
+      rm -f /tmp/prom-up.out
+      ns="osd-fleet-manager-${prom_ocm_env}"
       for q in \
         "fleet_manager_cluster_status_count{namespace=\"${ns}\"}" \
         "ALERTS{namespace=\"${ns}\"}"; do
-        out="${prom_artifact_dir}/prom-${label}-suite.out"
-        sc="$(curl -sS -o "${out}" -w '%{http_code}' --max-time 15 \
-          --get "http://${listen}/api/v1/query" --data-urlencode "query=${q}" || echo err)"
-        echo "${label} suite HTTP ${sc}: ${q}; body: $(head -c 120 "${out}" 2>/dev/null | tr '\n' ' ')"
+        sc="$(curl -sS -o /tmp/prom-suite.out -w '%{http_code}' --max-time 15 \
+          --get "http://127.0.0.1:9090/api/v1/query" --data-urlencode "query=${q}" || echo err)"
+        echo "suite HTTP ${sc}: ${q}; body: $(head -c 120 /tmp/prom-suite.out 2>/dev/null | tr '\n' ' ')"
+        rm -f /tmp/prom-suite.out
       done
+
+      # Container curls hard-coded .svc:9090 → build-pod host-gateway:9090 → this PF.
+      podman_args+=(--add-host="${prom_host_fqdn}:host-gateway")
+      # Do not proxy the injected Prom hostname (Hive sets HTTP(S)_PROXY in the container).
+      echo "NO_PROXY=${prom_host_fqdn},localhost,127.0.0.1" >> "${podman_env_file}"
+      echo "no_proxy=${prom_host_fqdn},localhost,127.0.0.1" >> "${podman_env_file}"
+      echo "Prometheus PF ready (pid ${prom_pf_pid}); podman --add-host ${prom_host_fqdn}:host-gateway"
     fi
 
-    echo "=== prom-${label}.log ==="
-    cat "${log_file}" 2>/dev/null || echo "(no log)"
-    echo "=== end prom-${label}.log ==="
-    kill "${pid}" 2>/dev/null || true
-    wait "${pid}" 2>/dev/null || true
-    PROM_PROBE_HTTP_CODE="${code}"
-  }
-
-  # Preferred: backplane-api monitoring proxy (OCM token; no oc port-forward).
-  # Args after label: optional "suite", then ocm-backplane flags (-l / -u …).
-  prom_backplane_monitoring_probe() {
-    local label="$1"
-    shift
-    local mode=""
-    if [[ "${1:-}" == "suite" ]]; then
-      mode=suite
-      shift
-    fi
-    local bp_log="${prom_artifact_dir}/prom-${label}.log"
-    rm -f "${bp_log}"
-    echo "--- backplane monitoring (${label}) ---"
-    echo "cmd: ocm-backplane monitoring prometheus -n ${prom_ns} --listen ${prom_listen_bp} -p 9090 $*"
-    ocm-backplane monitoring prometheus \
-      -n "${prom_ns}" \
-      --listen "${prom_listen_bp}" \
-      -p 9090 \
-      "$@" \
-      >"${bp_log}" 2>&1 &
-    sleep 2
-    prom_local_probe "${label}" "${prom_listen_bp}" $! "${bp_log}" "${mode}"
-  }
-
-  # Only if monitoring fails: oc port-forward (+ optional elevated kubeconfig).
-  prom_port_forward_probe() {
-    local label="$1" kc="${2:-}"
-    local pf_log="${prom_artifact_dir}/prom-${label}.log"
-    rm -f "${pf_log}"
-    echo "--- port-forward (${label}) ---"
-    if [[ -n "${kc}" ]]; then
-      oc --kubeconfig "${kc}" -n "${prom_ns}" port-forward "svc/${prom_svc}" "${prom_listen_pf#*:}:9090" \
-        >"${pf_log}" 2>&1 &
-    else
-      oc -n "${prom_ns}" port-forward "svc/${prom_svc}" "${prom_listen_pf#*:}:9090" \
-        >"${pf_log}" 2>&1 &
-    fi
-    prom_local_probe "${label}" "${prom_listen_pf}" $! "${pf_log}"
-  }
-
-  echo "=== Prometheus reachability probe (osdfm) ==="
-  echo "Baseline .svc (expect fail from build farm):"
-  code_svc="$(curl -sS -o /tmp/prom-svc.out -w '%{http_code}' --max-time 5 \
-    "http://${prom_svc}.${prom_ns}.svc.cluster.local:9090/api/v1/query?query=up" \
-    || echo err)"
-  echo "HTTP ${code_svc}; body: $(head -c 80 /tmp/prom-svc.out 2>/dev/null | tr '\n' ' ')"
-  echo "Baseline route via proxy (expect 403 HTML without SSO):"
-  code_route="$(curl -sS -o /tmp/prom-route.out -w '%{http_code}' --max-time 15 --proxy "${prom_proxy}" \
-    "${prom_route}/api/v1/query?query=up" \
-    || echo err)"
-  echo "HTTP ${code_route}; body: $(head -c 80 /tmp/prom-route.out 2>/dev/null | tr '\n' ' ')"
-
-  if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" && -n "${backplane_bin_dir}" ]]; then
-    appsre_cluster_id="${OCM_FVT_APPSRE_BACKPLANE_CLUSTER_ID:-19mjrthsfn66bm22m574v2v1gt9a8r4q}"
-    appsre_kubeconfig="$(mktemp /tmp/appsre-kubeconfig.XXXXXX)"
-    rm -f "${appsre_kubeconfig}"
-    saved_kubeconfig="${KUBECONFIG:-}"
-    export KUBECONFIG="${appsre_kubeconfig}"
-    export PATH="${backplane_bin_dir}:${PATH}"
-    echo "Backplane login app-sre-stage-01 (${appsre_cluster_id}):"
-    if ocm-backplane login "${appsre_cluster_id}"; then
-      echo "oc whoami: $(oc whoami 2>&1 || true)"
-      echo "kubeconfig host: $(oc config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>&1 || true)"
-      oc -n "${prom_ns}" get svc "${prom_svc}" -o wide 2>&1 || echo "get svc: failed"
-      oc -n "${prom_ns}" get pods -l "${prom_selector}" -o wide 2>&1 || echo "get pods: failed"
-
-      PROM_PROBE_HTTP_CODE=""
-      # Prefer monitoring; on success also spot-check feature-alerts PromQL.
-      prom_backplane_monitoring_probe "bp-monitoring" suite -l "${prom_selector}"
-      if [[ "${PROM_PROBE_HTTP_CODE}" != "200" ]]; then
-        # Retry with --origin (route-aware backplane-cli path).
-        prom_backplane_monitoring_probe "bp-monitoring-origin" suite \
-          -l "${prom_selector}" -u "${prom_route}"
-      fi
-
-      if [[ "${PROM_PROBE_HTTP_CODE}" != "200" ]]; then
-        echo "Monitoring failed — compare oc port-forward (+ elevate):"
-        oc auth can-i create pods/portforward -n "${prom_ns}" 2>&1 || true
-        prom_port_forward_probe "pf-plain"
-        if [[ "${PROM_PROBE_HTTP_CODE}" != "200" ]]; then
-          elev_reason="${backplane_elevate_reason:-https://issues.redhat.com/browse/ROSAENG-62717}"
-          appsre_elev_kubeconfig="$(mktemp /tmp/appsre-elev-kubeconfig.XXXXXX)"
-          chmod 0600 "${appsre_elev_kubeconfig}"
-          if ocm-backplane elevate "${elev_reason}" -- \
-            config view --raw --minify > "${appsre_elev_kubeconfig}" 2>"${prom_artifact_dir}/prom-elevate-dump.err"; then
-            echo "elevate whoami: $(oc --kubeconfig "${appsre_elev_kubeconfig}" whoami 2>&1 || true)"
-            oc --kubeconfig "${appsre_elev_kubeconfig}" auth can-i create pods/portforward -n "${prom_ns}" 2>&1 || true
-            prom_port_forward_probe "pf-elevate" "${appsre_elev_kubeconfig}"
-          else
-            echo "elevate kubeconfig dump failed:"
-            cat "${prom_artifact_dir}/prom-elevate-dump.err" 2>/dev/null || true
-          fi
-          rm -f "${appsre_elev_kubeconfig}"
-        fi
-      fi
-    else
-      echo "Backplane login to app-sre-stage-01 failed"
-    fi
+    # Parent returns to Hive kubeconfig; PF child keeps appsre path open until EXIT cleanup.
     export KUBECONFIG="${saved_kubeconfig}"
-    rm -f "${appsre_kubeconfig}"
-  else
-    echo "Skip AppSRE Prom probe (need OCM_FVT_USE_BACKPLANE=true + backplane bins)"
   fi
   echo "============================================"
 fi
