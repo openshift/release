@@ -285,27 +285,6 @@ create_sg_rule() {
     fi
 }
 
-patch_nested_kubeconfig_for_ci() {
-    local hosted_kubeconfig="${SHARED_DIR}/nested_kubeconfig"
-
-    local nodeport
-    nodeport=$(oc get svc kube-apiserver -n "${hcp_ns}" \
-        -o jsonpath="{.spec.ports[?(@.port==6443)].nodePort}" 2>/dev/null || true)
-
-    if [[ -z "${nodeport}" ]]; then
-        echo "ERROR: could not determine kube-apiserver NodePort from svc kube-apiserver in namespace ${hcp_ns}"
-        exit 1
-    fi
-
-    local cluster_name
-    cluster_name=$(oc --kubeconfig "${hosted_kubeconfig}" config view -o jsonpath='{.clusters[0].name}')
-    oc --kubeconfig "${hosted_kubeconfig}" config set-cluster "${cluster_name}" \
-        --server="https://${BASTION_FIP}:${nodeport}"
-    oc --kubeconfig "${hosted_kubeconfig}" config set-cluster "${cluster_name}" \
-        --insecure-skip-tls-verify=true
-    echo "Updated nested_kubeconfig server to https://${BASTION_FIP}:${nodeport}"
-}
-
 configure_bastion_squid_proxy() {
     local mgmt_api_host mgmt_domain no_proxy_list
 
@@ -674,8 +653,14 @@ if ! oc wait --all=true agent -n $hcp_ns --for=jsonpath='{.status.debugInfo.stat
 fi
 echo "$(date) All the agents are attached as compute nodes to the hosted control plane"
 
-# CI pods use cluster DNS and cannot resolve IBM Cloud private DNS for the hosted cluster API.
-patch_nested_kubeconfig_for_ci
+# Sourcing the proxy settings so that oc commands against the hosted cluster API
+# can reach the private DNS endpoint via the bastion squid proxy
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+echo "Verifying management cluster API is reachable with proxy settings"
+oc whoami --show-server >/dev/null
 
 # Verifying the compute nodes status
 echo "$(date) Checking the compute nodes in the hosted control plane"
@@ -690,13 +675,5 @@ if ! oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co \
   exit 1
 fi
 oc get co --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
-
-# Sourcing the proxy settings for the next steps
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-  source "${SHARED_DIR}/proxy-conf.sh"
-fi
-
-echo "Verifying management cluster API is reachable with proxy settings"
-oc whoami --show-server >/dev/null
 
 echo "$(date) Successfully completed the e2e creation chain"
