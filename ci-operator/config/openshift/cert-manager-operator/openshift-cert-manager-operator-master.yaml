@@ -471,10 +471,9 @@ tests:
           oc -n cert-manager-operator get subscriptions.operators.coreos.com -o yaml || true
           exit 1
         fi
-        echo "Patching Subscription ${SUB}"
-        oc -n cert-manager-operator patch subscription "${SUB}" \
-          --type='merge' \
-          -p '{"spec":{"config":{"env":[{"name":"UNSUPPORTED_ADDON_FEATURES","value":"TrustManager=true"}]}}}'
+        echo "Patching Subscription ${SUB} (preserve existing env, match e2e patchSubscriptionWithEnvVars)"
+        PATCH=$(oc -n cert-manager-operator get "subscription/${SUB}" -o json | python3 -c 'import json,sys; sub=json.load(sys.stdin); cfg=(sub.get("spec") or {}).get("config") or {}; env=[e for e in (cfg.get("env") or []) if e.get("name")!="UNSUPPORTED_ADDON_FEATURES"]; env.append({"name":"UNSUPPORTED_ADDON_FEATURES","value":"TrustManager=true"}); print(json.dumps({"spec":{"config":{"env":env}}}))')
+        oc -n cert-manager-operator patch "subscription/${SUB}" --type=merge -p "${PATCH}"
 
         echo "Waiting for TrustManager feature gate on operator deployment env and rollout..."
         FOUND=false
@@ -495,22 +494,33 @@ tests:
         fi
         oc -n cert-manager-operator rollout status deployment/cert-manager-operator-controller-manager --timeout=5m
 
-        echo "Creating TrustManager CR..."
+        echo "Creating TrustManager CR (minimal, match e2e newTrustManagerCR)..."
         oc apply -f - <<EOF
         apiVersion: operator.openshift.io/v1alpha1
         kind: TrustManager
         metadata:
           name: cluster
         spec:
-          trustManagerConfig:
-            logLevel: 1
-            logFormat: text
-            trustNamespace: cert-manager
-            defaultCAPackage:
-              policy: Enabled
+          trustManagerConfig: {}
         EOF
 
-        echo "Waiting for trust-manager deployment..."
+        echo "Waiting for TrustManager Ready and trust-manager deployment..."
+        FOUND=false
+        for _ in $(seq 1 60); do
+          READY=$(oc get trustmanagers.operator.openshift.io cluster \
+            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
+          if [[ "${READY}" == "True" ]]; then
+            echo "TrustManager CR is Ready"
+            FOUND=true
+            break
+          fi
+          sleep 5
+        done
+        if [[ "${FOUND}" != "true" ]]; then
+          echo "Timed out waiting for TrustManager Ready=True"
+          oc get trustmanagers.operator.openshift.io cluster -o yaml || true
+          exit 1
+        fi
         oc wait --for=create -n cert-manager deployment/trust-manager --timeout=5m
         oc wait --for=condition=Available -n cert-manager deployment/trust-manager --timeout=5m
       from: src
