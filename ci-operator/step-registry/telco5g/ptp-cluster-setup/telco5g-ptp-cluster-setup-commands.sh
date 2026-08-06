@@ -305,6 +305,319 @@ log_chronyd_status() {
   KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
 }
 
+# Hypervisor JSON map keyed by T5CI_VERSION → kernel URI (or "reset"):
+#   {"4.22": "https://.../kernel-rt-core-....rpm", "5.0": "https://.../kernel-rt-core-....rpm"}
+# flip_kernel: fetch from GitHub by default; set SIDELOAD_KERNEL_SCRIPT for a
+# local hypervisor path when disconnected.
+SIDELOAD_KERNEL_CONFIG="${SIDELOAD_KERNEL_CONFIG:-/home/kni/sideload_kernel.json}"
+SIDELOAD_KERNEL_SCRIPT="${SIDELOAD_KERNEL_SCRIPT:-}"
+SIDELOAD_KERNEL_SCRIPT_URL="${SIDELOAD_KERNEL_SCRIPT_URL:-https://raw.githubusercontent.com/redhatci/ansible-collection-redhatci-ocp/main/roles/sideload_kernel/files/flip_kernel}"
+SIDELOAD_KERNEL_JOB_TIMEOUT_MIN="${SIDELOAD_KERNEL_JOB_TIMEOUT_MIN:-20}"
+
+# The upstream redhatci.ocp.sideload_kernel role is SNO-oriented (single Job, no
+# nodeSelector). For PTP MNO we reuse its flip_kernel script and run one Job per
+# worker with nodeName set, sequentially so the API stays available across reboots.
+sideload_kernel_on_workers() {
+  local kubeconfig=$1
+
+  echo "************ Sideload kernel on all worker nodes ************"
+
+  pip3 install --user kubernetes >/dev/null
+  ansible-galaxy collection install kubernetes.core community.general
+
+  # Escape ${KERNEL_URI} for the Job args so the container shell expands it.
+  cat << EOF > "${HOME}/sideload-kernel.yml"
+---
+- name: Read sideload kernel config from hypervisor
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+  - name: Skip when T5CI_VERSION is empty
+    ansible.builtin.debug:
+      msg: "Skipping kernel sideload: T5CI_VERSION is empty"
+    when: not (t5ci_version | default('') | length)
+
+  - name: End play when T5CI_VERSION is empty
+    ansible.builtin.meta: end_play
+    when: not (t5ci_version | default('') | length)
+
+  - name: Check if sideload kernel config exists
+    ansible.builtin.stat:
+      path: "{{ sideload_kernel_config }}"
+    register: sideload_cfg
+
+  - name: Skip when config file is missing
+    ansible.builtin.debug:
+      msg: "Skipping kernel sideload: {{ sideload_kernel_config }} not present on hypervisor"
+    when: not sideload_cfg.stat.exists
+
+  - name: End play when config file is missing
+    ansible.builtin.meta: end_play
+    when: not sideload_cfg.stat.exists
+
+  - name: Slurp sideload kernel config
+    ansible.builtin.slurp:
+      src: "{{ sideload_kernel_config }}"
+    register: sideload_cfg_slurp
+
+  - name: Resolve kernel URI for T5CI_VERSION
+    ansible.builtin.set_fact:
+      sideload_kernel_uri: "{{ (sideload_cfg_slurp.content | b64decode | from_json)[t5ci_version] | default('') }}"
+
+  - name: Skip when version key is missing
+    ansible.builtin.debug:
+      msg: "Skipping kernel sideload: no URI for version key {{ t5ci_version }} in {{ sideload_kernel_config }}"
+    when: not (sideload_kernel_uri | length)
+
+  - name: End play when version key is missing
+    ansible.builtin.meta: end_play
+    when: not (sideload_kernel_uri | length)
+
+  - name: Show resolved sideload_kernel_uri
+    ansible.builtin.debug:
+      msg: "sideload_kernel_uri={{ sideload_kernel_uri }} (version {{ t5ci_version }})"
+
+  - name: Check if flip_kernel script exists on hypervisor
+    ansible.builtin.stat:
+      path: "{{ sideload_kernel_script }}"
+    register: flip_kernel_cfg
+    when: sideload_kernel_script | default('') | length
+
+  - name: Fail when configured flip_kernel script is missing
+    ansible.builtin.fail:
+      msg: "SIDELOAD_KERNEL_SCRIPT is set but {{ sideload_kernel_script }} is missing on hypervisor"
+    when:
+      - sideload_kernel_script | default('') | length
+      - not flip_kernel_cfg.stat.exists
+
+  - name: Slurp flip_kernel script from hypervisor
+    ansible.builtin.slurp:
+      src: "{{ sideload_kernel_script }}"
+    register: flip_kernel_slurp
+    when: sideload_kernel_script | default('') | length
+
+  - name: Set flip_kernel script content from hypervisor
+    ansible.builtin.set_fact:
+      flip_kernel_script_content: "{{ flip_kernel_slurp.content | b64decode }}"
+    when: sideload_kernel_script | default('') | length
+
+- name: Sideload kernel on all PTP worker nodes
+  hosts: localhost
+  gather_facts: false
+  vars:
+    sideload_kernel_uri: "{{ hostvars[groups['hypervisor'][0]].sideload_kernel_uri | default('') }}"
+    flip_kernel_script_content: "{{ hostvars[groups['hypervisor'][0]].flip_kernel_script_content | default('') }}"
+    flip_kernel_local_path: "{{ lookup('env', 'HOME') }}/flip_kernel"
+    k8s_auth:
+      K8S_AUTH_KUBECONFIG: "{{ kubeconfig }}"
+  tasks:
+  - name: End play when sideload was skipped on hypervisor
+    ansible.builtin.meta: end_play
+    when: not (sideload_kernel_uri | length)
+
+  - name: Fetch flip_kernel from GitHub when SIDELOAD_KERNEL_SCRIPT is unset
+    ansible.builtin.get_url:
+      url: "{{ sideload_kernel_script_url }}"
+      dest: "{{ flip_kernel_local_path }}"
+      mode: "0755"
+    when: not (sideload_kernel_script | default('') | length)
+
+  - name: Load flip_kernel fetched from GitHub
+    ansible.builtin.set_fact:
+      flip_kernel_script_content: "{{ lookup('file', flip_kernel_local_path) }}"
+    when: not (sideload_kernel_script | default('') | length)
+
+  - name: List worker-capable nodes
+    kubernetes.core.k8s_info:
+      api_version: v1
+      kind: Node
+      label_selectors:
+        - node-role.kubernetes.io/worker
+    environment: "{{ k8s_auth }}"
+    register: worker_nodes
+
+  - name: Select workers that are not control-plane/master/arbiter
+    ansible.builtin.set_fact:
+      sideload_worker_names: "{{ sideload_worker_names | default([]) + [item.metadata.name] }}"
+    loop: "{{ worker_nodes.resources }}"
+    when:
+      - "'node-role.kubernetes.io/master' not in (item.metadata.labels | default({}))"
+      - "'node-role.kubernetes.io/control-plane' not in (item.metadata.labels | default({}))"
+      - "'node-role.kubernetes.io/arbiter' not in (item.metadata.labels | default({}))"
+
+  - name: Fail when no dedicated worker nodes are found
+    ansible.builtin.fail:
+      msg: No dedicated worker nodes found for kernel sideload (excluding control-plane/master/arbiter)
+    when: (sideload_worker_names | default([])) | length == 0
+
+  - name: Create sideload-kernel ConfigMap
+    kubernetes.core.k8s:
+      state: present
+      apply: true
+      definition:
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: sideload-kernel
+          namespace: default
+        data:
+          KERNEL_URI: "{{ sideload_kernel_uri }}"
+          flip_kernel: "{{ flip_kernel_script_content }}"
+    environment: "{{ k8s_auth }}"
+
+  - name: Sideload kernel on each worker sequentially
+    ansible.builtin.include_tasks: ${HOME}/sideload-kernel-one-worker.yml
+    loop: "{{ sideload_worker_names }}"
+    loop_control:
+      loop_var: worker_node
+      index_var: worker_idx
+EOF
+
+  cat << EOF > "${HOME}/sideload-kernel-one-worker.yml"
+---
+- name: Delete previous flip-kernel job for {{ worker_node }}
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    name: "flip-kernel-{{ worker_idx }}"
+    namespace: default
+    wait: true
+  environment: "{{ k8s_auth }}"
+
+- name: Create flip-kernel job pinned to {{ worker_node }}
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: "flip-kernel-{{ worker_idx }}"
+        namespace: default
+      spec:
+        backoffLimit: 3
+        activeDeadlineSeconds: "{{ (sideload_kernel_job_timeout | int) * 60 }}"
+        template:
+          spec:
+            nodeName: "{{ worker_node }}"
+            automountServiceAccountToken: false
+            containers:
+              - name: flipper
+                image: ubi9
+                imagePullPolicy: IfNotPresent
+                command: ["/bin/bash"]
+                args:
+                  - "-c"
+                  - "install /script/flip_kernel /host/tmp && chroot /host /tmp/flip_kernel \${KERNEL_URI}"
+                env:
+                  - name: KERNEL_URI
+                    valueFrom:
+                      configMapKeyRef:
+                        name: sideload-kernel
+                        key: KERNEL_URI
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
+                  limits:
+                    cpu: "2"
+                    memory: 2Gi
+                securityContext:
+                  privileged: true
+                  runAsUser: 0
+                volumeMounts:
+                  - mountPath: /host
+                    name: host
+                  - mountPath: /script
+                    name: script
+            restartPolicy: Never
+            volumes:
+              - name: host
+                hostPath:
+                  path: /
+                  type: Directory
+              - name: script
+                configMap:
+                  name: sideload-kernel
+                  defaultMode: 0755
+  environment: "{{ k8s_auth }}"
+
+- name: Wait for flip-kernel job on {{ worker_node }}
+  block:
+    - name: Poll flip-kernel job completion
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        name: "flip-kernel-{{ worker_idx }}"
+        namespace: default
+      environment: "{{ k8s_auth }}"
+      register: job_state
+      until: >-
+        not job_state.failed
+        and job_state.resources | length > 0
+        and (job_state.resources[0].status.conditions | default([])
+             | selectattr('type', 'equalto', 'Complete')
+             | selectattr('status', 'equalto', 'True')
+             | list | length > 0
+             or
+             job_state.resources[0].status.conditions | default([])
+             | selectattr('type', 'equalto', 'Failed')
+             | selectattr('status', 'equalto', 'True')
+             | list | length > 0)
+      retries: "{{ (sideload_kernel_job_timeout | int) * 4 }}"
+      delay: 15
+
+    - name: Fail when flip-kernel job did not complete on {{ worker_node }}
+      ansible.builtin.fail:
+        msg: "Kernel sideload job flip-kernel-{{ worker_idx }} did not complete on {{ worker_node }}: {{ job_state.resources[0].status | default({}) }}"
+      when: >-
+        job_state.resources[0].status.conditions | default([])
+        | selectattr('type', 'equalto', 'Complete')
+        | selectattr('status', 'equalto', 'True')
+        | list | length == 0
+  rescue:
+    - name: Delete timed-out or failed flip-kernel job on {{ worker_node }}
+      kubernetes.core.k8s:
+        state: absent
+        api_version: batch/v1
+        kind: Job
+        name: "flip-kernel-{{ worker_idx }}"
+        namespace: default
+        wait: true
+      environment: "{{ k8s_auth }}"
+
+    - name: Fail sideload after cleanup on {{ worker_node }}
+      ansible.builtin.fail:
+        msg: "Kernel sideload failed on {{ worker_node }}; cleaned up job flip-kernel-{{ worker_idx }}"
+
+- name: Wait for {{ worker_node }} to become Ready after sideload
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Node
+    name: "{{ worker_node }}"
+  environment: "{{ k8s_auth }}"
+  register: node_state
+  until: >-
+    node_state.resources | length > 0
+    and (node_state.resources[0].status.conditions | default([])
+         | selectattr('type', 'equalto', 'Ready')
+         | selectattr('status', 'equalto', 'True')
+         | list | length > 0)
+  retries: "{{ (sideload_kernel_job_timeout | int) * 4 }}"
+  delay: 15
+EOF
+
+  export KUBECONFIG="${kubeconfig}"
+  ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i "${SHARED_DIR}/inventory" \
+    "${HOME}/sideload-kernel.yml" \
+    -e "kubeconfig=${kubeconfig}" \
+    -e "t5ci_version=${T5CI_VERSION}" \
+    -e "sideload_kernel_config=${SIDELOAD_KERNEL_CONFIG}" \
+    -e "sideload_kernel_script=${SIDELOAD_KERNEL_SCRIPT}" \
+    -e "sideload_kernel_script_url=${SIDELOAD_KERNEL_SCRIPT_URL}" \
+    -e "sideload_kernel_job_timeout=${SIDELOAD_KERNEL_JOB_TIMEOUT_MIN}" \
+    -vv
+}
 
 #Set status and run playbooks
 status=0
@@ -334,6 +647,12 @@ if [[ -f "$SHARED_DIR/kubeconfig" ]]; then
     status=1
   fi
   echo "****************************************************************"
+fi
+
+# Sideload custom/rt kernel on every worker before chronyd MachineConfigs, so
+# rpm-ostree staging is less likely to race with the MCO (see flip_kernel notes).
+if [[ "$status" -eq 0 && -f "$SHARED_DIR/kubeconfig" ]]; then
+  sideload_kernel_on_workers "$SHARED_DIR/kubeconfig" || status=$?
 fi
 
 if [[ "$SKIP_OCP_INSTALL" != "true" && "$status" -eq 0 ]]; then

@@ -13,7 +13,7 @@ ref:
   - namespace: test-credentials
     name: cikey
     mount_path: /var/run/ci-key
-  timeout: 3h
+  timeout: 4h
   env:
   - name: T5CI_VERSION
     default: ""
@@ -24,5 +24,26 @@ ref:
   - name: SKIP_OCP_INSTALL
     default: "false"
     documentation: Skip ocp install if this is set to "true".
+  - name: SIDELOAD_KERNEL_CONFIG
+    default: "/home/kni/sideload_kernel.json"
+    documentation: |-
+      Path on the PTP hypervisor to a JSON map of T5CI_VERSION → kernel URI
+      (kernel-rt-core/kernel-core RPM URL, or "reset"). Example:
+      {"4.22": "https://.../kernel-rt-core.rpm"}. Missing file or version key
+      skips sideload.
+  - name: SIDELOAD_KERNEL_SCRIPT
+    default: ""
+    documentation: |-
+      Optional path on the PTP hypervisor to flip_kernel. When unset, the script
+      is fetched from SIDELOAD_KERNEL_SCRIPT_URL (GitHub). Set this for
+      disconnected environments (e.g. /home/kni/flip_kernel).
+  - name: SIDELOAD_KERNEL_SCRIPT_URL
+    default: "https://raw.githubusercontent.com/redhatci/ansible-collection-redhatci-ocp/main/roles/sideload_kernel/files/flip_kernel"
+    documentation: URL used to fetch flip_kernel when SIDELOAD_KERNEL_SCRIPT is unset.
+  - name: SIDELOAD_KERNEL_JOB_TIMEOUT_MIN
+    default: "20"
+    documentation: Per-worker timeout in minutes waiting for sideload Job completion and node Ready.
   documentation: |-
-    Set up Telco5G baremetal cluster
+    Set up Telco5G baremetal PTP cluster. Optionally sideloads a custom/rt
+    kernel onto all worker nodes when SIDELOAD_KERNEL_CONFIG has a URI for
+    T5CI_VERSION.
