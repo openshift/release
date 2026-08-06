@@ -34,6 +34,7 @@ tests:
           cpu: 100m
           memory: 256Mi
 - as: vm-orphan-monitor
+  cluster: build01
   cron: 0 */4 * * *
   reporter_config:
     channel: '#forum-ocp-splat-alerts'
@@ -42,11 +43,12 @@ tests:
     - error
     report_template: VM Orphan Monitor job failed. <{{.Status.URL}}|View logs>
   steps:
+    cluster_profile: nutanix
     test:
     - as: monitor
       commands: |
         set +x
-        source /var/run/vault/nutanix/secrets.sh
+        source "${CLUSTER_PROFILE_DIR}/secrets.sh"
         mkdir -p /tmp/nutanix-creds
         echo -n "${prism_central_username}" > /tmp/nutanix-creds/nutanix-username
         echo -n "${prism_central_password}" > /tmp/nutanix-creds/nutanix-password
@@ -57,10 +59,6 @@ tests:
           --endpoint "${prism_central_host}" \
           --port "${prism_central_port}" \
           --cleanup
-      credentials:
-      - mount_path: /var/run/vault/nutanix
-        name: nutanix-pc
-        namespace: test-credentials
       from: src
       resources:
         requests:
