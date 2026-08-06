@@ -29,26 +29,31 @@ OVERALL_RESULT=0
 # --- Storage account cleanup (Velero) ---
 if [[ -f "${STORAGE_ACCOUNT_MARKER}" ]]; then
   STORAGE_ACCOUNT_NAME="$(cat "${STORAGE_ACCOUNT_MARKER}")"
-  RESOURCEGROUP="$(cat "${STORAGE_RESOURCEGROUP_MARKER}")"
-
-  echo "Deleting storage account ${STORAGE_ACCOUNT_NAME}..."
-  RETRIES=3
-  STORAGE_DELETED=false
-  for attempt in $(seq "${RETRIES}"); do
-    if az storage account delete \
-      --name "${STORAGE_ACCOUNT_NAME}" \
-      --resource-group "${RESOURCEGROUP}" \
-      --yes; then
-      echo "Storage account deleted successfully"
-      STORAGE_DELETED=true
-      break
-    fi
-    echo "Attempt ${attempt}/${RETRIES}: Failed to delete storage account. Retrying in 30s..."
-    sleep 30
-  done
-  if [[ "${STORAGE_DELETED}" != "true" ]]; then
-    echo "Error: Failed to delete storage account ${STORAGE_ACCOUNT_NAME} after ${RETRIES} attempts"
+  if [[ ! -f "${STORAGE_RESOURCEGROUP_MARKER}" ]]; then
+    echo "Error: ${STORAGE_RESOURCEGROUP_MARKER} missing, cannot delete storage account ${STORAGE_ACCOUNT_NAME}"
     OVERALL_RESULT=1
+  else
+    RESOURCEGROUP="$(cat "${STORAGE_RESOURCEGROUP_MARKER}")"
+
+    echo "Deleting storage account ${STORAGE_ACCOUNT_NAME}..."
+    RETRIES=3
+    STORAGE_DELETED=false
+    for attempt in $(seq "${RETRIES}"); do
+      if az storage account delete \
+        --name "${STORAGE_ACCOUNT_NAME}" \
+        --resource-group "${RESOURCEGROUP}" \
+        --yes; then
+        echo "Storage account deleted successfully"
+        STORAGE_DELETED=true
+        break
+      fi
+      echo "Attempt ${attempt}/${RETRIES}: Failed to delete storage account. Retrying in 30s..."
+      sleep 30
+    done
+    if [[ "${STORAGE_DELETED}" != "true" ]]; then
+      echo "Error: Failed to delete storage account ${STORAGE_ACCOUNT_NAME} after ${RETRIES} attempts"
+      OVERALL_RESULT=1
+    fi
   fi
 else
   echo "No oadp-storage-account-name file found, skipping storage account cleanup"

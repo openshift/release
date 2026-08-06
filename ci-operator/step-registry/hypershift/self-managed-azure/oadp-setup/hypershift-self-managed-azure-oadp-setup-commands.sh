@@ -13,7 +13,7 @@ OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/konveyor/hypershift-o
 CLUSTER_PREFIX="${CLUSTER_PREFIX:-public}"
 
 echo "Discovering the public self-managed-Azure guest cluster..."
-CLUSTER_NAME="$(oc get hostedcluster -n clusters -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep "${CLUSTER_PREFIX}" | head -n1)"
+CLUSTER_NAME="$(oc get hostedcluster -n clusters -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep "${CLUSTER_PREFIX}" | head -n1 || true)"
 if [[ -z "${CLUSTER_NAME}" ]]; then
   echo "!!! Unable to find a public HostedCluster in the 'clusters' namespace"
   oc get hostedcluster -n clusters
@@ -22,10 +22,13 @@ fi
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 RESOURCEGROUP="$(cat "${SHARED_DIR}/azure_pls_resource_group")"
-CONTAINER_NAME="${OADP_AZURE_CONTAINER_NAME:-hypershift-oadp-${CLUSTER_NAME}}"
+CONTAINER_PREFIX="hypershift-oadp-"
+CONTAINER_NAME="${CONTAINER_PREFIX}${CLUSTER_NAME:0:$((63 - ${#CONTAINER_PREFIX}))}"
 # Storage account names must be 3-24 chars, lowercase letters and numbers only.
-STORAGE_ACCOUNT_NAME="oadp${CLUSTER_NAME:0:20}"
-STORAGE_ACCOUNT_NAME="$(echo "${STORAGE_ACCOUNT_NAME}" | tr -cd '[:lower:][:digit:]' | cut -c1-24)"
+# "oadp" (4) + sanitized cluster stem (up to 12) + job-unique hash (8) = max 24.
+CLUSTER_STEM="$(echo "${CLUSTER_NAME}" | tr '[:upper:]' '[:lower:]' | tr -cd '[:lower:][:digit:]')"
+JOB_SUFFIX="$(echo -n "${PROW_JOB_ID:-unknown}" | md5sum | cut -c1-8)"
+STORAGE_ACCOUNT_NAME="oadp${CLUSTER_STEM:0:12}${JOB_SUFFIX}"
 
 echo "Setting up OADP prerequisites for backup/restore tests"
 echo "Cluster: ${CLUSTER_NAME}, Resource Group: ${RESOURCEGROUP}, Storage Account: ${STORAGE_ACCOUNT_NAME}, Container: ${CONTAINER_NAME}"
@@ -97,8 +100,8 @@ echo "Resolving client ID and principal ID of ${OADP_MI_NAME}..."
 OADP_MI_CLIENT_ID=""
 OADP_MI_PRINCIPAL_ID=""
 for attempt in $(seq 1 5); do
-  OADP_MI_CLIENT_ID="$(az identity show --name "${OADP_MI_NAME}" --resource-group "${OADP_MI_RESOURCEGROUP}" --query clientId -o tsv)"
-  OADP_MI_PRINCIPAL_ID="$(az identity show --name "${OADP_MI_NAME}" --resource-group "${OADP_MI_RESOURCEGROUP}" --query principalId -o tsv)"
+  OADP_MI_CLIENT_ID="$(az identity show --name "${OADP_MI_NAME}" --resource-group "${OADP_MI_RESOURCEGROUP}" --query clientId -o tsv || true)"
+  OADP_MI_PRINCIPAL_ID="$(az identity show --name "${OADP_MI_NAME}" --resource-group "${OADP_MI_RESOURCEGROUP}" --query principalId -o tsv || true)"
   if [[ -n "${OADP_MI_CLIENT_ID}" && -n "${OADP_MI_PRINCIPAL_ID}" ]]; then
     break
   fi
@@ -235,7 +238,7 @@ EOF
 
 # Wait for Velero pod to be ready
 echo "Waiting for Velero pod to be ready..."
-oc wait --for=condition=Available deployment/velero -n openshift-adp --timeout=300s || true
+oc wait --for=condition=Available deployment/velero -n openshift-adp --timeout=300s
 
 # Safety net: the OADP operator's own ServiceAccount reconcile could in
 # principle recreate/strip the annotation we pre-set above, or the very first
