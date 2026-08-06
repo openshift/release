@@ -52,22 +52,11 @@ tests:
     test:
     - as: monitor
       commands: |
-        set +x
-        if [[ -f "${CLUSTER_PROFILE_DIR}/secrets.sh" ]]; then
-          source "${CLUSTER_PROFILE_DIR}/secrets.sh"
-        else
-          source /var/run/vault/nutanix/secrets.sh
-        fi
-        mkdir -p /tmp/nutanix-creds
-        echo -n "${prism_central_username}" > /tmp/nutanix-creds/nutanix-username
-        echo -n "${prism_central_password}" > /tmp/nutanix-creds/nutanix-password
-        set -x
-        make build
-        ./bin/vm-monitor --config config/nutanix.yaml \
-          --credentials-dir /tmp/nutanix-creds \
-          --endpoint "${prism_central_host}" \
-          --port "${prism_central_port}" \
-          --cleanup
+        echo "=== Cluster profile contents ==="
+        ls -la "${CLUSTER_PROFILE_DIR}/"
+        echo "=== Checking vault path ==="
+        ls -la /var/run/vault/nutanix/ 2>/dev/null || echo "No vault mount at /var/run/vault/nutanix/"
+        echo "=== Done ==="
       from: src
       resources:
         requests:
