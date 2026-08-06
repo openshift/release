@@ -54,16 +54,17 @@ tests:
       commands: |
         set +x
         source /tmp/nutanix-creds/secrets.sh
-        mkdir -p /tmp/nutanix-auth
-        echo -n "${prism_central_username}" > /tmp/nutanix-auth/nutanix-username
-        echo -n "${prism_central_password}" > /tmp/nutanix-auth/nutanix-password
         set -x
-        make build
-        ./bin/vm-monitor --config config/nutanix.yaml \
-          --credentials-dir /tmp/nutanix-auth \
-          --endpoint "${prism_central_host}" \
-          --port "${prism_central_port}" \
-          --cleanup
+        echo "=== PC endpoint: ${prism_central_host}:${prism_central_port} ==="
+        echo "=== DNS lookup ==="
+        nslookup "${prism_central_host}" 2>&1 || echo "nslookup failed"
+        echo "=== Connectivity test ==="
+        curl -sk --connect-timeout 10 "https://${prism_central_host}:${prism_central_port}" && echo "Reachable" || echo "Unreachable"
+        echo "=== With cluster profile CA cert ==="
+        curl -s --cacert "${CLUSTER_PROFILE_DIR}/prismcentral.pem" --connect-timeout 10 "https://${prism_central_host}:${prism_central_port}" && echo "Reachable with cert" || echo "Unreachable with cert"
+        echo "=== VPN status ==="
+        ip route 2>/dev/null | head -10
+        echo "=== Done ==="
       credentials:
       - mount_path: /tmp/nutanix-creds
         name: nutanix-pc
