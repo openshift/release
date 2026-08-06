@@ -7,7 +7,7 @@ chain:
     grace_period: 10m
     env:
     - name: CNV_SUBSCRIPTION_SOURCE
-      default: "cnv-prerelease-catalog-source"
+      default: "redhat-operators"
       documentation: |
         Subscription source for kubevirt on the infra cluster.
         Allowed values: redhat-operators or cnv-prerelease-catalog-source.
@@ -15,186 +15,7 @@ chain:
       default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
     - name: BREW_IMAGE_REGISTRY_TOKEN_PATH
       default: /var/run/cnv-ci-brew-pull-secret/token
-    commands: |
-      #!/usr/bin/env bash
-      set -ex
-
-      # Target the infra cluster instead of the default mgmt kubeconfig
-      export KUBECONFIG="${SHARED_DIR}/infra-kubeconfig"
-
-      function ocp_version() {
-          oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
-      }
-
-      if [[ ! "${CNV_SUBSCRIPTION_SOURCE}" =~ ^(cnv-prerelease-catalog-source|redhat-operators)$ ]]; then
-          echo "CNV_SUBSCRIPTION_SOURCE value '${CNV_SUBSCRIPTION_SOURCE}' not allowed; use 'redhat-operators' or 'cnv-prerelease-catalog-source'"
-          exit 1
-      fi
-
-      function add_pullsecret() {
-        local REGISTRY=$1
-        local USERNAME=$2
-        local PASSWORD=$3
-        oc extract secret/pull-secret -n openshift-config --keys=.dockerconfigjson --to=/tmp --confirm
-        jq --arg reg "$REGISTRY" --arg user "$USERNAME" --arg pass "$PASSWORD" \
-           '.auths[$reg] = {auth: ($user + ":" + $pass | @base64)}' \
-           /tmp/.dockerconfigjson > /tmp/.dockerconfigjson.new
-        oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/.dockerconfigjson.new
-        rm /tmp/.dockerconfigjson /tmp/.dockerconfigjson.new
-      }
-
-      YQ="/tmp/yq"
-      curl -L -o "${YQ}" https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-      chmod +x "${YQ}"
-
-      CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" | \
-        "${YQ}" e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_PRERELEASE_CATALOG_IMAGE") | .value')
-      CNV_SUBSCRIPTION_CHANNEL=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" | \
-        "${YQ}" e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_CHANNEL") | .value')
-
-      if [ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]; then
-        CNV_RELEASE_CHANNEL=stable
-      elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]; then
-        CNV_RELEASE_CHANNEL=${CNV_SUBSCRIPTION_CHANNEL}
-      else
-        CNV_RELEASE_CHANNEL=nightly-$(ocp_version)
-        CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:$(ocp_version)
-      fi
-
-      oc patch ingresscontroller -n openshift-ingress-operator default --type=json \
-        -p '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
-
-      CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
-      if [[ ${CONTROL_PLANE_TOPOLOGY} != "External" ]]; then
-        oc patch scheduler cluster --type=json \
-          -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
-      fi
-
-      if [[ $(oc get nodes --no-headers | wc -l) -eq 1 ]]; then
-        NODENAME=$(oc get nodes -o jsonpath='{.items[].metadata.name}')
-        oc label node "${NODENAME}" node-role.kubernetes.io/control-plane=
-      fi
-
-      if [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]; then
-        if [[ "${CNV_PRERELEASE_CATALOG_IMAGE}" == *"brew"* ]]; then
-          add_pullsecret "brew.registry.redhat.io" "${BREW_IMAGE_REGISTRY_USERNAME}" "$(cat "${BREW_IMAGE_REGISTRY_TOKEN_PATH}")"
-          oc apply -f - <<EOFIDMS
-      apiVersion: config.openshift.io/v1
-      kind: ImageDigestMirrorSet
-      metadata:
-        name: brew-idms
-      spec:
-        imageDigestMirrors:
-        - mirrors:
-          - brew.registry.redhat.io
-          source: registry.redhat.io
-      EOFIDMS
-        elif [[ "${CNV_PRERELEASE_CATALOG_IMAGE}" == *"quay"* ]]; then
-          QUAY_USERNAME=openshift-cnv+openshift_ci
-          QUAY_PASSWORD=$(cat /etc/cnv-nightly-pull-credentials/openshift_cnv_pullsecret)
-          add_pullsecret "quay.io/openshift-cnv" "${QUAY_USERNAME}" "${QUAY_PASSWORD}"
-        fi
-        oc wait mcp master worker --for condition=Updated=True --timeout=20m
-        oc apply -f - <<EOFCS
-      apiVersion: operators.coreos.com/v1alpha1
-      kind: CatalogSource
-      metadata:
-        name: cnv-prerelease-catalog-source
-        namespace: openshift-marketplace
-      spec:
-        sourceType: grpc
-        image: ${CNV_PRERELEASE_CATALOG_IMAGE}
-        displayName: OpenShift Virtualization Pre-Release Catalog
-        publisher: Red Hat
-        updateStrategy:
-          registryPoll:
-            interval: 8h
-      EOFCS
-      fi
-
-      oc apply -f - <<EOFNS
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: openshift-cnv
-      EOFNS
-
-      oc apply -f - <<EOFOG
-      apiVersion: operators.coreos.com/v1
-      kind: OperatorGroup
-      metadata:
-        name: openshift-cnv-group
-        namespace: openshift-cnv
-      spec:
-        targetNamespaces:
-        - openshift-cnv
-      EOFOG
-
-      oc apply -f - <<EOFSUB
-      apiVersion: operators.coreos.com/v1alpha1
-      kind: Subscription
-      metadata:
-        labels:
-          operators.coreos.com/kubevirt-hyperconverged.openshift-cnv: ''
-        name: kubevirt-hyperconverged
-        namespace: openshift-cnv
-      spec:
-        channel: ${CNV_RELEASE_CHANNEL}
-        installPlanApproval: Automatic
-        name: kubevirt-hyperconverged
-        source: ${CNV_SUBSCRIPTION_SOURCE}
-        sourceNamespace: openshift-marketplace
-      EOFSUB
-
-      sleep 30
-      RETRIES=30
-      CSV=
-      for i in $(seq ${RETRIES}); do
-        if [[ -z ${CSV} ]]; then
-          CSV=$(oc get subscription -n openshift-cnv kubevirt-hyperconverged -o jsonpath='{.status.installedCSV}')
-        fi
-        if [[ -z ${CSV} ]]; then
-          echo "Try ${i}/${RETRIES}: CSV not available yet. Retrying in 30 seconds"
-          sleep 30
-          continue
-        fi
-        if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
-          echo "CNV deployed on infra cluster"
-          break
-        else
-          echo "Try ${i}/${RETRIES}: CNV not deployed yet. Retrying in 30 seconds"
-          sleep 30
-        fi
-      done
-
-      if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
-        echo "Error: Failed to deploy CNV on infra cluster"
-        oc get csv "${CSV}" -n openshift-cnv -o yaml
-        oc describe csv "${CSV}" -n openshift-cnv
-        exit 1
-      fi
-
-      oc create -f - <<EOFHCO
-      apiVersion: hco.kubevirt.io/v1beta1
-      kind: HyperConverged
-      metadata:
-        name: kubevirt-hyperconverged
-        namespace: openshift-cnv
-      spec:
-        featureGates:
-          enableCommonBootImageImport: false
-        logVerbosityConfig:
-          kubevirt:
-            virtLauncher: 8
-            virtHandler: 8
-            virtController: 8
-            virtApi: 8
-            virtOperator: 8
-      EOFHCO
-
-      oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
-      echo "Installing VM console logger on infra cluster"
-      oc apply -f https://raw.githubusercontent.com/davidvossel/kubevirt-console-debugger/main/kubevirt-console-logger.yaml
+    commands: hypershift-kubevirt-install-commands.sh
     credentials:
     - mount_path: /etc/cnv-nightly-pull-credentials
       name: openshift-cnv-quay-credentials
@@ -207,7 +28,15 @@ chain:
       requests:
         cpu: 100m
         memory: 100Mi
+  env:
+  - name: KUBEVIRT_INSTALL_KUBECONFIG
+    default: "${SHARED_DIR}/infra-kubeconfig"
+    documentation: |
+      Kubeconfig path for this chain. Defaults to the infra cluster kubeconfig.
+      The hypershift-kubevirt-install-commands.sh script reads this and exports
+      it as KUBECONFIG when non-empty.
   documentation: |-
     Installs the KubeVirt / OpenShift Virtualization operator on the infra cluster.
-    Overrides KUBECONFIG to $SHARED_DIR/infra-kubeconfig so the operator is installed
-    on the infra cluster while the management cluster kubeconfig remains untouched.
+    Sets KUBEVIRT_INSTALL_KUBECONFIG at the chain level so the shared script
+    overrides KUBECONFIG to the infra cluster kubeconfig, leaving the management
+    cluster kubeconfig untouched.
