@@ -371,12 +371,12 @@ spec:
         memory: 2Gi
     mgr:
       requests:
-        cpu: 500m
-        memory: 512Mi
+        cpu: 100m
+        memory: 250Mi
     mgr-sidecar:
       requests:
-        cpu: 100m
-        memory: 256Mi
+        cpu: 10m
+        memory: 75Mi
     mon:
       requests:
         cpu: 100m
@@ -433,7 +433,7 @@ oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster" \
     -n "${ODF_INSTALL_NAMESPACE}" --for=condition='Available' --timeout='30m'
 
 # Enable Ceph toolbox for diagnostics
-oc patch OCSInitialization ocsinit -n openshift-storage \
+oc patch storagecluster ocs-storagecluster -n openshift-storage \
     --type json --patch '[{ "op": "replace", "path": "/spec/enableCephTools", "value": true }]'
 echo "Waiting for Ceph toolbox pod..."
 for ((i=1; i <= 30; i++)); do

@@ -164,25 +164,6 @@ fi
 echo "Using Fedora snapshot: ${FEDORA_SNAP}"
 
 # -------------------------------------------------------------------------
-# Determine MGR node and force VM placement there for deterministic testing
-# -------------------------------------------------------------------------
-MGR_NODE=$(oc get pods -n openshift-storage -l app=rook-ceph-mgr \
-    --no-headers -o custom-columns=':spec.nodeName' 2>/dev/null | grep -v Terminating | head -1 || true)
-echo "Ceph MGR is running on: ${MGR_NODE}"
-
-if [[ "${MGR_NODE}" == "${NODE_0}" ]]; then
-  FENCE_NODE="${NODE_0}"
-  SURVIVE_NODE="${NODE_1}"
-else
-  FENCE_NODE="${NODE_1}"
-  SURVIVE_NODE="${NODE_0}"
-fi
-echo "Will fence ${FENCE_NODE} (MGR node), expect VM to migrate to ${SURVIVE_NODE}"
-
-echo "Cordoning ${SURVIVE_NODE} to force VM placement on MGR node ${FENCE_NODE}..."
-oc adm cordon "${SURVIVE_NODE}"
-
-# -------------------------------------------------------------------------
 # Create a test VM with LiveMigrate eviction on an RWX PVC
 # -------------------------------------------------------------------------
 echo "--- Creating test VM for HA validation ---"
@@ -239,8 +220,14 @@ oc wait vm/test-vm-ha -n default --for=condition=Ready --timeout=10m
 VMI_NODE=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.nodeName}')
 echo "VM is running on node: ${VMI_NODE}"
 
-echo "Uncordoning ${SURVIVE_NODE}..."
-oc adm uncordon "${SURVIVE_NODE}"
+if [[ "${VMI_NODE}" == "${NODE_0}" ]]; then
+  FENCE_NODE="${NODE_0}"
+  SURVIVE_NODE="${NODE_1}"
+else
+  FENCE_NODE="${NODE_1}"
+  SURVIVE_NODE="${NODE_0}"
+fi
+echo "Will fence ${FENCE_NODE}, expect VM to migrate to ${SURVIVE_NODE}"
 
 # -------------------------------------------------------------------------
 # Idempotent recovery: power on the fenced VM and restore STONITH action
@@ -253,8 +240,6 @@ recover_fenced_node() {
   fi
   echo "--- Recovery trap: restoring ${FENCE_NODE} ---"
   RECOVERY_NEEDED=false
-
-  oc adm uncordon "${SURVIVE_NODE}" 2>/dev/null || true
 
   local fence_vm="ostest_${FENCE_NODE//-/_}"
   ssh "${SSHOPTS[@]}" "root@${IP}" \
@@ -317,36 +302,36 @@ run_on_node "${SURVIVE_NODE}" "pcs resource status" || true
 collect_rbd_diagnostics "post-fencing"
 
 # -------------------------------------------------------------------------
-# Wait for ODF/Ceph to recover (MGR failover if needed)
+# Wait for Ceph to recover after fencing (max 20 min)
 # -------------------------------------------------------------------------
-echo "--- Waiting for Ceph MGR pod to reach 2/2 Running on ${SURVIVE_NODE} ---"
-MGR_WAIT_DEADLINE=$((SECONDS + 900))
-for ((i=1; SECONDS < MGR_WAIT_DEADLINE; i++)); do
-  MGR_STATUS=$(oc get pods -n openshift-storage -l app=rook-ceph-mgr \
-      --no-headers --request-timeout=10s 2>/dev/null | grep -v Terminating | head -1 || true)
-  MGR_READY_COUNT=$(echo "${MGR_STATUS}" | awk '{print $2}')
-  MGR_POD_STATUS=$(echo "${MGR_STATUS}" | awk '{print $3}')
-  if [[ "${MGR_READY_COUNT}" == "2/2" && "${MGR_POD_STATUS}" == "Running" ]]; then
-    echo "Ceph MGR pod is 2/2 Running (attempt ${i})"
-    break
+TOOLBOX=$(oc get pod -n openshift-storage -l app=rook-ceph-tools \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+echo "--- Waiting for Ceph to respond (ceph -s) on ${SURVIVE_NODE} ---"
+CEPH_WAIT_DEADLINE=$((SECONDS + 1200))
+CEPH_RECOVERED=false
+for ((i=1; SECONDS < CEPH_WAIT_DEADLINE; i++)); do
+  if [[ -n "${TOOLBOX}" ]]; then
+    CEPH_OUT=$(oc exec -n openshift-storage "${TOOLBOX}" -- ceph -s 2>&1) && {
+      echo "Ceph is responding (attempt ${i}):"
+      echo "${CEPH_OUT}"
+      CEPH_RECOVERED=true
+      echo "Waiting 4 min for OSD out processing..."
+      sleep 240
+      echo "Post-OSD-out ceph status:"
+      oc exec -n openshift-storage "${TOOLBOX}" -- ceph -s 2>&1 || true
+      break
+    }
   fi
-  echo "Attempt ${i}: MGR=${MGR_READY_COUNT:-?} ${MGR_POD_STATUS:-?}, waiting 15s..."
-  if (( i % 5 == 0 )); then
-    echo "--- MGR diagnostics (attempt ${i}) ---"
-    oc adm top pod -n openshift-storage -l app=rook-ceph-mgr --containers 2>/dev/null || true
-    MGR_POD_NAME=$(echo "${MGR_STATUS}" | awk '{print $1}')
-    if [[ -n "${MGR_POD_NAME}" ]]; then
-      oc describe pod "${MGR_POD_NAME}" -n openshift-storage 2>/dev/null \
-        | grep -A5 -E '(State:|Last State:|Reason:|Exit Code:|Restart Count:)' || true
-      echo "--- mgr container logs (last 20 lines) ---"
-      oc logs "${MGR_POD_NAME}" -n openshift-storage -c mgr --tail=20 2>/dev/null || true
-    fi
-    echo "--- End MGR diagnostics ---"
-  fi
+  echo "Attempt ${i}: ceph -s not responding, waiting 15s..."
   sleep 15
 done
 
-echo "ODF pod status after MGR wait:"
+if [[ "${CEPH_RECOVERED}" != "true" ]]; then
+  echo "WARNING: Ceph did not respond within 20 min"
+fi
+
+echo "ODF pod status after Ceph wait:"
 oc get pods -n openshift-storage -o wide 2>&1 || true
 
 # -------------------------------------------------------------------------
