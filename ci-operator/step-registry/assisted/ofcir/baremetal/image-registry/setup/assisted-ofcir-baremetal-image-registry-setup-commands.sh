@@ -35,9 +35,21 @@ else
   exit 1
 fi
 
+dump_image_registry_debug() {
+  echo "===== image-registry debug ====="
+  oc get configs.imageregistry.operator.openshift.io cluster -o yaml || true
+  oc get co image-registry -o yaml || true
+  oc get pods -n openshift-image-registry -o wide || true
+  oc get events -n openshift-image-registry --sort-by=.lastTimestamp | tail -50 || true
+}
+
 patch_image_registry() {
+  # emptyDir is node-local: multi-node clusters default to replicas>1, which leaves
+  # image-registry unavailable. Force replicas=1 + Recreate (OpenShift requirement).
+  # Pin to masters (day2 workers must not steal emptyDir state) and tolerate the
+  # master NoSchedule taint — nodeSelector alone leaves pods Pending on HA.
   until oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
-    --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+    --patch '{"spec":{"managementState":"Managed","replicas":1,"rolloutStrategy":"Recreate","storage":{"emptyDir":{}},"nodeSelector":{"node-role.kubernetes.io/master":""},"tolerations":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master","operator":"Exists"}]}}'
   do
     echo "$(date --rfc-3339=seconds) Failed to patch image registry configuration. Retrying..."
     sleep 15
@@ -45,11 +57,17 @@ patch_image_registry() {
 }
 
 wait_cluster_operators() {
+  local deadline=$((SECONDS + 25 * 60))
   until \
     oc wait --all=true clusteroperators --for=condition=Available=True --timeout=2m >/dev/null && \
     oc wait --all=true clusteroperators --for=condition=Progressing=False --timeout=2m >/dev/null && \
     oc wait --all=true clusteroperators --for=condition=Degraded=False --timeout=2m >/dev/null
   do
+    if (( SECONDS >= deadline )); then
+      echo "$(date --rfc-3339=seconds) FATAL: clusteroperators not ready before deadline"
+      dump_image_registry_debug
+      return 1
+    fi
     echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
     sleep 1s
   done
