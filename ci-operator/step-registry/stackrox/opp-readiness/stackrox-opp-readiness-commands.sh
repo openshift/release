@@ -78,16 +78,20 @@ function CheckCentralRoute () {
 
 WaitFor "Central route" CheckCentralRoute
 
+set +x
 CENTRAL_URL="$(oc get route central -n "${CENTRAL_NS}" -o jsonpath='{.spec.host}')"
+set -x
 echo "[readiness] Central route discovered"
 
 # ---------------------------------------------------------------------------
 # Check 2: Central API health (v1/metadata returns 200)
 # ---------------------------------------------------------------------------
 function CheckCentralApi () {
+    set +x
     typeset httpCode=""
     httpCode="$(curl -sk -o /dev/null -w '%{http_code}' \
-        "https://${CENTRAL_URL}/v1/metadata" --max-time 10)" || return 1
+        "https://${CENTRAL_URL}/v1/metadata" --max-time 10)" || { set -x; return 1; }
+    set -x
     [[ "${httpCode}" == "200" ]]
 }
 
@@ -148,12 +152,15 @@ function CheckSensorPods () {
         echo "[readiness] WARNING: OOMKilled detected in sensor containers: ${oom}"
     fi
 
-    typeset notRunning=""
-    notRunning="$(echo "${podJson}" | jq -r '
-        .items[] | select(.status.phase != "Running")
-        | "\(.metadata.name):\(.status.phase)"
+    typeset notReady=""
+    notReady="$(echo "${podJson}" | jq -r '
+        .items[]
+        | select(
+            [.status.conditions[]? | select(.type == "Ready" and .status == "True")] | length == 0
+        )
+        | "\(.metadata.name):NotReady"
     ')"
-    [[ -z "${notRunning}" ]]
+    [[ -z "${notReady}" ]]
 }
 
 WaitFor "sensor pods Running in ${SC_NS}" CheckSensorPods

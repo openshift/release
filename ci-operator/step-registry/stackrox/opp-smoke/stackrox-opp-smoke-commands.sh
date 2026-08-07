@@ -20,9 +20,8 @@ fi
 # ---------------------------------------------------------------------------
 echo "[smoke] Reading connection details from SHARED_DIR..."
 
-CENTRAL_URL="$(cat "${SHARED_DIR}/CENTRAL_URL")"
-
 set +x
+CENTRAL_URL="$(cat "${SHARED_DIR}/CENTRAL_URL")"
 ROX_ADMIN_PASSWORD="$(cat "${SHARED_DIR}/ROX_ADMIN_PASSWORD")"
 set -x
 
@@ -56,12 +55,14 @@ chmod -R u+w /tmp/stackrox/qa-tests-backend/src/main/proto/scanner
 # ---------------------------------------------------------------------------
 # Set environment for the Gradle test suite
 # ---------------------------------------------------------------------------
+set +x
 export API_HOSTNAME="${CENTRAL_URL}"
 export API_PORT="443"
 export ROX_USERNAME="admin"
 export ROX_ADMIN_PASSWORD
 export CLUSTER="OPENSHIFT"
 export CI="true"
+set -x
 
 # ---------------------------------------------------------------------------
 # Run testSMOKE
