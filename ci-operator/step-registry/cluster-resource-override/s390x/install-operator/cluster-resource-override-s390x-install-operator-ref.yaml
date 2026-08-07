@@ -1,0 +1,77 @@
+ref:
+  as: cluster-resource-override-s390x-install-operator
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: cluster-resource-override-s390x-install-operator-commands.sh
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 40m0s
+  env:
+  - name: CRO_NAMESPACE
+    default: "openshift-cluster-resource-override"
+    documentation: |-
+      Namespace where the ClusterResourceOverride operator is installed.
+  - name: CRO_PACKAGE_NAME
+    default: "clusterresourceoverride"
+    documentation: |-
+      OLM package name to subscribe to. Product catalogs often use
+      "clusterresourceoverride"; upstream bundle annotations use
+      "clusterresourceoverride-operator".
+  - name: CRO_SUBSCRIPTION_NAME
+    default: "clusterresourceoverride"
+    documentation: |-
+      Name of the Subscription object created in CRO_NAMESPACE.
+  - name: CRO_CHANNEL
+    default: "stable"
+    documentation: |-
+      Subscription channel for the ClusterResourceOverride operator.
+  - name: CRO_CATALOG_SOURCE
+    default: "redhat-operators"
+    documentation: |-
+      CatalogSource name used for the Subscription (in openshift-marketplace
+      unless CRO_CATALOG_SOURCE_NAMESPACE is overridden).
+  - name: CRO_CATALOG_SOURCE_NAMESPACE
+    default: "openshift-marketplace"
+    documentation: |-
+      Namespace of the CatalogSource referenced by the Subscription.
+  - name: CRO_CREATE_CR
+    default: "true"
+    documentation: |-
+      When "true", create the ClusterResourceOverride CR after the CSV is Ready.
+  - name: CRO_IDMS_NAME
+    default: "cluster-resource-override-idms"
+    documentation: |-
+      Name of the ImageDigestMirrorSet created when mirror env vars are set.
+  - name: CRO_SOURCE_OPERATOR_IMAGE
+    default: "registry.redhat.io/openshift4/ose-clusterresourceoverride-rhel9-operator"
+    documentation: |-
+      Source operator image repository for ImageDigestMirrorSet. Ignored when
+      CRO_MIRROR_OPERATOR_IMAGE is empty.
+  - name: CRO_MIRROR_OPERATOR_IMAGE
+    default: ""
+    documentation: |-
+      Mirror repository for the operator image. When non-empty, an
+      ImageDigestMirrorSet entry is created mapping CRO_SOURCE_OPERATOR_IMAGE
+      to this mirror (image source change).
+  - name: CRO_SOURCE_OPERAND_IMAGE
+    default: "registry.redhat.io/openshift4/ose-clusterresourceoverride-rhel9"
+    documentation: |-
+      Source operand image repository for ImageDigestMirrorSet. Ignored when
+      CRO_MIRROR_OPERAND_IMAGE is empty.
+  - name: CRO_MIRROR_OPERAND_IMAGE
+    default: ""
+    documentation: |-
+      Mirror repository for the operand (admission webhook) image. When non-empty,
+      an ImageDigestMirrorSet entry is created mapping CRO_SOURCE_OPERAND_IMAGE
+      to this mirror.
+  documentation: |-
+    Installs the ClusterResourceOverride operator via OLM Subscription on a
+    provisioned s390x cluster. Optionally applies an ImageDigestMirrorSet to
+    redirect registry.redhat.io operator/operand pulls to mirror repositories
+    (image source change). Waits for the CSV to Succeed, then optionally creates
+    the ClusterResourceOverride CR (name: cluster).
