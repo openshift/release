@@ -44,8 +44,10 @@ echo "SSH public key loaded from cluster profile"
 # --- Step 1: Import golden image DataVolume ---
 echo "$(date -u --rfc-3339=seconds) - Importing golden image from ${CNV_WINDOWS_BOOT_SOURCE_URL}..."
 
-oc get namespace "${OS_IMAGES_NAMESPACE}" 2>/dev/null || \
-  oc create namespace "${OS_IMAGES_NAMESPACE}"
+if ! oc get namespace "${OS_IMAGES_NAMESPACE}" 2>/dev/null; then
+  echo "ERROR: Namespace ${OS_IMAGES_NAMESPACE} does not exist. OpenShift Virtualization may not be installed correctly."
+  exit 1
+fi
 
 # Registry auth Secret for quay.io/openshift-cnv/containerdisks
 # Credentials are mounted from test-credentials/openshift-cnv-containerdisks-auth
