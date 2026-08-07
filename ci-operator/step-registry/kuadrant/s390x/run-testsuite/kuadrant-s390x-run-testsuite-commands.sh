@@ -789,6 +789,14 @@ spec:
         image: ${TESTSUITE_S390X_IMAGE}
         # Always: same tag (stablev1) may be rebuilt; avoid stale node cache.
         imagePullPolicy: Always
+        # Sized for PYTEST_FLAGS=-n4 (xdist workers share this container).
+        resources:
+          requests:
+            cpu: "4"
+            memory: 8Gi
+          limits:
+            cpu: "8"
+            memory: 16Gi
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
