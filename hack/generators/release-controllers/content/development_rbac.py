@@ -82,7 +82,7 @@ def _add_cache_monitoring_rbac(gendoc):
         },
         'rules': [
             {
-                'apiGroups': ['batch/v1'],
+                'apiGroups': ['batch'],
                 'resources': ['jobs'],
                 'verbs': ['get', 'list', 'watch']
             },
