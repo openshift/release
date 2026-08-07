@@ -150,6 +150,9 @@ def _controller_rbac(gendoc):
     # OKD Resources
     _namespaced_releasepayloads_rbac_resources(gendoc, 'origin')
 
+    # HyperShift Resources
+    _namespaced_rbac_resources(gendoc, 'hypershift')
+
 
 def _namespaced_releasepayloads_rbac_resources(gendoc, namespace):
     config = gendoc.context.config
