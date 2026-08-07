@@ -15,7 +15,7 @@ if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
 fi
 
 POLL_INTERVAL=30
-TIMEOUT=300   # 5 minutes
+TIMEOUT=600
 ELAPSED=0
 
 # ---------------------------------------------------------------------------

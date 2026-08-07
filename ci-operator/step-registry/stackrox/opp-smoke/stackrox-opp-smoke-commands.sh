@@ -36,6 +36,7 @@ SCANNER_REF="${SCANNER_REF:-main}"
 # ---------------------------------------------------------------------------
 echo "[smoke] Sparse-cloning stackrox/stackrox..."
 cd /tmp
+rm -rf stackrox scanner
 git clone --depth 1 --filter=blob:none --sparse --branch "${STACKROX_REF}" \
     https://github.com/stackrox/stackrox.git stackrox
 cd stackrox
