@@ -15,10 +15,6 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: "4.20"
-  hypershift-tests:
-    name: hypershift-tests
-    namespace: hypershift
-    tag: latest
 build_root:
   from_repository: true
   use_build_cache: true
@@ -27,6 +23,8 @@ images:
   - to: hypershift-operator-pr
   - dockerfile_path: Dockerfile.control-plane
     to: hypershift
+  - dockerfile_path: Dockerfile.e2e
+    to: hypershift-tests
   - dockerfile_literal: |
       FROM base
       RUN dnf install -y python3-pip
@@ -36,6 +34,7 @@ promotion:
   to:
   - excluded_images:
     - hypershift-operator-pr
+    - hypershift-tests
     name: "4.20"
     namespace: ocp
   - additional_images:
@@ -171,6 +170,21 @@ tests:
     env:
       CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-nested
+- always_run: false
+  as: e2e-aws-backport
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-pr
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
+    env:
+      CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      INSTALL_FROM_LATEST: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-nested
 - always_run: false
