@@ -1,0 +1,89 @@
+ref:
+  as: p2p-cnv-cclm-readiness
+  from: cli
+  commands: p2p-cnv-cclm-readiness-commands.sh
+  timeout: 35m0s
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CNV_ENABLE_CCLM
+    default: "false"
+    documentation: |-
+      When "true", run CCLM readiness checks: restart virt-operator, verify
+      /etc/virt-handler/clientcertificates/tls.crt is present in virt-handler pods,
+      and ensure the virt-synchronization-controller Service and ServiceExport exist.
+      Set to "true" for CCLM scenarios; leave "false" for upgrade or non-CCLM jobs.
+  - name: CNV_CCLM_WAIT_TIMEOUT
+    default: "600"
+    documentation: |-
+      Maximum seconds to poll for /etc/virt-handler/clientcertificates/tls.crt in
+      a virt-handler pod after virt-operator restart.  The fallback DaemonSet patch
+      is attempted if the cert is still absent after this timeout.
+  - name: CNV_CCLM_VIRT_HANDLER_CERT_SECRET
+    default: "kubevirt-virt-handler-certs"
+    documentation: |-
+      Name of the Secret in openshift-cnv to mount at
+      /etc/virt-handler/clientcertificates when virt-operator does not add the
+      mount automatically (fallback DaemonSet patch path only).
+  - name: CNV_CCLM_SYNC_PORT
+    default: "9185"
+    documentation: |-
+      TCP port for the virt-synchronization-controller sync data endpoint.
+      Used when creating the missing Service in openshift-cnv.
+  documentation: |-
+    Verifies and remediates CCLM (Cross-Cluster Live Migration) prerequisites on
+    every spoke cluster before migration steps run.  No-op when CNV_ENABLE_CCLM
+    is not "true".
+
+    Background — CNV bug CNV-89129 / upstream kubevirt#16264
+    (https://github.com/kubevirt/kubevirt/issues/16264):
+    virt-operator does not add the /etc/virt-handler/clientcertificates volume mount
+    to the virt-handler DaemonSet when DecentralizedLiveMigration is enabled, even
+    though the Secret (kubevirt-virt-handler-certs) exists and is populated.
+    Without this mount, virt-handler emits "failed to load the certificate
+    /etc/virt-handler/clientcertificates/tls.crt: no such file or directory" every
+    60 s and cannot make the required mTLS connection to the destination
+    virt-synchronization-controller:9185, leaving the migration stuck in
+    Synchronizing/WaitingForSync indefinitely.
+    Affected: CNV 4.17+ / OCP 4.22 (as of 2026-08).
+
+    Additionally, OLM's CSV reconciler periodically scales virt-operator back to its
+    desired replica count even after this step scales it to 0.  Once virt-operator
+    is running again it immediately reconciles away the cert mount patch, undoing the
+    fix.  A background watchdog process in this step container would not survive
+    across subsequent CI step containers.  To address this, step 5 deploys an
+    in-cluster Deployment (cclm-watchdog) that continuously monitors and re-applies
+    the fix for the entire test window.
+
+    What this step does (idempotent, safe to re-run):
+      1. Checks whether /etc/virt-handler/clientcertificates/tls.crt is already
+         present in all Running virt-handler pods.  Skips to step 3 if so.
+      2. Applies the DaemonSet workaround patch (CNV-89129):
+         a. Scales virt-operator to 0 to prevent immediate reconciliation.
+         b. Patches virt-handler DaemonSet to mount CNV_CCLM_VIRT_HANDLER_CERT_SECRET
+            at /etc/virt-handler/clientcertificates.
+         c. Rollout-restarts the DaemonSet so all pods pick up the new mount.
+         d. Polls up to 300 s for the cert to appear in all Running pods.
+         e. Leaves virt-operator at 0 replicas — p2p-cnv-restore-virt-operator
+            (post chain) restores it after all migrations complete.
+      3. Ensures a Service named virt-synchronization-controller on port
+         CNV_CCLM_SYNC_PORT (9185) exists in openshift-cnv.
+      4. Ensures a ServiceExport for that Service exists, allowing Submariner to
+         propagate it to other clusters for cross-cluster DNS resolution.  Skipped
+         gracefully when the ServiceExport CRD (Submariner) is not yet installed.
+      5. Deploys an in-cluster watchdog Deployment (cclm-watchdog) in openshift-cnv
+         on each spoke.  The watchdog runs in a 30-second loop: if OLM has scaled
+         virt-operator back above 0 it re-scales it to 0; if the cert volume mount
+         has been removed from the virt-handler DaemonSet it re-patches and restarts
+         the DaemonSet.  The watchdog survives across all subsequent CI step containers
+         and is stopped and deleted by p2p-cnv-restore-virt-operator.
+
+    Reads spoke names and kubeconfigs from ${SHARED_DIR} (managed-cluster-kubeconfig-N
+    and managed-cluster-name-N files).
+
+    Must run after p2p-acm-cnv-install-policy and ideally after
+    acm-interop-p2p-submariner-install (so ServiceExport CRD is available).
+    Must run before p2p-mtv-bidir-mig-config / p2p-cclm-bidir-migration-test.

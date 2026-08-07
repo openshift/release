@@ -3,12 +3,13 @@ chain:
   steps:
     - ref: acm-interop-p2p-submariner-cloud-prepare
     - ref: acm-interop-p2p-submariner-broker-join
+    - ref: acm-interop-p2p-submariner-snat-fix
     - ref: acm-interop-p2p-submariner-verify
   documentation: |-
     Installs and verifies Submariner for a 1-hub + N-spoke cluster topology
     without Globalnet (non-overlapping pod CIDRs per spoke).
 
-    This chain sequences three steps:
+    This chain sequences four steps:
       1. acm-interop-p2p-submariner-cloud-prepare
          Installs subctl locally, prepares AWS security groups on each spoke
          (subctl cloud prepare aws with --gateways 1 dedicated gateway nodes),
@@ -24,7 +25,14 @@ chain:
          agent, Lighthouse CoreDNS, and OpenShift cluster CoreDNS DNS forwarding
          to be fully ready.
 
-      3. acm-interop-p2p-submariner-verify
+      3. acm-interop-p2p-submariner-snat-fix
+         Applies the official ACM SNAT workaround (ACM-22805/24786/36927) for
+         OVN-K nftables mgmtport-snat breaking cross-cluster return routing.
+         Creates submariner-global ConfigMap (enable-snat-handler=true), restarts
+         submariner-routeagent and ovnkube-node DaemonSets on each spoke, and
+         waits for rollout completion before verify runs.
+
+      4. acm-interop-p2p-submariner-verify
          Waits for IPsec tunnels to reach connected state, asserts remote
          subnets are pod CIDRs (not Globalnet 242.x), pre-warms Lighthouse
          service discovery, runs 'subctl verify', and probes CCLM sync TCP

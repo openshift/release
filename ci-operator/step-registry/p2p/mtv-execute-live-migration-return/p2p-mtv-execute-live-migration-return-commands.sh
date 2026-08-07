@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# Execute MTV cross-cluster live migration (CCLM) from source spoke to destination spoke on the hub.
+# Execute MTV cross-cluster live migration (CCLM) return leg: spoke-2 back to spoke-1 on the hub.
+# Return-leg companion to p2p-mtv-execute-live-migration; artifact names carry a "-return" suffix.
 #
 set -euxo pipefail; shopt -s inherit_errexit
 
@@ -31,7 +32,7 @@ typeset cclmDebugMode="${P2P_CCLM_DEBUG_MODE}"
 
 # Temp file accumulating tab-separated JUnit records (PASS/FAIL\tname\telapsed\t[msg]).
 # Written in the subshell; read by WriteJunit after it exits.
-typeset -r junitFile="${TMPDIR:-/tmp}/cclm-junit-$$.tsv"
+typeset -r junitFile="${TMPDIR:-/tmp}/cclm-return-junit-$$.tsv"
 
 typeset sourceKubeconfig="${MTV_SOURCE_SPOKE_KUBECONFIG}"
 typeset destKubeconfig="${MTV_DEST_SPOKE_KUBECONFIG}"
@@ -79,7 +80,7 @@ ResolveSpokeKubeconfigs() {
 # DumpDiagnostics — write MTV and VM state to ARTIFACT_DIR on failure.
 DumpDiagnostics() {
     [[ -n "${ARTIFACT_DIR}" ]] || return 0
-    diagDir="${ARTIFACT_DIR}/mtv-live-migration-diagnostics"
+    diagDir="${ARTIFACT_DIR}/mtv-live-migration-return-diagnostics"
     mkdir -p "${diagDir}"
     HubOc get plan,migration,networkmap,storagemap,provider -n "${MTV_NAMESPACE}" \
         > "${diagDir}/hub-mtv-resources.txt" 2>&1 || true
@@ -728,7 +729,7 @@ JStep() {
     if (( rc == 0 )); then
         printf 'PASS\t%s\t%d\t\n' "${name}" "${elapsed}" >> "${junitFile}"
     else
-        printf 'FAIL\t%s\t%d\tFailed (rc=%d); see diagnostics in mtv-live-migration-diagnostics/\n' \
+        printf 'FAIL\t%s\t%d\tFailed (rc=%d); see diagnostics in mtv-live-migration-return-diagnostics/\n' \
             "${name}" "${elapsed}" "${rc}" >> "${junitFile}"
     fi
     return "${rc}"
@@ -752,7 +753,7 @@ WriteJunit() {
     [[ -n "${ARTIFACT_DIR}" ]] || return 0
     [[ -f "${junitFile}" ]] || return 0
 
-    typeset xmlFile="${ARTIFACT_DIR}/junit_cclm_live_migration.xml"
+    typeset xmlFile="${ARTIFACT_DIR}/junit_cclm_live_migration_return.xml"
     mkdir -p "${ARTIFACT_DIR}"
 
     typeset -i total=0 failures=0 totalTime=0
@@ -766,11 +767,11 @@ WriteJunit() {
 
     {
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
-        printf '<testsuite name="cclm-live-migration" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
+        printf '<testsuite name="cclm-live-migration-return" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
             "${total}" "${failures}" "${totalTime}"
         while IFS=$'\t' read -r status name elapsed failMsg; do
             typeset escapedName; escapedName="$(XmlEscape "${name}")"
-            printf '  <testcase name="%s" classname="cclm-live-migration" time="%d">\n' \
+            printf '  <testcase name="%s" classname="cclm-live-migration-return" time="%d">\n' \
                 "${escapedName}" "${elapsed}"
             if [[ "${status}" == "FAIL" ]]; then
                 typeset escapedMsg; escapedMsg="$(XmlEscape "${failMsg}")"
@@ -825,7 +826,7 @@ typeset -i cclmStepRc=0
                 -n "${MTV_TEST_VM_NAMESPACE}" -o wide
             DestOc get "virtualmachine/${MTV_TEST_VM_NAME}" "virtualmachineinstance/${MTV_TEST_VM_NAME}" \
                 -n "${targetNs}" -o wide
-        } > "${ARTIFACT_DIR}/mtv-live-migration-status.txt"
+        } > "${ARTIFACT_DIR}/mtv-live-migration-return-status.txt"
     fi
     true
 ) || cclmStepRc=$?
@@ -837,7 +838,7 @@ WriteJunit
 if (( cclmStepRc != 0 )); then
     DumpDiagnostics
     if [[ "${cclmDebugMode}" == "true" ]]; then
-        : "WARNING: p2p-mtv-execute-live-migration failed (rc=${cclmStepRc}); not failing job (debug mode)"
+        : "WARNING: p2p-mtv-execute-live-migration-return failed (rc=${cclmStepRc}); not failing job (debug mode)"
     else
         exit "${cclmStepRc}"
     fi

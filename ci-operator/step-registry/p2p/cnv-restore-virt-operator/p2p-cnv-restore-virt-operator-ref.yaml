@@ -1,0 +1,31 @@
+ref:
+  as: p2p-cnv-restore-virt-operator
+  from: cli
+  commands: p2p-cnv-restore-virt-operator-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - mount_path: /tmp/secret
+    name: managed-cluster-kubeconfigs
+    namespace: test-credentials
+  env:
+  - name: CNV_ENABLE_CCLM
+    default: "false"
+    documentation: >-
+      Set to "true" to restore virt-operator replicas on spoke clusters after
+      CCLM migration tests.  Must match the value used in p2p-cnv-cclm-readiness.
+  documentation: |-
+    Restores virt-operator to 2 replicas on all spoke clusters after CCLM migration
+    tests complete.  Counterpart to p2p-cnv-cclm-readiness which intentionally leaves
+    virt-operator at 0 replicas during migrations to prevent it from reconciling away
+    the virt-handler clientcertificates volume mount patch (workaround for CNV-89129).
+
+    This step also stops and removes the in-cluster cclm-watchdog Deployment (and its
+    RBAC) deployed by p2p-cnv-cclm-readiness.  The watchdog must be deleted FIRST:
+    if it is still running when virt-operator is scaled back to 2, the watchdog would
+    immediately scale it back to 0.
+
+    Should run in the post phase, after all migration steps, so that virt-operator cannot
+    interfere with the running migrations.

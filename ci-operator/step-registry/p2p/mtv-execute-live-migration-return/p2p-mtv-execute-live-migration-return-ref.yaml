@@ -1,7 +1,7 @@
 ref:
-  as: p2p-mtv-execute-live-migration
+  as: p2p-mtv-execute-live-migration-return
   from: cli
-  commands: p2p-mtv-execute-live-migration-commands.sh
+  commands: p2p-mtv-execute-live-migration-return-commands.sh
   timeout: 3h0m0s
   grace_period: 15m0s
   resources:
@@ -9,54 +9,59 @@ ref:
       cpu: 200m
       memory: 400Mi
   documentation: |-
-    Execute MTV cross-cluster live migration (CCLM) from source spoke to destination spoke.
+    Execute MTV cross-cluster live migration (CCLM) return leg: spoke-2 back to spoke-1.
+
+    Return-leg companion to p2p-mtv-execute-live-migration. Defaults are reversed so that
+    spoke-2 is the source and spoke-1 is the destination. Plan and Migration CR names carry
+    a "-return" suffix to coexist alongside the forward migration CRs in the same namespace.
 
     Runs on the ACM hub (KUBECONFIG). Creates Plan and Migration CRs, waits for Succeeded,
-    and verifies the VM is Running on the destination spoke. Requires p2p-mtv-mig-config
-    (providers + maps Ready), p2p-create-migration-test-vm (source VM Running),
-    p2p-acm-cnv-install-policy (DecentralizedLiveMigration + sync controller on spokes),
-    and acm-interop-p2p-submariner-install (no Globalnet; :9185 sync-port reachability).
+    and verifies the VM is Running on the destination spoke (spoke-1). Requires:
+      - p2p-mtv-bidir-mig-config (return NetworkMap/StorageMap Ready on hub)
+      - p2p-mtv-execute-live-migration (VM currently on spoke-2 after forward migration)
+      - p2p-acm-cnv-install-policy (DecentralizedLiveMigration + sync controller on spokes)
+      - acm-interop-p2p-submariner-install (no Globalnet; :9185 sync-port reachability)
 
-    Live preflight: sync-controller ready, no submariner-globalnet, TCP probe to dest
-    sync-controller from source virt-launcher. During migration wait, fails early if
+    Live preflight: sync-controller ready, no submariner-globalnet, TCP probe to spoke-1
+    sync-controller from spoke-2 virt-launcher. During migration wait, fails early if
     Synchronization stays stuck (source Synchronizing / dest WaitingForSync).
 
-    Spoke kubeconfigs default to SHARED_DIR/managed-cluster-kubeconfig-1 (source) and
-    managed-cluster-kubeconfig-2 (destination).
+    Spoke kubeconfigs default to SHARED_DIR/managed-cluster-kubeconfig-2 (source) and
+    managed-cluster-kubeconfig-1 (destination) for the return leg.
 
-    Writes ${ARTIFACT_DIR}/mtv-live-migration-status.txt; diagnostics on failure under
-    ${ARTIFACT_DIR}/mtv-live-migration-diagnostics/.
+    Writes ${ARTIFACT_DIR}/mtv-live-migration-return-status.txt; diagnostics on failure under
+    ${ARTIFACT_DIR}/mtv-live-migration-return-diagnostics/.
   env:
   - name: MTV_NAMESPACE
     default: "openshift-mtv"
     documentation: Namespace where MTV Plan and Migration CRs live.
   - name: MTV_SOURCE_PROVIDER
-    default: "spoke-1"
-    documentation: MTV source Provider CR name (migration origin).
-  - name: MTV_DESTINATION_PROVIDER
     default: "spoke-2"
-    documentation: MTV destination Provider CR name (migration target).
+    documentation: MTV source Provider CR name for the return leg (VM currently resides here after forward migration).
+  - name: MTV_DESTINATION_PROVIDER
+    default: "spoke-1"
+    documentation: MTV destination Provider CR name for the return leg (original source cluster).
   - name: MTV_TEST_VM_NAME
     default: "test-vm-1"
-    documentation: VirtualMachine name to migrate (must match p2p-create-migration-test-vm).
+    documentation: VirtualMachine name to migrate back (must match p2p-create-migration-test-vm).
   - name: MTV_TEST_VM_NAMESPACE
     default: "vm-migration-test"
-    documentation: Source namespace of the VM to migrate.
+    documentation: Namespace where the VM lives on spoke-2 after the forward migration.
   - name: MTV_TEST_VM_TARGET_NAMESPACE
     default: ""
-    documentation: Destination namespace on spoke-2. Empty uses MTV_TEST_VM_NAMESPACE.
+    documentation: Destination namespace on spoke-1. Empty uses MTV_TEST_VM_NAMESPACE.
   - name: MTV_PLAN_NAME
-    default: "cclm-plan"
-    documentation: Plan metadata.name on the hub.
+    default: "cclm-plan-return"
+    documentation: Plan metadata.name for the return leg on the hub.
   - name: MTV_MIGRATION_NAME
-    default: "cclm-run-1"
-    documentation: Migration metadata.name on the hub.
+    default: "cclm-run-return"
+    documentation: Migration metadata.name for the return leg on the hub.
   - name: MTV_NETWORK_MAP_NAME
-    default: "spoke-network-map"
-    documentation: NetworkMap referenced by the Plan.
+    default: "spoke-network-map-return"
+    documentation: NetworkMap referenced by the return Plan (created by p2p-mtv-create-return-migration-maps).
   - name: MTV_STORAGE_MAP_NAME
-    default: "spoke-storage-map"
-    documentation: StorageMap referenced by the Plan.
+    default: "spoke-storage-map-return"
+    documentation: StorageMap referenced by the return Plan (created by p2p-mtv-create-return-migration-maps).
   - name: MTV_PLAN_TYPE
     default: "live"
     documentation: Plan spec.type — live for CCLM, cold for powered-off migration.
@@ -71,16 +76,16 @@ ref:
     documentation: Sleep between Migration status polls.
   - name: MTV_SOURCE_SPOKE_KUBECONFIG
     default: ""
-    documentation: Optional source spoke kubeconfig path. Defaults to SHARED_DIR index 1.
+    documentation: Optional source spoke kubeconfig path for the return leg. Defaults to SHARED_DIR index 2.
   - name: MTV_DEST_SPOKE_KUBECONFIG
     default: ""
-    documentation: Optional destination spoke kubeconfig path. Defaults to SHARED_DIR index 2.
+    documentation: Optional destination spoke kubeconfig path for the return leg. Defaults to SHARED_DIR index 1.
   - name: MTV_SOURCE_SPOKE_INDEX
-    default: "1"
-    documentation: 1-based SHARED_DIR kubeconfig index for the source spoke.
-  - name: MTV_DEST_SPOKE_INDEX
     default: "2"
-    documentation: 1-based SHARED_DIR kubeconfig index for the destination spoke.
+    documentation: 1-based SHARED_DIR kubeconfig index for the return-leg source spoke (spoke-2).
+  - name: MTV_DEST_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based SHARED_DIR kubeconfig index for the return-leg destination spoke (spoke-1).
   - name: MTV_CNV_NAMESPACE
     default: "openshift-cnv"
     documentation: OpenShift Virtualization namespace on spokes (KubeVirt/HCO).
@@ -123,5 +128,5 @@ ref:
   - name: P2P_CCLM_DEBUG_MODE
     default: "false"
     documentation: |-
-      When true, log failures and exit 0 so downstream debug steps (e.g. acm-interop-p2p-test-poc)
-      can run. Set P2P_CCLM_DEBUG_MODE=true in the job env during CCLM investigation.
+      When true, log failures and exit 0 so downstream debug steps can run.
+      Set P2P_CCLM_DEBUG_MODE=true in the job env during CCLM investigation.
