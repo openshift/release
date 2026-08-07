@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -eux -o pipefail
 
 # ---------------------------------------------------------------------------
 # ACS OPP SMOKE Test Runner
@@ -24,10 +24,10 @@ CENTRAL_URL="$(cat "${SHARED_DIR}/CENTRAL_URL")"
 
 set +x
 ROX_ADMIN_PASSWORD="$(cat "${SHARED_DIR}/ROX_ADMIN_PASSWORD")"
+set -x
 
 echo "[smoke] Connection details loaded from SHARED_DIR"
 
-# Allow pinning to a known-good ref for reproducibility
 STACKROX_REF="${STACKROX_REF:-main}"
 SCANNER_REF="${SCANNER_REF:-main}"
 
@@ -77,15 +77,13 @@ TEST_EXIT=0
 # ---------------------------------------------------------------------------
 echo "[smoke] Copying JUnit results to ARTIFACT_DIR..."
 if [[ -d build/test-results/testSMOKE ]]; then
-    cp -v build/test-results/testSMOKE/*.xml "${ARTIFACT_DIR}/" 2>/dev/null || true
-else
-    echo "[smoke] WARNING: No test results directory found at build/test-results/testSMOKE/"
+    find build/test-results/testSMOKE -name '*.xml' -exec cp -v {} "${ARTIFACT_DIR}/" \;
 fi
 
-# Also copy HTML report if available
 if [[ -d build/reports/tests/testSMOKE ]]; then
     mkdir -p "${ARTIFACT_DIR}/smoke-report"
-    cp -r build/reports/tests/testSMOKE/* "${ARTIFACT_DIR}/smoke-report/" 2>/dev/null || true
+    find build/reports/tests/testSMOKE -mindepth 1 -maxdepth 1 \
+        -exec cp -r {} "${ARTIFACT_DIR}/smoke-report/" \;
 fi
 
 echo "[smoke] Test run finished with exit code: ${TEST_EXIT}"
