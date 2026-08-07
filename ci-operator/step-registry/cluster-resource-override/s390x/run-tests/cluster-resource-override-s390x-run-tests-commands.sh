@@ -2,20 +2,22 @@
 
 set -euo pipefail
 
-echo "=== ClusterResourceOverride s390x placeholder test ==="
+echo "=== ClusterResourceOverride s390x e2e ==="
 echo "Namespace: ${CRO_NAMESPACE}"
+echo "E2E_SKIP: ${E2E_SKIP:-<none>}"
 
-echo "=== Operator status ==="
+echo "=== Operator status before tests ==="
 oc get deployment,pods,csv,subscription -n "${CRO_NAMESPACE}" -o wide || true
 oc get clusterresourceoverride -A -o wide || true
 
-echo "=== Checking operator Deployment Available ==="
 oc wait --for=condition=Available deployment/clusterresourceoverride-operator \
-  -n "${CRO_NAMESPACE}" --timeout=300s
+  -n "${CRO_NAMESPACE}" --timeout=600s
 
-oc get deployment/clusterresourceoverride-operator -n "${CRO_NAMESPACE}" -o yaml \
-  > "${ARTIFACT_DIR}/clusterresourceoverride-operator-deployment.yaml" || true
-oc get csv -n "${CRO_NAMESPACE}" -o yaml \
-  > "${ARTIFACT_DIR}/clusterresourceoverride-csv.yaml" || true
+# make e2e expects OPERATOR_NAMESPACE and KUBECONFIG; KUBECONFIG is injected by ci-operator.
+export OPERATOR_NAMESPACE="${CRO_NAMESPACE}"
+export KUBECTL="$(which oc)"
 
-echo "=== Placeholder test passed (replace with real testsuite later) ==="
+echo "=== Running make e2e ==="
+make e2e E2E_SKIP="${E2E_SKIP}" OPERATOR_NAMESPACE="${CRO_NAMESPACE}" KUBECTL="${KUBECTL}"
+
+echo "=== e2e complete ==="
