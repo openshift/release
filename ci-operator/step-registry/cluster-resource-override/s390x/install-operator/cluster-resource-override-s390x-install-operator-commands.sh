@@ -23,7 +23,7 @@ wait_for_csv() {
 
 apply_idms_if_configured() {
   if [[ -z "${CRO_MIRROR_OPERATOR_IMAGE}" && -z "${CRO_MIRROR_OPERAND_IMAGE}" ]]; then
-    echo "=== Skipping ImageDigestMirrorSet (no mirror images configured) ==="
+    echo "=== Skipping ImageDigestMirrorSet (no mirror repositories configured) ==="
     return 0
   fi
 
@@ -46,6 +46,72 @@ apply_idms_if_configured() {
       echo "    - ${CRO_MIRROR_OPERAND_IMAGE}"
     fi
   } | oc apply -f -
+}
+
+patch_operator_images() {
+  local csv
+  if [[ -z "${CRO_OPERATOR_IMAGE}" && -z "${CRO_OPERAND_IMAGE}" ]]; then
+    echo "=== Skipping image overrides (CRO_OPERATOR_IMAGE / CRO_OPERAND_IMAGE unset) ==="
+    return 0
+  fi
+
+  csv="$(oc get subscription "${CRO_SUBSCRIPTION_NAME}" -n "${CRO_NAMESPACE}" -o jsonpath='{.status.installedCSV}')"
+  if [[ -z "${csv}" ]]; then
+    echo "ERROR: no installedCSV for ${CRO_SUBSCRIPTION_NAME}" >&2
+    return 1
+  fi
+
+  echo "=== Patching CSV ${csv} images ==="
+  echo "  operator: ${CRO_OPERATOR_IMAGE:-<unchanged>}"
+  echo "  operand:  ${CRO_OPERAND_IMAGE:-<unchanged>}"
+
+  oc get csv "${csv}" -n "${CRO_NAMESPACE}" -o json \
+    | jq \
+      --arg op_img "${CRO_OPERATOR_IMAGE}" \
+      --arg operand_img "${CRO_OPERAND_IMAGE}" '
+        def set_container_image:
+          if $op_img != "" then
+            (.spec.install.spec.deployments[]?
+              | select(.name == "clusterresourceoverride-operator")
+              | .spec.template.spec.containers[]?
+              | select(.name == "clusterresourceoverride-operator")
+              | .image) = $op_img
+          else . end;
+        def set_operand_env:
+          if $operand_img != "" then
+            (.spec.install.spec.deployments[]?
+              | select(.name == "clusterresourceoverride-operator")
+              | .spec.template.spec.containers[]?
+              | select(.name == "clusterresourceoverride-operator")
+              | .env[]?
+              | select(.name == "OPERAND_IMAGE")
+              | .value) = $operand_img
+          else . end;
+        def set_related_images:
+          if (.spec.relatedImages|type) == "array" then
+            .spec.relatedImages |= map(
+              if $op_img != "" and (.name|test("operator";"i")) then .image = $op_img
+              elif $operand_img != "" and (.name|test("operand|clusterresourceoverride";"i")) and (.name|test("operator";"i")|not) then .image = $operand_img
+              else . end
+            )
+          else . end;
+        set_container_image | set_operand_env | set_related_images
+      ' \
+    | oc apply -f -
+
+  if [[ -n "${CRO_OPERATOR_IMAGE}" ]]; then
+    oc set image deployment/clusterresourceoverride-operator \
+      -n "${CRO_NAMESPACE}" \
+      "clusterresourceoverride-operator=${CRO_OPERATOR_IMAGE}"
+  fi
+  if [[ -n "${CRO_OPERAND_IMAGE}" ]]; then
+    oc set env deployment/clusterresourceoverride-operator \
+      -n "${CRO_NAMESPACE}" \
+      "OPERAND_IMAGE=${CRO_OPERAND_IMAGE}"
+  fi
+
+  oc rollout status deployment/clusterresourceoverride-operator \
+    -n "${CRO_NAMESPACE}" --timeout=600s
 }
 
 echo "=== Ensuring operator namespace ${CRO_NAMESPACE} ==="
@@ -97,6 +163,12 @@ EOF
 wait_for_csv "${CRO_NAMESPACE}" "${CRO_SUBSCRIPTION_NAME}"
 
 echo "=== Waiting for operator Deployment Available ==="
+oc wait --for=condition=Available deployment/clusterresourceoverride-operator \
+  -n "${CRO_NAMESPACE}" --timeout=600s || true
+oc get deployment,pods -n "${CRO_NAMESPACE}"
+
+patch_operator_images
+
 oc wait --for=condition=Available deployment/clusterresourceoverride-operator \
   -n "${CRO_NAMESPACE}" --timeout=600s
 oc get deployment,pods -n "${CRO_NAMESPACE}"

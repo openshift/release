@@ -43,6 +43,18 @@ ref:
     default: "true"
     documentation: |-
       When "true", create the ClusterResourceOverride CR after the CSV is Ready.
+  - name: CRO_OPERATOR_IMAGE
+    default: ""
+    documentation: |-
+      Optional override for the clusterresourceoverride-operator container image
+      (CSV + Deployment). When set, patches the installed CSV and Deployment after
+      OLM install. Example: quay.io/tdudhade/cluster-resource-override-admission-operator:0.0.5
+  - name: CRO_OPERAND_IMAGE
+    default: ""
+    documentation: |-
+      Optional override for OPERAND_IMAGE on the operator Deployment/CSV. When set,
+      patches relatedImages and the OPERAND_IMAGE env after OLM install.
+      Example: quay.io/tdudhade/clusterresourceoverride:0.0.5
   - name: CRO_IDMS_NAME
     default: "cluster-resource-override-idms"
     documentation: |-
@@ -57,7 +69,8 @@ ref:
     documentation: |-
       Mirror repository for the operator image. When non-empty, an
       ImageDigestMirrorSet entry is created mapping CRO_SOURCE_OPERATOR_IMAGE
-      to this mirror (image source change).
+      to this mirror (image source change). Prefer CRO_OPERATOR_IMAGE when using
+      a full pullspec override (tag or digest).
   - name: CRO_SOURCE_OPERAND_IMAGE
     default: "registry.redhat.io/openshift4/ose-clusterresourceoverride-rhel9"
     documentation: |-
@@ -68,10 +81,10 @@ ref:
     documentation: |-
       Mirror repository for the operand (admission webhook) image. When non-empty,
       an ImageDigestMirrorSet entry is created mapping CRO_SOURCE_OPERAND_IMAGE
-      to this mirror.
+      to this mirror. Prefer CRO_OPERAND_IMAGE when using a full pullspec override.
   documentation: |-
     Installs the ClusterResourceOverride operator via OLM Subscription on a
-    provisioned s390x cluster. Optionally applies an ImageDigestMirrorSet to
-    redirect registry.redhat.io operator/operand pulls to mirror repositories
-    (image source change). Waits for the CSV to Succeed, then optionally creates
-    the ClusterResourceOverride CR (name: cluster).
+    provisioned s390x cluster. Optionally applies an ImageDigestMirrorSet and/or
+    patches the installed CSV/Deployment to use CRO_OPERATOR_IMAGE and
+    CRO_OPERAND_IMAGE. Waits for the CSV to Succeed, then optionally creates the
+    ClusterResourceOverride CR (name: cluster).
