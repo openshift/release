@@ -8,6 +8,8 @@ set -eux -o pipefail
 # running SMOKE tests.  Discovers namespaces dynamically via CRs.
 # Writes credentials and connection details to $SHARED_DIR for
 # downstream steps.
+#
+# Dependencies: oc, curl, python3 (all present in the `cli` image).
 # ---------------------------------------------------------------------------
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
@@ -18,9 +20,6 @@ POLL_INTERVAL=30
 TIMEOUT=600
 ELAPSED=0
 
-# ---------------------------------------------------------------------------
-# WaitFor - retry a check function with backoff until TIMEOUT
-# ---------------------------------------------------------------------------
 function WaitFor () {
     typeset description="$1"
     shift
@@ -43,6 +42,10 @@ function WaitFor () {
         sleep "${POLL_INTERVAL}"
     done
     true
+}
+
+function JsonLength () {
+    python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('$1',[])))"
 }
 
 # ---------------------------------------------------------------------------
@@ -90,7 +93,7 @@ echo "[readiness] Extracting ROX_ADMIN_PASSWORD..."
 ROX_ADMIN_PASSWORD=""
 set +x
 ROX_ADMIN_PASSWORD="$(oc get secret -n "${CENTRAL_NS}" central-htpasswd \
-    -o json | jq -r '.data.password' | base64 -d)"
+    -o jsonpath='{.data.password}' | base64 -d)"
 set -x
 
 if [[ -z "${ROX_ADMIN_PASSWORD}" ]]; then
@@ -122,7 +125,7 @@ function CheckClustersConnected () {
     typeset clusterCount=""
     clusterCount="$(curl -sk -u "admin:${ROX_ADMIN_PASSWORD}" \
         "https://${CENTRAL_URL}/v1/clusters" --max-time 10 \
-        | jq '.clusters | length' 2>/dev/null)" || { set -x; return 1; }
+        | JsonLength clusters)" || { set -x; return 1; }
     set -x
     [[ "${clusterCount}" -ge 1 ]]
 }
@@ -133,34 +136,38 @@ WaitFor "secured cluster connected (v1/clusters)" CheckClustersConnected
 # Check 4: Sensor pods Running (detect OOMKilled)
 # ---------------------------------------------------------------------------
 function CheckSensorPods () {
-    typeset podJson=""
-    podJson="$(oc get pods -n "${SC_NS}" -l app=sensor -o json 2>/dev/null)"
-
     typeset podCount=""
-    podCount="$(echo "${podJson}" | jq '.items | length')"
+    podCount="$(oc get pods -n "${SC_NS}" -l app=sensor \
+        -o jsonpath='{.items}' 2>/dev/null | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")" || return 1
     if [[ "${podCount}" -eq 0 ]]; then
         echo "[readiness]   no sensor pods found yet"
         return 1
     fi
 
-    typeset oom=""
-    oom="$(echo "${podJson}" | jq -r '
-        .items[].status.containerStatuses[]?
-        | select(.lastState.terminated.reason == "OOMKilled")
-        | .name
-    ')"
-    if [[ -n "${oom}" ]]; then
-        echo "[readiness] WARNING: OOMKilled detected in sensor containers: ${oom}"
+    typeset oomContainers=""
+    oomContainers="$(oc get pods -n "${SC_NS}" -l app=sensor -o json 2>/dev/null \
+        | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+for pod in d.get('items',[]):
+    for cs in pod.get('status',{}).get('containerStatuses',[]):
+        ls=cs.get('lastState',{}).get('terminated',{})
+        if ls.get('reason')=='OOMKilled':
+            print(cs['name'])
+")" || true
+    if [[ -n "${oomContainers}" ]]; then
+        echo "[readiness] WARNING: OOMKilled detected in sensor containers: ${oomContainers}"
     fi
 
     typeset notReady=""
-    notReady="$(echo "${podJson}" | jq -r '
-        .items[]
-        | select(
-            [.status.conditions[]? | select(.type == "Ready" and .status == "True")] | length == 0
-        )
-        | "\(.metadata.name):NotReady"
-    ')"
+    notReady="$(oc get pods -n "${SC_NS}" -l app=sensor \
+        -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[*]}{.type}={.status}{" "}{end}{"\n"}{end}' 2>/dev/null \
+        | while IFS= read -r line; do
+            [[ -z "${line}" ]] && continue
+            if ! echo "${line}" | grep -q 'Ready=True'; then
+                echo "${line%% *}:NotReady"
+            fi
+        done)" || true
     [[ -z "${notReady}" ]]
 }
 
@@ -174,7 +181,7 @@ function CheckPoliciesLoaded () {
     typeset policyCount=""
     policyCount="$(curl -sk -u "admin:${ROX_ADMIN_PASSWORD}" \
         "https://${CENTRAL_URL}/v1/policies?query=" --max-time 10 \
-        | jq '.policies | length' 2>/dev/null)" || { set -x; return 1; }
+        | JsonLength policies)" || { set -x; return 1; }
     set -x
     echo "[readiness]   policy count: ${policyCount}"
     [[ "${policyCount}" -gt 80 ]]
