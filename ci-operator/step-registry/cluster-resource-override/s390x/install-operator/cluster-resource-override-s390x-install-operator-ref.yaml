@@ -43,6 +43,16 @@ ref:
     default: "true"
     documentation: |-
       When "true", create the ClusterResourceOverride CR after the CSV is Ready.
+  - name: CRO_OPERATOR_IMAGE
+    default: ""
+    documentation: |-
+      Optional override for the clusterresourceoverride-operator container image
+      (CSV + Deployment). When empty, the image from the OLM catalog CSV is used.
+  - name: CRO_OPERAND_IMAGE
+    default: ""
+    documentation: |-
+      Optional override for OPERAND_IMAGE on the operator Deployment/CSV. When
+      empty, the catalog/CSV value is left unchanged.
   - name: CRO_IDMS_NAME
     default: "cluster-resource-override-idms"
     documentation: |-
@@ -70,15 +80,9 @@ ref:
       Mirror repository for the operand (admission webhook) image. When non-empty,
       an ImageDigestMirrorSet entry is created mapping CRO_SOURCE_OPERAND_IMAGE
       to this mirror. Prefer CRO_OPERAND_IMAGE when using a full pullspec override.
-  dependencies:
-  - name: cro-operator
-    env: CRO_OPERATOR_IMAGE
-  - name: cro-operand
-    env: CRO_OPERAND_IMAGE
   documentation: |-
     Installs the ClusterResourceOverride operator via OLM Subscription on a
-    provisioned s390x cluster. Optionally applies an ImageDigestMirrorSet and/or
-    patches the installed CSV/Deployment using CRO_OPERATOR_IMAGE and
-    CRO_OPERAND_IMAGE (typically wired from ocp-s390x base_images via the
-    job dependencies). Waits for the CSV to Succeed, then optionally creates the
-    ClusterResourceOverride CR (name: cluster).
+    provisioned s390x cluster (redhat-operators by default). Optionally applies
+    an ImageDigestMirrorSet and/or patches CSV/Deployment when CRO_OPERATOR_IMAGE
+    / CRO_OPERAND_IMAGE are set. Waits for the CSV to Succeed, then optionally
+    creates the ClusterResourceOverride CR (name: cluster).
