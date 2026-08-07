@@ -1,0 +1,18 @@
+workflow:
+  as: hypershift-aws-e2e-external-sg-verify
+  documentation: |-
+    Runs HyperShift AWS e2e tests with a pre/post security group verification.
+    Before the test, records existing vpce-private-router security groups as a baseline.
+    After the test, compares current SGs against the baseline to detect orphaned SGs.
+    This workflow verifies the fix for OCPBUGS-74960 (SG leak on cluster deletion).
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-aws-sg-baseline
+    test:
+    - ref: hypershift-aws-run-e2e-external
+    post:
+    - ref: hypershift-aws-verify-sg-cleanup
+    - chain: hypershift-destroy-nested-management-cluster
