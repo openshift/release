@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euxo pipefail
+set -eux -o pipefail
 shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ function CheckStorageClasses () {
     typeset failMsg=""
 
     for scName in ocs-storagecluster-ceph-rbd ocs-storagecluster-cephfs; do
-        if ! oc get sc "${scName}" &>/dev/null; then
+        if ! oc get sc "${scName}" -o name 2>/dev/null; then
             if [[ -n "${failMsg}" ]]; then
                 failMsg="${failMsg}; StorageClass ${scName} not found"
             else
@@ -232,7 +232,7 @@ spec:
 EOF
 )
 
-        if ! echo "${pvcYaml}" | oc apply -f - 2>/dev/null; then
+        if ! echo "${pvcYaml}" | oc apply -f -; then
             AddResult "${testId}" "fail" "Failed to create test PVC for ${scName}"
             continue
         fi
@@ -302,7 +302,7 @@ spec:
 EOF
 )
 
-    if ! echo "${obcYaml}" | oc apply -f - 2>/dev/null; then
+    if ! echo "${obcYaml}" | oc apply -f -; then
         AddResult "noobaa-s3-functional" "fail" "Failed to create ObjectBucketClaim"
         return
     fi
@@ -383,8 +383,8 @@ EOF
 )
 
     typeset s3Result=""
-    if echo "${podManifest}" | oc apply -f - 2>/dev/null; then
-        if ! oc wait pod "${podName}" -n "${ODF_NAMESPACE}" --for=condition=Ready --timeout="${NOOBAA_S3_TIMEOUT}s" 2>/dev/null; then
+    if echo "${podManifest}" | oc apply -f -; then
+        if ! oc wait pod "${podName}" -n "${ODF_NAMESPACE}" --for=condition=Ready --timeout="${NOOBAA_S3_TIMEOUT}s"; then
             : "Pod did not reach Ready, checking logs anyway"
         fi
         s3Result="$(oc logs "${podName}" -n "${ODF_NAMESPACE}" 2>/dev/null || echo "")"
