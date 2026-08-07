@@ -405,6 +405,8 @@ sideload_kernel_on_workers() {
   hosts: localhost
   gather_facts: false
   vars:
+    # Keep Job integer fields (e.g. activeDeadlineSeconds) as JSON numbers, not strings.
+    ansible_jinja2_native: true
     sideload_kernel_uri: "{{ hostvars[groups['hypervisor'][0]].sideload_kernel_uri | default('') }}"
     flip_kernel_script_content: "{{ hostvars[groups['hypervisor'][0]].flip_kernel_script_content | default('') }}"
     flip_kernel_local_path: "{{ lookup('env', 'HOME') }}/flip_kernel"
@@ -504,7 +506,7 @@ EOF
         namespace: default
       spec:
         backoffLimit: 3
-        activeDeadlineSeconds: "{{ (sideload_kernel_job_timeout | int) * 60 }}"
+        activeDeadlineSeconds: "{{ ((sideload_kernel_job_timeout | int) * 60) | int }}"
         template:
           spec:
             nodeName: "{{ worker_node }}"
