@@ -541,8 +541,9 @@ install()
 PY
 
 # ---------------------------------------------------------------------------
-# 3. Build the in-container command (smoke + authorino/limitador/dnstls/
-#    observability + optional catch-all kuadrant)
+# 3. Build the in-container command
+#    Default: smoke + kuadrant. Optional segmented suites via RUN_* (default false).
+#    Order when enabled: smoke → authorino → limitador → dnstls → observability → kuadrant.
 # ---------------------------------------------------------------------------
 # protobuf ≥6.33.0 ships broken s390x upb wheels (protocolbuffers/protobuf#24103).
 # Image may pin 6.32.1, but `make` → poetry sync upgrades from an unlocked/
@@ -552,6 +553,31 @@ PROTOBUF_PIN="${PROTOBUF_PIN:-6.32.1}"
 # Ignore UI: the s390x testsuite image omits Playwright; collecting
 # singlecluster/ui still imports conftest and fails make with ModuleNotFoundError.
 PYTEST_PLUGIN_FLAGS="${PYTEST_FLAGS} -p kuadrant_coredns_resolve -vv --tb=short --ignore=testsuite/tests/singlecluster/ui"
+
+# Normalize optional flags (default false when unset).
+RUN_SMOKE="${RUN_SMOKE:-true}"
+RUN_AUTHORINO="${RUN_AUTHORINO:-false}"
+RUN_LIMITADOR="${RUN_LIMITADOR:-false}"
+RUN_DNSTLS="${RUN_DNSTLS:-false}"
+RUN_OBSERVABILITY="${RUN_OBSERVABILITY:-false}"
+RUN_KUADRANT="${RUN_KUADRANT:-true}"
+
+append_make_target() {
+  # $1 = target name, $2 = extra flags (e.g. --reruns 0), empty for smoke
+  local target="$1"
+  local extra="${2:-}"
+  local flags="${PYTEST_PLUGIN_FLAGS}"
+  [[ -n "${extra}" ]] && flags="${flags} ${extra}"
+  if [[ -n "${extra}" ]]; then
+    CONTAINER_SCRIPT+="echo '=== make ${target} (runs even if prior targets failed; ${extra}) ==='
+flags='${flags}' make ${target} || rc=1
+"
+  else
+    CONTAINER_SCRIPT+="echo '=== make ${target} ==='
+flags='${flags}' make ${target} || rc=1
+"
+  fi
+}
 
 CONTAINER_SCRIPT="set -o pipefail
 cd /opt/workdir/kuadrant-testsuite
@@ -600,40 +626,20 @@ fi
 command -v cfssl
 cfssl version || true
 "
-# Make targets are independent: each records failure into rc but does not skip
-# the next target. Order: smoke → authorino → limitador → dnstls → observability
-# → kuadrant (catch-all single-cluster). Non-smoke targets use --reruns 0
-# (Makefile defaults to --reruns 3; last --reruns on the pytest CLI wins).
-if [[ "${RUN_SMOKE}" == "true" ]]; then
-  CONTAINER_SCRIPT+="echo '=== make smoke ==='
-flags='${PYTEST_PLUGIN_FLAGS}' make smoke || rc=1
-"
-fi
-if [[ "${RUN_AUTHORINO:-true}" == "true" ]]; then
-  CONTAINER_SCRIPT+="echo '=== make authorino (runs even if prior targets failed; --reruns 0) ==='
-flags='${PYTEST_PLUGIN_FLAGS} --reruns 0' make authorino || rc=1
-"
-fi
-if [[ "${RUN_LIMITADOR:-true}" == "true" ]]; then
-  CONTAINER_SCRIPT+="echo '=== make limitador (runs even if prior targets failed; --reruns 0) ==='
-flags='${PYTEST_PLUGIN_FLAGS} --reruns 0' make limitador || rc=1
-"
-fi
-if [[ "${RUN_DNSTLS:-true}" == "true" ]]; then
-  CONTAINER_SCRIPT+="echo '=== make dnstls (runs even if prior targets failed; --reruns 0) ==='
-flags='${PYTEST_PLUGIN_FLAGS} --reruns 0' make dnstls || rc=1
-"
-fi
-if [[ "${RUN_OBSERVABILITY:-true}" == "true" ]]; then
-  CONTAINER_SCRIPT+="echo '=== make observability (runs even if prior targets failed; --reruns 0) ==='
-flags='${PYTEST_PLUGIN_FLAGS} --reruns 0' make observability || rc=1
-"
-fi
-if [[ "${RUN_KUADRANT}" == "true" ]]; then
-  CONTAINER_SCRIPT+="echo '=== make kuadrant (runs even if prior targets failed; --reruns 0) ==='
-flags='${PYTEST_PLUGIN_FLAGS} --reruns 0' make kuadrant || rc=1
-"
-fi
+
+echo "=== Testsuite make targets (from RUN_* flags) ==="
+echo "  RUN_SMOKE=${RUN_SMOKE} RUN_AUTHORINO=${RUN_AUTHORINO} RUN_LIMITADOR=${RUN_LIMITADOR}"
+echo "  RUN_DNSTLS=${RUN_DNSTLS} RUN_OBSERVABILITY=${RUN_OBSERVABILITY} RUN_KUADRANT=${RUN_KUADRANT}"
+
+# Independent targets: each records failure into rc but does not skip the next.
+# Non-smoke uses --reruns 0 (Makefile defaults to --reruns 3; last CLI flag wins).
+[[ "${RUN_SMOKE}" == "true" ]] && append_make_target smoke
+[[ "${RUN_AUTHORINO}" == "true" ]] && append_make_target authorino "--reruns 0"
+[[ "${RUN_LIMITADOR}" == "true" ]] && append_make_target limitador "--reruns 0"
+[[ "${RUN_DNSTLS}" == "true" ]] && append_make_target dnstls "--reruns 0"
+[[ "${RUN_OBSERVABILITY}" == "true" ]] && append_make_target observability "--reruns 0"
+[[ "${RUN_KUADRANT}" == "true" ]] && append_make_target kuadrant "--reruns 0"
+
 CONTAINER_SCRIPT+="make polish-junit || true
 # Debug summary before JUnit dump (survives even if follow logs drop mid-run).
 echo '===KUADRANT_SUMMARY_BEGIN==='
@@ -850,7 +856,14 @@ extract_junit_from_log() {
   python3 - "$logfile" "$dest" <<'PY'
 import base64
 import os
+import re
 import sys
+
+# oc logs --timestamps prefixes every line; strip before marker/base64 matching.
+_TS = re.compile(r"^\d{4}-\d{2}-\d{2}T[0-9:.]+Z\s+")
+
+def strip_ts(line: str) -> str:
+    return _TS.sub("", line, count=1)
 
 logfile, dest = sys.argv[1], sys.argv[2]
 os.makedirs(dest, exist_ok=True)
@@ -858,7 +871,7 @@ name = None
 buf = []
 with open(logfile, "r", errors="replace") as fh:
     for line in fh:
-        line = line.rstrip("\n")
+        line = strip_ts(line.rstrip("\n"))
         if line.startswith("===KUADRANT_JUNIT_BEGIN ") and line.endswith("==="):
             name = line[len("===KUADRANT_JUNIT_BEGIN "):-3].strip()
             buf = []
@@ -881,7 +894,13 @@ extract_summary_from_log() {
   local logfile="$1" dest="$2"
   python3 - "$logfile" "$dest" <<'PY'
 import os
+import re
 import sys
+
+_TS = re.compile(r"^\d{4}-\d{2}-\d{2}T[0-9:.]+Z\s+")
+
+def strip_ts(line: str) -> str:
+    return _TS.sub("", line, count=1)
 
 logfile, dest = sys.argv[1], sys.argv[2]
 os.makedirs(dest, exist_ok=True)
@@ -891,7 +910,7 @@ buf = []
 rc_line = None
 with open(logfile, "r", errors="replace") as fh:
     for line in fh:
-        raw = line.rstrip("\n")
+        raw = strip_ts(line.rstrip("\n"))
         if raw.startswith("===KUADRANT_RC "):
             rc_line = raw
         if raw == "===KUADRANT_SUMMARY_BEGIN===":

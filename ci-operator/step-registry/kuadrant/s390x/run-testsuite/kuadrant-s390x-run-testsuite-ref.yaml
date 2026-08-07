@@ -46,35 +46,33 @@ ref:
   - name: RUN_SMOKE
     default: "true"
     documentation: |-
-      When "true", run `make smoke` before the single-cluster tests.
+      When "true", run `make smoke` first. Enabled by default.
   - name: RUN_AUTHORINO
-    default: "true"
+    default: "false"
     documentation: |-
-      When "true", run `make authorino` (Authorino-related single-cluster tests).
-      Runs even if prior targets failed. Invoked with --reruns 0.
+      Optional. When "true", run `make authorino` after smoke (overlaps heavily
+      with make kuadrant). Invoked with --reruns 0. Default false.
   - name: RUN_LIMITADOR
-    default: "true"
+    default: "false"
     documentation: |-
-      When "true", run `make limitador` (Limitador-related single-cluster tests).
-      Runs even if prior targets failed. Invoked with --reruns 0.
+      Optional. When "true", run `make limitador` (overlaps with kuadrant).
+      Invoked with --reruns 0. Default false.
   - name: RUN_DNSTLS
-    default: "true"
+    default: "false"
     documentation: |-
-      When "true", run `make dnstls` (DNSPolicy/TLSPolicy tests).
-      Runs even if prior targets failed. Invoked with --reruns 0.
+      Optional. When "true", run `make dnstls` (overlaps with kuadrant).
+      Invoked with --reruns 0. Default false.
   - name: RUN_OBSERVABILITY
-    default: "true"
+    default: "false"
     documentation: |-
-      When "true", run `make observability` (metrics, tracing, logging tests).
-      Runs even if prior targets failed. Invoked with --reruns 0.
+      Optional. When "true", run `make observability` (overlaps with kuadrant).
+      Invoked with --reruns 0. Default false.
   - name: RUN_KUADRANT
     default: "true"
     documentation: |-
-      When "true", run `make kuadrant` after the other make targets in the same
-      in-cluster Job. Runs even if prior targets failed. UI paths are ignored
-      (no Playwright on s390x). Invoked with --reruns 0 (overrides Makefile
-      --reruns 3). Note: authorino/limitador/dnstls/observability overlap with
-      kuadrant; keep enabled for dedicated JUnit suites per target.
+      When "true", run `make kuadrant` (catch-all single-cluster suite; excludes
+      standalone_only, disruptive, ui). Runs after optional segmented targets.
+      Invoked with --reruns 0. Enabled by default.
   - name: HTTPBIN_IMAGE
     default: "quay.io/vray_rh/rhcl_testsuite_dependencies:httpbin-s390x"
     documentation: |-
@@ -145,9 +143,12 @@ ref:
     CLI is injected via cli: latest. A cert-only installer kubeconfig is not used
     because testsuite Prometheus auth requires cluster.token (Bearer).
 
-    Make targets (each toggleable via RUN_* env, failure does not skip later ones):
+    Default make targets: smoke + kuadrant. Optional segmented suites
+    (authorino, limitador, dnstls, observability) are off by default via RUN_*
+    booleans; enable for focused rehearsals. Order when enabled:
     smoke → authorino → limitador → dnstls → observability → kuadrant.
-    Non-smoke targets use --reruns 0. Each target writes its own junit-*.xml.
+    Failure does not skip later targets. Non-smoke uses --reruns 0.
+    Each target writes its own junit-*.xml.
 
     In-Job s390x workarounds (also kept as companion files / embedded patch):
     Velocity MockServer echo (header-mirroring; testsuite#952), Authorino/OIDC
