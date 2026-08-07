@@ -104,6 +104,12 @@ CONFIG = {
         'us-west-2': 5,
         'us-east-2': 5
     },
+    'metal-dpf-doca4-quota-slice': {
+        'metal-dpf-doca4-rdu2': 1,
+    },
+    'metal-dpf-doca5-quota-slice': {
+        'metal-dpf-doca5-rdu2': 1,
+    },
     'metal-dpf-doca8-quota-slice': {
         'metal-dpf-doca8-rdu2': 1,
     },
