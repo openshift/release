@@ -84,12 +84,29 @@ set -x
 echo "[readiness] Central route discovered"
 
 # ---------------------------------------------------------------------------
-# Check 2: Central API health (v1/metadata returns 200)
+# Extract ROX_ADMIN_PASSWORD before API checks
+# ---------------------------------------------------------------------------
+echo "[readiness] Extracting ROX_ADMIN_PASSWORD..."
+ROX_ADMIN_PASSWORD=""
+set +x
+ROX_ADMIN_PASSWORD="$(oc get secret -n "${CENTRAL_NS}" central-htpasswd \
+    -o json | jq -r '.data.password' | base64 -d)"
+set -x
+
+if [[ -z "${ROX_ADMIN_PASSWORD}" ]]; then
+    echo "[readiness] FATAL: could not extract ROX_ADMIN_PASSWORD"
+    exit 1
+fi
+echo "[readiness] ROX_ADMIN_PASSWORD extracted successfully"
+
+# ---------------------------------------------------------------------------
+# Check 2: Central API health (authenticated v1/metadata)
 # ---------------------------------------------------------------------------
 function CheckCentralApi () {
     set +x
     typeset httpCode=""
     httpCode="$(curl -sk -o /dev/null -w '%{http_code}' \
+        -u "admin:${ROX_ADMIN_PASSWORD}" \
         "https://${CENTRAL_URL}/v1/metadata" --max-time 10)" || { set -x; return 1; }
     set -x
     [[ "${httpCode}" == "200" ]]
@@ -109,22 +126,6 @@ function CheckClustersConnected () {
     set -x
     [[ "${clusterCount}" -ge 1 ]]
 }
-
-# ---------------------------------------------------------------------------
-# Extract ROX_ADMIN_PASSWORD before cluster check
-# ---------------------------------------------------------------------------
-echo "[readiness] Extracting ROX_ADMIN_PASSWORD..."
-ROX_ADMIN_PASSWORD=""
-set +x
-ROX_ADMIN_PASSWORD="$(oc get secret -n "${CENTRAL_NS}" central-htpasswd \
-    -o json | jq -r '.data.password' | base64 -d)"
-set -x
-
-if [[ -z "${ROX_ADMIN_PASSWORD}" ]]; then
-    echo "[readiness] FATAL: could not extract ROX_ADMIN_PASSWORD"
-    exit 1
-fi
-echo "[readiness] ROX_ADMIN_PASSWORD extracted successfully"
 
 WaitFor "secured cluster connected (v1/clusters)" CheckClustersConnected
 
