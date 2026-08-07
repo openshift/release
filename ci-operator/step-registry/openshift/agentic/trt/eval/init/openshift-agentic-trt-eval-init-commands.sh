@@ -6,57 +6,52 @@ set -o pipefail
 
 echo "=== TRT Eval Init ==="
 
-# --- Gangway override ---
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_EVAL_CASE:-}" ]]; then
-    echo "Applying Gangway override: EVAL_CASE=${MULTISTAGE_PARAM_OVERRIDE_EVAL_CASE}"
     EVAL_CASE="${MULTISTAGE_PARAM_OVERRIDE_EVAL_CASE}"
 fi
 
-ALL_CASES_DIR="/opt/ai-helpers/evals/jira-solver/cases"
+set +x
+GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
+export GITHUB_TOKEN
+set -x
 
-# --- Build case list ---
-CASE_LIST=()
-if [[ -n "${EVAL_CASE:-}" ]]; then
-    CASE_LIST=("${EVAL_CASE}")
+EVAL_CONFIG_DIR="/opt/ai-helpers/evals/jira-solver"
+
+# Write eval config if not already present in the image
+if [[ ! -f "${EVAL_CONFIG_DIR}/eval.yaml" ]]; then
+    cat > /tmp/eval.yaml <<'EVALCFG'
+name: jira-solver-eval
+init:
+  repo: "${UPSTREAM_REPO}"
+dataset:
+  path: cases
+collect:
+  build_result: true
+  test_result: true
+  expected_branch_diff: true
+judges:
+  - name: branch_created
+  - name: pr_exists
+  - name: build_passed
+  - name: test_passed
+  - name: file_overlap
+thresholds: {}
+EVALCFG
+    sed -i "s|\${UPSTREAM_REPO}|${UPSTREAM_REPO}|g" /tmp/eval.yaml
+    EVAL_CONFIG="/tmp/eval.yaml"
 else
-    for d in "${ALL_CASES_DIR}"/*/; do
-        CASE_LIST+=("$(basename "$d")")
-    done
+    EVAL_CONFIG="${EVAL_CONFIG_DIR}/eval.yaml"
 fi
 
-[[ ${#CASE_LIST[@]} -gt 0 ]] || { echo "ERROR: No eval cases found."; exit 1; }
-echo "Cases to run: ${CASE_LIST[*]}"
+CASE_FLAG=""
+if [[ -n "${EVAL_CASE:-}" ]]; then
+    CASE_FLAG="--case=${EVAL_CASE}"
+fi
 
-# --- Set up per-case metadata ---
-# input.yaml must use flat "key: value" format — no nesting, quoting, or indentation
-yaml_val() { grep "^${1}:" "$2" | cut -d' ' -f2-; }
-
-for case_name in "${CASE_LIST[@]}"; do
-    CASE_SRC="${ALL_CASES_DIR}/${case_name}"
-    [[ -d "${CASE_SRC}" ]] || { echo "ERROR: Case directory not found: ${CASE_SRC}"; exit 1; }
-
-    INPUT_FILE="${CASE_SRC}/input.yaml"
-    [[ -f "${INPUT_FILE}" ]] || { echo "ERROR: input.yaml not found in ${CASE_SRC}"; exit 1; }
-
-    JIRA_ISSUE_KEY=$(yaml_val jira_key "${INPUT_FILE}")
-    BASE_BRANCH=$(yaml_val base_branch "${INPUT_FILE}")
-    EXPECTED_BRANCH=$(yaml_val expected_branch "${INPUT_FILE}")
-
-    [[ -n "${JIRA_ISSUE_KEY}" ]] || { echo "ERROR: ${case_name}: missing jira_key in input.yaml"; exit 1; }
-    [[ -n "${BASE_BRANCH}" ]] || { echo "ERROR: ${case_name}: missing base_branch in input.yaml"; exit 1; }
-    [[ -n "${EXPECTED_BRANCH}" ]] || { echo "ERROR: ${case_name}: missing expected_branch in input.yaml"; exit 1; }
-
-    echo "${JIRA_ISSUE_KEY}" > "${SHARED_DIR}/${case_name}.jira-issue-key"
-    cp "${CASE_SRC}/jira-issue.json" "${SHARED_DIR}/${case_name}.jira-issue.json"
-    echo "${BASE_BRANCH}" > "${SHARED_DIR}/${case_name}.eval-base-branch"
-    echo "${EXPECTED_BRANCH}" > "${SHARED_DIR}/${case_name}.eval-expected-branch"
-    echo "${case_name}" > "${SHARED_DIR}/${case_name}.eval-case"
-
-    SUMMARY=$(jq -r '.fields.summary // .summary // "N/A"' "${SHARED_DIR}/${case_name}.jira-issue.json")
-    echo "  ${case_name}: ${JIRA_ISSUE_KEY} - ${SUMMARY}"
-done
-
-# --- Write case list for downstream steps ---
-printf '%s\n' "${CASE_LIST[@]}" > "${SHARED_DIR}/eval-cases"
+prow-agent-eval init \
+    --config="${EVAL_CONFIG}" \
+    --shared-dir="${SHARED_DIR}" \
+    --mode=solve \
+    ${CASE_FLAG}
 
 echo "=== TRT Eval Init Complete ==="
