@@ -327,6 +327,11 @@ EOF
 
     typeset bucketName=""
     bucketName="$(oc get obc "${obcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.spec.bucketName}' 2>/dev/null)" || true
+    if [[ -z "${bucketName}" ]]; then
+        oc delete obc "${obcName}" -n "${ODF_NAMESPACE}" --ignore-not-found=true --wait=false 2>/dev/null || true
+        AddResult "noobaa-s3-functional" "fail" "OBC bound but bucket name is empty"
+        return
+    fi
     typeset secretRef=""
     secretRef="$(oc get obc "${obcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.spec.secretName}' 2>/dev/null)"
     if [[ -z "${secretRef}" ]]; then
@@ -383,9 +388,12 @@ EOF
 )
 
     typeset s3Result=""
+    typeset -i podWait=$(( NOOBAA_S3_TIMEOUT + 60 ))
     if echo "${podManifest}" | oc apply -f -; then
-        if ! oc wait pod "${podName}" -n "${ODF_NAMESPACE}" --for=condition=Ready --timeout="${NOOBAA_S3_TIMEOUT}s"; then
-            : "Pod did not reach Ready, checking logs anyway"
+        if ! oc wait pod "${podName}" -n "${ODF_NAMESPACE}" \
+            --for=jsonpath='{.status.phase}'=Succeeded \
+            --timeout="${podWait}s" 2>/dev/null; then
+            : "Pod did not succeed within ${podWait}s, checking logs anyway"
         fi
         s3Result="$(oc logs "${podName}" -n "${ODF_NAMESPACE}" 2>/dev/null || echo "")"
     fi
