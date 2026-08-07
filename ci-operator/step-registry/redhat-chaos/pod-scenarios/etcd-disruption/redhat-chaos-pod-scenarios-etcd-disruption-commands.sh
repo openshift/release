@@ -56,24 +56,31 @@ else
     export HEALTH_CHECK_URL=https://$console_url
     echo "Using console health check URL: $HEALTH_CHECK_URL"
 fi
-set -o nounset
-set -o pipefail
-set -x
+
+collect_artifacts() {
+  local rc=$?
+  # Disable errexit here: prow_run.sh may have exited non-zero and triggered
+  # this trap, so none of the collection commands below should abort the trap.
+  set +o errexit
+  echo "Done running the test!"
+  oc get pods -n "$TARGET_NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{.status.conditions[?(@.type=="Ready")].lastTransitionTime}{"\t"}{.status.startTime}{"\t"}{.metadata.creationTimestamp}{"\n"}{end}'
+  cat /tmp/*.log 2>/dev/null
+  if [[ "${TELEMETRY_EVENTS_BACKUP:-}" == "True" && -f /tmp/events.json ]]; then
+    cp /tmp/events.json "${ARTIFACT_DIR}/events.json"
+  fi
+  if [[ -f /tmp/report.out.pdf ]]; then
+    cp /tmp/report.out.pdf "${ARTIFACT_DIR}/kraken.report.pdf"
+  fi
+  echo "Return code: $rc"
+  exit "$rc"
+}
+
+# errexit will abort the script the instant prow_run.sh fails, before any
+# artifact-collection commands can run. A trap on EXIT fires regardless of
+# how the shell exits, so it's used here to guarantee artifacts (including
+# the PDF report) are always copied to ARTIFACT_DIR.
+trap collect_artifacts EXIT
+
+set -euxo pipefail; shopt -s inherit_errexit
 
 ./pod-scenarios/prow_run.sh
-rc=$?
-echo "Done running the test!" 
-oc get pods -n $TARGET_NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{.status.conditions[?(@.type=="Ready")].lastTransitionTime}{"\t"}{.status.startTime}{"\t"}{.metadata.creationTimestamp}{"\n"}{end}' 
-
-cat /tmp/*.log 
-if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
-    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
-fi
-
-
-if [[ -f /tmp/report.out.pdf ]]; then
-  cp /tmp/report.out.pdf ${ARTIFACT_DIR}/kraken.report.pdf
-fi
-
-echo "Return code: $rc"
-exit $rc
