@@ -15,7 +15,8 @@ oc wait --for=condition=Available deployment/clusterresourceoverride-operator \
 
 # make e2e expects OPERATOR_NAMESPACE and KUBECONFIG; KUBECONFIG is injected by ci-operator.
 export OPERATOR_NAMESPACE="${CRO_NAMESPACE}"
-export KUBECTL="$(which oc)"
+KUBECTL="$(which oc)"
+export KUBECTL
 
 echo "=== Running make e2e ==="
 make e2e E2E_SKIP="${E2E_SKIP}" OPERATOR_NAMESPACE="${CRO_NAMESPACE}" KUBECTL="${KUBECTL}"
