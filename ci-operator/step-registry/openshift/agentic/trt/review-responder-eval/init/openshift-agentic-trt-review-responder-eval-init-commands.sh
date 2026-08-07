@@ -27,6 +27,7 @@ echo "  JIRA: ${JIRA_ISSUE_KEY} | Base: ${BASE_BRANCH} | Head: ${HEAD_BRANCH}"
 set +x
 GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
 export GITHUB_TOKEN
+git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GITHUB_TOKEN}"; }; f'
 
 # --- Create timestamped eval branch from head ---
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
