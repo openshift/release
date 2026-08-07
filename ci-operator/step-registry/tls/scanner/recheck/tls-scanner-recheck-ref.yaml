@@ -1,8 +1,8 @@
 ref:
-  as: tls-scanner-run
+  as: tls-scanner-recheck
   from: cli
   cli: latest
-  commands: tls-scanner-run-commands.sh
+  commands: tls-scanner-recheck-commands.sh
   env:
   - name: SCAN_NAMESPACE
     default: ""
@@ -24,22 +24,10 @@ ref:
     documentation: "Max IPs to scan (empty/0 = no limit). Bounds actual TLS scans after full endpoint discovery."
   - name: SCANNER_CPU
     default: "4"
-    documentation: "Deprecated: use SCANNER_CPU_REQUEST and SCANNER_CPU_LIMIT. Kept as fallback."
+    documentation: "CPU request/limit for the scanner pod."
   - name: SCANNER_MEMORY
     default: "4Gi"
-    documentation: "Deprecated: use SCANNER_MEM_REQUEST and SCANNER_MEM_LIMIT. Kept as fallback."
-  - name: SCANNER_CPU_REQUEST
-    default: "4"
-    documentation: "CPU request for the scanner pod."
-  - name: SCANNER_CPU_LIMIT
-    default: "4"
-    documentation: "CPU limit for the scanner pod."
-  - name: SCANNER_MEM_REQUEST
-    default: "4Gi"
-    documentation: "Memory request for the scanner pod."
-  - name: SCANNER_MEM_LIMIT
-    default: "4Gi"
-    documentation: "Memory limit for the scanner pod."
+    documentation: "Memory request/limit for the scanner pod."
   - name: TLS_SCANNER_CLUSTER_LABEL
     default: ""
     documentation: |-
@@ -70,6 +58,7 @@ ref:
   timeout: 4h0m0s
   grace_period: 5m0s
   documentation: |-
-    Runs the TLS scanner against all pods in the target cluster.
-    The scanner runs with cluster-admin privileges and full host access.
-    Set PQC_CHECK=true to check post-quantum cryptography readiness (scanner will only check TLS 1.3 and mlkem/mlkem25519 support).
+    Alias of tls-scanner-run for use when a job needs to scan twice in the same
+    multi-stage test (e.g. before and after a TLS profile change). ci-operator
+    requires unique step names so a second ref that shares the same commands
+    script via symlink is necessary.
