@@ -586,5 +586,17 @@ export UPGRADE_FAILURE_TYPE="OCP-25473"
 # The cases are from the general checkpoints setting explicitly in upgrade step by export UPGRADE_FAILURE_TYPE="xxx".
 export IMPLICIT_ENABLED_CASES=""
 
+# Mimic https://github.com/openshift/installer/blob/98d5859f6cb6d2660cf9ffbed8885d9c9907ec56/pkg/asset/ignition/bootstrap/cvoignore.go#L142-L158
+# which is available from 4.21+
+# Only non-stable (nightly/EC/RC) builds of 4.20 carry the 'openshift' ClusterImagePolicy which needs to mimiced
+installed_version=$(oc get clusterversion version -o jsonpath='{.status.history[-1].version}')
+echo "The installed version is $installed_version"
+if [[ $installed_version == "4.20."* ]] && [[ $installed_version == *"-"* ]]; then
+    echo "Overriding the cluster-scoped 'openshift' ClusterImagePolicy"
+    oc patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/overrides", "value": [{"group": "config.openshift.io", "kind": "ClusterImagePolicy", "name": "openshift", "namespace": "", "unmanaged": true}]}]'
+    echo "Showing the ClusterVersion spec"
+    oc get clusterversion version -o jsonpath='{.spec}{"\n"}'
+fi
+
 upgrade
 check_upgrade_status
