@@ -50,6 +50,7 @@ function WriteJunit () {
     typeset -i total=${#tcNamesArr[@]}
     typeset -i failCount=0
     typeset -i skipCount=0
+    typeset r=""
     for r in "${tcResultsArr[@]}"; do
         if [[ "${r}" == "fail" ]]; then
             (( failCount++ )) || true
@@ -60,11 +61,12 @@ function WriteJunit () {
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"odf-health\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        echo "<testsuite name=\"lp-interop--ODF\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        typeset -i i=0
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
-            echo "  <testcase classname=\"odf-health\" name=\"${name}\">"
+            echo "  <testcase classname=\"lp-interop--ODF\" name=\"${name}\">"
             if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
                 typeset msg=""
                 msg="$(XmlEscape "${tcMessagesArr[$i]}")"
@@ -179,6 +181,7 @@ function CheckCephCluster () {
 function CheckStorageClasses () {
     : "=== Check 4: StorageClasses ==="
     typeset failMsg=""
+    typeset scName=""
 
     for scName in ocs-storagecluster-ceph-rbd ocs-storagecluster-cephfs; do
         if ! oc get sc "${scName}" -o name 2>/dev/null; then
@@ -209,6 +212,7 @@ function CheckPvcProvision () {
 
     typeset -a scTests=("ocs-storagecluster-ceph-rbd" "ocs-storagecluster-cephfs")
     typeset -a scModes=("ReadWriteOnce" "ReadWriteMany")
+    typeset -i idx=0
 
     for idx in "${!scTests[@]}"; do
         typeset scName="${scTests[$idx]}"
@@ -360,9 +364,14 @@ metadata:
   namespace: ${ODF_NAMESPACE}
 spec:
   restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
   containers:
   - name: s3check
     image: amazon/aws-cli:2.22.35
+    securityContext:
+      allowPrivilegeEscalation: false
     envFrom:
     - secretRef:
         name: ${secretRef}
@@ -472,6 +481,7 @@ function Main () {
     WriteJunit
 
     typeset -i hasAnyFail=0
+    typeset r=""
     for r in "${tcResultsArr[@]}"; do
         if [[ "${r}" == "fail" ]]; then
             hasAnyFail=1
