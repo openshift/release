@@ -78,30 +78,17 @@ echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig successfully"
 
 # The *.apps wildcard DNS is internal to the hypervisor network and not
 # resolvable from CI pods. Resolve the ingress VIP from the hypervisor
-# and write /etc/hosts entries via proxy-conf.sh so downstream steps
-# pick them up automatically.
+# and pass it to kube-burner via --prometheus-url in KB_FLAGS through
+# proxy-conf.sh so downstream steps pick it up automatically.
 APPS_DOMAIN="$(oc --kubeconfig=/tmp/kubeconfig.doca8 get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')"
 echo "Resolving apps domain '*.${APPS_DOMAIN}' from the hypervisor..."
-APPS_HOSTNAME="console-openshift-console.${APPS_DOMAIN}"
+APPS_HOSTNAME="prometheus-k8s-openshift-monitoring.${APPS_DOMAIN}"
 APPS_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${APPS_HOSTNAME} | awk '{print \$1}'" | head -1)"
 
 if [[ -z "${APPS_IP}" ]]; then
-    echo "WARNING: Failed to resolve '${APPS_HOSTNAME}' from the hypervisor, skipping apps DNS setup"
+    echo "WARNING: Failed to resolve '${APPS_HOSTNAME}' from the hypervisor, skipping Prometheus URL setup"
 else
     echo "Resolved '${APPS_HOSTNAME}' to '${APPS_IP}'"
-    # /etc/hosts does not support wildcards so we enumerate the monitoring
-    # routes that kube-burner needs.
-    APPS_HOSTS=(
-        "prometheus-k8s-openshift-monitoring.${APPS_DOMAIN}"
-        "thanos-querier-openshift-monitoring.${APPS_DOMAIN}"
-        "alertmanager-main-openshift-monitoring.${APPS_DOMAIN}"
-        "console-openshift-console.${APPS_DOMAIN}"
-    )
-    {
-        echo "# Apps wildcard DNS entries resolved from the hypervisor"
-        for h in "${APPS_HOSTS[@]}"; do
-            echo "echo '${APPS_IP} ${h}' >> /etc/hosts"
-        done
-    } >> "${SHARED_DIR}/proxy-conf.sh"
-    echo "Wrote apps DNS entries to \${SHARED_DIR}/proxy-conf.sh"
+    echo "export KB_FLAGS=\"\${KB_FLAGS:-} --prometheus-url=https://${APPS_IP}\"" >> "${SHARED_DIR}/proxy-conf.sh"
+    echo "Wrote Prometheus URL to \${SHARED_DIR}/proxy-conf.sh"
 fi
