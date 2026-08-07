@@ -19,7 +19,7 @@ name: jira-solver-eval
 init:
   repo: "${UPSTREAM_REPO}"
 dataset:
-  path: cases
+  path: /opt/ai-helpers/evals/jira-solver/cases
 collect:
   build_result: true
   test_result: true
