@@ -25,7 +25,10 @@ detach_nodes() {
     IFS=' ' read -ra machines_list <<< "$machines"
     echo "Machines List : ${machines_list[*]}"
     for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
-        oc delete node compute-$i.$job_id-$HYPERSHIFT_BASEDOMAIN --kubeconfig "${SHARED_DIR}/nested_kubeconfig"
+        # Best-effort: hosted cluster API may already be unreachable at destroy time;
+        # the critical step is patching the machine finalizers below.
+        oc delete node compute-$i.$job_id-$HYPERSHIFT_BASEDOMAIN --kubeconfig "${SHARED_DIR}/nested_kubeconfig" || \
+            echo "WARN: could not delete node compute-$i from hosted cluster (API unreachable) - continuing"
         oc patch machine.cluster.x-k8s.io ${machines_list[i]} -n "$hcp_ns" -p '{"metadata":{"finalizers":null}}' --type=merge
     done
 }
