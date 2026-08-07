@@ -82,12 +82,17 @@ else
   # speaker mount cert secrets that only get created when the serving-cert
   # annotated monitor Services are rendered (DEPLOY_SERVICEMONITORS=true).
   # Guard on the ServiceMonitor CRD, set the env, then re-wait the rollouts.
+  # Workaround for OCPBUGS-105394 (bin/metallb-operator.yaml env drift from
+  # the CSV, which sets DEPLOY_SERVICEMONITORS=true); remove when fixed.
   wait_operator_rollouts
   oc get crd servicemonitors.monitoring.coreos.com
   oc set env deploy/metallb-operator-controller-manager -n metallb-system DEPLOY_SERVICEMONITORS=true
   # the dev manifest hardcodes METALLB_BGP_TYPE=native on the webhook server,
   # which rejects IPv6 pools/advertisements; this deployment runs MetalLB in
-  # frr-k8s (external) mode where IPv6 is supported
+  # frr-k8s (external) mode where IPv6 is supported. The webhook reads only
+  # this env, never the MetalLB CR's bgpBackend (verified empirically).
+  # Workaround for OCPBUGS-105395 (CSV sets METALLB_BGP_TYPE=frr); remove
+  # when fixed.
   oc set env deploy/metallb-operator-webhook-server -n metallb-system METALLB_BGP_TYPE=frr-k8s
   wait_operator_rollouts
 fi
