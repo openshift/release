@@ -16,7 +16,7 @@ import os
 import pathlib
 import sys
 
-from config import Context, Config
+from config import Context, Config, Product
 
 # Change python path so we can import genlib
 sys.path.append(str(pathlib.Path(__file__).absolute().parent.parent.joinpath('lib')))
@@ -31,20 +31,30 @@ logger = logging.getLogger()
 
 def generate_app_ci_content(config, git_clone_dir):
     namespaces = []
-    for private in (False, True):
-        for arch in config.arches:
-            context = Context(config, arch, private)
-            namespaces.append(context.is_namespace)
 
-            with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin_deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
-                content.add_imagestream_namespace_rbac(gendoc)
-                content.add_release_payload_modifier_rbac(gendoc)
+    for product in config.products:
+        for private in product.privacy_modes:
+            for arch in product.arches:
+                context = Context(config, arch, private, product)
 
-            with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
-                content.add_osd_rc_deployments(gendoc)
-                content.add_osd_files_cache_service_account_resources(gendoc)
-                content.add_osd_files_cache_resources(gendoc)
+                with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin_deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
+                    content.add_imagestream_namespace_rbac(gendoc)
+                    content.add_release_payload_modifier_rbac(gendoc)
 
+                if product.name == 'ocp':
+                    namespaces.append(context.is_namespace)
+                    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
+                        content.add_osd_rc_deployments(gendoc)
+                        content.add_osd_files_cache_service_account_resources(gendoc)
+                        content.add_osd_files_cache_resources(gendoc)
+
+                elif product.name == 'okd':
+                    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
+                        content.add_okd_deployments(gendoc)
+                        if not context.suffix:
+                            content.add_legacy_origin_deployments_scaled_down(gendoc)
+
+    # OCP-specific one-off resources
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('serviceaccount.yaml'), context=config) as gendoc:
         content.add_osd_rc_service_account_resources(gendoc)
         content.add_release_payload_modifier_service_account(gendoc)
@@ -85,15 +95,7 @@ def generate_app_ci_content(config, git_clone_dir):
         with config.paths.path_priv_rc_annotations.joinpath(annotation_filename).open(mode='w+', encoding='utf-8') as f:
             json.dump(priv_annotation, f, sort_keys=True, indent=4)
 
-    # Generate the release-controller one-offs...
-    context = Context(config, "x86_64", False)
-
-    # Origin release-controller
-    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-origin-controller.yaml'), context) as gendoc:
-        content.generate_origin_admin_resources(gendoc)
-
-    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('deploy-origin-controller.yaml'), context) as gendoc:
-        content.generate_origin_resources(gendoc)
+    context = Context(config, "x86_64", False, config.ocp)
 
     # Signer
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('deploy-ci-signer.yaml'), context) as gendoc:

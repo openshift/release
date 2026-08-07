@@ -128,16 +128,17 @@ def _add_monitoring_rbac(gendoc, namespace):
 
 
 def generate_development_rbac(config):
-    for private in (False, True):
-        for arch in config.arches:
-            context = Context(config, arch, private)
+    ci_monitoring_generated = False
 
-            with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin-{context.is_namespace}-rbac.yaml'), context) as gendoc:
-                _add_namespace_read_only_rbac(gendoc, context.is_namespace)
-                _add_cache_monitoring_rbac(gendoc)
+    for product in config.products:
+        for private in product.privacy_modes:
+            for arch in product.arches:
+                context = Context(config, arch, private, product)
 
-    context = Context(config, "x86_64", False)
-    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin-origin-rbac.yaml'), context) as gendoc:
-        _add_deployment_monitoring_role(gendoc)
-        _add_monitoring_rbac(gendoc, 'ci')
-        _add_namespace_read_only_rbac(gendoc, 'origin')
+                with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin-{context.is_namespace}-rbac.yaml'), context) as gendoc:
+                    if not ci_monitoring_generated and product.name == 'okd':
+                        _add_deployment_monitoring_role(gendoc)
+                        _add_monitoring_rbac(gendoc, 'ci')
+                        ci_monitoring_generated = True
+                    _add_namespace_read_only_rbac(gendoc, context.is_namespace)
+                    _add_cache_monitoring_rbac(gendoc)
