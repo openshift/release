@@ -18,7 +18,64 @@ wait_for_csv() {
   oc get subscription "${sub}" -n "${ns}" -o yaml >&2 || true
   oc get csv -n "${ns}" -o yaml >&2 || true
   oc get events -n "${ns}" --sort-by='.lastTimestamp' | tail -30 >&2 || true
+  dump_deployment_debug "csv-not-succeeded"
   return 1
+}
+
+dump_deployment_debug() {
+  local reason="${1:-deployment-failure}"
+  local out="${ARTIFACT_DIR}/cro-deploy-debug-${reason}"
+  mkdir -p "${out}"
+
+  echo "=== DEBUG (${reason}): dumping operator deployment state to ${out} ===" >&2
+
+  {
+    echo "=== reason: ${reason} ==="
+    echo "=== namespace: ${CRO_NAMESPACE} ==="
+    echo "=== CRO_OPERATOR_IMAGE=${CRO_OPERATOR_IMAGE:-<unset>} ==="
+    echo "=== CRO_OPERAND_IMAGE=${CRO_OPERAND_IMAGE:-<unset>} ==="
+    date -u +"=== timestamp: %Y-%m-%dT%H:%M:%SZ ==="
+  } >"${out}/summary.txt" 2>&1 || true
+
+  oc get all,csv,subscription,installplan,operatorgroup -n "${CRO_NAMESPACE}" -o wide \
+    >"${out}/get-all-wide.txt" 2>&1 || true
+  oc get deployment,rs,pods -n "${CRO_NAMESPACE}" -o yaml \
+    >"${out}/workload.yaml" 2>&1 || true
+  oc describe deployment/clusterresourceoverride-operator -n "${CRO_NAMESPACE}" \
+    >"${out}/describe-deployment.txt" 2>&1 || true
+  oc get pods -n "${CRO_NAMESPACE}" -o wide \
+    >"${out}/pods-wide.txt" 2>&1 || true
+  oc get pods -n "${CRO_NAMESPACE}" -o json \
+    >"${out}/pods.json" 2>&1 || true
+  oc get events -n "${CRO_NAMESPACE}" --sort-by='.lastTimestamp' \
+    >"${out}/events.txt" 2>&1 || true
+
+  # Per-pod details (image pull / crashloop)
+  local pod
+  for pod in $(oc get pods -n "${CRO_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+    oc describe pod "${pod}" -n "${CRO_NAMESPACE}" \
+      >"${out}/describe-pod-${pod}.txt" 2>&1 || true
+    oc logs "${pod}" -n "${CRO_NAMESPACE}" --all-containers --tail=200 \
+      >"${out}/logs-pod-${pod}.txt" 2>&1 || true
+    oc get pod "${pod}" -n "${CRO_NAMESPACE}" -o jsonpath='{.spec.containers[*].image}{"\n"}{.status.containerStatuses[*].image}{"\n"}{.status.containerStatuses[*].imageID}{"\n"}{.status.containerStatuses[*].state}{"\n"}' \
+      >"${out}/images-pod-${pod}.txt" 2>&1 || true
+  done
+
+  local csv
+  csv="$(oc get subscription "${CRO_SUBSCRIPTION_NAME}" -n "${CRO_NAMESPACE}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+  if [[ -n "${csv}" ]]; then
+    oc get csv "${csv}" -n "${CRO_NAMESPACE}" -o yaml >"${out}/csv.yaml" 2>&1 || true
+    oc describe csv "${csv}" -n "${CRO_NAMESPACE}" >"${out}/describe-csv.txt" 2>&1 || true
+  fi
+
+  # Also echo a short digest into the build log for quick triage
+  echo "=== DEBUG (${reason}): deployments/pods ===" >&2
+  oc get deployment,pods -n "${CRO_NAMESPACE}" -o wide >&2 || true
+  echo "=== DEBUG (${reason}): recent events ===" >&2
+  oc get events -n "${CRO_NAMESPACE}" --sort-by='.lastTimestamp' | tail -40 >&2 || true
+  echo "=== DEBUG (${reason}): pod images/state ===" >&2
+  oc get pods -n "${CRO_NAMESPACE}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{range .status.containerStatuses[*]}{.image}{"\t"}{.state}{"\n"}{end}{end}' >&2 || true
+  echo "=== DEBUG (${reason}): full dump under ${out} ===" >&2
 }
 
 apply_idms_if_configured() {
@@ -65,6 +122,10 @@ patch_operator_images() {
   echo "  operator: ${CRO_OPERATOR_IMAGE:-<unchanged>}"
   echo "  operand:  ${CRO_OPERAND_IMAGE:-<unchanged>}"
 
+  echo "=== Pre-override deployment images ==="
+  oc get deployment/clusterresourceoverride-operator -n "${CRO_NAMESPACE}" \
+    -o jsonpath='{.spec.template.spec.containers[*].name}{" -> "}{.spec.template.spec.containers[*].image}{"\n"}' || true
+
   oc get csv "${csv}" -n "${CRO_NAMESPACE}" -o json \
     | jq \
       --arg op_img "${CRO_OPERATOR_IMAGE}" \
@@ -110,8 +171,16 @@ patch_operator_images() {
       "OPERAND_IMAGE=${CRO_OPERAND_IMAGE}"
   fi
 
-  oc rollout status deployment/clusterresourceoverride-operator \
-    -n "${CRO_NAMESPACE}" --timeout=600s
+  echo "=== Post-override deployment images ==="
+  oc get deployment/clusterresourceoverride-operator -n "${CRO_NAMESPACE}" \
+    -o jsonpath='{.spec.template.spec.containers[*].name}{" -> "}{.spec.template.spec.containers[*].image}{"\n"}' || true
+  oc set env deployment/clusterresourceoverride-operator -n "${CRO_NAMESPACE}" --list 2>/dev/null | grep -E 'OPERAND_IMAGE|RELATED' || true
+
+  if ! oc rollout status deployment/clusterresourceoverride-operator \
+    -n "${CRO_NAMESPACE}" --timeout=600s; then
+    dump_deployment_debug "rollout-after-image-patch"
+    return 1
+  fi
 }
 
 echo "=== Ensuring operator namespace ${CRO_NAMESPACE} ==="
@@ -162,16 +231,26 @@ EOF
 
 wait_for_csv "${CRO_NAMESPACE}" "${CRO_SUBSCRIPTION_NAME}"
 
-echo "=== Waiting for operator Deployment Available ==="
-oc wait --for=condition=Available deployment/clusterresourceoverride-operator \
-  -n "${CRO_NAMESPACE}" --timeout=600s || true
-oc get deployment,pods -n "${CRO_NAMESPACE}"
+echo "=== Waiting for operator Deployment Available (catalog images, pre-patch) ==="
+if ! oc wait --for=condition=Available deployment/clusterresourceoverride-operator \
+  -n "${CRO_NAMESPACE}" --timeout=600s; then
+  dump_deployment_debug "pre-patch-not-available"
+  exit 1
+fi
+oc get deployment,pods -n "${CRO_NAMESPACE}" -o wide
+echo "=== Catalog (pre-patch) operator image ==="
+oc get deployment/clusterresourceoverride-operator -n "${CRO_NAMESPACE}" \
+  -o jsonpath='{.spec.template.spec.containers[*].image}{"\n"}' || true
 
 patch_operator_images
 
-oc wait --for=condition=Available deployment/clusterresourceoverride-operator \
-  -n "${CRO_NAMESPACE}" --timeout=600s
-oc get deployment,pods -n "${CRO_NAMESPACE}"
+echo "=== Waiting for operator Deployment Available (post-patch) ==="
+if ! oc wait --for=condition=Available deployment/clusterresourceoverride-operator \
+  -n "${CRO_NAMESPACE}" --timeout=600s; then
+  dump_deployment_debug "post-patch-not-available"
+  exit 1
+fi
+oc get deployment,pods -n "${CRO_NAMESPACE}" -o wide
 
 if [[ "${CRO_CREATE_CR}" == "true" ]]; then
   echo "=== Creating ClusterResourceOverride CR ==="
