@@ -1,70 +1,90 @@
 from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
 
 
-def _add_origin_rbac(gendoc):
-    gendoc.append_all([{
-        'apiVersion': 'rbac.authorization.k8s.io/v1',
-        'kind': 'Role',
-        'metadata': {
-            'name': 'release-controller-modify',
-            'namespace': 'origin'
-        },
-        'rules': [
-            {
-                'apiGroups': [''],
-                'resourceNames': ['release-upgrade-graph'],
-                'resources': ['secrets'],
-                'verbs': ['get', 'update', 'patch']
+def add_legacy_origin_deployments_scaled_down(gendoc):
+    """Emit the old release-controller / release-controller-api deployments
+    (the ones that pre-date the okd rename) with replicas: 0 so they are
+    drained atomically when the new release-controller-okd resources land."""
+    context = gendoc.context
+
+    gendoc.append({
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+            "annotations": {
+                'keel.sh/policy': 'force',
+                'keel.sh/matchTag': 'true',
+                'keel.sh/trigger': 'poll',
+                'keel.sh/pollSchedule': '@every 5m'
             },
-            {
-                'apiGroups': ['image.openshift.io'],
-                'resources': ['imagestreams', 'imagestreamtags'],
-                'verbs': ['get',
-                          'list',
-                          'watch',
-                          'create',
-                          'delete',
-                          'update',
-                          'patch']
-            },
-            {
-                'apiGroups': ['release.openshift.io'],
-                'resources': ['releasepayloads'],
-                'verbs': ['get',
-                          'list',
-                          'watch',
-                          'create',
-                          'delete',
-                          'update',
-                          'patch']
-            },
-            {
-                'apiGroups': [''],
-                'resources': ['events'],
-                'verbs': ['create', 'patch', 'update']
-            }]
-    }, {
-        'apiVersion': 'rbac.authorization.k8s.io/v1',
-        'kind': 'RoleBinding',
-        'metadata': {
-            'name': 'release-controller-binding',
-            'namespace': 'origin',
+            "name": "release-controller",
+            "namespace": context.config.rc_deployment_namespace,
         },
-        'roleRef': {
-            'apiGroup': 'rbac.authorization.k8s.io',
-            'kind': 'Role',
-            'name': 'release-controller-modify',
-        },
-        'subjects': [{
-            'kind': 'ServiceAccount',
-            'name': 'release-controller',
-            'namespace': 'ci'
+        "spec": {
+            "replicas": 0,
+            "selector": {
+                "matchLabels": {
+                    "app": "release-controller"
+                }
+            },
+            "template": {
+                "metadata": {
+                    "labels": {
+                        "app": "release-controller"
+                    }
+                },
+                "spec": {
+                    "containers": [
+                        {
+                            'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest',
+                            "name": "controller",
+                        }
+                    ],
+                }
+            }
         }
-        ]
-    }])
+    })
+
+    gendoc.append({
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+            "annotations": {
+                'keel.sh/policy': 'force',
+                'keel.sh/matchTag': 'true',
+                'keel.sh/trigger': 'poll',
+                'keel.sh/pollSchedule': '@every 5m'
+            },
+            "name": "release-controller-api",
+            "namespace": context.config.rc_deployment_namespace,
+        },
+        "spec": {
+            "replicas": 0,
+            "selector": {
+                "matchLabels": {
+                    "app": "release-controller-api"
+                }
+            },
+            "template": {
+                "metadata": {
+                    "labels": {
+                        "app": "release-controller-api"
+                    }
+                },
+                "spec": {
+                    "containers": [
+                        {
+                            'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',
+                            "name": "controller",
+                        }
+                    ],
+                }
+            }
+        }
+    })
 
 
-def _add_origin_resources(gendoc):
+def add_okd_deployments(gendoc):
     context = gendoc.context
 
     gendoc.append_all([
@@ -72,26 +92,26 @@ def _add_origin_resources(gendoc):
             "apiVersion": "route.openshift.io/v1",
             "kind": "Route",
             "metadata": {
-                "name": "release-controller",
-                "namespace": "ci",
+                "name": context.rc_route_name,
+                "namespace": context.config.rc_deployment_namespace,
             },
             "spec": {
-                "host": "origin-release.apps.ci.l2s4.p1.openshiftapps.com",
+                "host": context.rc_app_url,
                 "tls": {
                     "insecureEdgeTerminationPolicy": "Redirect",
                     "termination": "edge"
                 },
                 "to": {
                     "kind": "Service",
-                    "name": "release-controller-api",
+                    "name": context.rc_api_service_name,
                 }
             }
         }, {
             "apiVersion": "v1",
             "kind": "Service",
             "metadata": {
-                "name": "release-controller",
-                "namespace": "ci",
+                "name": context.rc_service_name,
+                "namespace": context.config.rc_deployment_namespace,
             },
             "spec": {
                 "ports": [
@@ -101,15 +121,15 @@ def _add_origin_resources(gendoc):
                     }
                 ],
                 "selector": {
-                    "app": "release-controller"
+                    "app": context.rc_service_name
                 }
             }
         }, {
             "apiVersion": "v1",
             "kind": "Service",
             "metadata": {
-                "name": "release-controller-api",
-                "namespace": "ci",
+                "name": context.rc_api_service_name,
+                "namespace": context.config.rc_deployment_namespace,
             },
             "spec": {
                 "ports": [
@@ -119,7 +139,7 @@ def _add_origin_resources(gendoc):
                     }
                 ],
                 "selector": {
-                    "app": "release-controller-api"
+                    "app": context.rc_api_service_name
                 }
             }
         }, {
@@ -132,20 +152,20 @@ def _add_origin_resources(gendoc):
                     'keel.sh/trigger': 'poll',
                     'keel.sh/pollSchedule': '@every 5m'
                 },
-                "name": "release-controller",
-                "namespace": "ci",
+                "name": context.rc_service_name,
+                "namespace": context.config.rc_deployment_namespace,
             },
             "spec": {
                 "replicas": 1,
                 "selector": {
                     "matchLabels": {
-                        "app": "release-controller"
+                        "app": context.rc_service_name
                     }
                 },
                 "template": {
                     "metadata": {
                         "labels": {
-                            "app": "release-controller"
+                            "app": context.rc_service_name
                         }
                     },
                     "spec": {
@@ -209,14 +229,14 @@ def _add_origin_resources(gendoc):
                             {
                                 "command": [
                                     "/usr/bin/release-controller",
-                                    "--release-namespace=origin",
+                                    f"--release-namespace={context.is_namespace}",
                                     "--prow-config=/etc/config/config.yaml",
                                     "--supplemental-prow-config-dir=/etc/config",
                                     "--job-config=/var/repo/release/ci-operator/jobs",
-                                    "--prow-namespace=ci",
-                                    "--job-namespace=ci-release",
+                                    f"--prow-namespace={context.config.rc_deployment_namespace}",
+                                    f"--job-namespace={context.jobs_namespace}",
                                     "--tools-image-stream-tag=release-controller-bootstrap:tools",
-                                    "--release-architecture=amd64",
+                                    f"--release-architecture={context.get_supported_architecture_name()}",
                                     "-v=4",
                                     "--manifest-list-mode"
                                 ],
@@ -243,7 +263,7 @@ def _add_origin_resources(gendoc):
                                 },
                             }
                         ],
-                        "serviceAccountName": "release-controller",
+                        "serviceAccountName": context.rc_serviceaccount_name,
                         "volumes": get_rc_volumes(context)
                     }
                 }
@@ -258,20 +278,20 @@ def _add_origin_resources(gendoc):
                     'keel.sh/trigger': 'poll',
                     'keel.sh/pollSchedule': '@every 5m'
                 },
-                "name": "release-controller-api",
-                "namespace": "ci",
+                "name": context.rc_api_service_name,
+                "namespace": context.config.rc_deployment_namespace,
             },
             "spec": {
                 "replicas": 3,
                 "selector": {
                     "matchLabels": {
-                        "app": "release-controller-api"
+                        "app": context.rc_api_service_name
                     }
                 },
                 "template": {
                     "metadata": {
                         "labels": {
-                            "app": "release-controller-api"
+                            "app": context.rc_api_service_name
                         }
                     },
                     "spec": {
@@ -279,11 +299,11 @@ def _add_origin_resources(gendoc):
                             {
                                 "command": [
                                     "/usr/bin/release-controller-api",
-                                    "--release-namespace=origin",
-                                    "--prow-namespace=ci",
-                                    "--job-namespace=ci-release",
+                                    f"--release-namespace={context.is_namespace}",
+                                    f"--prow-namespace={context.config.rc_deployment_namespace}",
+                                    f"--job-namespace={context.jobs_namespace}",
                                     "--tools-image-stream-tag=release-controller-bootstrap:tools",
-                                    "--release-architecture=amd64",
+                                    f"--release-architecture={context.get_supported_architecture_name()}",
                                     "--enable-jira",
                                     "--jira-endpoint=https://redhat.atlassian.net",
                                     "--jira-username=openshift-release-controller-jira-bot@redhat.com",
@@ -314,18 +334,10 @@ def _add_origin_resources(gendoc):
                                 },
                             }
                         ],
-                        "serviceAccountName": "release-controller",
+                        "serviceAccountName": context.rc_serviceaccount_name,
                         "volumes": get_rcapi_volumes(context, secret_name=context.secret_name_tls_api)
                     }
                 }
             }
         }
     ])
-
-
-def generate_origin_admin_resources(gendoc):
-    _add_origin_rbac(gendoc)
-
-
-def generate_origin_resources(gendoc):
-    _add_origin_resources(gendoc)
