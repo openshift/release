@@ -450,6 +450,14 @@ sideload_kernel_on_workers() {
       msg: No dedicated worker nodes found for kernel sideload (excluding control-plane/master/arbiter)
     when: (sideload_worker_names | default([])) | length == 0
 
+  - name: Derive expected kernel release from sideload URI
+    ansible.builtin.set_fact:
+      expected_kernel_release: >-
+        {{ sideload_kernel_uri | basename
+           | regex_replace('^kernel-(rt-)?core-', '')
+           | regex_replace('\\.rpm$', '') }}
+    when: sideload_kernel_uri != 'reset'
+
   - name: Create sideload-kernel ConfigMap
     kubernetes.core.k8s:
       state: present
@@ -605,6 +613,42 @@ EOF
          | list | length > 0)
   retries: "{{ (sideload_kernel_job_timeout | int) * 4 }}"
   delay: 15
+
+- name: Wait for sideloaded kernel on {{ worker_node }}
+  when: sideload_kernel_uri != 'reset'
+  block:
+    - name: Poll node kernelVersion for {{ worker_node }}
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+        name: "{{ worker_node }}"
+      environment: "{{ k8s_auth }}"
+      register: node_kernel_state
+      until: >-
+        node_kernel_state.resources | length > 0
+        and (node_kernel_state.resources[0].status.nodeInfo.kernelVersion | default('')) == expected_kernel_release
+      retries: "{{ (sideload_kernel_job_timeout | int) * 4 }}"
+      delay: 15
+
+    - name: Confirm sideloaded kernel on {{ worker_node }}
+      ansible.builtin.debug:
+        msg: >-
+          Verified {{ worker_node }} kernelVersion={{ node_kernel_state.resources[0].status.nodeInfo.kernelVersion }}
+          matches {{ expected_kernel_release }}
+  rescue:
+    - name: Fail when sideloaded kernel is not active on {{ worker_node }}
+      ansible.builtin.fail:
+        msg: >-
+          After sideload reboot, {{ worker_node }} kernelVersion={{
+          node_kernel_state.resources[0].status.nodeInfo.kernelVersion | default('unknown')
+          }} does not match expected {{ expected_kernel_release }} from {{ sideload_kernel_uri }}
+
+- name: Record post-reset kernel on {{ worker_node }}
+  ansible.builtin.debug:
+    msg: >-
+      reset requested; {{ worker_node }} kernelVersion={{
+      node_state.resources[0].status.nodeInfo.kernelVersion | default('unknown') }}
+  when: sideload_kernel_uri == 'reset'
 EOF
 
   export KUBECONFIG="${kubeconfig}"
