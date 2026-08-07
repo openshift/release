@@ -1,4 +1,4 @@
-# pylint: disable=R0902,R0903
+# pylint: disable=R0902,R0903,R0913,R0917
 
 import os
 import pathlib
