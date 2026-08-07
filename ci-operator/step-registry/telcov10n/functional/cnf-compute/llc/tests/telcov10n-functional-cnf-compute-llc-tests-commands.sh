@@ -18,7 +18,7 @@ NTO_BRANCH="all_fixes"
 if [[ -n "${TEST_RUN_FEATURES:-}" ]]; then
     GINKGO_LABEL="${TEST_RUN_FEATURES}"
 else
-    GINKGO_LABEL="tier-0 || tier-1 || tier-2 || uncore-cache"
+    GINKGO_LABEL="tier-0 || tier-1 || tier-2 || tier-3 || uncore-cache || workload-hints || tuned-deferred"
 fi
 GINKGO_SUITES="test/e2e/performanceprofile/functests"
 
