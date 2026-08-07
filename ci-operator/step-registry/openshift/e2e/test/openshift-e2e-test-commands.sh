@@ -216,13 +216,18 @@ esac
 mkdir -p /tmp/output
 cd /tmp/output
 
-if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64"  ]]; then
+if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64" ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-468.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-468.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+    UNIVERSE_DOMAIN=$(jq -r ".universe_domain // empty" "${GCP_SHARED_CREDENTIALS_FILE}" 2>/dev/null)
+    if [[ -n "${UNIVERSE_DOMAIN}" ]]; then
+      export GOOGLE_CLOUD_UNIVERSE_DOMAIN="${UNIVERSE_DOMAIN}"
+      gcloud config set universe_domain "${UNIVERSE_DOMAIN}"
+    fi
     gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
     gcloud config set project "${PROJECT}"
     popd
@@ -337,9 +342,17 @@ function suite() {
     if [[ -n "${TEST_SKIPS}" ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
-        echo "Skipping tests:" &&
+        echo "Tests to be skipped:" &&
         echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
-        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests" &&
+
+        # Warn about individual skip patterns that match nothing.
+        # Assumes \| is only used as a top-level OR (true for all known usages at the time of writing).
+        echo "${TEST_SKIPS}" | sed 's/\\|/\n/g' | while IFS= read -r pattern; do
+            [[ -z "${pattern}" ]] && continue
+            echo "${TESTS}" | grep "${pattern}" > /dev/null 2>&1 ||
+                echo "Warning: TEST_SKIPS pattern matched 0 tests (test renamed/removed or regex invalid): ${pattern}"
+        done
     fi &&
 
     set -x &&

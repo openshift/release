@@ -17,7 +17,7 @@ tests:
     test:
     - as: rebasebot
       commands: |
-        export BRANCH_NAME=$(curl --silent --header "X-GitHub-Api-Version:2022-11-28" "https://api.github.com/repos/IBM-Cloud/cloud-provider-ibm/branches" | grep -E '"name": "release-[0-9]+\.[0-9]+"' | awk -F'"' '{print $4}' | sort -V | tail -n 1)
+        export BRANCH_NAME=$(git ls-remote --heads https://github.com/IBM-Cloud/cloud-provider-ibm 'refs/heads/release-*' | sed 's|.*refs/heads/||' | grep -E '^release-[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
         rebasebot --source https://github.com/IBM-Cloud/cloud-provider-ibm:${BRANCH_NAME} \
                   --dest openshift/cloud-provider-powervs:main \
                   --rebase openshift-cloud-team/cloud-provider-powervs:rebase-bot-main \

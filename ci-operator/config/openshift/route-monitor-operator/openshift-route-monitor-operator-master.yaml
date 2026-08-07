@@ -10,15 +10,21 @@ images:
   - dockerfile_path: Dockerfile
     to: route-monitor-operator
   - dockerfile_literal: |
-      FROM src
-      RUN cp -r deploy_pko /package
-    from: src
+      FROM scratch
+      COPY deploy_pko/ /package/
     to: operator-pko
   - dockerfile_literal: |
       FROM src
       RUN CGO_ENABLED=0 go test ./test/e2e -v -c --tags=osde2e -o /usr/local/bin/e2e.test
     from: src
     to: operator-e2e
+  - dockerfile_literal: |
+      FROM src
+      RUN CGO_ENABLED=0 go build -cover -covermode=count -coverpkg=./... -o /manager . && \
+          mkdir -p /tmp/e2e-cover && chmod 777 /tmp/e2e-cover
+      ENTRYPOINT ["/usr/local/bin/manager"]
+    from: src
+    to: operator-coverage
 releases:
   latest:
     candidate:
@@ -71,8 +77,6 @@ tests:
   container:
     from: src
 - as: rosa-sts-e2e
-  optional: true
-  run_if_changed: ^(test/e2e/.*|pkg/.*|api/.*|cmd/.*|deploy/.*|go\.mod|go\.sum)$
   steps:
     cluster_profile: rosa-e2e-01
     dependencies:
@@ -128,6 +132,88 @@ tests:
       OPERATOR_DEPLOYMENT_NAME: route-monitor-operator-controller-manager
       OPERATOR_NAME: route-monitor-operator
     workflow: rosa-cluster-lease-e2e-workflow
+- as: osd-gcp-e2e
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:route-monitor-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      GINKGO_FOCUS: Route Monitor Operator
+      LEASE_TYPE: osd-gcp
+      OPERATOR_CRDS: routemonitors.monitoring.openshift.io,clusterurlmonitors.monitoring.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: route-monitor-operator-controller-manager
+      OPERATOR_NAME: route-monitor-operator
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: osd-gcp-e2e-promotion-int
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:route-monitor-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      GINKGO_FOCUS: Route Monitor Operator
+      LEASE_ENV: integration
+      LEASE_TYPE: osd-gcp
+      OPERATOR_CRDS: routemonitors.monitoring.openshift.io,clusterurlmonitors.monitoring.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: route-monitor-operator-controller-manager
+      OPERATOR_NAME: route-monitor-operator
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: osd-gcp-e2e-promotion-stage
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:route-monitor-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      GINKGO_FOCUS: Route Monitor Operator
+      LEASE_ENV: staging
+      LEASE_TYPE: osd-gcp
+      OPERATOR_CRDS: routemonitors.monitoring.openshift.io,clusterurlmonitors.monitoring.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: route-monitor-operator-controller-manager
+      OPERATOR_NAME: route-monitor-operator
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: rosa-sts-e2e-coverage
+  cron: 0 6 * * 0
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      COVERAGE_IMAGE: pipeline:operator-coverage
+      OPERATOR_IMAGE: pipeline:route-monitor-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      GINKGO_FOCUS: Route Monitor Operator
+      OPERATOR_CRDS: routemonitors.monitoring.openshift.io,clusterurlmonitors.monitoring.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: route-monitor-operator-controller-manager
+      OPERATOR_NAME: route-monitor-operator
+    post:
+    - ref: rosa-operator-coverage-collect
+    - ref: rosa-operator-cleanup
+    - ref: rosa-cluster-lease-checkin
+    pre:
+    - ref: rosa-cluster-lease-checkout
+    - ref: rosa-operator-install
+    - ref: rosa-operator-coverage-setup
+    test:
+    - ref: rosa-operator-e2e
 zz_generated_metadata:
   branch: master
   org: openshift

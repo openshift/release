@@ -36,8 +36,8 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_os:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: rhel-coreos
 build_root:
   from_repository: true
@@ -72,20 +72,20 @@ promotion:
     - custom-os-image
     - src-with-skopeo
     - zacks-toolbox
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -115,7 +115,11 @@ tests:
     - ref: agent-e2e-compact-ipv4-iso-no-registry-validation
     - as: iri-e2e-step
       cli: latest
-      commands: make test-e2e-iri
+      commands: |
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        make test-e2e-iri
+        TAGS=iri_delete make test-e2e-iri
       from: src
       resources:
         requests:
@@ -158,6 +162,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
     pre:
     - chain: ipi-aws-pre
@@ -285,7 +291,6 @@ tests:
   timeout: 4h0m0s
 - always_run: false
   as: e2e-gcp-op-ocl-part1
-  optional: true
   pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
@@ -301,7 +306,6 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-op-ocl-part2
-  optional: true
   pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp

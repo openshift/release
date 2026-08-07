@@ -1,27 +1,27 @@
 base_images:
   base:
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: base
   base-machine:
     name: centos
     namespace: openshift
     tag: stream9
   cli:
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: cli
   cloud-provider-aws-rpms:
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: cloud-provider-aws-rpms
   cloud-provider-azure-rpms:
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: cloud-provider-azure-rpms
   cloud-provider-gcp-rpms:
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: cloud-provider-gcp-rpms
   commitchecker:
     name: commitchecker
@@ -36,20 +36,20 @@ base_images:
     namespace: hypershift
     tag: latest
   oc-rpms:
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: oc-rpms
   rhel-coreos-base:
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: rhel-coreos-10
   rhel-coreos-base-rhel9:
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: rhel-coreos
   tools:
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: tools
 binary_build_commands: openshift-hack/build-go.sh
 build_root:
@@ -115,8 +115,8 @@ promotion:
     excluded_images:
     - rhel-coreos-10
     - rhel-coreos
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
 prowgen:
   private: true
 raw_steps:
@@ -168,13 +168,13 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 5.1-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.1-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -283,6 +283,27 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-kubernetes-e2e-aws-serial
+- always_run: false
+  as: k8s-e2e-aws-ovn-dra-serial
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - ref: dra-example-driver-install
+    - as: k8s-dra-e2e
+      commands: |
+        export ARTIFACTS="${ARTIFACT_DIR}"
+        export KUBE_E2E_TEST_ARGS="-focus=DRA|DynamicResourceAllocation -skip=v1beta|OffByDefault"
+        export TEST_SUITE=serial
+        test-kubernetes-e2e.sh
+      from: kubernetes-tests
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 600Mi
+    workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-aws
   optional: true
@@ -490,20 +511,32 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-crun
-- always_run: false
-  as: perfscale-control-plane-6nodes
+- as: perfscale-control-plane-6nodes
+  optional: true
+  skip_if_only_changed: ^docs/|^logo/|^test/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|SECURITY_CONTACTS|LICENSE)$
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
+      ADDITIONAL_WORKER_NODES: "3"
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "6"
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s --service-latency
+      CDV2_ITERATION_MULTIPLIER: "15"
+      ENABLE_LAYER_3: "false"
       ENABLE_LOCAL_INDEX: "true"
       ES_TYPE: qe
-      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=13s
-      ITERATION_MULTIPLIER_ENV: "15"
+      IGNORE_JOB_ITERATIONS: "true"
+      KB_FLAGS: --local-indexing
+      ND_CNI_EXTRA_FLAGS: --churn-mode=objects --churn-delay=1m --churn-percent=50
+        --churn-cycles=2
+      ND_EXTRA_FLAGS: --churn-mode=objects --churn-delay=1m --churn-percent=50 --churn-cycles=2
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: deferred
+      UDN_ITERATION_MULTIPLIER: "12"
+      VERSION: "5.0"
       ZONES_COUNT: "3"
     test:
+    - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws

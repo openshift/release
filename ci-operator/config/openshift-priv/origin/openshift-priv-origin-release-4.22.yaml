@@ -20,8 +20,8 @@ base_images:
     namespace: ci
     tag: latest
   tools:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: tools
 binary_build_commands: make build
 build_root:
@@ -36,8 +36,8 @@ images:
     to: hello-openshift
 promotion:
   to:
-  - name: 4.22-priv
-    namespace: ocp-private
+  - name: "4.22"
+    namespace: ocp-priv
 prowgen:
   private: true
 raw_steps:
@@ -49,13 +49,13 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   nightly-arm64:
     candidate:
       architecture: arm64
@@ -402,6 +402,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
       TEST_REQUIRES_BUILDFARM_NET_ADMIN: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -566,9 +568,7 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true

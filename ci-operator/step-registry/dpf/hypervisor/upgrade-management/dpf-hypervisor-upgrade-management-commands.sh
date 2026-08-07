@@ -5,7 +5,8 @@ set -euo pipefail
 # Duplicated because each step ref runs as an independent pod with no shared setup.
 # Also duplicated in network-tests and deploy-cluster. TODO: extract into a shared script.
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
-REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
+CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
+REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
@@ -43,5 +44,5 @@ echo "=== Running management cluster upgrade ==="
 ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
     source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
     cd \${LAST_OPENSHIFT_DPF}; \
-    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.doca8; \
+    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME}; \
     make upgrade-management"

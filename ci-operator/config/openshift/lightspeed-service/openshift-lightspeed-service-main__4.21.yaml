@@ -151,6 +151,75 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- as: ols-cluster-updates-periodics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.21"
+  cron: 10 14 * * *
+  reporter_config:
+    channel: '#forum-ocp-pixaa-interrupt'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: Periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      (<{{.Status.URL}}|View logs>)
+      (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/{{.Spec.Job}}|View history>)
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    pre:
+    - ref: ipi-install-rbac
+    - ref: openshift-configure-cincinnati
+    - ref: cucushift-installer-check-cluster-health
+    test:
+    - as: cluster-updates
+      cli: latest
+      commands: |
+        export BAM_PROVIDER_KEY_PATH=/var/run/bam/token
+        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
+        export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
+        export WATSONX_PROVIDER_KEY_PATH=/var/run/watsonx/token
+        export VERTEX_PROVIDER_KEY_PATH=/var/run/vertex/token
+        export PROVIDER_KEY_PATH=/var/run/openai/token
+        export PROVIDER=openai
+        export MODEL=gpt-4.1-mini
+
+        export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
+
+        tests/scripts/test-cluster-updates.sh
+      credentials:
+      - mount_path: /var/run/bam
+        name: bam-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/azure_openai
+        name: azureopenai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/watsonx
+        name: watsonx-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/vertex
+        name: vertex-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/insights-stage-upload-offline-token
+        name: insights-stage-upload-offline-token
+        namespace: test-credentials
+      dependencies:
+      - env: OLS_IMAGE
+        name: lightspeed-service-api
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift

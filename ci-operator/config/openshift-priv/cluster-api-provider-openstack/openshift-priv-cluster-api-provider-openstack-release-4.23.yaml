@@ -17,20 +17,20 @@ images:
     to: openstack-cluster-api-controllers
 promotion:
   to:
-  - name: 4.23-priv
-    namespace: ocp-private
+  - name: "4.23"
+    namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -58,7 +58,8 @@ tests:
     make -C openshift verify
   container:
     from: src
-- as: e2e-hypershift
+- always_run: false
+  as: e2e-hypershift
   steps:
     cluster_profile: hypershift-aws
     env:
@@ -70,8 +71,9 @@ tests:
     test:
     - chain: hypershift-openstack-e2e
     workflow: hypershift-aws-e2e-nested
-- as: e2e-openstack-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-openstack-capi-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:

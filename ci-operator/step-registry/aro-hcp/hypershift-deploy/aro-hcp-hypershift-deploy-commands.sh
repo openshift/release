@@ -42,6 +42,7 @@ SESSIONGATE_REPO=$(yq '.sessiongate.image.repository' "${CONFIG_FILE}")
 FLEET_REPO=$(yq '.fleet.image.repository' "${CONFIG_FILE}")
 MGMT_AGENT_REPO=$(yq '.mgmtAgent.image.repository' "${CONFIG_FILE}")
 KUBE_APPLIER_REPO=$(yq '.kubeApplier.image.repository' "${CONFIG_FILE}")
+EXPORTER_REPO=$(yq '.customExporter.image.repository' "${CONFIG_FILE}")
 
 MAIN_SHA=$(git ls-remote https://github.com/Azure/ARO-HCP.git main | cut -c1-7)
 echo "ARO-HCP main HEAD: ${MAIN_SHA}"
@@ -100,6 +101,7 @@ SESSIONGATE_DIGEST=$(resolve_digest "${SESSIONGATE_REPO}" "${MAIN_SHA}")
 FLEET_DIGEST=$(resolve_digest "${FLEET_REPO}" "${MAIN_SHA}")
 MGMT_AGENT_DIGEST=$(resolve_digest "${MGMT_AGENT_REPO}" "${MAIN_SHA}")
 KUBE_APPLIER_DIGEST=$(resolve_digest "${KUBE_APPLIER_REPO}" "${MAIN_SHA}")
+EXPORTER_DIGEST=$(resolve_digest "${EXPORTER_REPO}" "${MAIN_SHA}")
 
 echo "Resolved digests:"
 echo "  backend:      ${BACKEND_DIGEST}"
@@ -109,6 +111,7 @@ echo "  sessiongate:  ${SESSIONGATE_DIGEST}"
 echo "  fleet:        ${FLEET_DIGEST}"
 echo "  mgmt-agent:   ${MGMT_AGENT_DIGEST}"
 echo "  kube-applier: ${KUBE_APPLIER_DIGEST}"
+echo "  exporter:     ${EXPORTER_DIGEST}"
 
 export BACKEND_IMAGE="${ACR_URL}/${BACKEND_REPO}@${BACKEND_DIGEST}"
 export FRONTEND_IMAGE="${ACR_URL}/${FRONTEND_REPO}@${FRONTEND_DIGEST}"
@@ -117,6 +120,7 @@ export SESSIONGATE_IMAGE="${ACR_URL}/${SESSIONGATE_REPO}@${SESSIONGATE_DIGEST}"
 export FLEET_IMAGE="${ACR_URL}/${FLEET_REPO}@${FLEET_DIGEST}"
 export MGMT_AGENT_IMAGE="${ACR_URL}/${MGMT_AGENT_REPO}@${MGMT_AGENT_DIGEST}"
 export KUBE_APPLIER_IMAGE="${ACR_URL}/${KUBE_APPLIER_REPO}@${KUBE_APPLIER_DIGEST}"
+export EXPORTER_IMAGE="${ACR_URL}/${EXPORTER_REPO}@${EXPORTER_DIGEST}"
 
 set +x
 exec hack/ci/provision-environment.sh

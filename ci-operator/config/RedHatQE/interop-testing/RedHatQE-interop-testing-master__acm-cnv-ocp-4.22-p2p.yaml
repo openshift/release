@@ -15,6 +15,10 @@ base_images:
     name: cli-jq
     namespace: ocp
     tag: latest
+  console-e2e:
+    name: main
+    namespace: acm-qe
+    tag: console-e2e
   fetch-managed-clusters:
     name: autotest
     namespace: acm-qe
@@ -63,15 +67,10 @@ releases:
       channel: stable
       version: "4.21"
   latest:
-    release:
-      channel: stable
-      version: "4.21"
-  target:
-    prerelease:
+    candidate:
       product: ocp
-      version_bounds:
-        lower: 4.22.0-rc.0
-        upper: 4.22.0-rc.20
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -84,7 +83,7 @@ tests:
     cluster_profile: aws-cspi-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ACM_CLUSTER_UPGRADE_TARGET_CHANNEL: candidate-4.22
       ACM_SPOKE_CLUSTER_COUNT: "1"
@@ -103,6 +102,7 @@ tests:
       CNV_TARGET_MAJOR_MINOR: "4.21"
       COMPUTE_NODE_TYPE: m6a.4xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      DR__RP__CR_COMP_NAME: lp-interop--ACM-Virt
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -127,13 +127,14 @@ tests:
               {"step": "p2p-install-odf-spokes"            , "failure_type": "all" , "classification": "ODF Spoke Deployment"                , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default"], "jira_project": "DFBUGS", "jira_assignee": "ebenahar@redhat.com" }
             ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/cr/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-p2p","ipi-aws-p2p","mpiit-acm-virt","mpiit_product2product","mpiit_virt"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: vshakya@redhat.com
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA","mpiit_p2p"]'
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8652
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      MAP_TESTS: "true"
       OCP_VERSION: "4.22"
       ODF_DEFAULT_STORAGE_CLASS: ocs-storagecluster-ceph-rbd-virtualization
       ODF_OPERATOR_CHANNEL: stable-4.21
@@ -158,6 +159,7 @@ tests:
     - ref: gather-aws-console
     - ref: acm-interop-p2p-cluster-uninstall
     - chain: ipi-deprovision
+    - ref: mpiit-data-router-reporter
     - ref: firewatch-report-issues
     pre:
     - ref: ipi-conf

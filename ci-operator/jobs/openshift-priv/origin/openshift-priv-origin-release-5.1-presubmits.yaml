@@ -5,6 +5,103 @@ presubmits:
     branches:
     - ^release-5\.1$
     - ^release-5\.1-
+    cluster: build05
+    context: ci/prow/e2e-agent-compact-ipv4-iso-no-registry
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - .devcontainer/Dockerfile
+      - images/hello-openshift/Dockerfile.rhel
+      - images/tests/Dockerfile.rhel
+    hidden: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-origin-release-5.1-e2e-agent-compact-ipv4-iso-no-registry
+    optional: true
+    path_alias: github.com/openshift/origin
+    rerun_command: /test e2e-agent-compact-ipv4-iso-no-registry
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agent-compact-ipv4-iso-no-registry
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-compact-ipv4-iso-no-registry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5\.1$
+    - ^release-5\.1-
     cluster: build03
     context: ci/prow/e2e-agnostic-ovn-cmd
     decorate: true
@@ -14,6 +111,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -109,6 +207,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -203,6 +302,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -298,6 +398,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -393,6 +494,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -490,6 +592,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -584,6 +687,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -679,6 +783,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -774,6 +879,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -869,6 +975,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -964,6 +1071,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -1059,6 +1167,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -1155,6 +1264,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -1249,6 +1359,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -1346,6 +1457,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -1441,6 +1553,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -1535,6 +1648,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -1629,6 +1743,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -1724,6 +1839,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -1819,6 +1935,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -1914,6 +2031,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -2009,6 +2127,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -2105,6 +2224,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -2201,6 +2321,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -2296,6 +2417,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -2391,6 +2513,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -2486,6 +2609,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -2581,6 +2705,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -2676,6 +2801,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -2773,6 +2899,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -2868,6 +2995,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -2963,6 +3091,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -3058,6 +3187,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -3153,6 +3283,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -3248,6 +3379,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -3343,6 +3475,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -3438,6 +3571,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -3533,6 +3667,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -3630,6 +3765,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -3725,6 +3861,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -3820,6 +3957,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -3915,6 +4053,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -4010,6 +4149,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -4104,6 +4244,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -4199,6 +4340,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -4295,6 +4437,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -4391,6 +4534,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -4487,6 +4631,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -4581,6 +4726,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -4678,6 +4824,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -4772,6 +4919,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -4867,6 +5015,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -4962,6 +5111,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -5057,6 +5207,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -5152,6 +5303,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -5248,6 +5400,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -5344,6 +5497,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -5438,6 +5592,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -5533,6 +5688,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -5628,6 +5784,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -5724,6 +5881,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -5820,6 +5978,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -5916,6 +6075,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -6012,6 +6172,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -6108,6 +6269,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -6204,6 +6366,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -6300,6 +6463,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -6395,6 +6559,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -6491,6 +6656,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -6588,6 +6754,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -6685,6 +6852,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -6782,6 +6950,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -6879,6 +7048,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -6975,6 +7145,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -7070,6 +7241,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -7167,6 +7339,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -7265,6 +7438,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -7363,6 +7537,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -7460,6 +7635,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -7555,6 +7731,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -7650,6 +7827,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -7745,6 +7923,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -7839,6 +8018,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -7934,6 +8114,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -8028,6 +8209,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -8120,6 +8302,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -8187,6 +8370,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -8263,6 +8447,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -8339,6 +8524,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -8415,6 +8601,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true
@@ -8491,6 +8678,7 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/hello-openshift/Dockerfile.rhel
       - images/tests/Dockerfile.rhel
     hidden: true

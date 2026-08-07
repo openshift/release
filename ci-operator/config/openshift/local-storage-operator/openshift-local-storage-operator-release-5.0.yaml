@@ -7,6 +7,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.22"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -94,6 +98,27 @@ tests:
       TEST_SCENARIOS: \[LSO\]
     test:
     - ref: openshift-extended-test
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: tls-scanner-local-storage
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-local-storage-operator-bundle
+    env:
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-local-storage
+      OO_PACKAGE: local-storage-operator
+      OO_TARGET_NAMESPACES: '!install'
+      SCAN_NAMESPACE: openshift-local-storage
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
     workflow: optional-operators-ci-aws
 - as: verify-deps
   steps:

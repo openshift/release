@@ -4,17 +4,21 @@ base_images:
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: cluster-resource-override-admission-operator-bundle
   previous-operand:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: cluster-resource-override-admission
   previous-operator:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: cluster-resource-override-admission-operator
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -39,20 +43,20 @@ promotion:
   to:
   - additional_images:
       cluster-resource-override-admission-operator-bundle: cluster-resource-override-admission-operator-bundle
-    name: 5.1-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: 5.1-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.1-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -85,7 +89,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make e2e-ci
+      commands: make e2e-ci E2E_SKIP=TestUpgrade
       dependencies:
       - env: CI_OPERATOR_IMAGE
         name: cluster-resource-override-admission-operator
@@ -102,10 +106,15 @@ tests:
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-cluster-resource-override,clusterresourceoverride-operator
+      SCANNER_CPU: 500m
+      SCANNER_MEMORY: 1Gi
     test:
     - as: test
       cli: latest
-      commands: make e2e-olm-ci
+      commands: make e2e-olm-ci E2E_SKIP=TestUpgrade
       dependencies:
       - env: CI_OPERATOR_IMAGE
         name: cluster-resource-override-admission-operator
@@ -117,6 +126,28 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - as: deploy-operand
+      cli: latest
+      commands: |-
+        oc apply -f - <<EOF
+        apiVersion: operator.autoscaling.openshift.io/v1
+        kind: ClusterResourceOverride
+        metadata:
+          name: cluster
+        spec:
+          podResourceOverride:
+            spec:
+              memoryRequestToLimitPercent: 50
+              cpuRequestToLimitPercent: 25
+              limitCPUToMemoryPercent: 200
+        EOF
+        echo "Waiting for ClusterResourceOverride operand to become available..."
+        oc wait --for=condition=Available clusterresourceoverride/cluster --timeout=5m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-scanner-run
     workflow: ipi-aws
 - as: e2e-aws-upgrade
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -126,7 +157,7 @@ tests:
     - as: install
       cli: latest
       commands: |
-        export NS=clusterresourceoverride-operator
+        export NS=openshift-cluster-resource-override
         oc create ns $NS
 
         # Deploy the bundle which will fail to come up due to it pointing to the operator
@@ -169,7 +200,7 @@ tests:
     - as: upgrade
       cli: latest
       commands: |
-        export NS=clusterresourceoverride-operator
+        export NS=openshift-cluster-resource-override
         operator-sdk run bundle-upgrade --timeout 10m -n $NS --security-context-config restricted "$OO_BUNDLE"
       dependencies:
       - env: OO_BUNDLE
@@ -182,7 +213,8 @@ tests:
       cli: latest
       commands: |
         export KUBECTL=$(which oc)
-        make e2e-upgrade-post e2e
+        make e2e-upgrade-post
+        make e2e E2E_SKIP=TestOperandTLS
       from: src
       resources:
         requests:

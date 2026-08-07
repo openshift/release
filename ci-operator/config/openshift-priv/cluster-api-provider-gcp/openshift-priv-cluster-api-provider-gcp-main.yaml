@@ -21,24 +21,24 @@ images:
     to: gcp-cluster-api-controllers
 promotion:
   to:
-  - name: 5.0-priv
-    namespace: ocp-private
+  - name: "5.0"
+    namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -48,20 +48,23 @@ tests:
   commands: openshift/unit-tests.sh
   container:
     from: src
-- as: e2e-gcp
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-ovn-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-ovn-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-capi-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -74,8 +77,9 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-serial
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-serial
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-serial

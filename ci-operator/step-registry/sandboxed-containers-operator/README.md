@@ -251,7 +251,7 @@ In case you want to manage secrets on that path, first must log-in https://selfs
 ## Clusterbot
 
 The [sandboxed-containers-operator-e2e-azure](./e2e/azure/) and
-[sandboxed-containers-operator-e2e-azure](./e2e/aws/) workflows are
+[sandboxed-containers-operator-e2e-aws](./e2e/aws/) workflows are
 available in [clusterbot](https://github.com/openshift/ci-chat-bot/blob/main/README.md).
 You have 2 main options:
 

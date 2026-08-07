@@ -1,7 +1,7 @@
 base_images:
   base-rhel9:
-    name: 4.20-priv
-    namespace: ocp-private
+    name: "4.20"
+    namespace: ocp-priv
     tag: base-rhel9
   cli-operator-sdk:
     name: cli-operator-sdk
@@ -12,8 +12,8 @@ base_images:
     namespace: origin
     tag: operator-sdk
   upi-installer:
-    name: 4.20-priv
-    namespace: ocp-private
+    name: "4.20"
+    namespace: ocp-priv
     tag: upi-installer
 binary_build_commands: make build --warn-undefined-variables
 build_root:
@@ -155,6 +155,32 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-hypershift
+- always_run: false
+  as: e2e-operator-consoleless
+  optional: true
+  skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: marketplace CloudControllerManager CloudCredential
+        OperatorLifecycleManager Ingress MachineAPI ImageRegistry Storage
+      BASELINE_CAPABILITY_SET: None
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS,Generic} && CredentialsMode: isSubsetOf {Mint} && !TechPreview"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-operator-aws-proxy
   optional: true

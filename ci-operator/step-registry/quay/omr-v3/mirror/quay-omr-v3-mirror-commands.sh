@@ -288,12 +288,20 @@ for command in base64 curl jq oc scp sha256sum ssh tar tee yq-v4; do
   fi
 done
 
+remote_address_file="${SHARED_DIR}/bastion_private_address"
+remote_user_file="${SHARED_DIR}/bastion_ssh_user"
+if [[ -s "${SHARED_DIR}/omr_host_public_address" ||
+      -s "${SHARED_DIR}/omr_host_ssh_user" ]]; then
+  remote_address_file="${SHARED_DIR}/omr_host_public_address"
+  remote_user_file="${SHARED_DIR}/omr_host_ssh_user"
+fi
+
 for required_file in \
   "${SHARED_DIR}/mirror_registry_url" \
   "${SHARED_DIR}/mirror_registry_creds" \
   "${SHARED_DIR}/mirror_registry_ca.crt" \
-  "${SHARED_DIR}/bastion_private_address" \
-  "${SHARED_DIR}/bastion_ssh_user" \
+  "${remote_address_file}" \
+  "${remote_user_file}" \
   "${CLUSTER_PROFILE_DIR}/pull-secret" \
   "${CLUSTER_PROFILE_DIR}/ssh-privatekey"; do
   if [[ ! -s "${required_file}" ]]; then
@@ -381,11 +389,12 @@ if ! whoami > /dev/null 2>&1; then
   fi
 fi
 
-BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
-if [[ -s "${SHARED_DIR}/bastion_public_address" ]]; then
+BASTION_IP=$(<"${remote_address_file}")
+if [[ "${remote_address_file}" == "${SHARED_DIR}/bastion_private_address" &&
+      -s "${SHARED_DIR}/bastion_public_address" ]]; then
   BASTION_IP=$(<"${SHARED_DIR}/bastion_public_address")
 fi
-BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
+BASTION_SSH_USER=$(<"${remote_user_file}")
 if [[ ! "${BASTION_IP}" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]] ||
    [[ ! "${BASTION_SSH_USER}" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] ||
    [[ ! "${UNIQUE_HASH}" =~ ^[A-Za-z0-9]+$ ]]; then
@@ -528,7 +537,8 @@ omr_cli_tmp=$(mktemp "${SHARED_DIR}/.omr_mirrored_cli_image.XXXXXX")
 omr_completed_tmp=$(mktemp "${SHARED_DIR}/.omr_mirror_completed_at.XXXXXX")
 printf '%s\n' "${component_mirror}" > "${omr_repository_tmp}"
 printf '%s@%s\n' "${component_mirror}" "${cli_digest}" > "${omr_cli_tmp}"
-date -u +%Y-%m-%dT%H:%M:%SZ > "${omr_completed_tmp}"
+# Older systemd versions reject RFC 3339's T/Z form in journalctl --since.
+date -u '+%Y-%m-%d %H:%M:%S UTC' > "${omr_completed_tmp}"
 chmod 0644 \
   "${install_patch_tmp}" \
   "${signature_json_tmp}" \

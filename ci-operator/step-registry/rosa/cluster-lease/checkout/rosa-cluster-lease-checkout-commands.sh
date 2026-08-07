@@ -18,6 +18,7 @@ LEASE_VERSION="${LEASE_VERSION:-}"
 LEASE_CHECKOUT_TIMEOUT="${LEASE_CHECKOUT_TIMEOUT_MINUTES:-30}"
 LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
+OPERATOR_NAME="${OPERATOR_NAME:-}"
 
 if [[ ! -f "${LEASE_HOST_KUBECONFIG}" ]]; then
     log "ERROR: Lease host kubeconfig not found at ${LEASE_HOST_KUBECONFIG}"
@@ -29,7 +30,13 @@ lease_oc() {
 }
 
 # Build label selector
-SELECTOR="rosa-cluster-lease/managed=true,rosa-cluster-lease/status=available,rosa-cluster-lease/type=${LEASE_TYPE}"
+# When OPERATOR_NAME is set, query all managed clusters (not just available)
+# and filter by operator in-script to support concurrent use
+if [[ -n "${OPERATOR_NAME}" ]]; then
+    SELECTOR="rosa-cluster-lease/managed=true,rosa-cluster-lease/type=${LEASE_TYPE}"
+else
+    SELECTOR="rosa-cluster-lease/managed=true,rosa-cluster-lease/status=available,rosa-cluster-lease/type=${LEASE_TYPE}"
+fi
 if [[ -n "${LEASE_ENV}" ]]; then
     SELECTOR="${SELECTOR},rosa-cluster-lease/env=${LEASE_ENV}"
 fi
@@ -40,11 +47,38 @@ if [[ -n "${LEASE_VERSION}" ]]; then
     SELECTOR="${SELECTOR},rosa-cluster-lease/version=${LEASE_VERSION}"
 fi
 
+# Check if a cluster is eligible for this operator
+cluster_eligible() {
+    local cm="$1"
+    local status operators
+    status=$(echo "${cm}" | jq -r '.metadata.labels["rosa-cluster-lease/status"]')
+    operators=$(echo "${cm}" | jq -r '.metadata.annotations["rosa-cluster-lease/operators"] // ""')
+
+    if [[ -z "${OPERATOR_NAME}" ]]; then
+        # Legacy mode: only available clusters
+        [[ "${status}" == "available" ]]
+        return
+    fi
+
+    # Skip clusters in error/provisioning/maintenance
+    if [[ "${status}" != "available" && "${status}" != "in-use" ]]; then
+        return 1
+    fi
+
+    # Skip if this operator is already on this cluster
+    if echo ",${operators}," | grep -q ",${OPERATOR_NAME}:"; then
+        return 1
+    fi
+
+    return 0
+}
+
 log "Lease checkout starting"
 log "  Type: ${LEASE_TYPE}"
 log "  Env: ${LEASE_ENV:-any}"
 log "  Region: ${LEASE_REGION:-any}"
 log "  Version: ${LEASE_VERSION:-any}"
+log "  Operator: ${OPERATOR_NAME:-exclusive}"
 log "  Timeout: ${LEASE_CHECKOUT_TIMEOUT} minutes"
 log "  Selector: ${SELECTOR}"
 
@@ -66,18 +100,32 @@ while true; do
     log "Attempt ${ATTEMPT} (${REMAINING}m remaining)"
 
     CLUSTERS_JSON=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "${SELECTOR}" -o json 2>/dev/null || echo '{"items":[]}')
-    COUNT=$(echo "${CLUSTERS_JSON}" | jq '.items | length')
+    TOTAL=$(echo "${CLUSTERS_JSON}" | jq '.items | length')
+
+    # Filter to eligible clusters
+    ELIGIBLE=()
+    for i in $(seq 0 $((TOTAL - 1))); do
+        CM=$(echo "${CLUSTERS_JSON}" | jq ".items[${i}]")
+        if cluster_eligible "${CM}"; then
+            ELIGIBLE+=("${i}")
+        fi
+    done
+    COUNT=${#ELIGIBLE[@]}
 
     if [[ "${COUNT}" -eq 0 ]]; then
-        log "No available clusters in lease inventory. Waiting 30s..."
+        if [[ -n "${OPERATOR_NAME}" ]]; then
+            log "No eligible clusters (${TOTAL} total, all either have ${OPERATOR_NAME} running or are unhealthy). Waiting 30s..."
+        else
+            log "No available clusters in lease inventory. Waiting 30s..."
+        fi
         sleep 30
         continue
     fi
 
-    log "Found ${COUNT} available cluster(s), attempting claim..."
+    log "Found ${COUNT} eligible cluster(s) of ${TOTAL} total, attempting claim..."
 
     CLAIMED=false
-    for i in $(seq 0 $((COUNT - 1))); do
+    for i in "${ELIGIBLE[@]}"; do
         CM=$(echo "${CLUSTERS_JSON}" | jq ".items[${i}]")
         CM_NAME=$(echo "${CM}" | jq -r '.metadata.name')
         CLUSTER_ID=$(echo "${CM}" | jq -r '.data["cluster-id"]')
@@ -86,12 +134,32 @@ while true; do
         log "Trying to claim ${CM_NAME} (cluster: ${CLUSTER_ID})..."
 
         ACQUIRED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        MODIFIED=$(echo "${CM}" | jq '
-            .metadata.labels["rosa-cluster-lease/status"] = "in-use" |
-            .metadata.annotations["rosa-cluster-lease/holder"] = "'"${JOB_NAME}"'" |
-            .metadata.annotations["rosa-cluster-lease/build-id"] = "'"${BUILD_ID}"'" |
-            .metadata.annotations["rosa-cluster-lease/acquired-at"] = "'"${ACQUIRED_AT}"'"
-        ')
+        EPOCH=$(date +%s)
+
+        if [[ -n "${OPERATOR_NAME}" ]]; then
+            # Per-operator mode: add operator to the operators annotation
+            CURRENT_OPS=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/operators"] // ""')
+            if [[ -z "${CURRENT_OPS}" ]]; then
+                NEW_OPS="${OPERATOR_NAME}:${EPOCH}"
+            else
+                NEW_OPS="${CURRENT_OPS},${OPERATOR_NAME}:${EPOCH}"
+            fi
+            MODIFIED=$(echo "${CM}" | jq '
+                .metadata.labels["rosa-cluster-lease/status"] = "in-use" |
+                .metadata.annotations["rosa-cluster-lease/operators"] = "'"${NEW_OPS}"'" |
+                .metadata.annotations["rosa-cluster-lease/holder"] = "'"${JOB_NAME}"'" |
+                .metadata.annotations["rosa-cluster-lease/build-id"] = "'"${BUILD_ID}"'" |
+                .metadata.annotations["rosa-cluster-lease/acquired-at"] = "'"${ACQUIRED_AT}"'"
+            ')
+        else
+            # Exclusive mode: set status to in-use (legacy behavior)
+            MODIFIED=$(echo "${CM}" | jq '
+                .metadata.labels["rosa-cluster-lease/status"] = "in-use" |
+                .metadata.annotations["rosa-cluster-lease/holder"] = "'"${JOB_NAME}"'" |
+                .metadata.annotations["rosa-cluster-lease/build-id"] = "'"${BUILD_ID}"'" |
+                .metadata.annotations["rosa-cluster-lease/acquired-at"] = "'"${ACQUIRED_AT}"'"
+            ')
+        fi
 
         if echo "${MODIFIED}" | lease_oc replace -n "${LEASE_NAMESPACE}" -f - 2>/dev/null; then
             log "Claimed cluster ${CLUSTER_ID} (${CM_NAME})"
@@ -100,6 +168,7 @@ while true; do
             echo "${CM_NAME}" > "${SHARED_DIR}/lease-claim"
             echo "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
             echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+            echo "${OPERATOR_NAME}" > "${SHARED_DIR}/lease-operator"
 
             echo "${CM}" | jq -r '.data.region // empty' > "${SHARED_DIR}/cluster-region"
             echo "${CM}" | jq -r '.data["ocm-env"] // empty' > "${SHARED_DIR}/ocm-env"
@@ -115,7 +184,7 @@ while true; do
         break
     fi
 
-    log "All available clusters were claimed by other jobs. Waiting 15s..."
+    log "All eligible clusters were claimed by other jobs. Waiting 15s..."
     sleep 15
 done
 

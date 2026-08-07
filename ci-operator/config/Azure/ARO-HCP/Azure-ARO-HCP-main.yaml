@@ -124,6 +124,17 @@ images:
     context_dir: tooling
     dockerfile_path: aro-hcp-exporter/Dockerfile
     to: aro-hcp-exporter
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: REVISION
+      value: ci-sha
+    - name: TAG
+      value: ci-test-img
+    capabilities:
+    - gcp
+    dockerfile_path: tooling/tenant-quota/Dockerfile
+    to: aro-hcp-tenant-quota
   - capabilities:
     - gcp
     dockerfile_literal: |
@@ -383,6 +394,8 @@ tests:
       <{{.Status.URL}}|View logs>'
   steps:
     env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters - Prod - 00,ARO HCP E2E Hosted
+        Clusters - Prod - 01
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_SUITE_NAME: prod/parallel
@@ -394,6 +407,8 @@ tests:
   optional: true
   steps:
     env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters - Prod - 00,ARO HCP E2E Hosted
+        Clusters - Prod - 01
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: stable
@@ -407,6 +422,8 @@ tests:
   optional: true
   steps:
     env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters - Prod - 00,ARO HCP E2E Hosted
+        Clusters - Prod - 01
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: fast
@@ -427,6 +444,8 @@ tests:
       <{{.Status.URL}}|View logs>'
   steps:
     env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters - Prod - 00,ARO HCP E2E Hosted
+        Clusters - Prod - 01
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
@@ -463,6 +482,18 @@ tests:
       MULTISTAGE_PARAM_OVERRIDE_LOCATION: westus3
     workflow: aro-hcp-upgrade-e2e
   timeout: 10h0m0s
+- always_run: false
+  as: e2e-parallel-inplace-upgrade
+  optional: true
+  steps:
+    env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters (EA Subscription),ARO HCP
+        E2E Hosted Clusters 2 (EA Subscription),ARO HCP E2E Hosted Clusters - Dev
+        - 02,ARO HCP E2E Hosted Clusters - Dev - 03
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      MULTISTAGE_PARAM_OVERRIDE_LOCATION: westus3
+    workflow: aro-hcp-local-e2e-upgrade
 - as: global-pipeline-postsubmit
   max_concurrency: 1
   postsubmit: true
@@ -494,6 +525,22 @@ tests:
   steps:
     test:
     - ref: aro-hcp-images-push
+- as: ci-images-push-postsubmit
+  capabilities:
+  - gcp
+  max_concurrency: 4
+  postsubmit: true
+  reporter_config:
+    channel: '#aro-hcp-failures-dev'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  run_if_changed: ^tooling/tenant-quota/
+  steps:
+    test:
+    - ref: aro-hcp-ci-images-push
 - as: cspr-pipeline-postsubmit
   max_concurrency: 1
   postsubmit: true

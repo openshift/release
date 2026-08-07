@@ -367,6 +367,8 @@ check_branch_changes() {
 
 # Reset working tree to upstream main for a clean starting state between issues.
 reset_to_main() {
+  # Claude Code may leave a stale lock after timeout/kill between issues
+  rm -f .git/index.lock
   git checkout main 2>/dev/null || true
   git reset --hard upstream/main 2>/dev/null || true
 }

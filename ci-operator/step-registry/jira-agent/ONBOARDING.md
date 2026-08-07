@@ -8,7 +8,7 @@ The jira-agent runs as a periodic Prow job that:
 
 1. **Setup** — Verifies Claude Code CLI and Vertex AI credentials
 2. **Process** — For each Jira issue matching your JQL query:
-   - Phase 1: Runs `/jira:solve` to analyze and fix the issue
+   - Phase 1: Runs `/openshift-developer:jira-solve` to analyze and fix the issue
    - Phase 2: Runs pre-commit code review
    - Phase 3: Addresses review findings
    - Phase 4: Creates a PR to your upstream repo

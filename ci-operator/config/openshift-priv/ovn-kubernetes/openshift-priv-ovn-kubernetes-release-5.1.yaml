@@ -26,20 +26,20 @@ images:
     to: ovn-kubernetes-microshift
 promotion:
   to:
-  - name: 5.1-priv
-    namespace: ocp-private
+  - name: "5.1"
+    namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: 5.1-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.1-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
   nightly-arm64:
     candidate:
       architecture: arm64
@@ -87,6 +87,7 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-aws-ovn-microshift
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -376,8 +377,8 @@ tests:
       ALL_PROJECTS: "true"
       PROJECT_NAME: ovn-kubernetes
     workflow: openshift-ci-security
-- always_run: true
-  as: qe-perfscale-payload-control-plane-6nodes
+- as: qe-perfscale-payload-control-plane-6nodes
+  skip_if_only_changed: ^(docs|\.github|contrib|test|dist|helm|LICENSES)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: aws-perfscale-qe
     env:
@@ -421,9 +422,9 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-udn-density-pods
-- always_run: true
-  as: qe-perfscale-aws-ovn-small-udn-density-l3
+- as: qe-perfscale-aws-ovn-small-udn-density-l3
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|test|dist|helm|LICENSES)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: aws-perfscale-qe
     env:
@@ -439,9 +440,9 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-udn-density-pods
-- always_run: true
-  as: qe-perfscale-aws-ovn-small-udn-density-l2
+- as: qe-perfscale-aws-ovn-small-udn-density-l2
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|test|dist|helm|LICENSES)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: aws-perfscale-qe
     env:
@@ -458,6 +459,32 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-udn-density-pods
+- always_run: false
+  as: cudn-incremental-1000-24nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      EXTRA_FLAGS: --incremental-step-size=200 --incremental-step-delay=5m --incremental-pattern=linear
+        --timeout=8h
+      NAMESPACES_PER_CUDN: "1"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      ORION_CONFIG: examples/small-scale-cudn-incremental-1000.yaml
+      OVERRIDE_ITERATIONS: "1000"
+      RUN_ORION: "true"
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    test:
+    - chain: openshift-qe-cudn-density
 - always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true

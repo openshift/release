@@ -101,30 +101,22 @@ resources:
       memory: 200Mi
 tests:
 - as: opentelemetry-upstream-tests
-  capabilities:
-  - intranet
   steps:
-    cluster_profile: equinix-ocp-metal-qe
+    cluster_profile: gcp-observability
     env:
       AGENT_SKILL: OTEL
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      JIRA_PROJECT: TRACING
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""}
         ]
-      RESERVE_BOOTSTRAP: "false"
       SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-otel/google*
-        tests/e2e-openshift/export-to-cluster-logging-lokistack tests/e2e-instrumentation/instrumentation-go
-      architecture: amd64
-      masters: "3"
-      workers: "2"
+        tests/e2e-otel/azuremonitorlogs tests/e2e-instrumentation/instrumentation-go
     post:
     - ref: openshift-observability-qe-agent
-    - chain: baremetal-lab-post
     test:
-    - ref: ipi-install-rbac
     - as: install
       cli: latest
       commands: |
@@ -142,7 +134,7 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-upstream
-    workflow: baremetal-lab-ipi
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

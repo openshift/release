@@ -144,14 +144,14 @@ function fetch_trustee_charts() {
   local lib_dir="${SCRATCH}/lib"
   mkdir -p "${lib_dir}"
   if extract_output=$(oc image extract "${HELM_CHART_IMAGE}" \
-    --path /charts/:${charts_dir}/ \
-    --path /usr/local/bin/helm:${bin_dir}/ \
-    --path /usr/bin/jq:${bin_dir}/ \
-    --path /usr/local/lib/libjq.so.1:${lib_dir}/ \
-    --path /usr/local/lib/libonig.so.5:${lib_dir}/ 2>&1); then
+    --path "/charts/:${charts_dir}/" \
+    --path "/usr/local/bin/helm:${bin_dir}/" \
+    --path "/usr/bin/jq:${bin_dir}/" \
+    --path "/usr/local/lib/libjq.so.1:${lib_dir}/" \
+    --path "/usr/local/lib/libonig.so.5:${lib_dir}/" 2>&1); then
     echo ">>> Extracted from image" >&2
     echo ">>> Chart files:" >&2
-    ls -lR "${charts_dir}" | head -50 >&2
+    find "${charts_dir}" -type f | head -50 >&2
 
     if [[ -f "${bin_dir}/helm" ]]; then
       chmod +x "${bin_dir}/helm"
@@ -599,8 +599,8 @@ function get_trustee_url() {
   if oc get route -n "${TRUSTEE_NAMESPACE}" &>/dev/null; then
     trustee_host=$(oc get route "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
     if [[ -n "${trustee_host}" ]]; then
-      trustee_url="http://${trustee_host}"
-      echo ">>> Trustee URL: ${trustee_url} (HTTP for test environment)"
+      trustee_url="https://${trustee_host}"
+      echo ">>> Trustee URL: ${trustee_url}"
     fi
   fi
 
@@ -609,7 +609,7 @@ function get_trustee_url() {
     trustee_ip=$(oc get svc "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
     [[ -z "${trustee_ip}" ]] && trustee_ip=$(oc get svc "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
     if [[ -n "${trustee_ip}" ]]; then
-      trustee_url="http://${trustee_ip}:${trustee_port}"
+      trustee_url="https://${trustee_ip}:${trustee_port}"
       trustee_host="${trustee_ip}"
     fi
   fi
@@ -619,7 +619,7 @@ function get_trustee_url() {
     trustee_ip=$(oc get svc "${kbs_service}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.spec.clusterIP}' 2>/dev/null || echo "")
     if [[ -n "${trustee_ip}" ]]; then
       echo ">>> WARN: Trustee using ClusterIP only (not externally accessible)"
-      trustee_url="http://${trustee_ip}:${trustee_port}"
+      trustee_url="https://${trustee_ip}:${trustee_port}"
       trustee_host="${trustee_ip}"
     else
       echo ">>> ERROR: Cannot find Trustee KBS service in namespace ${TRUSTEE_NAMESPACE}"
@@ -657,7 +657,13 @@ function create_initdata() {
       "ghcr.io/confidential-containers/test-container-image-rs": [
         {
           "type": "sigstoreSigned",
-          "keyPath": "kbs:///default/cosign-keys/key-0"
+          "keyPath": "kbs:///default/cosign-keys/key-0",
+          "signedIdentity": {
+            "type": "matchRepository"
+          }
+        },
+        {
+          "type": "insecureAcceptAnything"
         }
       ]
     }
@@ -742,7 +748,7 @@ default UpdateEphemeralMountsRequest := true
 default UpdateInterfaceRequest := true
 default UpdateRoutesRequest := true
 default WaitProcessRequest := true
-default ExecProcessRequest := false
+default ExecProcessRequest := true
 default SetPolicyRequest := true
 default WriteStreamRequest := false
 
@@ -836,7 +842,7 @@ function get_kbs_client_tag() {
   if [[ -n "${TRUSTEE_CSV_NAME:-}" ]]; then
     # Extract version from CSV name (e.g., "trustee-operator.v1.10.0" -> "1.10.0")
     local trustee_version
-    trustee_version=$(echo "${TRUSTEE_CSV_NAME}" | sed 's/^trustee-operator\.v//')
+    trustee_version="${TRUSTEE_CSV_NAME#trustee-operator.v}"
 
     if [[ -n "${trustee_version}" ]]; then
       # Try major.minor mapping first (e.g., "1.10.0" -> "1.10")
@@ -898,9 +904,9 @@ function verify_trustee_connectivity() {
   if ! wait_until "kbs-client pod Ready" 150 15 \
     "oc get pod/${kbs_client_pod} -n ${kbs_client_namespace} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q 'True'"; then
     echo ">>> ERROR: kbs-client pod not ready" >&2
-    oc describe pod/${kbs_client_pod} -n ${kbs_client_namespace} || true
-    oc logs pod/${kbs_client_pod} -n ${kbs_client_namespace} || true
-    oc delete pod/${kbs_client_pod} -n ${kbs_client_namespace} --ignore-not-found=true
+    oc describe "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" || true
+    oc logs "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" || true
+    oc delete "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" --ignore-not-found=true
     return 1
   fi
 
@@ -924,12 +930,15 @@ function verify_trustee_connectivity() {
   #   1. GET resource → 401 (no token)
   #   2. POST /auth + POST /attest (get attestation token)
   #   3. GET resource → 200 (with token)
+  # Use HTTP via in-cluster service DNS — the test pod is in the same namespace,
+  # so it can reach kbs-service directly without TLS.
+  local kbs_test_url="http://kbs-service.${kbs_client_namespace}.svc:${TRUSTEE_PORT}"
   local kbs_test_failed=false
-  echo ">>> Testing KBS connectivity: ${TRUSTEE_URL}/default/kbsres1/key1"
+  echo ">>> Testing KBS connectivity: ${kbs_test_url}/default/kbsres1/key1"
   echo ">>> Expected resource value: ${expected_value}"
 
-  if oc exec ${kbs_client_pod} -n ${kbs_client_namespace} -- \
-    kbs-client --url "${TRUSTEE_URL}" get-resource --path default/kbsres1/key1 \
+  if oc exec "${kbs_client_pod}" -n "${kbs_client_namespace}" -- \
+    kbs-client --url "${kbs_test_url}" get-resource --path default/kbsres1/key1 \
     > /tmp/kbs-resource.txt 2> /tmp/kbs-stderr.txt; then
 
     # Success - verify the retrieved value
@@ -950,7 +959,7 @@ function verify_trustee_connectivity() {
     fi
   else
     # Failure - show diagnostics
-    echo ">>> ERROR: Failed to retrieve resource from Trustee KBS at ${TRUSTEE_URL}"
+    echo ">>> ERROR: Failed to retrieve resource from Trustee KBS at ${kbs_test_url}"
 
     # Show stderr (has the actual error)
     if [[ -s /tmp/kbs-stderr.txt ]]; then
@@ -975,7 +984,7 @@ function verify_trustee_connectivity() {
       echo ">>> ERROR: Cannot connect to KBS service"
     fi
     if echo "${all_output}" | grep -q "certificate verify failed\|SSL\|TLS"; then
-      echo ">>> ERROR: SSL/TLS error - URL should be HTTP, not HTTPS (current: ${TRUSTEE_URL})"
+      echo ">>> ERROR: SSL/TLS error for: ${kbs_test_url}"
     fi
 
     kbs_test_failed=true
@@ -1014,7 +1023,7 @@ function verify_trustee_connectivity() {
     oc get pods -n "${TRUSTEE_NAMESPACE}" || true
   fi
 
-  oc delete pod/${kbs_client_pod} -n ${kbs_client_namespace} --ignore-not-found=true
+  oc delete "pod/${kbs_client_pod}" -n "${kbs_client_namespace}" --ignore-not-found=true
 
   if [[ "${kbs_test_failed}" == "true" ]]; then
     echo ">>> ERROR: kbs-client connectivity test failed"

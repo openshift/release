@@ -34,7 +34,8 @@ workflow:
         Conntrack proxy implementation should not be vulnerable to the invalid conntrack state bug\|
         CSRs from machines that are not recognized by the cloud provider are not approved\|
         blocks manual creation of EndpointSlices pointing to the cluster or service network\|
-        blocks manual creation of Endpoints pointing to the cluster or service network
+        blocks manual creation of Endpoints pointing to the cluster or service network\|
+        Feature:NetworkSegmentation
     pre:
       - chain: rosa-aws-sts-provision
       - ref: osd-ccs-conf-idp-htpasswd-multi-users
@@ -44,6 +45,9 @@ workflow:
     post:
       - ref: osd-gather-extra
       - chain: rosa-aws-sts-deprovision
+        best_effort: true
+      - ref: rosa-cluster-cleanup-vpc
+        best_effort: true
       - ref: send-results-to-reportportal
   documentation: |-
     This workflow installs a rosa sts cluster and performs openshift-tests conformance testing.

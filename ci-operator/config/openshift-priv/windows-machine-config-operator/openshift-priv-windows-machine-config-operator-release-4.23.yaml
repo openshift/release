@@ -4,16 +4,16 @@ base_images:
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: windows-machine-config-operator-test
   tls-scanner-tool:
-    name: 4.23-priv
-    namespace: ocp-private
+    name: "4.23"
+    namespace: ocp-priv
     tag: tls-scanner-tool
 binary_build_commands: make build
 build_root:
@@ -24,7 +24,7 @@ images:
   items:
   - dockerfile_path: build/Dockerfile.ci
     to: windows-machine-config-operator-test
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 operator:
   bundles:
   - as: wmco-bundle
@@ -38,20 +38,20 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    name: 4.23-priv
-    namespace: ocp-private
+    name: "4.23"
+    namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -76,14 +76,14 @@ tests:
   commands: make lint
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 - as: unit
   commands: make unit
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 - as: security
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     env:
       PROJECT_NAME: windows-machine-config-operator
@@ -100,7 +100,42 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
+  as: aws-e2e-ote
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --disable-monitor=pod-network-avalibility,required-scc-annotation-checker,termination-message-policy,kubelet-log-collector
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: wmco-setup-and-test
+      cli: latest
+      commands: |
+        export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-aws-ovn-hybrid
+- always_run: false
   as: vsphere-disconnected-e2e-operator
+  optional: true
   skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: vsphere-dis-2

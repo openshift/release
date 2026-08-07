@@ -1,7 +1,7 @@
 presubmits:
   openshift-priv/cluster-api-provider-openstack:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -92,9 +92,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-hypershift,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-hypershift|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -117,7 +119,6 @@ presubmits:
     name: pull-ci-openshift-priv-cluster-api-provider-openstack-release-4.23-e2e-openstack-capi-techpreview
     path_alias: sigs.k8s.io/cluster-api-provider-openstack
     rerun_command: /test e2e-openstack-capi-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:

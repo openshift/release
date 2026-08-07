@@ -107,13 +107,14 @@ Before making ANY changes, review the PR's history to understand what has alread
 
 ## Step 5: Address comments holistically
 
-Read ALL new comments together before making any changes. Do not process them one by one.
+Read ALL comments together before making any changes. Do not process them one by one.
 
 1. **Identify themes**: Group related comments by the concern they raise.
 2. **Spot contradictions**: When comments conflict, synthesize the underlying intent. The reviewer likely wants something implemented *differently*, not the same approach re-added.
 3. **If comments genuinely conflict**, reply on the PR asking the reviewer to clarify. Do not guess.
-4. **Plan a coherent set of changes** that addresses all feedback as a unified response. Then implement.
-5. Reply to each comment on the PR. Use the correct endpoint for the comment type:
+4. **Skip already-addressed comments**: Before acting on a comment, check whether you have already acted on it in a previous iteration. For inline comments, check the thread for a reply from you. For PR conversation comments, check whether you posted a follow-up. If you already acted on it (replied or made the requested change), do not act on it again — skip the comment entirely.
+5. **Plan a coherent set of changes** that addresses all remaining (not yet acted on) feedback as a unified response. Then implement.
+6. Reply to each **new** comment you are addressing on the PR. Do not re-reply to comments you already acted on, as determined in step 4. Use the correct endpoint for the comment type:
    - **Inline review comments** (from `pulls/PR_NUMBER/comments`): reply on the review thread:
      ```bash
      gh api repos/${UPSTREAM_REPO}/pulls/PR_NUMBER/comments/COMMENT_ID/replies -f body='explanation'
@@ -142,8 +143,8 @@ Not every comment requires a code change:
 
 ## Important
 
-- Address ALL review comments, not just some.
-- Reply to EVERY review comment explaining how you addressed it.
+- Address ALL review comments you have not already acted on, not just some.
+- Reply to EVERY comment you address, explaining how you addressed it.
 - Do not modify CI configuration or generated files.
 - Do NOT create new PRs. Push fixes to the existing branch.
 
@@ -174,10 +175,17 @@ is_trusted_user() {
     return 1
 }
 
+# Bot login written by the github-app-auth init step (passed to Claude for self-identification)
+BOT_LOGIN=$(cat "${SHARED_DIR}/gh-app-bot-login" 2>/dev/null || echo "")
+if [[ -z "${BOT_LOGIN}" ]]; then
+    echo "ERROR: ${SHARED_DIR}/gh-app-bot-login not found — github-app-auth step must run first"
+    exit 1
+fi
+echo "Bot login: ${BOT_LOGIN}"
+
 # --- Poll for review comments and CI failures ---
 echo "=== Watching PR #${PR_NUM} for review comments and CI failures ==="
 
-PROCESSED_IDS=""
 LAST_FAILING_NAMES=""
 iteration=0
 idle_streak=0
@@ -205,14 +213,6 @@ while true; do
     INLINE_JSON=$(echo "${raw_inline_comments}" | jq --argjson trusted "${trusted_jq_filter}" '[.[] | select(.user.login as $u | $trusted | index($u))]')
     REVIEWS_JSON=$(echo "${raw_reviews}" | jq --argjson trusted "${trusted_jq_filter}" '[.[] | select(.user.login as $u | $trusted | index($u))]')
     ISSUE_COMMENTS_JSON=$(echo "${raw_issue_comments}" | jq --argjson trusted "${trusted_jq_filter}" '[.[] | select(.user.login as $u | $trusted | index($u))]')
-
-    # Filter out already-processed items
-    if [[ -n "${PROCESSED_IDS}" ]]; then
-        processed_jq_filter=$(echo "${PROCESSED_IDS}" | tr ' ' '\n' | jq -R . | jq -s '.')
-        INLINE_JSON=$(echo "${INLINE_JSON}" | jq --argjson seen "${processed_jq_filter}" '[.[] | select((.id | tostring) as $id | $seen | index($id) | not)]')
-        REVIEWS_JSON=$(echo "${REVIEWS_JSON}" | jq --argjson seen "${processed_jq_filter}" '[.[] | select((.id | tostring) as $id | $seen | index($id) | not)]')
-        ISSUE_COMMENTS_JSON=$(echo "${ISSUE_COMMENTS_JSON}" | jq --argjson seen "${processed_jq_filter}" '[.[] | select((.id | tostring) as $id | $seen | index($id) | not)]')
-    fi
 
     inline_count=$(echo "${INLINE_JSON}" | jq 'length')
     review_count=$(echo "${REVIEWS_JSON}" | jq '[.[] | select(.state != "APPROVED" and .state != "PENDING")] | length')
@@ -246,15 +246,7 @@ while true; do
         git fetch origin "${BASE_BRANCH}" 2>/dev/null || true
         PR_DIFF_STAT=$(git diff "origin/${BASE_BRANCH}" --stat 2>/dev/null || echo "(no diff)")
 
-        # Full review thread from trusted users (read-only context for prior decisions)
-        ALL_INLINE_BODY=$(echo "${raw_inline_comments}" | jq --argjson trusted "${trusted_jq_filter}" \
-            '[.[] | select(.user.login as $u | $trusted | index($u))]' | \
-            jq -r '.[] | "**\(.user.login)** on `\(.path // "general")`:\n\(.body)\n---"' 2>/dev/null || echo "")
-        ALL_REVIEW_SUMMARY=$(echo "${raw_reviews}" | jq --argjson trusted "${trusted_jq_filter}" \
-            '[.[] | select(.user.login as $u | $trusted | index($u)) | select(.state != "APPROVED" and .state != "PENDING")]' | \
-            jq -r '.[] | "**\(.user.login)** (\(.state)):\n\(.body)\n---"' 2>/dev/null || echo "")
-
-        # Format NEW (unprocessed) comments for Claude to act on
+        # Format comments from trusted users for Claude
         # shellcheck disable=SC2034
         INLINE_BODY=$(echo "${INLINE_JSON}" | jq -r '.[] | "**\(.user.login)** on `\(.path // "general")`:\n\(.body)\n---"' 2>/dev/null || echo "")
         # shellcheck disable=SC2034
@@ -274,6 +266,8 @@ while true; do
             --append-system-prompt-file "${FOLLOWUP_PROMPT}" \
             -p "Address the review comments and fix any failing CI checks for ${JIRA_ISSUE_KEY}. The PR is #${PR_NUM} on ${UPSTREAM_REPO}.
 
+Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login.
+
 ## PR History (what has already been done on this branch)
 
 Recent commits:
@@ -282,15 +276,7 @@ ${COMMIT_LOG}
 Files changed in this PR:
 ${PR_DIFF_STAT}
 
-## Prior Review Thread (already addressed in earlier iterations - read-only context)
-
-Prior inline comments:
-${ALL_INLINE_BODY}
-
-Prior reviews:
-${ALL_REVIEW_SUMMARY}
-
-## NEW Comments To Address (act on these)
+## Review Comments
 
 Inline review comments:
 ${INLINE_BODY}
@@ -305,11 +291,6 @@ Failing CI checks:
 ${FAILING_CHECKS_BODY}" \
             --verbose 2>&1 | tee -a /workspace/artifacts/claude-output.log || true
 
-        # Track processed comment IDs
-        new_inline_ids=$(echo "${INLINE_JSON}" | jq -r '.[].id' 2>/dev/null)
-        new_review_ids=$(echo "${REVIEWS_JSON}" | jq -r '.[].id' 2>/dev/null)
-        new_issue_comment_ids=$(echo "${ISSUE_COMMENTS_JSON}" | jq -r '.[].id' 2>/dev/null)
-        PROCESSED_IDS="${PROCESSED_IDS} ${new_inline_ids} ${new_review_ids} ${new_issue_comment_ids}"
     else
         idle_streak=$(( idle_streak + 1 ))
         echo "Nothing to do (idle streak: ${idle_streak}/3)."

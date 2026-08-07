@@ -9,7 +9,58 @@ mkdir -p "${WORKDIR}"
 CLAUDE_HOME="/home/claude/.claude"
 mkdir -p "${CLAUDE_HOME}"
 
-CLAUDE_DOCTOR_LOG="${WORKDIR}/claude-doctor.log"
+github_app_token() {
+    local -r jwt="$1"
+    local -r repo="$2"
+
+    local install_id
+    install_id="$(curl -s \
+        -H "Authorization: Bearer ${jwt}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/${repo}/installation" \
+        | jq -r '.id')"
+    if [ -z "${install_id}" ] || [ "${install_id}" = "null" ]; then
+        echo "ERROR: Failed to get installation ID for ${repo}" >&2
+        return 1
+    fi
+
+    curl -s -X POST \
+        -H "Authorization: Bearer ${jwt}" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/${install_id}/access_tokens" \
+        | jq -r '.token'
+}
+
+load_secrets() {
+    # Disable command tracing to prevent leaking credentials in logs
+    # and restore it after the secrets are loaded
+    trap 'set -x' RETURN
+    set +x
+
+    echo "Loading secrets..."
+    if [ -f "${GITHUB_APP_ID_PATH}" ] && [ -f "${GITHUB_KEY_PATH}" ]; then
+        GITHUB_APP_JWT="$(gh-token generate \
+            --app-id "$(< "${GITHUB_APP_ID_PATH}")" \
+            --key "${GITHUB_KEY_PATH}" \
+            --jwt \
+            --token-only)"
+        if [ -z "${GITHUB_APP_JWT}" ]; then
+            echo "ERROR: Failed to generate GitHub App JWT"
+            return 1
+        fi
+
+        GITHUB_TOKEN="$(github_app_token "${GITHUB_APP_JWT}" openshift/lvm-operator)"
+        if [ -z "${GITHUB_TOKEN}" ] || [ "${GITHUB_TOKEN}" = "null" ]; then
+            echo "ERROR: Failed to generate installation access token for openshift/lvm-operator"
+            return 1
+        fi
+        export GITHUB_TOKEN
+
+        echo "GitHub token generated."
+    else
+        echo "WARNING: GitHub App credentials not found at ${GITHUB_APP_ID_PATH} and ${GITHUB_KEY_PATH}. GitHub operations will not be available."
+    fi
+}
 
 # The procedure to copy reports and session logs to artifacts, executed at exit
 atexit_handler() {
@@ -39,24 +90,6 @@ atexit_handler() {
         echo "Analysis complete"
     else
         echo "ERROR: No HTML report was generated"
-        return 1
-    fi
-
-    # Check if the Claude session completed successfully
-    if [ ! -f "${CLAUDE_DOCTOR_LOG}" ]; then
-        echo "WARNING: Log file '${CLAUDE_DOCTOR_LOG}' not found"
-        return 1
-    fi
-
-    local result_line
-    result_line="$(grep '"type":"result"' "${CLAUDE_DOCTOR_LOG}" | tail -1 || true)"
-    if [[ -z "${result_line}" ]]; then
-        echo "ERROR: No Claude result event found in '${CLAUDE_DOCTOR_LOG}'"
-        return 1
-    fi
-    if ! echo "$result_line" | grep -q '"subtype":"success"' ||
-       ! echo "$result_line" | grep -q '"is_error":false'; then
-        echo "ERROR: Claude session did not complete successfully"
         return 1
     fi
 }
@@ -95,6 +128,7 @@ echo "Starting LVMS Claude CI Doctor"
 # Ensure reports and session logs are copied to artifacts
 trap atexit_handler EXIT TERM INT
 
+load_secrets
 configure_claude
 
 # Use the edge-tooling source pre-installed in the image
@@ -102,14 +136,11 @@ SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/lvms-ci"
 cd "${SRC_DIR}"
 
-# Run analysis on all releases.
-# Time-box analysis and limit turns to avoid uncontrolled billable minutes.
-echo "Running Claude to analyze LVMS CI jobs..."
-timeout 4800 claude \
+# Run the deterministic doctor pipeline.
+echo "Running CI doctor pipeline..."
+python3 "${PLUGIN_DIR}/scripts/run-doctor.py" \
+    --releases "${RELEASE_VERSIONS}" \
+    --workdir "${WORKDIR}" \
     --model "${CLAUDE_MODEL}" \
-    --max-turns 100 \
-    --output-format stream-json \
-    --plugin-dir "${PLUGIN_DIR}" \
-    -p "/lvms-ci:doctor ${RELEASE_VERSIONS}" \
-    --verbose &> "${CLAUDE_DOCTOR_LOG}"
-echo "Analysis for LVMS CI jobs completed"
+    --pull-requests
+echo "CI doctor pipeline completed"

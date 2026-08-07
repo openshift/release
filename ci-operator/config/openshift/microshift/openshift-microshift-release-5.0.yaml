@@ -22,6 +22,20 @@ images:
           source_path: /go/src/github.com/openshift/microshift
     optional: true
     to: microshift-test-rpm
+  - dockerfile_literal: |
+      FROM src
+      USER 0
+      RUN dnf install -y podman shadow-utils jq file && dnf clean all && \
+          setcap cap_setuid+ep /usr/bin/newuidmap && \
+          setcap cap_setgid+ep /usr/bin/newgidmap && \
+          touch /etc/subgid /etc/subuid && \
+          chmod g=u /etc/subuid /etc/subgid
+      USER 1000
+    inputs:
+      src:
+        as:
+        - src
+    to: rebase-cryptoscan-src
 promotion:
   to:
   - disabled: true
@@ -87,12 +101,17 @@ tests:
   steps:
     workflow: openshift-ci-security
 - as: test-rebase
+  capabilities:
+  - intranet
+  - nested-podman
+  nested_podman: true
   optional: true
+  restrict_network_access: false
   run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod|vendor/.*|deps/.*)$
   steps:
     env:
       DRY_RUN: "y"
-    workflow: openshift-microshift-rebase
+    workflow: openshift-microshift-rebase-cryptoscan
 - as: e2e-aws-tests
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
@@ -345,7 +364,7 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
-      MICROSHIFT_OS: rhel-9.8
+      MICROSHIFT_OS: rhel-9.6
       SCENARIO_TYPE: bootc-c2cc
     workflow: openshift-microshift-e2e-metal-tests
 - as: e2e-aws-tests-bootc-c2cc-arm
@@ -354,7 +373,7 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c7g.metal
-      MICROSHIFT_OS: rhel-9.8
+      MICROSHIFT_OS: rhel-9.6
       SCENARIO_TYPE: bootc-c2cc
     workflow: openshift-microshift-e2e-metal-tests
 zz_generated_metadata:

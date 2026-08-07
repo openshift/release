@@ -9,11 +9,6 @@ mkdir -p "${WORKDIR}"
 CLAUDE_HOME="/home/claude/.claude"
 mkdir -p "${CLAUDE_HOME}"
 
-CLAUDE_DOCTOR_LOG="${WORKDIR}/claude-doctor.log"
-#CLAUDE_CREATE_BUGS_LOG="${WORKDIR}/claude-create-bugs.log"
-CLAUDE_CLOSE_STALE_BUGS_LOG="${WORKDIR}/claude-close-stale-bugs.log"
-CLAUDE_FIX_TEST_BUGS_LOG="${WORKDIR}/claude-fix-test-bugs.log"
-CLAUDE_DOCTOR_REFRESH_LOG="${WORKDIR}/claude-doctor-refresh.log"
 MCP_JIRA_LOG="${WORKDIR}/mcp-jira.log"
 
 # The procedure to copy reports and session logs to artifacts, executed at exit
@@ -47,45 +42,6 @@ atexit_handler() {
         echo "ERROR: No HTML report was generated"
         return 1
     fi
-
-    # Check if the Claude sessions were completed successfully.
-    # CLAUDE_CREATE_BUGS_LOG is excluded while the create-bugs session is disabled.
-    for log_file in "${CLAUDE_DOCTOR_LOG}" "${CLAUDE_CLOSE_STALE_BUGS_LOG}" "${CLAUDE_FIX_TEST_BUGS_LOG}" "${CLAUDE_DOCTOR_REFRESH_LOG}"; do
-        # If a session was terminated due to a timeout, report lack of
-        # subsequent session log files as a warning and continue not
-        # to mask the actual error
-        if [ ! -f "${log_file}" ]; then
-            echo "WARNING: Log file '${log_file}' not found"
-            continue
-        fi
-
-        local result_line
-        result_line="$(grep '"type":"result"' "${log_file}" | tail -1 || true)"
-        if [[ -z "${result_line}" ]]; then
-            echo "ERROR: No Claude result event found in '${log_file}'"
-            return 1
-        fi
-        if ! echo "$result_line" | grep -q '"subtype":"success"' ||
-           ! echo "$result_line" | grep -q '"is_error":false'; then
-            echo "ERROR: Claude session in '${log_file}' did not complete successfully"
-            return 1
-        fi
-    done
-}
-
-check_claude_rc() {
-    local -r rc="$1"
-    local -r session="$2"
-    local -r timeout_min="$3"
-
-    if [ "${rc}" -eq 124 ]; then
-        echo "ERROR: Claude ${session} session timed out after ${timeout_min} minutes"
-        exit 1
-    elif [ "${rc}" -ne 0 ]; then
-        echo "ERROR: Claude ${session} session failed with exit code ${rc}"
-        exit 1
-    fi
-    echo "Claude ${session} session completed successfully"
 }
 
 github_app_token() {
@@ -128,11 +84,12 @@ load_secrets() {
             return 1
         fi
 
-        GITHUB_TOKEN_USHIFT="$(github_app_token "${GITHUB_APP_JWT}" openshift/microshift)"
-        if [ -z "${GITHUB_TOKEN_USHIFT}" ] || [ "${GITHUB_TOKEN_USHIFT}" = "null" ]; then
+        GITHUB_TOKEN="$(github_app_token "${GITHUB_APP_JWT}" openshift/microshift)"
+        if [ -z "${GITHUB_TOKEN}" ] || [ "${GITHUB_TOKEN}" = "null" ]; then
             echo "ERROR: Failed to generate installation access token for openshift/microshift"
             return 1
         fi
+        export GITHUB_TOKEN
 
         echo "GitHub tokens generated."
     else
@@ -249,9 +206,6 @@ SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/microshift-ci"
 cd "${SRC_DIR}"
 
-# Configure the GitHub token for MicroShift repo operations
-{ set +x; export GITHUB_TOKEN="${GITHUB_TOKEN_USHIFT}"; set -x; }
-
 # Close duplicate rebase PRs before running the analysis to prevent them
 # from being included in the analysis and bug creation.
 echo "Running automatic closing of duplicate rebase PRs..."
@@ -263,75 +217,15 @@ echo "Running automatic closing of duplicate rebase PRs..."
     --filter 'NO-ISSUE: rebase-release'
 echo "Automatic closing of duplicate rebase PRs completed"
 
-# Run analysis on all releases and open rebase PRs (45m and 100 turns).
-echo "Running Claude to analyze MicroShift CI jobs and pull requests..."
-CLAUDE_RC=0
-timeout 2700 claude \
+# Run the deterministic doctor pipeline.
+echo "Running CI doctor pipeline..."
+python3 "${PLUGIN_DIR}/scripts/run-doctor.py" \
+    --releases "${RELEASE_VERSIONS}" \
+    --workdir "${WORKDIR}" \
     --model "${CLAUDE_MODEL}" \
-    --max-turns 100 \
-    --output-format stream-json \
-    --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:doctor ${RELEASE_VERSIONS}" \
-    --verbose &> "${CLAUDE_DOCTOR_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "doctor" 45
-
-# DISABLED: Automatic bug creation is turned off - bugs are filed manually
-# via the "Create Bug in JIRA" buttons in the HTML report. 
-# To re-enable:
-# - Uncomment the CLAUDE_CREATE_BUGS_LOG assignment above
-# - Uncomment the block below,
-# - Re-add CLAUDE_CREATE_BUGS_LOG to the loop in atexit_handler
-# - Re-add Slack notification link to created bugs
-
-# # Run bug creation for failed jobs (15m and 50 turns).
-# echo "Running Claude to create bugs for failed jobs..."
-# CLAUDE_RC=0
-# timeout 900 claude \
-#     --model "${CLAUDE_MODEL}" \
-#     --max-turns 50 \
-#     --output-format stream-json \
-#     --plugin-dir "${PLUGIN_DIR}" \
-#     -p "/microshift-ci:create-bugs ${RELEASE_VERSIONS} --create" \
-#     --verbose &> "${CLAUDE_CREATE_BUGS_LOG}" || CLAUDE_RC=$?
-# check_claude_rc "${CLAUDE_RC}" "create-bugs" 15
-
-# Close stale bugs that are no longer linked to current failures (10m and 20 turns).
-echo "Running Claude to close stale bugs..."
-CLAUDE_RC=0
-timeout 600 claude \
-    --model "${CLAUDE_MODEL}" \
-    --max-turns 20 \
-    --output-format stream-json \
-    --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:close-stale-bugs --close" \
-    --verbose &> "${CLAUDE_CLOSE_STALE_BUGS_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "close-stale-bugs" 10
-
-# Run bug fix for test bugs (15m and 50 turns).
-# Dry-run mode only.
-echo "Running Claude to fix test bugs (dry-run mode)..."
-export MICROSHIFT_CI_DRY_RUN=1
-CLAUDE_RC=0
-timeout 900 claude \
-    --model "${CLAUDE_MODEL}" \
-    --max-turns 50 \
-    --output-format stream-json \
-    --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:fix-test-bugs ${RELEASE_VERSIONS}" \
-    --verbose &> "${CLAUDE_FIX_TEST_BUGS_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "fix-test-bugs" 15
-
-# Run HTML report refresh to include the latest bug data (10m and 20 turns).
-echo "Running Claude to refresh the HTML report..."
-CLAUDE_RC=0
-timeout 600 claude \
-    --model "${CLAUDE_MODEL}" \
-    --max-turns 20 \
-    --output-format stream-json \
-    --plugin-dir "${PLUGIN_DIR}" \
-    -p "/microshift-ci:doctor-refresh ${RELEASE_VERSIONS}" \
-    --verbose &> "${CLAUDE_DOCTOR_REFRESH_LOG}" || CLAUDE_RC=$?
-check_claude_rc "${CLAUDE_RC}" "doctor-refresh" 10
+    --pull-requests \
+    --repo openshift/microshift
+echo "CI doctor pipeline completed"
 
 # Now attempt to restart failed rebase PRs tests. If the restarted tests
 # complete successfully, the PR will be automatically merged.

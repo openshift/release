@@ -82,6 +82,10 @@ source "${SHARED_DIR}/git-helpers.sh"
 # ── Setup ──────────────────────────────────────────────────────────────────────
 
 git config --global url."https://github.com/".insteadOf "git@github.com:"
+mkdir -p ~/.ssh
+if ! ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>&1; then
+  echo "Warning: ssh-keyscan failed — SSH host key verification may fail later"
+fi
 
 echo "Installing Claude Code plugins..."
 claude plugin marketplace add openshift-eng/ai-helpers
