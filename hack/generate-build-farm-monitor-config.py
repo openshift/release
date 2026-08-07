@@ -21,9 +21,12 @@ CONSOLE_URLS = {
     "build11": "https://console-openshift-console.apps.build11.ci.devcluster.openshift.com",
     "build12": "https://console-openshift-console.apps.build12.ci.devcluster.openshift.com",
     "build13": "https://console.build13.ci.openshift.org",
+    "hosted-mgmt": "https://console-openshift-console.apps.hosted-mgmt.ci.devcluster.openshift.com",
 }
 
 BUILD_ORDER = [f"build{i:02d}" for i in range(1, 14)]
+MGMT_CLUSTERS = ["hosted-mgmt"]
+CLUSTER_ORDER = BUILD_ORDER + MGMT_CLUSTERS
 
 
 def splice(path, begin, end, body):
@@ -106,11 +109,64 @@ def monitor_entry(cluster_name: str, console_url: str) -> str:
 """
 
 
+def mgmt_monitor_entry(cluster_name: str, console_url: str) -> str:
+    return f"""\
+  - component_slug: "build-farm"
+    sub_component_slug: "{cluster_name}"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{{job=\\"blackbox\\",instance=\\"{console_url}\\"}} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+  - component_slug: "build-farm"
+    sub_component_slug: "{cluster_name}"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "{cluster_name}"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{{namespace=\\"openshift-machine-api\\",deployment=\\"cluster-autoscaler-default\\"}} > 0 or absent(kube_deployment_status_replicas_available{{namespace=\\"openshift-machine-api\\",deployment=\\"cluster-autoscaler-default\\"}})"
+          failure_query: "kube_deployment_status_replicas_available{{namespace=\\"openshift-machine-api\\",deployment=\\"cluster-autoscaler-default\\"}}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+"""
+
+
 def dash_entry(cluster_name: str) -> str:
     display = "Build" + cluster_name[5:]
     return f"""\
       - name: "{display}"
         description: "Build cluster {cluster_name}"
+        monitoring:
+          frequency: 5m
+          component_monitor: "app-ci-component-monitor"
+          auto_resolve: true
+        requires_confirmation: false
+"""
+
+
+def mgmt_dash_entry(cluster_name: str) -> str:
+    display = "-".join(w.capitalize() for w in cluster_name.split("-"))
+    return f"""\
+      - name: "{display}"
+        description: "Management cluster {cluster_name}"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -143,6 +199,13 @@ for name in BUILD_ORDER:
         monitor_body += monitor_entry(name, console)
         dash_body += dash_entry(name)
 
+for name in MGMT_CLUSTERS:
+    if name not in CONSOLE_URLS:
+        continue
+    console = CONSOLE_URLS[name]
+    monitor_body += mgmt_monitor_entry(name, console)
+    dash_body += mgmt_dash_entry(name)
+
 splice(
     "core-services/ship-status/component-monitor-config.yaml",
     "  # BEGIN: auto-generated build-farm entries (hack/generate-build-farm-monitor-config.py)\n",
@@ -156,7 +219,7 @@ splice(
     dash_body,
 )
 
-for name in BUILD_ORDER:
+for name in CLUSTER_ORDER:
     if name not in CONSOLE_URLS:
         continue
     if blocked_by_name.get(name, False):
