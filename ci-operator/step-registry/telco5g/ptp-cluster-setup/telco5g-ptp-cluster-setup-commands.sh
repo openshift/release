@@ -453,7 +453,7 @@ sideload_kernel_on_workers() {
   - name: Derive expected kernel release from sideload URI
     ansible.builtin.set_fact:
       expected_kernel_release: >-
-        {{ sideload_kernel_uri | basename
+        {{ sideload_kernel_uri | regex_replace('[?#].*$', '') | basename
            | regex_replace('^kernel-(rt-)?core-', '')
            | regex_replace('\\.rpm$', '') }}
     when: sideload_kernel_uri != 'reset'
