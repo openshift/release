@@ -27,8 +27,8 @@ set -x
 
 echo "[smoke] Connection details loaded from SHARED_DIR"
 
-STACKROX_REF="${STACKROX_REF:-main}"
-SCANNER_REF="${SCANNER_REF:-main}"
+STACKROX_REF="${STACKROX_REF:-master}"
+SCANNER_REF="${SCANNER_REF:-master}"
 
 # ---------------------------------------------------------------------------
 # Sparse clone of stackrox/stackrox (qa-tests-backend + proto)
