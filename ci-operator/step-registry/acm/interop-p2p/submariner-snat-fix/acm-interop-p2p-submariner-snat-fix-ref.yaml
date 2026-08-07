@@ -6,7 +6,7 @@ ref:
     requests:
       cpu: 100m
       memory: 250Mi
-  timeout: 40m0s
+  timeout: 60m0s
   grace_period: 5m0s
   env:
     - name: ACM_SPOKE_CLUSTER_COUNT
@@ -20,25 +20,37 @@ ref:
         the next step runs subctl verify or starts migration. Kept short because
         no pod restarts are involved; nft changes take effect immediately.
   documentation: |-
-    Fixes the OVN-Kubernetes mgmtport-snat SNAT issue that breaks Submariner
-    cross-cluster connectivity on OCP 4.22 nightly (ACM-22805, ACM-24786,
-    ACM-36927).
+    Fixes the OVN-Kubernetes nftables SNAT issue that breaks Submariner
+    cross-cluster TCP connectivity on OCP 4.21+ (ACM-22805, ACM-24786,
+    ACM-36927, CORENET-7418, OCPSTRAT-940).
+    Upstream fix: ovn-kubernetes PR #6030 (not yet merged as of 2026-08-07).
 
-    Root cause: OVN-K's nftables mgmtport-snat chain rewrites the source IP of
-    cross-cluster traffic arriving at a spoke's gateway node.  The routeagent
-    sets k8s.ovn.org/node-ingress-snat-exclude-subnets on the gateway Node but
-    OVN-K on OCP 4.22 nightly does NOT reconcile that annotation into the
-    mgmtport-no-snat-subnets-v4 nftables set, leaving it empty.
+    Root cause: OVN-K completed its iptables→nftables migration under OCPSTRAT-940
+    in June-July 2026.  In local-gateway mode, two independent POSTROUTING basechains
+    now exist in the "inet ovn-kubernetes" nftables table:
+      mgmtport-snat (priority 100, fires first):
+        Masquerades traffic transiting ovn-k8s-mp0.  The mgmtport-no-snat-subnets-v4
+        exemption set is populated by the Submariner ConfigMap handler, but this only
+        fixes chain 1 — chain 2 fires independently regardless.
+      ovn-kube-local-gw-masq (priority 101, fires second):
+        Masquerades ALL pod-subnet traffic via its sub-chain ovn-kube-pod-subnet-masq.
+        A "return" in chain 1 has no effect on chain 2 because they are separate hooks.
+    This is why the ConfigMap fix repaired ICMP (stateless) but never fixed TCP:
+    chain 2 still masqueraded every packet with the wrong source IP.
+
+    The problem affects ALL nodes (workers + gateway), not just the gateway.
 
     What this step does (idempotent, safe to re-run):
-      1. For each spoke, discovers the OTHER spokes' pod+service CIDRs by
-         reading Submariner Endpoint CRs from the local submariner-operator
-         namespace.
-      2. Uses "oc debug node" to directly inject those CIDRs into the
-         mgmtport-no-snat-subnets-v4 nftables set (family: inet, table:
-         ovn-kubernetes) on every gateway node of that spoke.
-      3. Sleeps SUBMARINER_SNAT_FIX_SETTLE_SECS (default 10) for the rules
-         to take effect.
+      1. Discovers the remote spokes' pod+service CIDRs from Submariner Endpoint CRs.
+      2. PRIMARY FIX — on every node (workers + gateways): uses "oc debug node" to
+         insert "ip daddr <remote-cidr> return" rules at the head of BOTH
+         mgmtport-snat and ovn-kube-pod-subnet-masq chains.  Chains that do not
+         exist on a node are silently skipped.  Rules are inserted only when not
+         already present (idempotent check before each insert).
+      3. SECONDARY FIX (belt-and-suspenders, gateway nodes only): also adds the
+         remote CIDRs to the mgmtport-no-snat-subnets-v4 set — the canonical
+         OVN-K exemption mechanism, effective when OVN-K correctly reconciles it.
+      4. Sleeps SUBMARINER_SNAT_FIX_SETTLE_SECS (default 10) for rules to settle.
 
     NOTE: The ConfigMap (enable-snat-handler) + routeagent-restart approach
     is intentionally NOT used. Restarting submariner-routeagent re-publishes
@@ -50,7 +62,10 @@ ref:
     Must run after acm-interop-p2p-submariner-broker-join and before
     acm-interop-p2p-submariner-verify.
 
-    Applies to: ACM 2.13+ with OVN-Kubernetes network plugin on OCP 4.18+.
+    Timing: iterates all nodes on each spoke (~9 nodes × ~45s per node × 2 spokes
+    ≈ 15-20 minutes). Timeout is set to 60 minutes.
+
+    Applies to: ACM 2.13+ with OVN-Kubernetes network plugin on OCP 4.21+.
 
     Env vars consumed:
       ACM_SPOKE_CLUSTER_COUNT          - number of spoke clusters (default: 2)
