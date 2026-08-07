@@ -1,0 +1,22 @@
+workflow:
+  as: hypershift-aws-e2e-ipi-mgmt
+  documentation: |-
+    The HyperShift AWS IPI management cluster e2e workflow provisions a
+    standalone OpenShift cluster via IPI on AWS to serve as the management
+    cluster, installs the HyperShift operator, and runs the nested e2e test
+    suite. Unlike the standard hypershift-aws-e2e-nested workflow, this uses
+    a 2-tier model (IPI cluster is the management cluster) instead of the
+    3-tier nested management cluster model.
+  steps:
+    env:
+      KUBECONFIG: ${SHARED_DIR}/kubeconfig
+    post:
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: hypershift-install
+    - ref: hypershift-resolve-nodepool-releases
+    test:
+    - ref: hypershift-aws-run-e2e-nested
