@@ -105,6 +105,71 @@ apply_idms_if_configured() {
   } | oc apply -f -
 }
 
+ensure_catalog_source() {
+  if [[ -z "${CRO_CATALOG_IMAGE}" ]]; then
+    echo "=== Using existing CatalogSource ${CRO_CATALOG_SOURCE} (CRO_CATALOG_IMAGE unset) ==="
+    return 0
+  fi
+
+  echo "=== Creating CatalogSource ${CRO_CATALOG_SOURCE} from ${CRO_CATALOG_IMAGE} ==="
+  oc delete catalogsource "${CRO_CATALOG_SOURCE}" -n "${CRO_CATALOG_SOURCE_NAMESPACE}" --ignore-not-found=true
+
+  # OCP 4.15+ / modern kube: use extractContent cache (OCPBUGS-31427)
+  cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${CRO_CATALOG_SOURCE}
+  namespace: ${CRO_CATALOG_SOURCE_NAMESPACE}
+spec:
+  displayName: ClusterResourceOverride ART FBC
+  grpcPodConfig:
+    extractContent:
+      cacheDir: /tmp/cache
+      catalogDir: /configs
+    memoryTarget: 30Mi
+  image: ${CRO_CATALOG_IMAGE}
+  publisher: OpenShift CI
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+
+  local status=""
+  local i
+  for i in $(seq 1 60); do
+    status="$(oc -n "${CRO_CATALOG_SOURCE_NAMESPACE}" get catalogsource "${CRO_CATALOG_SOURCE}" \
+      -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)"
+    if [[ "${status}" == "READY" ]]; then
+      echo "CatalogSource ${CRO_CATALOG_SOURCE} is READY"
+      return 0
+    fi
+    echo "Waiting for CatalogSource READY... (${i}/60) state=${status:-<none>}"
+    sleep 10
+  done
+
+  echo "ERROR: CatalogSource ${CRO_CATALOG_SOURCE} did not become READY" >&2
+  oc -n "${CRO_CATALOG_SOURCE_NAMESPACE}" get catalogsource "${CRO_CATALOG_SOURCE}" -o yaml >&2 || true
+  oc -n "${CRO_CATALOG_SOURCE_NAMESPACE}" get pods -l "olm.catalogSource=${CRO_CATALOG_SOURCE}" -o wide >&2 || true
+  oc -n "${CRO_CATALOG_SOURCE_NAMESPACE}" get pods -l "olm.catalogSource=${CRO_CATALOG_SOURCE}" -o yaml >&2 || true
+  return 1
+}
+
+package_manifest_ready() {
+  oc get packagemanifest -n openshift-marketplace -o json \
+    | jq -e \
+      --arg pkg "${CRO_PACKAGE_NAME}" \
+      --arg src "${CRO_CATALOG_SOURCE}" '
+        .items[]
+        | select(.status.catalogSource == $src)
+        | select(
+            .metadata.name == $pkg
+            or (.status.packageName // "") == $pkg
+          )
+      ' >/dev/null 2>&1
+}
+
 patch_operator_images() {
   local csv
   if [[ -z "${CRO_OPERATOR_IMAGE}" && -z "${CRO_OPERAND_IMAGE}" ]]; then
@@ -187,20 +252,25 @@ echo "=== Ensuring operator namespace ${CRO_NAMESPACE} ==="
 oc get ns "${CRO_NAMESPACE}" >/dev/null 2>&1 || oc create ns "${CRO_NAMESPACE}"
 
 apply_idms_if_configured
+ensure_catalog_source
 
-echo "=== Waiting for PackageManifest ${CRO_PACKAGE_NAME} from ${CRO_CATALOG_SOURCE} ==="
+echo "=== Waiting for PackageManifest ${CRO_PACKAGE_NAME} from CatalogSource ${CRO_CATALOG_SOURCE} ==="
 for i in $(seq 1 36); do
-  if oc get packagemanifest -n openshift-marketplace "${CRO_PACKAGE_NAME}" >/dev/null 2>&1; then
-    echo "PackageManifest found."
+  if package_manifest_ready; then
+    echo "PackageManifest found from ${CRO_CATALOG_SOURCE}."
     break
   fi
   echo "Waiting for PackageManifest... (${i}/36)"
   sleep 10
 done
 
-if ! oc get packagemanifest -n openshift-marketplace "${CRO_PACKAGE_NAME}" >/dev/null 2>&1; then
-  echo "ERROR: PackageManifest '${CRO_PACKAGE_NAME}' not found in openshift-marketplace" >&2
-  oc get packagemanifest -n openshift-marketplace 2>/dev/null | grep -i clusterresource || true
+if ! package_manifest_ready; then
+  echo "ERROR: PackageManifest '${CRO_PACKAGE_NAME}' not found from CatalogSource '${CRO_CATALOG_SOURCE}'" >&2
+  oc get packagemanifest -n openshift-marketplace -o wide 2>/dev/null | grep -i clusterresource || true
+  oc get packagemanifest -n openshift-marketplace -o json \
+    | jq -r --arg pkg "${CRO_PACKAGE_NAME}" \
+      '.items[] | select(.metadata.name == $pkg) | [.metadata.name, .status.catalogSource, .status.catalogSourceNamespace] | @tsv' \
+    >&2 || true
   oc get catalogsource -n "${CRO_CATALOG_SOURCE_NAMESPACE}" -o wide >&2 || true
   exit 1
 fi

@@ -34,11 +34,19 @@ ref:
     default: "redhat-operators"
     documentation: |-
       CatalogSource name used for the Subscription (in openshift-marketplace
-      unless CRO_CATALOG_SOURCE_NAMESPACE is overridden).
+      unless CRO_CATALOG_SOURCE_NAMESPACE is overridden). When CRO_CATALOG_IMAGE
+      is set, this CatalogSource is created/replaced before subscribing.
   - name: CRO_CATALOG_SOURCE_NAMESPACE
     default: "openshift-marketplace"
     documentation: |-
       Namespace of the CatalogSource referenced by the Subscription.
+  - name: CRO_CATALOG_IMAGE
+    default: ""
+    documentation: |-
+      Optional index/FBC image for a custom CatalogSource. When set, the step
+      creates CRO_CATALOG_SOURCE from this image (ART FBC recommended for 5.0
+      s390x where redhat-operators may not list clusterresourceoverride yet).
+      Example: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__5.0__ose-clusterresourceoverride-rhel9-operator
   - name: CRO_CREATE_CR
     default: "true"
     documentation: |-
@@ -82,7 +90,8 @@ ref:
       to this mirror. Prefer CRO_OPERAND_IMAGE when using a full pullspec override.
   documentation: |-
     Installs the ClusterResourceOverride operator via OLM Subscription on a
-    provisioned s390x cluster (redhat-operators by default). Optionally applies
-    an ImageDigestMirrorSet and/or patches CSV/Deployment when CRO_OPERATOR_IMAGE
-    / CRO_OPERAND_IMAGE are set. Waits for the CSV to Succeed, then optionally
-    creates the ClusterResourceOverride CR (name: cluster).
+    provisioned s390x cluster. Optionally creates a CatalogSource from
+    CRO_CATALOG_IMAGE (ART FBC), applies an ImageDigestMirrorSet, and/or patches
+    CSV/Deployment when CRO_OPERATOR_IMAGE / CRO_OPERAND_IMAGE are set. Waits
+    for the CSV to Succeed, then optionally creates the ClusterResourceOverride
+    CR (name: cluster).
