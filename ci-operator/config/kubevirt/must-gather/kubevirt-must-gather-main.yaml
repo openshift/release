@@ -121,12 +121,37 @@ tests:
       commands: |
         INCIDENT_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-incident-output -- NS=ns001 VM=testvm-ns001-vm001 /usr/bin/gather --vm-incident --incident-time=${INCIDENT_TIME}
+        METRICS_FILE=$(find ${ARTIFACT_DIR}/must-gather-incident-output -name "incident-metrics.txt" -type f | head -1)
+        if [[ -f "${METRICS_FILE}" ]]; then
+          PROM_IMAGE=$(oc get statefulset -n openshift-monitoring prometheus-k8s -o jsonpath='{.spec.template.spec.containers[?(@.name=="prometheus")].image}' 2>/dev/null)
+          if [[ -z "${PROM_IMAGE}" ]]; then
+            echo "WARNING: openshift-monitoring/prometheus-k8s not found, skipping backfill validation"
+          else
+            echo "Validating OpenMetrics backfill with promtool..."
+            PROMTOOL_DIR=$(mktemp -d)
+            BACKFILL_DIR=$(mktemp -d)
+            PROMTOOL_LOG=$(mktemp)
+            _promtool_cleanup() { rm -rf "${PROMTOOL_DIR}" "${BACKFILL_DIR}" "${PROMTOOL_LOG}"; }
+            trap _promtool_cleanup EXIT
+            oc image extract "${PROM_IMAGE}" --path=/bin/promtool:"${PROMTOOL_DIR}" --confirm
+            if "${PROMTOOL_DIR}/promtool" tsdb create-blocks-from openmetrics "${METRICS_FILE}" "${BACKFILL_DIR}" > "${PROMTOOL_LOG}" 2>&1; then
+              echo "promtool backfill validation passed"
+            else
+              echo "ERROR: promtool backfill validation failed (exit code $?). Redacted output saved to artifacts."
+              sed -E 's/="[^"]*"/="<redacted>"/g' "${PROMTOOL_LOG}" > "${ARTIFACT_DIR}/promtool-backfill.log"
+              exit 1
+            fi
+          fi
+        else
+          echo "WARNING: incident-metrics.txt not found, skipping backfill validation"
+        fi
         mkdir -p ${ARTIFACT_DIR}/junit
         (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} INCIDENT_NS=ns001 MG_INCIDENT_OUTPUT_DIR=must-gather-incident-output /go/bin/must-gather.test --ginkgo.label-filter=level:incident --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
       dependencies:
       - env: KMG_IMAGE
         name: kubevirt-must-gather
       from: test-bin
+      grace_period: 1m0s
       resources:
         requests:
           cpu: 100m
@@ -254,12 +279,37 @@ tests:
       commands: |
         INCIDENT_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-incident-output -- NS=ns001 VM=testvm-ns001-vm001 /usr/bin/gather --vm-incident --incident-time=${INCIDENT_TIME}
+        METRICS_FILE=$(find ${ARTIFACT_DIR}/must-gather-incident-output -name "incident-metrics.txt" -type f | head -1)
+        if [[ -f "${METRICS_FILE}" ]]; then
+          PROM_IMAGE=$(oc get statefulset -n openshift-monitoring prometheus-k8s -o jsonpath='{.spec.template.spec.containers[?(@.name=="prometheus")].image}' 2>/dev/null)
+          if [[ -z "${PROM_IMAGE}" ]]; then
+            echo "WARNING: openshift-monitoring/prometheus-k8s not found, skipping backfill validation"
+          else
+            echo "Validating OpenMetrics backfill with promtool..."
+            PROMTOOL_DIR=$(mktemp -d)
+            BACKFILL_DIR=$(mktemp -d)
+            PROMTOOL_LOG=$(mktemp)
+            _promtool_cleanup() { rm -rf "${PROMTOOL_DIR}" "${BACKFILL_DIR}" "${PROMTOOL_LOG}"; }
+            trap _promtool_cleanup EXIT
+            oc image extract "${PROM_IMAGE}" --path=/bin/promtool:"${PROMTOOL_DIR}" --confirm
+            if "${PROMTOOL_DIR}/promtool" tsdb create-blocks-from openmetrics "${METRICS_FILE}" "${BACKFILL_DIR}" > "${PROMTOOL_LOG}" 2>&1; then
+              echo "promtool backfill validation passed"
+            else
+              echo "ERROR: promtool backfill validation failed (exit code $?). Redacted output saved to artifacts."
+              sed -E 's/="[^"]*"/="<redacted>"/g' "${PROMTOOL_LOG}" > "${ARTIFACT_DIR}/promtool-backfill.log"
+              exit 1
+            fi
+          fi
+        else
+          echo "WARNING: incident-metrics.txt not found, skipping backfill validation"
+        fi
         mkdir -p ${ARTIFACT_DIR}/junit
         (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} INCIDENT_NS=ns001 MG_INCIDENT_OUTPUT_DIR=must-gather-incident-output /go/bin/must-gather.test --ginkgo.label-filter=level:incident --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
       dependencies:
       - env: KMG_IMAGE
         name: kubevirt-must-gather
       from: test-bin
+      grace_period: 1m0s
       resources:
         requests:
           cpu: 100m
