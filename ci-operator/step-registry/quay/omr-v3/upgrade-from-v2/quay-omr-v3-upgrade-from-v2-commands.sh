@@ -123,40 +123,43 @@ set -o pipefail
 umask 077
 
 work_dir="$1"
-data_dir="/home/$(id -un)/quay-v3"
 registry_hostname="$2"
 registry_endpoint="${registry_hostname}:8443"
-export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+source_root="/home/$(id -un)/quay-install"
+data_dir="/var/lib/quay"
 
-if ! "${work_dir}/quay" migrate \
+# DNM experiment: install the migrated v3 registry as root instead of
+# rootless, to test whether root-owned cgroups avoid the RHEL 8 cgroups v1
+# "mkdir /sys/fs/cgroup/devices/user.slice/runtime: permission denied"
+# failure hit by rootless Quadlet installs on this host. Source paths are
+# passed explicitly because auto-detection would look under root's $HOME
+# (/root) instead of this session's home once `quay migrate` runs via sudo.
+for service in quay-app quay-redis quay-pod; do
+    systemctl --user stop "${service}.service" 2>/dev/null || true
+done
+
+if ! sudo "${work_dir}/quay" migrate \
     -data-dir "${data_dir}" \
-    -image-archive "${work_dir}/quay-mirror.tar" \
-    -cleanup > "${work_dir}/migration.log" 2>&1; then
-    echo "OMR v3 migration failed; see the sanitized migration artifact." >&2
+    -hostname "${registry_hostname}" \
+    -source-db "${source_root}/sqlite-storage/quay_sqlite.db" \
+    -source-storage "${source_root}/quay-storage" \
+    -source-certs "${source_root}/quay-config" \
+    -image-archive "${work_dir}/quay-mirror.tar" > "${work_dir}/migration.log" 2>&1; then
+    echo "OMR v3 root migration failed; see the sanitized migration artifact." >&2
     exit 1
 fi
 
-systemctl --user is-active --quiet quay.service
-for service in quay-app.service quay-redis.service quay-pod.service; do
-    if systemctl --user is-active --quiet "${service}"; then
-        echo "Old OMR v2 service ${service} is still active." >&2
-        exit 1
-    fi
-    if [[ -e "/home/$(id -un)/.config/systemd/user/${service}" ]]; then
-        echo "Old OMR v2 unit ${service} was not removed." >&2
-        exit 1
-    fi
-done
+sudo systemctl is-active --quiet quay.service
 
-curl --retry 20 --retry-delay 3 --retry-all-errors \
+sudo curl --retry 20 --retry-delay 3 --retry-all-errors \
     --silent --show-error --fail \
-    --cacert "/home/$(id -un)/quay-install/quay-rootCA/rootCA.pem" \
+    --cacert "${data_dir}/rootCA.pem" \
     "https://${registry_endpoint}/healthz" >/dev/null
 cert_dir="${work_dir}/certs"
 auth_file="${work_dir}/registry-auth.json"
 install -d -m 0700 "${cert_dir}"
-install -m 0600 \
-    "/home/$(id -un)/quay-install/quay-rootCA/rootCA.pem" \
+sudo install -m 0644 \
+    "${data_dir}/rootCA.pem" \
     "${cert_dir}/ca.crt"
 admin_password=$(<"/home/$(id -un)/.omr-v2-admin-password")
 if ! printf '%s' "${admin_password}" | podman login \
@@ -201,4 +204,4 @@ if [[ "${migration_status}" -ne 0 ]]; then
 fi
 
 sha256sum --check "${work_dir}/runtime-material.sha256"
-echo "OMR v2 content and runtime identity migrated successfully to rootless OMR v3."
+echo "OMR v2 content and runtime identity migrated successfully to root OMR v3 (DNM cgroups-v1 experiment)."
