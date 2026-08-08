@@ -149,7 +149,7 @@ EOF
 # The SBR controller's validateStorageClass uses kubernetes.io/no-provisioner (unknown
 # provisioner) so it falls through to testRWXSupport, which creates a temporary 1Gi
 # PVC. The best-fit scheduler binds that PVC to the smallest matching PV. If our only
-# PV is 10Gi, the test consumes it and then patches its reclaim policy to Delete —
+# PV is 10Gi, the test consumes it and then patches its reclaim policy to Delete -
 # leaving the actual SBRC PVC (10Mi) with no PV to bind to.
 # Workaround: provide a 1Gi decoy PV sized to attract the test PVC exactly, keeping
 # the 10Gi PV available for the real SBRC workload.
@@ -180,65 +180,40 @@ oc get pv nfs-sbr-pv nfs-sbr-pv-test
 
 # --- Mirror UBI base image for SBR operator init Job ---
 # The SBR operator's ensureSBRDevice() init Job hardcodes
-# registry.access.redhat.com/ubi8/ubi-minimal:latest. This image is not in the
+# registry.access.redhat.com/ubi9/ubi-minimal:9.8. This image is not in the
 # operator's relatedImages (so oc-mirror never mirrors it) and uses a tag
 # reference which IDMS cannot redirect. We mirror it manually and create an ITMS.
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
-log "Mirroring ubi8/ubi-minimal to disconnected registry ${MIRROR_REGISTRY_HOST}..."
+log "Mirroring ubi9/ubi-minimal to disconnected registry ${MIRROR_REGISTRY_HOST}..."
 ssh_bastion "sudo skopeo copy --retry-times 3 \
     --src-tls-verify=true --dest-tls-verify=false \
     --authfile=/tmp/new_pull_secret \
-    docker://registry.access.redhat.com/ubi8/ubi-minimal:latest \
-    docker://${MIRROR_REGISTRY_HOST}/ubi8/ubi-minimal:latest" \
-    || { log "ERROR: failed to mirror ubi8/ubi-minimal"; exit 1; }
-log "UBI image mirrored"
+    docker://registry.access.redhat.com/ubi9/ubi-minimal:9.8 \
+    docker://${MIRROR_REGISTRY_HOST}/ubi9/ubi-minimal:9.8"
+log "ubi9/ubi-minimal:9.8 mirrored to ${MIRROR_REGISTRY_HOST}"
 
-# Create an ImageTagMirrorSet so CRI-O redirects the tag-based pull to the mirror.
+# Create ITMS so nodes redirect tag-based pulls to the mirror.
+# IDMS (digest-based) does not help because the operator uses a tag reference.
+log "Creating ITMS for ubi9/ubi-minimal..."
 oc apply -f - <<EOF
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet
 metadata:
-  name: ubi-minimal-mirror
+  name: medik8s-ubi-init-image
 spec:
   imageTagMirrors:
-  - source: registry.access.redhat.com/ubi8/ubi-minimal
-    mirrors:
-    - ${MIRROR_REGISTRY_HOST}/ubi8/ubi-minimal
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}/ubi9/ubi-minimal
+    source: registry.access.redhat.com/ubi9/ubi-minimal
 EOF
 
-# Wait for ITMS to propagate to all nodes by actively verifying the image is pullable.
-# The previous approach (watching MCP rendered config names) is unreliable: ITMS may
-# update CRI-O config via a path that does not change the rendered MachineConfig name.
-# Active verification is the only reliable signal that nodes have picked up the mirror.
-log "Waiting for ubi8/ubi-minimal to be pullable via ITMS mirror (up to 12m)..."
-UBI_PULLABLE=false
-for i in $(seq 1 24); do
-    sleep 30
-    oc delete pod sbr-ubi-preflight --ignore-not-found --wait=false 2>/dev/null || true
-    POD_PHASE=$(oc run sbr-ubi-preflight \
-        --image=registry.access.redhat.com/ubi8/ubi-minimal:latest \
-        --restart=Never \
-        --command -- sh -c 'echo PREFLIGHT_OK' 2>/dev/null && \
-        timeout 30 bash -c 'until [[ $(oc get pod sbr-ubi-preflight -o jsonpath="{.status.phase}" 2>/dev/null) =~ ^(Succeeded|Failed)$ ]]; do sleep 2; done; oc get pod sbr-ubi-preflight -o jsonpath="{.status.phase}"' \
-        2>/dev/null || true)
-    if [[ "$POD_PHASE" == "Succeeded" ]]; then
-        log "  ubi8/ubi-minimal pullable after $((i * 30))s"
-        UBI_PULLABLE=true
-        oc delete pod sbr-ubi-preflight --ignore-not-found 2>/dev/null || true
-        break
-    fi
-    log "  attempt ${i}/24: image not yet pullable (phase=${POD_PHASE:-pending}), retrying in 30s..."
-    oc delete pod sbr-ubi-preflight --ignore-not-found --wait=false 2>/dev/null || true
-done
+# Wait for MCO to roll out the ITMS change to all nodes.
+log "Waiting for MachineConfigPool rollout after ITMS..."
+oc wait mcp master worker --for=condition=Updated --timeout=15m || {
+    log "WARNING: MCP rollout timed out, init Job may fail on image pull"
+}
 
-if [[ "${UBI_PULLABLE}" != "true" ]]; then
-    log "WARNING: ubi8/ubi-minimal not pullable after 12m — ITMS may not have propagated."
-    log "  SBR init Job may fail; device files are pre-created so it will retry quickly."
-    oc get mcp 2>/dev/null || true
-fi
-
-# For the watchdog test, use the OCP release cli image — it's already mirrored
-# as part of the release payload and has the basic tools the probe pods need.
+# For the watchdog test, use the OCP release cli image.
 WATCHDOG_IMAGE=$(oc adm release info --image-for=cli 2>/dev/null || true)
 if [[ -n "$WATCHDOG_IMAGE" ]]; then
     log "Using release cli image for watchdog probes: ${WATCHDOG_IMAGE}"
@@ -247,4 +222,4 @@ else
     log "WARNING: could not resolve release cli image, watchdog probes will use default"
 fi
 
-log "UBI mirror setup complete"
+log "NFS bastion setup complete"
