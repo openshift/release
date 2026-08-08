@@ -54,7 +54,7 @@ scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_N
 CLUSTER_NAME="$(oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config view -o jsonpath='{.clusters[0].name}')"
 CLUSTER_API_SERVER_HOSTNAME="$(oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config view -o jsonpath='{.clusters[0].cluster.server}' | sed -E 's#https://([^:]+):.*#\1#')"
 echo "Resolving cluster API server hostname '${CLUSTER_API_SERVER_HOSTNAME}' from the hypervisor..."
-CLUSTER_API_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${CLUSTER_API_SERVER_HOSTNAME} | awk '{print \$1}'")"
+CLUSTER_API_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${CLUSTER_API_SERVER_HOSTNAME} | awk '{print \$1}'" | head -1)"
 
 if [[ -z "${CLUSTER_API_IP}" ]]; then
     echo "ERROR: Failed to resolve '${CLUSTER_API_SERVER_HOSTNAME}' from the hypervisor"
@@ -76,3 +76,20 @@ oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config unset "clusters.${CLUSTER
 
 cp /tmp/kubeconfig.${CLUSTER_NAME} "${SHARED_DIR}/kubeconfig"
 echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig successfully"
+
+# The *.apps wildcard DNS is internal to the hypervisor network and not
+# resolvable from CI pods. Resolve the ingress VIP from the hypervisor
+# and pass it to kube-burner via --prometheus-url in KB_FLAGS through
+# proxy-conf.sh so downstream steps pick it up automatically.
+APPS_DOMAIN="$(oc --kubeconfig=/tmp/kubeconfig.doca8 get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')"
+echo "Resolving apps domain '*.${APPS_DOMAIN}' from the hypervisor..."
+APPS_HOSTNAME="prometheus-k8s-openshift-monitoring.${APPS_DOMAIN}"
+APPS_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${APPS_HOSTNAME} | awk '{print \$1}'" | head -1)"
+
+if [[ -z "${APPS_IP}" ]]; then
+    echo "WARNING: Failed to resolve '${APPS_HOSTNAME}' from the hypervisor, skipping Prometheus URL setup"
+else
+    echo "Resolved '${APPS_HOSTNAME}' to '${APPS_IP}'"
+    echo "export KB_FLAGS=\"\${KB_FLAGS:-} --prometheus-url=https://${APPS_IP}\"" >> "${SHARED_DIR}/proxy-conf.sh"
+    echo "Wrote Prometheus URL to \${SHARED_DIR}/proxy-conf.sh"
+fi
