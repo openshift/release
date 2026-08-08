@@ -1,0 +1,20 @@
+chain:
+  as: p2p-cclm-bidir-migration-test
+  steps:
+    - ref: p2p-create-migration-test-vm
+    - ref: p2p-mtv-execute-bidir-live-migration
+  documentation: |-
+    Bi-directional CCLM live migration test: create a VM on the source spoke then
+    round-trip live-migrate it in two passes using a single step.
+
+    Step 1 (p2p-create-migration-test-vm): Creates an ODF-backed VM on the source spoke
+    (MTV_SOURCE_PROVIDER / spoke-1 by default) and waits until it is Running.
+
+    Step 2 (p2p-mtv-execute-bidir-live-migration): Runs two sequential live migrations
+    via MTV on the hub —
+      Pass 1: source → destination (e.g. spoke-1 → spoke-2)
+      Pass 2: destination → source (e.g. spoke-2 → spoke-1, same VM)
+    Both passes write JUnit XML and per-pass diagnostics to ARTIFACT_DIR.
+
+    Requires: ODF + CNV (CNV_ENABLE_CCLM=true) on both spokes, Submariner (no Globalnet),
+    p2p-mtv-mig-config (ForkliftController, providers, network/storage maps).
