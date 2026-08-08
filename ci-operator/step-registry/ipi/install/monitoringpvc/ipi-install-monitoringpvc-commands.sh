@@ -60,6 +60,12 @@ prometheusK8s:
           storage: ${STORAGE}
 EOF
 
+if [[ "${ENABLE_USER_WORKLOAD_MONITORING}" == "true" ]]; then
+  cat >> "${PATCH}" << EOF
+enableUserWorkload: true
+EOF
+fi
+
 CONFIG_CONTENTS="$(echo "${CONFIG_CONTENTS}" | yq-go m - "${PATCH}")"
 yq-go w --style folded -i "${CONFIG}" 'data."config.yaml"' "${CONFIG_CONTENTS}"
 cat "${CONFIG}"
