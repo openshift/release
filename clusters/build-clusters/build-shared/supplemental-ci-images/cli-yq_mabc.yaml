@@ -18,20 +18,20 @@ spec:
         name: cli-yq:latest
     source:
       dockerfile: |
-        FROM quay.io/openshift/ci:ocp_4.18_cli
+        FROM registry.ci.openshift.org/ocp-multi/4.22.0:cli
         RUN ARCH=$(uname -m) && \
             case "$ARCH" in \
                 x86_64) ARCH='amd64' ;; \
                 aarch64) ARCH='arm64' ;; \
                 *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
             esac && \
-            curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${ARCH} -o /tmp/yq && chmod +x /tmp/yq
+            curl --fail --retry 3 -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${ARCH} -o /usr/local/bin/yq && chmod +x /usr/local/bin/yq
         RUN yum install -y jq
       type: Dockerfile
     strategy:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: quay.io/openshift/ci:ocp_4.18_cli
+          name: registry.ci.openshift.org/ocp-multi/4.22.0:cli
         imageOptimizationPolicy: SkipLayers
       type: Docker
