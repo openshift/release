@@ -23,7 +23,7 @@ spec:
   imagePullPolicy: IfNotPresent
   pathConfig:
     path: "/var/hpvolumes"
-    useNamingPrefix: "false"
+    useNamingPrefix: false
 EOF
 
 # Wait for HostPathProvisioner to be ready
