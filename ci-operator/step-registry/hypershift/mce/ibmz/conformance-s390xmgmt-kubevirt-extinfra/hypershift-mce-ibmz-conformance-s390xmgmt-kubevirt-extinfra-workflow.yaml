@@ -1,0 +1,35 @@
+workflow:
+  as: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra
+  documentation: |-
+    Phase 1 workflow that provisions two ephemeral OpenShift clusters on libvirt:
+    a management cluster and an external infrastructure (infra) cluster. This is the
+    foundation for HyperShift KubeVirt on external infrastructure testing.
+    MCE + virt operator are installed on the mgmt cluster; virt operator alone on infra.
+  steps:
+    allow_best_effort_post_steps: true
+    leases:
+    - resource_type: libvirt-s390x-vpn-oz-quota-slice
+      env: LEASED_RESOURCE_INFRA    # second OZ host for infra cluster
+    env:
+      CONTROL_COUNT: "1"
+      COMPUTE_COUNT: "0"
+      CNV_SUBSCRIPTION_SOURCE: 'redhat-operators'
+    pre:
+    # ── Management cluster (SNO: 1 control, 0 compute) ───────────────────
+    - chain: hypershift-mce-ibmz-create-s390xmgmt-oz
+
+    # ── Infra cluster (compact: 3 control, 0 compute) ────────────────────
+    - chain: hypershift-mce-ibmz-create-s390xinfra-oz
+
+    # ── Operator installs ─────────────────────────────────────────────────
+    # MCE + virt on mgmt cluster (default $KUBECONFIG → mgmt)
+    - chain: hypershift-mce-ibmz-install-operators-mgmt
+    # virt operator on infra cluster ($SHARED_DIR/infra-kubeconfig)
+    - chain: hypershift-mce-ibmz-install-operators-infra
+    test:
+    - ref: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra-test-print
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+    - ref: upi-libvirt-infra-cleanup-post

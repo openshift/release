@@ -2,6 +2,12 @@
 
 set -ex
 
+# Allow callers (e.g. the infra chain) to redirect oc commands to a different
+# cluster by setting INSTALL_KUBECONFIG. Empty = use ci-operator default.
+if [[ -n "${INSTALL_KUBECONFIG:-}" ]]; then
+  export KUBECONFIG="${INSTALL_KUBECONFIG}"
+fi
+
 function ocp_version() {
     oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
 }
