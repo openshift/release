@@ -1,0 +1,46 @@
+ref:
+  as: windows-cnv-provision
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: windows-cnv-provision-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CNV_WINDOWS_VERSION
+    default: "2025"
+    documentation: "Windows Server version for the KubeVirt VM (2022 or 2025)"
+  - name: CNV_WINDOWS_VM_COUNT
+    default: "1"
+    documentation: "Number of Windows KubeVirt VMs to provision (max 1; each VM adds ~70m and the step timeout is 2h30m)"
+  - name: CNV_WINDOWS_BOOT_SOURCE_URL
+    default: ""
+    documentation: "Container disk registry URL for the Windows golden image DataVolume import. When empty, auto-selected based on CNV_WINDOWS_VERSION."
+  credentials:
+  - mount_path: /tmp/cnv-registry-auth
+    name: openshift-cnv-containerdisks-auth
+    namespace: test-credentials
+  timeout: 2h30m0s
+  documentation: |-
+    Provisions Windows Server VMs on KubeVirt/OpenShift Virtualization for
+    WMCO BYOH testing.
+
+    This step:
+    1. Imports a Windows golden image as a DataVolume from a container registry
+    2. Creates a headless Service for DNS-based pod IP discovery
+    3. Creates VirtualMachine(s) with sysprep configured for WMCO BYOH
+       (SSH key auth, firewall ports, masquerade pod IP injection)
+    4. Waits for VMs to boot and complete sysprep
+    5. Writes <address>_windows_instance.txt files to SHARED_DIR
+
+    The SSH public key is read from ${CLUSTER_PROFILE_DIR}/ssh-publickey and
+    injected into the VM's administrators_authorized_keys via sysprep. The
+    matching private key is used by the BYOH test step for WMCO authentication.
+
+    The masquerade networking workaround resolves the VM's pod IP via a headless
+    Service and adds it as a secondary address inside the VM, which WMCO/WICD
+    requires to match node.status.addresses[].InternalIP.
