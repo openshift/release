@@ -10,7 +10,12 @@ ref:
     requests:
       cpu: 100m
       memory: 200Mi
-  timeout: 40m0s
+  # Pull-secret/IDMS MCP rollout + OLM subscribe; keep tighter than a padded 90m.
+  timeout: 60m0s
+  credentials:
+  - namespace: test-credentials
+    name: deploy-konflux-operator-art-image-share
+    mount_path: /var/run/secrets/pull-secret
   env:
   - name: CRO_NAMESPACE
     default: "openshift-cluster-resource-override"
@@ -61,10 +66,23 @@ ref:
     documentation: |-
       Optional override for OPERAND_IMAGE on the operator Deployment/CSV. When
       empty, the catalog/CSV value is left unchanged.
+  - name: CRO_ART_IMAGE_SHARE
+    default: ""
+    documentation: |-
+      When set (e.g. quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share),
+      merge deploy-konflux-operator-art-image-share into the cluster pull-secret
+      and create an ImageDigestMirrorSet mapping registry.redhat.io openshift4/5
+      ClusterResourceOverride repos to this mirror (Konflux ART weekly pattern).
+  - name: CRO_ART_PULL_SECRET_PATH
+    default: "/var/run/secrets/pull-secret/.dockerconfigjson"
+    documentation: |-
+      Path to the mounted ART image-share dockerconfigjson (from credentials
+      deploy-konflux-operator-art-image-share).
   - name: CRO_IDMS_NAME
     default: "cluster-resource-override-idms"
     documentation: |-
-      Name of the ImageDigestMirrorSet created when mirror env vars are set.
+      Name of the ImageDigestMirrorSet created for ART image-share and/or
+      CRO_MIRROR_* mappings.
   - name: CRO_SOURCE_OPERATOR_IMAGE
     default: "registry.redhat.io/openshift4/ose-clusterresourceoverride-rhel9-operator"
     documentation: |-
@@ -90,8 +108,9 @@ ref:
       to this mirror. Prefer CRO_OPERAND_IMAGE when using a full pullspec override.
   documentation: |-
     Installs the ClusterResourceOverride operator via OLM Subscription on a
-    provisioned s390x cluster. Optionally creates a CatalogSource from
-    CRO_CATALOG_IMAGE (ART FBC), applies an ImageDigestMirrorSet, and/or patches
-    CSV/Deployment when CRO_OPERATOR_IMAGE / CRO_OPERAND_IMAGE are set. Waits
-    for the CSV to Succeed, then optionally creates the ClusterResourceOverride
-    CR (name: cluster).
+    provisioned s390x cluster. Optionally merges Konflux ART image-share
+    credentials + IDMS (CRO_ART_IMAGE_SHARE), creates a CatalogSource from
+    CRO_CATALOG_IMAGE (ART FBC), and/or patches CSV/Deployment when
+    CRO_OPERATOR_IMAGE / CRO_OPERAND_IMAGE are set. Waits for the CSV to
+    Succeed, then optionally creates the ClusterResourceOverride CR.
+

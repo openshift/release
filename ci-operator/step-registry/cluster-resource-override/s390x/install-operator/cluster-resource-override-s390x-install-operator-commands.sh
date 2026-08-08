@@ -80,7 +80,7 @@ dump_deployment_debug() {
 
 apply_idms_if_configured() {
   if [[ -z "${CRO_MIRROR_OPERATOR_IMAGE}" && -z "${CRO_MIRROR_OPERAND_IMAGE}" ]]; then
-    echo "=== Skipping ImageDigestMirrorSet (no mirror repositories configured) ==="
+    echo "=== Skipping ImageDigestMirrorSet (no CRO_MIRROR_* repositories configured) ==="
     return 0
   fi
 
@@ -103,6 +103,71 @@ apply_idms_if_configured() {
       echo "    - ${CRO_MIRROR_OPERAND_IMAGE}"
     fi
   } | oc apply -f -
+}
+
+# Match secrets-store / Konflux ART weekly jobs: pull-secret for art-images-share +
+# IDMS so registry.redhat.io/openshift{4,5}/ose-clusterresourceoverride-* digests
+# resolve from quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share.
+setup_art_image_share_access() {
+  if [[ -z "${CRO_ART_IMAGE_SHARE}" ]]; then
+    echo "=== Skipping ART image-share access (CRO_ART_IMAGE_SHARE unset) ==="
+    return 0
+  fi
+
+  local art_pull_secret="${CRO_ART_PULL_SECRET_PATH}"
+  if [[ ! -f "${art_pull_secret}" ]]; then
+    echo "ERROR: ART image-share pull secret not found at ${art_pull_secret}" >&2
+    echo "Mount credentials secret deploy-konflux-operator-art-image-share (test-credentials)." >&2
+    return 1
+  fi
+
+  echo "=== Merging ART image-share credentials into cluster pull-secret ==="
+  # Disable tracing due to pull-secret handling
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
+  mkdir -p /tmp/cro-pull-secret
+  oc extract secret/pull-secret -n openshift-config --confirm --to /tmp/cro-pull-secret
+  jq -s '.[0].auths += .[1].auths | .[0]' \
+    /tmp/cro-pull-secret/.dockerconfigjson \
+    "${art_pull_secret}" > /tmp/cro-merged-pullsecret.json
+  oc set data secret/pull-secret -n openshift-config \
+    --from-file=.dockerconfigjson=/tmp/cro-merged-pullsecret.json
+  rm -rf /tmp/cro-pull-secret /tmp/cro-merged-pullsecret.json
+  $WAS_TRACING && set -x
+
+  echo "=== Applying ImageDigestMirrorSet ${CRO_IDMS_NAME} -> ${CRO_ART_IMAGE_SHARE} ==="
+  cat <<EOF | oc apply -f -
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: ${CRO_IDMS_NAME}
+spec:
+  imageDigestMirrors:
+  - source: registry.redhat.io/openshift5/ose-clusterresourceoverride-operator-bundle
+    mirrors:
+    - ${CRO_ART_IMAGE_SHARE}
+  - source: registry.redhat.io/openshift5/ose-clusterresourceoverride-rhel9-operator
+    mirrors:
+    - ${CRO_ART_IMAGE_SHARE}
+  - source: registry.redhat.io/openshift5/ose-clusterresourceoverride-rhel9
+    mirrors:
+    - ${CRO_ART_IMAGE_SHARE}
+  - source: registry.redhat.io/openshift4/ose-clusterresourceoverride-operator-bundle
+    mirrors:
+    - ${CRO_ART_IMAGE_SHARE}
+  - source: registry.redhat.io/openshift4/ose-clusterresourceoverride-rhel9-operator
+    mirrors:
+    - ${CRO_ART_IMAGE_SHARE}
+  - source: registry.redhat.io/openshift4/ose-clusterresourceoverride-rhel9
+    mirrors:
+    - ${CRO_ART_IMAGE_SHARE}
+EOF
+
+  echo "=== Waiting for MachineConfigPools after pull-secret/IDMS update ==="
+  sleep 60
+  oc wait mcp/master --for condition=Updated --timeout=15m
+  oc wait mcp/worker --for condition=Updated --timeout=15m
+  echo "MachineConfigPools are Updated"
 }
 
 ensure_catalog_source() {
@@ -251,6 +316,7 @@ patch_operator_images() {
 echo "=== Ensuring operator namespace ${CRO_NAMESPACE} ==="
 oc get ns "${CRO_NAMESPACE}" >/dev/null 2>&1 || oc create ns "${CRO_NAMESPACE}"
 
+setup_art_image_share_access
 apply_idms_if_configured
 ensure_catalog_source
 
