@@ -340,7 +340,7 @@ stringData:
     }
     Get-NetIPAddress -InterfaceAlias Ethernet -AddressFamily IPv4 | Format-Table IPAddress,AddressState
     Stop-Transcript
-'@
+    '@
     $startupScript | Set-Content -Path 'C:\k\add-pod-ip.ps1' -Force
     $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-ExecutionPolicy Bypass -File C:\k\add-pod-ip.ps1'
     $taskTrigger = New-ScheduledTaskTrigger -AtStartup
