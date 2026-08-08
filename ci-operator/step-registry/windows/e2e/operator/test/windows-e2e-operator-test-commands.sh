@@ -37,4 +37,4 @@ if [ -f $MIRROR_REGISTRY_FILE ]; then
   echo "Using mirror registry: $MIRROR_REGISTRY_HOST"
 fi
 
-make run-ci-e2e-test
+hack/run-ci-e2e-test.sh -m "${WINDOWS_MACHINE_REPLICAS}"
