@@ -88,11 +88,15 @@ spec:
         - --one-time=true
         - --depth=1
         - --link=release
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout
+          mountPath: /etc/git-sync
+          readOnly: true
       containers:
       - name: git-sync
         command:
@@ -104,11 +108,15 @@ spec:
         - --root=/tmp/git-sync
         - --max-failures=3
         - --link=release
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout
+          mountPath: /etc/git-sync
+          readOnly: true
         resources:
           requests:
             memory: "5Gi"
@@ -171,6 +179,12 @@ spec:
           name: config
       - name: release
         emptyDir: {}
+      - name: sparse-checkout
+        configMap:
+          name: git-sync-sparse-checkout
+          items:
+          - key: jobs
+            path: sparse-checkout
       - name: slack-bot-config
         configMap:
           name: slack-bot-keyword-list
