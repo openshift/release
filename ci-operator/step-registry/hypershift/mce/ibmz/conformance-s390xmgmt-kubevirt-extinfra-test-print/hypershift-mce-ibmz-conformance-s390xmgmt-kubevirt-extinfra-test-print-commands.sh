@@ -10,15 +10,36 @@ INFRA_KUBECONFIG="${SHARED_DIR}/infra-kubeconfig"
 echo "============================================================"
 echo "Management cluster nodes (KUBECONFIG=${MGMT_KUBECONFIG})"
 echo "============================================================"
-KUBECONFIG="${MGMT_KUBECONFIG}" oc get nodes -o wide
+export KUBECONFIG="${MGMT_KUBECONFIG}"
+echo "oc get nodes -o wide"
+oc get nodes -o wide
+echo "oc get co"
 oc get co
+echo "oc get mce"
 oc get mce
+echo "oc get po -n openshift-cnv"
 oc get po -n openshift-cnv
+echo "oc get sc"
+oc get sc
+echo "oc get po -n metallb-system"
+oc get po -n metallb-system
+echo "oc get ipaddresspool -A"
+oc get ipaddresspool -A
 
 echo ""
 echo "============================================================"
 echo "Infra cluster nodes (KUBECONFIG=${INFRA_KUBECONFIG})"
 echo "============================================================"
-KUBECONFIG="${INFRA_KUBECONFIG}" oc get nodes -o wide
+export KUBECONFIG="${INFRA_KUBECONFIG}"
+echo "oc get nodes -o wide"
+oc get nodes -o wide
+echo "oc get co"
 oc get co
+echo "oc get po -n openshift-cnv"
 oc get po -n openshift-cnv
+echo "oc get sc"
+oc get sc
+echo "oc get po -n metallb-system"
+oc get po -n metallb-system
+echo "oc get ipaddresspool -A"
+oc get ipaddresspool -A
