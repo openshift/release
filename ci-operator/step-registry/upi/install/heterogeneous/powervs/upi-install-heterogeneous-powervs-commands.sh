@@ -86,7 +86,7 @@ function cleanup_prior() {
             if [ -n "${VPC_CONN_ID}" ]
             then
                 echo "deleting VPC connection"
-                ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
+                ibmcloud tg connection-delete "${GW}" "${VPC_CONN_ID}" --force || true
                 sleep 120
                 echo "Done Cleaning up GW VPC Connection"
             else
@@ -174,11 +174,19 @@ function configure_automation() {
     echo "Target the PowerVS Workspace"
     ibmcloud pi workspace target "${CRN}"
 
+    echo "DEBUG: Images available in the workspace:"
+    ibmcloud pi image list || true
+
     # Invoke create-var-file.sh to generate var.tfvars file
     echo "Creating the var file"
+    echo "DEBUG: RHCOS_IMAGE_NAME='${RHCOS_IMAGE_NAME:-unset}'"
+    echo "DEBUG: OCP_VERSION='${OCP_VERSION}'"
+    echo "DEBUG: RHEL_IMAGE_NAME='${RHEL_IMAGE_NAME}'"
     cd ${IBMCLOUD_HOME}/ocp4-upi-compute-powervs \
         && bash scripts/create-var-file.sh /tmp/ibmcloud/ocp4-upi-compute-powervs "${ADDITIONAL_WORKERS}" "p-px"
     cp "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
+    echo "DEBUG: Generated var.tfvars:"
+    grep -E "rhcos_image_name|rhcos_import_image" "${SHARED_DIR}/var.tfvars" || true
 
     #Create the VPC to fixed transit gateway Connection for the TG
     RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
