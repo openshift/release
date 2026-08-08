@@ -71,6 +71,9 @@ if ! oc get secret "${REGISTRY_AUTH_SECRET}" -n "${OS_IMAGES_NAMESPACE}" 2>/dev/
   echo "$(date -u --rfc-3339=seconds) - Secret keys: $(oc get secret "${REGISTRY_AUTH_SECRET}" -n "${OS_IMAGES_NAMESPACE}" -o jsonpath='{.data}' | jq -r 'keys | join(", ")')"
 fi
 
+echo "$(date -u --rfc-3339=seconds) - Checking default StorageClass..."
+oc get sc -o name 2>/dev/null || true
+
 cat <<EOF | oc apply -f -
 apiVersion: cdi.kubevirt.io/v1beta1
 kind: DataVolume
@@ -85,10 +88,18 @@ spec:
       url: '${CNV_WINDOWS_BOOT_SOURCE_URL}'
       secretRef: ${REGISTRY_AUTH_SECRET}
   storage:
+    accessModes:
+      - ReadWriteOnce
+    volumeMode: Filesystem
     resources:
       requests:
         storage: 64Gi
 EOF
+
+echo "$(date -u --rfc-3339=seconds) - DataVolume created. Checking PVC status..."
+sleep 10
+oc get pvc -n "${OS_IMAGES_NAMESPACE}" 2>/dev/null || true
+oc get pods -n "${OS_IMAGES_NAMESPACE}" 2>/dev/null || true
 
 echo "$(date -u --rfc-3339=seconds) - Waiting for DataVolume import to complete (this may take 20-40 minutes)..."
 echo "$(date -u --rfc-3339=seconds) - Monitoring DataVolume progress..."
