@@ -1,4 +1,8 @@
 base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
   log-file-metric-exporter:
     name: 6.y
     namespace: logging
@@ -19,6 +23,10 @@ base_images:
     name: 5.y
     namespace: logging
     tag: loki-operator-src
+  operator-sdk:
+    name: "4.21"
+    namespace: origin
+    tag: operator-sdk
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -56,6 +64,7 @@ operator:
   bundles:
   - as: cluster-logging-operator-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/openshift-logging/cluster-logging-operator.*
     with: pipeline:cluster-logging-operator
@@ -143,16 +152,26 @@ tests:
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     dependencies:
-      OO_INDEX: ci-index-cluster-logging-operator-bundle
+      OO_BUNDLE: cluster-logging-operator-bundle
     env:
-      OO_CHANNEL: stable-6.7
       OO_INSTALL_NAMESPACE: openshift-logging
-      OO_PACKAGE: cluster-logging
-      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: test
       cli: latest
-      commands: make test-e2e-from-ci-bundle IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
+      commands: |
+        cd /go/src/github.com/openshift/cluster-logging-operator
+        export RELATED_IMAGE_VECTOR=${IMAGE_LOGGING_VECTOR}
+        export RELATED_IMAGE_LOG_FILE_METRIC_EXPORTER=${IMAGE_LOG_FILE_METRIC_EXPORTER}
+        export IMAGE_LOGGING_EVENTROUTER=${IMAGE_LOGGING_EVENTROUTER}
+        export IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
+        export LOG_LEVEL=3
+        export GOFLAGS=-mod=mod
+        export NO_COLOR=1
+        go test -v -timeout=90m \
+          -ginkgo.v -ginkgo.trace \
+          -ginkgo.poll-progress-after=300s \
+          -ginkgo.poll-progress-interval=30s \
+          ./test/e2e/...
       dependencies:
       - env: IMAGE_LOGGING_VECTOR
         name: pipeline:logging-vector
@@ -167,7 +186,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: optional-operators-ci-generic-claim
+    workflow: optional-operators-ci-operator-sdk-generic-claim
 - as: functional-target
   cluster_claim:
     architecture: amd64
