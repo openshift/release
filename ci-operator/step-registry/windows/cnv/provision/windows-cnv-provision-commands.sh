@@ -114,6 +114,15 @@ while [[ ${dv_elapsed} -lt ${dv_timeout} ]]; do
     exit 1
   fi
 
+  # Show importer pod status if stuck in ImportScheduled
+  if [[ "${dv_phase}" == "ImportScheduled" && ${dv_elapsed} -ge 300 && $(( dv_elapsed % 300 )) -eq 0 ]]; then
+    echo "--- Importer pod status (stuck at ImportScheduled) ---"
+    oc get pods -n "${OS_IMAGES_NAMESPACE}" -l "cdi.kubevirt.io/storage.import.importPvcName=${DV_NAME}" -o wide 2>/dev/null || true
+    oc get pvc -n "${OS_IMAGES_NAMESPACE}" 2>/dev/null || true
+    oc get events -n "${OS_IMAGES_NAMESPACE}" --sort-by='.lastTimestamp' 2>/dev/null | tail -10 || true
+    echo "--- end diagnostic ---"
+  fi
+
   echo "$(date -u --rfc-3339=seconds) - DataVolume phase: ${dv_phase}, progress: ${dv_progress} (${dv_elapsed}s/${dv_timeout}s)"
   sleep ${dv_interval}
   dv_elapsed=$((dv_elapsed + dv_interval))
