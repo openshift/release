@@ -15,7 +15,7 @@ images:
     to: ubi9-minimal-entitled
   - dockerfile_path: Dockerfile.openshift-appliance
     from: ubi9-minimal-entitled
-    to: agent-release-iso-builder
+    to: agent-preinstall-image-builder
 promotion:
   to:
   - excluded_images:
@@ -51,24 +51,16 @@ tests:
   container:
     from: test-bin
   run_if_changed: ^(cmd/.*|data/.*|hack/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
-- always_run: false
-  as: e2e-agent-compact-ipv4-iso-no-registry
-  capabilities:
-  - intranet
-  optional: true
-  run_if_changed: ^(cmd/.*|data/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
+- as: publish
+  cron: '@daily'
   steps:
-    cluster_profile: equinix-ocp-metal
     dependencies:
-      APPLIANCE_IMAGE: agent-release-iso-builder
+      SOURCE_IMAGE_REF: agent-preinstall-image-builder
     env:
-      AGENT_E2E_TEST_BOOT_MODE: ISO_NO_REGISTRY
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
-        AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
-      DEVSCRIPTS_TARGET: agent
-    workflow: agent-e2e-compact-ipv4-iso-no-registry
+      IMAGE_REPO: openshift-appliance
+      IMAGE_TAG: latest
+    test:
+    - ref: assisted-baremetal-images-publish
 - as: e2e-compact-ipv4-static
   capabilities:
   - intranet
@@ -76,8 +68,6 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: packet-assisted
-    dependencies:
-      APPLIANCE_IMAGE: agent-release-iso-builder
     workflow: agent-e2e-appliance-ipv4
 - always_run: false
   as: e2e-sno-dualstack-dhcp
@@ -88,8 +78,6 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: packet-assisted
-    dependencies:
-      APPLIANCE_IMAGE: agent-release-iso-builder
     workflow: agent-e2e-appliance-dualstack
 - as: e2e-sno-dualstack-dhcp-periodic
   capabilities:
@@ -97,10 +85,8 @@ tests:
   cron: 00 00 */1 * 5
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      APPLIANCE_IMAGE: agent-release-iso-builder
     workflow: agent-e2e-appliance-dualstack
 zz_generated_metadata:
-  branch: master
+  branch: agent-preinstall-image-builder
   org: openshift
   repo: appliance
