@@ -2,11 +2,16 @@
 
 set -ex
 
-# Allow callers (e.g. the infra chain) to redirect oc commands to a different
-# cluster by setting INSTALL_KUBECONFIG. Empty = use ci-operator default.
-if [[ -n "${INSTALL_KUBECONFIG:-}" ]]; then
-  export KUBECONFIG="${INSTALL_KUBECONFIG}"
+# This step always targets the infra cluster. Use INSTALL_KUBECONFIG if
+# explicitly set; otherwise fall back to $SHARED_DIR/infra-kubeconfig.
+# NOTE: env var defaults in ref YAMLs are not shell-expanded, so the path
+# cannot be defaulted in the ref — we resolve it here at runtime instead.
+EFFECTIVE_KUBECONFIG="${INSTALL_KUBECONFIG:-${SHARED_DIR}/infra-kubeconfig}"
+if [[ ! -f "${EFFECTIVE_KUBECONFIG}" ]]; then
+  echo "ERROR: infra kubeconfig not found at ${EFFECTIVE_KUBECONFIG}"
+  exit 1
 fi
+export KUBECONFIG="${EFFECTIVE_KUBECONFIG}"
 
 function ocp_version() {
     oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
