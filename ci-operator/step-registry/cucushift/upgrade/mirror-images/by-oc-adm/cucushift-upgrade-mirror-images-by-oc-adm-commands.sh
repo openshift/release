@@ -83,7 +83,23 @@ function mirror_image(){
             cmd="${cmd} --apply-release-image-signature --overwrite"
         fi
     fi
-    run_command "${cmd} | tee ${MIRROR_OUT_FILE}"
+    local max_attempts=10
+    local attempt=0
+    local success=false
+    while [[ "${success}" == "false" ]] && (( attempt++ < max_attempts )); do
+        echo "Mirroring images attempt ${attempt}/${max_attempts}"
+        if run_command "${cmd} | tee ${MIRROR_OUT_FILE}"; then
+            echo "Mirroring images was successful in attempt ${attempt}"
+            success=true
+        else
+            echo "Mirroring images attempt ${attempt} failed. Trying again..."
+            sleep 120
+        fi
+    done
+    if [[ "${success}" == "false" ]]; then
+        echo "Mirroring images failed after ${max_attempts} attempts, exiting..."
+        return 1
+    fi
 }
 
 function apply_signature(){
