@@ -1,0 +1,38 @@
+ref:
+  as: servicemesh-common-prepare-job-workdir
+  from: src
+  commands: servicemesh-common-prepare-job-workdir-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 20m0s
+  env:
+  - name: MAISTRA_NAMESPACE
+    default: "maistra-e2e-test"
+    documentation: |-
+      Namespace on the cluster under test for the workdir PVC, Secret, and Jobs.
+  - name: MAISTRA_BUILDER_IMAGE
+    documentation: |-
+      Builder image used for the temporary copy pod (must match suite Job image).
+  - name: MAISTRA_WORKDIR_PVC
+    default: "maistra-workdir"
+    documentation: |-
+      Name of the PersistentVolumeClaim that holds the copied source at /work.
+  - name: MAISTRA_WORKDIR_PVC_SIZE
+    default: "20Gi"
+    documentation: |-
+      Requested size for the workdir PVC.
+  - name: MAISTRA_COPY_POD
+    default: "maistra-workdir-copy"
+    documentation: |-
+      Temporary pod used to receive oc cp into the PVC; deleted before the suite Job.
+  - name: MAISTRA_KUBECONFIG_SECRET
+    default: "ci-kubeconfig"
+    documentation: |-
+      Secret name created from the step kubeconfig and mounted into suite Jobs.
+  documentation: |-
+    Creates a privileged namespace (if needed), a workdir PVC, a kubeconfig Secret,
+    and copies the Prow step checkout into the PVC via a temporary copy pod.
+    Installs shared Job helpers into SHARED_DIR for subsequent suite steps.
+    Use with SKIP_CREATE_TEST_RESOURCES=true so the sleep-pod workflow path is skipped.
