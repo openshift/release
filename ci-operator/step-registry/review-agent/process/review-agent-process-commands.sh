@@ -192,10 +192,46 @@ else
   # Disable tracing due to token handling
   [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
   set +x
-  git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
-  export GITHUB_TOKEN="$GITHUB_TOKEN_UPSTREAM"
+
+  # Write tokens to files so they can be refreshed mid-session
+  # (GitHub App installation tokens expire after 1 hour; long Claude sessions exceed this)
+  echo "$GITHUB_TOKEN_FORK" > /tmp/.github-token-fork
+  echo "$GITHUB_TOKEN_UPSTREAM" > /tmp/.github-token-upstream
+  chmod 600 /tmp/.github-token-fork /tmp/.github-token-upstream
+
+  # Credential helper reads from file each time (picks up refreshed tokens automatically)
+  git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(cat /tmp/.github-token-fork)"; }; f'
+
+  # Use gh auth login so token is stored persistently (not as an env var that can't be refreshed)
+  echo "$GITHUB_TOKEN_UPSTREAM" | gh auth login --with-token --hostname github.com
+
   echo "GitHub App tokens configured successfully"
   $_was_tracing && set -x || true
+
+  # Write a refresh script that Claude can call before push/reply operations
+  cat > /tmp/refresh-github-tokens.sh << REFRESH_EOF
+#!/bin/bash
+set -euo pipefail
+source "${SHARED_DIR}/github-app-auth.sh"
+echo "Refreshing GitHub App tokens..." >&2
+FORK_TOKEN=\$(generate_github_token "${INSTALLATION_ID_FORK}")
+UPSTREAM_TOKEN=\$(generate_github_token "${INSTALLATION_ID_UPSTREAM}")
+if [ -z "\$FORK_TOKEN" ] || [ "\$FORK_TOKEN" = "null" ]; then
+  echo "ERROR: Failed to refresh fork token" >&2
+  exit 1
+fi
+if [ -z "\$UPSTREAM_TOKEN" ] || [ "\$UPSTREAM_TOKEN" = "null" ]; then
+  echo "ERROR: Failed to refresh upstream token" >&2
+  exit 1
+fi
+echo "\$FORK_TOKEN" > /tmp/.github-token-fork
+echo "\$UPSTREAM_TOKEN" > /tmp/.github-token-upstream
+chmod 600 /tmp/.github-token-fork /tmp/.github-token-upstream
+git config --global credential.helper '!f() { echo username=x-access-token; echo "password=\$(cat /tmp/.github-token-fork)"; }; f'
+echo "\$UPSTREAM_TOKEN" | gh auth login --with-token --hostname github.com
+echo "GitHub App tokens refreshed successfully" >&2
+REFRESH_EOF
+  chmod +x /tmp/refresh-github-tokens.sh
 fi
 
 # TODO: Stronger sandboxing (container-level isolation, ai-guardian, PreToolUse hooks)
