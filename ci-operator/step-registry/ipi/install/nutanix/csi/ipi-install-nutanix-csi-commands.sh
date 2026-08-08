@@ -70,7 +70,7 @@ metadata:
   name: nutanixcsioperator
   namespace: openshift-cluster-csi-drivers
 spec:
-  channel: stable
+  channel: stable-3.x
   name: nutanixcsioperator
   installPlanApproval: Automatic
   source: nutanix-csi-operator-beta
