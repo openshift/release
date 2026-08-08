@@ -11,6 +11,7 @@ set -o pipefail
 : "${FLEET_IMAGE:?FLEET_IMAGE must be set}"
 : "${MGMT_AGENT_IMAGE:?MGMT_AGENT_IMAGE must be set}"
 : "${KUBE_APPLIER_IMAGE:?KUBE_APPLIER_IMAGE must be set}"
+: "${EXPORTER_IMAGE:?EXPORTER_IMAGE must be set}"
 
 if [[ ! -f "${SHARED_DIR}/config.yaml" ]]; then
   echo "ERROR: ${SHARED_DIR}/config.yaml missing; run aro-hcp-provision-from-main first"
@@ -44,7 +45,8 @@ export DETECT_DIRTY_GIT_WORKTREE=0
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 
-# Hypershift images from PR config; regional service images from PR pipeline builds.
+# Preserve the Hypershift images from the PR config when the shared helper
+# builds the regional service image override.
 if ! yq -e '.defaults.hypershift.image.registry' config/config.yaml >/dev/null 2>&1 \
   || ! yq -e '.defaults.hypershift.image.repository' config/config.yaml >/dev/null 2>&1 \
   || ! yq -e '.defaults.hypershift.image.digest' config/config.yaml >/dev/null 2>&1; then
@@ -58,91 +60,30 @@ if ! yq -e '.defaults.hypershift.sharedIngressImage.registry' config/config.yaml
   exit 1
 fi
 
-HO_IMAGE_REGISTRY=$(yq '.defaults.hypershift.image.registry' config/config.yaml)
-HO_IMAGE_REPOSITORY=$(yq '.defaults.hypershift.image.repository' config/config.yaml)
-HO_IMAGE_DIGEST=$(yq '.defaults.hypershift.image.digest' config/config.yaml)
-HO_SHARED_INGRESS_REGISTRY=$(yq '.defaults.hypershift.sharedIngressImage.registry' config/config.yaml)
-HO_SHARED_INGRESS_REPOSITORY=$(yq '.defaults.hypershift.sharedIngressImage.repository' config/config.yaml)
-HO_SHARED_INGRESS_DIGEST=$(yq '.defaults.hypershift.sharedIngressImage.digest' config/config.yaml)
-
-BACKEND_DIGEST=$(echo "${BACKEND_IMAGE}" | cut -d'@' -f2)
-BACKEND_REPOSITORY=$(echo "${BACKEND_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
-BACKEND_SOURCE_REGISTRY=$(echo "${BACKEND_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
-
-FRONTEND_DIGEST=$(echo "${FRONTEND_IMAGE}" | cut -d'@' -f2)
-FRONTEND_REPOSITORY=$(echo "${FRONTEND_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
-FRONTEND_SOURCE_REGISTRY=$(echo "${FRONTEND_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
-
-ADMIN_API_DIGEST=$(echo "${ADMIN_API_IMAGE}" | cut -d'@' -f2)
-ADMIN_API_REPOSITORY=$(echo "${ADMIN_API_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
-ADMIN_API_SOURCE_REGISTRY=$(echo "${ADMIN_API_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
-
-SESSIONGATE_DIGEST=$(echo "${SESSIONGATE_IMAGE}" | cut -d'@' -f2)
-SESSIONGATE_REPOSITORY=$(echo "${SESSIONGATE_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
-SESSIONGATE_SOURCE_REGISTRY=$(echo "${SESSIONGATE_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
-
-HCP_RECOVERY_DIGEST=$(echo "${HCP_RECOVERY_IMAGE}" | cut -d'@' -f2)
-HCP_RECOVERY_REPOSITORY=$(echo "${HCP_RECOVERY_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
-HCP_RECOVERY_SOURCE_REGISTRY=$(echo "${HCP_RECOVERY_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
-
-FLEET_DIGEST=$(echo "${FLEET_IMAGE}" | cut -d'@' -f2)
-FLEET_REPOSITORY=$(echo "${FLEET_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
-FLEET_SOURCE_REGISTRY=$(echo "${FLEET_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
-
-MGMT_AGENT_DIGEST=$(echo "${MGMT_AGENT_IMAGE}" | cut -d'@' -f2)
-MGMT_AGENT_REPOSITORY=$(echo "${MGMT_AGENT_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
-MGMT_AGENT_SOURCE_REGISTRY=$(echo "${MGMT_AGENT_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
-
-KUBE_APPLIER_DIGEST=$(echo "${KUBE_APPLIER_IMAGE}" | cut -d'@' -f2)
-KUBE_APPLIER_REPOSITORY=$(echo "${KUBE_APPLIER_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f2-)
-KUBE_APPLIER_SOURCE_REGISTRY=$(echo "${KUBE_APPLIER_IMAGE}" | cut -d'@' -f1 | cut -d '/' -f1)
-
-if [[ -n "${USE_OC_LOGIN_REGISTRIES:-}" ]]; then
-  USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY}"
-else
-  USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY}"
-fi
-export USE_OC_LOGIN_REGISTRIES
-
-export OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override-upgrade.yaml"
+export _YQ_HO_REGISTRY; _YQ_HO_REGISTRY=$(yq '.defaults.hypershift.image.registry' config/config.yaml)
+export _YQ_HO_REPOSITORY; _YQ_HO_REPOSITORY=$(yq '.defaults.hypershift.image.repository' config/config.yaml)
+export _YQ_HO_DIGEST; _YQ_HO_DIGEST=$(yq '.defaults.hypershift.image.digest' config/config.yaml)
+export _YQ_SHARED_INGRESS_REGISTRY; _YQ_SHARED_INGRESS_REGISTRY=$(yq '.defaults.hypershift.sharedIngressImage.registry' config/config.yaml)
+export _YQ_SHARED_INGRESS_REPOSITORY; _YQ_SHARED_INGRESS_REPOSITORY=$(yq '.defaults.hypershift.sharedIngressImage.repository' config/config.yaml)
+export _YQ_SHARED_INGRESS_DIGEST; _YQ_SHARED_INGRESS_DIGEST=$(yq '.defaults.hypershift.sharedIngressImage.digest' config/config.yaml)
 
 yq eval -n "
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${BACKEND_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.digest = \"${BACKEND_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.registry = \"${FRONTEND_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.repository = \"${FRONTEND_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.digest = \"${FRONTEND_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.registry = \"${ADMIN_API_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.repository = \"${ADMIN_API_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.digest = \"${ADMIN_API_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.registry = \"${SESSIONGATE_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.repository = \"${SESSIONGATE_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.digest = \"${SESSIONGATE_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.registry = \"${HCP_RECOVERY_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.repository = \"${HCP_RECOVERY_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.digest = \"${HCP_RECOVERY_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.registry = \"${FLEET_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.repository = \"${FLEET_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.digest = \"${FLEET_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.registry = \"${MGMT_AGENT_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.repository = \"${MGMT_AGENT_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.digest = \"${MGMT_AGENT_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.registry = \"${KUBE_APPLIER_SOURCE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.repository = \"${KUBE_APPLIER_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.registry = \"${HO_IMAGE_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.repository = \"${HO_IMAGE_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.digest = \"${HO_IMAGE_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.sharedIngressImage.registry = \"${HO_SHARED_INGRESS_REGISTRY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.sharedIngressImage.repository = \"${HO_SHARED_INGRESS_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.sharedIngressImage.digest = \"${HO_SHARED_INGRESS_DIGEST}\"
-" > "${OVERRIDE_CONFIG_FILE}"
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.registry = strenv(_YQ_HO_REGISTRY) |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.repository = strenv(_YQ_HO_REPOSITORY) |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image.digest = strenv(_YQ_HO_DIGEST) |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.sharedIngressImage.registry = strenv(_YQ_SHARED_INGRESS_REGISTRY) |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.sharedIngressImage.repository = strenv(_YQ_SHARED_INGRESS_REPOSITORY) |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.sharedIngressImage.digest = strenv(_YQ_SHARED_INGRESS_DIGEST)
+" > "${SHARED_DIR}/hypershift-image-overrides.yaml"
 
-cp "${OVERRIDE_CONFIG_FILE}" "${SHARED_DIR}/config-override.yaml"
+unset _YQ_HO_REGISTRY _YQ_HO_REPOSITORY _YQ_HO_DIGEST
+unset _YQ_SHARED_INGRESS_REGISTRY _YQ_SHARED_INGRESS_REPOSITORY _YQ_SHARED_INGRESS_DIGEST
 
-echo "Created upgrade override config at: ${OVERRIDE_CONFIG_FILE}"
-cat "${OVERRIDE_CONFIG_FILE}"
+# shellcheck source=hack/ci/build-config-override.sh
+source hack/ci/build-config-override.sh
+
+cp "${OVERRIDE_CONFIG_FILE}" "${SHARED_DIR}/config-override-upgrade.yaml"
+export OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override-upgrade.yaml"
 
 unset GOFLAGS
 
