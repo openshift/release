@@ -20,6 +20,11 @@ if [[ -n "${SHARED_DIR:-}" ]]; then
     OPERATOR_NAMESPACE=$(cat "${SHARED_DIR}/operator-e2e-namespace" 2>/dev/null || true)
 fi
 
+# Fallback for MC mode where install step doesn't run
+if [[ -z "${OPERATOR_NAMESPACE}" && -n "${OPERATOR_NAME:-}" ]]; then
+    OPERATOR_NAMESPACE="openshift-${OPERATOR_NAME}"
+fi
+
 # Collect operator logs as artifacts for debugging
 if [[ -n "${OPERATOR_NAMESPACE}" && -n "${ARTIFACT_DIR:-}" ]]; then
     log "Collecting operator logs from ${OPERATOR_NAMESPACE}"
