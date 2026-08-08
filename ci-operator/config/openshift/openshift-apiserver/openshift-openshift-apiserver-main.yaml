@@ -48,7 +48,17 @@ tests:
     test:
     - as: verify
       commands: |
+        cp /var/run/secrets/ci-pull-credentials/.dockerconfigjson "${REGISTRY_AUTH_FILE}"
+        oc registry login --to="${REGISTRY_AUTH_FILE}"
+        export OPENSHIFT_RELEASE="${RELEASE_IMAGE_LATEST}"
         make verify -k --warn-undefined-variables
+      credentials:
+      - mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: ci
+      env:
+      - default: /tmp/registry-auth.json
+        name: REGISTRY_AUTH_FILE
       from: bin-with-oc
       resources:
         requests:
