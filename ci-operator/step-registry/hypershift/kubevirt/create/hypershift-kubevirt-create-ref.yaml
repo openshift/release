@@ -36,9 +36,22 @@ ref:
     - name: ATTACH_DEFAULT_NETWORK
       default: ""
       documentation: |-
-        if true, config additional network for hostedcluster and attach-default-network true;
-        if false, config additional network for hostedcluster and attach-default-network false
-        if the default empty string will skip all additional network config.
+        Controls network attachment for KubeVirt hosted cluster VMs:
+        - "true": macvlan additional network, attach-default-network=true
+        - "false": macvlan additional network, attach-default-network=false
+        - "localnet": OVN localnet network (configurable via LOCALNET_* vars)
+        - "": skip additional network config (default, pod network only)
+    - name: LOCALNET_SUBNET
+      default: "192.168.111.0/24"
+      documentation: |-
+        Subnet for the OVN localnet NAD when ATTACH_DEFAULT_NETWORK=localnet.
+        Use 192.168.111.0/24 for same-L2 bootstrap (VMs can reach mgmt cluster).
+    - name: LOCALNET_ATTACH_DEFAULT
+      default: "false"
+      documentation: |-
+        Value for --attach-default-network when ATTACH_DEFAULT_NETWORK=localnet.
+        false = localnet-as-primary (localnet is primary, no pod network).
+        true = Model 3 (dual-homed: pod network + localnet).
     - name: ETCD_STORAGE_CLASS
       default: ""
       documentation: |-

@@ -358,10 +358,59 @@ tests:
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
 - always_run: false
   as: e2e-aws-hypershift-ovn-kubevirt
+  capabilities:
+  - intranet
   optional: true
   steps:
-    cluster_profile: openshift-org-aws
-    workflow: hypershift-kubevirt-conformance
+    cluster_profile: equinix-ocp-hcp
+    env:
+      ATTACH_DEFAULT_NETWORK: localnet
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators-v4-20
+      HYPERSHIFT_NODE_COUNT: "3"
+      HYPERSHIFT_NODE_MEMORY: "16"
+      KUBEVIRT_CSI_INFRA: lvms-vg1
+      LOCALNET_ATTACH_DEFAULT: "false"
+      LOCALNET_SUBNET: 192.168.111.0/24
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - ref: hypershift-kubevirt-install
+    - chain: hypershift-kubevirt-baremetalds-lvm
+    - chain: hypershift-kubevirt-baremetalds-metallb
+    - ref: hypershift-install
+    - ref: hypershift-agent-create-config-dns
+    - ref: hypershift-kubevirt-create
+    - ref: hypershift-kubevirt-baremetalds-proxy
+    - ref: hypershift-kubevirt-health-check
+    - ref: cucushift-installer-reportportal-marker
+    test:
+    - as: wait
+      cli: latest
+      commands: |
+        echo "Cluster is ready — localnet-as-primary debug session"
+        echo "Management cluster KUBECONFIG: \$KUBECONFIG"
+        echo "Hosted cluster KUBECONFIG: \${SHARED_DIR}/nested_kubeconfig"
+        echo ""
+        echo "Localnet-as-primary config:"
+        echo "  --attach-default-network=false"
+        echo "  Localnet subnet: 192.168.111.0/24"
+        echo "  VMs have ONLY localnet interface (eth0)"
+        echo ""
+        oc get nodes
+        echo ""
+        echo "Hosted cluster nodes:"
+        KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc get nodes 2>/dev/null || echo "(not ready yet)"
+        echo ""
+        echo "Sleeping for 18 hours..."
+        sleep 64800
+        echo "Wait complete."
+      from: stable:cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 18h30m0s
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-kubevirt-hypershift
+  timeout: 20h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-medium-cluster-density
   optional: true

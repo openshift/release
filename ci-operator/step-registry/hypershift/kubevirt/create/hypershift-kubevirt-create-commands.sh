@@ -136,7 +136,28 @@ fi
 oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc apply -f -
 oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
-  oc apply -f - <<EOF
+  if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
+    LOCALNET_SUBNET="${LOCALNET_SUBNET:-192.168.111.0/24}"
+    oc apply -f - <<EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: localnet-network
+  namespace: ${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "physnet",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network",
+      "subnets": "${LOCALNET_SUBNET}"
+  }'
+EOF
+    LOCALNET_ATTACH_DEFAULT="${LOCALNET_ATTACH_DEFAULT:-false}"
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=${LOCALNET_ATTACH_DEFAULT} --additional-network name:${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network"
+  else
+    oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
@@ -155,10 +176,11 @@ spec:
       }
   }'
 EOF
-  if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
-  else
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
+      EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    else
+      EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    fi
   fi
 fi
 
@@ -236,5 +258,121 @@ echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
+
+# Post-creation localnet setup: DHCP workaround, port security clearing, ipecho deployment
+if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
+  LOCALNET_SUBNET="${LOCALNET_SUBNET:-192.168.111.0/24}"
+  # Derive gateway IP (.1) from the subnet
+  LOCALNET_GW=$(echo "${LOCALNET_SUBNET}" | sed 's|\.[0-9]*/|.1|')
+
+  echo "Waiting for all VMIs to be Running..."
+  for i in $(seq 1 60); do
+    VMI_RUNNING_COUNT=$(oc get vmi -n "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}" --no-headers 2>/dev/null | grep -c Running || true)
+    if [[ "${VMI_RUNNING_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+      echo "All ${VMI_RUNNING_COUNT} VMIs are Running"
+      break
+    fi
+    echo "Waiting for VMIs... (${VMI_RUNNING_COUNT}/${HYPERSHIFT_NODE_COUNT} running) [${i}/60]"
+    sleep 10
+  done
+
+  echo "Configuring OVN DHCP options and clearing port security for localnet LSPs..."
+  for VMI in $(oc get vmi -n "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    NODE=$(oc get vmi "${VMI}" -n "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}" -o jsonpath='{.status.nodeName}' 2>/dev/null)
+    if [[ -z "${NODE}" ]]; then
+      echo "WARNING: Could not find node for VMI ${VMI}, skipping"
+      continue
+    fi
+
+    # Find the OVN pod on the node where the VM is scheduled
+    OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    if [[ -z "${OVN_POD}" ]]; then
+      echo "WARNING: No ovnkube-node pod found on node ${NODE} for VMI ${VMI}, skipping"
+      continue
+    fi
+
+    # Find the localnet Logical Switch Port for this VMI
+    LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl --columns=name --bare find Logical_Switch_Port \
+      "external_ids:k8s.ovn.org/topology=localnet" 2>/dev/null | head -1)
+    if [[ -z "${LSP_NAME}" ]]; then
+      echo "WARNING: No localnet LSP found on node ${NODE} for VMI ${VMI}, skipping"
+      continue
+    fi
+
+    # Create DHCP options with router, DNS server, and lease time
+    DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl create DHCP_Options cidr="${LOCALNET_SUBNET}" \
+      options='"lease_time"="3500" "router"="'"${LOCALNET_GW}"'" "server_id"="'"${LOCALNET_GW}"'" "server_mac"="c0:ff:ee:00:00:01" "dns_server"="'"${LOCALNET_GW}"'"' \
+      2>/dev/null)
+
+    # Bind the DHCP options to the localnet LSP
+    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl lsp-set-dhcpv4-options "${LSP_NAME}" "${DHCP_UUID}" 2>/dev/null
+
+    # Clear port security so EgressIP-SNATed packets can exit
+    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl clear Logical_Switch_Port "${LSP_NAME}" port_security 2>/dev/null
+
+    echo "Configured DHCP and cleared port security for VMI ${VMI} on node ${NODE} (LSP: ${LSP_NAME})"
+  done
+
+  # Deploy ip-echo on the management cluster with localnet NAD
+  IPECHO_NAMESPACE="egressip-ipecho-${CLUSTER_NAME}"
+  echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE}..."
+  oc create namespace "${IPECHO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+  oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+
+  # Create a localnet NAD in the ip-echo namespace
+  oc apply -f - <<IPECHO_NAD_EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: localnet-network
+  namespace: ${IPECHO_NAMESPACE}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "physnet",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "${IPECHO_NAMESPACE}/localnet-network",
+      "subnets": "${LOCALNET_SUBNET}"
+  }'
+IPECHO_NAD_EOF
+
+  oc apply -f - <<IPECHO_EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: egressip-ipecho
+  namespace: ${IPECHO_NAMESPACE}
+  annotations:
+    k8s.v1.cni.cncf.io/networks: localnet-network
+spec:
+  containers:
+  - name: ip-echo
+    image: quay.io/openshifttest/ip-echo:1.2.0
+    ports:
+    - containerPort: 80
+      protocol: TCP
+    securityContext:
+      runAsUser: 0
+  restartPolicy: Always
+  tolerations:
+  - operator: Exists
+IPECHO_EOF
+
+  echo "Waiting for ip-echo pod to be ready..."
+  oc wait --for=condition=Ready pod/egressip-ipecho -n "${IPECHO_NAMESPACE}" --timeout=120s
+
+  IPECHO_LOCALNET_IP=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" \
+    -o jsonpath='{.metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}' | \
+    python3 -c "import sys,json; nets=json.loads(sys.stdin.read()); [print(n['ips'][0]) for n in nets if 'localnet' in n.get('name','')]")
+  echo "ip-echo localnet IP: ${IPECHO_LOCALNET_IP}:80"
+  echo "${IPECHO_LOCALNET_IP}:80" > "${SHARED_DIR}/kubevirt_ipecho_url"
+  echo "Localnet post-creation setup complete"
+fi
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
