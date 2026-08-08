@@ -6,8 +6,14 @@ set -o pipefail
 run_tls_scan() {
 
   # TLS Scanner - scans TLS configurations of all pods in the cluster
-  local NAMESPACE="tls-scanner"
+  local NAMESPACE="${SCANNER_NAMESPACE:-tls-scanner}"
   local OWNS_NAMESPACE=true
+  # When SCANNER_NAMESPACE is explicitly set, deploy into an existing namespace
+  # (do not create/delete it). Check the variable itself, not the resolved value,
+  # so that SCANNER_NAMESPACE=tls-scanner is also treated as externally owned.
+  if [[ -n "${SCANNER_NAMESPACE:-}" ]]; then
+      OWNS_NAMESPACE=false
+  fi
   local SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
   local ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 
