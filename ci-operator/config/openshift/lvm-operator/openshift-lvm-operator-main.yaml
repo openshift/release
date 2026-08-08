@@ -1,4 +1,8 @@
 base_images:
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-5.0
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
@@ -15,6 +19,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: base-rhel9
+  ocp_5.0_base_rhel9-minimal:
+    name: "5.0"
+    namespace: ocp
+    tag: base-rhel9-minimal
 binary_build_commands: make build build-vgmanager
 build_root:
   image_stream_tag:
@@ -71,13 +79,36 @@ images:
         as:
         - registry.access.redhat.com/ubi9/ubi-minimal:latest
     to: lvm-operator-integration-test
+  - context_dir: .
+    dockerfile_path: release/operator/konflux.Dockerfile
+    inputs:
+      builder:
+        as:
+        - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.25
+      ocp_5.0_base_rhel9-minimal:
+        as:
+        - registry.redhat.io/ubi9/ubi-minimal
+    to: lvm-operator-konflux
+  - context_dir: .
+    dockerfile_path: release/must-gather/must-gather.konflux.Dockerfile
+    inputs:
+      must-gather:
+        as:
+        - registry.redhat.io/openshift4/ose-must-gather-rhel9
+    to: lvms-must-gather-konflux
 operator:
   bundles:
   - as: lvm-operator-bundle
     dockerfile_path: bundle.Dockerfile
+  - as: lvm-operator-bundle-konflux
+    dockerfile_path: release/bundle/bundle.konflux.Dockerfile
   substitutions:
   - pullspec: quay.io/lvms_dev/lvms-operator:latest
     with: pipeline:lvm-operator
+  - pullspec: registry.redhat.io/lvms4/lvms-rhel9-operator
+    with: pipeline:lvm-operator-konflux
+  - pullspec: registry.redhat.io/lvms4/lvms-must-gather-rhel9
+    with: pipeline:lvms-must-gather-konflux
 promotion:
   to:
   - additional_images:
