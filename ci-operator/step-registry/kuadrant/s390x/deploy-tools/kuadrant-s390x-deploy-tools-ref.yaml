@@ -1,0 +1,69 @@
+ref:
+  as: kuadrant-s390x-deploy-tools
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: kuadrant-s390x-deploy-tools-commands.sh
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 35m0s
+  env:
+  - name: TOOLS_NAMESPACE
+    default: "tools"
+    documentation: |-
+      Namespace where the testing tools (Keycloak, Mockserver, Jaeger) are deployed.
+  - name: KEYCLOAK_IMAGE
+    default: "registry.redhat.io/rhbk/keycloak-rhel9:26.0"
+    documentation: |-
+      Keycloak container image. Defaults to the Red Hat build of Keycloak (RHBK),
+      which is published multi-arch including s390x. Pulling from registry.redhat.io
+      relies on the cluster global pull secret.
+  - name: KEYCLOAK_ADMIN_USERNAME
+    default: "admin"
+    documentation: |-
+      Keycloak bootstrap admin username.
+  - name: KEYCLOAK_ADMIN_PASSWORD
+    default: "admin"
+    documentation: |-
+      Keycloak bootstrap admin password.
+  - name: MOCKSERVER_IMAGE
+    default: "quay.io/vray_rh/rhcl_testsuite_dependencies:mockserver-s390x-fixed-v10"
+    documentation: |-
+      Mockserver container image (s390x). Prefer the same tag as run-testsuite
+      (mockserver-s390x-fixed-v10) so tools and per-test backends stay aligned.
+  - name: JAEGER_IMAGE
+    default: "quay.io/jaegertracing/all-in-one:1.62.0"
+    documentation: |-
+      Jaeger all-in-one container image (must support s390x).
+  - name: KUADRANT_NAMESPACE
+    default: "kuadrant-system"
+    documentation: |-
+      Namespace of the Kuadrant operator / CR. Used to enable observability and
+      OTEL_* after Jaeger is ready (rhcl-mc1 pattern).
+  - name: KUADRANT_SUBSCRIPTION_NAME
+    default: "kuadrant-operator"
+    documentation: |-
+      Subscription name whose config.env receives OTEL_* for control-plane tracing.
+  documentation: |-
+    Deploys the Kuadrant testsuite tooling (Keycloak, Mockserver and Jaeger) into
+    the tools namespace on a provisioned s390x OCP cluster using s390x-compatible
+    images, and exposes Keycloak, Mockserver and the Jaeger query UI via Routes so
+    the testsuite config can be generated dynamically. The Jaeger collector is
+    reachable in-cluster at jaeger-collector.<TOOLS_NAMESPACE>.svc.cluster.local:4317.
+
+    Also enables OpenShift User Workload Monitoring (cluster-monitoring-config
+    enableUserWorkload) and writes SHARED_DIR/prometheus-url pointing at the
+    existing openshift-monitoring thanos-querier Service (same pattern as rhcl-mc1:
+    no separate Prometheus install). run-testsuite injects that URL into dynaconf.
+
+    After Jaeger is Available, patches kuadrant/kuadrant with
+    spec.observability.enable=true + tracing.defaultEndpoint (ServiceMonitors /
+    dataplane tracing) and merges OTEL_* into the Kuadrant Subscription
+    (control-plane tracing), matching the rhcl-mc1 reference cluster.
+
+    Tools that the testsuite self-deploys per test (httpbin, spicedb, llm_sim) are
+    not created here; only their images are referenced in the generated config.
