@@ -27,27 +27,29 @@ az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 oc version
 kubelogin --version
 
-# Check out the base branch to provision the baseline environment.
-# The container has the PR merge commit baked in; we rewind to the base
-# so Bicep templates, Helm charts, config, and pipeline definitions all
-# come from what the PR is being merged into.
+# Check out the main-branch revision to provision.
+# Presubmits rewind the PR merge commit to its base, while periodics and
+# rehearsals fetch main because they do not have an ARO-HCP PULL_BASE_SHA.
 #
-# Prow sets PULL_BASE_SHA to the exact base-branch commit used for the
-# merge. That commit is already in the local clone, so no fetch needed.
-# Rehearsal runs (JOB_NAME prefixed with "rehearse-") fetch main
-# explicitly, since PULL_BASE_SHA belongs to the openshift/release repo.
+# Prow sets PULL_BASE_SHA to the exact base-branch commit used for a
+# presubmit merge. That commit is already in the local clone, so no fetch
+# is needed. Periodic and rehearsal runs fetch main explicitly.
 IS_REHEARSAL=false
 if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
   IS_REHEARSAL=true
 fi
 
-if [[ "${IS_REHEARSAL}" == "true" ]]; then
-  echo "Rehearsal detected (JOB_NAME=${JOB_NAME:-unset}), fetching main ..."
+if [[ "${IS_REHEARSAL}" == "true" || "${JOB_TYPE:-}" == "periodic" ]]; then
+  if [[ "${IS_REHEARSAL}" == "true" ]]; then
+    echo "Rehearsal detected (JOB_NAME=${JOB_NAME:-unset}), fetching main ..."
+  else
+    echo "Periodic job detected (JOB_NAME=${JOB_NAME:-unset}), fetching main ..."
+  fi
   git fetch https://github.com/Azure/ARO-HCP.git main
   git checkout -f FETCH_HEAD
 else
   if [[ -z "${PULL_BASE_SHA:-}" ]]; then
-    echo "ERROR: PULL_BASE_SHA is not set and this is not a rehearsal. Cannot determine base commit."
+    echo "ERROR: PULL_BASE_SHA is not set for this non-periodic, non-rehearsal job. Cannot determine base commit."
     exit 1
   fi
   if ! git cat-file -e "${PULL_BASE_SHA}" 2>/dev/null; then
@@ -85,21 +87,40 @@ SESSIONGATE_REPO=$(yq '.sessiongate.image.repository' "${CONFIG_FILE}")
 FLEET_REPO=$(yq '.fleet.image.repository' "${CONFIG_FILE}")
 MGMT_AGENT_REPO=$(yq '.mgmtAgent.image.repository' "${CONFIG_FILE}")
 KUBE_APPLIER_REPO=$(yq '.kubeApplier.image.repository' "${CONFIG_FILE}")
+EXPORTER_REPO=$(yq '.customExporter.image.repository' "${CONFIG_FILE}")
 # hcpRecovery is not pushed to ACR by images-push; its config digest is
 # empty by default, so we leave it as-is rather than trying to resolve it.
 
 echo "ACR: ${ACR_URL}, main SHA: ${MAIN_SHA}"
-echo "Repos: backend=${BACKEND_REPO} frontend=${FRONTEND_REPO} admin-api=${ADMIN_API_REPO} sessiongate=${SESSIONGATE_REPO} fleet=${FLEET_REPO} mgmt-agent=${MGMT_AGENT_REPO} kube-applier=${KUBE_APPLIER_REPO}"
+echo "Repos: backend=${BACKEND_REPO} frontend=${FRONTEND_REPO} admin-api=${ADMIN_API_REPO} sessiongate=${SESSIONGATE_REPO} fleet=${FLEET_REPO} mgmt-agent=${MGMT_AGENT_REPO} kube-applier=${KUBE_APPLIER_REPO} exporter=${EXPORTER_REPO}"
+
+image_set_available() {
+  local tag=$1
+  local repo
+  for repo in \
+    "${BACKEND_REPO}" \
+    "${FRONTEND_REPO}" \
+    "${ADMIN_API_REPO}" \
+    "${SESSIONGATE_REPO}" \
+    "${FLEET_REPO}" \
+    "${MGMT_AGENT_REPO}" \
+    "${KUBE_APPLIER_REPO}" \
+    "${EXPORTER_REPO}"; do
+    if ! az acr manifest show -r "${ACR_NAME}" -n "${repo}:${tag}" &>/dev/null; then
+      return 1
+    fi
+  done
+}
 
 # Prefer the latest main commit's images. Poll ACR in case the postsubmit
 # images-push job is still running. If HEAD's images never appear, walk
 # back through history to find the newest commit with images available.
 MAX_POLL=30
 POLL_INTERVAL=30
-echo "Polling ACR for ${FLEET_REPO}:${MAIN_SHA} (up to $((MAX_POLL * POLL_INTERVAL))s) ..."
+echo "Polling ACR for the complete image set tagged ${MAIN_SHA} (up to $((MAX_POLL * POLL_INTERVAL))s) ..."
 FOUND_HEAD=false
 for attempt in $(seq 1 ${MAX_POLL}); do
-  if az acr manifest show -r "${ACR_NAME}" -n "${FLEET_REPO}:${MAIN_SHA}" &>/dev/null; then
+  if image_set_available "${MAIN_SHA}"; then
     echo "Images for HEAD (${MAIN_SHA}) available after attempt ${attempt}"
     FOUND_HEAD=true
     break
@@ -113,7 +134,7 @@ if [[ "${FOUND_HEAD}" != "true" ]]; then
   MAX_WALK=20
   IMAGE_SHA=""
   for sha in $(git log --format='%h' --abbrev=7 --skip=1 -n ${MAX_WALK}); do
-    if az acr manifest show -r "${ACR_NAME}" -n "${FLEET_REPO}:${sha}" &>/dev/null; then
+    if image_set_available "${sha}"; then
       IMAGE_SHA="${sha}"
       echo "Found images in ACR for commit ${sha}"
       break
@@ -148,6 +169,7 @@ SESSIONGATE_DIGEST=$(resolve_digest "${SESSIONGATE_REPO}" "${MAIN_SHA}")
 FLEET_DIGEST=$(resolve_digest "${FLEET_REPO}" "${MAIN_SHA}")
 MGMT_AGENT_DIGEST=$(resolve_digest "${MGMT_AGENT_REPO}" "${MAIN_SHA}")
 KUBE_APPLIER_DIGEST=$(resolve_digest "${KUBE_APPLIER_REPO}" "${MAIN_SHA}")
+EXPORTER_DIGEST=$(resolve_digest "${EXPORTER_REPO}" "${MAIN_SHA}")
 
 echo "Resolved digests:"
 echo "  backend:      ${BACKEND_DIGEST}"
@@ -157,6 +179,7 @@ echo "  sessiongate:  ${SESSIONGATE_DIGEST}"
 echo "  fleet:        ${FLEET_DIGEST}"
 echo "  mgmt-agent:   ${MGMT_AGENT_DIGEST}"
 echo "  kube-applier: ${KUBE_APPLIER_DIGEST}"
+echo "  exporter:     ${EXPORTER_DIGEST}"
 
 OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override.yaml"
 
@@ -182,7 +205,10 @@ yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.digest = \"${MGMT_AGENT_DIGEST}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.registry = \"${ACR_URL}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.repository = \"${KUBE_APPLIER_REPO}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\"
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.registry = \"${ACR_URL}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.repository = \"${EXPORTER_REPO}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.digest = \"${EXPORTER_DIGEST}\"
 " > "${OVERRIDE_CONFIG_FILE}"
 
 # MSI mock SP overrides (if provided). Needed for both baseline and upgrade.
