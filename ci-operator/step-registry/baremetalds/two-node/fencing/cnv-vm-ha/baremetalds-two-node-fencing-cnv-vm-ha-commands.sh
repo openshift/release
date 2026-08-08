@@ -302,6 +302,39 @@ run_on_node "${SURVIVE_NODE}" "pcs resource status" || true
 collect_rbd_diagnostics "post-fencing"
 
 # -------------------------------------------------------------------------
+# Wait for Ceph to recover after fencing (max 20 min)
+# -------------------------------------------------------------------------
+TOOLBOX=$(oc get pod -n openshift-storage -l app=rook-ceph-tools \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+echo "--- Waiting for Ceph to respond (ceph -s) on ${SURVIVE_NODE} ---"
+CEPH_WAIT_DEADLINE=$((SECONDS + 1200))
+CEPH_RECOVERED=false
+for ((i=1; SECONDS < CEPH_WAIT_DEADLINE; i++)); do
+  if [[ -n "${TOOLBOX}" ]]; then
+    CEPH_OUT=$(oc exec -n openshift-storage "${TOOLBOX}" -- ceph -s 2>&1) && {
+      echo "Ceph is responding (attempt ${i}):"
+      echo "${CEPH_OUT}"
+      CEPH_RECOVERED=true
+      echo "Waiting 4 min for OSD out processing..."
+      sleep 240
+      echo "Post-OSD-out ceph status:"
+      oc exec -n openshift-storage "${TOOLBOX}" -- ceph -s 2>&1 || true
+      break
+    }
+  fi
+  echo "Attempt ${i}: ceph -s not responding, waiting 15s..."
+  sleep 15
+done
+
+if [[ "${CEPH_RECOVERED}" != "true" ]]; then
+  echo "WARNING: Ceph did not respond within 20 min"
+fi
+
+echo "ODF pod status after Ceph wait:"
+oc get pods -n openshift-storage -o wide 2>&1 || true
+
+# -------------------------------------------------------------------------
 # Verify VM migrated to the surviving node
 # -------------------------------------------------------------------------
 echo "--- Verifying VM migration ---"
