@@ -18,8 +18,11 @@ if [[ $REMOTE_CLIENT = "true" ]]; then
     exit 0
 fi
 pushd /tmp
+# Disable tracing while reading and exporting the Slack API token.
+set +x
 SLACK_API_TOKEN=$(cat "/token/reliability-v2-slack-api-token")
 export SLACK_API_TOKEN
+set -x
 git clone https://github.com/openshift/svt --depth=1
 pushd svt/reliability-v2/utils
 git clone https://github.com/cloud-bulldozer/performance-dashboards.git --depth=1
@@ -27,7 +30,7 @@ popd
 pushd svt/reliability-v2
 echo "========Start Reliability-v2 test for $RELIABILITY_DURATION========"
 set +e
-bash -x ./start.sh -n reliability -t $RELIABILITY_DURATION -c $CONFIG_TEMPLATE -r $TOLERANCE_RATE
+bash ./start.sh -n reliability -t $RELIABILITY_DURATION -c $CONFIG_TEMPLATE -r $TOLERANCE_RATE
 result=$?
 set -e
 # copy the reliability test result
