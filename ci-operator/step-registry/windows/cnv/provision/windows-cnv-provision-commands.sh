@@ -62,10 +62,13 @@ if [[ ! -d "${CNV_REGISTRY_AUTH_DIR}" ]]; then
 fi
 
 if ! oc get secret "${REGISTRY_AUTH_SECRET}" -n "${OS_IMAGES_NAMESPACE}" 2>/dev/null; then
+  # Only copy the credential keys, not the secretsync metadata files
   oc create secret generic "${REGISTRY_AUTH_SECRET}" \
     -n "${OS_IMAGES_NAMESPACE}" \
-    --from-file="${CNV_REGISTRY_AUTH_DIR}"
+    --from-file=accessKeyId="${CNV_REGISTRY_AUTH_DIR}/accessKeyId" \
+    --from-file=secretKey="${CNV_REGISTRY_AUTH_DIR}/secretKey"
   echo "$(date -u --rfc-3339=seconds) - Created registry auth Secret ${REGISTRY_AUTH_SECRET} from mounted credentials"
+  echo "$(date -u --rfc-3339=seconds) - Secret keys: $(oc get secret "${REGISTRY_AUTH_SECRET}" -n "${OS_IMAGES_NAMESPACE}" -o jsonpath='{.data}' | jq -r 'keys | join(", ")')"
 fi
 
 cat <<EOF | oc apply -f -
