@@ -90,7 +90,8 @@ tests:
   steps:
     test:
     - ref: assisted-verify-generated-code
-- as: subsystem-aws
+- always_run: false
+  as: subsystem-aws
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -98,7 +99,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.15"
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  pipeline_run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     test:
     - as: subsystem-deploy-and-run
@@ -122,10 +123,11 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: e2e-metal-assisted-single-node
+- always_run: false
+  as: e2e-metal-assisted-single-node
   capabilities:
   - intranet
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  pipeline_run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -134,10 +136,11 @@ tests:
         NUM_MASTERS=1
         OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-day2
+- always_run: false
+  as: e2e-metal-assisted-day2
   capabilities:
   - intranet
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  pipeline_run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -146,7 +149,7 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
         OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
-- always_run: true
+- always_run: false
   as: e2e-metal-assisted
   capabilities:
   - intranet
@@ -158,10 +161,11 @@ tests:
         SERVICE_BASE_REF=v2.49
         OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-static-ip-suite
+- always_run: false
+  as: e2e-metal-assisted-static-ip-suite
   capabilities:
   - intranet
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  pipeline_run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -170,10 +174,11 @@ tests:
         STATIC_IPS=true
         OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ipv4v6
+- always_run: false
+  as: e2e-metal-assisted-ipv4v6
   capabilities:
   - intranet
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  pipeline_run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -183,11 +188,11 @@ tests:
         IPv4=yes
         OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
-- always_run: true
+- always_run: false
   as: e2e-metal-assisted-lvm
   capabilities:
   - intranet
-  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  pipeline_run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -201,10 +206,11 @@ tests:
         MASTER_DISK_COUNT=2
         OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-osc
+- always_run: false
+  as: e2e-metal-assisted-osc
   capabilities:
   - intranet
-  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/osc/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  pipeline_run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/osc/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -219,8 +225,9 @@ tests:
         WORKER_CPU=3
         OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
-- as: e2e-vsphere-assisted
-  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
+- always_run: false
+  as: e2e-vsphere-assisted
+  pipeline_run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -231,10 +238,11 @@ tests:
         OPENSHIFT_VERSION=4.20
       PLATFORM: vsphere
     workflow: assisted-vsphere
-- as: e2e-metal-assisted-none
+- always_run: false
+  as: e2e-metal-assisted-none
   capabilities:
   - intranet
-  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
+  pipeline_run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -243,10 +251,11 @@ tests:
         PLATFORM=none
         OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-external
+- always_run: false
+  as: e2e-metal-assisted-external
   capabilities:
   - intranet
-  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/external/.*|internal/provider/registry/.*)$
+  pipeline_run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/external/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -255,10 +264,11 @@ tests:
         PLATFORM=external
         OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-virtualization-4-18
+- always_run: false
+  as: e2e-metal-assisted-virtualization-4-18
   capabilities:
   - intranet
-  run_if_changed: ^(internal/operators/nodehealthcheck/.*|internal/operators/selfnoderemediation/.*|internal/operators/fenceagentsremediation/.*|internal/operators/nodemaintenance/.*|internal/operators/kubedescheduler/.*|internal/operators/cnv|internal/operators/mtv/.*|internal/operators/nmstate/.*)$
+  pipeline_run_if_changed: ^(internal/operators/nodehealthcheck/.*|internal/operators/selfnoderemediation/.*|internal/operators/fenceagentsremediation/.*|internal/operators/nodemaintenance/.*|internal/operators/kubedescheduler/.*|internal/operators/cnv|internal/operators/mtv/.*|internal/operators/nmstate/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -273,10 +283,11 @@ tests:
         WORKER_DISK_COUNT=2
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ai-nvidia-4-18
+- always_run: false
+  as: e2e-metal-assisted-ai-nvidia-4-18
   capabilities:
   - intranet
-  run_if_changed: ^(internal/operators/authorino/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/nvidiagpu/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
+  pipeline_run_if_changed: ^(internal/operators/authorino/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/nvidiagpu/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -287,10 +298,11 @@ tests:
       CLUSTERTYPE: assisted_large_el9
       REQUIRED_MEMORY_GIB: "400"
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ai-amd-4-19
+- always_run: false
+  as: e2e-metal-assisted-ai-amd-4-19
   capabilities:
   - intranet
-  run_if_changed: ^(internal/operators/andgpu/.*|internal/operators/authorino/.*|internal/operators/kmm/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
+  pipeline_run_if_changed: ^(internal/operators/andgpu/.*|internal/operators/authorino/.*|internal/operators/kmm/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
