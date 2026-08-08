@@ -9,10 +9,6 @@ base_images:
     tag: upi-installer
 build_root:
   from_repository: true
-images:
-  items:
-  - dockerfile_path: Dockerfile.rhel7
-    to: machine-config-operator
 releases:
   initial:
     candidate:
@@ -193,6 +189,21 @@ tests:
     - ref: mco-conf-day2-enable-ocl
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-upgrade
+- as: e2e-vsphere-mco-tp-disc-proxy-longduration
+  cron: 30 6 * * 0
+  shard_count: 2
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/machine-config-operator/longduration
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: mco-e2e-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disc-proxy
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
