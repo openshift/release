@@ -125,12 +125,17 @@ while [[ ${dv_elapsed} -lt ${dv_timeout} ]]; do
     exit 1
   fi
 
-  # Show importer pod status if stuck in ImportScheduled
-  if [[ "${dv_phase}" == "ImportScheduled" && ${dv_elapsed} -ge 300 && $(( dv_elapsed % 300 )) -eq 0 ]]; then
-    echo "--- Importer pod status (stuck at ImportScheduled) ---"
-    oc get pods -n "${OS_IMAGES_NAMESPACE}" -l "cdi.kubevirt.io/storage.import.importPvcName=${DV_NAME}" -o wide 2>/dev/null || true
+  # Show importer pod and PVC status if stuck in ImportScheduled (every 2 min after 1 min)
+  if [[ "${dv_phase}" == "ImportScheduled" && ${dv_elapsed} -ge 60 && $(( dv_elapsed % 120 )) -eq 0 ]]; then
+    echo "--- Diagnostic: stuck at ImportScheduled (${dv_elapsed}s) ---"
+    echo "PVC status:"
     oc get pvc -n "${OS_IMAGES_NAMESPACE}" 2>/dev/null || true
-    oc get events -n "${OS_IMAGES_NAMESPACE}" --sort-by='.lastTimestamp' 2>/dev/null | tail -10 || true
+    echo "Importer pods:"
+    oc get pods -n "${OS_IMAGES_NAMESPACE}" -o wide 2>/dev/null || true
+    echo "DataVolume conditions:"
+    oc get datavolume "${DV_NAME}" -n "${OS_IMAGES_NAMESPACE}" -o jsonpath='{.status.conditions}' 2>/dev/null | python3 -m json.tool 2>/dev/null || true
+    echo "Recent events:"
+    oc get events -n "${OS_IMAGES_NAMESPACE}" --sort-by='.lastTimestamp' 2>/dev/null | tail -15 || true
     echo "--- end diagnostic ---"
   fi
 
