@@ -3,6 +3,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   aws-efs-csi-operator-create-efs:
     name: "5.0"
     namespace: ocp
@@ -4991,6 +4995,40 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-dual-stack
+- as: metal-ds-hypershift-agent-ovn-egressip-debug
+  capabilities:
+  - intranet
+  cron: 36 15 1,17 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      CLUSTERTYPE: host_384gb_el9
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=3
+        WORKER_MEMORY=32768
+        WORKER_VCPU=16
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=256G
+        NUM_EXTRA_WORKERS=3
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      HYPERSHIFT_NAMESPACE: local-cluster
+      LVM_OPERATOR_SUB_CHANNEL: stable-5.0
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      MCE_VERSION: "2.17"
+      TIMEOUT: +18 hours
+    post:
+    - ref: hypershift-agent-ovn-ipecho-deprovision
+    - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-provision
+    - ref: hypershift-agent-ovn-ipecho-provision
+    test:
+    - ref: wait
+  timeout: 20h0m0s
 zz_generated_metadata:
   branch: release-5.0
   org: openshift
