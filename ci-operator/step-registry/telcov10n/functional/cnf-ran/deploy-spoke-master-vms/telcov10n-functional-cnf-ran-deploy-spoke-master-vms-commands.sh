@@ -34,24 +34,30 @@ process_inventory() {
   echo "Processing complete. Check \"${dest_file}\""
 }
 
-echo "CLUSTER_NAME=${CLUSTER_NAME}"
+echo "SPOKE_CLUSTER_NAME=${SPOKE_CLUSTER_NAME}"
 
-echo "Processing common group_vars"
+echo "Processing group_vars"
 mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
 
-find /var/group_variables/common/ -mindepth 1 -type d | while read -r dir; do
+find "/var/group_variables/${SPOKE_CLUSTER_NAME}/" -mindepth 1 -type d | while read -r dir; do
   echo "  group_var: $(basename "${dir}")"
   process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
 done
 
-echo "Processing cluster group_vars (${CLUSTER_NAME})"
-find "/var/group_variables/${CLUSTER_NAME}/" -mindepth 1 -type d | while read -r dir; do
-  echo "  group_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
+echo "Processing host_vars"
+mkdir /eco-ci-cd/inventories/ocp-deployment/host_vars
+
+find ${MOUNTED_HOST_INVENTORY}/"${SPOKE_CLUSTER_NAME}"/ -mindepth 1 -type d | while read -r dir; do
+    echo "Process group inventory file: ${dir}"
+    process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
 done
 
-echo "Create host_vars directory"
-mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
+# # spoke cluster 131 uses hub bastion kni-qe-130
+# if [[ "${CLUSTER_NAME}"  == "kni-qe-131" ]]; then
+#   echo "Processing shared bastion inventory for ${CLUSTER_NAME}"
+#   process_inventory "${MOUNTED_HOST_INVENTORY}/kni-qe-130/bastion" \
+#     /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
+# fi
 
 echo "Copy host inventory files from SHARED_DIR"
 cp ${SHARED_DIR}/bastion /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
@@ -62,10 +68,6 @@ cp ${SHARED_DIR}/hypervisor /eco-ci-cd/inventories/ocp-deployment/host_vars/hype
 # process_inventory "${MOUNTED_HOST_INVENTORY}/${TARGET_CLUSTER_NAME}/spoke-master0" \
 #   /eco-ci-cd/inventories/ocp-deployment/host_vars/master0
 
-find ${MOUNTED_HOST_INVENTORY}/"${SPOKE_CLUSTER_NAME}"/ -mindepth 1 -type d | while read -r dir; do
-    echo "Process group inventory file: ${dir}"
-    process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
-done
 
 cd /eco-ci-cd
 ansible-playbook playbooks/ran/create-spoke-masters.yml \
