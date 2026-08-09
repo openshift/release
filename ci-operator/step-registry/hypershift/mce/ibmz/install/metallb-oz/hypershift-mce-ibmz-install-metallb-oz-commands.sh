@@ -12,7 +12,53 @@ fi
 
 # ── Install metallb-operator via OLM ─────────────────────────────────────────
 
-echo "Installing metallb-operator (stable, redhat-operators) into metallb-system"
+# If the default CatalogSource does not carry metallb-operator, create a
+# pinned CatalogSource from the v4.22 index image and use that instead.
+FALLBACK_CATALOG="redhat-operator-index-v422"
+FALLBACK_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.22"
+
+if ! oc get packagemanifest -n openshift-marketplace metallb-operator \
+     --field-selector "status.catalogSource=${METALLB_OPERATOR_SUB_SOURCE}" \
+     --ignore-not-found -o name 2>/dev/null | grep -q metallb-operator; then
+  echo "metallb-operator not found in '${METALLB_OPERATOR_SUB_SOURCE}' — creating fallback CatalogSource ${FALLBACK_CATALOG}"
+  oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${FALLBACK_CATALOG}
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  image: ${FALLBACK_IMAGE}
+  displayName: "Red Hat Operators (v4.22 index)"
+  publisher: Red Hat
+  updateStrategy:
+    registryPoll:
+      interval: 10m
+EOF
+
+  # Wait for the fallback catalog to become READY
+  echo "Waiting for CatalogSource ${FALLBACK_CATALOG} to become ready..."
+  for i in $(seq 1 20); do
+    STATE=$(oc get catalogsource -n openshift-marketplace "${FALLBACK_CATALOG}" \
+              -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+    [[ "${STATE}" == "READY" ]] && break
+    echo "  [${i}/20] state=${STATE:-unknown}, retrying in 15s"
+    sleep 15
+  done
+  STATE=$(oc get catalogsource -n openshift-marketplace "${FALLBACK_CATALOG}" \
+            -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+  if [[ "${STATE}" != "READY" ]]; then
+    echo "Error: CatalogSource ${FALLBACK_CATALOG} did not reach READY state (last state: ${STATE})"
+    oc get catalogsource -n openshift-marketplace "${FALLBACK_CATALOG}" -o yaml
+    exit 1
+  fi
+  METALLB_OPERATOR_SUB_SOURCE="${FALLBACK_CATALOG}"
+else
+  echo "metallb-operator found in '${METALLB_OPERATOR_SUB_SOURCE}' — using default CatalogSource"
+fi
+
+echo "Installing metallb-operator (stable, ${METALLB_OPERATOR_SUB_SOURCE}) into metallb-system"
 
 # Create the install namespace
 oc apply -f - <<EOF
@@ -45,7 +91,7 @@ spec:
   channel: stable
   installPlanApproval: Automatic
   name: metallb-operator
-  source: redhat-operators
+  source: "${METALLB_OPERATOR_SUB_SOURCE}"
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -69,11 +115,13 @@ done
 
 if [[ "$i" == "max" ]]; then
   echo "Error: Failed to deploy metallb-operator"
+  echo "Subscription status:"
+  oc get subscription -n metallb-system metallb-operator -o yaml
   echo "csv ${CSV} YAML"
-  oc get csv "${CSV}" -n metallb-system -o yaml
+  oc get csv "${CSV}" -n metallb-system -o yaml || true
   echo
   echo "csv ${CSV} Describe"
-  oc describe csv "${CSV}" -n metallb-system
+  oc describe csv "${CSV}" -n metallb-system || true
   exit 1
 fi
 
