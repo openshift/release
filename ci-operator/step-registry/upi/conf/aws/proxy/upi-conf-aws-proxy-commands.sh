@@ -304,9 +304,9 @@ export TLS_PROXY_URL="https://${USER_NAME}:${PASSWORD}@${PROXY_DNS}:3130/"
 echo ${PROXY_URL} > ${SHARED_DIR}/http_proxy_url
 echo ${TLS_PROXY_URL} > ${SHARED_DIR}/https_proxy_url
 
-# need a squid image with at least version 4.x so that we can do a TLS 1.3 handshake.
-# 4.5:egress-http-proxy image only does up to 1.2 which podman fails to do a handshake with  https://github.com/containers/image/issues/699
-PROXY_IMAGE=registry.ci.openshift.org/origin/4.18:egress-http-proxy
+# Use a publicly-pullable squid image. The old registry.ci.openshift.org reference
+# requires auth that the proxy VM doesn't have, and the image is no longer updated post-QCI migration.
+PROXY_IMAGE=quay.io/openshifttest/squid-proxy:multiarch
 cat >> ${SHARED_DIR}/install-config.yaml << EOF
 proxy:
   httpsProxy: ${TLS_PROXY_URL}
