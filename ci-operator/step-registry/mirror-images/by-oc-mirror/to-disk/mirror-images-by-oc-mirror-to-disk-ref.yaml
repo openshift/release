@@ -1,0 +1,44 @@
+ref:
+  as: mirror-images-by-oc-mirror-to-disk
+  from: cli
+  cli: latest
+  grace_period: 30m
+  timeout: 4h0m0s
+  commands: mirror-images-by-oc-mirror-to-disk-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 500Mi
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  env:
+  - name: CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    default: ""
+    documentation: |-
+      Overrides OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE with a custom payload image.
+  - name: DISK_ARCHIVE_DIR
+    default: "/tmp/oc-mirror-archive"
+    documentation: |-
+      Absolute path on the bastion host where oc-mirror will write the disk archive
+      (file:// workspace). The directory is created if it does not exist. Must have
+      sufficient free space for the full release payload (typically 10-20 GiB).
+  documentation: |-
+    Mirror the OCP release payload to a disk archive (file:// workspace) on the
+    bastion host using oc-mirror v2. This is the first phase of a two-phase
+    air-gap simulation: content is mirrored from the source registry to a local
+    archive before internet access is removed. The second phase
+    (mirror-images-by-oc-mirror-from-disk) pushes the archive to the offline
+    mirror registry.
+
+    Requires the bastion host to already be provisioned (aws-provision-bastionhost
+    chain must have run) so that SHARED_DIR/bastion_public_address,
+    bastion_ssh_user, and mirror_registry_url are available.
+
+    On success writes SHARED_DIR/oc-mirror-disk-archive-dir containing the path
+    of the archive on the bastion, and SHARED_DIR/oc-mirror-imageset-config.yaml
+    containing the ImageSetConfiguration that was used.
