@@ -25,6 +25,7 @@ if oc get packagemanifest -l "catalog=${ODF_SUBSCRIPTION_SOURCE}" -n openshift-m
     -o jsonpath='{.items[?(@.metadata.name=="odf-operator")].status.channels[*].name}' | tr ' ' '\n' | sort -V | tail -1)
 else
   echo "odf-operator package not found in ${ODF_SUBSCRIPTION_SOURCE} catalog, creating ODF 4.23 catalog source with ICSP"
+  sleep 6h
 
   # Create ImageContentSourcePolicy for ODF 4.23
   echo "Creating ImageContentSourcePolicy for ODF repositories"
