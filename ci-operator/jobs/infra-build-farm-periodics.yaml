@@ -442,6 +442,61 @@ periodics:
         secretName: cluster-secrets-gcp-openshift-gce-devel-ci-2
 - agent: kubernetes
   cluster: build02
+  decorate: true
+  decoration_config:
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  interval: 4h
+  labels:
+    ci.openshift.io/role: cloud-azure
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-ipi-deprovision-azure
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@azure-ci-admin Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
+  spec:
+    containers:
+    - command:
+      - ./core-services/ipi-deprovision/azure.sh
+      env:
+      - name: HOME
+        value: /tmp
+      - name: AZURE_AUTH_LOCATION
+        value: /azure/osServicePrincipal.json
+      - name: CLUSTER_TTL
+        value: 6 hours ago
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ipi-deprovision_latest
+      imagePullPolicy: Always
+      name: ipi-deprovision
+      resources:
+        requests:
+          cpu: "1"
+          memory: 600Mi
+      volumeMounts:
+      - mountPath: /azure
+        name: cluster-secrets-azure4
+    nodeSelector:
+      beta.kubernetes.io/arch: amd64
+    serviceAccountName: ipi-deprovisioner
+    volumes:
+    - name: cluster-secrets-azure4
+      secret:
+        items:
+        - key: osServicePrincipal.json
+          path: osServicePrincipal.json
+        secretName: cluster-secrets-azure4
+- agent: kubernetes
+  cluster: build02
   cron: '@daily'
   decorate: true
   name: periodic-openshift-dptp-3312-hypershift-leaks-cleaner
