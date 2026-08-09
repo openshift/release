@@ -410,6 +410,19 @@ spec:
               name: ${secret_name}
 EOVM
 
+  # Wait for KubeVirt to create the DataVolume from the VM's dataVolumeTemplates
+  echo "$(date -u --rfc-3339=seconds) - Waiting for DataVolume ${vm_name}-volume to be created by KubeVirt..."
+  dv_wait=0
+  while [[ ${dv_wait} -lt 120 ]]; do
+    if oc get datavolume "${vm_name}-volume" -n "${VM_NAMESPACE}" 2>/dev/null; then
+      echo "$(date -u --rfc-3339=seconds) - DataVolume ${vm_name}-volume exists"
+      break
+    fi
+    echo "$(date -u --rfc-3339=seconds) - DataVolume not yet created, waiting... (${dv_wait}s/120s)"
+    sleep 10
+    dv_wait=$((dv_wait + 10))
+  done
+
   echo "$(date -u --rfc-3339=seconds) - Waiting for VM ${vm_name} DataVolume clone to complete..."
   oc wait datavolume "${vm_name}-volume" \
     -n "${VM_NAMESPACE}" \
@@ -417,6 +430,7 @@ EOVM
     --timeout=30m || {
     echo "ERROR: DataVolume clone timed out for ${vm_name}-volume"
     oc get datavolume "${vm_name}-volume" -n "${VM_NAMESPACE}" -o yaml || true
+    oc get events -n "${VM_NAMESPACE}" --sort-by='.lastTimestamp' | tail -20 || true
     exit 1
   }
 
