@@ -58,6 +58,39 @@ tests:
           memory: 1Gi
     workflow: ipi-aws
 - always_run: false
+  as: e2e-far-nhc-interop-aws
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: operator:far && operator:nhc && tier:interop
+      ECO_TEST_VERBOSE: "true"
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation,node-healthcheck-operator
+    test:
+    - chain: medik8s-setup
+    - ref: medik8s-aws-credentials
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    workflow: ipi-aws
+- always_run: false
   as: e2e-mdr-aws
   capabilities:
   - intranet
@@ -541,6 +574,42 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-far-nhc-interop-weekly-aws
+  capabilities:
+  - intranet
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_ENABLE_REPORT: "true"
+      ECO_TC_PREFIX: OCP-
+      ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: operator:far && operator:nhc && tier:interop
+      ECO_TEST_VERBOSE: "true"
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation,node-healthcheck-operator
+    test:
+    - chain: medik8s-setup
+    - ref: medik8s-aws-credentials
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_ENABLE_REPORT
+      - name: ECO_TC_PREFIX
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
     workflow: ipi-aws
 - as: e2e-nmo-weekly-aws
   capabilities:
