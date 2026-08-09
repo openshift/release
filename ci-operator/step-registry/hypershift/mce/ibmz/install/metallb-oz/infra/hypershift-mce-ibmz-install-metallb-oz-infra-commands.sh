@@ -19,8 +19,10 @@ export KUBECONFIG="${EFFECTIVE_KUBECONFIG}"
 
 # If the default CatalogSource does not carry metallb-operator, create a
 # pinned CatalogSource from the v4.22 index image and use that instead.
-FALLBACK_CATALOG="redhat-operator-index-v422"
-FALLBACK_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.22"
+FALLBACK_CATALOG="metallb-operator-catalog"
+# Use the quay.io mirror — registry.redhat.io is not reachable from OLM
+# catalog pods inside the CI libvirt cluster.
+FALLBACK_IMAGE="quay.io/redhat/redhat-operator-index:v4.18"
 
 if ! oc get packagemanifest -n openshift-marketplace metallb-operator \
      --field-selector "status.catalogSource=${METALLB_OPERATOR_SUB_SOURCE}" \
@@ -35,7 +37,7 @@ metadata:
 spec:
   sourceType: grpc
   image: ${FALLBACK_IMAGE}
-  displayName: "Red Hat Operators (v4.22 index)"
+  displayName: "Red Hat Operators - MetalLB"
   publisher: Red Hat
   updateStrategy:
     registryPoll:
