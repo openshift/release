@@ -34,15 +34,21 @@ process_inventory() {
   echo "Processing complete. Check \"${dest_file}\""
 }
 
-echo "Create group_vars directory"
-mkdir -p /eco-ci-cd/inventories/ocp-deployment/group_vars
+echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
-echo "Copy group inventory files from SHARED_DIR"
-cp ${SHARED_DIR}/all /eco-ci-cd/inventories/ocp-deployment/group_vars/all
-cp ${SHARED_DIR}/bastions /eco-ci-cd/inventories/ocp-deployment/group_vars/bastions
-cp ${SHARED_DIR}/hypervisors /eco-ci-cd/inventories/ocp-deployment/group_vars/hypervisors
-cp ${SHARED_DIR}/nodes /eco-ci-cd/inventories/ocp-deployment/group_vars/nodes
-cp ${SHARED_DIR}/masters /eco-ci-cd/inventories/ocp-deployment/group_vars/masters
+echo "Processing common group_vars"
+mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
+
+find /var/group_variables/common/ -mindepth 1 -type d | while read -r dir; do
+  echo "  group_var: $(basename "${dir}")"
+  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
+done
+
+echo "Processing cluster group_vars (${CLUSTER_NAME})"
+find "/var/group_variables/${CLUSTER_NAME}/" -mindepth 1 -type d | while read -r dir; do
+  echo "  group_var: $(basename "${dir}")"
+  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
+done
 
 echo "Create host_vars directory"
 mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
