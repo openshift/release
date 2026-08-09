@@ -21,14 +21,22 @@ fi
 
 # If it's serial upgrades then override-upgrade file will store the release and overrides OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
 # upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
-# If those file exists we fail the execution since serial upgrades are not supported in this step
+# If those file exists with multiple releases we fail the execution since serial upgrades are not supported in this step
 if [[ -f "${SHARED_DIR}/upgrade-edge" ]]; then
-    echo "ERROR: Serial upgrades are not supported!!"
-    exit 255
+    edge_count=$(tr ',' '\n' < "${SHARED_DIR}/upgrade-edge" | grep -c .)
+    if (( edge_count > 1 )); then
+        echo "ERROR: Serial upgrades are not supported!!"
+        exit 255
+    fi
+    echo "Single upgrade target override found in upgrade-edge, continuing..."
 fi
 
 
 TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+if [[ -f "${SHARED_DIR}/upgrade-edge" ]]; then
+    TARGET=$(head -n 1 "${SHARED_DIR}/upgrade-edge" | tr ',' '\n' | head -1)
+    echo "Overriding upgrade target from upgrade-edge: ${TARGET}"
+fi
 DIGEST=$(oc adm release info "${TARGET}" -a "${CLUSTER_PROFILE_DIR}"/pull-secret -o json | jq -r .digest)
 REPO="${TARGET%:*}"
 REPO="${REPO%@sha256*}"
