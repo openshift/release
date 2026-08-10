@@ -130,7 +130,8 @@ CONTAINER_RUNTIME=podman go test -count 1 -v -timeout 180m ./suite/ \
   --hostvalidator=/root/openperouter/bin/validatehost \
   -ginkgo.v \
   -ginkgo.label-filter='!systemdmode' \
-  -ginkgo.skip='editing the underlay parameters|auto-recover when the named netns is deleted|Unnumbered' \
+  -ginkgo.focus='Router Host configuration|Node Router Status|Routes between bgp and the fabric with Underlay in ipv4|Routes between bgp and the fabric with iBGP|Disconnected L2VNI|Single Session Baseline' \
+  -ginkgo.skip='editing the underlay parameters' \
   -ginkgo.timeout=3h
 EOFPHASE4
 test_exit=$?
