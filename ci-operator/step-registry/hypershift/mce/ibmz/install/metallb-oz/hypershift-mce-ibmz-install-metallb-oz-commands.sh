@@ -72,8 +72,8 @@ metadata:
 spec:
   sourceType: grpc
   publisher: redhat
-  displayName: Red Hat Operators v4.22 Stage
-  image: quay.io/openshift-release-dev/ocp-release-nightly:iib-int-index-art-operators-4.22
+  displayName: Red Hat Operators v4.20 Stage
+  image: quay.io/openshift-release-dev/ocp-release-nightly:iib-int-index-art-operators-4.20
   updateStrategy:
     registryPoll:
       interval: 15m
