@@ -121,13 +121,13 @@ for workdir in $(find "${logdir}" -mindepth 1 -type d); do
   fi
 done
 
-WARNINGS="$(find ${clusters} -name warning -printf '%H\n' | sort)"
+WARNINGS="$(find "${logdir}" -mindepth 2 -name warning -printf '%H\n' | sort)"
 if [[ -n "${WARNINGS}" ]]; then
   echo "The following clusters required force-deletion of their resource groups:"
   xargs --max-args 1 basename <<< $WARNINGS
 fi
 
-FAILED="$(find ${clusters} -name failure -printf '%H\n' | sort)"
+FAILED="$(find "${logdir}" -mindepth 2 -name failure -printf '%H\n' | sort)"
 if [[ -n "${FAILED}" ]]; then
   echo "Deprovision failed on the following clusters:"
   xargs --max-args 1 basename <<< $FAILED
