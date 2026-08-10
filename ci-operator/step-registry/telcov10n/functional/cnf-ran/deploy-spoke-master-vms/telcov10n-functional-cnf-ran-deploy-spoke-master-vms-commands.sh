@@ -71,5 +71,4 @@ cp ${SHARED_DIR}/hypervisor /eco-ci-cd/inventories/ocp-deployment/host_vars/hype
 
 cd /eco-ci-cd
 ansible-playbook playbooks/ran/create-spoke-masters.yml \
-  -i inventories/ocp-deployment/build-inventory.py \
-  --private-key=~/.ssh/ansible_ssh_private_key -vv
+  -i inventories/ocp-deployment/build-inventory.py
