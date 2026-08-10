@@ -377,7 +377,12 @@ spec:
             name: ${DV_NAME}
             namespace: ${OS_IMAGES_NAMESPACE}
         storage:
-          resources: {}
+          accessModes:
+            - ReadWriteOnce
+          volumeMode: Filesystem
+          resources:
+            requests:
+              storage: 64Gi
   instancetype:
     name: u1.large
   preference:
