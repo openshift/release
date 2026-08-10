@@ -157,8 +157,8 @@ def add_imagestream_namespace_rbac(gendoc):
             }]
     })
 
-    if not context.suffix:
-        # Special permissions for x86_64 public rc
+    if not context.suffix and context.product.name == 'ocp':
+        # Special permissions for OCP x86_64 public rc
         resources.append({
             'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'Role',
@@ -208,7 +208,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
-            'name': 'release-controller-import-ocp',
+            'name': f'release-controller-import-{context.product.deployment_prefix}',
             'namespace': context.is_namespace
         },
         'rules': [{
@@ -246,7 +246,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
         'metadata': {
-            'name': 'release-controller-binding-ocp',
+            'name': f'release-controller-binding-{context.product.deployment_prefix}',
             'namespace': context.is_namespace,
         },
         'roleRef': {
@@ -261,8 +261,8 @@ def add_imagestream_namespace_rbac(gendoc):
         }]
     })
 
-    if not context.suffix:
-        # Special permissions just for x86_64 public release controller
+    if not context.suffix and context.product.name == 'ocp':
+        # Special permissions just for OCP x86_64 public release controller
         resources.append({
             'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'RoleBinding',
@@ -351,7 +351,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
         'metadata': {
-            'name': 'release-controller-binding-ocp',
+            'name': f'release-controller-binding-{context.product.deployment_prefix}',
             'namespace': context.jobs_namespace,
         },
         'roleRef': {
@@ -395,7 +395,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'roleRef': {
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Role',
-            'name': 'release-controller-import-ocp',
+            'name': f'release-controller-import-{context.product.deployment_prefix}',
         },
         'subjects': [{
             'kind': 'ServiceAccount',
@@ -431,7 +431,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'ClusterRoleBinding',
             'metadata': {
-                'name': f'release-controller-ocp{context.suffix}-oauth'
+                'name': f'release-controller-{context.product.deployment_prefix}{context.suffix}-oauth'
             },
             'roleRef': {
                 'apiGroup': 'rbac.authorization.k8s.io',
@@ -450,7 +450,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'ClusterRoleBinding',
             'metadata': {
-                'name': f'release-controller-ocp{context.suffix}',
+                'name': f'release-controller-{context.product.deployment_prefix}{context.suffix}',
             },
             'roleRef': {
                 'apiGroup': 'rbac.authorization.k8s.io',

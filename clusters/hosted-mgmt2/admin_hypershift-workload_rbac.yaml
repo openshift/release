@@ -100,3 +100,59 @@ subjects:
 - kind: ServiceAccount
   name: hypershift-workload
   namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hypershift-oidc-discovery
+  namespace: kube-public
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hypershift-workload-rolebinding-oidc
+  namespace: kube-public
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: hypershift-oidc-discovery
+subjects:
+- kind: ServiceAccount
+  name: hypershift-workload
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hypershift-mgmt-readonly
+  namespace: hypershift
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - supported-versions
+  resources:
+  - configmaps
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hypershift-workload-rolebinding
+  namespace: hypershift
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: hypershift-mgmt-readonly
+subjects:
+- kind: ServiceAccount
+  name: hypershift-workload
+  namespace: ci

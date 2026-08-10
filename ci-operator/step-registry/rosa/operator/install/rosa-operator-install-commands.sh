@@ -4,7 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+collect_operator_logs() {
+    local ns="${OPERATOR_NAMESPACE:-openshift-${OPERATOR_NAME:-unknown}}"
+    if [[ -n "${ARTIFACT_DIR:-}" ]] && oc get namespace "${ns}" &>/dev/null; then
+        for deploy in $(oc get deployment -n "${ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
+            oc logs "deployment/${deploy}" -n "${ns}" --all-containers --tail=500 \
+                > "${ARTIFACT_DIR}/${deploy}-logs.txt" 2>&1 || true
+        done
+        oc get events -n "${ns}" --sort-by='.lastTimestamp' \
+            > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
+    fi
+}
+
+trap 'collect_operator_logs; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM EXIT
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
@@ -195,6 +207,11 @@ if [[ "${CLUSTER_PACKAGE_NAME}" != "${OPERATOR_NAME}" ]]; then
 fi
 
 # Create the ClusterPackage CR
+PKO_CONFIG="    image: ${OPERATOR_IMAGE}"
+if [[ -n "${PKO_CONFIG_NAMESPACE:-}" ]]; then
+    PKO_CONFIG="${PKO_CONFIG}
+    namespace: ${PKO_CONFIG_NAMESPACE}"
+fi
 cat <<EOF | oc apply -f -
 apiVersion: package-operator.run/v1alpha1
 kind: ClusterPackage
@@ -205,7 +222,7 @@ metadata:
 spec:
   image: ${OPERATOR_PKO_IMAGE}
   config:
-    image: ${OPERATOR_IMAGE}
+${PKO_CONFIG}
 EOF
 
 # Save the ClusterPackage name for cleanup

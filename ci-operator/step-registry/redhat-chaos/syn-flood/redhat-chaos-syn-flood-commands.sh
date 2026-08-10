@@ -43,5 +43,10 @@ rc=$?
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
     cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 fi
+
+
+if [[ -f /tmp/report.out.pdf ]]; then
+  cp /tmp/report.out.pdf ${ARTIFACT_DIR}/kraken.report.pdf
+fi
 echo "Finished running syn-flood chaos"
 echo "Return code: $rc"

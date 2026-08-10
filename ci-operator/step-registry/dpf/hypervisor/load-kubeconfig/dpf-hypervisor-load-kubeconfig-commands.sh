@@ -5,7 +5,8 @@ shopt -s inherit_errexit
 
 # Configuration
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
-REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
+CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
+REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
@@ -44,14 +45,14 @@ fi
 
 # Copy the cluster kubeconfig from the last install dir on the hypervisor
 echo "=== Copying kubeconfig from ${LAST_OPENSHIFT_DPF} on hypervisor ==="
-scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.doca8 /tmp/kubeconfig.doca8
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME} /tmp/kubeconfig.${CLUSTER_NAME}
 
 # The kubeconfig's API server is addressed by an internal hostname that is
 # not resolvable from the CI cluster's network. Resolve it from the
 # hypervisor (which can reach internal DNS) and substitute the IP so the
 # kubeconfig is usable from the CI pod.
-CLUSTER_NAME="$(oc --kubeconfig=/tmp/kubeconfig.doca8 config view -o jsonpath='{.clusters[0].name}')"
-CLUSTER_API_SERVER_HOSTNAME="$(oc --kubeconfig=/tmp/kubeconfig.doca8 config view -o jsonpath='{.clusters[0].cluster.server}' | sed -E 's#https://([^:]+):.*#\1#')"
+CLUSTER_NAME="$(oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config view -o jsonpath='{.clusters[0].name}')"
+CLUSTER_API_SERVER_HOSTNAME="$(oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config view -o jsonpath='{.clusters[0].cluster.server}' | sed -E 's#https://([^:]+):.*#\1#')"
 echo "Resolving cluster API server hostname '${CLUSTER_API_SERVER_HOSTNAME}' from the hypervisor..."
 CLUSTER_API_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${CLUSTER_API_SERVER_HOSTNAME} | awk '{print \$1}'")"
 
@@ -68,10 +69,10 @@ echo "Resolved '${CLUSTER_API_SERVER_HOSTNAME}' to '${CLUSTER_API_IP}'"
 # the CA data (the two are mutually exclusive in a kubeconfig) so consumers
 # of this kubeconfig don't need to pass --insecure-skip-tls-verify
 # themselves.
-oc --kubeconfig=/tmp/kubeconfig.doca8 config set-cluster "${CLUSTER_NAME}" \
+oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config set-cluster "${CLUSTER_NAME}" \
     --server="https://${CLUSTER_API_IP}:6443" \
     --insecure-skip-tls-verify=true
-oc --kubeconfig=/tmp/kubeconfig.doca8 config unset "clusters.${CLUSTER_NAME}.certificate-authority-data"
+oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config unset "clusters.${CLUSTER_NAME}.certificate-authority-data"
 
-cp /tmp/kubeconfig.doca8 "${SHARED_DIR}/kubeconfig"
+cp /tmp/kubeconfig.${CLUSTER_NAME} "${SHARED_DIR}/kubeconfig"
 echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig successfully"

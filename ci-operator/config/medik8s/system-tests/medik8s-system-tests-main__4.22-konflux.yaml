@@ -3,6 +3,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: aws-efs-csi-operator-create-efs
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -30,6 +34,8 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: '!tier:upgrade'
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation
@@ -43,6 +49,41 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-far-nhc-interop-aws
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: operator:far && operator:nhc && tier:interop
+      ECO_TEST_VERBOSE: "true"
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation,node-healthcheck-operator
+    test:
+    - chain: medik8s-setup
+    - ref: medik8s-aws-credentials
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
       from: src
       resources:
         requests:
@@ -59,6 +100,7 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: mdr-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: machine-deletion-remediation,node-healthcheck-operator
@@ -71,6 +113,7 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       from: src
       resources:
         requests:
@@ -87,11 +130,13 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: node-healthcheck-operator,self-node-remediation
     test:
     - chain: medik8s-setup
+    - ref: ssh-bastion
     - as: e2e-test
       cli: latest
       commands: |
@@ -99,6 +144,7 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       from: src
       resources:
         requests:
@@ -115,6 +161,7 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: nmo-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: node-maintenance-operator
@@ -127,6 +174,7 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       from: src
       resources:
         requests:
@@ -144,6 +192,7 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
       ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.21
       OO_CHANNEL: stable
@@ -160,6 +209,7 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       from: src
       resources:
         requests:
@@ -177,6 +227,7 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       CLUSTERCSIDRIVER: efs.csi.aws.com
       ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: storage-based-remediation
@@ -198,12 +249,85 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- always_run: false
+  as: e2e-sbr-hypershift-aws-odf
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      ECO_TEST_FEATURES: sbr-operator
+      HYPERSHIFT_INSTANCE_TYPE: m5.4xlarge
+      HYPERSHIFT_NODE_COUNT: "3"
+      OCP_VERSION: "422"
+      ODF__STORAGE_CLUSTER_WAIT_TIMEOUT: 15m
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      ODF_SC_AVAILABLE_FALLBACK: "true"
+      OO_CHANNEL: stable
+      OPERATORS: storage-based-remediation
+      SKIP_IDMS: "true"
+    test:
+    - ref: medik8s-sbr-hypershift-switch-kubeconfig
+    - ref: medik8s-sbr-hypershift-wait-nodes
+    - chain: medik8s-setup
+    - ref: odf-prepare-cluster
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-apply-storage-cluster
+    - as: e2e-test
+      cli: latest
+      commands: make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: medik8s-sbr-hypershift
+- always_run: false
+  as: e2e-sbr-hypershift-persistent-aws-odf
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      ECO_TEST_FEATURES: sbr-operator
+      HYPERSHIFT_INSTANCE_TYPE: m5.4xlarge
+      HYPERSHIFT_NODE_COUNT: "3"
+      OCP_VERSION: "422"
+      ODF__STORAGE_CLUSTER_WAIT_TIMEOUT: 15m
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.21
+      ODF_SC_AVAILABLE_FALLBACK: "true"
+      OO_CHANNEL: stable
+      OPERATORS: storage-based-remediation
+      SKIP_IDMS: "true"
+    test:
+    - ref: medik8s-sbr-hypershift-switch-kubeconfig
+    - ref: medik8s-sbr-hypershift-wait-nodes
+    - chain: medik8s-setup
+    - ref: odf-prepare-cluster
+    - ref: operatorhub-subscribe-odf-operator
+    - ref: odf-apply-storage-cluster
+    - as: e2e-test
+      cli: latest
+      commands: make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: medik8s-sbr-hypershift-persistent
 - always_run: false
   as: e2e-snr-aws
   capabilities:
@@ -214,6 +338,7 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: self-node-remediation,node-healthcheck-operator
@@ -226,6 +351,7 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       from: src
       resources:
         requests:
@@ -243,6 +369,8 @@ tests:
       ECO_ENABLE_REPORT: "true"
       ECO_TC_PREFIX: OCP-
       ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: '!tier:upgrade'
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation
@@ -263,6 +391,8 @@ tests:
       - name: ECO_ENABLE_REPORT
       - name: ECO_TC_PREFIX
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
       - name: REPORT_CASE_TAG
       from: src
       resources:
@@ -281,6 +411,7 @@ tests:
       COMPUTE_NODE_TYPE: m5.4xlarge
       ECO_TC_PREFIX: OCP-
       ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.21
       OO_CHANNEL: stable
@@ -303,6 +434,7 @@ tests:
       env:
       - name: ECO_TC_PREFIX
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       - name: REPORT_CASE_TAG
       from: src
       resources:
@@ -319,6 +451,7 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: self-node-remediation,node-healthcheck-operator
@@ -331,6 +464,7 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       from: src
       resources:
         requests:
@@ -346,6 +480,7 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: mdr-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: machine-deletion-remediation,node-healthcheck-operator
@@ -358,6 +493,7 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       from: src
       resources:
         requests:
@@ -375,6 +511,7 @@ tests:
       CLUSTERCSIDRIVER: efs.csi.aws.com
       ECO_TC_PREFIX: OCP-
       ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: storage-based-remediation
@@ -400,6 +537,7 @@ tests:
       env:
       - name: ECO_TC_PREFIX
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       - name: REPORT_CASE_TAG
       from: src
       resources:
@@ -416,11 +554,13 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: node-healthcheck-operator,self-node-remediation
     test:
     - chain: medik8s-setup
+    - ref: ssh-bastion
     - as: e2e-test
       cli: latest
       commands: |
@@ -428,11 +568,54 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-far-nhc-interop-weekly-aws
+  capabilities:
+  - intranet
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_ENABLE_REPORT: "true"
+      ECO_TC_PREFIX: OCP-
+      ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: operator:far && operator:nhc && tier:interop
+      ECO_TEST_VERBOSE: "true"
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation,node-healthcheck-operator
+      POLARION_TESTRUN_ID: RHWA-FAR-NHC-4.22-interop-weekly
+      REPORT_CASE_TAG: polarion-testcase-id
+    post:
+    - ref: medik8s-polarion-reporter
+    - chain: ipi-aws-post
+    test:
+    - chain: medik8s-setup
+    - ref: medik8s-aws-credentials
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_ENABLE_REPORT
+      - name: ECO_TC_PREFIX
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: REPORT_CASE_TAG
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
     workflow: ipi-aws
 - as: e2e-nmo-weekly-aws
   capabilities:
@@ -443,6 +626,7 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: nmo-operator
+      ECO_TEST_VERBOSE: "true"
       OCP_VERSION: "422"
       OO_CHANNEL: stable
       OPERATORS: node-maintenance-operator
@@ -455,6 +639,7 @@ tests:
         make run-tests
       env:
       - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
       from: src
       resources:
         requests:

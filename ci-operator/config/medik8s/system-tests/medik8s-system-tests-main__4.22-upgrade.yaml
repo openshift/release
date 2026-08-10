@@ -11,9 +11,8 @@ releases:
       channel: stable
       version: "4.21"
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.22"
 resources:
   '*':
@@ -56,7 +55,9 @@ tests:
     - ref: medik8s-aws-credentials
     - as: e2e-upgrade-test
       cli: latest
-      commands: make run-tests
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
@@ -99,7 +100,9 @@ tests:
     - ref: medik8s-aws-credentials
     - as: e2e-upgrade-test
       cli: latest
-      commands: make run-tests
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS

@@ -6,6 +6,8 @@ echo "Testing SHARED_DIR" > ${SHARED_DIR}/testing.txt
 ls -ltra ${SHARED_DIR}
 cat ${SHARED_DIR}/testing.txt
 
+CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
+
 # Configuration
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
 echo "Remote host: ${REMOTE_HOST}"
@@ -36,7 +38,6 @@ else
 fi
 
 OPENSHIFT_DPF_GITHUB_REPO_URL="https://github.com/rh-ecosystem-edge/openshift-dpf.git"
-CLUSTER_NAME="doca8"
 REMOTE_MAIN_WORK_DIR="/root/${CLUSTER_NAME}/ci"
 
 # Check if target bastion is in maintenance mode
@@ -46,7 +47,7 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f /root/${CLUSTER_NAME}/pause"; th
 fi
 
 # store last openshift-dpf install dir on hypervisor
-REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
+REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
 echo "Deploying OpenShift cluster with DPF on host ${REMOTE_HOST}"
 echo "Remote Main Working directory on hypervisor: ${REMOTE_MAIN_WORK_DIR}"
@@ -93,7 +94,7 @@ if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "openshift-dpf" ]]; the
   if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; \
     git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER}; \
     git checkout pr-${PULL_NUMBER}; \
-    git rebase ${OPENSHIFT_DPF_BRANCH}"; then
+    git rebase origin/${OPENSHIFT_DPF_BRANCH}"; then
     echo "Successfully checked out PR #${PULL_NUMBER}"
   else
     echo "ERROR: Failed to checkout PR #${PULL_NUMBER}"

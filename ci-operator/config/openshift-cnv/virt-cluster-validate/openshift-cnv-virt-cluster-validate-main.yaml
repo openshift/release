@@ -36,6 +36,13 @@ tests:
     env:
       BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4s_v5
+      OPERATORS: |
+        [
+          {"name": "kubernetes-nmstate-operator", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-nmstate", "target_namespaces": "openshift-nmstate", "operator_group": "nmstate-og"},
+          {"name": "redhat-oadp-operator", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group": "oadp-og"},
+          {"name": "node-healthcheck-operator", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-operators"},
+          {"name": "self-node-remediation", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-operators"}
+        ]
     test:
     - as: install-cnv
       cli: latest
@@ -46,7 +53,7 @@ tests:
         tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
         cd /tmp/cnv-ci
         make update_pull_secret set_imagedigestmirrorset deploy_cnv
-        oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=json -p='[{"op": "add", "path": "/spec/defaultCPUModel", "value": "Broadwell"}]'
+        oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=merge -p '{"spec":{"virtualization":{"virtualMachineOptions":{"defaultCPUModel":"Broadwell"}}}}'
       credentials:
       - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
@@ -77,29 +84,113 @@ tests:
           cpu: 100m
           memory: 600Mi
       timeout: 1h0m0s
+    - as: setup-catalog
+      cli: latest
+      commands: |
+        set -euo pipefail
+        oc create -f - <<'EOF'
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          name: redhat-operators-v4-22
+          namespace: openshift-marketplace
+        spec:
+          sourceType: grpc
+          image: registry.redhat.io/redhat/redhat-operator-index:v4.22
+          displayName: Red Hat Operators v4.22
+        EOF
+        echo "Waiting for CatalogSource to become READY..."
+        oc wait -n openshift-marketplace catalogsource/redhat-operators-v4-22 \
+          --for=jsonpath='{.status.connectionState.lastObservedState}'=READY --timeout=5m
+        echo "CatalogSource redhat-operators-v4-22 is ready"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: install-operators
+    - as: setup-rwx-storage
+      cli: latest
+      commands: |
+        set -euo pipefail
+        oc get storageclass -o name | xargs -I{} oc patch {} -p '{"metadata":{"annotations":{"storageclass.kubevirt.io/is-default-virt-class":"false"}}}' --type=merge 2>/dev/null || true
+        oc create -f - <<'EOF'
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata:
+          name: azurefile-csi-smb
+          annotations:
+            storageclass.kubevirt.io/is-default-virt-class: "true"
+        provisioner: file.csi.azure.com
+        parameters:
+          skuName: Standard_LRS
+        reclaimPolicy: Delete
+        volumeBindingMode: Immediate
+        allowVolumeExpansion: true
+        mountOptions:
+          - dir_mode=0777
+          - file_mode=0660
+          - uid=107
+          - gid=107
+          - noperm
+          - mfsymlinks
+          - cache=strict
+          - nosharesock
+          - actimeo=30
+          - nobrl
+        EOF
+        echo "Created azurefile-csi-smb StorageClass as default virt class"
+        echo "Waiting for StorageProfile to be created by CDI..."
+        oc wait storageprofile azurefile-csi-smb --for=jsonpath='{.status.provisioner}'=file.csi.azure.com --timeout=2m
+        oc patch storageprofile azurefile-csi-smb --type=merge -p '{"spec":{"claimPropertySets":[{"accessModes":["ReadWriteMany"],"volumeMode":"Filesystem"}]}}'
+        echo "StorageProfile patched with ReadWriteMany access mode"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: wait-for-golden-images
+      cli: latest
+      commands: |
+        set -euo pipefail
+        echo "Waiting for DataImportCron objects to appear..."
+        for i in $(seq 1 30); do
+          COUNT=$(oc get dataimportcron -n openshift-virtualization-os-images --no-headers 2>/dev/null | wc -l)
+          if [ "$COUNT" -gt 0 ]; then
+            echo "Found $COUNT DataImportCron objects"
+            break
+          fi
+          echo "No DataImportCron objects yet, waiting... ($i/30)"
+          sleep 10
+        done
+        echo "Waiting for all golden images to be up to date..."
+        oc wait dataimportcron --all \
+          -n openshift-virtualization-os-images \
+          --for=condition=UpToDate=true \
+          --timeout=15m
+        echo "All golden images imported successfully"
+        oc get pvc -n openshift-virtualization-os-images
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
     - as: validate
       cli: latest
       commands: |
         set -e
         # CI-specific exclusions (these checks detect real issues on customer clusters):
-        # 11-host-network: nmstate operator is not deployed on CI clusters
         # 20-bare-metal: CI clusters are cloud-hosted, bare-metal detection always fails
-        # 70-live-migration: CI default StorageClass is RWO, live migration needs RWX
         # 75-snapshots: CI StorageClass has no VolumeSnapshotClass configured
         # 80-high-performance: CI nodes lack dedicated CPU manager configuration
-        SKIP_CHECKS="11-host-network,20-bare-metal,70-live-migration,75-snapshots,80-high-performance"
+        SKIP_CHECKS="20-bare-metal,75-snapshots,80-high-performance"
         oc adm must-gather --image="${VCV_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- SKIP_CHECKS=${SKIP_CHECKS} /usr/bin/gather
         MG_SUBDIR=$(find ${ARTIFACT_DIR}/must-gather-output -path "*/virt-cluster-validate" -type d | head -1)
         if [[ -z "${MG_SUBDIR}" ]]; then
           echo "ERROR: virt-cluster-validate output directory not found in must-gather output"
           exit 1
         fi
-        cp "${MG_SUBDIR}/ctrf-results.json" ${ARTIFACT_DIR}/
-        cp -r "${MG_SUBDIR}/logs" ${ARTIFACT_DIR}/check-logs
-        cp "${MG_SUBDIR}/runner.log" ${ARTIFACT_DIR}/
         python3 -c "
         import json, sys
-        r = json.load(open('${ARTIFACT_DIR}/ctrf-results.json'))['results']['summary']
+        r = json.load(open('${MG_SUBDIR}/ctrf-results.json'))['results']['summary']
         print(f'Passed: {r[\"passed\"]}, Failed: {r[\"failed\"]}, Total: {r[\"tests\"]}')
         sys.exit(1 if r['failed'] > 0 else 0)
         "
@@ -116,6 +207,13 @@ tests:
     cluster_profile: gcp-virtualization
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
+      OPERATORS: |
+        [
+          {"name": "kubernetes-nmstate-operator", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-nmstate", "target_namespaces": "openshift-nmstate", "operator_group": "nmstate-og"},
+          {"name": "redhat-oadp-operator", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group": "oadp-og"},
+          {"name": "node-healthcheck-operator", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-operators"},
+          {"name": "self-node-remediation", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-operators"}
+        ]
     test:
     - as: install-cnv
       cli: latest
@@ -126,7 +224,7 @@ tests:
         tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
         cd /tmp/cnv-ci
         make update_pull_secret set_imagedigestmirrorset deploy_cnv
-        oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=json -p='[{"op": "add", "path": "/spec/defaultCPUModel", "value": "Broadwell"}]'
+        oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=merge -p '{"spec":{"virtualization":{"virtualMachineOptions":{"defaultCPUModel":"Broadwell"}}}}'
       credentials:
       - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
@@ -157,29 +255,49 @@ tests:
           cpu: 100m
           memory: 600Mi
       timeout: 1h0m0s
+    - as: setup-catalog
+      cli: latest
+      commands: |
+        set -euo pipefail
+        oc create -f - <<'EOF'
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          name: redhat-operators-v4-22
+          namespace: openshift-marketplace
+        spec:
+          sourceType: grpc
+          image: registry.redhat.io/redhat/redhat-operator-index:v4.22
+          displayName: Red Hat Operators v4.22
+        EOF
+        echo "Waiting for CatalogSource to become READY..."
+        oc wait -n openshift-marketplace catalogsource/redhat-operators-v4-22 \
+          --for=jsonpath='{.status.connectionState.lastObservedState}'=READY --timeout=5m
+        echo "CatalogSource redhat-operators-v4-22 is ready"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: install-operators
     - as: validate
       cli: latest
       commands: |
         set -e
         # CI-specific exclusions (these checks detect real issues on customer clusters):
-        # 11-host-network: nmstate operator is not deployed on CI clusters
         # 20-bare-metal: CI clusters are cloud-hosted, bare-metal detection always fails
         # 70-live-migration: CI default StorageClass is RWO, live migration needs RWX
         # 75-snapshots: CI StorageClass has no VolumeSnapshotClass configured
         # 80-high-performance: CI nodes lack dedicated CPU manager configuration
-        SKIP_CHECKS="11-host-network,20-bare-metal,70-live-migration,75-snapshots,80-high-performance"
+        SKIP_CHECKS="20-bare-metal,70-live-migration,75-snapshots,80-high-performance"
         oc adm must-gather --image="${VCV_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- SKIP_CHECKS=${SKIP_CHECKS} /usr/bin/gather
         MG_SUBDIR=$(find ${ARTIFACT_DIR}/must-gather-output -path "*/virt-cluster-validate" -type d | head -1)
         if [[ -z "${MG_SUBDIR}" ]]; then
           echo "ERROR: virt-cluster-validate output directory not found in must-gather output"
           exit 1
         fi
-        cp "${MG_SUBDIR}/ctrf-results.json" ${ARTIFACT_DIR}/
-        cp -r "${MG_SUBDIR}/logs" ${ARTIFACT_DIR}/check-logs
-        cp "${MG_SUBDIR}/runner.log" ${ARTIFACT_DIR}/
         python3 -c "
         import json, sys
-        r = json.load(open('${ARTIFACT_DIR}/ctrf-results.json'))['results']['summary']
+        r = json.load(open('${MG_SUBDIR}/ctrf-results.json'))['results']['summary']
         print(f'Passed: {r[\"passed\"]}, Failed: {r[\"failed\"]}, Total: {r[\"tests\"]}')
         sys.exit(1 if r['failed'] > 0 else 0)
         "

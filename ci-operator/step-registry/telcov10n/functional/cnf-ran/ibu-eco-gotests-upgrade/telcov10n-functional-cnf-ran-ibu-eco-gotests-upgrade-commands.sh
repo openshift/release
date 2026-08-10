@@ -48,7 +48,7 @@ MOUNTED_SPOKE_INVENTORY="/var/host_variables/${TARGET_CLUSTER_NAME}/spoke-master
 
 echo "=== IBU Upgrade eco-gotests Configuration ==="
 echo "TARGET_CLUSTER_NAME=${TARGET_CLUSTER_NAME}"
-echo "TARGET_SPOKE_CLUSTER=${TARGET_SPOKE_CLUSTER}"
+echo "TARGET_SPOKE_SNO=${TARGET_SPOKE_SNO}"
 echo "ECO_GOTESTS_FEATURES=${ECO_GOTESTS_FEATURES}"
 echo "MIRROR_REGISTRY=${MIRROR_REGISTRY}"
 echo "VERSION=${VERSION}"
@@ -93,12 +93,12 @@ cd /eco-ci-cd
 ansible-playbook playbooks/ran/ibu-prepare-spoke-sno.yml \
   -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
   --extra-vars "hub_cluster=${TARGET_CLUSTER_NAME}" \
-  --extra-vars "spoke_cluster=${TARGET_SPOKE_CLUSTER}" \
+  --extra-vars "spoke_cluster=${TARGET_SPOKE_SNO}" \
   --extra-vars "seed_vm_name=${TARGET_VM_NAME}"
 
 echo ""
 echo "=== Step 2: Run eco-gotests IBU upgrade suite ==="
-TARGET_SPOKE_KUBECONFIG="/tmp/${TARGET_SPOKE_CLUSTER}-kubeconfig"
+TARGET_SPOKE_KUBECONFIG="/tmp/${TARGET_SPOKE_SNO}-kubeconfig"
 
 # Build eco-gotests environment variables
 ECO_GOTESTS_ENV_VARS="-e ECO_CNF_RAN_SKIP_TLS_VERIFY=true"

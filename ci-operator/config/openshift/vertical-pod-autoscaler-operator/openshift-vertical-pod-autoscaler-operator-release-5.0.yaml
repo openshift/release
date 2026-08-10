@@ -4,13 +4,17 @@ base_images:
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: vertical-pod-autoscaler-operator-bundle
   previous-vpa-operator:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: vertical-pod-autoscaler-operator
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   ubi-python-311:
     name: ubi-python-311
     namespace: ocp
@@ -136,6 +140,11 @@ tests:
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-vertical-pod-autoscaler
+      SCANNER_CPU: 500m
+      SCANNER_MEMORY: 1Gi
     test:
     - as: install
       cli: latest
@@ -157,6 +166,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - ref: tls-scanner-run
     workflow: ipi-aws
 - as: e2e-aws-upgrade
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
