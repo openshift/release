@@ -297,17 +297,19 @@ ProbeCclmSyncPort() {
         --dry-run=client -o yaml --save-config | KUBECONFIG="${srcKubeconfig}" oc apply -f - 1>/dev/null
 
     # bash ships in ubi9-minimal; no extra package install needed.
+    # Capture exit code explicitly; cleanup must run even on failure.
+    typeset -i probeRc=0
     KUBECONFIG="${srcKubeconfig}" oc run "${probePod}" \
         -n "${probeNs}" \
         --rm -i --restart=Never \
         --image=registry.redhat.io/ubi9/ubi-minimal:latest \
         --command -- \
         timeout "${SUBMARINER_CCLM_SYNC_PROBE_TIMEOUT}" bash -c "echo >/dev/tcp/${destIp}/${SUBMARINER_CCLM_SYNC_PORT}" \
-        1>/dev/null
+        1>/dev/null || probeRc=$?
 
     KUBECONFIG="${srcKubeconfig}" oc delete namespace "${probeNs}" \
         --ignore-not-found --wait=false 1>/dev/null &
-    true
+    return "${probeRc}"
 }
 
 # ── VerifyCclmSyncPath — bidirectional sync-controller TCP reachability ───────
@@ -333,13 +335,14 @@ VerifyCclmSyncPath() {
         false
     }
 
+    typeset -i cclmRc=0
     : "CCLM sync probe ${srcName} -> ${tgtName} (${tgtSyncIp}:${SUBMARINER_CCLM_SYNC_PORT})"
-    ProbeCclmSyncPort "${kcSource}" "${tgtSyncIp}" "${srcName}-to-${tgtName}"
+    ProbeCclmSyncPort "${kcSource}" "${tgtSyncIp}" "${srcName}-to-${tgtName}" || cclmRc=$?
 
     : "CCLM sync probe ${tgtName} -> ${srcName} (${srcSyncIp}:${SUBMARINER_CCLM_SYNC_PORT})"
-    ProbeCclmSyncPort "${kcTarget}" "${srcSyncIp}" "${tgtName}-to-${srcName}"
+    ProbeCclmSyncPort "${kcTarget}" "${srcSyncIp}" "${tgtName}-to-${srcName}" || { (( cclmRc == 0 )) && cclmRc=$?; }
 
-    true
+    return "${cclmRc}"
 }
 
 # ── VerifyConnectivity — run subctl verify between two spokes ─────────────────
@@ -389,15 +392,15 @@ VerifyConnectivity() {
 
     # Bound subctl verify to 35m so it exits before the 45m step timeout.
     # Without this, each failing TCP test takes ~7m and the process is killed
-    # externally (exit 127) before the SUBMARINER_VERIFY_DEBUG_MODE handler runs.
-    # --kill-after 30s: send SIGKILL 30s after SIGTERM in case subctl is
-    # unresponsive (blocked goroutine / ncat subprocess ignoring SIGTERM).
+    # externally before the failure handler runs.
+    # Use || rc=$? instead of relying on set -e: bash does not reliably
+    # trigger set -e on function return codes inside for-loop bodies.
+    typeset -i rc=0
     KUBECONFIG="${mergedKc}" timeout --kill-after=30s 35m "${subctlBin}" verify \
         --context   "${ctx1}" \
         --tocontext "${ctx2}" \
         --only connectivity,service-discovery \
-        --verbose
-    typeset -i rc=$?
+        --verbose || rc=$?
 
     rm -f "${kc1Renamed}" "${kc2Renamed}" "${mergedKc}"
     return "${rc}"
@@ -441,12 +444,12 @@ typeset -i submarinerStepRc=0
                 "${spokeKubeconfigsArr[i]}" \
                 "${spokeKubeconfigsArr[j]}" \
                 "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}"
+                "${spokeNamesArr[j]}" || exit $?
             VerifyCclmSyncPath \
                 "${spokeKubeconfigsArr[i]}" \
                 "${spokeKubeconfigsArr[j]}" \
                 "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}"
+                "${spokeNamesArr[j]}" || exit $?
         done
     done
 
