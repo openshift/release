@@ -52,9 +52,12 @@ tests:
     test:
     - as: monitor
       commands: |
+        set -euo pipefail
         set +x
         source /tmp/nutanix-creds/secrets.sh
+        umask 077
         mkdir -p /tmp/nutanix-auth
+        trap 'rm -rf /tmp/nutanix-auth' EXIT
         echo -n "${prism_central_username}" > /tmp/nutanix-auth/nutanix-username
         echo -n "${prism_central_password}" > /tmp/nutanix-auth/nutanix-password
         set -x
@@ -69,6 +72,7 @@ tests:
         name: nutanix-pc
         namespace: test-credentials
       from: src
+      grace_period: 30s
       resources:
         requests:
           cpu: 100m
@@ -88,9 +92,12 @@ tests:
     test:
     - as: monitor
       commands: |
+        set -euo pipefail
         set +x
         source /tmp/nutanix-creds/secrets.sh
+        umask 077
         mkdir -p /tmp/nutanix-auth
+        trap 'rm -rf /tmp/nutanix-auth' EXIT
         echo -n "${prism_central_username}" > /tmp/nutanix-auth/nutanix-username
         echo -n "${prism_central_password}" > /tmp/nutanix-auth/nutanix-password
         set -x
@@ -104,6 +111,7 @@ tests:
         name: nutanix-pc
         namespace: test-credentials
       from: src
+      grace_period: 30s
       resources:
         requests:
           cpu: 100m
