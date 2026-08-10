@@ -111,8 +111,8 @@ for workdir in $(find "${logdir}" -mindepth 1 -type d); do
   if [[ -f "${workdir}/failure" ]]; then
     rg_name="$(jq -r '.azure.resourceGroupName' "${workdir}/metadata.json")"
     echo "openshift-install failed for ${rg_name}, force-deleting resource group ..."
-    if az group delete --name "${rg_name}" --yes --no-wait; then
-      echo "Initiated force-deletion of resource group ${rg_name}"
+    if az group delete --name "${rg_name}" --yes; then
+      echo "Successfully force-deleted resource group ${rg_name}"
       rm "${workdir}/failure"
       touch "${workdir}/warning"
     else
