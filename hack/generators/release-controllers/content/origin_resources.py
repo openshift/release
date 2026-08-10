@@ -1,4 +1,5 @@
 from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
+from content.osd_rc_deployments import get_oc_env_vars, get_oc_prepare_container
 
 
 def add_legacy_origin_deployments_scaled_down(gendoc):
@@ -295,6 +296,7 @@ def add_okd_deployments(gendoc):
                         }
                     },
                     "spec": {
+                        "initContainers": get_oc_prepare_container(),
                         "containers": [
                             {
                                 "command": [
@@ -315,6 +317,7 @@ def add_okd_deployments(gendoc):
                                 'imagePullPolicy': 'Always',
                                 "name": "controller",
                                 "volumeMounts": get_rcapi_volume_mounts(),
+                                "env": get_oc_env_vars(),
                                 'livenessProbe': {
                                     'httpGet': {
                                         'path': '/healthz',
