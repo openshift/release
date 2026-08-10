@@ -16,7 +16,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
                 ExitTrap--PostProcessPrep
         ' EXIT
     else
-        : "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping"
+        echo "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping" >&2
     fi
 fi
 
