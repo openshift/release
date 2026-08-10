@@ -15,6 +15,20 @@ if [[ ! -f "${EFFECTIVE_KUBECONFIG}" ]]; then
 fi
 export KUBECONFIG="${EFFECTIVE_KUBECONFIG}"
 
+# ── Merge abi-pull-secret into the cluster pull secret ───────────────────────
+# The abi-pull-secret contains credentials for registry.redhat.io and
+# brew.registry.redhat.io which OLM catalog pods need to pull index images.
+VAULT_PULL_SECRET="/etc/hypershift-agent-ibmz-credentials/abi-pull-secret"
+echo "Merging ${VAULT_PULL_SECRET} into cluster pull secret..."
+oc get secret pull-secret -n openshift-config \
+  -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > /tmp/cluster-pull-secret.json
+jq -s '.[0].auths * .[1].auths | {auths: .}' \
+  /tmp/cluster-pull-secret.json \
+  "${VAULT_PULL_SECRET}" > /tmp/merged-pull-secret.json
+oc set data secret/pull-secret -n openshift-config \
+  --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json
+echo "Pull secret updated successfully."
+
 # ── Ensure brew-registry ICSP is present so registry.redhat.io is reachable ──
 oc apply -f - <<EOF
 ---
