@@ -94,20 +94,25 @@ if [ -f "$PAT_FILE" ]; then
 
   GITHUB_TOKEN_PAT=$(cat "$PAT_FILE")
 
-  if [ -n "$JOB_URL" ]; then
-    COMMENT_BODY="Review agent triggered. [View job](${JOB_URL})"
+  if [ -n "$GITHUB_TOKEN_PAT" ]; then
+    if [ -n "$JOB_URL" ]; then
+      COMMENT_BODY="Review agent triggered. [View job](${JOB_URL})"
+    else
+      COMMENT_BODY="Review agent triggered (Gangway execution ID: \`${JOB_ID}\`). The Prow job has not started yet — check the [job history](https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/${PERIODIC_JOB_NAME}) for the run once it begins."
+    fi
+
+    curl --fail --silent --show-error -X POST \
+      -H "Authorization: token ${GITHUB_TOKEN_PAT}" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${REVIEW_AGENT_UPSTREAM_REPO}/issues/${PR_NUMBER}/comments" \
+      -d "$(jq -n --arg body "$COMMENT_BODY" '{body: $body}')" > /dev/null
+
+    $_was_tracing && set -x || true
+    echo "Comment posted on PR #$PR_NUMBER"
   else
-    COMMENT_BODY="Review agent triggered (Gangway execution ID: \`${JOB_ID}\`). The Prow job has not started yet — check the [job history](https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/${PERIODIC_JOB_NAME}) for the run once it begins."
+    $_was_tracing && set -x || true
+    echo "WARNING: PAT file is empty, skipping PR comment"
   fi
-
-  curl --fail --silent --show-error -X POST \
-    -H "Authorization: token ${GITHUB_TOKEN_PAT}" \
-    -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/repos/${REVIEW_AGENT_UPSTREAM_REPO}/issues/${PR_NUMBER}/comments" \
-    -d "$(jq -n --arg body "$COMMENT_BODY" '{body: $body}')" > /dev/null
-
-  $_was_tracing && set -x || true
-  echo "Comment posted on PR #$PR_NUMBER"
 else
   echo "WARNING: PAT not found at ${PAT_FILE}, skipping PR comment"
 fi
