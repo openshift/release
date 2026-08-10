@@ -37,6 +37,10 @@ ENABLEPEERPODS=${ENABLEPEERPODS:-false}
 WORKLOAD_TO_TEST=${WORKLOAD_TO_TEST:-kata}
 OSC_DEV_CATALOG_NAME="osc-operator-dev-catalog"
 
+OC_RETRY_COUNT=${OC_RETRY_COUNT:-3}
+OC_RETRY_INTERVAL=${OC_RETRY_INTERVAL:-20}
+
+
 # Early exit if installation disabled
 if [[ "${OSC_INSTALL}" != "true" ]]; then
   echo ">>> Skipping OSC operator installation (OSC_INSTALL=${OSC_INSTALL})"
@@ -117,10 +121,48 @@ function wait_until() {
   return 1
 }
 
+
+# Usage: oc_with_retry [--retries N] [--interval S] command [args...]
+function oc_with_retry() {
+  local max_attempts=${OC_RETRY_COUNT}
+  local interval=${OC_RETRY_INTERVAL}
+  while [[ "$1" == --* ]]; do
+    case "$1" in
+      --retries)  max_attempts="$2"; shift 2 ;;
+      --interval) interval="$2"; shift 2 ;;
+      *) break ;;
+    esac
+  done
+  local err_file
+  err_file=$(mktemp)
+  for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
+    if "$@" 2>"${err_file}"; then
+      rm -f "${err_file}"
+      return 0
+    fi
+
+    local err_output
+    err_output=$(cat "${err_file}")
+
+    if echo "${err_output}" | grep -qiE 'Unable to connect|connection refused|dial tcp|i/o timeout|EOF|network is unreachable|TLS handshake timeout'; then
+      echo ">>> Connection error (attempt ${attempt}/${max_attempts}): ${err_output}" >&2
+      [[ ${attempt} -lt ${max_attempts} ]] && sleep "${interval}" && continue
+      rm -f "${err_file}"
+      echo ">>> ERROR: Cannot reach cluster after ${max_attempts} attempts" >&2
+      return 1
+    fi
+
+    rm -f "${err_file}"
+    echo ">>> ERROR: Command failed: $*" >&2
+    echo "${err_output}" >&2
+    return 1
+  done
+}
+
 function mirror_konflux() {
   echo ">>> Create mirror for konflux images"
-  oc apply -f "https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/refs/heads/devel/.tekton/images-mirror-set.yaml"
-  oc apply -f "https://raw.githubusercontent.com/openshift/trustee-fbc/refs/heads/main/.tekton/images-mirror-set.yaml"
+  oc_with_retry oc apply -f "https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/refs/heads/devel/.tekton/images-mirror-set.yaml"
+  oc_with_retry oc apply -f "https://raw.githubusercontent.com/openshift/trustee-fbc/refs/heads/main/.tekton/images-mirror-set.yaml"
 }
 
 function latest_catsrc_image_tag() {
@@ -182,8 +224,8 @@ function setup_catalog_source() {
 
   # Update osc-config ConfigMap with the chart's catalog name
   if oc get configmap osc-config -n default &>/dev/null; then
-    oc patch configmap osc-config -n default --type merge \
-      -p "{\"data\":{\"catalogsourcename\":\"${OSC_DEV_CATALOG_NAME}\"}}" || true
+    oc_with_retry oc patch configmap osc-config -n default --type merge \
+      -p "{\"data\":{\"catalogsourcename\":\"${OSC_DEV_CATALOG_NAME}\"}}"
     echo ">>> Patched osc-config with catalogsourcename=${OSC_DEV_CATALOG_NAME}"
   fi
 }
@@ -215,7 +257,7 @@ function fetch_osc_charts() {
 
 function get_cloud_provider() {
   local provider
-  provider=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.type}' 2>/dev/null | tr '[:upper:]' '[:lower:]')
+  provider=$(oc_with_retry oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.type}' | tr '[:upper:]' '[:lower:]')
   if [[ "${provider}" == "none" ]]; then
     provider="libvirt"
   fi
@@ -383,15 +425,7 @@ function install_osc_operator() {
   echo ">>> Rendered operator objects:"
   oc apply -f "${operator_yaml}" --dry-run=client -o name || true
 
-  local apply_output
-  if ! apply_output=$(oc apply -f "${operator_yaml}" 2>&1); then
-    echo ">>> ERROR: Failed to apply operator manifests"
-    echo "$apply_output"
-    return 1
-  fi
-
-  echo ">>> Apply output:"
-  echo "$apply_output"
+  oc_with_retry oc apply -f "${operator_yaml}"
 }
 
 function wait_for_operator() {
@@ -505,15 +539,7 @@ function install_osc_operands() {
   echo ">>> Rendered operands objects:"
   oc apply -f "${operands_yaml}" --dry-run=client -o name || true
 
-  local apply_output
-  if ! apply_output=$(oc apply -f "${operands_yaml}" 2>&1); then
-    echo ">>> ERROR: Failed to apply operands manifests"
-    echo "$apply_output"
-    return 1
-  fi
-
-  echo ">>> Apply output:"
-  echo "$apply_output"
+  oc_with_retry oc apply -f "${operands_yaml}"
 }
 
 function create_peer_pods_secret() {
@@ -574,7 +600,7 @@ function create_peer_pods_secret() {
         subscription_id=$(oc get secret azure-credentials -n kube-system -o jsonpath='{.data.azure_subscription_id}' 2>/dev/null | base64 -d || echo "")
 
         set +x
-        oc create secret generic peer-pods-secret \
+        oc_with_retry oc create secret generic peer-pods-secret \
           -n "${OSC_NAMESPACE}" \
           --from-literal="AZURE_CLIENT_ID=${client_id}" \
           --from-literal="AZURE_CLIENT_SECRET=${client_secret}" \
@@ -590,7 +616,7 @@ function create_peer_pods_secret() {
       auth_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.auth\.json}' 2>/dev/null || echo "")
       if [[ -n "${auth_json}" ]]; then
         echo "${auth_json}" | base64 -d > "${SCRATCH}/auth.json"
-        oc create secret generic peer-pods-secret \
+        oc_with_retry oc create secret generic peer-pods-secret \
           -n "${OSC_NAMESPACE}" \
           --from-file="${SCRATCH}/auth.json"
         rm -f "${SCRATCH}/auth.json"
@@ -644,8 +670,8 @@ function update_osc_config() {
     return 0
   fi
 
-  oc patch configmap osc-config -n default --type merge \
-    -p '{"data":{"oscInstalled":"true"}}' || true
+  oc_with_retry oc patch configmap osc-config -n default --type merge \
+    -p '{"data":{"oscInstalled":"true"}}'
 
   echo ">>> osc-config patched with oscInstalled=true"
 }
