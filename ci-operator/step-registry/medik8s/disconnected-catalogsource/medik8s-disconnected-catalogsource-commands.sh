@@ -11,7 +11,7 @@ declare CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-medik8s-catalog}"
 declare IDMS_NAME="${IDMS_NAME:-medik8s-disconnected}"
 declare OCP_VERSION="${FBC_OCP_VERSION:-${OCP_VERSION:-}}"
 declare GIT_REF="${GIT_REF:-main}"
-declare FBC_COMMIT_SHA="${FBC_COMMIT_SHA:-}"
+declare FBC_COMMIT_SHA="${MULTISTAGE_PARAM_OVERRIDE_FBC_COMMIT_SHA:-${FBC_COMMIT_SHA:-}}"
 # shellcheck disable=SC2034 # used by medik8s-lib.sh verify_fbc_image()
 declare FBC_SHA_PINNED="${FBC_COMMIT_SHA:+true}"
 if [[ ! -s "${SHARED_DIR}/workload_image" ]]; then

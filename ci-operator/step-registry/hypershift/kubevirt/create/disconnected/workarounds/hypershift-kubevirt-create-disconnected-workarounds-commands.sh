@@ -96,14 +96,6 @@ echo "${HO_OPERATOR_IMAGE}" > /home/ho_operator_image
 
 jq -s '.[0] * .[1]' /home/pull-secret /tmp/.dockerconfigjson > /home/pull-secret-mirror
 
-if [[ -z ${MCE} ]] ; then
-  ### workaround for https://issues.redhat.com/browse/OCPBUGS-32770
-  echo "workaround for https://issues.redhat.com/browse/OCPBUGS-32770"
-  CNV_PRERELEASE_VERSION=$(cat /home/cnv-prerelease-version)
-  oc image -a /home/pull-secret-mirror mirror registry.ci.openshift.org/ocp/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt ${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt
-  echo "${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt" > /home/capi_provider_kubevirt_image
-fi
-
 # Only the redhat-operator-index is mirrored to the internal registry by openshift-metal3/dev-scripts
 # based on MIRROR_OLM_REMOTE_INDEX environment variable. For this specific testing in DISCONNECTED mode,
 # we redirect all the OLM catalogs to the same target to prevent excessive mirroring.

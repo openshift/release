@@ -13,12 +13,17 @@ ref:
     1. Run ibu-prepare-spoke-sno.yml to retrieve seed spoke kubeconfig from hub cluster ACM
     2. Attach container storage disk to seed SNO VM
     3. Configure shared container storage mount on seed SNO
-    4. Run eco-gotests IBU seedgeneration test suite
-    5. Power off seed spoke VM to prepare for upgrade
+    4. Generate eco-gotests run script (deploy-run-eco-gotests.yaml)
+    5. Run seedgeneration via ibu-run-seedgeneration.yml (pull-secret
+       backup/restore, MCP wait, verify SeedGenerator SeedGenCompleted)
+    6. Collect junit for ibu-report; power off seed spoke VM
 
     This step reuses inventory and credentials from earlier workflow steps
     (available in SHARED_DIR from hub-deploy step).
-  timeout: 90m
+
+    Requires eco-ci-cd image that includes playbooks/ran/ibu-run-seedgeneration.yml.
+  # Includes seedgeneration runtime plus post-suite pull-secret restore / MCP wait
+  timeout: 150m
   resources:
     requests:
       cpu: 100m

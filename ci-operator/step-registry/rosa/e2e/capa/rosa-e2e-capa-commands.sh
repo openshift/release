@@ -100,6 +100,9 @@ fi
 if [[ -n "${CHANNEL_GROUP}" ]]; then
   EXTRA_VARS+=("-e" "channel_group=${CHANNEL_GROUP}")
 fi
+if [[ "${RESERVE_UPGRADE_PATH:-}" == "true" ]]; then
+  EXTRA_VARS+=("-e" "reserve_upgrade_path=true")
+fi
 
 echo "Running rosa-hcp-e2e tests (name_prefix=${NAME_PREFIX})..."
 "${PYTHON}" run-test-suite.py ${TEST_SUITE} --ai-agent "${EXTRA_VARS[@]}" 2>&1 | tee "${ARTIFACT_DIR}/rosa-hcp-e2e-test.log"

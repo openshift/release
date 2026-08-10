@@ -94,7 +94,7 @@ if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "openshift-dpf" ]]; the
   if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; \
     git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER}; \
     git checkout pr-${PULL_NUMBER}; \
-    git rebase ${OPENSHIFT_DPF_BRANCH}"; then
+    git rebase origin/${OPENSHIFT_DPF_BRANCH}"; then
     echo "Successfully checked out PR #${PULL_NUMBER}"
   else
     echo "ERROR: Failed to checkout PR #${PULL_NUMBER}"
