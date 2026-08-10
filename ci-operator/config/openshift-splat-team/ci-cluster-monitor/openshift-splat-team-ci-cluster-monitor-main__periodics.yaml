@@ -116,6 +116,27 @@ tests:
         requests:
           cpu: 100m
           memory: 256Mi
+- as: job-health-monitor
+  cron: 0 */6 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: Job Health Monitor alert - check logs for details. <{{.Status.URL}}|View
+      logs>
+  steps:
+    test:
+    - as: monitor
+      commands: |
+        set -euo pipefail
+        make build
+        ./bin/job-health-monitor --config config/jobs.yaml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
 zz_generated_metadata:
   branch: main
   org: openshift-splat-team
