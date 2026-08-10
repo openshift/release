@@ -418,6 +418,7 @@ CONFIG = {
     },
     'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-s390x-vpn-oz-quota-slice': {},
+    'libvirt-s390x-vpn-hcp-quota-slice': {},
     'libvirt-s390x-vpn-virt-quota-slice': {},
     'libvirt-s390x-vpn-virt-sno-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
@@ -739,6 +740,13 @@ del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
 for i in range(4):
     for j in range(4):
         CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-{}-{}'.format(i, j)] = 1
+# Move lnxocp14 slots 2-3 from vpn-oz to the HCP VPN profile (same lease names / host)
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-2']
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-3']
+
+# HCP on OZ lnxocp14: reuse former vpn-oz leases oz-3-2 and oz-3-3
+CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-2'] = 1
+CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-3'] = 1
 
 # Orange zone (OZ) kubevirt06 (0) + kubevirt07 (1), 1 HA + 1 SNO lease each
 for i in range(2):
