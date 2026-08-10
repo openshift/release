@@ -69,7 +69,7 @@ cp "${SHARED_DIR}/masters" "${OCP_DEPLOYMENT_INVENTORY_PATH}/group_vars/masters"
 cp "${SHARED_DIR}/bastion" "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/bastion"
 cp "${SHARED_DIR}/hypervisor" "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/hypervisor"
 
-# Set up cnf inventory (used by deploy-run-eco-gotests.yaml)
+# Set up cnf inventory (used by deploy-run-eco-gotests.yaml / ibu-run-seedgeneration.yml)
 mkdir -p "${CNF_INVENTORY_PATH}/group_vars"
 mkdir -p "${CNF_INVENTORY_PATH}/host_vars"
 
@@ -93,10 +93,10 @@ ansible-playbook playbooks/ran/ibu-prepare-spoke-sno.yml \
   -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
   --extra-vars "hub_cluster=${CLUSTER_NAME}" \
   --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}" \
-  --extra-vars "seed_vm_name=${SEED_VM_NAME}" 
-  
+  --extra-vars "seed_vm_name=${SEED_VM_NAME}"
+
 echo ""
-echo "=== Step 2: Run eco-gotests IBU seedgeneration suite ==="
+echo "=== Step 2: Generate eco-gotests IBU seedgeneration script ==="
 SEED_SPOKE_KUBECONFIG="/tmp/${SEED_SPOKE_CLUSTER}-kubeconfig"
 
 # Build eco-gotests environment variables
@@ -104,7 +104,7 @@ ECO_GOTESTS_ENV_VARS="-e ECO_CNF_RAN_SKIP_TLS_VERIFY=true"
 ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBGU_SEED_IMAGE=${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
 ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_SNO=/kubeconfig/kubeconfig"
 
-# Run eco-gotests
+# Generate eco-gotests run script on bastion (does not execute)
 ansible-playbook playbooks/deploy-run-eco-gotests.yaml \
   -i "${CNF_INVENTORY_PATH}/switch-config.yaml" \
   --extra-vars "kubeconfig=${SEED_SPOKE_KUBECONFIG}" \
@@ -116,6 +116,16 @@ ansible-playbook playbooks/deploy-run-eco-gotests.yaml \
   --extra-vars 'eco_gotests_tag=latest' \
   --extra-vars "additional_test_env_variables=\"${ECO_GOTESTS_ENV_VARS}\""
 
+echo ""
+echo "=== Step 2b: Run seedgeneration with pull-secret backup/restore ==="
+# Backs up pull-secret, runs generated script, always restores + MCP wait,
+# then verifies SeedGenerator/seedimage has SeedGenCompleted=True.
+
+ansible-playbook playbooks/ran/ibu-run-seedgeneration.yml \
+  -i "${CNF_INVENTORY_PATH}/switch-config.yaml" \
+  --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}" \
+  --extra-vars "kubeconfig=${SEED_SPOKE_KUBECONFIG}" \
+
 echo "Set bastion SSH configuration"
 PROJECT_DIR="/tmp"
 grep ansible_ssh_private_key -A 100 "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/temp_ssh_key"
@@ -124,18 +134,12 @@ chmod 600 "${PROJECT_DIR}/temp_ssh_key"
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml" | sed "s/'//g")
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed "s/'//g")
 
-echo "Run eco-gotests via SSH tunnel"
-ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 \
-  -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-  "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
-  "cd /tmp/eco_gotests && ./eco-gotests-run.sh || true"
-
 echo "Gather artifacts from bastion"
 mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i "${PROJECT_DIR}/temp_ssh_key" \
   "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests/report/*.xml" \
-  "${ARTIFACT_DIR}/junit_eco_gotests/"
+  "${ARTIFACT_DIR}/junit_eco_gotests/" || true
 rm -f "${PROJECT_DIR}/temp_ssh_key"
 
 # Save junit XMLs to SHARED_DIR with junit_ prefix for ibu-report step
@@ -144,11 +148,23 @@ for f in "${ARTIFACT_DIR}/junit_eco_gotests/"*.xml; do
 done
 
 echo ""
-echo "=== Step 3: Power off seed spoke VM ==="
+echo "=== Step 3: Power off seed spoke node ==="
+
+grep ansible_ssh_private_key -A 100 \
+  "${OCP_DEPLOYMENT_INVENTORY_PATH}/host_vars/master-0" \
+  | sed 's/ansible_ssh_private_key: //g' \
+  | sed "s/'//g" \
+  | sed 's/^  //' \
+  | sed -n '/BEGIN/,/END/p' \
+  > /tmp/spoke-master-ssh-key
+chmod 600 /tmp/spoke-master-ssh-key
 ansible-playbook playbooks/ran/ibu-poweroff-seed-spoke.yml \
-  -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py"
+  -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
+  --private-key=/tmp/spoke-master-ssh-key
+rm -f /tmp/spoke-master-ssh-key
 
 echo ""
 echo "=== IBU Seed Eco-Gotests Complete ==="
 echo "Seed image: ${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
 echo "Seed spoke VM has been powered off and is ready for IBU upgrade"
+

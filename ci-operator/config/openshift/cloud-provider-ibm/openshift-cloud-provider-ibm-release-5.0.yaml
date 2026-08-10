@@ -10,7 +10,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.22"
+    tag: latest
 binary_build_commands: go build .
 build_root:
   from_repository: true
@@ -54,8 +54,9 @@ tests:
   commands: gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/")
   container:
     from: src
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws

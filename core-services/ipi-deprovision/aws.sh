@@ -216,7 +216,12 @@ function hypershift_pruner() {
 }
 
 function vpc_has_only_orphaned_eni() {
-	local region="${1}" vpc_id="${2}"
+	local region="${1}" vpc_id="${2}" elbv2_json="${3:-}"
+
+	# Without a valid elbv2 inventory, do not classify as orphan or skip the VPC.
+	if [[ -z "${elbv2_json}" ]]; then
+		return 1
+	fi
 
 	local enis
 	enis="$(aws ec2 describe-network-interfaces \
@@ -244,10 +249,7 @@ function vpc_has_only_orphaned_eni() {
 	case "${interface_type}" in
 		network_load_balancer|gateway_load_balancer)
 			local lb_count
-			lb_count="$(aws elbv2 describe-load-balancers \
-				--region "${region}" \
-				--query "length(LoadBalancers[?VpcId=='${vpc_id}'])" \
-				--output text)"
+			lb_count="$(echo "${elbv2_json}" | jq --arg vpc "${vpc_id}" '[.LoadBalancers[] | select(.VpcId == $vpc)] | length')"
 			if [[ "${lb_count}" -eq 0 ]]; then
 				owner_gone=true
 			fi
@@ -268,6 +270,84 @@ function vpc_has_only_orphaned_eni() {
 	return 0
 }
 
+function is_lb_not_found_error() {
+	grep -qiE 'LoadBalancerNotFound|Cannot find load balancer|NoSuchEntity' <<<"${1}"
+}
+
+# Delete leftover ALB/NLB/GWLB and classic ELBs in a VPC using pre-fetched region LB lists.
+# Returns 0 on success (nothing to delete, deletes ok, or not-found races).
+# Returns 1 if any delete or deletion-confirmation failed for a reason other than not-found.
+function delete_vpc_load_balancers() {
+	local region="${1}" vpc_id="${2}" elbv2_json="${3}" classic_json="${4}"
+	local arn name err failed=0
+	local -a deleted_arns=() deleted_names=()
+
+	while read -r arn; do
+		[[ -z "${arn}" ]] && continue
+		echo "deleting elbv2 load balancer ${arn} in ${region}"
+		if ! err="$(aws elbv2 delete-load-balancer --region "${region}" --load-balancer-arn "${arn}" 2>&1)"; then
+			if is_lb_not_found_error "${err}"; then
+				echo "load balancer ${arn} already gone"
+			else
+				echo "ERROR: failed to delete elbv2 load balancer ${arn}: ${err}"
+				failed=1
+			fi
+			continue
+		fi
+		deleted_arns+=( "${arn}" )
+	done < <(echo "${elbv2_json}" | jq -r --arg vpc "${vpc_id}" '.LoadBalancers[]? | select(.VpcId == $vpc) | .LoadBalancerArn')
+
+	while read -r name; do
+		[[ -z "${name}" ]] && continue
+		echo "deleting classic load balancer ${name} in ${region}"
+		if ! err="$(aws elb delete-load-balancer --region "${region}" --load-balancer-name "${name}" 2>&1)"; then
+			if is_lb_not_found_error "${err}"; then
+				echo "classic load balancer ${name} already gone"
+			else
+				echo "ERROR: failed to delete classic load balancer ${name}: ${err}"
+				failed=1
+			fi
+			continue
+		fi
+		deleted_names+=( "${name}" )
+	done < <(echo "${classic_json}" | jq -r --arg vpc "${vpc_id}" '.LoadBalancerDescriptions[]? | select(.VPCId == $vpc) | .LoadBalancerName')
+
+	if [[ ${#deleted_arns[@]} -gt 0 ]]; then
+		echo "waiting for elbv2 load balancer deletion in ${region} ..."
+		if ! aws elbv2 wait load-balancers-deleted --region "${region}" --load-balancer-arns "${deleted_arns[@]}"; then
+			echo "ERROR: timed out waiting for elbv2 load balancers to delete in VPC ${vpc_id} (${region})"
+			failed=1
+		fi
+	fi
+
+	# Classic ELB has no deletion waiter; bound polling via describe-load-balancers.
+	local attempt max_attempts=30
+	for name in "${deleted_names[@]+"${deleted_names[@]}"}"; do
+		[[ -z "${name}" ]] && continue
+		attempt=0
+		while true; do
+			if err="$(aws elb describe-load-balancers --region "${region}" --load-balancer-names "${name}" 2>&1)"; then
+				if [[ "${attempt}" -ge "${max_attempts}" ]]; then
+					echo "ERROR: classic load balancer ${name} still present after wait in ${region}"
+					failed=1
+					break
+				fi
+				sleep 10
+				attempt=$((attempt + 1))
+				continue
+			fi
+			if is_lb_not_found_error "${err}"; then
+				break
+			fi
+			echo "ERROR: failed to confirm classic load balancer ${name} deletion: ${err}"
+			failed=1
+			break
+		done
+	done
+
+	return "${failed}"
+}
+
 if [[ -n ${HYPERSHIFT_PRUNER:-} ]]; then
 	hypershift_pruner_rc=0
 	hypershift_pruner || hypershift_pruner_rc=$?
@@ -275,42 +355,75 @@ fi
 
 logdir="${ARTIFACTS}/deprovision"
 mkdir -p "${logdir}"
+inventory_dir="$(mktemp -d)"
 
 aws_cluster_age_cutoff="$(TZ=":Africa/Abidjan" date --date="${CLUSTER_TTL}" '+%Y-%m-%dT%H:%M+0000')"
 echo "deprovisioning clusters with an expirationDate before ${aws_cluster_age_cutoff} in AWS ..."
-# --region is necessary when there is no profile customization
-for region in $( aws ec2 describe-regions --region us-east-1 --query "Regions[].{Name:RegionName}" --output text ); do
-	echo "deprovisioning in AWS region ${region} ..."
-	aws ec2 describe-vpcs --output json --region ${region} | jq --arg date "${aws_cluster_age_cutoff}" -r '.Vpcs[] | select(.Tags[]? | select(.Key == "expirationDate" and .Value < $date)) | . as $vpc | .Tags[]? | select((.Key | startswith("kubernetes.io/cluster/")) and (.Value == "owned")) | "\($vpc.VpcId) \(.Key)"' > /tmp/clusters
-	while read vpc_id cluster; do
-		if vpc_has_only_orphaned_eni "${region}" "${vpc_id}"; then
-			continue
-		fi
-		workdir="${logdir}/${cluster:22}"
-		mkdir -p "${workdir}"
-		cat <<-EOF >"${workdir}/metadata.json"
-		{
-			"aws":{
-				"region":"${region}",
-				"identifier":[
-					{"${cluster}": "owned"}
-				]
-			}
-		}
-		EOF
-		echo "will deprovision AWS cluster ${cluster} in region ${region}"
-	done < /tmp/clusters
+
+# Phase 1: collect LB inventories for every region. Failures must not become empty lists.
+regions=( $( aws ec2 describe-regions --region us-east-1 --query "Regions[].{Name:RegionName}" --output text ) )
+inventory_failed=0
+for region in "${regions[@]}"; do
+	echo "collecting load balancer inventory in AWS region ${region} ..."
+	if ! aws elbv2 describe-load-balancers --region "${region}" --output json > "${inventory_dir}/elbv2-${region}.json"; then
+		echo "ERROR: elbv2 describe-load-balancers failed in ${region}"
+		inventory_failed=1
+		rm -f "${inventory_dir}/elbv2-${region}.json"
+		continue
+	fi
+	if ! aws elb describe-load-balancers --region "${region}" --output json > "${inventory_dir}/classic-${region}.json"; then
+		echo "ERROR: elb describe-load-balancers failed in ${region}"
+		inventory_failed=1
+		rm -f "${inventory_dir}/elbv2-${region}.json" "${inventory_dir}/classic-${region}.json"
+		continue
+	fi
 done
+
+lb_cleanup_failed=0
+if [[ "${inventory_failed}" -ne 0 ]]; then
+	echo "ERROR: LB inventory incomplete; deferring installer destroy until inventories succeed"
+else
+	# Phase 2: only after all regional inventories succeeded, plan VPC cleanup + destroy.
+	for region in "${regions[@]}"; do
+		echo "deprovisioning in AWS region ${region} ..."
+		elbv2_json="$(cat "${inventory_dir}/elbv2-${region}.json")"
+		classic_json="$(cat "${inventory_dir}/classic-${region}.json")"
+		clusters_file="${inventory_dir}/clusters-${region}.txt"
+		aws ec2 describe-vpcs --output json --region ${region} | jq --arg date "${aws_cluster_age_cutoff}" -r '.Vpcs[] | select(.Tags[]? | select(.Key == "expirationDate" and .Value < $date)) | . as $vpc | .Tags[]? | select((.Key | startswith("kubernetes.io/cluster/")) and (.Value == "owned")) | "\($vpc.VpcId) \(.Key)"' > "${clusters_file}"
+		while read vpc_id cluster; do
+			if vpc_has_only_orphaned_eni "${region}" "${vpc_id}" "${elbv2_json}"; then
+				continue
+			fi
+			if ! delete_vpc_load_balancers "${region}" "${vpc_id}" "${elbv2_json}" "${classic_json}"; then
+				echo "ERROR: load balancer cleanup failed for VPC ${vpc_id} in ${region}; deferring destroy for ${cluster}"
+				lb_cleanup_failed=1
+				continue
+			fi
+			workdir="$(mktemp -d "${logdir}/cluster.XXXXXX")"
+			jq -n --arg region "${region}" --arg cluster "${cluster}" \
+				'{aws:{region:$region,identifier:[{($cluster):"owned"}]}}' \
+				> "${workdir}/metadata.json"
+			echo "will deprovision AWS cluster ${cluster} in region ${region}"
+		done < "${clusters_file}"
+	done
+fi
+
+rm -rf "${inventory_dir}"
 
 # log installer version for debugging purposes
 openshift-install version
 
-clusters=$( find "${logdir}" -mindepth 1 -type d )
-for workdir in $(shuf <<< ${clusters}); do
-	queue deprovision "${workdir}"
-done
+clusters=()
+while IFS= read -r -d '' workdir; do
+	clusters+=( "${workdir}" )
+done < <(find "${logdir}" -mindepth 1 -type d -print0 2>/dev/null | shuf -z)
 
-wait
+if [[ ${#clusters[@]} -gt 0 ]]; then
+	for workdir in "${clusters[@]}"; do
+		queue deprovision "${workdir}"
+	done
+	wait
+fi
 
 # IAM user cleanup (ci-op-* older than 72h)
 cutoff="$(date -u -d '72 hours ago' --iso-8601=seconds)"
@@ -333,12 +446,25 @@ aws iam list-users --query "Users[?starts_with(UserName, 'ci-op-') && CreateDate
 	fi
 done
 
-FAILED="$(find ${clusters} -name failure -printf '%H\n' | sort)"
+FAILED=""
+if [[ ${#clusters[@]} -gt 0 ]]; then
+	FAILED="$(find "${clusters[@]}" -name failure -printf '%H\n' | sort)"
+fi
 final_rc=0
 
 if [[ -n "${FAILED}" ]]; then
 	echo "Deprovision failed on the following clusters:"
 	xargs --max-args 1 basename <<< "$FAILED"
+	final_rc=1
+fi
+
+if [[ "${inventory_failed}" -ne 0 ]]; then
+	echo "LB inventory collection had failures."
+	final_rc=1
+fi
+
+if [[ "${lb_cleanup_failed}" -ne 0 ]]; then
+	echo "Load balancer cleanup had failures; some destroys were deferred."
 	final_rc=1
 fi
 

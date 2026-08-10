@@ -100,10 +100,10 @@ fi
 echo "=== ocmci image digest ==="
 podman pull \
   --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
-  quay.io/redhat-services-prod/ocmci/ocmci:latest
+  quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest
 podman inspect \
   --format '{{index .RepoDigests 0}}' \
-  quay.io/redhat-services-prod/ocmci/ocmci:latest \
+  quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
   || echo "WARNING: failed to get ocmci image digest"
 echo "=========================="
 
@@ -118,7 +118,7 @@ podman run \
   "${podman_args[@]}" \
   "${aao_kubeconfig_env[@]}" \
   "${dr_aws_creds_env[@]}" \
-  quay.io/redhat-services-prod/ocmci/ocmci:latest \
+  quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 $WAS_TRACING_RUN && set -x
 

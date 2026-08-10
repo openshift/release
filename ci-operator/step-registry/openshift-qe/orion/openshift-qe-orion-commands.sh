@@ -104,7 +104,7 @@ if ! echo "${CLUSTER_METADATA}" | python -c "import sys,json; d=json.load(sys.st
     CLUSTER_METADATA=$(echo "${CLUSTER_METADATA}" | python -c "
 import sys, json
 d = json.load(sys.stdin)
-d.setdefault('masterNodesType', 'N/A')
+d.setdefault('masterNodesType', '')
 d.setdefault('masterNodesCount', 0)
 json.dump(d, sys.stdout, separators=(',', ':'))
 ")
@@ -114,7 +114,11 @@ EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 
 # Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
-    ORION_CONFIG="examples/${ORION_WORKLOAD_TYPE}.yaml"
+    ORION_PREFIX=""
+    if echo "${CLUSTER_METADATA}" | jq -e '.clusterType == "rosa-hcp"' &>/dev/null; then
+        ORION_PREFIX="rosa-hcp-"
+    fi
+    ORION_CONFIG="examples/${ORION_PREFIX}${ORION_WORKLOAD_TYPE}.yaml"
 fi
 
 export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')}"

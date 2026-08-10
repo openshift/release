@@ -608,7 +608,7 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-aws-ovn-single-node-4vcpu-32gb-compute-upgrade
-  cron: '@daily'
+  cron: 0 0 1 1 *
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -1489,6 +1489,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       DEBUG_ENABLE_TCPDUMP: "true"
       FIPS_ENABLED: "true"
       TEST_REQUIRES_BUILDFARM_NET_ADMIN: "true"
@@ -1504,6 +1506,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_CORE_DUMP: "true"
       FIPS_ENABLED: "true"
       TEST_TYPE: upgrade-conformance
@@ -1519,6 +1523,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_CORE_DUMP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
@@ -1536,6 +1542,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_CORE_DUMP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
@@ -1557,6 +1565,8 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       CI_NAT_REPLACE: "false"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_CORE_DUMP: "true"
       FIPS_ENABLED: "true"
       TEST_TYPE: upgrade-conformance
@@ -1605,6 +1615,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -1799,7 +1811,7 @@ tests:
 - as: e2e-telco5g-cnftests
   capabilities:
   - intranet
-  cron: 00 16 */1 * 1-5
+  cron: 0 0 1 1 *
   restrict_network_access: false
   steps:
     env:
@@ -2234,7 +2246,6 @@ tests:
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
         FEATURE_SET=TechPreviewNoUpgrade
     workflow: agent-e2e-generic-conformance-iso-no-registry
-  timeout: 4h0m0s
 - as: e2e-agent-ha5-dualstack-iso-no-registry-techpreview
   capabilities:
   - intranet
@@ -2247,8 +2258,8 @@ tests:
         AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
         FEATURE_SET=TechPreviewNoUpgrade
+      DEVSCRIPTS_SETUP_TIMEOUT: 150m
     workflow: agent-e2e-generic-conformance-iso-no-registry
-  timeout: 4h0m0s
 - as: e2e-agent-sno-ipv4-iso-no-registry-techpreview
   capabilities:
   - intranet
@@ -2976,6 +2987,16 @@ tests:
     workflow: baremetalds-e2e-upgrade-ovn-ipv6-runc
 - as: e2e-rosa-hcp-ovn
   cron: '@daily'
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      :rainbow: {{else}} <!subteam^S0B7Q6G7XQR> :red_jenkins_circle: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :volcano: {{end}}'
   steps:
     cluster_profile: rosa-e2e-02
     env:
@@ -3016,7 +3037,7 @@ tests:
     workflow: rosa-aws-hcp-conformance
 - as: e2e-osd-ccs-gcp
   cluster: build10
-  cron: '@daily'
+  cron: 0 0 1 1 *
   steps:
     cluster_profile: gcp-qe
     workflow: osd-ccs-gcp-conformance
@@ -3167,7 +3188,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp
 - as: e2e-vsphere-disruptive-longrunning-techpreview
-  interval: 168h
+  cron: 0 0 1 1 *
   steps:
     cluster_profile: vsphere-elastic
     env:

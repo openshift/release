@@ -20,6 +20,7 @@ cluster_groups:
     - build13
     - core-ci
     - vsphere02
+    - hvidosil
   managed_clusters:
     - app.ci
     - build01
@@ -38,6 +39,7 @@ cluster_groups:
     - core-ci
     - hosted-mgmt
     - hosted-mgmt2
+    - hvidosil
   non_app_ci:
     - build01
     - build02
@@ -54,6 +56,7 @@ cluster_groups:
     - build13
     - core-ci
     - vsphere02
+    - hvidosil
   standard_build_clusters:
     - build01
     - build02
@@ -68,6 +71,7 @@ cluster_groups:
     - build11
     - build12
     - build13
+    - hvidosil
   user_secrets_target_clusters:
     - app.ci
     - build01
@@ -87,6 +91,7 @@ cluster_groups:
     - hosted-mgmt
     - hosted-mgmt2
     - vsphere02
+    - hvidosil
 
 dptp_collection: test-platform-infra
 
@@ -155,6 +160,9 @@ bundles:
           - sa--dot--cluster-init--dot--build12--dot--token--dot--txt
           - sa--dot--cluster-init--dot--build13--dot--config
           - sa--dot--cluster-init--dot--build13--dot--token--dot--txt
+          - sa--dot--cluster-init--dot--hvidosil--dot--config
+          - sa--dot--cluster-init--dot--hvidosil--dot--token--dot--txt
+          - sa--dot--cluster-init--dot--core-ci--dot--config
           - sa--dot--cluster-init--dot--core-ci--dot--config
           - sa--dot--cluster-init--dot--core-ci--dot--token--dot--txt
           - sa--dot--cluster-init--dot--vsphere02--dot--config
@@ -773,6 +781,52 @@ bundles:
         namespace: keel
         type: kubernetes.io/dockerconfigjson
       - cluster: build13
+        namespace: ocp
+        type: kubernetes.io/dockerconfigjson
+
+  - name: registry-pull-credentials
+    dockerconfig:
+      registries:
+        - auth_field: token_image-puller_hvidosil_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+        - auth_field: token_image-puller_hvidosil_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+        - auth_field: token_image-puller_hvidosil_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.hvidosil.ci.openshift.org
+        - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.ci.openshift.org
+        - auth_field: auth
+          email_field: email
+          group: quay--dot--io-pull-secret
+          registry_url: quay.io
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay-proxy.ci.openshift.org
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay.io/openshift/ci
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: quay.io/openshift/network-edge-testing
+        - auth_field: auth
+          group: quayio-ci-read-only-robot
+          registry_url: qci-pull-through-cache-us-east-1-ci.apps.ci.l2s4.p1.openshiftapps.com
+    sync_to_cluster: true
+    targets:
+      - cluster: hvidosil
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: hvidosil
+        namespace: test-credentials
+        type: kubernetes.io/dockerconfigjson
+      - cluster: hvidosil
+        namespace: keel
+        type: kubernetes.io/dockerconfigjson
+      - cluster: hvidosil
         namespace: ocp
         type: kubernetes.io/dockerconfigjson
 
@@ -1629,6 +1683,60 @@ bundles:
         namespace: ci
         type: kubernetes.io/dockerconfigjson
       - cluster: build11
+        namespace: test-credentials
+        type: kubernetes.io/dockerconfigjson
+
+  - name: manifest-tool-local-pusher
+    dockerconfig:
+      registries:
+        - auth_field: token_image-pusher_build12_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+        - auth_field: token_image-pusher_build12_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.build12.ci.openshift.org
+    sync_to_cluster: true
+    targets:
+      - cluster: build12
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: build12
+        namespace: test-credentials
+        type: kubernetes.io/dockerconfigjson
+
+  - name: manifest-tool-local-pusher
+    dockerconfig:
+      registries:
+        - auth_field: token_image-pusher_build13_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+        - auth_field: token_image-pusher_build13_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.build13.ci.openshift.org
+    sync_to_cluster: true
+    targets:
+      - cluster: build13
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: build13
+        namespace: test-credentials
+        type: kubernetes.io/dockerconfigjson
+
+  - name: manifest-tool-local-pusher
+    dockerconfig:
+      registries:
+        - auth_field: token_image-pusher_hvidosil_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+        - auth_field: token_image-pusher_hvidosil_reg_auth_value--dot--txt
+          group: build_farm
+          registry_url: registry.hvidosil.ci.openshift.org
+    sync_to_cluster: true
+    targets:
+      - cluster: hvidosil
+        namespace: ci
+        type: kubernetes.io/dockerconfigjson
+      - cluster: hvidosil
         namespace: test-credentials
         type: kubernetes.io/dockerconfigjson
 

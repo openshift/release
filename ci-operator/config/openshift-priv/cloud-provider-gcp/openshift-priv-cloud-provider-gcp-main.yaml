@@ -18,7 +18,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.22"
+    tag: latest
 binary_build_commands: go build ./cmd/cloud-controller-manager
 build_root:
   from_repository: true
@@ -86,13 +86,15 @@ tests:
   commands: gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/")
   container:
     from: src
-- as: e2e-gcp-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-ovn-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-ovn-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upgrade

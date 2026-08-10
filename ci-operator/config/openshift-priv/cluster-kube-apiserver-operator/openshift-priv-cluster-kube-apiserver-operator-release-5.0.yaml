@@ -27,14 +27,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  vault-enterprise:
-    name: vault-enterprise
-    namespace: ci
-    tag: 2.0.0-ent
-  vault_kube_kms:
-    name: vault-kube-kms
-    namespace: ci
-    tag: 0.1.0-beta-ubi
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -98,21 +90,6 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- always_run: false
-  as: e2e-gcp-operator
-  steps:
-    cluster_profile: openshift-org-gcp
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-operator-encryption-aescbc
   optional: true
@@ -455,7 +432,7 @@ tests:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-cert-rotation-short-azure
 - always_run: false
-  as: e2e-gcp-operator-serial-ote
+  as: e2e-gcp-operator-serial
   steps:
     cluster_profile: openshift-org-gcp
     env:

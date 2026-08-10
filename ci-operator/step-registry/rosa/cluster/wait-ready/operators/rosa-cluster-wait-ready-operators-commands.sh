@@ -80,6 +80,17 @@ fi
 
 if [[ -z "${check_failed}" ]]; then
   echo "All cluster operators are Available, not Progressing, and not Degraded"
+
+  # Optionally clear the ClusterVersion channel so the CVO does not attempt to retrieve
+  # updates. CI clusters on nightly payloads have no valid update graph, causing the CVO
+  # retrieval timestamp to go stale. After ~1h the CannotRetrieveUpdatesSRE alert fires,
+  # which openshift-tests flags as an unknown alert and fails the conformance run.
+  # Clearing the channel sets reason=NoChannel on the RetrievedUpdates condition,
+  # which the alert expression explicitly excludes.
+  if [[ "${CLEAR_CLUSTERVERSION_CHANNEL:-}" == "true" ]]; then
+    echo "Clearing ClusterVersion channel to prevent CannotRetrieveUpdatesSRE alert..."
+    oc patch clusterversion version --type merge -p '{"spec":{"channel":""}}' || true
+  fi
 fi
 
 if [[ -n "${check_failed}" ]]; then
