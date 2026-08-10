@@ -14,13 +14,23 @@ workflow:
         MASTER_DISK=120
         MASTER_VCPU=16
       DEVSCRIPTS_TARGET: sno_bip
+      TIMEOUT: "+6 hours"
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: "release:latest"
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:latest"
     pre:
       - chain: baremetalds-ofcir-pre
       - ref: baremetalds-sno-conf
     test:
+      - ref: wait
       - ref: baremetalds-sno-test
     post:
       - chain: baremetalds-ofcir-post
   documentation: |-
     This workflow executes single-node OpenShift installation using the
-    dev-scripts sno_bip make target (bootstrap-in-place method).
+    dev-scripts sno_bip make target (bootstrap-in-place method). It installs
+    release payload 5.0.0-0-2026-08-10-183546-test-ci-ln-3sgfn3t-latest via
+    the release:latest dependency mapping. After the cluster is provisioned, a
+    debug wait of up to 6 hours runs before tests so operators can inspect the
+    cluster or run upgrade experiments. Exit early with `touch /tmp/debug.done`
+    in the test pod.
