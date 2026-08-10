@@ -30,6 +30,22 @@ spec:
     source: registry-proxy.engineering.redhat.com
 EOF
 
+# ICSP changes trigger a MachineConfig rollout — nodes reboot to apply the new
+# mirror config. OLM catalog pods won't be able to pull registry.redhat.io
+# until every node has the updated registries.conf. Wait for MCP to settle.
+echo "Waiting for MachineConfigPool to finish applying ICSP..."
+for i in $(seq 1 30); do
+  UPDATED=$(oc get mcp worker -o jsonpath='{.status.updatedMachineCount}' 2>/dev/null || echo "0")
+  TOTAL=$(oc get mcp worker -o jsonpath='{.status.machineCount}' 2>/dev/null || echo "1")
+  DEGRADED=$(oc get mcp worker -o jsonpath='{.status.degradedMachineCount}' 2>/dev/null || echo "0")
+  if [[ "$UPDATED" == "$TOTAL" && "$DEGRADED" == "0" && "$TOTAL" != "0" ]]; then
+    echo "  MCP worker is fully updated ($UPDATED/$TOTAL)"
+    break
+  fi
+  echo "  [${i}/30] MCP worker: updated=${UPDATED}, total=${TOTAL}, degraded=${DEGRADED} — retrying in 20s"
+  sleep 20
+done
+
 # ── Install metallb-operator via OLM ─────────────────────────────────────────
 
 # If the default CatalogSource does not carry metallb-operator, create a
