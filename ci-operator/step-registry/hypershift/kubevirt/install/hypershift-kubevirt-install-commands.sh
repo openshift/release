@@ -206,7 +206,7 @@ spec:
       virtOperator: 8
 EOF
 
-oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=30m
 
 # CDI auto-detects only volumeMode=Block for gp3-csi in its StorageProfile.
 # KubeVirt DataVolumes created by HyperShift request volumeMode=Filesystem,
