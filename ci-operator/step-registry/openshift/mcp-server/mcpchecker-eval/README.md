@@ -29,7 +29,7 @@ The two chains are:
 | Chain | Credential source | Typical use |
 |---|---|---|
 | `openshift-mcp-server-mcpchecker-eval-vertex` | `ocp-mcp` secret (GCP service account) | Gemini or Anthropic via Vertex AI |
-| `openshift-mcp-server-mcpchecker-eval-model-api` | `openai-token` secret | Any non-Vertex provider |
+| `openshift-mcp-server-mcpchecker-eval-model-api` | `ocp-mcp` secret (`openai-token` key) | Any non-Vertex provider |
 
 Agent, model, and judge selection are specified entirely within the in-repo eval config
 pointed to by `EVAL_CONFIG`. The credential setup steps exist only to surface authentication
@@ -89,7 +89,7 @@ and pointing `EVAL_CONFIG` at the Anthropic eval YAML. The chain is identical.
   steps:
     cluster_profile: openshift-org-aws
     env:
-      EVAL_CONFIG: evals/openai-agent/eval.yaml
+      EVAL_CONFIG: evals/core-eval-testing/builtin-openai/eval-core.yaml
       EVAL_LABEL_SELECTOR: suite=core
       TASK_PASS_RATE: "0.8"
       ASSERTION_PASS_RATE: "0.8"
@@ -99,8 +99,8 @@ and pointing `EVAL_CONFIG` at the Anthropic eval YAML. The chain is identical.
 ```
 
 The agent, model, and judge are configured inside the eval YAML (`EVAL_CONFIG`). The
-`openai-token` secret in the `test-credentials` namespace must contain whatever
-authentication keys that eval config's agent definition requires.
+`ocp-mcp` secret in the `test-credentials` namespace must include an `openai-token`
+key with the API key that eval config's agent definition requires.
 
 ### Adding a new provider
 
