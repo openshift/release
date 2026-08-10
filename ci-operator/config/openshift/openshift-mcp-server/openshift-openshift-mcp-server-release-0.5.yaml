@@ -1,25 +1,20 @@
 build_root:
   from_repository: true
-canonical_go_repository: github.com/openshift/openshift-mcp-server
 images:
   items:
   - dockerfile_path: Dockerfile.ci
     to: openshift-mcp-server
-promotion:
-  to:
-  - disabled: true
-    name: "5.0"
-    namespace: ocp-priv
-prowgen:
-  private: true
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 200Mi
-tag_specification:
-  name: "5.0"
-  namespace: ocp-priv
 tests:
 - as: lint
   commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
@@ -30,13 +25,6 @@ tests:
   commands: GOFLAGS='-mod=readonly' XDG_DATA_HOME=/tmp/.local/share make test
   container:
     from: src
-- as: fips-image-scan-openshift-mcp-server
-  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
-  steps:
-    dependencies:
-      SCAN_IMAGE: openshift-mcp-server
-    test:
-    - ref: fips-check-image-scan
 - as: security
   optional: true
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
@@ -70,7 +58,19 @@ tests:
     test:
     - chain: openshift-mcp-server-mcpchecker-eval-vertex
     workflow: ipi-aws
+- as: periodic-mcpchecker-eval
+  cron: 0 9 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      ASSERTION_PASS_RATE: "0.8"
+      EVAL_CONFIG: evals/core-eval-testing/builtin-openai/eval-core.yaml
+      EVAL_LABEL_SELECTOR: suite=core
+      TASK_PASS_RATE: "0.8"
+    test:
+    - chain: openshift-mcp-server-mcpchecker-eval-model-api
+    workflow: ipi-aws
 zz_generated_metadata:
-  branch: release-5.0
-  org: openshift-priv
+  branch: release-0.5
+  org: openshift
   repo: openshift-mcp-server
