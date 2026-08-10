@@ -92,27 +92,6 @@ InjectNftablesOnGateway() {
         2>/dev/null || true
 }
 
-# Diagnostic: list all chains in "inet ovn-kubernetes" and dump the two masquerade chains.
-# Run once per spoke (on the first node) to confirm chain topology before the fix is applied.
-DiagnoseNftablesOnNode() {
-    typeset kubeconfig="${1:?}"
-    typeset nodeName="${2:?}"
-
-    : "DiagnoseNftablesOnNode: node='${nodeName}'"
-    KUBECONFIG="${kubeconfig}" oc debug "node/${nodeName}" \
-        --quiet --to-namespace=default -- chroot /host bash -c '
-set +e
-echo "=== inet ovn-kubernetes chains ==="
-nft list table inet ovn-kubernetes 2>/dev/null \
-    | grep -E "^\s+chain " || echo "(table not found)"
-for chain in ovn-kube-local-gw-masq ovn-kube-pod-subnet-masq; do
-    echo "=== chain: ${chain} ==="
-    nft list chain inet ovn-kubernetes ${chain} 2>/dev/null \
-        || echo "(chain not found)"
-done
-' 2>&1 | grep -v '^$' || true
-}
-
 # Primary fix: prepend "ip daddr <cidr> return" in both SNAT chains on any node.
 # Both chains are independent hooks — must patch both to fully exempt cross-cluster traffic.
 # Absent chains are silently skipped; single oc debug node call (inject + verify).
@@ -123,9 +102,7 @@ InjectNftablesReturnRulesOnNode() {
 
     : "InjectNftablesReturnRulesOnNode: node='${nodeName}'"
 
-    # ovn-kube-pod-subnet-masq: sub-chain on some builds; ovn-kube-local-gw-masq: base chain on OCP 4.22+.
-    # Patch all three; absent chains are silently skipped (2>/dev/null || true).
-    typeset -a snatChains=("mgmtport-snat" "ovn-kube-pod-subnet-masq" "ovn-kube-local-gw-masq")
+    typeset -a snatChains=("mgmtport-snat" "ovn-kube-pod-subnet-masq")
     typeset inlineScript="set -euo pipefail"
     typeset chain cidr
     for chain in "${snatChains[@]}"; do
@@ -133,7 +110,7 @@ InjectNftablesReturnRulesOnNode() {
             [[ -z "${cidr}" ]] && continue
             inlineScript+="
 nft list chain inet ovn-kubernetes ${chain} 2>/dev/null | grep -qF 'ip daddr ${cidr}' \
-  || nft insert rule inet ovn-kubernetes ${chain} ip daddr ${cidr} return 2>/dev/null || true"
+  || nft insert rule inet ovn-kubernetes ${chain} ip daddr ${cidr} return || true"
         done <<< "${remoteSubnetList}"
     done
     for chain in "${snatChains[@]}"; do
@@ -183,8 +160,6 @@ ApplySnatFix() {
         : "ApplySnatFix: no nodes found on '${spokeName}' — skipping"
         return 0
     fi
-
-    DiagnoseNftablesOnNode "${kubeconfig}" "${allNodes[0]}"
 
     typeset nodeName
     for nodeName in "${allNodes[@]}"; do
