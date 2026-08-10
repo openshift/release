@@ -30,6 +30,9 @@ judges:
   - name: build_passed
   - name: test_passed
   - name: file_overlap
+  - name: pr_description_exists
+  - name: diff_size_ratio
+  - name: function_overlap
 thresholds: {}
 EVALCFG
     sed -i "s|\${UPSTREAM_REPO}|${UPSTREAM_REPO}|g" /tmp/eval.yaml
