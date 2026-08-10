@@ -65,55 +65,61 @@ for i in $(seq 1 30); do
   sleep 20
 done
 
-# ── Install metallb-operator via OLM ─────────────────────────────────────────
-
-# If the default CatalogSource does not carry metallb-operator, create a
-# pinned CatalogSource from the v4.22 index image and use that instead.
-FALLBACK_CATALOG="metallb-operator-catalog"
-# Use registry.redhat.io — accessible via the brew-registry ICSP mirror.
-FALLBACK_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.22"
-
-if ! oc get packagemanifest -n openshift-marketplace metallb-operator \
-     --field-selector "status.catalogSource=${METALLB_OPERATOR_SUB_SOURCE}" \
-     --ignore-not-found -o name 2>/dev/null | grep -q metallb-operator; then
-  echo "metallb-operator not found in '${METALLB_OPERATOR_SUB_SOURCE}' — creating fallback CatalogSource ${FALLBACK_CATALOG}"
-  oc apply -f - <<EOF
+# ── Create redhat-operators-stage CatalogSource (same pattern as metallb-commands.sh) ──
+echo "Creating redhat-operators-stage CatalogSource..."
+oc apply -f - <<EOF
+---
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: ${FALLBACK_CATALOG}
+  name: redhat-operators-stage
   namespace: openshift-marketplace
 spec:
   sourceType: grpc
-  image: ${FALLBACK_IMAGE}
-  displayName: "Red Hat Operators - MetalLB"
-  publisher: Red Hat
+  publisher: redhat
+  displayName: Red Hat Operators v4.22 Stage
+  image: quay.io/openshift-release-dev/ocp-release-nightly:iib-int-index-art-operators-4.22
   updateStrategy:
     registryPoll:
-      interval: 10m
+      interval: 15m
 EOF
 
-  # Wait for the fallback catalog to become READY
-  echo "Waiting for CatalogSource ${FALLBACK_CATALOG} to become ready..."
-  for i in $(seq 1 20); do
-    STATE=$(oc get catalogsource -n openshift-marketplace "${FALLBACK_CATALOG}" \
-              -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
-    [[ "${STATE}" == "READY" ]] && break
-    echo "  [${i}/20] state=${STATE:-unknown}, retrying in 15s"
-    sleep 15
-  done
-  STATE=$(oc get catalogsource -n openshift-marketplace "${FALLBACK_CATALOG}" \
+# Wait for the CatalogSource to become READY
+echo "Waiting for CatalogSource redhat-operators-stage to become READY..."
+for i in $(seq 1 30); do
+  STATE=$(oc get catalogsource -n openshift-marketplace redhat-operators-stage \
             -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
-  if [[ "${STATE}" != "READY" ]]; then
-    echo "Error: CatalogSource ${FALLBACK_CATALOG} did not reach READY state (last state: ${STATE})"
-    oc get catalogsource -n openshift-marketplace "${FALLBACK_CATALOG}" -o yaml
-    exit 1
+  [[ "${STATE}" == "READY" ]] && echo "  CatalogSource is READY" && break
+  echo "  [${i}/30] state=${STATE:-unknown}, retrying in 15s"
+  sleep 15
+done
+
+STATE=$(oc get catalogsource -n openshift-marketplace redhat-operators-stage \
+          -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+if [[ "${STATE}" != "READY" ]]; then
+  echo "ERROR: CatalogSource redhat-operators-stage did not reach READY (last state: ${STATE})"
+  echo "--- CatalogSource YAML ---"
+  oc get catalogsource redhat-operators-stage -n openshift-marketplace -o yaml
+  echo "--- CatalogSource pod logs ---"
+  CS_POD=$(oc get pods -n openshift-marketplace \
+    -l "olm.catalogSource=redhat-operators-stage" \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  if [[ -n "${CS_POD}" ]]; then
+    oc logs -n openshift-marketplace "${CS_POD}" || true
+  else
+    echo "  No pod found for CatalogSource redhat-operators-stage"
   fi
-  METALLB_OPERATOR_SUB_SOURCE="${FALLBACK_CATALOG}"
-else
-  echo "metallb-operator found in '${METALLB_OPERATOR_SUB_SOURCE}' — using default CatalogSource"
+  echo "--- All CatalogSources ---"
+  oc get catalogsource -n openshift-marketplace
+  echo "--- openshift-marketplace pods ---"
+  oc get pods -n openshift-marketplace -o wide
+  exit 1
 fi
 
+METALLB_OPERATOR_SUB_SOURCE="redhat-operators-stage"
+echo "Using CatalogSource: ${METALLB_OPERATOR_SUB_SOURCE}"
+
+# ── Install metallb-operator via OLM ─────────────────────────────────────────
 echo "Installing metallb-operator (stable, ${METALLB_OPERATOR_SUB_SOURCE}) into metallb-system"
 
 # Create the install namespace
@@ -158,11 +164,11 @@ for i in $(seq "${RETRIES}") max; do
   sleep 30
   if [[ -z "${CSV}" ]]; then
     echo "[Retry ${i}/${RETRIES}] The subscription is not yet available. Trying to get it..."
-    CSV=$(oc get subscription -n metallb-system metallb-operator -o jsonpath='{.status.installedCSV}')
+    CSV=$(oc get subscription -n metallb-system metallb-operator -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
     continue
   fi
 
-  if [[ $(oc get csv -n metallb-system ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
+  if [[ $(oc get csv -n metallb-system "${CSV}" -o jsonpath='{.status.phase}' 2>/dev/null || true) == "Succeeded" ]]; then
     echo "metallb-operator is deployed"
     break
   fi
@@ -170,12 +176,19 @@ for i in $(seq "${RETRIES}") max; do
 done
 
 if [[ "$i" == "max" ]]; then
-  echo "Error: Failed to deploy metallb-operator"
-  echo "csv ${CSV} YAML"
-  oc get csv "${CSV}" -n metallb-system -o yaml
-  echo
-  echo "csv ${CSV} Describe"
-  oc describe csv "${CSV}" -n metallb-system
+  echo "ERROR: Failed to deploy metallb-operator"
+  echo "--- Subscription ---"
+  oc get subscription -n metallb-system metallb-operator -o yaml || true
+  echo "--- InstallPlan ---"
+  oc get installplan -n metallb-system -o yaml || true
+  echo "--- CSV ${CSV} ---"
+  oc get csv "${CSV}" -n metallb-system -o yaml || true
+  echo "--- CSV ${CSV} describe ---"
+  oc describe csv "${CSV}" -n metallb-system || true
+  echo "--- metallb-system pods ---"
+  oc get pods -n metallb-system -o wide || true
+  echo "--- openshift-marketplace pods ---"
+  oc get pods -n openshift-marketplace -o wide || true
   exit 1
 fi
 
