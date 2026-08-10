@@ -453,10 +453,31 @@ EOVM
   echo "$(date -u --rfc-3339=seconds) - VM ${vm_name} is running. Waiting for sysprep + reboot cycle to complete..."
   sleep 180
 
-  # Poll SSH readiness: proves the guest OS finished sysprep, sshd is
-  # running, the authorized key is installed, DNS resolves, and the pod
-  # network is reachable.
-  echo "$(date -u --rfc-3339=seconds) - Waiting for SSH readiness on ${vm_fqdn}..."
+  # Get the pod IP from VMI status -- the CI step pod cannot resolve
+  # cluster-internal DNS names (*.svc.cluster.local), so we SSH via IP.
+  echo "$(date -u --rfc-3339=seconds) - Getting VM pod IP from VMI status..."
+  vm_ip=""
+  ip_attempts=0
+  while [[ ${ip_attempts} -lt 20 ]]; do
+    vm_ip=$(oc get vmi "${vm_name}" -n "${VM_NAMESPACE}" \
+      -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || echo "")
+    if [[ -n "${vm_ip}" ]]; then
+      echo "$(date -u --rfc-3339=seconds) - VM pod IP: ${vm_ip}"
+      break
+    fi
+    echo "$(date -u --rfc-3339=seconds) - IP not available yet, waiting... (${ip_attempts}/20)"
+    sleep 15
+    ((ip_attempts++)) || true
+  done
+
+  if [[ -z "${vm_ip}" ]]; then
+    echo "ERROR: Could not get pod IP for VM ${vm_name}"
+    oc get vmi "${vm_name}" -n "${VM_NAMESPACE}" -o yaml || true
+    exit 1
+  fi
+
+  # Poll SSH readiness using the pod IP
+  echo "$(date -u --rfc-3339=seconds) - Waiting for SSH readiness on ${vm_ip} (${vm_fqdn})..."
   ssh_attempts=0
   ssh_max=40
   ssh_ok=false
@@ -466,8 +487,8 @@ EOVM
          -o UserKnownHostsFile=/dev/null \
          -o ConnectTimeout=10 \
          -o BatchMode=yes \
-         "Administrator@${vm_fqdn}" "hostname" 2>/dev/null; then
-      echo "$(date -u --rfc-3339=seconds) - SSH to ${vm_fqdn} succeeded (attempt ${ssh_attempts}/${ssh_max})"
+         "Administrator@${vm_ip}" "hostname" 2>/dev/null; then
+      echo "$(date -u --rfc-3339=seconds) - SSH to ${vm_ip} succeeded (attempt ${ssh_attempts}/${ssh_max})"
       ssh_ok=true
       break
     fi
@@ -477,22 +498,19 @@ EOVM
   done
 
   if [[ "${ssh_ok}" != "true" ]]; then
-    echo "ERROR: SSH to ${vm_fqdn} failed after ${ssh_max} attempts"
+    echo "ERROR: SSH to ${vm_ip} (${vm_fqdn}) failed after ${ssh_max} attempts"
     echo "--- VMI status ---"
     oc get vmi "${vm_name}" -n "${VM_NAMESPACE}" -o yaml || true
-    echo "--- Sysprep log (if reachable) ---"
-    ssh -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
-      -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-      -o ConnectTimeout=5 -o BatchMode=yes \
-      "Administrator@${vm_fqdn}" \
-      "type C:\\var\\log\\byoh\\setup-byoh.log" 2>/dev/null || true
+    echo "--- Trying virtctl console for diagnostics ---"
+    timeout 10 virtctl console "${vm_name}" -n "${VM_NAMESPACE}" 2>/dev/null || true
     exit 1
   fi
 
-  # Write instance file using the DNS name (preferred for BYOH ConfigMap)
+  # Write instance file using the DNS name (WMCO BYOH ConfigMap uses this
+  # to connect from inside the cluster where DNS resolution works)
   instance_file="${SHARED_DIR}/${vm_fqdn}_windows_instance.txt"
   echo "username=Administrator" > "${instance_file}"
-  echo "$(date -u --rfc-3339=seconds) - Created instance file: ${instance_file}"
+  echo "$(date -u --rfc-3339=seconds) - Created instance file: ${instance_file} (VM IP: ${vm_ip})"
 
   ((vm_index++)) || true
 done
