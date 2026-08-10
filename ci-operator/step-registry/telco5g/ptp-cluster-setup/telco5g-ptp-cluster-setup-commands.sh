@@ -405,8 +405,6 @@ sideload_kernel_on_workers() {
   hosts: localhost
   gather_facts: false
   vars:
-    # Keep Job integer fields (e.g. activeDeadlineSeconds) as JSON numbers, not strings.
-    ansible_jinja2_native: true
     sideload_kernel_uri: "{{ hostvars[groups['hypervisor'][0]].sideload_kernel_uri | default('') }}"
     flip_kernel_script_content: "{{ hostvars[groups['hypervisor'][0]].flip_kernel_script_content | default('') }}"
     flip_kernel_local_path: "{{ lookup('env', 'HOME') }}/flip_kernel"
@@ -495,21 +493,22 @@ EOF
     wait: true
   environment: "{{ k8s_auth }}"
 
+# Render via from_yaml so activeDeadlineSeconds is a YAML int (API requires int64),
+# not a quoted Jinja string which kubernetes.core would send as JSON string.
 - name: Create flip-kernel job pinned to {{ worker_node }}
-  kubernetes.core.k8s:
-    state: present
-    definition:
+  vars:
+    flip_kernel_job: |
       apiVersion: batch/v1
       kind: Job
       metadata:
-        name: "flip-kernel-{{ worker_idx }}"
+        name: flip-kernel-{{ worker_idx }}
         namespace: default
       spec:
         backoffLimit: 3
-        activeDeadlineSeconds: "{{ ((sideload_kernel_job_timeout | int) * 60) | int }}"
+        activeDeadlineSeconds: {{ (sideload_kernel_job_timeout | int) * 60 }}
         template:
           spec:
-            nodeName: "{{ worker_node }}"
+            nodeName: {{ worker_node | to_json }}
             automountServiceAccountToken: false
             containers:
               - name: flipper
@@ -550,6 +549,9 @@ EOF
                 configMap:
                   name: sideload-kernel
                   defaultMode: 0755
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ flip_kernel_job | from_yaml }}"
   environment: "{{ k8s_auth }}"
 
 - name: Wait for flip-kernel job on {{ worker_node }}
