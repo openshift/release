@@ -16,38 +16,12 @@ echo "Triggering review agent for PR #$PR_NUMBER"
 
 CREDS_DIR="/var/run/claude-code-service-account"
 TOKEN_FILE="${CREDS_DIR}/gangway-token"
-APP_ID_FILE="${CREDS_DIR}/app-id"
-INSTALLATION_ID_UPSTREAM_FILE="${CREDS_DIR}/o-h-installation-id"
-PRIVATE_KEY_FILE="${CREDS_DIR}/private-key"
+PAT_FILE="${CREDS_DIR}/${REVIEW_AGENT_PAT_KEY:-gh-pat}"
 
 if [ ! -f "$TOKEN_FILE" ]; then
   echo "ERROR: Gangway token not found at ${TOKEN_FILE}"
   exit 1
 fi
-
-generate_github_token() {
-  local INSTALL_ID=$1
-  local APP_ID
-  APP_ID=$(cat "$APP_ID_FILE")
-  local NOW
-  NOW=$(date +%s)
-  local IAT=$((NOW - 60))
-  local EXP=$((NOW + 600))
-
-  local HEADER
-  HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-  local PAYLOAD
-  PAYLOAD=$(echo -n "{\"iat\":${IAT},\"exp\":${EXP},\"iss\":\"${APP_ID}\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-  local SIGNATURE
-  SIGNATURE=$(echo -n "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$PRIVATE_KEY_FILE" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-  local JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
-
-  curl -s -X POST \
-    -H "Authorization: Bearer ${JWT}" \
-    -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/app/installations/${INSTALL_ID}/access_tokens" \
-    | jq -r '.token'
-}
 
 POST_DATA=$(jq -n --arg pr "$PR_NUMBER" \
   '{job_execution_type: "1", pod_spec_options: {envs: {MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_TARGET_PR: $pr}}}')
@@ -110,32 +84,30 @@ for ((i=1; i<=10; i++)); do
 done
 set -x
 
-# Post a comment on the PR
-if [ -f "$APP_ID_FILE" ] && [ -f "$INSTALLATION_ID_UPSTREAM_FILE" ] && [ -f "$PRIVATE_KEY_FILE" ]; then
-  echo "Generating GitHub token to post PR comment..."
-  INSTALLATION_ID_UPSTREAM=$(cat "$INSTALLATION_ID_UPSTREAM_FILE")
-  GITHUB_TOKEN=$(generate_github_token "$INSTALLATION_ID_UPSTREAM")
+# Post a comment on the PR using the PAT
+if [ -f "$PAT_FILE" ]; then
+  echo "Posting PR comment..."
+  [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
+  set +x
 
-  if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "null" ]; then
-    if [ -n "$JOB_URL" ]; then
-      COMMENT_BODY="Review agent triggered. [View job](${JOB_URL})"
-    else
-      COMMENT_BODY="Review agent triggered (Gangway execution ID: \`${JOB_ID}\`). The Prow job has not started yet — check the [job history](https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/${PERIODIC_JOB_NAME}) for the run once it begins."
-    fi
+  GITHUB_TOKEN_PAT=$(cat "$PAT_FILE")
 
-    set +x
-    curl -s -X POST \
-      -H "Authorization: token ${GITHUB_TOKEN}" \
-      -H "Accept: application/vnd.github+json" \
-      "https://api.github.com/repos/${REVIEW_AGENT_UPSTREAM_REPO}/issues/${PR_NUMBER}/comments" \
-      -d "$(jq -n --arg body "$COMMENT_BODY" '{body: $body}')" > /dev/null
-    set -x
-    echo "Comment posted on PR #$PR_NUMBER"
+  if [ -n "$JOB_URL" ]; then
+    COMMENT_BODY="Review agent triggered. [View job](${JOB_URL})"
   else
-    echo "WARNING: Failed to generate GitHub token for PR comment"
+    COMMENT_BODY="Review agent triggered (Gangway execution ID: \`${JOB_ID}\`). The Prow job has not started yet — check the [job history](https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/${PERIODIC_JOB_NAME}) for the run once it begins."
   fi
+
+  curl --fail --silent --show-error -X POST \
+    -H "Authorization: token ${GITHUB_TOKEN_PAT}" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${REVIEW_AGENT_UPSTREAM_REPO}/issues/${PR_NUMBER}/comments" \
+    -d "$(jq -n --arg body "$COMMENT_BODY" '{body: $body}')" > /dev/null
+
+  $_was_tracing && set -x || true
+  echo "Comment posted on PR #$PR_NUMBER"
 else
-  echo "WARNING: GitHub App credentials not available, skipping PR comment"
+  echo "WARNING: PAT not found at ${PAT_FILE}, skipping PR comment"
 fi
 
 echo "=== Trigger Complete ==="
