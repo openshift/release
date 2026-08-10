@@ -73,6 +73,41 @@ tests:
         requests:
           cpu: 100m
           memory: 256Mi
+- as: capacity-monitor
+  cluster: build01
+  cron: 0 */6 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: Nutanix cluster capacity threshold exceeded. <{{.Status.URL}}|View
+      logs>
+  steps:
+    cluster_profile: nutanix
+    test:
+    - as: monitor
+      commands: |
+        set +x
+        source /tmp/nutanix-creds/secrets.sh
+        mkdir -p /tmp/nutanix-auth
+        echo -n "${prism_central_username}" > /tmp/nutanix-auth/nutanix-username
+        echo -n "${prism_central_password}" > /tmp/nutanix-auth/nutanix-password
+        set -x
+        make build
+        ./bin/capacity-monitor --config config/nutanix.yaml \
+          --credentials-dir /tmp/nutanix-auth \
+          --endpoint "${prism_central_host}" \
+          --port "${prism_central_port}"
+      credentials:
+      - mount_path: /tmp/nutanix-creds
+        name: nutanix-pc
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
 zz_generated_metadata:
   branch: main
   org: openshift-splat-team
