@@ -3,11 +3,13 @@ set -euo pipefail
 
 echo "=== HyperShift Review Agent Trigger ==="
 
-PR_NUMBER="${PULL_NUMBER:-}"
-if [ -z "$PR_NUMBER" ]; then
-  echo "ERROR: PULL_NUMBER not set. This step must run as a presubmit."
-  exit 1
-fi
+# TODO: remove hardcoded PR before merge
+PR_NUMBER="9102"
+# PR_NUMBER="${PULL_NUMBER:-}"
+# if [ -z "$PR_NUMBER" ]; then
+#   echo "ERROR: PULL_NUMBER not set. This step must run as a presubmit."
+#   exit 1
+# fi
 if [ -z "${REVIEW_AGENT_UPSTREAM_REPO:-}" ]; then
   echo "ERROR: REVIEW_AGENT_UPSTREAM_REPO is required (e.g. openshift/hypershift)"
   exit 1
