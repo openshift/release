@@ -15,14 +15,34 @@ if [[ ! -f "${EFFECTIVE_KUBECONFIG}" ]]; then
 fi
 export KUBECONFIG="${EFFECTIVE_KUBECONFIG}"
 
+# ── Ensure brew-registry ICSP is present so registry.redhat.io is reachable ──
+oc apply -f - <<EOF
+---
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: brew-registry
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry.redhat.io
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry.stage.redhat.io
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry-proxy.engineering.redhat.com
+EOF
+
+
 # ── Install metallb-operator via OLM ─────────────────────────────────────────
 
 # If the default CatalogSource does not carry metallb-operator, create a
 # pinned CatalogSource from the v4.22 index image and use that instead.
 FALLBACK_CATALOG="metallb-operator-catalog"
-# Use the quay.io mirror — registry.redhat.io is not reachable from OLM
-# catalog pods inside the CI libvirt cluster.
-FALLBACK_IMAGE="quay.io/redhat/redhat-operator-index:v4.18"
+# Use registry.redhat.io — accessible via the brew-registry ICSP mirror.
+FALLBACK_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.22"
 
 if ! oc get packagemanifest -n openshift-marketplace metallb-operator \
      --field-selector "status.catalogSource=${METALLB_OPERATOR_SUB_SOURCE}" \
