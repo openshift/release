@@ -18,7 +18,7 @@ SSHCMD="sudo dnf install --nobest --refresh -y git jq python3-pip epel-release;
     git clone https://github.com/openshift-metal3/bmctest;
     cd bmctest;
     if [ \"${REPO_NAME:-}\" = \"bmctest\" ] && [ -n \"${PULL_NUMBER:-}\" ]; then
-        git fetch origin pull/${PULL_NUMBER}/head:pr-branch;
+        git fetch origin pull/${PULL_NUMBER:-}/head:pr-branch;
         git checkout pr-branch;
     fi;
     ./ocpbmctest.sh -s /tmp/pull-secret -c /tmp/bmctest-openshift.yaml -r ${RELEASEV}"
