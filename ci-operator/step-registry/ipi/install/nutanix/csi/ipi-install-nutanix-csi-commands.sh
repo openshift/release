@@ -26,22 +26,6 @@ metadata:
   name: openshift-cluster-csi-drivers
 EOF
 
-cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-operator-beta-catalog-source.yaml" << EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: nutanix-csi-operator-beta
-  namespace: openshift-marketplace
-spec:
-  displayName: Nutanix Beta
-  publisher: Nutanix-dev
-  sourceType: grpc
-  image: quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest
-  updateStrategy:
-    registryPoll:
-      interval: 5m
-EOF
-
 cat > "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml" << EOF
 apiVersion: v1
 kind: Secret
@@ -73,7 +57,7 @@ spec:
   channel: stable-3.x
   name: nutanixcsioperator
   installPlanApproval: Automatic
-  source: nutanix-csi-operator-beta
+  source: redhat-operators
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -115,7 +99,6 @@ reclaimPolicy: Delete
 EOF
 
 oc apply -f "${SHARED_DIR}/manifest_0000-nutanix-csi-openshift-cluster-csi-drivers-namespace.yaml"
-oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-operator-beta-catalog-source.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0003-nutanix-csi-operator-group.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0004-nutanix-csi-subscription.yaml"
