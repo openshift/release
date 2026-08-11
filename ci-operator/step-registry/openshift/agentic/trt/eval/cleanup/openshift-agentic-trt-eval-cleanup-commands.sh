@@ -6,10 +6,10 @@ set -o pipefail
 
 echo "=== TRT Eval Cleanup ==="
 
+# Disable tracing while loading secret
 set +x
 GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token" 2>/dev/null || echo "")
 export GITHUB_TOKEN
-set -x
 
 if [[ -z "${GITHUB_TOKEN}" ]]; then
     echo "No token available, skipping cleanup."

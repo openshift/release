@@ -6,12 +6,12 @@ set -o pipefail
 
 echo "=== TRT Eval Judge ==="
 
+# Disable tracing while loading secret
 set +x
 GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
 export GITHUB_TOKEN
-set -x
 
-EVAL_CONFIG="/opt/ai-helpers/evals/trt-agentic-solve/solve-eval.yaml"
+EVAL_CONFIG="${EVAL_CONFIG:-/opt/ai-helpers/evals/trt-agentic-solve/solve-eval.yaml}"
 
 prow-agent-eval judge \
     --config="${EVAL_CONFIG}" \
