@@ -453,60 +453,41 @@ EOVM
   echo "$(date -u --rfc-3339=seconds) - VM ${vm_name} is running. Waiting for sysprep + reboot cycle to complete..."
   sleep 180
 
-  # Get the pod IP from VMI status -- the CI step pod cannot resolve
-  # cluster-internal DNS names (*.svc.cluster.local), so we SSH via IP.
-  echo "$(date -u --rfc-3339=seconds) - Getting VM pod IP from VMI status..."
-  vm_ip=""
-  ip_attempts=0
-  while [[ ${ip_attempts} -lt 20 ]]; do
-    vm_ip=$(oc get vmi "${vm_name}" -n "${VM_NAMESPACE}" \
-      -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || echo "")
-    if [[ -n "${vm_ip}" ]]; then
-      echo "$(date -u --rfc-3339=seconds) - VM pod IP: ${vm_ip}"
-      break
-    fi
-    echo "$(date -u --rfc-3339=seconds) - IP not available yet, waiting... (${ip_attempts}/20)"
-    sleep 15
-    ((ip_attempts++)) || true
-  done
-
-  if [[ -z "${vm_ip}" ]]; then
-    echo "ERROR: Could not get pod IP for VM ${vm_name}"
-    oc get vmi "${vm_name}" -n "${VM_NAMESPACE}" -o yaml || true
-    exit 1
+  # Install virtctl -- the standard CNV tool for SSH into VMs.
+  # virtctl ssh tunnels through the K8s API server, solving the network
+  # topology issue where the CI step pod is on a different cluster than
+  # the target cluster's pod network.
+  echo "$(date -u --rfc-3339=seconds) - Installing virtctl..."
+  VIRTCTL_BASE_URL=$(oc get ingress.config.openshift.io/cluster \
+    -o jsonpath='{.spec.domain}' 2>/dev/null || echo "")
+  if [[ -n "${VIRTCTL_BASE_URL}" ]]; then
+    curl -kfsSL "https://hyperconverged-cluster-cli-download-openshift-cnv.${VIRTCTL_BASE_URL}/amd64/linux/virtctl.tar.gz" \
+      | tar zx -C /tmp/ 2>/dev/null || true
+  fi
+  if [[ -x /tmp/virtctl ]]; then
+    echo "$(date -u --rfc-3339=seconds) - virtctl installed"
+  else
+    echo "WARNING: Could not install virtctl from cluster, trying oc get"
+    # Fallback: virtctl may already be available in the image
+    which virtctl 2>/dev/null || echo "virtctl not available"
   fi
 
-  # Poll SSH readiness from INSIDE the target cluster.
-  # The CI step pod runs on the build cluster and cannot reach the target
-  # cluster's pod network directly. We use oc run to create a temporary
-  # pod on the target cluster and SSH from there.
-  echo "$(date -u --rfc-3339=seconds) - Waiting for SSH readiness on ${vm_ip} from inside the cluster..."
-
-  # Create a Secret with the SSH private key on the target cluster
-  oc create secret generic ssh-test-key \
-    -n "${VM_NAMESPACE}" \
-    --from-file=ssh-privatekey="${CLUSTER_PROFILE_DIR}/ssh-privatekey" 2>/dev/null || true
-
+  # Poll SSH readiness using virtctl ssh (tunnels through API server)
+  echo "$(date -u --rfc-3339=seconds) - Waiting for SSH readiness via virtctl ssh..."
   ssh_attempts=0
   ssh_max=40
   ssh_ok=false
   while [[ ${ssh_attempts} -lt ${ssh_max} ]]; do
-    ssh_result=$(oc run "ssh-test-${ssh_attempts}" --rm -i --restart=Never \
+    ssh_result=$(/tmp/virtctl ssh "Administrator@vmi/${vm_name}" \
       -n "${VM_NAMESPACE}" \
-      --image=registry.access.redhat.com/ubi9/ubi-minimal:latest \
-      --overrides='{
-        "spec": {
-          "volumes": [{"name": "ssh-key", "secret": {"secretName": "ssh-test-key", "defaultMode": 384}}],
-          "containers": [{
-            "name": "ssh-test",
-            "image": "registry.access.redhat.com/ubi9/ubi-minimal:latest",
-            "command": ["bash", "-c", "microdnf install -y openssh-clients >/dev/null 2>&1 && ssh -i /ssh/ssh-privatekey -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes Administrator@'"${vm_ip}"' hostname 2>&1"],
-            "volumeMounts": [{"name": "ssh-key", "mountPath": "/ssh", "readOnly": true}]
-          }]
-        }
-      }' 2>/dev/null || echo "FAILED")
+      -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
+      --command="hostname" \
+      -t "-o StrictHostKeyChecking=no" \
+      -t "-o UserKnownHostsFile=/dev/null" \
+      -t "-o ConnectTimeout=10" \
+      -t "-o BatchMode=yes" 2>&1 || echo "SSH_FAILED")
 
-    if [[ "${ssh_result}" != "FAILED" && -n "${ssh_result}" && "${ssh_result}" != *"Permission denied"* && "${ssh_result}" != *"Connection refused"* && "${ssh_result}" != *"Connection timed out"* ]]; then
+    if [[ "${ssh_result}" != *"SSH_FAILED"* && -n "${ssh_result}" && "${ssh_result}" != *"Permission denied"* && "${ssh_result}" != *"Connection refused"* ]]; then
       echo "$(date -u --rfc-3339=seconds) - SSH succeeded (attempt ${ssh_attempts}/${ssh_max}): ${ssh_result}"
       ssh_ok=true
       break
@@ -516,16 +497,19 @@ EOVM
     ((ssh_attempts++)) || true
   done
 
-  # Clean up SSH key Secret
-  oc delete secret ssh-test-key -n "${VM_NAMESPACE}" 2>/dev/null || true
-
   if [[ "${ssh_ok}" != "true" ]]; then
-    echo "ERROR: SSH to ${vm_ip} (${vm_fqdn}) failed after ${ssh_max} attempts"
+    echo "ERROR: SSH to ${vm_name} (${vm_fqdn}) failed after ${ssh_max} attempts"
     echo "--- VMI status ---"
     oc get vmi "${vm_name}" -n "${VM_NAMESPACE}" -o yaml || true
-    echo "--- Checking if sysprep ran (via guest agent) ---"
+    echo "--- Guest OS info ---"
     oc get vmi "${vm_name}" -n "${VM_NAMESPACE}" \
       -o jsonpath='{.status.guestOSInfo}' 2>/dev/null | python3 -m json.tool 2>/dev/null || true
+    echo "--- Checking sysprep log via virtctl ---"
+    /tmp/virtctl ssh "Administrator@vmi/${vm_name}" -n "${VM_NAMESPACE}" \
+      -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
+      --command="type C:\\var\\log\\byoh\\setup-byoh.log" \
+      -t "-o StrictHostKeyChecking=no" -t "-o UserKnownHostsFile=/dev/null" \
+      -t "-o BatchMode=yes" 2>/dev/null || true
     exit 1
   fi
 
