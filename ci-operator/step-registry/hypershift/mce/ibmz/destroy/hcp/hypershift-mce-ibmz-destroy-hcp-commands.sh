@@ -11,6 +11,26 @@ export HC_NAME
 hcp_ns="${HC_NS}-${HC_NAME}"
 export hcp_ns
 
+# Patch nested kubeconfig to use bastion FIP so the hosted cluster API is reachable
+# from the CI pod without needing IBM Cloud private DNS resolution.
+HOSTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+if [ -f "$HOSTED_KUBECONFIG" ]; then
+  BASTION_FIP=$(cat "${SHARED_DIR}/bastion_fip" 2>/dev/null || true)
+  API_NODEPORT=$(cat "${SHARED_DIR}/api_nodeport" 2>/dev/null || true)
+  if [[ -n "$BASTION_FIP" && -n "$API_NODEPORT" ]]; then
+    CLSTR_NAME=$(oc --kubeconfig "$HOSTED_KUBECONFIG" config view -o jsonpath='{.clusters[0].name}' 2>/dev/null || true)
+    if [[ -n "$CLSTR_NAME" ]]; then
+      oc --kubeconfig "$HOSTED_KUBECONFIG" config set-cluster "$CLSTR_NAME" \
+        --server="https://${BASTION_FIP}:${API_NODEPORT}"
+      oc --kubeconfig "$HOSTED_KUBECONFIG" config set-cluster "$CLSTR_NAME" \
+        --insecure-skip-tls-verify=true
+      echo "destroy-hcp: patched nested kubeconfig server to https://${BASTION_FIP}:${API_NODEPORT}"
+    fi
+  else
+    echo "WARN: bastion_fip or api_nodeport not found in SHARED_DIR — nested kubeconfig URL not patched"
+  fi
+fi
+
 echo "$(date) Scaling down nodepool ${HC_NS} to 0"
 oc -n ${HC_NS} scale nodepool ${HC_NAME} --replicas 0
 
@@ -24,12 +44,19 @@ detach_nodes() {
     echo "Machines : $machines"
     IFS=' ' read -ra machines_list <<< "$machines"
     echo "Machines List : ${machines_list[*]}"
+    # Guard: if create step failed before nodes were provisioned, machines_list may be empty
+    if [[ ${#machines_list[@]} -eq 0 || -z "${machines_list[0]}" ]]; then
+        echo "WARN: no machines found in $hcp_ns — skipping detach_nodes"
+        return 0
+    fi
     for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
         # Best-effort: hosted cluster API may already be unreachable at destroy time;
         # the critical step is patching the machine finalizers below.
         oc delete node compute-$i.$job_id-$HYPERSHIFT_BASEDOMAIN --kubeconfig "${SHARED_DIR}/nested_kubeconfig" || \
             echo "WARN: could not delete node compute-$i from hosted cluster (API unreachable) - continuing"
-        oc patch machine.cluster.x-k8s.io ${machines_list[i]} -n "$hcp_ns" -p '{"metadata":{"finalizers":null}}' --type=merge
+        if [[ -n "${machines_list[i]:-}" ]]; then
+            oc patch machine.cluster.x-k8s.io ${machines_list[i]} -n "$hcp_ns" -p '{"metadata":{"finalizers":null}}' --type=merge
+        fi
     done
 }
 

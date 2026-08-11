@@ -168,15 +168,15 @@ create_vsi() {
             )
         fi
         ibmcloud is instance-create "$VSI_NAME" "$VPC_NAME" "$ZONE" "$PROFILE" "$SUBNET_NAME" --image "$IMAGE_NAME" --keys "$SSH_KEY_NAME" --pnac-vni "$VSI_NAME-vni" "${extra_vol_args[@]}"
-        echo "Waiting for the $VSI_NAME VSI to be ready under 2 minutes ⏳..."
-        for i in {1..13}; do
+        echo "Waiting for the $VSI_NAME VSI to be ready under 5 minutes ⏳..."
+        for i in {1..30}; do
             state=$(ibmcloud is instance $VSI_NAME --output JSON | jq -r '.status')
             if [ "$state" != "available" ] && [ "$state" != "running" ]; then
-                if [ $i -eq 13 ]; then
-                    echo "❌ Error: VSI $VSI_NAME creation is not successful even after 2 minutes. Exiting now."
+                if [ $i -eq 30 ]; then
+                    echo "❌ Error: VSI $VSI_NAME creation is not successful even after 5 minutes. Exiting now."
                     exit 1
                 fi
-                echo "🔄 Retry $i/12: Waiting for VSI $VSI_NAME to be in ready state, sleeping for 10 seconds ⏳..."
+                echo "🔄 Retry $i/29: Waiting for VSI $VSI_NAME to be in ready state, sleeping for 10 seconds ⏳..."
                 sleep 10
             else
                 echo "✅ Successfully created the VSI: $VSI_NAME in VPC: $VPC_NAME"
@@ -359,6 +359,9 @@ done
 BASTION_FIP=$(ibmcloud is floating-ip $infra_name-bastion-ip --output JSON | jq -r '.address')
 BASTION_RIP=$(ibmcloud is instance $infra_name-bastion --output JSON | jq -r '.network_interfaces[0].primary_ip.address')
 
+# Persist bastion FIP to SHARED_DIR so post/destroy steps can re-use it to patch nested_kubeconfig
+echo "$BASTION_FIP" > "${SHARED_DIR}/bastion_fip"
+
 # Fetching the Reserved IPs of the hcp compute nodes
 ZVSI_COMPUTE_RIP=()
 for i in $(seq 1 $HYPERSHIFT_NODE_COUNT); do
@@ -417,6 +420,8 @@ if [[ -z "${API_NODEPORT}" ]]; then
   exit 1
 fi
 echo "Hosted cluster kube-apiserver NodePort: ${API_NODEPORT}"
+# Persist so post/destroy steps can patch nested_kubeconfig without private DNS
+echo "$API_NODEPORT" > "${SHARED_DIR}/api_nodeport"
 
 cat <<HAPROXY_CFG > haproxy.cfg
 global
