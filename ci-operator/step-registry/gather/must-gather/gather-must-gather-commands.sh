@@ -266,10 +266,26 @@ function installCamgi() {
       source "${SHARED_DIR}/unset-proxy.sh"
     fi
 
-    curl -L -o camgi.tar https://github.com/elmiko/camgi.rs/releases/download/v"$CAMGI_VERSION"/camgi-"$CAMGI_VERSION"-linux-x86_64.tar
-    tar xvf camgi.tar
-    sha256sum -c camgi.sha256
-    echo "camgi version $CAMGI_VERSION downloaded"
+    # camgi download can hit transient DNS blips (curl exit 6); retry with
+    # backoff and treat a persistent failure as non-fatal below, since camgi
+    # is an optional must-gather visualization, not the data collection.
+    local attempt camgi_downloaded=false
+    for attempt in 1 2 3; do
+      if curl -L -o camgi.tar https://github.com/elmiko/camgi.rs/releases/download/v"$CAMGI_VERSION"/camgi-"$CAMGI_VERSION"-linux-x86_64.tar \
+        && tar xvf camgi.tar \
+        && sha256sum -c camgi.sha256; then
+        camgi_downloaded=true
+        break
+      fi
+      echo "WARNING: camgi download attempt ${attempt}/3 failed."
+      [ "$attempt" -lt 3 ] && sleep $((5 * attempt))
+    done
+
+    if [ "$camgi_downloaded" = true ]; then
+      echo "camgi version $CAMGI_VERSION downloaded"
+    else
+      echo "WARNING: failed to download camgi after 3 attempts, skipping camgi report (non-fatal)."
+    fi
 
     if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
       if [ ! -f "${SHARED_DIR}/proxy-conf.sh" ]; then
@@ -280,6 +296,7 @@ function installCamgi() {
     fi
 
     popd
+    [ "$camgi_downloaded" = true ]
 }
 
 createInstallJunit
@@ -343,9 +360,12 @@ if ! /tmp/mco-sanitize --input="${ARTIFACT_DIR}/must-gather"; then
 fi                                                                                                                     
 
 [ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ] && cp "${ARTIFACT_DIR}/must-gather/event-filter.html" "${ARTIFACT_DIR}/event-filter.html"
-installCamgi
-/tmp/camgi "${ARTIFACT_DIR}/must-gather" > "${ARTIFACT_DIR}/must-gather/camgi.html"
-[ -f "${ARTIFACT_DIR}/must-gather/camgi.html" ] && cp "${ARTIFACT_DIR}/must-gather/camgi.html" "${ARTIFACT_DIR}/camgi.html"
+if installCamgi; then
+  /tmp/camgi "${ARTIFACT_DIR}/must-gather" > "${ARTIFACT_DIR}/must-gather/camgi.html"
+  [ -f "${ARTIFACT_DIR}/must-gather/camgi.html" ] && cp "${ARTIFACT_DIR}/must-gather/camgi.html" "${ARTIFACT_DIR}/camgi.html"
+else
+  echo "WARNING: camgi installation failed, skipping camgi report generation (non-fatal)."
+fi
 tar -czC "${ARTIFACT_DIR}/must-gather" -f "${ARTIFACT_DIR}/must-gather.tar.gz" .
 rm -rf "${ARTIFACT_DIR}"/must-gather
 set +x # stop logging commands
