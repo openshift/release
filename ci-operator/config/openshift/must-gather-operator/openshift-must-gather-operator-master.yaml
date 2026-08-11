@@ -7,6 +7,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.39.2
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 binary_build_commands: make go-build
 build_root:
   from_repository: true
@@ -164,6 +168,41 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-hypershift
+- as: e2e-rosa-operator-weekly
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_BUNDLE: must-gather-operator-bundle
+    env:
+      CHANNEL_GROUP: stable
+      OCM_LOGIN_ENV: integration
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: must-gather-operator
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: install
+      cli: latest
+      commands: |
+        oc -n must-gather-operator rollout status deployment must-gather-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts
 - always_run: false
   as: e2e-gcp-operator-rhcos10-fips
   optional: true
