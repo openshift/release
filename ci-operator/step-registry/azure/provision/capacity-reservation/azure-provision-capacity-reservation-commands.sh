@@ -37,7 +37,7 @@ az group create -l "${REGION}" -n "${CAPRES_RG}" --output none
 echo "Creating capacity reservation group: ${CRG_NAME} in zone ${CAPACITY_RESERVATION_ZONE}"
 az capacity reservation group create \
     --resource-group "${CAPRES_RG}" \
-    --name "${CRG_NAME}" \
+    --capacity-reservation-group "${CRG_NAME}" \
     --location "${REGION}" \
     --zones "${CAPACITY_RESERVATION_ZONE}" \
     --output none
@@ -46,7 +46,7 @@ echo "Creating capacity reservation: ${CR_NAME} (SKU: ${CAPACITY_RESERVATION_SKU
 az capacity reservation create \
     --resource-group "${CAPRES_RG}" \
     --capacity-reservation-group "${CRG_NAME}" \
-    --name "${CR_NAME}" \
+    --capacity-reservation-name "${CR_NAME}" \
     --sku "${CAPACITY_RESERVATION_SKU}" \
     --capacity "${CAPACITY_RESERVATION_COUNT}" \
     --zone "${CAPACITY_RESERVATION_ZONE}" \
@@ -56,7 +56,7 @@ echo "Capacity reservation created successfully"
 az capacity reservation show \
     --resource-group "${CAPRES_RG}" \
     --capacity-reservation-group "${CRG_NAME}" \
-    --name "${CR_NAME}" \
+    --capacity-reservation-name "${CR_NAME}" \
     --output table
 
 echo "${CAPRES_RG}" > "${SHARED_DIR}/capacity_reservation_rg"
