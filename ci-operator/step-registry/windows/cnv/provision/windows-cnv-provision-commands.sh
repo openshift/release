@@ -476,33 +476,56 @@ EOVM
     exit 1
   fi
 
-  # Poll SSH readiness using the pod IP
-  echo "$(date -u --rfc-3339=seconds) - Waiting for SSH readiness on ${vm_ip} (${vm_fqdn})..."
+  # Poll SSH readiness from INSIDE the target cluster.
+  # The CI step pod runs on the build cluster and cannot reach the target
+  # cluster's pod network directly. We use oc run to create a temporary
+  # pod on the target cluster and SSH from there.
+  echo "$(date -u --rfc-3339=seconds) - Waiting for SSH readiness on ${vm_ip} from inside the cluster..."
+
+  # Create a Secret with the SSH private key on the target cluster
+  oc create secret generic ssh-test-key \
+    -n "${VM_NAMESPACE}" \
+    --from-file=ssh-privatekey="${CLUSTER_PROFILE_DIR}/ssh-privatekey" 2>/dev/null || true
+
   ssh_attempts=0
   ssh_max=40
   ssh_ok=false
   while [[ ${ssh_attempts} -lt ${ssh_max} ]]; do
-    if ssh -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
-         -o StrictHostKeyChecking=no \
-         -o UserKnownHostsFile=/dev/null \
-         -o ConnectTimeout=10 \
-         -o BatchMode=yes \
-         "Administrator@${vm_ip}" "hostname" 2>/dev/null; then
-      echo "$(date -u --rfc-3339=seconds) - SSH to ${vm_ip} succeeded (attempt ${ssh_attempts}/${ssh_max})"
+    ssh_result=$(oc run "ssh-test-${ssh_attempts}" --rm -i --restart=Never \
+      -n "${VM_NAMESPACE}" \
+      --image=registry.access.redhat.com/ubi9/ubi-minimal:latest \
+      --overrides='{
+        "spec": {
+          "volumes": [{"name": "ssh-key", "secret": {"secretName": "ssh-test-key", "defaultMode": 384}}],
+          "containers": [{
+            "name": "ssh-test",
+            "image": "registry.access.redhat.com/ubi9/ubi-minimal:latest",
+            "command": ["bash", "-c", "microdnf install -y openssh-clients >/dev/null 2>&1 && ssh -i /ssh/ssh-privatekey -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes Administrator@'"${vm_ip}"' hostname 2>&1"],
+            "volumeMounts": [{"name": "ssh-key", "mountPath": "/ssh", "readOnly": true}]
+          }]
+        }
+      }' 2>/dev/null || echo "FAILED")
+
+    if [[ "${ssh_result}" != "FAILED" && -n "${ssh_result}" && "${ssh_result}" != *"Permission denied"* && "${ssh_result}" != *"Connection refused"* && "${ssh_result}" != *"Connection timed out"* ]]; then
+      echo "$(date -u --rfc-3339=seconds) - SSH succeeded (attempt ${ssh_attempts}/${ssh_max}): ${ssh_result}"
       ssh_ok=true
       break
     fi
-    echo "$(date -u --rfc-3339=seconds) - SSH not ready (attempt ${ssh_attempts}/${ssh_max}), retrying in 30s..."
+    echo "$(date -u --rfc-3339=seconds) - SSH not ready (attempt ${ssh_attempts}/${ssh_max}): ${ssh_result}"
     sleep 30
     ((ssh_attempts++)) || true
   done
+
+  # Clean up SSH key Secret
+  oc delete secret ssh-test-key -n "${VM_NAMESPACE}" 2>/dev/null || true
 
   if [[ "${ssh_ok}" != "true" ]]; then
     echo "ERROR: SSH to ${vm_ip} (${vm_fqdn}) failed after ${ssh_max} attempts"
     echo "--- VMI status ---"
     oc get vmi "${vm_name}" -n "${VM_NAMESPACE}" -o yaml || true
-    echo "--- Trying virtctl console for diagnostics ---"
-    timeout 10 virtctl console "${vm_name}" -n "${VM_NAMESPACE}" 2>/dev/null || true
+    echo "--- Checking if sysprep ran (via guest agent) ---"
+    oc get vmi "${vm_name}" -n "${VM_NAMESPACE}" \
+      -o jsonpath='{.status.guestOSInfo}' 2>/dev/null | python3 -m json.tool 2>/dev/null || true
     exit 1
   fi
 
