@@ -3,13 +3,21 @@ ref:
   from: agentic-dev
   commands: openshift-agentic-trt-review-responder-eval-init-commands.sh
   env:
-  - name: UPSTREAM_REPO
+  - name: EVAL_CONFIG
+    default: "/opt/ai-helpers/evals/review-responder/review-responder-eval.yaml"
+    documentation: |-
+      Path to the eval config YAML inside the image.
+  - name: EVAL_CASE
+    default: ""
+    documentation: |-
+      Eval case directory name (e.g., case-001-trt-2660-null-explanations).
+      If empty, discovers and runs all cases.
   resources:
     requests:
       cpu: 100m
       memory: 256Mi
   timeout: 15m0s
   documentation: |-
-    Review-responder eval init step. Creates a PR from fixture branches
-    (deliberately flawed implementation), posts seeded review comments
-    from comments.json, and writes PR metadata to SHARED_DIR.
+    Review-responder eval init step. Uses prow-agent-eval CLI to create
+    a PR from fixture branches, post seeded review comments, and write
+    PR metadata to SHARED_DIR.
