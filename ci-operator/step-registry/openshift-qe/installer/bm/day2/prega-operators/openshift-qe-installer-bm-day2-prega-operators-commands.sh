@@ -32,9 +32,10 @@ get_idms_manifest() {
     local f="$1"
     [[ -s "$f" ]] || return 1
     if command -v yq &>/dev/null; then
-      yq eval 'has("kind") and has("apiVersion")' "$f" 2>/dev/null | grep -q '^true$'
+      yq eval '.apiVersion == "config.openshift.io/v1" and .kind == "ImageDigestMirrorSet"' "$f" 2>/dev/null | grep -q '^true$'
     else
-      grep -qE '^(apiVersion|kind):' "$f"
+      grep -qx 'apiVersion: config.openshift.io/v1' "$f" &&
+        grep -qx 'kind: ImageDigestMirrorSet' "$f"
     fi
   }
 
