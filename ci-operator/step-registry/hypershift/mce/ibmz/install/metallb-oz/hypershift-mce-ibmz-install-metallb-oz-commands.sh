@@ -221,3 +221,28 @@ spec:
   ipAddressPools:
    - metallb
 EOF
+
+# ── Wait up to 2 minutes for all pods in metallb-system to be Running/Ready ──
+echo "$(date) Waiting up to 2 minutes for all pods in metallb-system to be Running..."
+METALLB_WAIT=120
+METALLB_INTERVAL=10
+METALLB_ELAPSED=0
+NOT_READY=""
+
+while [[ ${METALLB_ELAPSED} -lt ${METALLB_WAIT} ]]; do
+  NOT_READY=$(oc get pods -n metallb-system --no-headers 2>/dev/null \
+    | grep -v "Running\|Completed" || true)
+  if [[ -z "${NOT_READY}" ]]; then
+    echo "$(date) All pods in metallb-system are Running"
+    break
+  fi
+  echo "$(date) Pods not yet ready (${METALLB_ELAPSED}s elapsed):"
+  echo "${NOT_READY}"
+  sleep ${METALLB_INTERVAL}
+  METALLB_ELAPSED=$((METALLB_ELAPSED + METALLB_INTERVAL))
+done
+
+if [[ -n "${NOT_READY}" ]]; then
+  echo "$(date) WARNING: Some pods in metallb-system are still not Running after ${METALLB_WAIT}s:"
+  oc get pods -n metallb-system -o wide
+fi

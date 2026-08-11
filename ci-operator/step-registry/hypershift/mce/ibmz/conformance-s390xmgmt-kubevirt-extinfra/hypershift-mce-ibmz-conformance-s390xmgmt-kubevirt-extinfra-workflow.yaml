@@ -22,12 +22,17 @@ workflow:
     - chain: hypershift-mce-ibmz-create-s390xinfra-oz
 
     # ── Operator installs ─────────────────────────────────────────────────
-    # MCE + virt on mgmt cluster (default $KUBECONFIG → mgmt)
+    # MCE, virt, HPP, MetalLB on mgmt cluster (default $KUBECONFIG → mgmt)
     - chain: hypershift-mce-ibmz-install-operators-mgmt
-    # virt operator on infra cluster ($SHARED_DIR/infra-kubeconfig)
+    # virt, HPP, MetalLB on infra cluster ($SHARED_DIR/infra-kubeconfig)
     - chain: hypershift-mce-ibmz-install-operators-infra
+    
+    # ── HCP virt external infra cluster creation ─────────────────────────────────────────────────
+    - ref: hypershift-mce-ibmz-create-hcpvirt-extinfra
+
     test:
     - ref: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra-test-print
+    
     post:
     - ref: ipi-conf-debug-kdump-gather-logs
     - chain: gather
