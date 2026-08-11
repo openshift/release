@@ -4,6 +4,7 @@ ref:
     name: rhdh-e2e-runner
     namespace: ci
     tag: main
+  timeout: 2h0m0s
   grace_period: 10m
   commands: sandboxed-containers-operator-install-osc-operator-commands.sh
   resources:
@@ -28,6 +29,7 @@ ref:
     default: ""
     documentation: |-
       The container image for a custom OSC operator CatalogSource.
+      This is the sole trigger for dev catalog creation.
       If empty (default), uses existing "redhat-operators" catalog.
       If set, the helm chart creates "osc-operator-dev-catalog" with this image.
   - name: ENABLEPEERPODS
@@ -59,3 +61,8 @@ ref:
     mode in osc-feature-gates.
 
     When complete, patches osc-config ConfigMap so tests can detect the pre-installed operator.
+
+    The 2h timeout covers KataConfig readiness (typically ~1h for node reboots)
+    plus operator install waits. Observed test phase times: kata ~34min avg,
+    peerpods ~97min avg (includes podvm image creation), coco ~44min avg.
+    Worst-case peerpods runs reach ~2h.

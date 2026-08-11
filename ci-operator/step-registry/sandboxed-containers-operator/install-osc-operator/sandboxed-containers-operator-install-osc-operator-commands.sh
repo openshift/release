@@ -153,7 +153,9 @@ function oc_with_retry() {
     fi
 
     rm -f "${err_file}"
-    echo ">>> ERROR: Command failed: $*" >&2
+    local safe_cmd
+    safe_cmd=$(echo "$*" | sed -E 's/(--from-literal=[^ =]+=)[^ ]*/\1<REDACTED>/g')
+    echo ">>> ERROR: Command failed: ${safe_cmd}" >&2
     echo "${err_output}" >&2
     return 1
   done
@@ -163,6 +165,16 @@ function mirror_konflux() {
   echo ">>> Create mirror for konflux images"
   oc_with_retry oc apply -f "https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/refs/heads/devel/.tekton/images-mirror-set.yaml"
   oc_with_retry oc apply -f "https://raw.githubusercontent.com/openshift/trustee-fbc/refs/heads/main/.tekton/images-mirror-set.yaml"
+
+  echo ">>> Waiting for MachineConfigPools to begin updating..."
+  sleep 30
+
+  if ! wait_until "all MachineConfigPools updated" 1800 30 \
+    "oc wait mcp --all --for=condition=Updated --timeout=0s 2>/dev/null"; then
+    echo ">>> ERROR: MachineConfigPools did not settle after 30 minutes"
+    oc get mcp || true
+    return 1
+  fi
 }
 
 function latest_catsrc_image_tag() {
@@ -172,7 +184,7 @@ function latest_catsrc_image_tag() {
 
     while [ "$page" -le "$max_pages" ]; do
         local resp
-        resp=$(curl -sf "${api_url}?limit=100&page=${page}&onlyActiveTags=true")
+        resp=$(curl -sf --max-time 30 "${api_url}?limit=100&page=${page}&onlyActiveTags=true") || resp=""
 
         if [ -z "$resp" ] || ! jq -e '.tags | length > 0' <<< "$resp" >/dev/null 2>&1; then
             break
@@ -235,14 +247,14 @@ function fetch_osc_charts() {
 
   echo ">>> Fetching OSC charts from: ${OSC_CHARTS_REPO} (ref: ${OSC_CHARTS_REF})" >&2
 
-  mkdir -p "${charts_dir}"
   rm -rf "${charts_dir}"
-  git clone --depth 1 --branch "${OSC_CHARTS_REF}" "${OSC_CHARTS_REPO}" "${charts_dir}"
-
-  if [[ ! -d "${charts_dir}" ]]; then
-    echo ">>> ERROR: Failed to clone charts repository" >&2
-    exit 1
+  git init --quiet "${charts_dir}"
+  git -C "${charts_dir}" remote add origin "${OSC_CHARTS_REPO}"
+  if ! git -C "${charts_dir}" fetch --depth 1 origin "${OSC_CHARTS_REF}"; then
+    echo ">>> ERROR: Failed to fetch ${OSC_CHARTS_REF} from charts repository" >&2
+    return 1
   fi
+  git -C "${charts_dir}" checkout --quiet FETCH_HEAD
 
   echo ">>> Charts fetched" >&2
   local result_dir
@@ -257,7 +269,12 @@ function fetch_osc_charts() {
 
 function get_cloud_provider() {
   local provider
-  provider=$(oc_with_retry oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.type}' | tr '[:upper:]' '[:lower:]')
+  provider=$(oc_with_retry oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.type}') || return 1
+  provider=$(echo "${provider}" | tr '[:upper:]' '[:lower:]')
+  if [[ -z "${provider}" ]]; then
+    echo ">>> ERROR: could not determine cluster platform type" >&2
+    return 1
+  fi
   if [[ "${provider}" == "none" ]]; then
     provider="libvirt"
   fi
@@ -290,9 +307,8 @@ function render_osc_operator_chart() {
   fi
 
   local helm_output
-  if ! helm_output=$(helm template "${helm_args[@]}" 2>&1); then
+  if ! helm_output=$(helm template "${helm_args[@]}"); then
     echo ">>> ERROR: helm template failed" >&2
-    echo "$helm_output" >&2
     return 1
   fi
 
@@ -364,7 +380,7 @@ function render_osc_operands_chart() {
           [[ -n "${azure_nsg_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_NSG_ID=${azure_nsg_id}")
           [[ -n "${azure_resource_group}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_RESOURCE_GROUP=${azure_resource_group}")
           [[ -n "${azure_region}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_REGION=${azure_region}")
-          [[ -n "${azure_instance_size}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZE=${azure_instance_size}")
+          [[ -n "${azure_instance_size}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.azure.AZURE_INSTANCE_SIZE=${azure_instance_size}") || true
           ;;
         aws)
           local aws_region aws_subnet_id aws_vpc_id aws_sg_ids podvm_instance_type
@@ -377,7 +393,7 @@ function render_osc_operands_chart() {
           [[ -n "${aws_subnet_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SUBNET_ID=${aws_subnet_id}")
           [[ -n "${aws_vpc_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_VPC_ID=${aws_vpc_id}")
           [[ -n "${aws_sg_ids}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.AWS_SG_IDS=${aws_sg_ids}")
-          [[ -n "${podvm_instance_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPE=${podvm_instance_type}")
+          [[ -n "${podvm_instance_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.aws.PODVM_INSTANCE_TYPE=${podvm_instance_type}") || true
           ;;
         gcp)
           local gcp_project_id gcp_zone gcp_network gcp_machine_type
@@ -388,7 +404,7 @@ function render_osc_operands_chart() {
           [[ -n "${gcp_project_id}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_PROJECT_ID=${gcp_project_id}")
           [[ -n "${gcp_zone}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_ZONE=${gcp_zone}")
           [[ -n "${gcp_network}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_NETWORK=${gcp_network}")
-          [[ -n "${gcp_machine_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_MACHINE_TYPE=${gcp_machine_type}")
+          [[ -n "${gcp_machine_type}" ]] && helm_args+=("--set-string" "peerpods.providersConfigs.gcp.GCP_MACHINE_TYPE=${gcp_machine_type}") || true
           ;;
       esac
     else
@@ -399,9 +415,8 @@ function render_osc_operands_chart() {
   fi
 
   local helm_output
-  if ! helm_output=$(helm template "${helm_args[@]}" 2>&1); then
+  if ! helm_output=$(helm template "${helm_args[@]}"); then
     echo ">>> ERROR: helm template failed" >&2
-    echo "$helm_output" >&2
     return 1
   fi
 
@@ -654,7 +669,28 @@ function wait_for_kataconfig() {
     return 1
   fi
 
-  echo ">>> KataConfig is ready"
+  # Check for Failed condition
+  local failed_status
+  failed_status=$(oc get kataconfig "${kataconfig_name}" -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null || echo "")
+  if [[ "${failed_status}" == "True" ]]; then
+    echo ">>> ERROR: KataConfig has Failed condition"
+    oc get kataconfig "${kataconfig_name}" -o yaml || true
+    oc get nodes || true
+    oc get mcp || true
+    return 1
+  fi
+
+  # Verify at least one node is ready
+  local ready_nodes
+  ready_nodes=$(oc get kataconfig "${kataconfig_name}" -o jsonpath='{.status.kataNodes.readyNodeCount}' 2>/dev/null || echo "0")
+  if [[ "${ready_nodes}" -lt 1 ]]; then
+    echo ">>> ERROR: KataConfig has no ready nodes (readyNodeCount=${ready_nodes})"
+    oc get kataconfig "${kataconfig_name}" -o yaml || true
+    oc get nodes || true
+    return 1
+  fi
+
+  echo ">>> KataConfig is ready (readyNodeCount=${ready_nodes})"
   oc get kataconfig "${kataconfig_name}" -o jsonpath='{.status}' 2>/dev/null | jq . || true
 }
 
