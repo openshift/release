@@ -370,7 +370,7 @@ CONFIG = {
         'ap-northeast-1': 3,
     },
     'gcd-quota-slice': {
-        'u-germany-northeast1': 2,
+        'u-germany-northeast1': 7,
     },
     'gcp-qe-quota-slice': {
         'us-central1': 45,
