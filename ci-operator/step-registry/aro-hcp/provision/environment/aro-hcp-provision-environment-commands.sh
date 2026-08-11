@@ -134,8 +134,8 @@ else
   echo "No MSI mock SP lease provided, skipping mock SP overrides"
 fi
 
-# ARM helper SP overrides (if provided). The second lease is reserved for
-# Clusters Service but remains unused until its dedicated identity wiring lands.
+# ARM helper SP overrides (if provided). The first lease is used by Backend and
+# the second by Clusters Service.
 # armHelperFPAPrincipalId deliberately remains unchanged: it identifies the mock
 # first-party principal, not either ARM helper authenticating a client.
 if [[ -n "${LEASED_ARM_HELPER_SP:-}" ]]; then
@@ -165,14 +165,18 @@ if [[ -n "${LEASED_ARM_HELPER_SP:-}" ]]; then
     ARM_HELPER_CERT_NAMES+=("${cert_name}")
   done
 
-  echo "ARM helper SP leases: backend=${ARM_HELPER_LEASES[0]}, clustersService=${ARM_HELPER_LEASES[1]} (reserved)"
+  echo "ARM helper SP leases: backend=${ARM_HELPER_LEASES[0]}, clustersService=${ARM_HELPER_LEASES[1]}"
   export _YQ_ARM_HELPER_CID="${ARM_HELPER_CLIENT_IDS[0]}"
   export _YQ_ARM_HELPER_CERT="${ARM_HELPER_CERT_NAMES[0]}"
+  export _YQ_CS_ARM_HELPER_CID="${ARM_HELPER_CLIENT_IDS[1]}"
+  export _YQ_CS_ARM_HELPER_CERT="${ARM_HELPER_CERT_NAMES[1]}"
   yq -i "
     .clouds.dev.environments.${DEPLOY_ENV}.defaults.armHelperClientId = strenv(_YQ_ARM_HELPER_CID) |
-    .clouds.dev.environments.${DEPLOY_ENV}.defaults.armHelperCertName = strenv(_YQ_ARM_HELPER_CERT)
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.armHelperCertName = strenv(_YQ_ARM_HELPER_CERT) |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.clustersServiceArmHelperClientId = strenv(_YQ_CS_ARM_HELPER_CID) |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.clustersServiceArmHelperCertName = strenv(_YQ_CS_ARM_HELPER_CERT)
   " "${OVERRIDE_CONFIG_FILE}"
-  unset _YQ_ARM_HELPER_CID _YQ_ARM_HELPER_CERT
+  unset _YQ_ARM_HELPER_CID _YQ_ARM_HELPER_CERT _YQ_CS_ARM_HELPER_CID _YQ_CS_ARM_HELPER_CERT
 else
   echo "No ARM helper SP leases provided, skipping ARM helper overrides"
 fi

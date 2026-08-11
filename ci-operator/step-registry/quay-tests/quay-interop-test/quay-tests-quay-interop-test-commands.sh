@@ -50,7 +50,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
                 ExitTrap--PostProcessPrep
         ' EXIT
     else
-        echo "WARNING: ExitTrap--PostProcessPrep not available, falling back to copyArtifacts only" >&2
+        : "WARNING: ExitTrap--PostProcessPrep not available, falling back to copyArtifacts only"
         trap copyArtifacts EXIT
     fi
 else

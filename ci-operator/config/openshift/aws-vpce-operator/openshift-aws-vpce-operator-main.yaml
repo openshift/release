@@ -1,4 +1,8 @@
 base_images:
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -126,6 +130,19 @@ tests:
       OPERATOR_DEPLOYMENT_NAME: aws-vpce-operator
       OPERATOR_NAME: aws-vpce-operator
     workflow: rosa-cluster-lease-e2e-workflow
+- as: rosa-hcp-mc-e2e
+  cron: 0 9 * * 0
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CLUSTER_SECTOR: rosa-e2e
+      GINKGO_FOCUS: VpcEndpointTemplate MC Controller
+      HOSTED_CP: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.21"
+      OPERATOR_NAME: aws-vpce-operator
+      REGION: us-west-2
+    workflow: rosa-operator-mc-e2e
 zz_generated_metadata:
   branch: main
   org: openshift
