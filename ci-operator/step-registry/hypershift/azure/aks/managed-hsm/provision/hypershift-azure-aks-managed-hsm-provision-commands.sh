@@ -26,14 +26,25 @@ retry() {
   done
 }
 
-AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
-WORKLOAD_IDENTITIES_FILE="/etc/hypershift-ci-jobs-self-managed-azure-e2e/workload-identities.json"
+read_kms_credentials() {
+  KMS_CREDENTIALS="$(az keyvault secret show \
+    --vault-name "${KEY_VAULT_NAME}" \
+    --name "${KMS_CREDENTIALS_SECRET}" \
+    --query value \
+    -o tsv)"
+  [[ -n "${KMS_CREDENTIALS}" ]]
+}
+
+AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+AZURE_KMS_INFO_LOCATION="/etc/hypershift-ci-jobs-azurecreds/aks-kms-info.json"
+AZURE_KEY_VAULT_INFO_LOCATION="/etc/hypershift-ci-jobs-azurecreds/keyvault-info.json"
 
 AZURE_AUTH_CLIENT_ID="$(jq -er .clientId "${AZURE_AUTH_LOCATION}")"
 AZURE_AUTH_CLIENT_SECRET="$(jq -er .clientSecret "${AZURE_AUTH_LOCATION}")"
 AZURE_AUTH_TENANT_ID="$(jq -er .tenantId "${AZURE_AUTH_LOCATION}")"
 AZURE_AUTH_SUBSCRIPTION_ID="$(jq -er .subscriptionId "${AZURE_AUTH_LOCATION}")"
-KMS_CLIENT_ID="$(jq -er .kmsClientID "${WORKLOAD_IDENTITIES_FILE}")"
+KMS_CREDENTIALS_SECRET="$(jq -er '."aks-kms-credentials-secret"' "${AZURE_KMS_INFO_LOCATION}")"
+KEY_VAULT_NAME="$(jq -er .keyvaultName "${AZURE_KEY_VAULT_INFO_LOCATION}")"
 
 az cloud set --name AzureCloud
 az login \
@@ -45,6 +56,9 @@ az login \
 az account set --subscription "${AZURE_AUTH_SUBSCRIPTION_ID}"
 
 ADMIN_OBJECT_ID="$(az ad sp show --id "${AZURE_AUTH_CLIENT_ID}" --query id -o tsv)"
+KMS_CREDENTIALS=""
+retry 10 30 read_kms_credentials
+KMS_CLIENT_ID="$(jq -er .client_id <<<"${KMS_CREDENTIALS}")"
 KMS_OBJECT_ID="$(az ad sp show --id "${KMS_CLIENT_ID}" --query id -o tsv)"
 
 UNIQUE_SUFFIX="$(printf '%s' "${PROW_JOB_ID}" | sha256sum | cut -c1-16)"
@@ -55,6 +69,7 @@ KEY_NAME="etcd-encryption"
 # Write cleanup inputs before provisioning so post steps can remove partial resources.
 printf '%s\n' "${HSM_NAME}" > "${SHARED_DIR}/azure_managed_hsm_name"
 printf '%s\n' "${RESOURCE_GROUP}" > "${SHARED_DIR}/azure_managed_hsm_resource_group"
+printf '%s\n' "${HYPERSHIFT_AZURE_MANAGED_HSM_LOCATION}" > "${SHARED_DIR}/azure_managed_hsm_location"
 
 az group create \
   --name "${RESOURCE_GROUP}" \
@@ -68,12 +83,18 @@ az keyvault create \
   --location "${HYPERSHIFT_AZURE_MANAGED_HSM_LOCATION}" \
   --administrators "${ADMIN_OBJECT_ID}" \
   --retention-days 7 \
+  --no-wait \
   --output none
+
+az keyvault wait \
+  --hsm-name "${HSM_NAME}" \
+  --resource-group "${RESOURCE_GROUP}" \
+  --created
 
 SECURITY_DOMAIN_DIR="$(mktemp -d)"
 trap 'rm -rf "${SECURITY_DOMAIN_DIR}"' EXIT
 
-security_domain_args=()
+security_domain_certificates=()
 for index in 0 1 2; do
   openssl req \
     -newkey rsa:2048 \
@@ -84,13 +105,13 @@ for index in 0 1 2; do
     -out "${SECURITY_DOMAIN_DIR}/cert-${index}.pem" \
     -subj "/CN=HyperShiftCI${index}" \
     2>/dev/null
-  security_domain_args+=(--sd-wrapping-keys "${SECURITY_DOMAIN_DIR}/cert-${index}.pem")
+  security_domain_certificates+=("${SECURITY_DOMAIN_DIR}/cert-${index}.pem")
 done
 
 az keyvault security-domain download \
   --hsm-name "${HSM_NAME}" \
   --security-domain-file "${SECURITY_DOMAIN_DIR}/security-domain.json" \
-  "${security_domain_args[@]}" \
+  --sd-wrapping-keys "${security_domain_certificates[@]}" \
   --sd-quorum 2 \
   --output none
 

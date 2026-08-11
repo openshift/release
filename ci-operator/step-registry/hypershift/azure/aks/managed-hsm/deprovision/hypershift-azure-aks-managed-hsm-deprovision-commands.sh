@@ -37,18 +37,20 @@ fi
 
 HSM_NAME_FILE="${SHARED_DIR}/azure_managed_hsm_name"
 RESOURCE_GROUP_FILE="${SHARED_DIR}/azure_managed_hsm_resource_group"
-if [[ ! -s "${HSM_NAME_FILE}" || ! -s "${RESOURCE_GROUP_FILE}" ]]; then
+LOCATION_FILE="${SHARED_DIR}/azure_managed_hsm_location"
+if [[ ! -s "${HSM_NAME_FILE}" || ! -s "${RESOURCE_GROUP_FILE}" || ! -s "${LOCATION_FILE}" ]]; then
   echo "Managed HSM resource information was not written; nothing to delete"
   exit 0
 fi
 
-AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
 AZURE_AUTH_CLIENT_ID="$(jq -er .clientId "${AZURE_AUTH_LOCATION}")"
 AZURE_AUTH_CLIENT_SECRET="$(jq -er .clientSecret "${AZURE_AUTH_LOCATION}")"
 AZURE_AUTH_TENANT_ID="$(jq -er .tenantId "${AZURE_AUTH_LOCATION}")"
 AZURE_AUTH_SUBSCRIPTION_ID="$(jq -er .subscriptionId "${AZURE_AUTH_LOCATION}")"
 HSM_NAME="$(<"${HSM_NAME_FILE}")"
 RESOURCE_GROUP="$(<"${RESOURCE_GROUP_FILE}")"
+HSM_LOCATION="$(<"${LOCATION_FILE}")"
 
 az cloud set --name AzureCloud
 az login \
@@ -75,7 +77,7 @@ if [[ "${PURGE_HSM}" == "true" ]]; then
   echo "Purging Managed HSM ${HSM_NAME}"
   az keyvault purge \
     --hsm-name "${HSM_NAME}" \
-    --location "${HYPERSHIFT_AZURE_MANAGED_HSM_LOCATION}" \
+    --location "${HSM_LOCATION}" \
     --output none
 fi
 
