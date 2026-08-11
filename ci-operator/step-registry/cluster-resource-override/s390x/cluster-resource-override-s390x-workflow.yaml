@@ -11,9 +11,9 @@ workflow:
     test:
     - chain: cluster-resource-override-s390x-test
     post:
-    - ref: cluster-resource-override-s390x-cleanup
     - ref: ipi-conf-debug-kdump-gather-logs
     - chain: gather
+    - ref: cluster-resource-override-s390x-cleanup
     - ref: upi-libvirt-cleanup-post
   documentation: |-
     End-to-end workflow for the ClusterResourceOverride operator on s390x (IBM Z).
@@ -21,5 +21,5 @@ workflow:
     UPI/libvirt pre and post steps as openshift-e2e-libvirt-vpn, installs the
     ClusterResourceOverride operator via OLM (with optional ImageDigestMirrorSet
     image source changes), creates the ClusterResourceOverride CR, then runs the
-    test step. Component cleanup runs first in post, followed by gather and
-    cluster deprovisioning.
+    test step. Gather runs before component cleanup so failure forensics are
+    preserved, then the cluster is deprovisioned.
