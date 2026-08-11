@@ -21,16 +21,14 @@ git_wrapper() {
 }
 
 log "INFO Fast-forward settings"
-log "    REPO_OWNER         = $REPO_OWNER"
-log "    REPO_NAME          = $REPO_NAME"
 log "    SOURCE_BRANCH      = $SOURCE_BRANCH"
 log "    DESTINATION_BRANCH = $DESTINATION_BRANCH"
 
-repo_url="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
+repo_url="https://github.com/openshift/openshift-mcp-server.git"
 
 log "INFO Cloning $DESTINATION_BRANCH"
 git_wrapper clone -b "$DESTINATION_BRANCH" "$repo_url"
-cd "$REPO_NAME"
+cd "openshift-mcp-server"
 
 log "INFO Pulling $SOURCE_BRANCH into $DESTINATION_BRANCH (ff-only)"
 git_wrapper pull --ff-only origin "$SOURCE_BRANCH"
