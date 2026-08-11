@@ -1,0 +1,52 @@
+ref:
+  as: security-adversary-scan
+  from: claude-ai-helpers
+  commands: security-adversary-scan-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: sa-claude-openshift-ci
+    mount_path: /var/run/claude-code-service-account
+  env:
+  - name: ADVERSARY_SCAN_MODE
+    default: "merge-ref-scan"
+    documentation: |-
+      Scan mode. Options:
+        merge-ref-scan  Scan the merge branch / test merge (default for presubmits).
+        full-scan       Scan the entire repo on main (default for periodics).
+        groundwork      Full scan with deep codebase analysis (Phases 0 + 0.5).
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+    documentation: "Claude model to use for the scan."
+  - name: MAX_TURNS
+    default: "100"
+    documentation: "Maximum conversation turns for the Claude session."
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "global"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "openshift-ci-prow-agents"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/google-token"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+  timeout: 3h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Runs the adversary security scanner (from rosa-claude-plugins/security)
+    against the repo source code. Covers 17 security domains: SAST, IaC,
+    containers, K8s, CI/CD, secrets, supply chain, web, API, auth, database,
+    mobile, cloud, performance, git, agent/skill, and critical workflows.
+
+    Three scan modes are available via ADVERSARY_SCAN_MODE:
+      merge-ref-scan  Scans the merge branch / test merge.
+      full-scan       Scan the entire repo on main.
+      groundwork      Full scan with deep architecture and code analysis.
+
+    Results are written to ARTIFACT_DIR as JUnit XML and a full scan log.
+    Groundwork mode also produces an interactive HTML report. A severity
+    summary is written to SHARED_DIR for downstream notification steps.
+
+    See ONBOARDING.md in this directory for setup instructions.

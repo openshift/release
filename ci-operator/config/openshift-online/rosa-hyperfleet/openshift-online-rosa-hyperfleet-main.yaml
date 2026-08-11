@@ -1,3 +1,8 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
 build_root:
   project_image:
     dockerfile_path: ci/Containerfile
@@ -121,6 +126,30 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- always_run: false
+  as: adversary-scan
+  optional: true
+  steps:
+    test:
+    - ref: security-adversary-scan
+- always_run: false
+  as: adversary-scan-full
+  optional: true
+  steps:
+    env:
+      ADVERSARY_SCAN_MODE: full-scan
+    test:
+    - ref: security-adversary-scan
+- as: weekly-adversary-scan
+  cron: 0 6 * * 6
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      ADVERSARY_SCAN_MODE: groundwork
+    post:
+    - ref: security-adversary-scan-notify
+    test:
+    - ref: security-adversary-scan
 zz_generated_metadata:
   branch: main
   org: openshift-online
