@@ -1,0 +1,29 @@
+ref:
+  as: security-adversary-scan-notify
+  from: cli
+  commands: security-adversary-scan-notify-commands.sh
+  env:
+  - name: SLACK_WEBHOOK_PATH
+    default: "/var/run/slack-webhook/url"
+    documentation: "Path to the file containing the Slack incoming webhook URL."
+  - name: ADVERSARY_NOTIFY_CHANNEL
+    default: ""
+    documentation: "Optional channel override for the Slack message."
+  credentials:
+  - namespace: test-credentials
+    name: adversary-scan-slack-webhook
+    mount_path: /var/run/slack-webhook
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 5m0s
+  documentation: |-
+    Posts adversary scan results to Slack. Reads the findings summary
+    written by security-adversary-scan to SHARED_DIR and sends a
+    traffic-light notification:
+      Red    — CRITICAL or HIGH findings present.
+      Yellow — only MEDIUM or LOW findings.
+      Green  — no findings.
+    Skips sending if no webhook is configured or the scan did not complete.
+    Runs as a post step so it executes even if the scan step fails.
