@@ -148,17 +148,16 @@ tests:
         # Mirror the manual install flow: derive cluster-specific values, then apply
         # ZeroTrustWorkloadIdentityManager + SPIRE operand CRs so TLS scanning covers
         # operator and operand communication endpoints in ${NS}.
+        # Disable tracing while handling cluster-derived hostnames/issuer URLs.
+        [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+        set +x
         APP_DOMAIN="apps.$(oc get dns cluster -o jsonpath='{.spec.baseDomain}')"
         JWT_ISSUER="https://oidc-discovery.${APP_DOMAIN}"
         CLUSTER_NAME="cluster1"
         BUNDLE_CONFIGMAP="spire-bundle"
 
-        echo "APP_DOMAIN=${APP_DOMAIN}"
-        echo "JWT_ISSUER=${JWT_ISSUER}"
-        echo "CLUSTER_NAME=${CLUSTER_NAME}"
-
         echo "Applying ZTWIM and SPIRE operand CRs..."
-        cat <<EOF | oc apply -f -
+        cat <<EOF | oc apply -f - >/dev/null
         apiVersion: operator.openshift.io/v1alpha1
         kind: ZeroTrustWorkloadIdentityManager
         metadata:
@@ -218,6 +217,7 @@ tests:
           jwtIssuer: ${JWT_ISSUER}
           managedRoute: "true"
         EOF
+        $WAS_TRACING && set -x
 
         echo "Waiting for SPIRE Server StatefulSet..."
         oc wait --for=create -n "${NS}" statefulset/spire-server --timeout=10m
@@ -235,8 +235,8 @@ tests:
         oc wait --for=create -n "${NS}" deployment/spire-spiffe-oidc-discovery-provider --timeout=10m
         oc wait --for=condition=Available -n "${NS}" deployment/spire-spiffe-oidc-discovery-provider --timeout=10m
 
-        echo "Listing pods in ${NS} before TLS scan:"
-        oc get pods -n "${NS}" -o wide || true
+        echo "Operand pod status in ${NS} before TLS scan:"
+        oc get pods -n "${NS}" -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,READY:.status.containerStatuses[*].ready --no-headers || true
       from: src
       resources:
         requests:
