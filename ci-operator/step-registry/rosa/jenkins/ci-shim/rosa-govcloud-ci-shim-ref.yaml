@@ -1,0 +1,43 @@
+ref:
+  as: rosa-govcloud-ci-shim
+  from: cli
+  grace_period: 5m
+  commands: rosa-govcloud-ci-shim-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 2h30m
+  credentials:
+  - mount_path: /tmp/s3-creds
+    name: rosa-govcloud-s3-creds
+    namespace: test-credentials
+  env:
+  - name: S3_BUCKET
+    default: "prow-testing-bucket"
+    documentation: The S3 bucket name for GovCloud bridge communication
+  - name: S3_REGION
+    default: "us-gov-west-1"
+    documentation: AWS GovCloud region for S3 bucket
+  - name: GOVCLOUD_POLL_INTERVAL
+    default: "30"
+    documentation: Seconds between S3 polls for result.json (default 30)
+  - name: GOVCLOUD_TIMEOUT
+    default: "7200"
+    documentation: Maximum seconds to wait for results before timing out (default 7200 = 2 hours)
+  - name: GOVCLOUD_JENKINS_JOB
+    default: ""
+    documentation: Jenkins job name in GovCloud (for logging/debugging)
+  documentation: |-
+    CI shim for ROSA GovCloud testing bridge.
+
+    Polls S3 bucket for results from GovCloud reconciler. The reconciler
+    triggers Jenkins jobs in-boundary and writes results back to S3.
+
+    This shim waits for result.json to appear at:
+      s3://{S3_BUCKET}/{PROW_JOB_ID}/result.json
+
+    Once detected, downloads all artifacts to $ARTIFACT_DIR and exits
+    with appropriate status code for Prow to consume.
+
+    Requires PROW_JOB_ID environment variable (automatically set by Prow).
