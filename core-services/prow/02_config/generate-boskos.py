@@ -92,6 +92,9 @@ CONFIG = {
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 20,
     },
+    'rosa-boundary-ci-quota-slice': {
+        'us-east-1': 1,
+    },
     'rosa-e2e-01-quota-slice': {
         'us-west-2': 5,
         'us-east-2': 5

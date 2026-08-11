@@ -16,7 +16,7 @@ unzip -q /tmp/awscliv2.zip -d /tmp/
 /tmp/aws/install --install-dir /tmp/aws-cli --bin-dir /tmp/bin
 export PATH="/tmp/bin:${PATH}"
 
-# AWS credentials from cluster_profile: openshift-org-aws
+# AWS credentials from cluster_profile: rosa-boundary-ci
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 # Default to us-east-1 if no region specified
