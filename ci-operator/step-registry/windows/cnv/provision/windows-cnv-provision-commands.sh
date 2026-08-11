@@ -517,7 +517,7 @@ EOVM
   # to connect from inside the cluster where DNS resolution works)
   instance_file="${SHARED_DIR}/${vm_fqdn}_windows_instance.txt"
   echo "username=Administrator" > "${instance_file}"
-  echo "$(date -u --rfc-3339=seconds) - Created instance file: ${instance_file} (VM IP: ${vm_ip})"
+  echo "$(date -u --rfc-3339=seconds) - Created instance file: ${instance_file}"
 
   ((vm_index++)) || true
 done
