@@ -1,0 +1,91 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  libvirt-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: libvirt-installer
+  operator-sdk:
+    name: "4.17"
+    namespace: origin
+    tag: operator-sdk
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+      RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+      RUN dnf install -y jq skopeo git && dnf clean all
+    from: src
+    to: kueue-operator-src
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN wget -qO /usr/local/bin/jq https://github.com/jqlang/jq/releases/latest/download/jq-linux64 && chmod +x /usr/local/bin/jq
+      RUN dnf install -y skopeo git podman && dnf clean all
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-with-oc-and-kubectl
+prowgen:
+  disable_sparse_checkout: true
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: "4"
+      memory: 4Gi
+tests:
+- as: test-e2e-downstream-4-22
+  capabilities:
+  - intranet
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: libvirt-s390x-vpn
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      BRANCH: "4.22"
+      BUNDLE_COMPONENT: kueue-bundle-1-4
+      OPERAND_COMPONENT: kueue-operand-1-4
+      OPERATOR_COMPONENT: kueue-operator-1-4
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-downstream
+    workflow: kueue-operator-libvirt-s390x
+zz_generated_metadata:
+  branch: release-1.4
+  org: openshift
+  repo: kueue-operator
+  variant: libvirt-s390x
