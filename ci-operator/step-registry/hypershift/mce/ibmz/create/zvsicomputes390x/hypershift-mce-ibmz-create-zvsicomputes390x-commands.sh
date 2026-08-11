@@ -553,9 +553,22 @@ fi
 # Agents need outbound proxy and API access during install; configure squid before pxeboot.
 configure_bastion_squid_proxy
 
+# Patch the nested kubeconfig server URL to use the bastion public Floating IP + API NodePort.
+# The default kubeconfig written by `hcp create kubeconfig` uses the private DNS hostname
+# (api.<hcname>.<domain>) which is only resolvable from inside the IBM Cloud VPC — not from
+# the CI pod whose DNS resolver (kube-dns at 172.30.0.10) has no knowledge of the private zone.
+# Setting HTTP(S)_PROXY doesn't help because Go resolves the hostname locally before opening
+# the proxy CONNECT tunnel. The kubevirt flow (create-hcpvirt) solves this identically.
+HOSTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+CLSTR_NAME=$(oc --kubeconfig "$HOSTED_KUBECONFIG" config view -o jsonpath='{.clusters[0].name}')
+oc --kubeconfig "$HOSTED_KUBECONFIG" config set-cluster "$CLSTR_NAME" \
+  --server="https://${BASTION_FIP}:${API_NODEPORT}"
+oc --kubeconfig "$HOSTED_KUBECONFIG" config set-cluster "$CLSTR_NAME" \
+  --insecure-skip-tls-verify=true
+echo "Patched nested kubeconfig: server=https://${BASTION_FIP}:${API_NODEPORT} insecure=true"
 
 
-# Booting Agents 
+# Booting Agents
 # Generating script for agent bootup execution on zVSI
 initrd_url=$(oc get infraenv/${HC_NAME} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.initrd')
 export initrd_url
