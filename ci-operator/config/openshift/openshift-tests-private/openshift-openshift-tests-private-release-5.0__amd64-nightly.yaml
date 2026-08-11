@@ -5024,7 +5024,43 @@ tests:
     - ref: hypershift-agent-ovn-ipecho-deprovision
     - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-provision
+    - chain: baremetalds-ofcir-pre
+    - ref: enable-qe-catalogsource
+    - chain: hypershift-mce-agent-lvm
+    - ref: hypershift-mce-install
+    - ref: hypershift-mce-conf-os-images
+    - as: patch-os-images-50
+      commands: |
+        set -euo pipefail
+        OS_IMAGES_FILE="${SHARED_DIR}/default_os_images.json"
+        if jq -e '.[] | select(.openshift_version == "5.0")' "$OS_IMAGES_FILE" > /dev/null 2>&1; then
+          echo "5.0 entries already present, skipping patch"
+        else
+          echo "Adding OCP 5.0 OS images to default_os_images.json"
+          jq '. += [
+            {"openshift_version":"5.0","cpu_architecture":"x86_64","url":"https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/5.0.0-ec.5/rhcos-5.0.0-ec.5-x86_64-live-iso.x86_64.iso","version":"9.8.20260428-0"},
+            {"openshift_version":"5.0","cpu_architecture":"arm64","url":"https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/pre-release/5.0.0-ec.5/rhcos-5.0.0-ec.5-aarch64-live-iso.aarch64.iso","version":"9.8.20260428-0"},
+            {"openshift_version":"5.0","cpu_architecture":"ppc64le","url":"https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/pre-release/5.0.0-ec.5/rhcos-5.0.0-ec.5-ppc64le-live-iso.ppc64le.iso","version":"9.8.20260428-0"},
+            {"openshift_version":"5.0","cpu_architecture":"s390x","url":"https://mirror.openshift.com/pub/openshift-v4/s390x/dependencies/rhcos/pre-release/5.0.0-ec.5/rhcos-5.0.0-ec.5-s390x-live-iso.s390x.iso","version":"9.8.20260428-0"}
+          ]' "$OS_IMAGES_FILE" > /tmp/patched_os_images.json
+          mv /tmp/patched_os_images.json "$OS_IMAGES_FILE"
+          echo "Patched. Versions now available:"
+          jq -r '.[].openshift_version' "$OS_IMAGES_FILE" | sort -V | uniq
+        fi
+      from: dev-scripts
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - ref: hypershift-mce-agent-create-agentserviceconfig
+    - ref: hypershift-agent-create-config-dns
+    - ref: hypershift-mce-agent-create-hostedcluster
+    - ref: hypershift-agent-create-proxy
+    - ref: hypershift-agent-create-add-worker-metal3
+    - ref: cucushift-hypershift-extended-enable-qe-catalogsource
+    - ref: hypershift-agent-create-metallb-catalogsource
+    - ref: hypershift-agent-create-metallb
+    - ref: hypershift-agent-check-conditions
     - ref: hypershift-agent-ovn-ipecho-provision
     test:
     - ref: wait
