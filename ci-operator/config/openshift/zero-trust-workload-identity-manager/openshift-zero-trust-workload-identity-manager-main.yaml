@@ -7,6 +7,10 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -101,6 +105,145 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: tls-scanner
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+      SCAN_NAMESPACE: zero-trust-workload-identity-manager
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - as: deploy-operand
+      cli: latest
+      commands: |-
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        NS=zero-trust-workload-identity-manager
+
+        echo "Waiting for operator Deployment..."
+        oc wait --for=condition=Available -n "${NS}" deployment/zero-trust-workload-identity-manager-controller-manager --timeout=10m
+
+        echo "Waiting for managed CRDs..."
+        for crd in \
+          zerotrustworkloadidentitymanagers.operator.openshift.io \
+          spireservers.operator.openshift.io \
+          spireagents.operator.openshift.io \
+          spiffecsidrivers.operator.openshift.io \
+          spireoidcdiscoveryproviders.operator.openshift.io; do
+          oc wait --for=condition=Established "crd/${crd}" --timeout=5m
+        done
+
+        # Mirror the manual install flow: derive cluster-specific values, then apply
+        # ZeroTrustWorkloadIdentityManager + SPIRE operand CRs so TLS scanning covers
+        # operator and operand communication endpoints in ${NS}.
+        APP_DOMAIN="apps.$(oc get dns cluster -o jsonpath='{.spec.baseDomain}')"
+        JWT_ISSUER="https://oidc-discovery.${APP_DOMAIN}"
+        CLUSTER_NAME="cluster1"
+        BUNDLE_CONFIGMAP="spire-bundle"
+
+        echo "APP_DOMAIN=${APP_DOMAIN}"
+        echo "JWT_ISSUER=${JWT_ISSUER}"
+        echo "CLUSTER_NAME=${CLUSTER_NAME}"
+
+        echo "Applying ZTWIM and SPIRE operand CRs..."
+        cat <<EOF | oc apply -f -
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: ZeroTrustWorkloadIdentityManager
+        metadata:
+          name: cluster
+        spec:
+          trustDomain: ${APP_DOMAIN}
+          clusterName: ${CLUSTER_NAME}
+          bundleConfigMap: ${BUNDLE_CONFIGMAP}
+        ---
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpireServer
+        metadata:
+          name: cluster
+        spec:
+          jwtIssuer: ${JWT_ISSUER}
+          caValidity: 24h
+          defaultX509Validity: 1h
+          defaultJWTValidity: 5m
+          caSubject:
+            commonName: ${APP_DOMAIN}
+            country: "US"
+            organization: "RH"
+          persistence:
+            size: "1Gi"
+            accessMode: ReadWriteOncePod
+          datastore:
+            databaseType: sqlite3
+            connectionString: "/run/spire/data/datastore.sqlite3"
+            maxOpenConns: 100
+            maxIdleConns: 2
+            connMaxLifetime: 3600
+            disableMigration: "false"
+        ---
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpireAgent
+        metadata:
+          name: cluster
+        spec:
+          nodeAttestor:
+            k8sPSATEnabled: "true"
+          workloadAttestors:
+            k8sEnabled: "true"
+            workloadAttestorsVerification:
+              type: "auto"
+        ---
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpiffeCSIDriver
+        metadata:
+          name: cluster
+        spec: {}
+        ---
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpireOIDCDiscoveryProvider
+        metadata:
+          name: cluster
+        spec:
+          jwtIssuer: ${JWT_ISSUER}
+          managedRoute: "true"
+        EOF
+
+        echo "Waiting for SPIRE Server StatefulSet..."
+        oc wait --for=create -n "${NS}" statefulset/spire-server --timeout=10m
+        oc rollout status statefulset/spire-server -n "${NS}" --timeout=10m
+
+        echo "Waiting for SPIRE Agent DaemonSet..."
+        oc wait --for=create -n "${NS}" daemonset/spire-agent --timeout=10m
+        oc rollout status daemonset/spire-agent -n "${NS}" --timeout=10m
+
+        echo "Waiting for SPIFFE CSI Driver DaemonSet..."
+        oc wait --for=create -n "${NS}" daemonset/spire-spiffe-csi-driver --timeout=10m
+        oc rollout status daemonset/spire-spiffe-csi-driver -n "${NS}" --timeout=10m
+
+        echo "Waiting for OIDC Discovery Provider Deployment..."
+        oc wait --for=create -n "${NS}" deployment/spire-spiffe-oidc-discovery-provider --timeout=10m
+        oc wait --for=condition=Available -n "${NS}" deployment/spire-spiffe-oidc-discovery-provider --timeout=10m
+
+        echo "Listing pods in ${NS} before TLS scan:"
+        oc get pods -n "${NS}" -o wide || true
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 45m0s
+    - ref: tls-13
+    - ref: tls-scanner-run
     workflow: optional-operators-ci-operator-sdk-aws
 - always_run: false
   as: e2e-operator-rhcos10-fips
