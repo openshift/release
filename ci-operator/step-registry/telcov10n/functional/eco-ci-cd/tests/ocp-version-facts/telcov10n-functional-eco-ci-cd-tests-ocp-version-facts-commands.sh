@@ -11,7 +11,8 @@ cd /eco-ci-cd
 # .containerignore excludes .git from the build context anyway), so point
 # git at a git-dir in a writable scratch location instead of initializing
 # one inside /eco-ci-cd.
-export GIT_DIR="$(mktemp -d)/.git"
+GIT_DIR="$(mktemp -d)/.git"
+export GIT_DIR
 export GIT_WORK_TREE=/eco-ci-cd
 git init -q
 
