@@ -15,6 +15,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
   upi-installer:
     name: "4.20"
     namespace: ocp
@@ -111,6 +115,18 @@ tests:
     - chain: cucushift-installer-rehearse-vsphere-ipi-deprovision
     pre:
     - chain: cucushift-installer-rehearse-vsphere-ipi-provision
+- as: installer-rehearse-vsphere-multi-vcenter
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.ci.openshift.org/ocp/release:4.20.0-0.nightly-2026-08-13-065221
+      SLEEP_DURATION: 8h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-vsphere-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-vsphere-ipi-multi-vcenter-provision
 - as: installer-rehearse-azurestack
   cluster: build01
   cron: '@yearly'
