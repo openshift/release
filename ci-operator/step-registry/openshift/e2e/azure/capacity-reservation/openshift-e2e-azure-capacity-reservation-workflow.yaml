@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-e2e-azure-capacity-reservation
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: azure-provision-capacity-reservation
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-capacity-reservation
+    - chain: azure-provision-service-principal-minimal-permission
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    - ref: ipi-azure-describe
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-azure-post
+    - ref: azure-deprovision-capacity-reservation
+  documentation: |-
+    The OpenShift E2E Azure Capacity Reservation workflow provisions an Azure
+    Capacity Reservation Group, installs an OpenShift cluster with all nodes
+    pinned to the reserved capacity, runs the standard e2e test suite, and
+    then cleans up both the cluster and the reservation resources.

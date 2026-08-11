@@ -1,0 +1,32 @@
+ref:
+  as: azure-provision-capacity-reservation
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-provision-capacity-reservation-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: CAPACITY_RESERVATION_SKU
+    default: "Standard_D4as_v5"
+    documentation: |-
+      The VM SKU to reserve capacity for. Must match the instance types used
+      for both control plane and compute nodes in the install-config.
+  - name: CAPACITY_RESERVATION_COUNT
+    default: "7"
+    documentation: |-
+      The total number of VM instances to reserve. Default 7 covers
+      3 control plane + 3 workers + 1 bootstrap.
+  - name: CAPACITY_RESERVATION_ZONE
+    default: "1"
+    documentation: |-
+      The availability zone in which to create the capacity reservation.
+      All cluster nodes will be pinned to this zone.
+  documentation: |-
+    Provisions an Azure Capacity Reservation Group and Capacity Reservation
+    in a dedicated resource group. Writes CRG metadata to SHARED_DIR for use
+    by the ipi-conf-azure-capacity-reservation step.
