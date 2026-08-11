@@ -13,9 +13,12 @@ export GH_FORK_TOKEN
 GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
 export GITHUB_TOKEN
 
-PR_NUM=$(cat "${SHARED_DIR}/pr-number")
-EVAL_BRANCH=$(cat "${SHARED_DIR}/eval-head-branch")
-JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
+# prow-agent-eval writes metadata with a case-name prefix.
+# Read the first case and resolve prefixed filenames.
+CASE_NAME=$(head -1 "${SHARED_DIR}/eval-cases")
+PR_NUM=$(cat "${SHARED_DIR}/${CASE_NAME}.pr-number")
+EVAL_BRANCH=$(cat "${SHARED_DIR}/${CASE_NAME}.eval-head-branch")
+JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/${CASE_NAME}.jira-issue-key")
 
 git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
 
