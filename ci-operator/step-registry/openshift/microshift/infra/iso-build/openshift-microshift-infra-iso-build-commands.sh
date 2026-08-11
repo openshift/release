@@ -40,7 +40,10 @@ chmod +x /tmp/iso.sh
 # GBRN=mybranch
 # git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
 #
-ci_clone_src
+# TODO: Revert to 'ci_clone_src' before merging
+GUSR=agullon
+GBRN=USHIFT-7412
+git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
 
 download_brew_rpms() {
     # See BREW_RPM_SOURCE variable definition in test/bin/common.sh
