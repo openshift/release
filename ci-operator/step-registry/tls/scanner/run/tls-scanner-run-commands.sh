@@ -3,6 +3,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Clusters behind a bastion (e.g. baremetal dev-scripts) are only reachable
+# through the proxy configured by the install steps.
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 run_tls_scan() {
 
   # TLS Scanner - scans TLS configurations of all pods in the cluster
