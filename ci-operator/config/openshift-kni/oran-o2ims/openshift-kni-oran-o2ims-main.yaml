@@ -1,0 +1,340 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+  ubi-min9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make binary
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi-min9
+    to: oran-o2ims-operator
+  - dockerfile_path: bundle.Dockerfile
+    from: ubi-min9
+    to: oran-o2ims-operator-bundle
+  - dockerfile_path: Dockerfile.must-gather
+    to: oran-o2ims-operator-must-gather
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|OWNERS_ALIASES|\.md$|^hack/|renovate\.json
+operator:
+  bundles:
+  - as: operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift-kni/oran-o2ims-operator:.*
+    with: pipeline:oran-o2ims-operator
+promotion:
+  to:
+  - name: "5.0"
+    namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+      reference_policy: Local
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+      reference_policy: Local
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  ./hack/install-markdownlint.sh
+tests:
+- as: ci-job
+  commands: |
+    unset VERSION
+    unset GOFLAGS
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
+    make ci-job
+  container:
+    from: src
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|OWNERS_ALIASES|\.md$|^hack/|renovate\.json
+- as: e2e
+  commands: |
+    unset VERSION
+    unset GOFLAGS
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
+    make test-e2e
+  container:
+    from: src
+  run_if_changed: \.go$|^go\.mod$
+- always_run: false
+  as: scorecard
+  run_if_changed: ^bundle/
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: oran-o2ims-operator-bundle
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: oran-o2ims
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-scorecard-oran-o2ims-main
+        ci-job-type optional-operators-ci-aws
+        ci-repo-name oran-o2ims
+        ci-org-name openshift-kni
+    test:
+    - as: scorecard-test
+      cli: latest
+      commands: make scorecard-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: install-bundle-tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      OO_INSTALL_NAMESPACE: oran-o2ims
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: oran-o2ims
+      SCANNER_NAMESPACE: oran-o2ims
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: wait-for-server-pods
+      cli: latest
+      commands: |
+        NAMESPACE=oran-o2ims
+        echo "Waiting for Inventory CR to be auto-created..."
+        for i in $(seq 1 60); do
+          if oc get inventory default -n "$NAMESPACE" &>/dev/null; then
+            echo "Inventory CR 'default' found."
+            break
+          fi
+          echo "  attempt $i/60..."
+          sleep 5
+        done
+
+        if ! oc get inventory default -n "$NAMESPACE" &>/dev/null; then
+          echo "ERROR: Inventory CR 'default' was not created after 5 minutes"
+          exit 1
+        fi
+
+        echo ""
+        echo "Discovering services with TLS serving certs..."
+        TLS_SERVICES=$(oc get services -n "$NAMESPACE" \
+          -o jsonpath='{range .items[?(@.metadata.annotations.service\.beta\.openshift\.io/serving-cert-secret-name)]}{.metadata.name}{"\n"}{end}')
+
+        echo "TLS services found:"
+        while read -r svc; do
+          [ -z "$svc" ] && continue
+          SECRET=$(oc get service "$svc" -n "$NAMESPACE" \
+            -o jsonpath='{.metadata.annotations.service\.beta\.openshift\.io/serving-cert-secret-name}')
+          echo "  $svc -> secret: $SECRET"
+        done <<< "$TLS_SERVICES"
+
+        echo ""
+        echo "Waiting for TLS service pods to be ready..."
+        FAILED=false
+        while read -r svc; do
+          [ -z "$svc" ] && continue
+          SELECTOR=$(oc get service "$svc" -n "$NAMESPACE" \
+            -o go-template='{{range $k,$v := .spec.selector}}{{$k}}={{$v}},{{end}}' | sed 's/,$//')
+          if [ -z "$SELECTOR" ]; then
+            echo "  SKIP: $svc has no selector"
+            continue
+          fi
+          echo "  $svc (selector: $SELECTOR)..."
+          if ! oc wait pods -l "$SELECTOR" -n "$NAMESPACE" \
+            --for=condition=Ready --timeout=5m; then
+            echo "  ERROR: pods for $svc did not become ready within 5m"
+            echo "  Pod status:"
+            oc get pods -l "$SELECTOR" -n "$NAMESPACE" --no-headers | sed 's/^/    /'
+            echo "  Recent events:"
+            oc get events -n "$NAMESPACE" --field-selector reason!=Pulling,reason!=Pulled \
+              --sort-by='.lastTimestamp' 2>/dev/null | grep "$svc" | tail -5 | sed 's/^/    /' \
+              || echo "    (no events found)"
+            FAILED=true
+          fi
+        done <<< "$TLS_SERVICES"
+
+        if [ "$FAILED" = true ]; then
+          echo "ERROR: one or more TLS service pods failed readiness checks"
+          exit 1
+        fi
+
+        echo ""
+        echo "Verifying TLS secrets from service-ca..."
+        while read -r svc; do
+          [ -z "$svc" ] && continue
+          SECRET=$(oc get service "$svc" -n "$NAMESPACE" \
+            -o jsonpath='{.metadata.annotations.service\.beta\.openshift\.io/serving-cert-secret-name}')
+          if oc get secret "$SECRET" -n "$NAMESPACE" &>/dev/null; then
+            echo "  $SECRET exists"
+          else
+            echo "  ERROR: $SECRET not found"
+            FAILED=true
+          fi
+        done <<< "$TLS_SERVICES"
+
+        if [ "$FAILED" = true ]; then
+          echo "ERROR: one or more TLS secrets are missing"
+          exit 1
+        fi
+
+        echo ""
+        echo "Final pod status in $NAMESPACE:"
+        oc get pods -n "$NAMESPACE"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- as: install-bundle-tls-scan-periodic
+  cron: 0 3 * * 5
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      OO_INSTALL_NAMESPACE: oran-o2ims
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: oran-o2ims
+      SCANNER_NAMESPACE: oran-o2ims
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: wait-for-server-pods
+      cli: latest
+      commands: |
+        NAMESPACE=oran-o2ims
+        echo "Waiting for Inventory CR to be auto-created..."
+        for i in $(seq 1 60); do
+          if oc get inventory default -n "$NAMESPACE" &>/dev/null; then
+            echo "Inventory CR 'default' found."
+            break
+          fi
+          echo "  attempt $i/60..."
+          sleep 5
+        done
+
+        if ! oc get inventory default -n "$NAMESPACE" &>/dev/null; then
+          echo "ERROR: Inventory CR 'default' was not created after 5 minutes"
+          exit 1
+        fi
+
+        echo ""
+        echo "Discovering services with TLS serving certs..."
+        TLS_SERVICES=$(oc get services -n "$NAMESPACE" \
+          -o jsonpath='{range .items[?(@.metadata.annotations.service\.beta\.openshift\.io/serving-cert-secret-name)]}{.metadata.name}{"\n"}{end}')
+
+        echo "TLS services found:"
+        while read -r svc; do
+          [ -z "$svc" ] && continue
+          SECRET=$(oc get service "$svc" -n "$NAMESPACE" \
+            -o jsonpath='{.metadata.annotations.service\.beta\.openshift\.io/serving-cert-secret-name}')
+          echo "  $svc -> secret: $SECRET"
+        done <<< "$TLS_SERVICES"
+
+        echo ""
+        echo "Waiting for TLS service pods to be ready..."
+        FAILED=false
+        while read -r svc; do
+          [ -z "$svc" ] && continue
+          SELECTOR=$(oc get service "$svc" -n "$NAMESPACE" \
+            -o go-template='{{range $k,$v := .spec.selector}}{{$k}}={{$v}},{{end}}' | sed 's/,$//')
+          if [ -z "$SELECTOR" ]; then
+            echo "  SKIP: $svc has no selector"
+            continue
+          fi
+          echo "  $svc (selector: $SELECTOR)..."
+          if ! oc wait pods -l "$SELECTOR" -n "$NAMESPACE" \
+            --for=condition=Ready --timeout=5m; then
+            echo "  ERROR: pods for $svc did not become ready within 5m"
+            echo "  Pod status:"
+            oc get pods -l "$SELECTOR" -n "$NAMESPACE" --no-headers | sed 's/^/    /'
+            echo "  Recent events:"
+            oc get events -n "$NAMESPACE" --field-selector reason!=Pulling,reason!=Pulled \
+              --sort-by='.lastTimestamp' 2>/dev/null | grep "$svc" | tail -5 | sed 's/^/    /' \
+              || echo "    (no events found)"
+            FAILED=true
+          fi
+        done <<< "$TLS_SERVICES"
+
+        if [ "$FAILED" = true ]; then
+          echo "ERROR: one or more TLS service pods failed readiness checks"
+          exit 1
+        fi
+
+        echo ""
+        echo "Verifying TLS secrets from service-ca..."
+        while read -r svc; do
+          [ -z "$svc" ] && continue
+          SECRET=$(oc get service "$svc" -n "$NAMESPACE" \
+            -o jsonpath='{.metadata.annotations.service\.beta\.openshift\.io/serving-cert-secret-name}')
+          if oc get secret "$SECRET" -n "$NAMESPACE" &>/dev/null; then
+            echo "  $SECRET exists"
+          else
+            echo "  ERROR: $SECRET not found"
+            FAILED=true
+          fi
+        done <<< "$TLS_SERVICES"
+
+        if [ "$FAILED" = true ]; then
+          echo "ERROR: one or more TLS secrets are missing"
+          exit 1
+        fi
+
+        echo ""
+        echo "Final pod status in $NAMESPACE:"
+        oc get pods -n "$NAMESPACE"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- always_run: false
+  as: markdownlint
+  commands: |
+    hack/markdownlint.sh
+  container:
+    from: test-bin
+  run_if_changed: (?i)(\.md|\.markdown|^hack/.*markdown.*|^.markdown.*)$
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: oran-o2ims

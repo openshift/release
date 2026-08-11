@@ -1,0 +1,50 @@
+base_images:
+  rhtap-cli:
+    name: redhat-appstudio
+    namespace: ci
+    tag: rhdh-prerelease-install
+build_root:
+  image_stream_tag:
+    name: redhat-appstudio
+    namespace: ci
+    tag: rhtap-installer
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rhtap-sample-pipelines-shellcheck
+  commands: |
+    #!/usr/bin/env bash
+    set -o errexit
+    set -o nounset
+    set -o pipefail
+    find . -type f -name "*.sh" -print0 | xargs -r -0 shellcheck
+  container:
+    from: src
+- always_run: false
+  as: rhtap-sample-pipelines-yamllint
+  commands: |
+    #!/usr/bin/env bash
+    set -o errexit
+    set -o nounset
+    set -o pipefail
+
+    pwd && ls -la
+    yamllint -c ci/config/yamllint.yaml .
+  container:
+    from: src
+  optional: true
+zz_generated_metadata:
+  branch: main
+  org: redhat-appstudio
+  repo: tssc-sample-pipelines

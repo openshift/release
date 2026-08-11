@@ -1,0 +1,121 @@
+ref:
+  as: openshift-e2e-test-longrun
+  from: tests
+  grace_period: 10m
+  commands: openshift-e2e-test-longrun-commands.sh
+  timeout: 22h
+  env:
+  - name: TEST_ARGS
+    default: ""
+    documentation: |-
+      Additional arguments to be passed to 'openshift-test'
+  - name: SHARD_ARGS
+    default: ""
+    documentation: |-
+      Arguments to be passed to 'openshift-test' regarding the sharding parameters of this run
+  - name: TEST_TYPE
+    default: "suite"
+    documentation: |
+      The type of test to perform.
+
+      * 'suite' - Run the test suite defined by TEST_SUITE. By default this executes the
+                  OpenShift parallel conformance suite. All product components must run the
+                  default suite on pull requests prior to merge.
+      * 'suite-conformance' - Runs the test suite defined by TEST_SUITE, then runs the product conformance
+                  suite to verify the cluster is still functional. This is typically used for testing
+                  disruption from one suite, then confirming that the disruption did not degrade the
+                  product.
+      * 'upgrade' - Perform an upgrade to the image defined by OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE.
+                  The TEST_UPGRADE_OPTIONS flag may be optionally set. All product components
+                  must run the default upgrade test (verify an upgrade completes) on pull requests
+                  prior to merge.
+      * 'upgrade-conformance' - Performs the 'upgrade' test and then executes the full conformance
+                  suite after upgrade completes. Does not honor TEST_SUITE but will respect
+                  TEST_UPGRADE_OPTIONS. All product releases must pass the conformance suite after
+                  an upgrade completes or have explicit logic in their test to tolerate behavior after
+                  upgrade.
+      * 'upgrade-paused' - Perform an upgrade to the images defined by OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE with paused worker pool.
+      * 'ipsec-suite' - Runs IPsec test suite. The test suite is invoked separately for IPsec Full and External modes.
+                   1. Rollout IPsec Full mode, wait for it to complete and run the ipsec test suite.
+                   2. Change IPsec Full -> External mode, wait for rollout to complete, run the ipsec test suite.
+  - name: TEST_SUITE
+    default: openshift/conformance/parallel
+    documentation: The test suite to run.  Use 'openshift-test run --help' to list available suites.
+  - name: TEST_UPGRADE_SUITE
+    default: all
+    documentation: The test suite to run in upgrade tests.  Use 'openshift-test run --help' to list available suites.
+  - name: TEST_SKIPS
+    default: ""
+    documentation: |
+      Regular expression (POSIX basic regular expression) of tests to skip.
+      It is suggested to test the regex to make sure that it matches with the available tests.
+      Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
+      that are printed in Prow won't exactly match the list returned by openshift-tests.
+  - name: TEST_UPGRADE_OPTIONS
+    default: ""
+    documentation: Options controlling how an upgrade is performed. See `openshift-test run-upgrade --help` for more details.
+  - name: TEST_REQUIRES_SSH
+    default: ""
+    documentation:
+      If the test suite requires SSH access, setting this variable will install a bastion and configure
+      the Kube e2e test infrastructure to use the bastion. Otherwise, tests that require SSH will fail because
+      OpenShift does not expose SSH to nodes by default.
+  - name: TEST_REQUIRES_BUILDFARM_NET_ADMIN
+    default: ""
+    documentation:
+      If the test suite requires NET_ADMIN/NET_RAW caps on the build farm.
+  - name: TEST_INSTALL_CSI_DRIVERS
+    default: ""
+    documentation: The CSI driver(s) to use.  Used by the `openshift-tests` program, see its documentation for details.
+  - name: TEST_CSI_DRIVER_MANIFEST
+    default: ""
+    documentation: |-
+      Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
+      program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
+      details. The file must be present in ${SHARED_DIR}.
+  - name: TEST_OCP_CSI_DRIVER_MANIFEST
+    default: ""
+    documentation: |-
+      Name of the OCP specific CSI driver manifest file to use.  Used by the `openshift-tests`
+      program as TEST_OCP_CSI_DRIVER_FILES env. var., see its documentation for
+      details. The file must be present in ${SHARED_DIR}.
+  - name: TEST_IMAGE_MIRROR_REGISTRY
+    default: ""
+    documentation: |-
+      Defines the location of a pull-through cache to be used by e2e tests which directly pull an image. When defined, targeted
+      tests will pull from the specified registry.  This variable is intended to be used for 4.6 configurations where the
+      docker.io rate limit results in failing CI jobs.  Note: This variable is only honored for `openshift-tests` built from
+      the release-4.6 branch.  This configuration is intended to be made in concert with an associated mirror configuration
+      to the cluster under test.
+  - name: AWS_EDGE_POOL_ENABLED
+    default: ""
+    documentation: |-
+      Flag to enable the AWS Edge compute pool. This flag is AWS-specific when deploying nodes in Local Zone using the 'edge' compute
+      pool option in install-config.yaml, or when the subnets in Local Zones have been provided. EC2 Instances in Local Zones usually takes
+      longer to be ready (Node Ready), so it requires longer time to wait for Node VS Machine count. This flag will extend three times
+      than the regular cluster, so it would prevent the monitor to fail before starting the tests.
+  - name: TEST_SDN_LIVE_MIGRATION_OPTIONS
+    default: ""
+    documentation: |-
+      This flag enables the migration from one network provider to another. Following successful migration,
+      it tests that the cluster is stable. Default is blank which means no live migration will be triggered.
+      Valid entry is one or more key=value seperated by a comma. Valid keys are 'target-cni' and 'rollback'.
+      'target-cni' denotes which network provider we want to migrate to. This key is required, otherwise tests are skipped.
+      For 'target-cni', a valid value is 'OpenShiftSDN' or 'OVNKubernetes'. Following successful migration to a network provider,
+      you may perform rollback to the initial network provider. For 'rollback', valid value is 'true' or 'false'. This key is optional.
+  - name: OPENSHIFT_SKIP_EXTERNAL_TESTS
+    default: ""
+    documentation: |-
+      When set to any non-empty value, openshift-tests will skip extraction of tests from external binaries, and only run
+      the tests available in openshift-tests itself.
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  resources:
+    requests:
+      cpu: "3"
+      memory: 600Mi
+    limits:
+      memory: 10Gi
+  documentation: |-
+    The Openshift E2E step executes the common end-to-end test suite for long-running tests.

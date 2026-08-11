@@ -1,0 +1,75 @@
+base_images:
+  ubi-python:
+    name: ubi-python-312
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.18
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src AS source
+      FROM ubi-python
+      USER 0
+      RUN dnf install -y git && \
+          ln -sf /usr/bin/python3.12 /usr/bin/python && \
+          ln -sf /usr/bin/pip3.12 /usr/bin/pip && \
+          pip install --no-cache-dir ruff pytest PyYAML requests paramiko fabric && \
+          dnf clean all
+      COPY --from=source /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson/beaker/ansible /opt/qe-rhel-jetson-ansible
+      COPY --from=source /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson /workspace
+      WORKDIR /workspace
+    from: ubi-python
+    inputs:
+      src:
+        as:
+        - src
+    to: qe-rhel-jetson
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    cd /workspace
+    ruff check tests/
+  container:
+    from: qe-rhel-jetson
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: pytest
+  capabilities:
+  - intranet
+  cluster: build07
+  optional: true
+  restrict_network_access: false
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      JETSON_HOSTNAME: nvidia-jetson-agx-orin-03.khw.eng.bos2.dc.redhat.com
+      JUMPHOST: ""
+    test:
+    - ref: qe-rhel-jetson-pytest
+- as: bootc-install
+  capabilities:
+  - intranet
+  cluster: build07
+  optional: true
+  restrict_network_access: false
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      BOOTC_IMAGE_BASE: quay.io/redhat-user-workloads/jetpack-for-rhel-tenant/rhel-102-bootc
+      BOOTC_IMAGE_TAG: 7.2_6.12.0-211.20.1_062526071550
+    test:
+    - ref: qe-rhel-jetson-bootc-install
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: qe-rhel-jetson
