@@ -215,7 +215,7 @@ while true; do
     # Filter to trusted users (in eval mode, filter to seeded comment IDs only)
     if [[ "${EVAL_MODE:-}" == "true" ]]; then
         SEEDED_IDS=$(cat "${SHARED_DIR}/comment-map.json" 2>/dev/null || echo "{}")
-        SEEDED_GH_IDS=$(echo "${SEEDED_IDS}" | jq '[.[] | tonumber]')
+        SEEDED_GH_IDS=$(echo "${SEEDED_IDS}" | jq '[.[] | .github_id]')
         ISSUE_COMMENTS_JSON=$(echo "${raw_issue_comments}" | jq --argjson ids "${SEEDED_GH_IDS}" '[.[] | select(.id as $id | $ids | index($id))]')
         INLINE_JSON="[]"
         REVIEWS_JSON="[]"

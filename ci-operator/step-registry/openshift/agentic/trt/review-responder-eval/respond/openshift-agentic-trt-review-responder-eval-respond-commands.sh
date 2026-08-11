@@ -57,9 +57,10 @@ copy_artifacts() {
 trap copy_artifacts EXIT TERM INT
 
 # --- Build SHARED_DIR for review-responder ---
-# The production script reads these standard filenames
+# The production script reads these standard (unprefixed) filenames.
 echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
 echo "${JIRA_ISSUE_KEY}" > "${SHARED_DIR}/jira-issue-key"
+cp "${SHARED_DIR}/${CASE_NAME}.comment-map.json" "${SHARED_DIR}/comment-map.json"
 
 BOT_LOGIN=$(cat "${SHARED_DIR}/gh-app-bot-login" 2>/dev/null || echo "")
 if [[ -z "${BOT_LOGIN}" ]]; then
