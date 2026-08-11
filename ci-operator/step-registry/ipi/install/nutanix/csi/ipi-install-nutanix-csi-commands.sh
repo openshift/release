@@ -57,7 +57,7 @@ spec:
   channel: stable-3.x
   name: nutanixcsioperator
   installPlanApproval: Automatic
-  source: redhat-operators
+  source: certified-operators
   sourceNamespace: openshift-marketplace
 EOF
 
