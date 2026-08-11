@@ -1,0 +1,27 @@
+ref:
+  as: openshift-qe-sos-report
+  from: cli
+  commands: openshift-qe-sos-report-commands.sh
+  best_effort: true
+  optional_on_success: true
+  grace_period: 5m
+  timeout: 30m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: SOS_REPORT_NODE_SELECTOR
+    default: ""
+    documentation: |-
+      Optional label selector used to limit which nodes have an sos report collected (e.g. node-role.kubernetes.io/worker=). Defaults to all nodes.
+  - name: SOS_REPORT_CONCURRENCY
+    default: "6"
+    documentation: |-
+      Maximum number of nodes to collect sos reports from in parallel.
+  documentation: |-
+    Collects an sos report from every (or selected) cluster node via `oc debug
+    node`, without requiring SSH or bastion access, and stores the resulting
+    archives under `${ARTIFACT_DIR}/sos-reports/<node>/`. Marked
+    `optional_on_success` so it is skipped unless a prior step in the test
+    failed, and `best_effort` so a collection failure does not fail the job.
