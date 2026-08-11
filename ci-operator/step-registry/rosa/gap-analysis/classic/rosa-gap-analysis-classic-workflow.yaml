@@ -1,0 +1,26 @@
+workflow:
+  as: rosa-gap-analysis-classic
+  steps:
+    env:
+      CHANNEL_GROUP: nightly
+      HOSTED_CP: "false"
+      STS: "true"
+      REPLICAS: "2"
+    pre:
+      - chain: rosa-aws-sts-provision
+      - ref: rosa-cluster-wait-ready-nodes
+    test:
+      - ref: rosa-gap-analysis-test
+    post:
+      - chain: rosa-cluster-deprovision
+        best_effort: true
+      - ref: rosa-sts-account-roles-delete
+        best_effort: true
+      - ref: rosa-e2e-cleanup-vpc
+        best_effort: true
+      - ref: aws-deprovision-stacks
+        best_effort: true
+  documentation: |-
+    This workflow provisions a ROSA Classic STS cluster and runs gap-analysis
+    validation tests (cluster ready state, ClusterOperators, nodes), then tears
+    down the cluster.
