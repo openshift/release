@@ -34,6 +34,11 @@ else
   export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 fi
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
+UNIVERSE_DOMAIN=$(jq -r ".universe_domain // empty" "${GCP_SHARED_CREDENTIALS_FILE}" 2>/dev/null)
+if [[ -n "${UNIVERSE_DOMAIN}" ]]; then
+  export GOOGLE_CLOUD_UNIVERSE_DOMAIN="${UNIVERSE_DOMAIN}"
+  gcloud config set universe_domain "${UNIVERSE_DOMAIN}"
+fi
 PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
