@@ -510,6 +510,11 @@ EOF
           spec:
             nodeName: {{ worker_node | to_json }}
             automountServiceAccountToken: false
+            # host* namespaces required: rpm-ostree in chroot talks to host dbus
+            # (without them: "Failed to connect to system scope bus").
+            hostIPC: true
+            hostNetwork: true
+            hostPID: true
             containers:
               - name: flipper
                 image: ubi9
@@ -588,6 +593,21 @@ EOF
         | selectattr('status', 'equalto', 'True')
         | list | length == 0
   rescue:
+    - name: Collect failed flip-kernel pod logs on {{ worker_node }}
+      ansible.builtin.command:
+        cmd: >-
+          oc --kubeconfig={{ kubeconfig }} logs -n default
+          -l job-name=flip-kernel-{{ worker_idx }}
+          --all-containers --tail=200
+      register: flip_kernel_pod_logs
+      ignore_errors: true
+      environment: "{{ k8s_auth }}"
+
+    - name: Show failed flip-kernel pod logs on {{ worker_node }}
+      ansible.builtin.debug:
+        var: flip_kernel_pod_logs.stdout_lines
+      when: flip_kernel_pod_logs.stdout_lines is defined
+
     - name: Delete timed-out or failed flip-kernel job on {{ worker_node }}
       kubernetes.core.k8s:
         state: absent
