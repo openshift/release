@@ -99,7 +99,10 @@ function install_required_tools() {
 		exit 1
 	}
 
-	HOME=/tmp
+	# Make a private directory that is only readable by us
+	HOME="$(mktemp -d /tmp/powervc-checks.XXXXXX)"
+	chmod 0700 "${HOME}"
+	echo "HOME is now ${HOME}"
 	export HOME
 
 	mkdir -p "${tmp_bin_dir}" || {
@@ -108,6 +111,7 @@ function install_required_tools() {
 	}
 
 	PATH="${tmp_bin_dir}:${PATH}"
+	echo "PATH is now ${PATH}"
 	export PATH
 
 	log_info "Installing PowerVC-Tool version ${POWERVC_TOOL_VERSION}"
@@ -140,7 +144,7 @@ function install_required_tools() {
 		destination_name="${tool#*:}"
 		log_info "Downloading tool: ${source_name}"
 		if ! curl --location --fail --silent \
-			--connect-timeout 30 --show-error \
+			--connect-timeout 30 --max-time 300 --show-error \
 			--output "${tmp_bin_dir}/${destination_name}" \
 			"${tool_url}/${source_name}"; then
 			log_error "Failed to download ${source_name}"
@@ -181,6 +185,10 @@ function install_required_tools() {
 		exit 1
 	}
 
+	# The cloud configuration in the secret uses hardcoded /tmp/ocp-ci-ca.pem
+	sed -i -e "s|/tmp/ocp-ci-ca.pem|${HOME}/ocp-ci-ca.pem|" "${HOME}/clouds.yaml"
+	sed -i -e "s|/tmp/ocp-ci-ca.pem|${HOME}/ocp-ci-ca.pem|" "${HOME}/.config/openstack/clouds.yaml"
+
 	# Verify all required tools are available
 	log_info "Verifying installed tools..."
 	local tools=("ocp-ipi-powervc" "openstack")
@@ -201,6 +209,7 @@ function install_required_tools() {
 function check_rhcos_images() {
 	local -a releases
 	local -a rhels
+	# @TODO make global.  Programmatically determine list of releases.
 	releases=("release-4.21" "release-4.22" "release-4.23" "release-5.0")
 	rhels=("rhel9" "rhel10")
 
