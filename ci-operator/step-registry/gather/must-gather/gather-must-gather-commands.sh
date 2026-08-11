@@ -265,7 +265,13 @@ function installCamgi() {
         echo "ERROR, unset-proxy.sh does not exist."
         exit 1
       fi
-      source "${SHARED_DIR}/unset-proxy.sh"
+      # installCamgi runs as the condition of an if statement, which
+      # suspends errexit for its whole body -- check source's own status
+      # explicitly so a real failure here still stays fatal.
+      if ! source "${SHARED_DIR}/unset-proxy.sh"; then
+        echo "ERROR, failed to source unset-proxy.sh."
+        exit 1
+      fi
     fi
 
     # camgi download can hit transient DNS blips (curl exit 6); retry with
@@ -294,7 +300,10 @@ function installCamgi() {
         echo "ERROR, proxy-conf.sh does not exist."
         exit 1
       fi
-      source "${SHARED_DIR}/proxy-conf.sh"
+      if ! source "${SHARED_DIR}/proxy-conf.sh"; then
+        echo "ERROR, failed to source proxy-conf.sh."
+        exit 1
+      fi
     fi
 
     popd
@@ -364,7 +373,10 @@ fi
 [ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ] && cp "${ARTIFACT_DIR}/must-gather/event-filter.html" "${ARTIFACT_DIR}/event-filter.html"
 if installCamgi; then
   if /tmp/camgi "${ARTIFACT_DIR}/must-gather" > "${ARTIFACT_DIR}/must-gather/camgi.html"; then
-    [ -f "${ARTIFACT_DIR}/must-gather/camgi.html" ] && cp "${ARTIFACT_DIR}/must-gather/camgi.html" "${ARTIFACT_DIR}/camgi.html"
+    if [ -f "${ARTIFACT_DIR}/must-gather/camgi.html" ] && ! cp "${ARTIFACT_DIR}/must-gather/camgi.html" "${ARTIFACT_DIR}/camgi.html"; then
+      echo "WARNING: failed to copy camgi.html to ${ARTIFACT_DIR}, skipping (non-fatal)."
+      rm -f "${ARTIFACT_DIR}/camgi.html"
+    fi
   else
     echo "WARNING: camgi report generation failed, skipping (non-fatal)."
     rm -f "${ARTIFACT_DIR}/must-gather/camgi.html"
