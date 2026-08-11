@@ -56,8 +56,8 @@ resource "azurerm_storage_account" "quayazure" {
 }
 
 resource "azurerm_storage_container" "quayazure" {
-  name                  = var.storage_container
-  storage_account_name  = azurerm_storage_account.quayazure.name
+  name                = var.storage_container
+  storage_account_id  = azurerm_storage_account.quayazure.id
   container_access_type = "private"
 }
 
