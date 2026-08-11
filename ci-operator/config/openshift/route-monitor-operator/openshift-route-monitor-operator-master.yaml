@@ -1,4 +1,8 @@
 base_images:
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -214,6 +218,19 @@ tests:
     - ref: rosa-operator-coverage-setup
     test:
     - ref: rosa-operator-e2e
+- as: rosa-hcp-mc-e2e
+  cron: 0 8 * * 0
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CLUSTER_SECTOR: rosa-e2e
+      GINKGO_FOCUS: MC Probe Verification
+      HOSTED_CP: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.21"
+      OPERATOR_NAME: route-monitor-operator
+      REGION: us-west-2
+    workflow: rosa-operator-mc-e2e
 zz_generated_metadata:
   branch: master
   org: openshift

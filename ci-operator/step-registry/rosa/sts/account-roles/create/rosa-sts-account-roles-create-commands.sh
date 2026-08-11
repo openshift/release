@@ -68,7 +68,21 @@ if [[ -z "$OPENSHIFT_VERSION" ]]; then
   else
     versionList=$(rosa list versions --channel-group "${CHANNEL_GROUP}" -o json | jq -r '.[].raw_id')
   fi
-  OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
+  # Resolve version from offset when VERSION_OFFSET_FROM_LATEST is set
+  if [[ -n "${VERSION_OFFSET_FROM_LATEST:-}" ]]; then
+    readarray -t y_streams < <(echo "$versionList" | cut -d'.' -f1,2 | sort -Vu)
+    total=${#y_streams[@]}
+    offset=${VERSION_OFFSET_FROM_LATEST}
+    source_index=$((total - offset - 1))
+    if (( source_index < 0 )); then
+      echo "ERROR: Not enough Y-streams for offset ${offset}. Have ${total}: ${y_streams[*]}"
+      exit 1
+    fi
+    OPENSHIFT_VERSION=${y_streams[$source_index]}
+    echo "Resolved version from offset ${offset}: ${OPENSHIFT_VERSION} (available Y-streams: ${y_streams[*]})"
+  else
+    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
+  fi
 fi
 
 if [[ -n "$OPENSHIFT_VERSION" ]]; then

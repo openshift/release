@@ -1,8 +1,13 @@
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
+    name: builder
+    namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.23
+releases:
+  latest:
+    integration:
+      name: "4.18"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -10,11 +15,6 @@ resources:
       memory: 256Mi
 tests:
 - as: pr-age-monitor
-  commands: |
-    make build
-    GITHUB_TOKEN=$(cat /tmp/secret/token) ./bin/pr-monitor --config config/repos.yaml
-  container:
-    from: src
   cron: 0 9 * * 1-5
   reporter_config:
     channel: '#forum-ocp-splat-alerts'
@@ -23,9 +23,99 @@ tests:
     - error
     report_template: PR Age Monitor detected threshold violations. <{{.Status.URL}}|View
       logs>
-  secret:
-    mount_path: /tmp/secret
-    name: ci-cluster-monitor-github-token
+  steps:
+    test:
+    - as: monitor
+      commands: |
+        make build
+        GITHUB_TOKEN=$(cat /tmp/secret/token) ./bin/pr-monitor --config config/repos.yaml
+      credentials:
+      - mount_path: /tmp/secret
+        name: ci-cluster-monitor-github-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+- as: vm-orphan-monitor
+  cluster: build01
+  cron: 0 */4 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: VM Orphan Monitor job failed. <{{.Status.URL}}|View logs>
+  steps:
+    cluster_profile: nutanix
+    test:
+    - as: monitor
+      commands: |
+        set -euo pipefail
+        set +x
+        source /tmp/nutanix-creds/secrets.sh
+        umask 077
+        mkdir -p /tmp/nutanix-auth
+        trap 'rm -rf /tmp/nutanix-auth' EXIT
+        echo -n "${prism_central_username}" > /tmp/nutanix-auth/nutanix-username
+        echo -n "${prism_central_password}" > /tmp/nutanix-auth/nutanix-password
+        set -x
+        make build
+        ./bin/vm-monitor --config config/nutanix.yaml \
+          --credentials-dir /tmp/nutanix-auth \
+          --endpoint "${prism_central_host}" \
+          --port "${prism_central_port}" \
+          --cleanup
+      credentials:
+      - mount_path: /tmp/nutanix-creds
+        name: nutanix-pc
+        namespace: test-credentials
+      from: src
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+- as: capacity-monitor
+  cluster: build01
+  cron: 0 */6 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: Capacity Monitor alert - check logs for details. <{{.Status.URL}}|View
+      logs>
+  steps:
+    cluster_profile: nutanix
+    test:
+    - as: monitor
+      commands: |
+        set -euo pipefail
+        set +x
+        source /tmp/nutanix-creds/secrets.sh
+        umask 077
+        mkdir -p /tmp/nutanix-auth
+        trap 'rm -rf /tmp/nutanix-auth' EXIT
+        echo -n "${prism_central_username}" > /tmp/nutanix-auth/nutanix-username
+        echo -n "${prism_central_password}" > /tmp/nutanix-auth/nutanix-password
+        set -x
+        make build
+        ./bin/capacity-monitor --config config/nutanix.yaml \
+          --credentials-dir /tmp/nutanix-auth \
+          --endpoint "${prism_central_host}" \
+          --port "${prism_central_port}"
+      credentials:
+      - mount_path: /tmp/nutanix-creds
+        name: nutanix-pc
+        namespace: test-credentials
+      from: src
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
 zz_generated_metadata:
   branch: main
   org: openshift-splat-team

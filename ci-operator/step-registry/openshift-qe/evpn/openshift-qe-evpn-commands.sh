@@ -22,9 +22,11 @@ oc version
 # EVPN pre-setup (not GA, requires TechPreview and manual FRR configuration)
 
 wait_for_network_operator_rollout() {
-  # Wait for reconciliation to start before waiting for it to finish.
-  oc wait co/network --for=condition=Progressing=True --timeout=2m
+  # Progressing=True may never be observed when the patch is a no-op or
+  # reconciliation finishes before oc wait starts, so treat it as optional.
+  oc wait co/network --for=condition=Progressing=True --timeout=2m || true
   oc wait co/network --for=condition=Progressing=False --timeout=10m
+  oc wait co/network --for=condition=Available=True --timeout=10m
 }
 
 # 1. Enable TechPreview feature gate
@@ -45,14 +47,7 @@ oc patch Network.operator.openshift.io cluster --type='merge' -p='{"spec":{"mana
 oc set image daemonset/frr-k8s -n openshift-frr-k8s frr=${FRR_IMAGE} reloader=${FRR_IMAGE}
 oc rollout status daemonset/frr-k8s -n openshift-frr-k8s --timeout=5m
 
-current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
-
-if [[ -n "${ITERATIONS}" ]]; then
-  export ITERATIONS
-else
-  ITERATIONS=$(awk "BEGIN {printf \"%d\", int($ITERATION_MULTIPLIER * $current_worker_count)}")
-  export ITERATIONS
-fi
+export ITERATIONS
 
 # 5. Run external FRR/VRF setup on bastion
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
@@ -153,6 +148,10 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
 if [[ -n "${SCENARIO}" ]]; then
   EXTRA_FLAGS+=" --scenario=${SCENARIO}"
+fi
+
+if [[ -n "${EXTERNAL_WEBSERVER_IP}" ]]; then
+  EXTRA_FLAGS+=" --external-webserver-ip=${EXTERNAL_WEBSERVER_IP}"
 fi
 
 EXTRA_FLAGS+=" --profile-type=${PROFILE_TYPE}"

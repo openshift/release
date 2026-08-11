@@ -76,7 +76,7 @@ main() {
         --extra-vars "release=${VERSION}" \
         --extra-vars "cluster_name=${CLUSTER_NAME}" \
         --extra-vars "kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig" \
-        --extra-vars "ocp_version_facts_release_type=${OCP_VERSION_RELEASE_TYPE}" \
+        --extra-vars "ocp_version_facts_dev_version=${OCP_VERSION_RELEASE_TYPE}" \
         --extra-vars "ocp_version_release_age_max_days=${OCP_VERSION_RELEASE_AGE_MAX_DAYS}" \
         --extra-vars "cpu_partitioning=${WORKLOAD_PARTITIONING}"
 

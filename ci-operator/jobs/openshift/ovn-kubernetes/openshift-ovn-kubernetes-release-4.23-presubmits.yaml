@@ -5,6 +5,93 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
+    cluster: build09
+    context: ci/prow/cudn-incremental-1000-24nodes
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.base
+      - Dockerfile.microshift
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.23-cudn-incremental-1000-24nodes
+    optional: true
+    rerun_command: /test cudn-incremental-1000-24nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=cudn-incremental-1000-24nodes
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cudn-incremental-1000-24nodes,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.23$
+    - ^release-4\.23-
     cluster: build10
     context: ci/prow/e2e-agent-compact-ipv4
     decorate: true
@@ -446,7 +533,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build03
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-hypershift
     decorate: true
     decoration_config:
@@ -705,6 +792,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-aws-ovn-local-to-shared-gateway-mode-migration,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^$
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -788,7 +877,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(e2e-aws-ovn-microshift|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-microshift,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1669,7 +1758,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build03
+    cluster: build06
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -1756,7 +1845,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build03
+    cluster: build06
     context: ci/prow/e2e-azure-ovn-techpreview
     decorate: true
     decoration_config:
@@ -1845,7 +1934,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build03
+    cluster: build06
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     decoration_config:
@@ -3776,7 +3865,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build03
+    cluster: build06
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -3843,7 +3932,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build03
+    cluster: build06
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -3903,7 +3992,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build03
+    cluster: build06
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -5087,7 +5176,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )qe-perfscale-aws-ovn-small-udn-density-churn-l3,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -5108,6 +5197,7 @@ presubmits:
     name: pull-ci-openshift-ovn-kubernetes-release-4.23-qe-perfscale-aws-ovn-small-udn-density-l2
     optional: true
     rerun_command: /test qe-perfscale-aws-ovn-small-udn-density-l2
+    skip_if_only_changed: ^(docs|\.github|contrib|test|dist|helm|LICENSES)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
     spec:
       containers:
       - args:
@@ -5174,7 +5264,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )qe-perfscale-aws-ovn-small-udn-density-l2,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -5195,6 +5285,7 @@ presubmits:
     name: pull-ci-openshift-ovn-kubernetes-release-4.23-qe-perfscale-aws-ovn-small-udn-density-l3
     optional: true
     rerun_command: /test qe-perfscale-aws-ovn-small-udn-density-l3
+    skip_if_only_changed: ^(docs|\.github|contrib|test|dist|helm|LICENSES)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
     spec:
       containers:
       - args:
@@ -5261,7 +5352,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )qe-perfscale-aws-ovn-small-udn-density-l3,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -5281,6 +5372,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-release-4.23-qe-perfscale-payload-control-plane-6nodes
     rerun_command: /test qe-perfscale-payload-control-plane-6nodes
+    skip_if_only_changed: ^(docs|\.github|contrib|test|dist|helm|LICENSES)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
     spec:
       containers:
       - args:
@@ -5351,7 +5443,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build03
+    cluster: build06
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -5435,7 +5527,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build03
+    cluster: build06
     context: ci/prow/unit
     decorate: true
     decoration_config:
