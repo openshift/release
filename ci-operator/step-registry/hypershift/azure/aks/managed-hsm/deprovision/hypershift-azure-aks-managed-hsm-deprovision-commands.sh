@@ -30,6 +30,15 @@ deleted_hsm_exists() {
   [[ "${count}" == "1" ]]
 }
 
+deleted_hsm_absent() {
+  local count
+  count="$(az keyvault list-deleted \
+    --resource-type hsm \
+    --query "[?name=='${HSM_NAME}'] | length(@)" \
+    -o tsv)"
+  [[ "${count}" == "0" ]]
+}
+
 if [[ "${HYPERSHIFT_AZURE_MANAGED_HSM}" != "true" ]]; then
   echo "Managed HSM deprovisioning is disabled"
   exit 0
@@ -39,8 +48,8 @@ HSM_NAME_FILE="${SHARED_DIR}/azure_managed_hsm_name"
 RESOURCE_GROUP_FILE="${SHARED_DIR}/azure_managed_hsm_resource_group"
 LOCATION_FILE="${SHARED_DIR}/azure_managed_hsm_location"
 if [[ ! -s "${HSM_NAME_FILE}" || ! -s "${RESOURCE_GROUP_FILE}" || ! -s "${LOCATION_FILE}" ]]; then
-  echo "Managed HSM resource information was not written; nothing to delete"
-  exit 0
+  echo "Managed HSM cleanup cannot continue because resource information is missing" >&2
+  exit 1
 fi
 
 AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
@@ -61,27 +70,45 @@ az login \
   --output none
 az account set --subscription "${AZURE_AUTH_SUBSCRIPTION_ID}"
 
-PURGE_HSM=true
-if az keyvault show --hsm-name "${HSM_NAME}" --output none 2>/dev/null; then
+ACTIVE_HSM_COUNT="$(az keyvault list \
+  --resource-type hsm \
+  --query "[?name=='${HSM_NAME}'] | length(@)" \
+  -o tsv)"
+DELETED_HSM_COUNT="$(az keyvault list-deleted \
+  --resource-type hsm \
+  --query "[?name=='${HSM_NAME}'] | length(@)" \
+  -o tsv)"
+
+if [[ "${ACTIVE_HSM_COUNT}" == "1" ]]; then
   echo "Deleting Managed HSM ${HSM_NAME}"
   az keyvault delete --hsm-name "${HSM_NAME}" --output none
   retry 20 30 deleted_hsm_exists
-elif deleted_hsm_exists; then
+elif [[ "${ACTIVE_HSM_COUNT}" != "0" ]]; then
+  echo "Unexpected active Managed HSM count for ${HSM_NAME}: ${ACTIVE_HSM_COUNT}" >&2
+  exit 1
+elif [[ "${DELETED_HSM_COUNT}" == "1" ]]; then
   echo "Managed HSM ${HSM_NAME} is already soft-deleted"
+elif [[ "${DELETED_HSM_COUNT}" != "0" ]]; then
+  echo "Unexpected deleted Managed HSM count for ${HSM_NAME}: ${DELETED_HSM_COUNT}" >&2
+  exit 1
 else
   echo "Managed HSM ${HSM_NAME} was not created; nothing to purge"
-  PURGE_HSM=false
 fi
 
-if [[ "${PURGE_HSM}" == "true" ]]; then
+if [[ "${ACTIVE_HSM_COUNT}" == "1" || "${DELETED_HSM_COUNT}" == "1" ]]; then
   echo "Purging Managed HSM ${HSM_NAME}"
   az keyvault purge \
     --hsm-name "${HSM_NAME}" \
     --location "${HSM_LOCATION}" \
     --output none
+  retry 20 15 deleted_hsm_absent
 fi
 
-if az group show --name "${RESOURCE_GROUP}" --output none 2>/dev/null; then
+RESOURCE_GROUP_EXISTS="$(az group exists --name "${RESOURCE_GROUP}")"
+if [[ "${RESOURCE_GROUP_EXISTS}" == "true" ]]; then
   echo "Deleting resource group ${RESOURCE_GROUP}"
-  az group delete --name "${RESOURCE_GROUP}" --yes --no-wait
+  az group delete --name "${RESOURCE_GROUP}" --yes
+elif [[ "${RESOURCE_GROUP_EXISTS}" != "false" ]]; then
+  echo "Unexpected resource group existence result for ${RESOURCE_GROUP}: ${RESOURCE_GROUP_EXISTS}" >&2
+  exit 1
 fi
