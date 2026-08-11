@@ -2,12 +2,17 @@ build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
-      USER 0
-      RUN dnf install -y podman
 images:
   items:
   - dockerfile_path: Containerfile
     to: lightspeed-service-api
+  - dockerfile_literal: |
+      FROM quay.io/openshift-lightspeed/ols-qe:tls-scanner AS scanner
+      FROM src
+      COPY --from=scanner /usr/local/bin/tls-scanner /usr/local/bin/tls-scanner
+      COPY --from=scanner /opt/testssl /opt/testssl
+    from: src
+    to: tls-scan-src
 promotion:
   to:
   - namespace: ols
@@ -34,7 +39,7 @@ tests:
 - as: tls-scan
   commands: make install-deps && make tls-scan
   container:
-    from: src
+    from: tls-scan-src
   skip_if_only_changed: ^docs/|\.md$|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: |
