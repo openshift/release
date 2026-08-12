@@ -1,5 +1,5 @@
 presubmits:
-  stolostron/observatorium:
+  stolostron/prometheus-operator:
   - agent: kubernetes
     always_run: true
     branches:
@@ -10,11 +10,12 @@ presubmits:
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - Dockerfile
+      - Dockerfile.prow
+      - cmd/prometheus-config-reloader/Dockerfile.prow
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-observatorium-release-5.1-images
+    name: pull-ci-stolostron-prometheus-operator-release-5.1-images
     rerun_command: /test images
     spec:
       containers:
@@ -62,80 +63,17 @@ presubmits:
     - ^release-5\.1$
     - ^release-5\.1-
     cluster: build01
-    context: ci/prow/lint
+    context: ci/prow/pr-image-mirror-prometheus-config-reloader
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - Dockerfile
+      - Dockerfile.prow
+      - cmd/prometheus-config-reloader/Dockerfile.prow
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-observatorium-release-5.1-lint
-    rerun_command: /test lint
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=lint
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )lint,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-5\.1$
-    - ^release-5\.1-
-    cluster: build01
-    context: ci/prow/pr-image-mirror
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - Dockerfile
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-observatorium-release-5.1-pr-image-mirror
-    rerun_command: /test pr-image-mirror
+    name: pull-ci-stolostron-prometheus-operator-release-5.1-pr-image-mirror-prometheus-config-reloader
+    rerun_command: /test pr-image-mirror-prometheus-config-reloader
     spec:
       containers:
       - args:
@@ -143,7 +81,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=pr-image-mirror
+        - --target=pr-image-mirror-prometheus-config-reloader
         command:
         - ci-operator
         env:
@@ -193,7 +131,82 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
+    trigger: (?m)^/test( | .* )pr-image-mirror-prometheus-config-reloader,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-5\.1$
+    - ^release-5\.1-
+    cluster: build01
+    context: ci/prow/pr-image-mirror-prometheus-operator
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile.prow
+      - cmd/prometheus-config-reloader/Dockerfile.prow
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stolostron-prometheus-operator-release-5.1-pr-image-mirror-prometheus-operator
+    rerun_command: /test pr-image-mirror-prometheus-operator
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=pr-image-mirror-prometheus-operator
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )pr-image-mirror-prometheus-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -204,11 +217,12 @@ presubmits:
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - Dockerfile
+      - Dockerfile.prow
+      - cmd/prometheus-config-reloader/Dockerfile.prow
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-observatorium-release-5.1-test
+    name: pull-ci-stolostron-prometheus-operator-release-5.1-test
     rerun_command: /test test
     skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
     spec:
