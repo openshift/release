@@ -15,7 +15,7 @@ else
   JOB_LINK="${JOB_LINK}logs/${JOB_NAME}/${BUILD_ID}"
 fi
 
-# Prow-only Hive access (skipped by Tekton/Jenkins).
+# Backplane Hive login (Prow only; Tekton uses vault).
 hive_kubeconfig=""
 hive_kubeconfig_src=""
 backplane_bin_dir=""
@@ -23,7 +23,7 @@ backplane_proxy_url=""
 if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   echo "=== OCM backplane login (Hive) ==="
   cred_dir="${OCM_FVT_BACKPLANE_CREDENTIALS_DIR:-/usr/local/rosa-clusters-service-sandbox}"
-  # Disable tracing due to credential handling.
+  # Do not trace credential reads.
   [[ $- == *x* ]] && WAS_TRACING_BP=true || WAS_TRACING_BP=false
   set +x
   backplane_client_id="${BACKPLANE_CLIENT_ID:-}"
@@ -38,12 +38,12 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   if [[ -z "${backplane_client_id}" || -z "${backplane_client_secret}" ]]; then
     echo "ERROR: OCM_FVT_USE_BACKPLANE=true but backplane client credentials are missing" >&2
     echo "Expected BACKPLANE_CLIENT_ID/SECRET env or ${cred_dir}/backplane_client_{id,secret}" >&2
-    echo "(CS mounts these from ci/rosa-clusters-service-sandbox)" >&2
+    echo "(mount Prow secret ci/rosa-clusters-service-sandbox; see longrunning ref)" >&2
     exit 1
   fi
   echo "Using backplane credentials from ${cred_dir} (or env)"
 
-  # Defaults match rosa-e2e-ocm-fvt*-ref.yaml.
+  # Defaults match *-ref.yaml; CLI versions align with rosa-clusters-service build/backplane.py.
   backplane_cluster_id="${OCM_FVT_BACKPLANE_CLUSTER_ID:-1g268u7pp694gj152nj16me4sv615lpv}"
   backplane_ocm_url="${OCM_FVT_BACKPLANE_OCM_URL:-https://api.openshift.com}"
   backplane_proxy_url="${OCM_FVT_BACKPLANE_PROXY_URL:-http://squid.corp.redhat.com:3128}"
@@ -56,22 +56,22 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   export PATH="${backplane_bin_dir}:${PATH}"
 
   echo "Installing ocm CLI v${ocm_ver} into ${backplane_bin_dir}"
-  curl -sSL -o "${backplane_bin_dir}/ocm" \
+  curl -sSL --fail --connect-timeout 30 --max-time 300 -o "${backplane_bin_dir}/ocm" \
     "https://github.com/openshift-online/ocm-cli/releases/download/v${ocm_ver}/ocm-linux-amd64"
   chmod 0755 "${backplane_bin_dir}/ocm"
 
   echo "Installing ocm-backplane CLI v${bp_ver} into ${backplane_bin_dir}"
   bp_tar="$(mktemp /tmp/ocm-backplane.XXXXXX.tar.gz)"
-  curl -sSL -o "${bp_tar}" \
+  curl -sSL --fail --connect-timeout 30 --max-time 300 -o "${bp_tar}" \
     "https://github.com/openshift/backplane-cli/releases/download/v${bp_ver}/ocm-backplane_${bp_ver}_Linux_x86_64.tar.gz"
   tar -xzf "${bp_tar}" -C "${backplane_bin_dir}" ocm-backplane
   chmod 0755 "${backplane_bin_dir}/ocm-backplane"
   rm -f "${bp_tar}"
 
-  # nested-podman image has no oc; backplane login/elevate need it.
+  # nested-podman image has no oc.
   echo "Installing oc CLI (${oc_ver}) into ${backplane_bin_dir}"
   oc_tar="$(mktemp /tmp/openshift-client.XXXXXX.tar.gz)"
-  curl -sSL -o "${oc_tar}" \
+  curl -sSL --fail --connect-timeout 30 --max-time 600 -o "${oc_tar}" \
     "https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/${oc_ver}/openshift-client-linux.tar.gz"
   tar -xzf "${oc_tar}" -C "${backplane_bin_dir}" oc
   chmod 0755 "${backplane_bin_dir}/oc"
@@ -80,12 +80,12 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   mkdir -p "${HOME}/.config/backplane"
   printf '{"proxy-url":"%s"}\n' "${backplane_proxy_url}" > "${HOME}/.config/backplane/config.json"
 
-  # Pin KUBECONFIG so login writes a known path.
+  # Fixed path for backplane login kubeconfig.
   hive_kubeconfig_src="$(mktemp /tmp/backplane-kubeconfig.XXXXXX)"
   rm -f "${hive_kubeconfig_src}"
   export KUBECONFIG="${hive_kubeconfig_src}"
 
-  # Disable tracing due to client-secret handling.
+  # Do not trace ocm login secrets.
   [[ $- == *x* ]] && WAS_TRACING_BP=true || WAS_TRACING_BP=false
   set +x
   ocm login \
@@ -94,7 +94,7 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
     --url="${backplane_ocm_url}"
   ocm-backplane login "${backplane_cluster_id}"
   $WAS_TRACING_BP && set -x
-  # Confirm elevate before dumping Impersonate kubeconfig.
+  # Verify elevation before kubeconfig dump.
   ocm-backplane elevate "${backplane_elevate_reason}" -- whoami
 
   if [[ ! -f "${KUBECONFIG}" ]]; then
@@ -102,7 +102,7 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
     exit 1
   fi
 
-  # Elevated Impersonate kubeconfig for AAO (exec uses PATH in container).
+  # Elevated kubeconfig for osdfm AAO secret reads.
   hive_kubeconfig="$(mktemp /tmp/hive-kubeconfig.XXXXXX)"
   chmod 0600 "${hive_kubeconfig}"
   [[ $- == *x* ]] && WAS_TRACING_ELEV=true || WAS_TRACING_ELEV=false
@@ -151,7 +151,7 @@ umask "${old_umask}"
 } > "${podman_env_file}"
 
 if [[ -n "${hive_kubeconfig}" ]]; then
-  # Proxy + PATH/HOME so container can refresh backplane tokens.
+  # Let podman refresh backplane tokens (proxy + CLI on PATH).
   echo "PATH=/usr/local/backplane-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >> "${podman_env_file}"
   echo "HOME=/home/ci-user" >> "${podman_env_file}"
   echo "HTTPS_PROXY=${backplane_proxy_url}" >> "${podman_env_file}"
@@ -177,7 +177,7 @@ fi
 
 osdfm_qe_creds_dir=/usr/local/osdfm-qe-credentials
 aao_kubeconfig_env=()
-# Prow: elevated kubeconfig. Else vault (Tekton/Jenkins).
+# AAO kubeconfig: backplane (Prow) or mounted file (Tekton/Jenkins).
 if [[ -n "${hive_kubeconfig}" && "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
   [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
   set +x
@@ -193,7 +193,7 @@ elif [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
   exit 1
 fi
 
-# DR_AWS_CREDENTIALS: static DR AWS creds (farm cannot reach Hive; ROSAENG-60596).
+# Static DR creds; build farm cannot reach Hive (ROSAENG-60596).
 dr_aws_creds_env=()
 if [[ -f "${osdfm_qe_creds_dir}/aws_dr_cred" ]]; then
   [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
@@ -202,7 +202,7 @@ if [[ -f "${osdfm_qe_creds_dir}/aws_dr_cred" ]]; then
   $WAS_TRACING && set -x
 fi
 
-# ZERO_EGRESS_ECR_CONFIG for @id_76488 (sync with app-interface ecr account/regions).
+# ECR mirror list for zero-egress test (@id_76488).
 zero_egress_env=()
 if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
   ecr_account=""
@@ -216,7 +216,7 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
       ecr_account="122610517469"
       ecr_regions=("us-east-1" "us-west-2")
       ;;
-    production|prod) ;; # test skips
+    production|prod) ;; # prod test skips ECR config
     *)
       echo "WARNING: ZERO_EGRESS_ECR_CONFIG not generated for OCM_FVT_OCM_ENV=${OCM_FVT_OCM_ENV:-<empty>}" >&2
       ;;
@@ -277,10 +277,8 @@ if [[ "${OCM_FVT_REPORT_JIRA:-true}" == "true" ]]; then
   ocmtest_args+=(--reportJiraTicket)
 fi
 
-# AppSRE prometheus-app-sre for osdfm post-alerts (Prow): keep oc port-forward up for ocmtest.
-# Tests hardcode http://prometheus-app-sre.openshift-customer-monitoring.svc.cluster.local:9090;
-# map that name to the build pod via --add-host=...:host-gateway (PF listens on 0.0.0.0:9090).
-# ocm-backplane monitoring returns 404 for this stack; RHOBS is the long-term alternative.
+# osdfm post-alerts: port-forward AppSRE Prom; tests use a hard-coded in-cluster URL.
+# --add-host maps that hostname to host-gateway:9090 (backplane monitoring is not available).
 prom_host_fqdn="prometheus-app-sre.openshift-customer-monitoring.svc.cluster.local"
 if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && "${OCM_FVT_USE_BACKPLANE:-false}" == "true" && -n "${backplane_bin_dir}" ]]; then
   prom_ns=openshift-customer-monitoring
@@ -308,8 +306,7 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && "${OCM_FVT_USE_BACKPLANE:-false}" == 
     oc -n "${prom_ns}" get svc "${prom_svc}" -o name 2>&1 || true
 
     pf_log="${prom_artifact_dir}/prom-port-forward.log"
-    # Bind 0.0.0.0 so podman --add-host=...:host-gateway can reach PF (127.0.0.1 alone is not enough).
-    # Scope is the build pod network namespace only (Prow); not exposed outside the CI pod.
+    # Listen on 0.0.0.0 so podman host-gateway can reach the port-forward.
     oc -n "${prom_ns}" port-forward --address 0.0.0.0 "svc/${prom_svc}" 9090:9090 \
       >"${pf_log}" 2>&1 &
     prom_pf_pid=$!
@@ -335,7 +332,7 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && "${OCM_FVT_USE_BACKPLANE:-false}" == 
       wait "${prom_pf_pid}" 2>/dev/null || true
       prom_pf_pid=""
     else
-      # Readiness + suite spot-check; truncate to build log only (avoid full PromQL in artifacts).
+      # Spot-check Prom; log truncated snippets only.
       code="$(curl -sS -o /tmp/prom-up.out -w '%{http_code}' --max-time 10 \
         "http://127.0.0.1:9090/api/v1/query?query=up" || echo err)"
       echo "PromQL up HTTP ${code}; body: $(head -c 160 /tmp/prom-up.out 2>/dev/null | tr '\n' ' ')"
@@ -350,15 +347,15 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && "${OCM_FVT_USE_BACKPLANE:-false}" == 
         rm -f /tmp/prom-suite.out
       done
 
-      # Container curls hard-coded .svc:9090 → build-pod host-gateway:9090 → this PF.
+      # Route hard-coded Prom hostname to this port-forward.
       podman_args+=(--add-host="${prom_host_fqdn}:host-gateway")
-      # Do not proxy the injected Prom hostname (Hive sets HTTP(S)_PROXY in the container).
+      # Bypass proxy for the injected Prom hostname.
       echo "NO_PROXY=${prom_host_fqdn},localhost,127.0.0.1" >> "${podman_env_file}"
       echo "no_proxy=${prom_host_fqdn},localhost,127.0.0.1" >> "${podman_env_file}"
       echo "Prometheus PF ready (pid ${prom_pf_pid}); podman --add-host ${prom_host_fqdn}:host-gateway"
     fi
 
-    # Parent returns to Hive kubeconfig; PF child keeps appsre path open until EXIT cleanup.
+    # Restore Hive kubeconfig; port-forward stays up until EXIT cleanup.
     export KUBECONFIG="${saved_kubeconfig}"
   fi
   echo "============================================"
@@ -376,7 +373,7 @@ echo "=========================="
 
 echo "Running ocmtest: ${ocmtest_args[*]}"
 exit_code=0
-# Disable tracing while expanding secret env args.
+# Do not trace secret env expansion.
 [[ $- == *x* ]] && WAS_TRACING_RUN=true || WAS_TRACING_RUN=false
 set +x
 podman run \
@@ -388,12 +385,12 @@ podman run \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 $WAS_TRACING_RUN && set -x
 
-# Copy merged report.xml only (avoid inflated counts from per-phase XMLs).
+# Copy merged report.xml (skip per-phase duplicates).
 find "${ocm_fvt_output}" -type f -name 'report.xml' -print0 | while IFS= read -r -d '' xml_file; do
   cp "${xml_file}" "${ARTIFACT_DIR}/junit-ocm-fvt-report.xml"
 done
 
-# Exit code for post steps (e.g. stage promotion).
+# Exit code for post-steps (e.g. stage promotion).
 echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code" 2>/dev/null || true
 
 exit "${exit_code}"

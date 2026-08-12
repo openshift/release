@@ -22,85 +22,68 @@ ref:
   env:
   - name: OCM_FVT_JOB_NAME
     documentation: |-
-      Required. The ocmtest job name passed to --job flag.
-      Example: cs-rosa-hcp-ad-staging-main
+      Required ocmtest --job name (e.g. cs-rosa-hcp-ad-staging-main).
   - name: OCM_FVT_SERVICE
     default: "cms"
     documentation: |-
-      Optional. The ocmtest --service flag value.
-      Use "cms" for Clusters Service tests (default), "osdfm" for
-      OSD Fleet Manager tests.
+      ocmtest --service: cms (default) or osdfm.
   - name: OCM_FVT_REPORT_JIRA
     default: "true"
     documentation: |-
-      Optional. Set to "true" to enable Jira reporting via
-      --reportJiraTicket flag and ENABLE_JIRA_REPORTING env var.
-      Set to "false" for tests that do not use Jira reporting.
+      Enable Jira reporting (--reportJiraTicket, ENABLE_JIRA_REPORTING).
   - name: OCM_FVT_OCM_ENV
     default: ""
     documentation: |-
-      Optional. OCM environment override. Set to "integration" for
-      integration tests. When empty, ocmtest uses its default (staging).
+      OCM env override (e.g. integration). Empty uses ocmtest default (staging).
   - name: OCM_FVT_EXTRA_ENVS
     default: ""
     documentation: |-
-      Optional. Newline-delimited KEY=VALUE pairs for additional env vars
-      injected into the podman container. Example:
-        DR_AWS_CREDENTIALS_FILE=/credentials/aws_dr_shared_cred
+      Newline-separated KEY=VALUE pairs injected into the podman container.
   - name: OCM_FVT_GCP_CREDS
     default: "false"
     documentation: |-
-      Optional. Set to "true" to mount the GCP credentials file
-      (osd-ccs-admin.json) into the podman container at
-      /home/ci-user/.gcp/osd-ccs-admin.json. Required for OSD GCP tests.
+      Mount osd-ccs-admin.json for OSD GCP tests.
   - name: OCM_FVT_USE_BACKPLANE
     default: "false"
     documentation: |-
-      Optional. Prow-only. Set to "true" for ocm-backplane login to Hive and
-      an elevated kubeconfig (Impersonate backplane-cluster-admin) used as
-      AWS_ACCOUNT_OPERATOR_KUBECONFIG for osdfm AAO secret reads. Leave
-      "false" when Hive is not needed (Tekton/Jenkins keep vault AAO).
+      Prow-only: backplane login to Hive for osdfm AAO kubeconfig.
+      False when Tekton/Jenkins supply vault or a mounted kubeconfig.
   - name: OCM_FVT_BACKPLANE_CLUSTER_ID
     default: "1g268u7pp694gj152nj16me4sv615lpv"
     documentation: |-
-      Optional. OCM cluster id passed to ocm-backplane login. Default is
-      hivei01ue1 (integration Hive).
+      Hive cluster id (default hivei01ue1). Override per env for stage/prod gating.
+  - name: OCM_FVT_APPSRE_BACKPLANE_CLUSTER_ID
+    default: "19mjrthsfn66bm22m574v2v1gt9a8r4q"
+    documentation: |-
+      AppSRE cluster for Prom port-forward (default app-sre-stage-01).
+      Override for prod osdfm gating.
   - name: OCM_FVT_BACKPLANE_CREDENTIALS_DIR
     default: "/usr/local/rosa-clusters-service-sandbox"
     documentation: |-
-      Optional. Directory containing backplane_client_id and
-      backplane_client_secret.
+      Dir with backplane_client_id/secret (mounted by this ref).
   - name: OCM_FVT_BACKPLANE_OCM_URL
     default: "https://api.openshift.com"
     documentation: |-
-      Optional. OCM API URL used for ocm login before backplane login.
-      Default is production API (hivei01ue1 is registered there).
+      OCM API for ocm login before backplane (Hive clusters use production API).
   - name: OCM_FVT_BACKPLANE_PROXY_URL
     default: "http://squid.corp.redhat.com:3128"
     documentation: |-
-      Optional. HTTP(S) proxy for backplane/corp access from the build
-      farm. Default is the Red Hat corp squid proxy.
+      Corp proxy for backplane from the build farm.
   - name: OCM_FVT_BACKPLANE_ELEVATE_REASON
     default: "https://issues.redhat.com/browse/ROSAENG-62717"
     documentation: |-
-      Optional. Reason/URL passed to ocm-backplane elevate for audit.
+      Audit reason passed to ocm-backplane elevate.
   - name: OCM_FVT_OCM_CLI_VERSION
     default: "1.0.15"
     documentation: |-
-      Optional. ocm CLI release version (without leading v) downloaded when
-      OCM_FVT_USE_BACKPLANE=true.
+      ocm CLI version (no v prefix). Keep in sync with rosa-clusters-service build/backplane.py.
   - name: OCM_FVT_BACKPLANE_CLI_VERSION
     default: "0.11.0"
     documentation: |-
-      Optional. ocm-backplane CLI release version (without leading v)
-      downloaded when OCM_FVT_USE_BACKPLANE=true.
+      ocm-backplane CLI version (no v prefix).
   - name: OCM_FVT_OC_VERSION
     default: "stable"
     documentation: |-
-      Optional. OpenShift client path segment under
-      mirror.openshift.com/.../clients/ocp/<version>/ (e.g. stable or
-      4.19.0). Used when OCM_FVT_USE_BACKPLANE=true.
+      oc client version (stable or e.g. 4.19.0).
   documentation: |-
-    Runs an OCM FVT (Functional Verification Test) using ocmtest inside
-    a nested podman container. Same as rosa-e2e-ocm-fvt but with a 12h
-    step timeout for long-running jobs (e.g. OSDFM SC/MC autoscaling).
+    Same as rosa-e2e-ocm-fvt with 12h timeout and osdfm/backplane credential mounts.
