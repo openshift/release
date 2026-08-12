@@ -1046,6 +1046,40 @@ SKIPPED_REPOS=(
   "memcached"
 )
 
+# Repos to skip for specific destination versions only
+# Format: "repo-name:version" — skips fast-forward to that version while allowing others
+SKIPPED_REPO_VERSIONS=(
+  "multicluster-observability-operator:5.0"
+  "multicluster-observability-addon:5.0"
+  "observatorium-operator:5.0"
+  "observatorium:5.0"
+)
+
+is_repo_version_skipped() {
+  local repo=$1
+  local version=$2
+  for entry in "${SKIPPED_REPO_VERSIONS[@]}"; do
+    if [[ "${entry}" == "${repo}:${version}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Returns 0 if version_a >= version_b (major.minor comparison)
+is_version_gte() {
+  local a_major="${1%%.*}"
+  local a_minor="${1##*.}"
+  local b_major="${2%%.*}"
+  local b_minor="${2##*.}"
+  if [[ $a_major -gt $b_major ]]; then
+    return 0
+  elif [[ $a_major -eq $b_major && $a_minor -ge $b_minor ]]; then
+    return 0
+  fi
+  return 1
+}
+
 # Repos with release-* default branch - exclude from main fast-forward
 # These are processed separately to handle non-main default branches
 # EXCLUDED_REPOS list is no longer needed - auto-detect based on default branch
@@ -1146,7 +1180,18 @@ for product in mce acm globalhub; do
       # NORMAL REPO HANDLING: default branch is main/master
       echo "INFO: Using normal fast-forward (${default_branch} → release branches)"
 
+      # Build filtered version list for this repo (excluding per-repo version skips)
+      REPO_DEST_VERSIONS=""
       for version in ${DESTINATION_VERSIONS}; do
+        if is_repo_version_skipped "${repo}" "${version}"; then
+          echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (per-repo version exclusion)"
+          continue
+        fi
+        REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS} ${version}"
+      done
+      REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS# }"
+
+      for version in ${REPO_DEST_VERSIONS}; do
         branch="${branch_prefix}-${version}"
         echo "INFO: Fast-forwarding ${owner_repo} ${default_branch} → ${branch}"
         log_file="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${branch}.log"
@@ -1177,13 +1222,18 @@ for product in mce acm globalhub; do
         fi
       done
 
-      # After fast-forward, create Tekton files for all destination versions
+      if [[ -z "${REPO_DEST_VERSIONS}" ]]; then
+        echo "INFO: All versions skipped for ${owner_repo}, skipping Tekton file creation"
+        continue
+      fi
+
+      # After fast-forward, create Tekton files for non-skipped versions
       echo "INFO: Creating Tekton files for ${owner_repo}"
       tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}.log"
 
       TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
 
-      if create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "${default_branch}" "${DESTINATION_VERSIONS}" "${tekton_log_file}"; then
+      if create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "${default_branch}" "${REPO_DEST_VERSIONS}" "${tekton_log_file}"; then
         status=0
       else
         status=$?
@@ -1291,11 +1341,23 @@ for product in mce acm globalhub; do
 
       # Fast-forward to destination branches and transform Tekton files
       for version in ${DESTINATION_VERSIONS}; do
+        # Check per-repo version exclusion
+        if is_repo_version_skipped "${repo}" "${version}"; then
+          echo "INFO: Skipping ${owner_repo} → ${repo_branch_prefix}-${version} (per-repo version exclusion)"
+          continue
+        fi
+
         dest_branch="${repo_branch_prefix}-${version}"
 
         # Skip if dest_branch same as default_branch
         if [[ "${dest_branch}" == "${default_branch}" ]]; then
           echo "INFO: Skipping ${dest_branch} (same as default branch)"
+          continue
+        fi
+
+        # Skip destination versions older than default — can't fast-forward backwards
+        if ! is_version_gte "${version}" "${default_version}"; then
+          echo "INFO: Skipping ${owner_repo} → ${dest_branch} (${version} is older than default ${default_version})"
           continue
         fi
 
