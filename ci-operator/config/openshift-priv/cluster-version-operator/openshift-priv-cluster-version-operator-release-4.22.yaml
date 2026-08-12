@@ -67,13 +67,15 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-agnostic-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-agnostic-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
-- as: e2e-agnostic-operator
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-agnostic-operator
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -96,40 +98,46 @@ tests:
     test:
     - chain: openshift-e2e-test-ota-qe
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: e2e-agnostic-ovn-techpreview-serial
+- always_run: false
+  as: e2e-agnostic-ovn-techpreview-serial
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   shard_count: 3
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-azure
-- as: e2e-agnostic-ovn-upgrade-into-change
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-agnostic-ovn-upgrade-into-change
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
-- as: e2e-agnostic-ovn-upgrade-out-of-change
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-agnostic-ovn-upgrade-out-of-change
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     workflow: openshift-upgrade-azure
-- as: e2e-hypershift-conformance
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-hypershift-conformance
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
-- as: e2e-hypershift
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-hypershift
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-ovn-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -137,6 +145,7 @@ tests:
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-agnostic-operator-techpreview
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -152,6 +161,7 @@ tests:
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-agnostic-ovn-upgrade-into-change-techpreview
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -159,6 +169,7 @@ tests:
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-agnostic-ovn-upgrade-out-of-change-techpreview
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-azure
     dependencies:

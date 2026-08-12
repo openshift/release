@@ -124,20 +124,25 @@ function validate_environment() {
 function install_required_tools() {
 	log_info "Installing required tools..."
 
+	local tmp_bin_dir="/tmp/bin"
+
 	cd /tmp || {
 		log_error "Failed to change directory to /tmp"
 		exit 1
 	}
 
-	HOME=/tmp
+	# Make a private directory that is only readable by us
+	HOME="$(mktemp -d /tmp/powervc-checks.XXXXXX)"
+	chmod 0700 "${HOME}"
+	echo "HOME is now ${HOME}"
 	export HOME
 
-	mkdir -p /tmp/bin || {
-		log_error "Failed to create /tmp/bin directory"
+	mkdir -p "${tmp_bin_dir}" || {
+		log_error "Failed to create ${tmp_bin_dir} directory"
 		exit 1
 	}
 
-	PATH="/tmp/bin:${PATH}"
+	PATH="${tmp_bin_dir}:${PATH}"
 	export PATH
 
 	# Install PowerVC-Tool
@@ -151,11 +156,14 @@ function install_required_tools() {
 	local tool_bin="ocp-ipi-powervc-linux-${machine}"
 	local tool_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}/${tool_bin}"
 
-	if ! curl --location --fail --silent --show-error --output /tmp/bin/PowerVC-Tool "${tool_url}"; then
+	if ! curl --location --fail --silent \
+		--connect-timeout 30 --max-time 300 --show-error \
+		--output ${tmp_bin_dir}/PowerVC-Tool \
+		"${tool_url}"; then
 		log_error "Failed to download PowerVC-Tool"
 		exit 1
 	fi
-	chmod ugo+x /tmp/bin/PowerVC-Tool
+	chmod ugo+x ${tmp_bin_dir}/PowerVC-Tool
 
 	# Install yq-v4 if not present
 	log_info "Checking for yq-v4..."
@@ -168,11 +176,14 @@ function install_required_tools() {
 		yq_arch=$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')
 		local yq_url="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${yq_arch}"
 
-		if ! curl --fail --location --silent --show-error "${yq_url}" -o /tmp/bin/yq-v4; then
+		if ! curl --fail --location --silent \
+			--connect-timeout 30 --max-time 300 --show-error \
+			--output ${tmp_bin_dir}/yq-v4 \
+			"${yq_url}"; then
 			log_error "Failed to download yq-v4 from ${yq_url}"
 			exit 1
 		fi
-		chmod +x /tmp/bin/yq-v4
+		chmod +x ${tmp_bin_dir}/yq-v4
 	else
 		log_info "yq-v4 already installed at ${cmd_yq}"
 	fi
@@ -194,20 +205,24 @@ function install_required_tools() {
 		exit 1
 	fi
 
-	cp "${SECRETS_DIR}/clouds.yaml" "${HOME}/.config/openstack/" || {
+	install -m 0600 "${SECRETS_DIR}/clouds.yaml" "${HOME}/.config/openstack/clouds.yaml" || {
 		log_error "Failed to copy clouds.yaml to .config/openstack/"
 		exit 1
 	}
 
-	cp "${SECRETS_DIR}/clouds.yaml" "${HOME}/" || {
+	install -m 0600 "${SECRETS_DIR}/clouds.yaml" "${HOME}/clouds.yaml" || {
 		log_error "Failed to copy clouds.yaml to HOME"
 		exit 1
 	}
 
-	cp "${SECRETS_DIR}/ocp-ci-ca.pem" "${HOME}/" || {
+	install -m 0600 "${SECRETS_DIR}/ocp-ci-ca.pem" "${HOME}/ocp-ci-ca.pem" || {
 		log_error "Failed to copy ocp-ci-ca.pem"
 		exit 1
 	}
+
+	# The cloud configuration in the secret uses hardcoded /tmp/ocp-ci-ca.pem
+	sed -i -e "s|/tmp/ocp-ci-ca.pem|${HOME}/ocp-ci-ca.pem|" "${HOME}/clouds.yaml"
+	sed -i -e "s|/tmp/ocp-ci-ca.pem|${HOME}/ocp-ci-ca.pem|" "${HOME}/.config/openstack/clouds.yaml"
 
 	# Verify all required tools are available
 	log_info "Verifying installed tools..."
@@ -302,6 +317,12 @@ function verify_rhcos_image() {
 
 	# Verify image exists in PowerVC
 	log_info "Checking if ${RHCOS_IMAGE_NAME} exists in PowerVC..."
+
+	cd ${HOME} || {
+		log_error "Failed to change directory to ${HOME}"
+		exit 1
+	}
+
 	if ! PowerVC-Tool \
 		rhcos-exists \
 		--cloud "${CLOUD}" \
@@ -401,9 +422,9 @@ EOF
 function check_powervc_alive() {
 	log_info "Checking PowerVC server connectivity..."
 
-	# Workaround: cd to /tmp as clouds.yaml is also there
-	cd /tmp/ || {
-		log_error "Failed to change directory to /tmp"
+	# Workaround: cd to ${HOME} as clouds.yaml is also there
+	cd ${HOME} || {
+		log_error "Failed to change directory to ${HOME}"
 		exit 1
 	}
 
@@ -510,6 +531,10 @@ function create_bastion() {
 	log_info "  Cloud: ${CLOUD}"
 
 	# Note: an empty --bastionRsa is for remote creation
+	cd ${HOME} || {
+		log_error "Failed to change directory to ${HOME}"
+		exit 1
+	}
 	if ! PowerVC-Tool \
 		create-bastion \
 		--cloud "${CLOUD}" \
