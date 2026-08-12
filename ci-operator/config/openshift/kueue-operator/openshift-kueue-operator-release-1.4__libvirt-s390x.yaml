@@ -38,6 +38,19 @@ images:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: src-with-oc-and-kubectl
+operator:
+  bundles:
+  - as: kueue-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: registry.redhat.io/kueue/kueue-rhel9-operator:latest
+    with: pipeline:kueue-operator
+  - pullspec: registry.redhat.io/kueue/kueue-rhel9:latest
+    with: pipeline:kueue-operand
+  - pullspec: registry.redhat.io/kueue/kueue-must-gather-rhel9:latest
+    with: pipeline:kueue-must-gather
 prowgen:
   disable_sparse_checkout: true
 releases:
@@ -62,6 +75,7 @@ tests:
 - as: test-e2e-downstream-4-22
   capabilities:
   - intranet
+  cluster: build12
   cron: '@daily'
   reporter_config:
     channel: '#forum-node-jira'
