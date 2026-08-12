@@ -75,12 +75,15 @@ def add_imagestream_namespace_rbac(gendoc):
     hostname_prefix = arch_in_hostname[context.arch]
 
     puller_subjects = []
+    viewer_subjects = []
     if not context.private:
-        puller_subjects.append({
+        authenticated = {
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Group',
             'name': 'system:authenticated'
-        })
+        }
+        puller_subjects.append(authenticated)
+        viewer_subjects.append(authenticated)
         if context.product.name == 'okd':
             puller_subjects.append({
                 'apiGroup': 'rbac.authorization.k8s.io',
@@ -89,6 +92,7 @@ def add_imagestream_namespace_rbac(gendoc):
             })
     else:
         puller_subjects.extend(get_private_release_pullers())
+        viewer_subjects.extend(get_private_release_pullers())
 
     resources.append({
         'apiVersion': 'rbac.authorization.k8s.io/v1',
@@ -117,7 +121,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'kind': 'ClusterRole',
             'name': 'view'
         },
-        'subjects': puller_subjects,
+        'subjects': viewer_subjects,
     })
 
     resources.append({
