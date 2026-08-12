@@ -517,7 +517,7 @@ EOF
             hostPID: true
             containers:
               - name: flipper
-                image: ubi9
+                image: registry.access.redhat.com/ubi9/ubi:latest
                 imagePullPolicy: IfNotPresent
                 command: ["/bin/bash"]
                 args:
