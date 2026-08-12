@@ -641,7 +641,8 @@ EOF
 - name: Wait for sideloaded kernel on {{ worker_node }}
   when: sideload_kernel_uri != 'reset'
   block:
-    # nodeInfo.kernelVersion is empty on these RHCOS workers; read uname -r via oc debug.
+    # Prefer host uname -r: nodeInfo.kernelVersion can be empty right after Ready.
+    # RT kernels append "+rt" to the release (RPM URI has no such suffix).
     - name: Poll uname -r on {{ worker_node }}
       ansible.builtin.command:
         argv:
@@ -656,7 +657,9 @@ EOF
           - uname
           - -r
       register: node_uname
-      until: (node_uname.stdout | trim) == expected_kernel_release
+      until: >-
+        (node_uname.stdout | default('') | trim | regex_replace('\\+rt$', ''))
+        == expected_kernel_release
       retries: "{{ (sideload_kernel_job_timeout | int) * 4 }}"
       delay: 15
       changed_when: false
@@ -665,14 +668,15 @@ EOF
       ansible.builtin.debug:
         msg: >-
           Verified {{ worker_node }} uname -r={{ node_uname.stdout | trim }}
-          matches {{ expected_kernel_release }}
+          matches {{ expected_kernel_release }} (optional +rt suffix ignored)
   rescue:
     - name: Fail when sideloaded kernel is not active on {{ worker_node }}
       ansible.builtin.fail:
         msg: >-
           After sideload reboot, {{ worker_node }} uname -r={{
           node_uname.stdout | default('') | trim | default('unknown', true)
-          }} does not match expected {{ expected_kernel_release }} from {{ sideload_kernel_uri }}
+          }} does not match expected {{ expected_kernel_release }}
+          (or {{ expected_kernel_release }}+rt) from {{ sideload_kernel_uri }}
 
 - name: Record post-reset kernel on {{ worker_node }}
   when: sideload_kernel_uri == 'reset'
