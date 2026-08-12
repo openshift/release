@@ -995,6 +995,7 @@ echo "Fast-forward workflow inputs:
 * REPO_MAP_PATH: ${REPO_MAP_PATH}
 * DESTINATION_VERSIONS: ${DESTINATION_VERSIONS}
 * LAST_RELEASE_VERSION: ${LAST_RELEASE_VERSION:-<not set>}
+* SKIP_VERSIONS_PATH: ${SKIP_VERSIONS_PATH:-<not set>}
 * ARTIFACT_DIR: ${ARTIFACT_DIR:-<not set>}
 "
 
@@ -1046,18 +1047,28 @@ SKIPPED_REPOS=(
   "memcached"
 )
 
-# Repos to skip for specific destination versions only
-# Format: "repo-name:version" — skips fast-forward to that version while allowing others
-SKIPPED_REPO_VERSIONS=(
-  "multicluster-observability-operator:5.0"
-  "multicluster-observability-addon:5.0"
-  "observatorium-operator:5.0"
-  "observatorium:5.0"
-)
+# Per-repo version exclusions loaded from SKIP_VERSIONS_PATH (YAML file)
+SKIPPED_REPO_VERSIONS=()
+
+if [[ -n "${SKIP_VERSIONS_PATH:-}" ]] && [[ -f "${SKIP_VERSIONS_PATH}" ]]; then
+  echo "INFO: Loading per-repo version exclusions from ${SKIP_VERSIONS_PATH}"
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] && SKIPPED_REPO_VERSIONS+=("$entry")
+  done < <(yq '.skip_versions[] | .repo as $r | .versions[] | $r + ":" + .' "${SKIP_VERSIONS_PATH}")
+  echo "INFO: Loaded ${#SKIPPED_REPO_VERSIONS[@]} repo:version exclusion(s)"
+  for entry in "${SKIPPED_REPO_VERSIONS[@]+"${SKIPPED_REPO_VERSIONS[@]}"}"; do
+    echo "  - ${entry}"
+  done
+elif [[ -n "${SKIP_VERSIONS_PATH:-}" ]]; then
+  echo "WARNING: SKIP_VERSIONS_PATH set but file not found: ${SKIP_VERSIONS_PATH}"
+fi
 
 is_repo_version_skipped() {
   local repo=$1
   local version=$2
+  if [[ ${#SKIPPED_REPO_VERSIONS[@]} -eq 0 ]]; then
+    return 1
+  fi
   for entry in "${SKIPPED_REPO_VERSIONS[@]}"; do
     if [[ "${entry}" == "${repo}:${version}" ]]; then
       return 0
