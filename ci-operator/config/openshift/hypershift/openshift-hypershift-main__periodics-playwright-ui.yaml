@@ -1,0 +1,47 @@
+base_images:
+  hypershift-ui-tests:
+    name: hypershift-ui-tests
+    namespace: hypershift
+    tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ui-e2e-playwright
+  cron: 0 9 * * 1
+  steps:
+    test:
+    - as: test
+      commands: |
+        source /etc/hypershift-ui-e2e/env
+        cd /hypershift/test/ui
+        npm test
+        rc=$?
+        if [ -d playwright-report ]; then
+          cp -r playwright-report "${ARTIFACT_DIR}/"
+        fi
+        if [ -d test-results ]; then
+          cp -r test-results "${ARTIFACT_DIR}/"
+          find "${ARTIFACT_DIR}/test-results" -name "*.xml" | while read f; do
+            mv "$f" "$(dirname $f)/junit_$(basename $f)"
+          done
+        fi
+        exit $rc
+      credentials:
+      - mount_path: /etc/hypershift-ui-e2e
+        name: hypershift-ui-e2e-credentials
+        namespace: test-credentials
+      from: hypershift-ui-tests
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 1h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: hypershift
+  variant: periodics-playwright-ui
