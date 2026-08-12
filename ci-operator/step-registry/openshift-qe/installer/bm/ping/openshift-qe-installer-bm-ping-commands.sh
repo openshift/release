@@ -6,4 +6,4 @@ set -x
 
 bastion=$(cat "/secret/address")
 
-ping -c 5 $bastion
+ping -c 5 prometheus-k8s-openshift-monitoring.apps.doca8.nvidia.eng.rdu2.dc.redhat.com
