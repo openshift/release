@@ -313,50 +313,54 @@ fi
 temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
 
-# deploy ptp
-echo "deploying ptp-operator on branch ${PTP_UNDER_TEST_BRANCH}"
-
-# build ptp operator and create catalog
-
-export REGISTRY="image-registry.openshift-image-registry.svc:5000"
-export IMG="${REGISTRY}/openshift-ptp/ptp-operator:${T5CI_VERSION}"
-export DAEMON_IMG="${REGISTRY}/openshift-ptp/linuxptp-daemon:${T5CI_VERSION}"
-export SIDECAR_IMG="${REGISTRY}/openshift-ptp/cloud-event-proxy:${T5CI_VERSION}"
-build_images
-
-# Get an updated version of oc
-mkdir ~/bin
-wget https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
-tar -zxvf openshift-client-linux.tar.gz -C ~/bin
-export PATH=$HOME/bin:$PATH
-
-oc version --client
-
-# deploy ptp-operator
-if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
-  echo "Running on upstream main branch"
-  git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+# Path A (ptp-operator e2e-telco5g-ptp): optional-operators-subscribe already
+# installed from the in-job ci-index. Skip privileged build_images + make deploy.
+# Release nightlies still use the legacy in-cluster build path below.
+if [[ "${T5CI_PTP_SKIP_DEPLOY:-false}" == "true" ]]; then
+  echo "[INFO] T5CI_PTP_SKIP_DEPLOY=true: using OLM-installed ptp-operator (Path A)"
 else
-  git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
-fi
+  echo "deploying ptp-operator on branch ${PTP_UNDER_TEST_BRANCH}"
 
-cd ptp-operator-under-test
+  export REGISTRY="image-registry.openshift-image-registry.svc:5000"
+  export IMG="${REGISTRY}/openshift-ptp/ptp-operator:${T5CI_VERSION}"
+  export DAEMON_IMG="${REGISTRY}/openshift-ptp/linuxptp-daemon:${T5CI_VERSION}"
+  export SIDECAR_IMG="${REGISTRY}/openshift-ptp/cloud-event-proxy:${T5CI_VERSION}"
+  build_images
 
-# force downloading fresh images
-grep -r "imagePullPolicy: IfNotPresent" --files-with-matches | awk '{print  "sed -i -e \"s@imagePullPolicy: IfNotPresent@imagePullPolicy: Always@g\" " $1 }' | bash
+  # Get an updated version of oc
+  mkdir ~/bin
+  wget https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+  tar -zxvf openshift-client-linux.tar.gz -C ~/bin
+  export PATH=$HOME/bin:$PATH
 
-# deploy ptp-operator
-if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
-  make deploy \
-    IMG=${IMG} \
-    LINUXPTP_DAEMON_IMAGE=${DAEMON_IMG} \
-    SIDECAR_EVENT_IMAGE=${SIDECAR_IMG}
-else
-  make deploy IMG=${IMG}
+  oc version --client
+
+  if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
+    echo "Running on upstream main branch"
+    git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+  else
+    git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+  fi
+
+  cd ptp-operator-under-test
+
+  # force downloading fresh images
+  grep -r "imagePullPolicy: IfNotPresent" --files-with-matches | awk '{print  "sed -i -e \"s@imagePullPolicy: IfNotPresent@imagePullPolicy: Always@g\" " $1 }' | bash
+
+  if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
+    make deploy \
+      IMG=${IMG} \
+      LINUXPTP_DAEMON_IMAGE=${DAEMON_IMG} \
+      SIDECAR_EVENT_IMAGE=${SIDECAR_IMG}
+  else
+    make deploy IMG=${IMG}
+  fi
 fi
 
 # wait until the linuxptp-daemon pods are ready
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
+# OLM installs may create the default PtpOperatorConfig asynchronously.
+retry_with_timeout 400 5 oc get ptpoperatorconfigs.ptp.openshift.io default -n openshift-ptp
 
 # patching to add events
 if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
@@ -408,7 +412,7 @@ fi
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
 
 # Run ptp conformance test
-cd -
+cd "$temp_dir"
 echo "running conformance tests from branch ${TEST_BRANCH}"
 # always run test from latest upstream
 git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
