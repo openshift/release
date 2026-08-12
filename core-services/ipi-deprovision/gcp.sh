@@ -110,7 +110,7 @@ function cleanup_orphaned_service_accounts() {
     return 1
   fi
   if ! jq -r --argjson cutoff "${gce_cluster_age_cutoff_seconds}" \
-    '.[] | select(.createTime != null) | select((.createTime | sub("\\.[0-9]+"; "") | fromdateiso8601) < $cutoff) | [.email, (.displayName // "")] | @tsv' \
+    '.[] | select(.createTime == null or ((.createTime | sub("\\.[0-9]+"; "") | fromdateiso8601) < $cutoff)) | [.email, (.displayName // "")] | @tsv' \
     "${sa_json_file}" >"${sa_list_file}"; then
     rm -f "${active_ids_file}" "${sa_json_file}" "${sa_list_file}"
     return 1
