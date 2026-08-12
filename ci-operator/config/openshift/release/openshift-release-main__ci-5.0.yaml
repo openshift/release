@@ -70,6 +70,55 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
+- as: e2e-gcd-ovn
+  cron: 0 0,12 * * *
+  steps:
+    cluster_profile: gcd
+    env:
+      BASE_DOMAIN: ci.gcd.devcluster.openshift.com
+      BASTION_IMAGE_NAME: fedora-coreos-41-20241122-3-0-gcp-x86-64
+      BASTION_IMAGE_PROJECT: eu0:openshift
+      BASTION_MACHINE_TYPE: c3-standard-4
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c3-standard-4
+      CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
+      CONTROL_PLANE_NODE_TYPE: c3-standard-8
+      DEFAULT_MACHINE_OSIMAGE: projects/eu0:openshift/images/rhcos10
+      PUBLISH: Internal
+      TEST_SKIPS: Ensure HTTPRoute object is created\|The HAProxy router should pass
+        the http2 tests\|The HAProxy router should pass the h2spec conformance tests\|should
+        serve a basic image on each replica with a private image\|regional PD should
+        store data and sync across zones\|API LBs follow /readyz of kube-apiserver
+        and stop sending requests
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcd
+- as: e2e-gcd-ovn-techpreview
+  cron: 0 6,18 * * *
+  steps:
+    cluster_profile: gcd
+    env:
+      BASE_DOMAIN: ci.gcd.devcluster.openshift.com
+      BASTION_IMAGE_NAME: fedora-coreos-41-20241122-3-0-gcp-x86-64
+      BASTION_IMAGE_PROJECT: eu0:openshift
+      BASTION_MACHINE_TYPE: c3-standard-4
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c3-standard-4
+      CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
+      CONTROL_PLANE_NODE_TYPE: c3-standard-8
+      DEFAULT_MACHINE_OSIMAGE: projects/eu0:openshift/images/rhcos10
+      FEATURE_SET: TechPreviewNoUpgrade
+      PUBLISH: Internal
+      TEST_SKIPS: Ensure HTTPRoute object is created\|The HAProxy router should pass
+        the http2 tests\|The HAProxy router should pass the h2spec conformance tests\|should
+        serve a basic image on each replica with a private image\|regional PD should
+        store data and sync across zones\|API LBs follow /readyz of kube-apiserver
+        and stop sending requests
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcd
 - as: e2e-gcp-ovn-rhcos10-fips-techpreview-serial
   interval: 168h
   shard_count: 2
