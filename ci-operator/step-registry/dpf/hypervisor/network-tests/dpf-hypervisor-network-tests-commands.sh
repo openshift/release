@@ -1,169 +1,56 @@
 #!/bin/bash
 set -euo pipefail
 
-# Configuration
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
-CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
 # Prepare SSH key from Vault (add trailing newline if missing)
-echo "Configuring SSH private key..."
 cat /var/run/dpf-ci/private-key | base64 -d > /tmp/id_rsa
 echo "" >> /tmp/id_rsa
 chmod 600 /tmp/id_rsa
 
-# Define SSH command with explicit options (don't rely on ~/.ssh/config)
 SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
-# Test SSH connection
-echo "Testing SSH connection to ${REMOTE_HOST}..."
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} echo 'SSH connection successful'; then
-    echo "SSH setup complete and tested successfully"
-else
-    echo "ERROR: Failed to connect to hypervisor ${REMOTE_HOST}"
-    echo "Debug information:"
-    echo "- Checking if SSH key exists:"
-    ls -la /tmp/id_rsa
-    echo "- Testing SSH connectivity with verbose output:"
-    ssh -v ${SSH_OPTS} root@${REMOTE_HOST} echo 'test' || true
+# Start iperf3 server on bastion via podman
+CONTAINER_NAME="tft-iperf3-$$"
+echo "Starting iperf3 server container '${CONTAINER_NAME}' on bastion ${REMOTE_HOST}..."
+ssh ${SSH_OPTS} root@${REMOTE_HOST} \
+    "podman run -d --rm --name ${CONTAINER_NAME} --network host ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest iperf3 -s -p 5201"
+
+cleanup() {
+    echo "Stopping iperf3 server container on bastion..."
+    ssh ${SSH_OPTS} root@${REMOTE_HOST} "podman stop ${CONTAINER_NAME}" || true
+}
+trap cleanup EXIT
+
+# Use kubeconfig from load-kubeconfig step
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+# Copy .env to working directory
+cp "${SHARED_DIR}/.env" .env
+
+echo "Verifying cluster access..."
+oc get nodes
+
+# Select two worker-dpu nodes
+TFT_SERVER_NODE=$(oc get nodes --no-headers | grep worker-dpu | awk 'NR==1 {print $1}')
+TFT_CLIENT_NODE=$(oc get nodes --no-headers | grep worker-dpu | awk 'NR==2 {print $1}')
+
+if [[ -z "${TFT_SERVER_NODE}" ]] || [[ -z "${TFT_CLIENT_NODE}" ]]; then
+    echo "ERROR: Need at least 2 worker-dpu nodes, found:"
+    oc get nodes --no-headers | grep worker-dpu || true
     exit 1
 fi
 
-# Export SSH settings for subsequent steps
-echo "REMOTE_HOST=${REMOTE_HOST}" >> ${SHARED_DIR}/dpf-env
-echo "SSH_OPTS=${SSH_OPTS}" >> ${SHARED_DIR}/dpf-env
-echo "SSH setup completed successfully for ${REMOTE_HOST}"
+echo "TFT_SERVER_NODE=${TFT_SERVER_NODE}"
+echo "TFT_CLIENT_NODE=${TFT_CLIENT_NODE}"
 
-echo "Remote host: ${REMOTE_HOST}"
+export TFT_SERVER_NODE
+export TFT_CLIENT_NODE
+export TFT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
+export TFT_EXTERNAL_SERVER="${REMOTE_HOST}:5201"
 
-datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
-NETWORK_TESTS_RESULT=""
-
-# Run dpf make target checks test
-REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
-
-echo "=== DPF Make Target checks on Existing Cluster ==="
-echo "Using openshift-dpf dir from last cluster-deploy: '${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}'"
-
-echo "Updating VERIFY_DEPLOYMENT, VERIFY_MAX_RETRIES and VERIFY_SLEEP_SECONDS variable values to true, 4 and 3 respectively in .env file"
-# Using delimiter '|' since we have '/' in the patterns
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -e; \
-    test -f ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
-    source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
-    echo \${LAST_OPENSHIFT_DPF}; \
-    cd \${LAST_OPENSHIFT_DPF}; \
-    if [[ -n '${PULL_NUMBER:-}' ]] && [[ '${REPO_NAME:-}' == 'openshift-dpf' ]]; then \
-        echo 'PR job detected: checking out PR #${PULL_NUMBER} on the remote host'; \
-        git rebase --abort 2>/dev/null || true; \
-        git checkout -f ${OPENSHIFT_DPF_BRANCH}; \
-        git branch -D pr-${PULL_NUMBER} 2>/dev/null || true; \
-        git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER}; \
-        git fetch origin ${OPENSHIFT_DPF_BRANCH}; \
-        git checkout pr-${PULL_NUMBER}; \
-        git rebase origin/${OPENSHIFT_DPF_BRANCH}; \
-    fi; \
-    pwd ; \
-    set -e; \
-    test -f .env ; \
-    cat .env | grep VERIFY ; \
-    cp .env .env_orig ; \
-    sed -i 's|VERIFY_DEPLOYMENT=.*|VERIFY_DEPLOYMENT=true|' .env ; \
-    sed -i 's|VERIFY_MAX_RETRIES=.*|VERIFY_MAX_RETRIES=4|' .env ; \
-    sed -i 's|VERIFY_SLEEP_SECONDS=.*|VERIFY_SLEEP_SECONDS=3|' .env ; \
-    cat .env | grep VERIFY"; then
-  echo "VERIFY_DEPLOYMENT, VERIFY_MAX_RETRIES and VERIFY_SLEEP_SECONDS variables updated successfully in .env file"
-else
-  echo "ERROR: Failed to update VERIFY_DEPLOYMENT, VERIFY_MAX_RETRIES and VERIFY_SLEEP_SECONDS variables in .env file"
-  exit 1
-fi
-
-
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -a; \
-    pwd; \
-    ls -ltr; \
-    env; \
-    source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
-    echo \${LAST_OPENSHIFT_DPF}; \
-    env; \
-    cd \${LAST_OPENSHIFT_DPF}; \
-    pwd; \
-    set -e;\
-    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME}; \
-    oc get co; \
-    oc get nodes; \
-    oc get dpu -A; \
-    oc get application -A; \
-    echo \${KUBECONFIG}; \
-    ls -ltr ; \
-    make verify-workers; \
-    make verify-dpu-nodes; \
-    make verify-deployment; \
-    make verify-dpudeployment; \
-    echo \$? > verification-result"; then
-
-  echo "DPF spot check tests Passed";
-
-else
-  echo "DPF spot checks tests Failed";
-  exit 1
-fi
-
-
-echo "=== Run DPF Kubernetes Traffic Flow Tests on Existing Cluster ==="
-
-# Need to export the dpu-workers after they are renamed, on hypervisor:
-# export TFT_SERVER_NODE=worker-303ea713ea90
-# export TFT_CLIENT_NODE=worker-303ea713ea94
-
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
-  ls -ltr; \
-  env; \
-  source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
-  echo \${LAST_OPENSHIFT_DPF}; \
-  env; \
-  cd \${LAST_OPENSHIFT_DPF}; \
-  pwd; \
-  ls -ltra; \
-  set -e;\
-  export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME}; \
-  oc get nodes; \
-  export TFT_SERVER_NODE=\$(oc get nodes | grep worker-dpu | awk 'NR==1 {print \$1}'); \
-  echo \${TFT_SERVER_NODE} ;\
-  export TFT_CLIENT_NODE=\$(oc get nodes | grep worker-dpu | awk 'NR==2 {print \$1}'); \
-  echo \${TFT_CLIENT_NODE} ; \
-  source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
-  echo \${LAST_OPENSHIFT_DPF}; \
-  make run-traffic-flow-tests 2>&1 | tee log-traffic-flow-tests-${datetime_string}"; then
-
-  echo "Kubernetes Network Traffic Flow Iperf Tests Passed";
-  NETWORK_TESTS_RESULT="PASS"
-
-else
-  echo "Kubernetes Network Traffic Flow Iperf Tests Failed";
-
-fi
-
-echo "====== Output DPF Kubernetes Traffic Flow Tests Log file:"
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
-  echo \${LAST_OPENSHIFT_DPF}; \
-  env; \
-  cd \${LAST_OPENSHIFT_DPF}; \
-  cat log-traffic-flow-tests-${datetime_string}"; then
-
-  echo "Successfully output Kubernetes Network Traffic Flow Iperf Tests logs";
-
-else
-  echo "Failed to output DPF kubernetes Traffic Flow Iperf Tests logs";
-
-fi
-
-# Parse the log files, may need to scp to container running ssh cmds and process the
-# output file and exit accordingly
-
-if [ "${NETWORK_TESTS_RESULT}" == "PASS" ]; then
-  exit 0
-fi
-
-exit 1
-
+echo "=== Running DPF Kubernetes Traffic Flow Tests ==="
+echo "TFT_EXTERNAL_SERVER=${TFT_EXTERNAL_SERVER}"
+make run-traffic-flow-tests
