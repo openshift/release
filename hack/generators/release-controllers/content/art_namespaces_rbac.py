@@ -81,6 +81,12 @@ def add_imagestream_namespace_rbac(gendoc):
             'kind': 'Group',
             'name': 'system:authenticated'
         })
+        if context.product.name == 'okd':
+            puller_subjects.append({
+                'apiGroup': 'rbac.authorization.k8s.io',
+                'kind': 'Group',
+                'name': 'system:unauthenticated'
+            })
     else:
         puller_subjects.extend(get_private_release_pullers())
 
