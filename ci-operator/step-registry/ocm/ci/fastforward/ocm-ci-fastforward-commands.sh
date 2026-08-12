@@ -62,8 +62,7 @@ if ! git clone -b "$DESTINATION_BRANCH" "$repo_url" ; then
     log "INFO Cloning SOURCE_BRANCH"
     if ! git clone -b "$SOURCE_BRANCH" "$repo_url" ; then
         log "ERROR Could not clone SOURCE_BRANCH"
-        log "      repo   = $repo"
-        log "      branch = $SOURCE_BRANCH"
+        log "      repo_url = $repo_url"
         exit 1
     fi
 
