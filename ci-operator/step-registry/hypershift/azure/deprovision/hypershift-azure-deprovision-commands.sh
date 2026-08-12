@@ -82,7 +82,8 @@ phase1_hc_pruner() {
         --name="${hc}" \
         --namespace=clusters \
         --dns-zone-rg-name=os4-common \
-        --cluster-grace-period 40m || had_failure=$((had_failure+1))
+        --cluster-grace-period 20m \
+        --force || had_failure=$((had_failure+1))
     fi
   done
 
