@@ -305,7 +305,7 @@ function build_hypervisor_config() {
 function upgrade() {
     mirror_release_image_for_disconnected_upgrade
     set -x
-    openshift-tests run-upgrade all \
+    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE:-all}" \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
         --provider "${TEST_PROVIDER:-}" \
         ${TEST_UPGRADE_ARGS:-} \
