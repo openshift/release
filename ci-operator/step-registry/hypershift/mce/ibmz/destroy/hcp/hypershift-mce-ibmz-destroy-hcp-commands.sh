@@ -61,7 +61,8 @@ detach_nodes() {
 }
 
 echo "$(date) Waiting for the compute nodes to successfully detach from the hosted cluster ${HC_NAME}"
-oc wait --for=jsonpath='{.status.replicas}'=0 np/${HC_NAME} -n ${HC_NS} --timeout=10m || detach_nodes
+# Best-effort: np CRD may not exist if create step failed before hypershift-mce-install ran
+oc wait --for=jsonpath='{.status.replicas}'=0 np/${HC_NAME} -n ${HC_NS} --timeout=10m || detach_nodes || true
 
 echo "$(date) Deleting agents from the namespace ${hcp_ns}"
 agents=$(oc get agents -n ${hcp_ns} --no-headers | awk '{print $1}')

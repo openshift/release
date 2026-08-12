@@ -18,6 +18,12 @@ httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 
 
+# mgmt_cluster_name is written by create-s390xmgmt; if that step failed, the file won't exist.
+# Nothing was provisioned so there is nothing to destroy — exit cleanly.
+if [[ ! -f "$SHARED_DIR/mgmt_cluster_name" ]]; then
+    echo "WARN: $SHARED_DIR/mgmt_cluster_name not found — create-s390xmgmt did not complete, no zVSIs to destroy."
+    exit 0
+fi
 MGMT_CLUSTER_NAME=$(cat "$SHARED_DIR/mgmt_cluster_name")
 export MGMT_CLUSTER_NAME
 
