@@ -13,7 +13,9 @@ chmod 600 /tmp/id_rsa
 SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
 # Start iperf3 server on bastion via podman
-CONTAINER_NAME="tft-iperf3-$(date +%s)"
+CONTAINER_NAME="tft-iperf3-server"
+echo "Cleaning up any leftover iperf3 container on bastion..."
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "podman rm -f ${CONTAINER_NAME}" || true
 echo "Starting iperf3 server container '${CONTAINER_NAME}' on bastion ${REMOTE_HOST}..."
 ssh ${SSH_OPTS} root@${REMOTE_HOST} \
     "podman run -d --rm --name ${CONTAINER_NAME} --network host ghcr.io/ovn-kubernetes/kubernetes-traffic-flow-tests:latest iperf3 -s -p 5201"
