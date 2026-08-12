@@ -662,8 +662,24 @@ if [[ "${DISABLE_BOOT_IMAGE_UPDATE}" == "true" ]]; then
     fi
 fi
 
+set +e
 upgrade
+upgrade_rc=$?
+if [[ $upgrade_rc -ne 0 ]]; then
+    echo "UPGRADE COMMAND FAILED - WAITING FOR DEBUG..."
+    echo "Touch /tmp/continue to proceed"
+    while [ ! -f "/tmp/continue" ]; do sleep 10; done
+    exit $upgrade_rc
+fi
 check_upgrade_status
+upgrade_status_rc=$?
+if [[ $upgrade_status_rc -ne 0 ]]; then
+    echo "UPGRADE STATUS CHECK FAILED - WAITING FOR DEBUG..."
+    echo "Touch /tmp/continue to proceed"
+    while [ ! -f "/tmp/continue" ]; do sleep 10; done
+    exit $upgrade_status_rc
+fi
+set -e
 
 if [[ "$UPGRADE_RHEL_WORKER_BEFOREHAND" != "triggered" ]]; then
     check_history
