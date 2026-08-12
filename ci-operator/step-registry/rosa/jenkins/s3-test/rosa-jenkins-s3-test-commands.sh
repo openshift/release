@@ -98,10 +98,15 @@ fi
 
 # Test 5: Verify IAM policy scope (should NOT be able to access other buckets)
 log "Test 4: Verifying IAM policy scope (negative test)..."
-if aws s3 ls s3://cloudtrail-ccb904aa-75ce-3db2-854a-ecab3eb4a5e3/ 2>&1 | grep -q "AccessDenied"; then
+if OUTPUT=$(aws s3 ls s3://cloudtrail-ccb904aa-75ce-3db2-854a-ecab3eb4a5e3/ 2>&1); then
+    log "✗ ERROR: Credentials have broader S3 access than expected"
+    exit 1
+elif echo "$OUTPUT" | grep -q "AccessDenied"; then
     log "✓ Correctly denied access to other buckets (IAM policy working as expected)"
 else
-    log "⚠ WARNING: May have broader S3 access than expected"
+    log "✗ ERROR: Unexpected response from IAM scope test"
+    echo "$OUTPUT"
+    exit 1
 fi
 
 log "========================================"
