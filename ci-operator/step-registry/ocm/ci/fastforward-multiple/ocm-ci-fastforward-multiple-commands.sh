@@ -1050,17 +1050,27 @@ SKIPPED_REPOS=(
 # Per-repo version exclusions loaded from SKIP_VERSIONS_PATH (YAML file)
 SKIPPED_REPO_VERSIONS=()
 
-if [[ -n "${SKIP_VERSIONS_PATH:-}" ]] && [[ -f "${SKIP_VERSIONS_PATH}" ]]; then
+if [[ -n "${SKIP_VERSIONS_PATH:-}" ]]; then
+  if [[ ! -f "${SKIP_VERSIONS_PATH}" ]]; then
+    echo "ERROR: SKIP_VERSIONS_PATH set but file not found: ${SKIP_VERSIONS_PATH}"
+    exit 1
+  fi
+
   echo "INFO: Loading per-repo version exclusions from ${SKIP_VERSIONS_PATH}"
+  yq_output=""
+  if ! yq_output=$(yq '.skip_versions[] | .repo as $r | .versions[] | $r + ":" + .' "${SKIP_VERSIONS_PATH}"); then
+    echo "ERROR: Failed to parse ${SKIP_VERSIONS_PATH}"
+    exit 1
+  fi
+
   while IFS= read -r entry; do
     [[ -n "$entry" ]] && SKIPPED_REPO_VERSIONS+=("$entry")
-  done < <(yq '.skip_versions[] | .repo as $r | .versions[] | $r + ":" + .' "${SKIP_VERSIONS_PATH}")
+  done <<< "$yq_output"
+
   echo "INFO: Loaded ${#SKIPPED_REPO_VERSIONS[@]} repo:version exclusion(s)"
   for entry in "${SKIPPED_REPO_VERSIONS[@]+"${SKIPPED_REPO_VERSIONS[@]}"}"; do
     echo "  - ${entry}"
   done
-elif [[ -n "${SKIP_VERSIONS_PATH:-}" ]]; then
-  echo "WARNING: SKIP_VERSIONS_PATH set but file not found: ${SKIP_VERSIONS_PATH}"
 fi
 
 is_repo_version_skipped() {
