@@ -641,66 +641,44 @@ EOF
 - name: Wait for sideloaded kernel on {{ worker_node }}
   when: sideload_kernel_uri != 'reset'
   block:
-    # Prefer host uname -r: nodeInfo.kernelVersion can be empty right after Ready.
-    # RT kernels append "+rt" to the release (RPM URI has no such suffix).
-    - name: Poll uname -r on {{ worker_node }}
-      ansible.builtin.command:
-        argv:
-          - oc
-          - --kubeconfig={{ kubeconfig }}
-          - debug
-          - node/{{ worker_node }}
-          - --quiet
-          - --
-          - chroot
-          - /host
-          - uname
-          - -r
-      register: node_uname
+    # RT kernels report nodeInfo.kernelVersion / uname -r with a "+rt" suffix;
+    # the RPM URI basename does not include it.
+    - name: Poll node kernelVersion for {{ worker_node }}
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Node
+        name: "{{ worker_node }}"
+      environment: "{{ k8s_auth }}"
+      register: node_kernel_state
       until: >-
-        (node_uname.stdout | default('') | trim | regex_replace('\\+rt$', ''))
-        == expected_kernel_release
+        node_kernel_state.resources | length > 0
+        and (
+          node_kernel_state.resources[0].status.nodeInfo.kernelVersion | default('')
+          | regex_replace('\\+rt$', '')
+        ) == expected_kernel_release
       retries: "{{ (sideload_kernel_job_timeout | int) * 4 }}"
       delay: 15
-      changed_when: false
 
     - name: Confirm sideloaded kernel on {{ worker_node }}
       ansible.builtin.debug:
         msg: >-
-          Verified {{ worker_node }} uname -r={{ node_uname.stdout | trim }}
+          Verified {{ worker_node }} kernelVersion={{
+          node_kernel_state.resources[0].status.nodeInfo.kernelVersion }}
           matches {{ expected_kernel_release }} (optional +rt suffix ignored)
   rescue:
     - name: Fail when sideloaded kernel is not active on {{ worker_node }}
       ansible.builtin.fail:
         msg: >-
-          After sideload reboot, {{ worker_node }} uname -r={{
-          node_uname.stdout | default('') | trim | default('unknown', true)
+          After sideload reboot, {{ worker_node }} kernelVersion={{
+          node_kernel_state.resources[0].status.nodeInfo.kernelVersion | default('unknown')
           }} does not match expected {{ expected_kernel_release }}
           (or {{ expected_kernel_release }}+rt) from {{ sideload_kernel_uri }}
 
 - name: Record post-reset kernel on {{ worker_node }}
-  when: sideload_kernel_uri == 'reset'
-  ansible.builtin.command:
-    argv:
-      - oc
-      - --kubeconfig={{ kubeconfig }}
-      - debug
-      - node/{{ worker_node }}
-      - --quiet
-      - --
-      - chroot
-      - /host
-      - uname
-      - -r
-  register: node_uname_reset
-  changed_when: false
-  ignore_errors: true
-
-- name: Show post-reset kernel on {{ worker_node }}
   ansible.builtin.debug:
     msg: >-
-      reset requested; {{ worker_node }} uname -r={{
-      node_uname_reset.stdout | default('') | trim | default('unknown', true) }}
+      reset requested; {{ worker_node }} kernelVersion={{
+      node_state.resources[0].status.nodeInfo.kernelVersion | default('unknown') }}
   when: sideload_kernel_uri == 'reset'
 EOF
 
