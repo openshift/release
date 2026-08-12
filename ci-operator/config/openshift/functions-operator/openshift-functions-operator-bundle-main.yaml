@@ -1,3 +1,8 @@
+base_images:
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   image_stream_tag:
     name: release
@@ -5,8 +10,8 @@ build_root:
     tag: rhel-9-release-golang-1.26-openshift-5.0
 images:
   items:
-  - dockerfile_path: Dockerfile
-    to: functions-operator
+  - dockerfile_path: bundle.Dockerfile
+    to: functions-operator-bundle
 releases:
   latest:
     integration:
@@ -20,17 +25,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: GOFLAGS="" make test
+- as: validate-bundle
+  commands: operator-sdk bundle validate ./bundle --select-optional suite=operatorframework
   container:
-    from: src
+    from: operator-sdk
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
-- as: lint
-  commands: GOFLAGS="" GOLANGCI_LINT_CACHE=/tmp/.cache make lint
-  container:
-    from: src
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
-- as: e2e-deploy-aws
+- as: e2e-install-aws
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -42,36 +42,42 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     test:
-    - as: deploy
+    - as: install
       cli: latest
       commands: |
-        GOFLAGS="" IMG="${OPERATOR_IMG}" make deploy
-        oc wait --for=condition=Ready pod -n func-operator-system -l control-plane=controller-manager --timeout=5m
+        NS="serverless-functions-$(head -c 128 </dev/urandom | LC_CTYPE=C tr -dc 'a-z0-9' | head -c 6)"
+        echo "$NS" > "${SHARED_DIR}/test-namespace"
+        oc create namespace "$NS"
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n "$NS" "${BUNDLE_IMG}" --verbose
+        oc wait --for condition=Available -n "$NS" deployment func-operator-controller-manager --timeout=5m
       dependencies:
-      - env: OPERATOR_IMG
-        name: functions-operator
-      from: src
+      - env: BUNDLE_IMG
+        name: functions-operator-bundle
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
     - as: verify
       cli: latest
       commands: |
+        NS=$(cat "${SHARED_DIR}/test-namespace")
+
         echo "Verifying CRDs..."
         oc get crd functions.functions.dev
         oc get crd objectbucketsources.sources.functions.dev
 
         echo "Verifying operator pod is running..."
-        oc get pods -n func-operator-system -l control-plane=controller-manager -o wide
+        oc get pods -n "$NS" -l control-plane=controller-manager -o wide
+        oc wait --for=condition=Ready pod -n "$NS" -l control-plane=controller-manager --timeout=2m
 
         echo "Verifying metrics endpoint..."
-        oc get service -n func-operator-system func-operator-controller-manager-metrics-service
-      from: src
+        oc get service -n "$NS" func-operator-controller-manager-metrics-service
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
     workflow: generic-claim
 zz_generated_metadata:
-  branch: main
+  branch: bundle-main
   org: openshift
   repo: functions-operator
