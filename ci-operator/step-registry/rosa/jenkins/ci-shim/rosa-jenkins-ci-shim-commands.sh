@@ -150,9 +150,12 @@ parse_result() {
     fi
 
     # Extract fields (only allowlisted safe fields)
-    local status=$(jq -r '.status // "unknown"' "${result_file}")
-    local duration=$(jq -r '.duration // "unknown"' "${result_file}")
-    local jenkins_build=$(jq -r '.jenkinsBuild // "unknown"' "${result_file}")
+    local status
+    local duration
+    local jenkins_build
+    status=$(jq -r '.status // "unknown"' "${result_file}")
+    duration=$(jq -r '.duration // "unknown"' "${result_file}")
+    jenkins_build=$(jq -r '.jenkinsBuild // "unknown"' "${result_file}")
 
     log "========================================"
     log "GovCloud Test Results"
