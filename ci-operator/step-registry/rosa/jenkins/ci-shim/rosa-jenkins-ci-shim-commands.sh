@@ -145,16 +145,14 @@ parse_result() {
 
     # Validate JSON
     if ! jq empty "${result_file}" 2>/dev/null; then
-        log_error "Invalid JSON in result.json"
-        cat "${result_file}"
+        log_error "Invalid JSON in result.json - file is malformed or corrupted"
         return 1
     fi
 
-    # Extract fields
+    # Extract fields (only allowlisted safe fields)
     local status=$(jq -r '.status // "unknown"' "${result_file}")
     local duration=$(jq -r '.duration // "unknown"' "${result_file}")
     local jenkins_build=$(jq -r '.jenkinsBuild // "unknown"' "${result_file}")
-    local message=$(jq -r '.message // ""' "${result_file}")
 
     log "========================================"
     log "GovCloud Test Results"
@@ -162,9 +160,6 @@ parse_result() {
     log "Status: ${status}"
     log "Duration: ${duration}"
     log "Jenkins Build: ${jenkins_build}"
-    if [[ -n "${message}" ]]; then
-        log "Message: ${message}"
-    fi
     log "========================================"
 
     # Copy result.json to ARTIFACT_DIR for Prow visibility

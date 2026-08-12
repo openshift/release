@@ -29,9 +29,20 @@ periodics:
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
+      securityContext:
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
       resources:
         requests:
-          cpu: 10m
+          cpu: 100m
+          memory: 200Mi
+        limits:
+          cpu: 500m
+          memory: 500Mi
       volumeMounts:
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -47,6 +58,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: gcs-credentials
+      secret:
+        secretName: gcs-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -68,6 +82,7 @@ periodics:
     org: openshift
     repo: release
   labels:
+    executor: govcloud-jenkins
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-rosa-govcloud-s3-test
   spec:
@@ -82,9 +97,20 @@ periodics:
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
+      securityContext:
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
       resources:
         requests:
-          cpu: 10m
+          cpu: 100m
+          memory: 200Mi
+        limits:
+          cpu: 500m
+          memory: 500Mi
       volumeMounts:
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -97,6 +123,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: gcs-credentials
+      secret:
+        secretName: gcs-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
