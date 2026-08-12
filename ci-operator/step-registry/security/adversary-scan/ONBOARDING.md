@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `security-adversary-scan` step runs the [adversary](https://github.com/openshift-online/rosa-claude-plugins/tree/main/security) security scanner against your repo's source code. It covers 17 security domains: SAST, IaC, containers, Kubernetes, CI/CD, secrets, supply chain, web, API, auth, database, mobile, cloud, performance, git, agent/skill, and critical workflows.
+The `security-adversary-scan` step runs the adversary security scanner (from `openshift-online/rosa-claude-plugins`, requires org membership) against your repo's source code. It covers 17 security domains: SAST, IaC, containers, Kubernetes, CI/CD, secrets, supply chain, web, API, auth, database, mobile, cloud, performance, git, agent/skill, and critical workflows.
 
 The scan uses Claude Code with the adversary skill from the `rosa-claude-plugins` marketplace. Results are stored as Prow artifacts and optionally posted to Slack.
 
@@ -132,7 +132,6 @@ All results are stored as Prow artifacts, accessible from the job link on the PR
 | `adversary-scan.log` | Full Claude conversation log |
 | `junit_adversary.xml` | JUnit pass/fail for Prow UI |
 | `adversary-groundwork-report.html` | Interactive HTML report (groundwork mode only) |
-| `claude-sessions.tar.gz` | Claude session transcripts |
 
 ## Example: Complete Config with All Job Types
 

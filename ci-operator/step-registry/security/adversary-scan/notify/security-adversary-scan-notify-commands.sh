@@ -66,8 +66,6 @@ while IFS='=' read -r key value; do
     esac
 done < "${FINDINGS_FILE}"
 
-TOTAL=$(( CRITICAL + HIGH + MEDIUM + LOW ))
-
 echo "Findings: ${CRITICAL} critical, ${HIGH} high, ${MEDIUM} medium, ${LOW} low"
 
 # -----------------------------------------------------------------------
