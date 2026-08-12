@@ -42,13 +42,13 @@ poll() {
 
 is_v6() { [[ "$1" == *:* ]]; }
 
-echo "[1/5] Infrastructure CR requests BGP VIP management"
+echo "[1/6] Infrastructure CR requests BGP VIP management"
 vip_management="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.baremetal.vipManagement}')"
 if [[ "${vip_management}" != "BGP" ]]; then
     fail "vipManagement is '${vip_management}', expected 'BGP'"
 fi
 
-echo "[2/5] a Ready frr-k8s static pod runs on every control plane node"
+echo "[2/6] a Ready frr-k8s static pod runs on every control plane node"
 masters="$(oc get nodes -l node-role.kubernetes.io/master -o name | wc -l)"
 for node in $(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.items[*].metadata.name}'); do
     ready="$(oc get pod -n openshift-frr-k8s "frr-k8s-${node}" \
@@ -58,14 +58,57 @@ for node in $(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{.item
     fi
 done
 
-echo "[3/5] no keepalived pods (BGP replaces VRRP)"
+echo "[3/6] no keepalived pods (BGP replaces VRRP)"
 keepalived="$(oc get pods --all-namespaces -o name | { grep -c keepalived || true; })"
 if [[ "${keepalived}" -ne 0 ]]; then
     oc get pods --all-namespaces | grep keepalived || true
     fail "found ${keepalived} keepalived pods, expected none"
 fi
 
-echo "[4/5] ToR sees every VIP of every address family with the expected path counts"
+echo "[4/6] every ToR BGP session is Established with the negotiated timers and BFD up"
+# The peers are configured with holdTime=90s/keepaliveTime=30s (dev-scripts
+# BGP_VIP_* defaults) and BFD; the negotiated values prove the node-side FRR
+# actually accepted and applied the rendered timer/BFD config. A silently
+# rejected "timers" line would leave the FRR defaults (180/60) in place and
+# fail this check even though the session still establishes.
+masters_total="$(oc get nodes -l node-role.kubernetes.io/master -o name | wc -l)"
+neighbors_json() {
+    ${CLI} exec bgp-tor vtysh -c 'show bgp neighbors json' 2>/dev/null
+}
+check_sessions() {
+    neighbors_json | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+expected_min = int(sys.argv[1])
+failures = []
+established = 0
+for addr, n in data.items():
+    state = n.get("bgpState")
+    if state != "Established":
+        failures.append(f"{addr}: state {state}, expected Established")
+        continue
+    established += 1
+    hold = n.get("bgpTimerHoldTimeMsecs")
+    keep = n.get("bgpTimerKeepAliveIntervalMsecs")
+    if hold != 90000 or keep != 30000:
+        failures.append(f"{addr}: negotiated timers hold={hold}ms keepalive={keep}ms, expected 90000/30000 - the node-side FRR did not apply the configured timers")
+    bfd = n.get("peerBfdInfo", {}).get("status")
+    if bfd != "Up":
+        failures.append(f"{addr}: BFD status {bfd!r}, expected Up")
+if established < expected_min:
+    failures.append(f"only {established} Established session(s), expected at least {expected_min} (one per master)")
+for f in failures:
+    print(f)
+sys.exit(1 if failures else 0)
+' "${expected_min}"
+}
+expected_min="${masters_total}"
+if ! poll 300 check_sessions; then
+    neighbors_json || true
+    fail "BGP sessions at the ToR not Established with negotiated timers 90/30 and BFD Up"
+fi
+
+echo "[5/6] ToR sees every VIP of every address family with the expected path counts"
 api_vips="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.baremetal.apiServerInternalIPs[*]}')"
 ingress_vips="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.baremetal.ingressIPs[*]}')"
 workers="$(oc get nodes -l node-role.kubernetes.io/worker -o name | { grep -cv master || true; })"
@@ -102,7 +145,7 @@ else
     done
 fi
 
-echo "[5/5] console answers over the BGP-routed ingress VIP of every family"
+echo "[6/6] console answers over the BGP-routed ingress VIP of every family"
 console_url="$(oc whoami --show-console)"
 console_host="${console_url#https://}"
 console_host="${console_host%%/*}"
