@@ -31,13 +31,6 @@ copy_artifacts() {
         cp /tmp/groundwork-report.html "${ARTIFACT_DIR}/adversary-groundwork-report.html"
         echo "Groundwork HTML report copied."
     fi
-
-    # Claude session transcripts
-    CLAUDE_HOME="/home/claude/.claude"
-    if [[ -d "${CLAUDE_HOME}/projects" ]]; then
-        tar -czf "${ARTIFACT_DIR}/claude-sessions.tar.gz" \
-            -C "${CLAUDE_HOME}" projects/ 2>/dev/null || true
-    fi
 }
 trap copy_artifacts EXIT TERM INT
 
@@ -115,10 +108,10 @@ echo "=== Scan completed in ${SCAN_DURATION}s (exit ${EXIT_CODE}) ==="
 # -----------------------------------------------------------------------
 LOG_FILE="${ARTIFACT_DIR}/adversary-scan.log"
 
-CRITICAL=$(grep -c '\[CRITICAL\]' "${LOG_FILE}" 2>/dev/null || echo 0)
-HIGH=$(grep -c '\[HIGH\]' "${LOG_FILE}" 2>/dev/null || echo 0)
-MEDIUM=$(grep -c '\[MEDIUM\]' "${LOG_FILE}" 2>/dev/null || echo 0)
-LOW=$(grep -c '\[LOW\]' "${LOG_FILE}" 2>/dev/null || echo 0)
+CRITICAL=$(grep -c '\[CRITICAL\]' "${LOG_FILE}" 2>/dev/null) || CRITICAL=0
+HIGH=$(grep -c '\[HIGH\]' "${LOG_FILE}" 2>/dev/null) || HIGH=0
+MEDIUM=$(grep -c '\[MEDIUM\]' "${LOG_FILE}" 2>/dev/null) || MEDIUM=0
+LOW=$(grep -c '\[LOW\]' "${LOG_FILE}" 2>/dev/null) || LOW=0
 
 echo "Findings: ${CRITICAL} critical, ${HIGH} high, ${MEDIUM} medium, ${LOW} low"
 
