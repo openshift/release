@@ -686,6 +686,33 @@ tests:
     - ref: openshift-qe-workers-scale
     test:
     - chain: openshift-qe-cudn-density
+- as: evpn
+  cron: 0 10 * * 2,4
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      EXTERNAL_WEBSERVER_IP: 172.27.187.82
+      ITERATIONS: "5"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+    test:
+    - ref: ipi-install-post-featureset
+    - ref: openshift-qe-evpn
+    workflow: openshift-qe-installer-aws-bastion
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
