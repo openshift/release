@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-export API_GROUP=${API_GROUP}
+export API_GROUP=cluster.x-k8s.io
 export API_NAMESPACE=openshift-cluster-api
 
 function print_node_machine_info() {
