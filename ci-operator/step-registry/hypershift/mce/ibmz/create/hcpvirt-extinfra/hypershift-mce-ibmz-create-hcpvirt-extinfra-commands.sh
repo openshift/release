@@ -59,12 +59,15 @@ echo "$(date) Kubevirt cluster is available"
 
 # --- Step 3: Retrieve the guest cluster kubeconfig ---
 echo "$(date) Retrieving guest cluster kubeconfig"
-hcp create kubeconfig kubevirt --name "${HC_NAME}" --namespace "${HC_NS}" > "${SHARED_DIR}/virt-kubeconfig"
+hcp create kubeconfig kubevirt --name "${HC_NAME}" --namespace "${HC_NS}" > "${SHARED_DIR}/nested_kubeconfig"
+
+# Save mgmt kubeconfig so hypershift-conformance chain picks it up via mgmt_kubeconfig
+cp "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/mgmt_kubeconfig"
 
 # --- Step 4: Wait for 2 worker nodes to join (with metallb speaker rollout on failure) ---
 echo "$(date) Waiting for 2 worker nodes to join the guest cluster"
 
-VIRT_KC="${SHARED_DIR}/virt-kubeconfig"
+VIRT_KC="${SHARED_DIR}/nested_kubeconfig"
 REQUIRED_NODES=2
 MAX_RETRIES=10
 
@@ -188,3 +191,6 @@ if [[ -n "${UNAVAILABLE}" ]]; then
 fi
 
 echo "$(date) HCP virt - external infra cluster is fully operational"
+
+# Set KUBECONFIG to guest cluster so subsequent steps (hypershift-conformance) target it
+export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
