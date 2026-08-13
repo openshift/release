@@ -221,8 +221,21 @@ function update_image_registry() {
   oc wait co image-registry  --for=condition=Progressing=False --timeout=10m
   sleep 60
   echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver and openshift-apiserver to finish rolling out..."
-  oc wait co kube-apiserver  openshift-apiserver --for=condition=Progressing=False  --timeout=30m
-  oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
+  for co in kube-apiserver openshift-apiserver; do
+    for attempt in $(seq 1 5); do
+      if oc wait co "${co}" --for=condition=Progressing=False --timeout=30m && \
+         oc wait co "${co}" --for=condition=Degraded=False --timeout=1m; then
+        echo "$(date -u --rfc-3339=seconds) - ${co} is stable."
+        break
+      fi
+      if [ "${attempt}" -eq 5 ]; then
+        echo "ERROR: ${co} did not stabilize after 5 attempts."
+        return 1
+      fi
+      echo "$(date -u --rfc-3339=seconds) - Attempt ${attempt}/5: transient error waiting for ${co}, retrying in 60s..."
+      sleep 60
+    done
+  done
 }
 
 function update_sno_bip_live_iso {
