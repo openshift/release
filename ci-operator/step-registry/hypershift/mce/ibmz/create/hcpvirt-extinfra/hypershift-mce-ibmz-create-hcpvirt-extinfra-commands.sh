@@ -51,7 +51,8 @@ hcp create cluster kubevirt \
   --root-volume-size 60 \
   --infra-namespace=ext-infra-vms-ns \
   --infra-kubeconfig-file="${SHARED_DIR}/infra-kubeconfig" \
-  --release-image ${OCP_IMAGE_MULTI}
+  --release-image quay.io/openshift-release-dev/ocp-release:4.22.9-multi
+ # --release-image ${OCP_IMAGE_MULTI}
 
 echo "$(date) DEBUG: HostedCluster created, listing HC and NodePool status"
 oc get hostedcluster -n ${HC_NS} ${HC_NAME} -o yaml || true
