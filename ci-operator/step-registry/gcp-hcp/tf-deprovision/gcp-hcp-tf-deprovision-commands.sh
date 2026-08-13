@@ -36,18 +36,30 @@ log "Deprovisioning infrastructure for workspace: ${WORKSPACE_NAME}"
 # The 'src' image already contains the gcp-hcp-infra repo at the working directory.
 REPO_ROOT="$(pwd)"
 
-# Read terraform version from .tool-versions to ensure consistency with local dev
-TERRAFORM_VERSION="$(grep '^terraform' "${REPO_ROOT}/.tool-versions" | awk '{print $2}')"
-
-if [[ -z "${TERRAFORM_VERSION}" ]]; then
+# Read terraform version — use awk to avoid grep pipefail on missing entry
+if ! TERRAFORM_VERSION="$(awk '$1 == "terraform" { print $2; exit }' "${REPO_ROOT}/.tool-versions")" \
+  || [[ -z "${TERRAFORM_VERSION}" ]]; then
   log "ERROR: Failed to read terraform version from .tool-versions"
+  log "Auto-destroy will clean up resources in 24h"
   exit 0  # Don't fail job
 fi
 
 log "Installing Terraform ${TERRAFORM_VERSION}..."
-curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
-python3 -c "import zipfile; zipfile.ZipFile('/tmp/terraform.zip').extractall('/tmp')"
-chmod +x /tmp/terraform
+if ! curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip; then
+  log "ERROR: Failed to download Terraform ${TERRAFORM_VERSION}"
+  log "Auto-destroy will clean up resources in 24h"
+  exit 0  # Don't fail job
+fi
+if ! python3 -c "import zipfile; zipfile.ZipFile('/tmp/terraform.zip').extractall('/tmp')"; then
+  log "ERROR: Failed to extract Terraform"
+  log "Auto-destroy will clean up resources in 24h"
+  exit 0  # Don't fail job
+fi
+if ! chmod +x /tmp/terraform; then
+  log "ERROR: Failed to make Terraform executable"
+  log "Auto-destroy will clean up resources in 24h"
+  exit 0  # Don't fail job
+fi
 export PATH="/tmp:${PATH}"
 
 # We need the same terraform config that was used in provision

@@ -36,14 +36,14 @@ tfc_api_call() {
     
     if (( attempt < max_retries )); then
       local wait_time=$((attempt * 5))
-      log "API call failed (attempt ${attempt}/${max_retries}), retrying in ${wait_time}s..."
+      log "API call failed (attempt ${attempt}/${max_retries}), retrying in ${wait_time}s..." >&2
       sleep ${wait_time}
     fi
     
     ((attempt++))
   done
   
-  log "ERROR: API call failed after ${max_retries} attempts"
+  log "ERROR: API call failed after ${max_retries} attempts" >&2
   return 1
 }
 
@@ -215,7 +215,7 @@ echo "${WORKSPACE_NAME}" > "${SHARED_DIR}/workspace-name"
 echo "${RUN_ID}" > "${SHARED_DIR}/run-id"
 
 # Validate critical outputs were written
-for output_file in region-project-id mc-project-id workspace-name run-id; do
+for output_file in region-project-id mc-project-id mc-cluster-name mc-cluster-endpoint workspace-name run-id; do
   if [[ ! -s "${SHARED_DIR}/${output_file}" ]]; then
     log "ERROR: Output file ${output_file} is empty or missing"
     exit 1
