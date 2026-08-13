@@ -32,13 +32,24 @@ log "Deprovisioning infrastructure for workspace: ${WORKSPACE_NAME}"
 # via the WIF variable set on the TFC workspace — no local gcloud required.
 
 # Install rsync if not present (needed by scripts/e2e-render.sh).
+# Stopgap: download RPM and extract binary without root.
+# TODO: Remove once gcp-hcp-infra-base image includes rsync.
 if ! command -v rsync >/dev/null 2>&1; then
-  log "rsync not found, installing..."
-  if ! dnf install -y --nodocs rsync 2>&1 | tail -1; then
-    log "WARNING: Failed to install rsync"
+  log "rsync not found, extracting from RPM..."
+  _rsync_tmp="$(mktemp -d)"
+  if ! curl -fsSL --connect-timeout 15 --max-time 60 \
+    "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/os/Packages/rsync-3.3.0-5.el10.x86_64.rpm" \
+    -o "${_rsync_tmp}/rsync.rpm"; then
+    log "WARNING: Failed to download rsync RPM"
     log "Auto-destroy will clean up resources in 24h"
+    rm -rf "${_rsync_tmp}"
     exit 0
   fi
+  rpm2cpio "${_rsync_tmp}/rsync.rpm" | cpio -idm -D "${_rsync_tmp}" 2>/dev/null
+  cp "${_rsync_tmp}/usr/bin/rsync" /tmp/rsync
+  chmod +x /tmp/rsync
+  export PATH="/tmp:${PATH}"
+  rm -rf "${_rsync_tmp}"
 fi
 
 # --- Install Terraform ---
