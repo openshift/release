@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -euxo pipefail; shopt -s inherit_errexit
 
 # Legacy backward compatibility. TODO: To be removed once all caller are migrated.
 : "${DR__RP__CR_COMP_NAME:=${REPORTPORTAL_CMP}}"
@@ -15,7 +15,7 @@ if [ -z "${OCP_VERSION}" ]; then
     fi
 fi
 
-launch_attrs="$(
+launchAttrs="$(
     jq -nc \
         --arg jobName "${JOB_NAME}" \
         --arg buildID "${BUILD_ID}" \
@@ -37,7 +37,7 @@ RETRY_INTERVAL=120
 for (( attempt=1; attempt<=MAX_RETRIES; attempt++ )); do
     if DATAROUTER_RESULTS="${SHARED_DIR}/*.xml" \
         REPORTPORTAL_LAUNCH_NAME="${DR__RP__CR_COMP_NAME}" \
-        REPORTPORTAL_LAUNCH_ATTRIBUTES="${launch_attrs}" \
+        REPORTPORTAL_LAUNCH_ATTRIBUTES="${launchAttrs}" \
         datarouter-openshift-ci; then
         echo "INFO: Data Router upload succeeded on attempt ${attempt}"
         exit 0
