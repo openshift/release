@@ -11,10 +11,10 @@
 set -euo pipefail
 
 # --- Configuration ---
-VAULT_CREDS_DIR="/var/run/vault/secrets-store-csi"
+VAULT_CREDS_DIR="/etc/hypershift-agent-ibmz-credentials"
 
-# Vault license
-VAULT_LICENSE_FILE="${VAULT_CREDS_DIR}/vault-license.yaml"
+# Vault license (just the license string, not a full YAML)
+VAULT_LICENSE_STRING_FILE="${VAULT_CREDS_DIR}/vault-license"
 VAULT_NAMESPACE="vault"
 
 # Repo
@@ -119,20 +119,17 @@ validate_files() {
 
     local missing=0
 
-    if [ ! -f "${VAULT_LICENSE_FILE}" ]; then
-        echo "ERROR: Required file not found: ${VAULT_LICENSE_FILE}"
+    if [ ! -f "${VAULT_LICENSE_STRING_FILE}" ]; then
+        echo "ERROR: Required file not found: ${VAULT_LICENSE_STRING_FILE}"
         missing=$(( missing + 1 ))
     else
-        echo "  [OK] ${VAULT_LICENSE_FILE}"
-    fi
-
-    # Validate vault-license.yaml has namespace: vault configured
-    if [ -f "${VAULT_LICENSE_FILE}" ]; then
-        if ! grep -q "namespace:.*vault" "${VAULT_LICENSE_FILE}"; then
-            echo "ERROR: '${VAULT_LICENSE_FILE}' does not have 'namespace: vault' set."
+        echo "  [OK] ${VAULT_LICENSE_STRING_FILE}"
+        # Validate it's not empty
+        if [ ! -s "${VAULT_LICENSE_STRING_FILE}" ]; then
+            echo "ERROR: '${VAULT_LICENSE_STRING_FILE}' is empty."
             missing=$(( missing + 1 ))
         else
-            echo "  [OK] vault-license.yaml namespace check passed"
+            echo "  [OK] vault-license file is not empty"
         fi
     fi
 
@@ -244,14 +241,20 @@ creds_dir = sys.argv[2]
 with open(path, 'r') as f:
     content = f.read()
 
-# Patch 1: Insert vault-license apply before "# install the vault provider"
-license_apply_line = f'  oc apply -f {creds_dir}/vault-license.yaml\n'
+# Patch 1: Insert vault-license secret creation before "# install the vault provider"
+license_secret_creation = f'''  # Create vault-license secret from license string
+  oc create namespace vault || true
+  oc create secret generic vault-license \\
+    --from-file=license={creds_dir}/vault-license \\
+    -n vault --dry-run=client -o yaml | oc apply -f -
+  
+'''
 vault_comment = '  # install the vault provider using the helm charts'
 
-if 'oc apply -f' not in content or 'vault-license.yaml' not in content:
+if 'vault-license' not in content or 'oc create secret' not in content:
     content = content.replace(
         vault_comment,
-        license_apply_line + vault_comment
+        license_secret_creation + vault_comment
     )
 
 # Patch 2: Replace the old helm install block
