@@ -1,0 +1,61 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+build_root:
+  from_repository: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- as: tls13-adherence-all
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      INSTALL_NAMESPACE: openshift-workload-availability
+      OCP_VERSION: "50"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation,storage-based-remediation
+      PQC_CHECK: "false"
+      SCAN_NAMESPACE: openshift-workload-availability
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: medik8s-catalogsource
+    - ref: medik8s-operator-subscribe
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- as: tls-pqc-readiness-all
+  cron: 0 6 * * 3
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      INSTALL_NAMESPACE: openshift-workload-availability
+      OCP_VERSION: "50"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation,storage-based-remediation
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-workload-availability
+    test:
+    - ref: medik8s-catalogsource
+    - ref: medik8s-operator-subscribe
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: system-tests
+  variant: "5.0"
