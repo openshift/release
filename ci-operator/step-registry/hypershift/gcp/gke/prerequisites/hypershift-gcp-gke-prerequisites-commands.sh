@@ -47,10 +47,14 @@ curl -sL "https://github.com/cert-manager/cert-manager/releases/download/${CERT_
 # Autopilot does not have to guess and delay scheduling.
 echo "Patching cert-manager deployments with explicit resource requests..."
 for deploy in cert-manager cert-manager-webhook cert-manager-cainjector; do
-  CONTAINER="${deploy#cert-manager-}"
-  # The main deployment container name is "cert-manager-controller"
+  # Container names match the deployment name, except for the main cert-manager
+  # deployment whose container is "cert-manager-controller".
+  # cert-manager v1.14.0 container names: cert-manager-controller,
+  # cert-manager-webhook, cert-manager-cainjector.
   if [[ "${deploy}" == "cert-manager" ]]; then
     CONTAINER="cert-manager-controller"
+  else
+    CONTAINER="${deploy}"
   fi
   oc patch deployment "${deploy}" -n cert-manager --type=strategic -p \
     "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"${CONTAINER}\",\"resources\":{\"requests\":{\"cpu\":\"50m\",\"memory\":\"64Mi\"}}}]}}}}"
