@@ -11,7 +11,8 @@ oc get application -A
 cd /root/dpf-ci
 cp "${SHARED_DIR}/.env" .env
 
-echo "Updating VERIFY_DEPLOYMENT, VERIFY_MAX_RETRIES and VERIFY_SLEEP_SECONDS in .env file"
+echo "Updating .env file"
+sed -i -E "s|^KUBECONFIG=.*$|KUBECONFIG=${KUBECONFIG}|" .env
 sed -i -E 's|^VERIFY_DEPLOYMENT=.*$|VERIFY_DEPLOYMENT=true|' .env
 sed -i -E 's|^VERIFY_MAX_RETRIES=.*$|VERIFY_MAX_RETRIES=4|' .env
 sed -i -E 's|^VERIFY_SLEEP_SECONDS=.*$|VERIFY_SLEEP_SECONDS=3|' .env
