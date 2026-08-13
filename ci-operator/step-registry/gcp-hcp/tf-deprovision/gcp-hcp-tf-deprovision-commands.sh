@@ -31,6 +31,16 @@ log "Deprovisioning infrastructure for workspace: ${WORKSPACE_NAME}"
 # NOTE: gcloud is NOT needed here. TFC remote execution handles GCP auth
 # via the WIF variable set on the TFC workspace — no local gcloud required.
 
+# Install rsync if not present (needed by scripts/e2e-render.sh).
+if ! command -v rsync >/dev/null 2>&1; then
+  log "rsync not found, installing..."
+  if ! dnf install -y --nodocs rsync 2>&1 | tail -1; then
+    log "WARNING: Failed to install rsync"
+    log "Auto-destroy will clean up resources in 24h"
+    exit 0
+  fi
+fi
+
 # --- Install Terraform ---
 
 # The 'src' image already contains the gcp-hcp-infra repo at the working directory.

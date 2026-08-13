@@ -14,6 +14,15 @@ for tool in jq curl sha256sum; do
     exit 1
   fi
 done
+
+# Install rsync if not present (needed by scripts/e2e-render.sh).
+# The BuildConfig adds rsync to the base image, but until that change
+# propagates we install it at runtime as a fallback.
+if ! command -v rsync >/dev/null 2>&1; then
+  log "rsync not found, installing..."
+  dnf install -y --nodocs rsync 2>&1 | tail -1
+fi
+
 log "All required tools available"
 
 # Validate TFC token mount exists
