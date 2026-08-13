@@ -28,8 +28,14 @@ oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/v0.15
 # ============================================================================
 # Step 2: Install cert-manager
 # GKE Autopilot doesn't allow kube-system modifications, so we change
-# leader election namespace to cert-manager
+# leader election namespace to cert-manager.
 # See: https://cert-manager.io/docs/installation/compatibility/#gke-autopilot
+#
+# cert-manager v1.14.0 ships without resource requests/limits, which causes
+# GKE Autopilot to mutate the deployments with default resources. On cold
+# clusters this can delay pod scheduling beyond the wait timeout. We apply
+# the manifests first, then patch each deployment with explicit resource
+# requests so Autopilot schedules them promptly.
 # ============================================================================
 CERT_MANAGER_VERSION="v1.14.0"
 echo "Installing cert-manager ${CERT_MANAGER_VERSION}..."
@@ -37,10 +43,23 @@ curl -sL "https://github.com/cert-manager/cert-manager/releases/download/${CERT_
   | sed 's/kube-system/cert-manager/g' \
   | oc apply -f -
 
+# Patch cert-manager deployments with explicit resource requests so GKE
+# Autopilot does not have to guess and delay scheduling.
+echo "Patching cert-manager deployments with explicit resource requests..."
+for deploy in cert-manager cert-manager-webhook cert-manager-cainjector; do
+  CONTAINER="${deploy#cert-manager-}"
+  # The main deployment container name is "cert-manager-controller"
+  if [[ "${deploy}" == "cert-manager" ]]; then
+    CONTAINER="cert-manager-controller"
+  fi
+  oc patch deployment "${deploy}" -n cert-manager --type=strategic -p \
+    "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"${CONTAINER}\",\"resources\":{\"requests\":{\"cpu\":\"50m\",\"memory\":\"64Mi\"}}}]}}}}"
+done
+
 echo "Waiting for cert-manager to be ready..."
-oc wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=300s
-oc wait --for=condition=Available deployment/cert-manager-webhook -n cert-manager --timeout=300s
-oc wait --for=condition=Available deployment/cert-manager-cainjector -n cert-manager --timeout=300s
+oc wait --for=condition=Available deployment/cert-manager -n cert-manager --timeout=600s
+oc wait --for=condition=Available deployment/cert-manager-webhook -n cert-manager --timeout=600s
+oc wait --for=condition=Available deployment/cert-manager-cainjector -n cert-manager --timeout=600s
 
 # Wait for webhook to be fully operational (CA bundle injection takes time)
 echo "Waiting for cert-manager webhook to be fully operational..."

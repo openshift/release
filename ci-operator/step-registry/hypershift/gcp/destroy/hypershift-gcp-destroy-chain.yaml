@@ -11,6 +11,15 @@ chain:
           exit 0
       fi
 
+      # Fail fast if the GKE kubeconfig token has expired (~60 min lifetime).
+      # Without this check, `hypershift destroy` would spin for the entire
+      # --cluster-grace-period (40m) retrying Unauthorized errors.
+      if ! oc get ns default &>/dev/null; then
+          echo "WARNING: kubeconfig token appears expired (cannot reach API server). Skipping destroy."
+          echo "The deprovision step will clean up via GCP project deletion."
+          exit 0
+      fi
+
       CLUSTER_NAME="$(<"${SHARED_DIR}/cluster-name")"
       echo "$(date) Deleting GCP HyperShift cluster ${CLUSTER_NAME}"
       bin/hypershift destroy cluster gcp \
