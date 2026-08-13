@@ -190,6 +190,13 @@ fi
 # pull_number input variable is required and
 # it must be set as $PULL_NUMBER OR 0 to get compared against periodic runs.
 pull_number='0'
+# For rehearsal runs: compare the current UUID against the periodic baseline only.
+# This prevents previous rehearsal iterations from accumulating in the comparison pool
+# and masking regressions introduced by the change under test.
+# Requires the preceding kube-burner step to have written its UUID to SHARED_DIR
+# (file: kube-burner-uuid). Falls back to job_type-based behaviour when
+# the file is absent or the periodic baseline query fails.
+_REHEARSAL_UUID_BASELINE_FLAGS=""
 if [[ "${JOB_TYPE}" == "periodic" ]]; then
     if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${PULL_NUMBER}" -ne 0 ]]; then
         pull_number="(${PULL_NUMBER} OR 0)"
@@ -201,13 +208,66 @@ elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${P
     # Indicates a ci test triggered in PR against a pull request
     pull_number="(${PULL_NUMBER} OR 0)"
     job_type="(periodic OR pull)"
-elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-    # Indicates a rehearse job triggered from a PR
-    pull_number="(${PULL_NUMBER} OR 0)"
-    job_type="(rehearse OR pull OR periodic)"
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
-    # Indicates a rehearsal in PR against openshift/release repo
-    job_type="(periodic OR rehearse)"
+    # Indicates a rehearsal in PR against openshift/release repo.
+    # Attempt UUID-based baseline comparison when the kube-burner UUID is available.
+    _REHEARSAL_UUID=""
+    [[ -f "${SHARED_DIR}/kube-burner-uuid" ]] && _REHEARSAL_UUID=$(cat "${SHARED_DIR}/kube-burner-uuid")
+
+    if [[ -n "${_REHEARSAL_UUID}" && -n "${ORION_CONFIG}" ]]; then
+        echo "Rehearsal UUID-based comparison: fetching periodic baseline for uuid=${_REHEARSAL_UUID}"
+        # Use Orion's installed Python libraries to query ES for recent periodic runs that
+        # match the same workload metadata as defined in the config (platform, node count,
+        # benchmark type, OCP version, etc.) but with jobType=periodic.
+        # jobtype and pull_number env vars are overridden just for this query.
+        _PERIODIC_UUIDS=$(jobtype="periodic" pull_number="0" python3 << 'PYEOF'
+import os, sys
+try:
+    from orion.config import load_config
+    from orion.matcher import Matcher
+
+    config = load_config(os.environ["ORION_CONFIG"], {})
+    test = config["tests"][0]
+    matcher = Matcher(
+        index=os.environ.get("ES_METADATA_INDEX") or os.environ.get("es_metadata_index", "perf_scale_ci*"),
+        es_server=os.environ.get("ES_SERVER", ""),
+        verify_certs=False,
+        version_field=test.get("version_field", "ocpVersion"),
+        uuid_field=test.get("uuid_field", "uuid"),
+    )
+    uuid_field = test.get("uuid_field", "uuid")
+    runs = matcher.get_uuid_by_metadata(test.get("metadata", {}), lookback_size=15)
+    print(",".join(r[uuid_field] for r in runs if r.get(uuid_field)))
+except Exception as exc:
+    print("", end="")
+    print(f"Warning: could not fetch periodic UUIDs: {exc}", file=sys.stderr)
+PYEOF
+        )
+
+        if [[ -n "${_PERIODIC_UUIDS}" ]]; then
+            echo "Periodic baseline UUIDs: ${_PERIODIC_UUIDS}"
+            _REHEARSAL_UUID_BASELINE_FLAGS="--uuid ${_REHEARSAL_UUID} --baseline ${_PERIODIC_UUIDS}"
+            # job_type still needs a value for the config template; periodic is correct
+            # since --baseline overrides the metadata-based UUID lookup in Orion.
+            job_type="periodic"
+        else
+            echo "Could not fetch periodic UUIDs; using job_type-based rehearsal comparison"
+            if [[ -n "${PULL_NUMBER:-}" ]]; then
+                pull_number="(${PULL_NUMBER} OR 0)"
+                job_type="(rehearse OR pull OR periodic)"
+            else
+                job_type="(periodic OR rehearse)"
+            fi
+        fi
+    else
+        # kube-burner-uuid not present — use job_type-based comparison
+        if [[ -n "${PULL_NUMBER:-}" ]]; then
+            pull_number="(${PULL_NUMBER} OR 0)"
+            job_type="(rehearse OR pull OR periodic)"
+        else
+            job_type="(periodic OR rehearse)"
+        fi
+    fi
 fi
 
 set +e
@@ -216,7 +276,9 @@ export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_
 if [[ -n $pull_number ]]; then
     export pull_number=${pull_number}
 fi
-orion --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
+echo "Orion query parameters: jobtype=${job_type} pull_number=${pull_number:-0} uuid_baseline_flags=${_REHEARSAL_UUID_BASELINE_FLAGS:-none}"
+# shellcheck disable=SC2086  # intentional word-splitting for _REHEARSAL_UUID_BASELINE_FLAGS
+orion --config ${ORION_CONFIG} ${EXTRA_FLAGS} ${_REHEARSAL_UUID_BASELINE_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
 orion_exit_status=$?
 set -e
 

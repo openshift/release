@@ -19,6 +19,8 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
 fi
 
 UUID=$(uuidgen)
+# Make UUID available to subsequent steps for baseline comparison
+echo "${UUID}" > "${SHARED_DIR}/kube-burner-uuid"
 
 #Support Libvirt Hypershift Cluster
 cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')

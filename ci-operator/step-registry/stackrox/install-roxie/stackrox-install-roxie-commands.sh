@@ -129,13 +129,20 @@ if [[ "${SMALL_INSTALL:-true}" == "true" ]]; then
   extra_flags+=('--set' 'central.spec.scanner.analyzer.resources.limits.cpu=2000m')
   if [[ "${ROX_SCANNER_V4_ENABLED}" == "true" ]]; then
     extra_flags+=('--set' 'central.spec.scannerV4.indexer.scaling.autoScaling=Disabled')
-    extra_flags+=('--set' 'central.spec.scannerV4.indexer.scaling.replicas=1')
+    # 2 replicas matches the effective count from the previous helm-based install.
+    # The helm script passed scannerV4.indexer.scaling.replicas=1 and
+    # scannerV4.indexer.scaling.autoScaling=Disabled, but the chart's actual value
+    # paths are scannerV4.indexer.replicas and scannerV4.indexer.autoscaling.disable,
+    # so both flags were silently ignored. With autoscaling left enabled, the HPA
+    # defaulted to minReplicas=2, which is what every historical periodic run used.
+    extra_flags+=('--set' 'central.spec.scannerV4.indexer.scaling.replicas=2')
     extra_flags+=('--set' 'central.spec.scannerV4.indexer.resources.requests.cpu=600m')
     extra_flags+=('--set' 'central.spec.scannerV4.indexer.resources.requests.memory=1500Mi')
     extra_flags+=('--set' 'central.spec.scannerV4.indexer.resources.limits.cpu=1000m')
     extra_flags+=('--set' 'central.spec.scannerV4.indexer.resources.limits.memory=2Gi')
     extra_flags+=('--set' 'central.spec.scannerV4.matcher.scaling.autoScaling=Disabled')
-    extra_flags+=('--set' 'central.spec.scannerV4.matcher.scaling.replicas=1')
+    # Same rationale as for indexer above (wrong helm path → autoscaling left enabled → minReplicas=2).
+    extra_flags+=('--set' 'central.spec.scannerV4.matcher.scaling.replicas=2')
     extra_flags+=('--set' 'central.spec.scannerV4.matcher.resources.requests.cpu=600m')
     extra_flags+=('--set' 'central.spec.scannerV4.matcher.resources.requests.memory=5Gi')
     extra_flags+=('--set' 'central.spec.scannerV4.matcher.resources.limits.cpu=1000m')
