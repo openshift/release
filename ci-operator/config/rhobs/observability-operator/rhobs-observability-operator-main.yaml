@@ -7,6 +7,10 @@ base_images:
     name: "4.18"
     namespace: origin
     tag: operator-sdk
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -56,6 +60,13 @@ tests:
     timeout: 3h0m0s
     version: "4.21"
   steps:
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: coo
+      SCANNER_CPU_LIMIT: "4"
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
     test:
     - as: install
       cli: latest
@@ -86,6 +97,97 @@ tests:
           memory: 400Mi
     - ref: rhobs-enable-ocp
     - ref: rhobs-obo-test-harness
+    - as: create-obo-resources
+      cli: latest
+      commands: |
+        # Create observability resources to run the TLS scanner against all COO
+        # workloads.
+        set -euo pipefail
+
+        printf 'Applying MonitoringStack monitoring-stack in namespace coo...\n'
+        oc -n coo apply -f - <<'EOF'
+        apiVersion: monitoring.rhobs/v1alpha1
+        kind: MonitoringStack
+        metadata:
+          name: monitoring-stack
+          labels:
+            app.kubernetes.io/instance: monitoring-stack
+        spec:
+          resourceSelector: {}
+          prometheusConfig:
+            replicas: 1
+          alertmanagerConfig:
+            replicas: 1
+        EOF
+
+        printf 'Applying ThanosQuerier monitoring-stack in namespace coo...\n'
+        oc -n coo apply -f - <<'EOF'
+        apiVersion: monitoring.rhobs/v1alpha1
+        kind: ThanosQuerier
+        metadata:
+          name: monitoring-stack
+        spec:
+          selector:
+            matchLabels:
+              app.kubernetes.io/instance: monitoring-stack
+        EOF
+
+        printf '%s\n' 'Applying cluster-scoped UIPlugin logging...'
+        oc apply -f - <<'EOF'
+        apiVersion: observability.openshift.io/v1alpha1
+        kind: UIPlugin
+        metadata:
+          name: logging
+        spec:
+          type: Logging
+        EOF
+
+        printf '%s\n' 'Applying cluster-scoped UIPlugin distributed-tracing...'
+        oc apply -f - <<'EOF'
+        apiVersion: observability.openshift.io/v1alpha1
+        kind: UIPlugin
+        metadata:
+          name: distributed-tracing
+        spec:
+          type: DistributedTracing
+        EOF
+
+        printf '%s\n' 'Applying cluster-scoped UIPlugin troubleshooting-panel...'
+        oc apply -f - <<'EOF'
+        apiVersion: observability.openshift.io/v1alpha1
+        kind: UIPlugin
+        metadata:
+          name: troubleshooting-panel
+        spec:
+          type: TroubleshootingPanel
+        EOF
+
+        printf '%s\n' 'Applying cluster-scoped UIPlugin monitoring...'
+        oc apply -f - <<'EOF'
+        apiVersion: observability.openshift.io/v1alpha1
+        kind: UIPlugin
+        metadata:
+          name: monitoring
+        spec:
+          type: Monitoring
+          monitoring:
+            perses:
+              enabled: true
+            clusterHealthAnalyzer:
+              enabled: true
+        EOF
+
+        printf 'Waiting for MonitoringStack monitoring-stack in namespace coo to become available...\n'
+        oc -n coo wait --for=condition=Available --timeout=10m monitoringstack/monitoring-stack
+        printf 'Waiting for ThanosQuerier Deployment thanos-querier-monitoring-stack in namespace coo to become available...\n'
+        oc -n coo wait --for=condition=Available --timeout=10m deployment/thanos-querier-monitoring-stack
+        printf '%s\n' 'Waiting for logging, distributed-tracing, troubleshooting-panel, and monitoring UIPlugins to become available...'
+        oc wait --for=condition=Available --timeout=10m \
+          uiplugin/logging \
+          uiplugin/distributed-tracing \
+          uiplugin/troubleshooting-panel \
+          uiplugin/monitoring
+    - ref: tls-scanner-run
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
