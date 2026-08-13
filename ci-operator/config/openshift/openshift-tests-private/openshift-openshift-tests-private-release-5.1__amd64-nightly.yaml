@@ -7,6 +7,10 @@ base_images:
     name: "5.1"
     namespace: ocp
     tag: aws-efs-csi-operator-create-efs
+  cbo-tests:
+    name: "5.1"
+    namespace: ocp
+    tag: cluster-baremetal-operator
   cli:
     name: "5.1"
     namespace: ocp
@@ -5109,6 +5113,32 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-dual-stack
+- as: metal-ipi-ovn-vmedia-cbo-firmware-update-f28
+  capabilities:
+  - intranet
+  cron: 35 5 30 * *
+  reporter_config:
+    channel: '#metal-qe-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      TEST_SUITE: cluster-baremetal-operator/firmware
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - ref: baremetal-lab-test-cbo-extension
+    workflow: baremetal-lab-ipi-virtual-media
 zz_generated_metadata:
   branch: release-5.1
   org: openshift
