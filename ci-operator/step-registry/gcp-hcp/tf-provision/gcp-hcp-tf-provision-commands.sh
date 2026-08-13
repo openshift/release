@@ -5,21 +5,16 @@ LOG="${ARTIFACT_DIR}/provision.log"
 log() { echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') | $*" | tee -a "${LOG}"; }
 
 # Validate required tools are available
-for tool in gcloud jq curl unzip sha256sum; do
+# NOTE: gcloud is NOT needed here. TFC remote execution handles GCP auth
+# via the WIF variable set on the TFC workspace — no local gcloud required.
+for tool in jq curl unzip sha256sum; do
   if ! command -v "${tool}" >/dev/null 2>&1; then
     log "ERROR: Required tool '${tool}' not found in image"
-    log "The gcp-hcp-infra tools image should include all required utilities"
+    log "The gcp-hcp-infra-base image should include all required utilities"
     exit 1
   fi
 done
 log "All required tools available"
-
-# Validate WIF credentials exist
-if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
-  log "ERROR: ${SHARED_DIR}/wif-cred.json not found"
-  log "The hypershift-gcp-wif-auth step must run first"
-  exit 1
-fi
 
 # Validate TFC token mount exists
 if [[ ! -f "/etc/terraform-cloud/token" ]]; then
@@ -51,12 +46,6 @@ tfc_api_call() {
   log "ERROR: API call failed after ${max_retries} attempts"
   return 1
 }
-
-# --- Authenticate to GCP ---
-
-log "Authenticating to GCP via WIF..."
-gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet
-gcloud config set project gcp-hcp-platform-ci
 
 # --- Install Terraform ---
 
