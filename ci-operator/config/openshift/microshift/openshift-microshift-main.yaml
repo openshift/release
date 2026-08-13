@@ -434,6 +434,31 @@ tests:
       MICROSHIFT_OS: rhel-9.6
       SCENARIO_TYPE: bootc-c2cc
     workflow: openshift-microshift-e2e-metal-tests
+- always_run: false
+  as: perf-node-density
+  capabilities:
+  - intranet
+  disable_rehearsal: true
+  optional: true
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-selfsched
+    env:
+      BUILD_FROM_PR: "true"
+      MICROSHIFT_BRANCH: main
+      MODEL: R640
+      NUM_SERVERS: "1"
+      PROMETHEUS_LOGGING: "true"
+      QPS: "10"
+      WORKLOAD: node-density
+    post:
+    - ref: openshift-qe-installer-bm-self-sched-terminate
+    pre:
+    - ref: openshift-qe-installer-bm-self-sched
+    - ref: openshift-qe-installer-bm-ping
+    test:
+    - ref: openshift-qe-microshift-deploy
+    - ref: openshift-qe-microshift-kube-burner
 zz_generated_metadata:
   branch: main
   org: openshift
