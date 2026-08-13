@@ -48,6 +48,17 @@ images:
     from: cli
     optional: true
     to: cli-with-git
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/openjdk-17:1.21
+      USER root
+      RUN microdnf install -y git && microdnf clean all
+      RUN cd /tmp \
+          && curl -sLO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+          && curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/sha256sum.txt | grep openshift-client-linux.tar.gz | sha256sum -c - \
+          && tar xzf openshift-client-linux.tar.gz -C /usr/local/bin oc kubectl \
+          && rm -f openshift-client-linux.tar.gz
+      USER 1001
+    to: acs-smoke-runner
 releases:
   latest:
     candidate:
@@ -122,6 +133,8 @@ tests:
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
     - chain: cucushift-installer-check-cluster-health
+    - ref: stackrox-opp-readiness
+    - ref: stackrox-opp-smoke
     - ref: acm-tests-clc-create
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
