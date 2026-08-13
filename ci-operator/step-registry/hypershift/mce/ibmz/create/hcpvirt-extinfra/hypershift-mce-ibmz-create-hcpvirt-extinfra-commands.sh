@@ -3,6 +3,16 @@
 set -x
 set -e
 
+# --- Step 0: Download the hcp CLI ---
+echo "$(date) Installing hcp CLI"
+mkdir -p /tmp/hcp_cli
+downloadURL=$(oc get ConsoleCLIDownload hcp-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
+curl -k --output /tmp/hcp.tar.gz ${downloadURL}
+tar -xvf /tmp/hcp.tar.gz -C /tmp/hcp_cli
+chmod +x /tmp/hcp_cli/hcp
+export PATH=$PATH:/tmp/hcp_cli
+hcp version
+
 # --- Step 1: Login to infra cluster and create the external infra namespace ---
 echo "$(date) Logging in to infra cluster"
 export KUBECONFIG="${SHARED_DIR}/infra-kubeconfig"
