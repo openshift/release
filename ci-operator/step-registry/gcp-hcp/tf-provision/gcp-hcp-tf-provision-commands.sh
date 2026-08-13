@@ -22,7 +22,7 @@ if ! command -v rsync >/dev/null 2>&1; then
   log "rsync not found, extracting from RPM..."
   _rsync_tmp="$(mktemp -d)"
   curl -fsSL --connect-timeout 15 --max-time 60 \
-    "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/os/Packages/rsync-3.3.0-5.el10.x86_64.rpm" \
+    "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/os/Packages/rsync-3.4.4-1.el10.x86_64.rpm" \
     -o "${_rsync_tmp}/rsync.rpm"
   rpm2cpio "${_rsync_tmp}/rsync.rpm" | cpio -idm -D "${_rsync_tmp}" 2>/dev/null
   cp "${_rsync_tmp}/usr/bin/rsync" /tmp/rsync

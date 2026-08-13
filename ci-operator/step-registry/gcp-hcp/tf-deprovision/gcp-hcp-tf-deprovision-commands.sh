@@ -38,7 +38,7 @@ if ! command -v rsync >/dev/null 2>&1; then
   log "rsync not found, extracting from RPM..."
   _rsync_tmp="$(mktemp -d)"
   if ! curl -fsSL --connect-timeout 15 --max-time 60 \
-    "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/os/Packages/rsync-3.3.0-5.el10.x86_64.rpm" \
+    "https://mirror.stream.centos.org/10-stream/BaseOS/x86_64/os/Packages/rsync-3.4.4-1.el10.x86_64.rpm" \
     -o "${_rsync_tmp}/rsync.rpm"; then
     log "WARNING: Failed to download rsync RPM"
     log "Auto-destroy will clean up resources in 24h"
