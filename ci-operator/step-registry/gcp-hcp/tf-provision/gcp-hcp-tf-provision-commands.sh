@@ -60,7 +60,7 @@ if [[ -z "${TERRAFORM_VERSION}" ]]; then
 fi
 
 log "Installing Terraform ${TERRAFORM_VERSION}..."
-curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
+curl -fsSL --connect-timeout 15 --max-time 300 "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
 # Use python3 (available in UBI9 image) to extract zip since unzip is not installed
 python3 -c "import zipfile; zipfile.ZipFile('/tmp/terraform.zip').extractall('/tmp')"
 chmod +x /tmp/terraform

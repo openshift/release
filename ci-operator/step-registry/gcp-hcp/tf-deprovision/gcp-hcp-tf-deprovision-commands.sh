@@ -45,7 +45,7 @@ if ! TERRAFORM_VERSION="$(awk '$1 == "terraform" { print $2; exit }' "${REPO_ROO
 fi
 
 log "Installing Terraform ${TERRAFORM_VERSION}..."
-if ! curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip; then
+if ! curl -fsSL --connect-timeout 15 --max-time 300 "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip; then
   log "ERROR: Failed to download Terraform ${TERRAFORM_VERSION}"
   log "Auto-destroy will clean up resources in 24h"
   exit 0  # Don't fail job
