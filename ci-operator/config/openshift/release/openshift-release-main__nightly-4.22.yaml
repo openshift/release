@@ -2784,6 +2784,7 @@ tests:
       {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: rosa-e2e-02
     env:
       ENABLE_BILLING_ACCOUNT: "yes"
@@ -2821,6 +2822,10 @@ tests:
     observers:
       enable:
       - observers-resource-watch
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
     workflow: rosa-aws-hcp-conformance
 - as: e2e-rosa-sts-ovn
   cron: '@daily'
@@ -2835,10 +2840,15 @@ tests:
       {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: rosa-e2e-02
     observers:
       enable:
       - observers-resource-watch
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
     workflow: rosa-aws-sts-conformance
 - as: e2e-osd-ccs-gcp
   cluster: build10
