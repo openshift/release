@@ -6,10 +6,7 @@ set -o pipefail
 
 ETCD_QUOTA_BACKEND_GIB="${ETCD_QUOTA_BACKEND_GIB:-8}"
 
-# Calculate bytes from GiB (1 GiB = 1073741824 bytes = 1024^3)
-QUOTA_BYTES=$((ETCD_QUOTA_BACKEND_GIB * 1073741824))
-
-echo "Setting etcd backend quota to ${ETCD_QUOTA_BACKEND_GIB} GiB (${QUOTA_BYTES} bytes)..."
+echo "Setting etcd backend quota to ${ETCD_QUOTA_BACKEND_GIB} GiB..."
 
 # Patch etcd cluster with backendQuotaGiB
 oc patch etcd/cluster --type=merge -p "{\"spec\": {\"backendQuotaGiB\": ${ETCD_QUOTA_BACKEND_GIB}}}"
@@ -60,7 +57,7 @@ done
 echo "Describing etcd/cluster"
 oc describe etcd/cluster
 echo "Logging etcd pods env"
-oc describe -n openshift-etcd pod/etcd-ip-10 | grep -C1 "ETCD_QUOTA_BACKEND_BYTES"
+oc describe pods -n openshift-etcd -l app=etcd | grep "ETCD_QUOTA_BACKEND_BYTES" | sort | uniq -c
 
 echo "✅ Successfully configured etcd backend quota to ${ETCD_QUOTA_BACKEND_GIB} GiB"
 echo "All ${expected_pods} etcd pods are ready"
