@@ -50,7 +50,37 @@ tests:
   steps:
     env:
       OCM_FVT_BACKPLANE_CREDENTIALS_DIR: /usr/local/rosa-clusters-service-sandbox
-      OCM_FVT_EXTRA_ENVS: SECTOR=canary
+      OCM_FVT_EXTRA_ENVS: |-
+        SECTOR=canary
+        SOAK_TIME=15
+      OCM_FVT_JOB_NAME: osdfm-basic-integration
+      OCM_FVT_OCM_ENV: integration
+      OCM_FVT_REPORT_JIRA: "false"
+      OCM_FVT_SERVICE: osdfm
+      OCM_FVT_USE_BACKPLANE: "true"
+    test:
+    - ref: rosa-e2e-ocm-fvt-longrunning
+  timeout: 4h0m0s
+- as: ocm-fvt-gating-osdfm-integration-main
+  capabilities:
+  - intranet
+  - nested-podman
+  cluster: build05
+  cron: 0 0 31 2 *
+  nested_podman: true
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+  restrict_network_access: false
+  steps:
+    env:
+      OCM_FVT_BACKPLANE_CREDENTIALS_DIR: /usr/local/rosa-clusters-service-sandbox
+      OCM_FVT_EXTRA_ENVS: |-
+        SECTOR=main
+        SOAK_TIME=15
       OCM_FVT_JOB_NAME: osdfm-basic-integration
       OCM_FVT_OCM_ENV: integration
       OCM_FVT_REPORT_JIRA: "false"
