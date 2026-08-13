@@ -37,6 +37,15 @@ if [[ -n "${OPERATOR_NAMESPACE}" && -n "${ARTIFACT_DIR:-}" ]]; then
         > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
 fi
 
+# Restore reconcile-interval if it was overridden for MC e2e testing
+RMO_NS="openshift-route-monitor-operator"
+RMO_CM="route-monitor-operator-config"
+if oc get configmap "${RMO_CM}" -n "${RMO_NS}" -o jsonpath='{.data.reconcile-interval}' 2>/dev/null | grep -q .; then
+    log "Restoring default reconcile-interval on ${RMO_CM}"
+    oc patch configmap "${RMO_CM}" -n "${RMO_NS}" --type json \
+        -p '[{"op":"remove","path":"/data/reconcile-interval"}]' 2>/dev/null || true
+fi
+
 if [[ -z "${CLUSTER_PACKAGE_NAME}" ]]; then
     log "No ClusterPackage to clean up"
     exit 0
