@@ -20,16 +20,19 @@ if [[ -f "${awsCredFile}" ]]; then
     awsAccKeyID="$(sed -nE 's/^\s*aws_access_key_id\s*=\s*//p;T;q' "${awsCredFile}")"
     awsAccKeyToken="$(sed -nE 's/^\s*aws_secret_access_key\s*=\s*//p;T;q' "${awsCredFile}")"
 
-    [ -n "${awsAccKeyID}" ] && [ -n "${awsAccKeyToken}" ]
+    if [[ -z "${awsAccKeyID}" ]] || [[ -z "${awsAccKeyToken}" ]]; then
+        echo "ERROR: Failed to extract AWS credentials from ${awsCredFile}" 1>&2
+        exit 1
+    fi
 
     yq -o json eval . "${optionFile}" |
     jq -c \
           --arg awsAccKeyID "${awsAccKeyID}" \
-          --arg awsAccKeyToken "${awsAccKeyToken}" \
+          --rawfile awsAccKeyToken <(printf '%s' "${awsAccKeyToken}") \
         '
           .options.connections.apiKeys.aws|=(
                 .awsAccessKeyID=$awsAccKeyID |
-                .awsSecretAccessKeyID=$awsAccKeyToken
+                .awsSecretAccessKeyID=($awsAccKeyToken | rtrimstr("\n"))
             )
         ' |
     yq -p json -o yaml eval . > "${optionFile}.tmp"
