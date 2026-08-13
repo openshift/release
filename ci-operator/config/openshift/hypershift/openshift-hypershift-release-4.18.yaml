@@ -20,11 +20,14 @@ build_root:
   use_build_cache: true
 images:
   items:
+  - to: hypershift-operator-pr
   - dockerfile_path: Dockerfile.control-plane
     to: hypershift
 promotion:
   to:
-  - name: "4.18"
+  - excluded_images:
+    - hypershift-operator-pr
+    name: "4.18"
     namespace: ocp
 releases:
   initial:
@@ -88,6 +91,17 @@ tests:
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
+    workflow: hypershift-aws-e2e-nested
+- always_run: false
+  as: e2e-aws-backport
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-pr
+    env:
+      CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
+      INSTALL_FROM_LATEST: "true"
     workflow: hypershift-aws-e2e-nested
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
