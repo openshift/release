@@ -2084,6 +2084,8 @@ tests:
   interval: 168h
   steps:
     cluster_profile: openshift-org-gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
     observers:
       enable:
       - observers-resource-watch
@@ -2110,8 +2112,8 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      COMPUTE_NODE_TYPE: e2-custom-8-32768
-      CONTROL_PLANE_NODE_TYPE: e2-custom-8-32768
+      COMPUTE_NODE_TYPE: e2-standard-8
+      CONTROL_PLANE_NODE_TYPE: e2-standard-8
       TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
         to support the 1.17 Sample API Server using the current Aggregator \| Ensure
         HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
@@ -2220,7 +2222,7 @@ tests:
         MASTER_VCPU=8
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
-- as: e2e-agent-compact-iso-no-registry-techpreview
+- as: e2e-agent-compact-iso-no-registry
   capabilities:
   - intranet
   cron: 0 */8 * * *
@@ -2231,9 +2233,8 @@ tests:
         AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
         AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
-        FEATURE_SET=TechPreviewNoUpgrade
     workflow: agent-e2e-generic-conformance-iso-no-registry
-- as: e2e-agent-ha-dualstack-iso-no-registry-techpreview
+- as: e2e-agent-ha-dualstack-iso-no-registry
   capabilities:
   - intranet
   cron: 30 */8 * * *
@@ -2244,9 +2245,8 @@ tests:
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6
         AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
-        FEATURE_SET=TechPreviewNoUpgrade
     workflow: agent-e2e-generic-conformance-iso-no-registry
-- as: e2e-agent-ha5-dualstack-iso-no-registry-techpreview
+- as: e2e-agent-ha5-dualstack-iso-no-registry
   capabilities:
   - intranet
   cron: 0 1/8 * * *
@@ -2257,10 +2257,9 @@ tests:
         AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4V6
         AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
-        FEATURE_SET=TechPreviewNoUpgrade
       DEVSCRIPTS_SETUP_TIMEOUT: 150m
     workflow: agent-e2e-generic-conformance-iso-no-registry
-- as: e2e-agent-sno-ipv4-iso-no-registry-techpreview
+- as: e2e-agent-sno-ipv4-iso-no-registry
   capabilities:
   - intranet
   cron: 30 1/8 * * *
@@ -2273,7 +2272,6 @@ tests:
         AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
         AGENT_PLATFORM_TYPE=none
-        FEATURE_SET=TechPreviewNoUpgrade
     workflow: agent-e2e-generic-conformance-iso-no-registry
 - as: e2e-agent-single-node-ipv6-conformance
   capabilities:
@@ -2904,6 +2902,7 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       OS_IMAGE_STREAM: rhel-9
     observers:
       enable:
@@ -3097,6 +3096,7 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
       OS_IMAGE_STREAM: rhel-10
@@ -3260,6 +3260,65 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-ovn-haproxy28
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      HAPROXY_VERSION: "2.8"
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-serial-haproxy28
+  interval: 168h
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      HAPROXY_VERSION: "2.8"
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-e2e-aws-serial
+- as: e2e-aws-ovn-upgrade-haproxy28
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      HAPROXY_VERSION: "2.8"
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-ovn-fips-haproxy28
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+      HAPROXY_VERSION: "2.8"
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: fips-check
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
   org: openshift

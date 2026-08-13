@@ -56,9 +56,10 @@ else
       if [[ "${control_plane_arch}" == "arm64" ]]; then
         master_type_suffix="standard-4"
       else
-        # Temporary test to see if this helps the consistent high CPU alerts and random test failures
-        master_type_suffix="custom-6-16384"
-        # TODO: remove if block and revert master_type_suffix back to standard if/when we switch back to standard
+        # 8 vCPU / 16GB default: empirically validated (PR openshift/release#82754) to
+        # eliminate the CPU saturation / etcd disk-latency pattern seen with the prior
+        # 6 vCPU default, at a lower cost than e2-standard-8.
+        master_type_suffix="custom-8-16384"
         # custom sizes are not supported by arm64 VMs
       fi
     ;;
@@ -76,7 +77,10 @@ if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
   if [[ "${compute_arch}" == "arm64" ]]; then
     COMPUTE_NODE_TYPE="t2a-standard-4"
   else
-    COMPUTE_NODE_TYPE="e2-custom-6-16384"
+    # 4 vCPU default: empirically validated (PR openshift/release#82856) to show
+    # no disqualifying etcd/CPU regression versus the prior 6 vCPU default, at a
+    # meaningfully lower cost.
+    COMPUTE_NODE_TYPE="e2-standard-4"
   fi
 fi
 
