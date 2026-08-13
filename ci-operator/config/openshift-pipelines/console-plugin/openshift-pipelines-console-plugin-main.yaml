@@ -2,6 +2,9 @@ build_root:
   from_repository: true
 images:
   items:
+  - dockerfile_literal: |
+      FROM quay.io/openshift-pipeline/ui-ci:latest
+    to: playwright-runner
   - dockerfile_path: Dockerfile
     to: console-pipelines-plugin
 promotion:
@@ -49,17 +52,44 @@ tests:
     owner: rh-openshift-ecosystem
     product: ocp
     timeout: 3h0m0s
-    version: "4.18"
+    version: "4.21"
   steps:
     test:
     - as: e2e
       cli: latest
-      commands: ./test-prow-e2e.sh
-      from: src
+      commands: |
+        set -o pipefail
+        git clone -b release-v4.21 https://github.com/openshift-pipelines/release-ui-tests.git /tmp/release-ui-tests
+        cd /tmp/release-ui-tests
+        export CONSOLE_URL=$(oc get consoles.config.openshift.io cluster -o jsonpath='{.status.consoleURL}')
+        export CONSOLE_USERNAME=kubeadmin
+        export CONSOLE_PASSWORD=$(cat "${KUBEADMIN_PASSWORD_FILE:-${SHARED_DIR}/kubeadmin-password}")
+        export ARTIFACTS_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
+        export APP_TIMEOUT=90000
+        export AUTH_TYPE=direct
+        export CAPTURE_SCREENSHOTS=true
+        export CAPTURE_RECORDINGS=true
+
+        echo "=== Debug: Cluster Info ==="
+        echo "CONSOLE_URL=$CONSOLE_URL"
+        echo "ARTIFACTS_DIR=$ARTIFACTS_DIR"
+        echo "=== OAuth Identity Providers ==="
+        oc get oauth cluster -o jsonpath='{.spec.identityProviders[*].name}' || echo "No OAuth config found"
+        echo ""
+        echo "=== TektonConfig Status ==="
+        oc get tektonconfig || echo "TektonConfig not found — Pipelines may not be installed"
+        echo "=== OpenShift Pipelines Operator ==="
+        oc get csv -A 2>/dev/null | grep -i pipelines || echo "Pipelines operator NOT installed"
+        echo "=== Console Plugins ==="
+        oc get consoleplugin 2>/dev/null || echo "No console plugins found"
+        echo "==========================="
+
+        pytest -m sanity -v --tb=short 2>&1 | tee "${ARTIFACTS_DIR}/pytest-output.log"
+      from: playwright-runner
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 200m
+          memory: 512Mi
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
