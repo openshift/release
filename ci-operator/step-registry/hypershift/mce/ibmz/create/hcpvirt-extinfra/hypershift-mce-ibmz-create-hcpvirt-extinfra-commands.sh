@@ -51,11 +51,21 @@ hcp create cluster kubevirt \
   --root-volume-size 60 \
   --infra-namespace=ext-infra-vms-ns \
   --infra-kubeconfig-file="${SHARED_DIR}/infra-kubeconfig" \
-  --release-image ${OCP_IMAGE_MULTI} 
+  --release-image ${OCP_IMAGE_MULTI}
 
+echo "$(date) DEBUG: HostedCluster created, listing HC and NodePool status"
+oc get hostedcluster -n ${HC_NS} ${HC_NAME} -o yaml || true
+oc get nodepool -n ${HC_NS} || true
 
-oc wait --timeout=25m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
+oc wait --timeout=40m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
 echo "$(date) Kubevirt cluster is available"
+
+echo "$(date) DEBUG: HostedCluster conditions after Available"
+oc get hostedcluster -n ${HC_NS} ${HC_NAME} -o jsonpath='{.status.conditions}' | jq . || true
+echo "$(date) DEBUG: NodePool status"
+oc get nodepool -n ${HC_NS} -o yaml || true
+echo "$(date) DEBUG: HCP control plane pods"
+oc get pods -n ${HC_NS}-${HC_NAME} || true
 
 # --- Step 3: Retrieve the guest cluster kubeconfig ---
 echo "$(date) Retrieving guest cluster kubeconfig"
@@ -84,7 +94,12 @@ wait_for_nodes() {
 
     # If kubeconfig is not yet accessible or nodes not ready, restart metallb speaker
     echo "$(date) Nodes not ready yet — restarting metallb speaker daemonset and retrying"
+    echo "$(date) DEBUG: All nodes in guest cluster:"
+    oc get no --kubeconfig "${VIRT_KC}" -o wide 2>/dev/null || echo "  (kubeconfig not yet accessible)"
+    echo "$(date) DEBUG: KubeVirt VMs on infra cluster:"
     export KUBECONFIG="${SHARED_DIR}/infra-kubeconfig"
+    oc get vmi -n ext-infra-vms-ns 2>/dev/null || true
+    oc get pods -n metallb-system 2>/dev/null || true
     oc rollout restart daemonset speaker -n metallb-system || true
     oc rollout status daemonset speaker -n metallb-system --timeout=60s || true
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -187,6 +202,12 @@ done
 if [[ -n "${UNAVAILABLE}" ]]; then
   echo "$(date) ERROR: Some ClusterOperators are not Available or are Degraded:"
   oc get co --kubeconfig "${VIRT_KC}"
+  echo "$(date) DEBUG: Degraded CO details:"
+  oc get co --kubeconfig "${VIRT_KC}" -o yaml || true
+  echo "$(date) DEBUG: Guest cluster nodes:"
+  oc get no --kubeconfig "${VIRT_KC}" -o wide || true
+  echo "$(date) DEBUG: Guest cluster pods with issues:"
+  oc get pods -A --kubeconfig "${VIRT_KC}" --field-selector=status.phase!=Running,status.phase!=Succeeded 2>/dev/null || true
   exit 1
 fi
 
