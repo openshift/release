@@ -1,0 +1,37 @@
+ref:
+  as: quay-tests-resource-provisioning-baremetal-builder
+  cli: latest
+  from_image:
+    name: quay-test-omr
+    namespace: ci
+    tag: latest
+  commands: quay-tests-resource-provisioning-baremetal-builder-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  grace_period: 15m0s
+  documentation: |-
+    Deploy bare-metal QEMU builder for Quay. Uses the kubernetes executor
+    with QEMU/KVM virtual machines instead of the kubernetesPodman executor.
+    Requires bare-metal or nested-virt-enabled nodes with /dev/kvm access.
+  credentials:
+  - namespace: test-credentials
+    name: konflux-quay-pull-auth
+    mount_path: /var/run/konflux-quay-pull-auth
+  env:
+  - name: QUAYREGISTRY
+    documentation: The quay registry name
+    default: "quay"
+  - name: QUAYNAMESPACE
+    documentation: The Quay installed namespace
+    default: "quay-enterprise"
+  - name: QUAY_BUILDER_IMAGE
+    documentation: The QEMU VM container image for Quay bare-metal build
+    default: "quay.io/quay/quay-builder-qemu-fedoracoreos:stable"
+  - name: QUAY_BUILDER_WORKER_IMAGE
+    documentation: The builder worker image repository (without tag) that runs inside the QEMU VM to execute Dockerfile builds
+    default: "quay.io/quay-qetest/quaybuild"
+  - name: QUAY_BUILDER_WORKER_TAG
+    documentation: The tag to use when mirroring the worker image to quay.io
+    default: "latest"
