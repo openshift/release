@@ -35,17 +35,21 @@ MAX_RETRIES=5
 RETRY_INTERVAL=120
 
 for (( attempt=1; attempt<=MAX_RETRIES; attempt++ )); do
-    if DATAROUTER_RESULTS="${SHARED_DIR}/*.xml" \
+    set +x
+    uploadOutput="$(DATAROUTER_RESULTS="${SHARED_DIR}/*.xml" \
         REPORTPORTAL_LAUNCH_NAME="${DR__RP__CR_COMP_NAME}" \
         REPORTPORTAL_LAUNCH_ATTRIBUTES="${launchAttrs}" \
-        datarouter-openshift-ci; then
+        datarouter-openshift-ci 2>&1)" && {
+        set -x
         echo "INFO: Data Router upload succeeded on attempt ${attempt}"
         exit 0
-    fi
+    }
+    set -x
     if (( attempt < MAX_RETRIES )); then
-        echo "WARNING: Data Router upload failed (attempt ${attempt}/${MAX_RETRIES}), retrying in ${RETRY_INTERVAL}s..."
+        echo "WARNING: Data Router upload failed (attempt ${attempt}/${MAX_RETRIES}): ${uploadOutput}"
+        echo "WARNING: Retrying in ${RETRY_INTERVAL}s..."
         sleep "${RETRY_INTERVAL}"
     fi
 done
-echo "ERROR: Data Router upload failed after ${MAX_RETRIES} attempts"
+echo "ERROR: Data Router upload failed after ${MAX_RETRIES} attempts: ${uploadOutput}"
 exit 1
