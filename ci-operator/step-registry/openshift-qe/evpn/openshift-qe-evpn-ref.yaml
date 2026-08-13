@@ -34,11 +34,13 @@ ref:
   - name: L2VNI_START
     default: "20000"
     documentation: |-
-      Starting L2 VNI for external FRR VRF setup on bastion
+      Starting L2 VNI for east-west CUDN macVRF and external bastion VXLAN/FRR setup
   - name: VTEP_CIDR
     default: "198.18.0.0/24"
     documentation: |-
-      CIDR for the EVPN VTEP resource
+      Fallback CIDR for the EVPN VTEP resource on baremetal. On AWS the VTEP is
+      created by openshift-qe-installer-aws-provision-bastion using the VPC CIDR from the
+      bastion provision step.
   - name: EXTRA_FLAGS
     default: " --external-webserver-port=80 --alerting=false"
     documentation: |-
@@ -75,7 +77,8 @@ ref:
   resources:
     requests:
       cpu: 100m
-      memory: 100Mi
+      memory: 512Mi
   documentation: >-
     This step runs the perfscale EVPN e2e test using e2e-benchmarking.
+    Supports both AWS (direct SSH) and baremetal (SSH via jumphost) bastion access.
     Use the SCENARIO env var to select different EVPN test scenarios from the CI config.
