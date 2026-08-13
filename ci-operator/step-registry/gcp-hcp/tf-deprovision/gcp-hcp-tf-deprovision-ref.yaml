@@ -1,0 +1,30 @@
+ref:
+  as: gcp-hcp-tf-deprovision
+  from: src
+  commands: gcp-hcp-tf-deprovision-commands.sh
+  credentials:
+  - mount_path: /etc/terraform-cloud
+    name: tfcloud-ci-secret
+    namespace: ci
+  env:
+  - name: GCP_REGION
+    default: "us-central1"
+    documentation: "GCP region for e2e infrastructure deployment"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 90m0s
+  grace_period: 10m0s
+  best_effort: true
+  dependencies:
+  - name: src
+    env: SRC_DIR
+  documentation: |-
+    Destroys GCP HCP e2e infrastructure via terraform destroy.
+    
+    Runs in post phase to clean up resources even if tests fail.
+    Uses best_effort: true so job doesn't fail if cleanup has issues.
+    
+    Workspace persists in TFC for debug history. Auto-destroy (24h)
+    handles orphaned resources if this step fails.
