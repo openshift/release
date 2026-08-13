@@ -197,4 +197,8 @@ echo '--- DaemonSets ---'
 kubectl get daemonsets -n stackrox -o json | jq '[.items[] | {name: .metadata.name, containers: [.spec.template.spec.containers[] | {name: .name, requests: .resources.requests, limits: .resources.limits}]}]'
 echo '--- End resource dump ---'
 
+echo '>>> Full pod specs for stackrox namespace (env vars, resources, node placement)'
+kubectl get pods -n stackrox -o yaml > "${ARTIFACT_DIR}/stackrox-pods.yaml"
+echo "Saved to stackrox-pods.yaml ($(wc -l < "${ARTIFACT_DIR}/stackrox-pods.yaml") lines)"
+
 echo ">>> ACS installation complete [$(date -u || true)]"
