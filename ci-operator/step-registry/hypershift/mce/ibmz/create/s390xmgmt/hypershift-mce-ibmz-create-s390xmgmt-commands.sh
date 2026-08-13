@@ -32,8 +32,8 @@ set -x
 GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
 git clone -b image-name-fix git@github.ibm.com:OpenShift-on-Z/ibmcloud-openshift-provisioning.git
 
-# Apply patch to the cloned repo
-git -C ibmcloud-openshift-provisioning apply <<'PATCH'
+# Apply patch to the cloned repo (no-op if the branch already contains the changes)
+_PATCH=$(cat <<'PATCH'
 diff --git a/scripts/2-create-infrastructure.sh b/scripts/2-create-infrastructure.sh
 index e0ab984..c946320 100755
 --- a/scripts/2-create-infrastructure.sh
@@ -191,8 +191,13 @@ index 081ae33..50fa1f5 100755
    echo "Successfully generated the boot artifacts"
  fi
 PATCH
-
-
+)
+if echo "$_PATCH" | git -C ibmcloud-openshift-provisioning apply --check --ignore-whitespace 2>/dev/null; then
+    echo "Applying patch to ibmcloud-openshift-provisioning..."
+    echo "$_PATCH" | git -C ibmcloud-openshift-provisioning apply --ignore-whitespace
+else
+    echo "Patch does not apply cleanly (branch may already contain the changes) — skipping."
+fi
 
 #Navigate to clone directory
 cd "ibmcloud-openshift-provisioning" || {
