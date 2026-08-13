@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# SSH + cluster-locate boilerplate copied from dpf-hypervisor-sanity-existing-commands.sh.
-# Duplicated because each step ref runs as an independent pod with no shared setup.
+# SSH + cluster-locate boilerplate duplicated because each step ref runs as
+# an independent pod with no shared setup.
 # Also duplicated in network-tests and deploy-cluster. TODO: extract into a shared script.
 REMOTE_HOST=$(cat ${CLUSTER_PROFILE_DIR}/remote-host)
 CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
