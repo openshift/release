@@ -33,8 +33,8 @@ SUBSCRIPTION_CHANNEL="stable"
 CLUSTER_CSI_DRIVER_NAME="secrets-store.csi.k8s.io"
 CSV_READY_TIMEOUT=300   # seconds to wait for CSV to reach Succeeded
 
-# Pull secret from vault mount
-PULL_SECRET_FILE="/var/run/vault/secrets-store-csi/pull-secret.json"
+# Pull secret from deploy-konflux credential (same as AWS weekly test)
+PULL_SECRET_FILE="/var/run/secrets/pull-secret/.dockerconfigjson"
 CLUSTER_PULL_SECRET_NAME="pull-secret"
 CLUSTER_PULL_SECRET_NAMESPACE="openshift-config"
 
