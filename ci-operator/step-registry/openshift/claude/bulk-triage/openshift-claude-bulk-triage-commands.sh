@@ -57,9 +57,22 @@ if [[ -z "${TRIAGE_VIEW:-}" ]]; then
     echo "Auto-selected view: ${TRIAGE_VIEW}"
 fi
 
+# Resolve component scope. An empty value or the sentinel "all"
+# (case-insensitive) means triage every component in the view: run
+# list_regressions.py without a --components filter, rather than following
+# the skill default of asking which components the duty covers.
+TRIAGE_COMPONENTS="${TRIAGE_COMPONENTS:-}"
+if [[ -z "${TRIAGE_COMPONENTS}" || "${TRIAGE_COMPONENTS,,}" == "all" ]]; then
+    TRIAGE_COMPONENTS_DISPLAY="all"
+    COMPONENTS_CLAUSE="ALL components in the view. Do NOT ask which components the duty covers and do NOT pass a --components filter: run list_regressions.py with only --view so every component is inventoried"
+else
+    TRIAGE_COMPONENTS_DISPLAY="${TRIAGE_COMPONENTS}"
+    COMPONENTS_CLAUSE="components: ${TRIAGE_COMPONENTS}"
+fi
+
 echo "Starting claude bulk-triage dry run"
 echo "View: ${TRIAGE_VIEW}"
-echo "Components: ${TRIAGE_COMPONENTS}"
+echo "Components: ${TRIAGE_COMPONENTS_DISPLAY}"
 echo "Model: ${CLAUDE_MODEL}"
 
 # Install gcloud CLI for GCS artifact access (no root required)
@@ -142,7 +155,7 @@ SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer on Component
 
 **THIS IS A DRY RUN — READ-ONLY MODE**: You must NOT perform any write operations of any kind. Do not create or update triage records, do not file or comment on JIRA issues, do not set release blockers, do not create Sippy labels or symptoms, do not apply retroactive re-evaluation, and do not post anything anywhere. You have no write credentials; every write step of the skill must instead be captured as a recommended action in your report."
 
-PROMPT="Load and follow the ci:bulk-triage-regressions skill for view '${TRIAGE_VIEW}' with components: ${TRIAGE_COMPONENTS}. Execute Phases 1-3 and the analysis parts of Phase 4-5 fully, but perform NO writes (dry run): every action the skill would take (extend triage, new triage, new bug, symptom label) must be recorded as a recommendation instead.
+PROMPT="Load and follow the ci:bulk-triage-regressions skill for view '${TRIAGE_VIEW}' covering ${COMPONENTS_CLAUSE}. Execute Phases 1-3 and the analysis parts of Phase 4-5 fully, but perform NO writes (dry run): every action the skill would take (extend triage, new triage, new bug, symptom label) must be recorded as a recommendation instead.
 
 Write the complete duty report as GitHub-flavored markdown to ${WORKDIR}/${REPORT_FILE}. The report must contain: the untriaged-regression inventory table, the bucket list with member regression IDs and evidence (error signatures, failure stage, representative run links, suspect PRs), the recommended disposition per bucket (extend triage <id> / link to <JIRA> / file new bug against <component> with a draft summary), deliberately-untriaged leftovers with reasons, and cross-cutting observations. Every claim must cite artifact paths or run URLs."
 
