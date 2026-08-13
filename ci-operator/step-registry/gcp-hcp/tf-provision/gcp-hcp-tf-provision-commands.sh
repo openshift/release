@@ -7,7 +7,7 @@ log() { echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') | $*" | tee -a "${LOG}"; }
 # Validate required tools are available
 # NOTE: gcloud is NOT needed here. TFC remote execution handles GCP auth
 # via the WIF variable set on the TFC workspace — no local gcloud required.
-for tool in jq curl unzip sha256sum; do
+for tool in jq curl sha256sum; do
   if ! command -v "${tool}" >/dev/null 2>&1; then
     log "ERROR: Required tool '${tool}' not found in image"
     log "The gcp-hcp-infra-base image should include all required utilities"
@@ -49,8 +49,10 @@ tfc_api_call() {
 
 # --- Install Terraform ---
 
-# Read terraform version from .tool-versions to ensure consistency with local dev
-TERRAFORM_VERSION="$(grep '^terraform' "${SRC_DIR}/.tool-versions" | awk '{print $2}')"
+# The 'src' image already contains the gcp-hcp-infra repo at the working directory.
+# Read terraform version from .tool-versions to ensure consistency with local dev.
+REPO_ROOT="$(pwd)"
+TERRAFORM_VERSION="$(grep '^terraform' "${REPO_ROOT}/.tool-versions" | awk '{print $2}')"
 
 if [[ -z "${TERRAFORM_VERSION}" ]]; then
   log "ERROR: Failed to read terraform version from .tool-versions"
@@ -59,7 +61,8 @@ fi
 
 log "Installing Terraform ${TERRAFORM_VERSION}..."
 curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
-unzip -q /tmp/terraform.zip -d /tmp
+# Use python3 (available in UBI9 image) to extract zip since unzip is not installed
+python3 -c "import zipfile; zipfile.ZipFile('/tmp/terraform.zip').extractall('/tmp')"
 chmod +x /tmp/terraform
 export PATH="/tmp:${PATH}"
 
@@ -94,7 +97,7 @@ log "  JOB_NAME:    ${JOB_NAME:-unknown}"
 
 # --- Render Template ---
 
-cd "${SRC_DIR}"  # gcp-hcp-infra repo root (from dependency)
+cd "${REPO_ROOT}"  # gcp-hcp-infra repo root (from: src)
 
 log "Rendering e2e template..."
 RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}")"
@@ -139,7 +142,6 @@ log "Workspace ${WORKSPACE_NAME} created successfully"
 log "Configuring auto-destroy (24h safety net)..."
 
 TFC_ORG="hp-platform-engineering"
-TFC_PROJECT="gcp-hcp-ci"
 
 # Get workspace ID from TFC API (with retry)
 WORKSPACE_RESPONSE=$(tfc_api_call \

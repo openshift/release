@@ -33,8 +33,11 @@ log "Deprovisioning infrastructure for workspace: ${WORKSPACE_NAME}"
 
 # --- Install Terraform ---
 
+# The 'src' image already contains the gcp-hcp-infra repo at the working directory.
+REPO_ROOT="$(pwd)"
+
 # Read terraform version from .tool-versions to ensure consistency with local dev
-TERRAFORM_VERSION="$(grep '^terraform' "${SRC_DIR}/.tool-versions" | awk '{print $2}')"
+TERRAFORM_VERSION="$(grep '^terraform' "${REPO_ROOT}/.tool-versions" | awk '{print $2}')"
 
 if [[ -z "${TERRAFORM_VERSION}" ]]; then
   log "ERROR: Failed to read terraform version from .tool-versions"
@@ -43,13 +46,13 @@ fi
 
 log "Installing Terraform ${TERRAFORM_VERSION}..."
 curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
-unzip -q /tmp/terraform.zip -d /tmp
+python3 -c "import zipfile; zipfile.ZipFile('/tmp/terraform.zip').extractall('/tmp')"
 chmod +x /tmp/terraform
 export PATH="/tmp:${PATH}"
 
 # We need the same terraform config that was used in provision
 # Re-render using the same run-id
-cd "${SRC_DIR}"  # gcp-hcp-infra repo
+cd "${REPO_ROOT}"  # gcp-hcp-infra repo root (from: src)
 
 REGION="${GCP_REGION:-us-central1}"
 
