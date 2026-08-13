@@ -41,15 +41,13 @@ images:
   - context_dir: .
     dockerfile_path: ./dashboard-operator/Dockerfile
     to: odh-dashboard-operator-image
-  # Node 22 + repo source for lint/type-check/unit (keep golang build_root for image builds)
   - dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/nodejs-22:latest
       USER root
       RUN dnf install -y git && dnf clean all
       WORKDIR /opt/app-root/src
-      COPY --from=src . .
+      COPY . .
       USER 1001
-    from: src
     to: nodejs-22-src
 promotion:
   to:
@@ -76,6 +74,10 @@ resources:
     requests:
       cpu: "2"
       memory: 8Gi
+  nodejs-22-src:
+    requests:
+      cpu: "1"
+      memory: 2Gi
   type-check:
     requests:
       cpu: "2"
@@ -84,26 +86,28 @@ resources:
     requests:
       cpu: "2"
       memory: 8Gi
-  nodejs-22-src:
-    requests:
-      cpu: "1"
-      memory: 2Gi
 tests:
 - as: lint
   commands: |
+    npm install -g npm@11.8.0
     npm ci
+    npm run install:modules
     NODE_OPTIONS="--max-old-space-size=8192" npm run lint
   container:
     from: nodejs-22-src
 - as: type-check
   commands: |
+    npm install -g npm@11.8.0
     npm ci
+    npm run install:modules
     npm run type-check
   container:
     from: nodejs-22-src
 - as: unit-tests
   commands: |
+    npm install -g npm@11.8.0
     npm ci
+    npm run install:modules
     npm run test-unit
   container:
     from: nodejs-22-src
