@@ -640,6 +640,27 @@ tests:
   cron: '@yearly'
   steps:
     workflow: hypershift-review-agent
+- as: periodic-e2e-v2-aws-multi-arch
+  cron: 0 2 1,15 * *
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      EXTRA_ARGS: --arch=arm64
+      HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-v2
+- as: periodic-e2e-v2-azure-multi-arch
+  cron: 0 2 1,15 * *
+  steps:
+    cluster_profile: hypershift-aks
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      EXTRA_ARGS: --arch=arm64
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-azure-e2e-v2-self-managed
 - always_run: false
   as: address-review-comments
   optional: true
