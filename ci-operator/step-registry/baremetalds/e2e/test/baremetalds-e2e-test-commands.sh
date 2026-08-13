@@ -384,9 +384,10 @@ packet|equinix*)
         echo "### IDMS check: DS_IP_STACK=${DS_IP_STACK} DS_OPENSHIFT_VERSION=${DS_OPENSHIFT_VERSION}"
         if [[ "${DS_IP_STACK}" == "v6" ]] && is_openshift_version_gte "4.13"; then
             echo "### Creating ImageDigestMirrorSet for test images on disconnected cluster"
-            ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${DEVSCRIPTS_TEST_IMAGE_REPO}" << 'IDMS_EOF'
+            ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${DEVSCRIPTS_TEST_IMAGE_REPO}" "${SKIP_READINESS_CHECKS:-false}" << 'IDMS_EOF'
                 set -euo pipefail
                 LOCAL_REPO="$1"
+                SKIP_MCP_WAIT="$2"
                 oc apply -f - <<EOF
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -400,7 +401,12 @@ spec:
 EOF
                 echo "Waiting for machine-config operator to reconcile IDMS..."
                 oc wait mcp --all --for=condition=Updating=True --timeout=5m || true
-                oc wait mcp --all --for=condition=Updated=true --timeout=10m
+                if [[ "${SKIP_MCP_WAIT}" == "true" ]]; then
+                    echo "Degraded cluster: MCP wait is best-effort (fenced node cannot reconcile)"
+                    oc wait mcp --all --for=condition=Updated=true --timeout=2m || true
+                else
+                    oc wait mcp --all --for=condition=Updated=true --timeout=10m
+                fi
 IDMS_EOF
         fi
     else
