@@ -60,8 +60,6 @@ else
   exit 1
 fi
 
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
 # Containerfile is updated in openshift-dpf to dnf install oc client, and the openshift-dpf
 # latest main clone should be mounted in /root/dpf-ci
 echo "=== Checking if the openshift-dpf latest PR clone is mounted in /root/dpf-ci dir on this running pod"
