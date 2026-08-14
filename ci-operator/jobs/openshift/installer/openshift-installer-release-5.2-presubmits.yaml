@@ -11629,7 +11629,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build01
+    cluster: build13
     context: ci/prow/shellcheck
     decorate: true
     decoration_config:
@@ -11694,6 +11694,65 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )shellcheck,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5.2$
+    - ^release-5.2-
+    cluster: build13
+    context: ci/prow/tf-fmt
+    decorate: true
+    labels:
+      ci.openshift.io/manually-branched: "true"
+    name: pull-ci-openshift-installer-release-5.2-tf-fmt
+    optional: true
+    rerun_command: /test tf-fmt
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+    spec:
+      containers:
+      - args:
+        - ./hack/tf-fmt.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/terraform-alpine:v0.12.0-rc1
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test( | .* )tf-fmt,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5.2$
+    - ^release-5.2-
+    cluster: build13
+    context: ci/prow/tf-lint
+    decorate: true
+    labels:
+      ci.openshift.io/manually-branched: "true"
+    name: pull-ci-openshift-installer-release-5.2-tf-lint
+    rerun_command: /test tf-lint
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+    spec:
+      containers:
+      - args:
+        - ./hack/tf-lint.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/tflint
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test tf-lint
   - agent: kubernetes
     always_run: false
     branches:
@@ -11994,7 +12053,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build01
+    cluster: build13
     context: ci/prow/yaml-lint
     decorate: true
     decoration_config:
