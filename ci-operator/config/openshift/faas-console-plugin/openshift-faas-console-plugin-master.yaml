@@ -1,0 +1,65 @@
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.buildroot
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: faas-console-plugin
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: "1"
+      memory: 3Gi
+test_binary_build_commands: yarn install --immutable && npx playwright install chromium
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: test-bin
+  skip_if_only_changed: \.md$|^docs/|^demo/|^\.claude/|^\.github/|^\.vscode/|^\.husky/|^hack/|^\.tekton/|^(LICENSE|OWNERS)$
+- as: unit
+  commands: make unit
+  container:
+    from: test-bin
+  skip_if_only_changed: \.md$|^docs/|^demo/|^\.claude/|^\.github/|^\.vscode/|^\.husky/|^hack/|^\.tekton/|^(LICENSE|OWNERS)$
+- as: e2e-aws
+  pipeline_skip_if_only_changed: \.md$|^docs/|^demo/|^\.claude/|^\.github/|^\.vscode/|^\.husky/|^hack/|^\.tekton/|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      OPERATORS: |
+        [
+          {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "operator_group": "openshift-serverless"},
+          {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}
+        ]
+    test:
+    - ref: install-operators
+    - as: e2e
+      cli: latest
+      commands: make e2e
+      dependencies:
+      - env: PLUGIN_PULL_SPEC
+        name: faas-console-plugin
+      from: test-bin
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 500m
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: faas-console-plugin

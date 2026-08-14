@@ -1,0 +1,40 @@
+chain:
+  as: kueue-operator-test-e2e-dra
+  steps:
+  - ref: kueue-operator-test-e2e-dra-enable-feature-gate
+  - ref: kueue-operator-image-env-setup
+  - ref: nvidia-nfd-operator-install
+  - ref: nvidia-gpu-operator-install
+  - ref: kueue-operator-test-e2e-dra-disable-device-plugin
+  - ref: nvidia-dra-driver-install
+  - ref: cert-manager-install-operator
+  - as: run-sdk
+    commands: |
+      source "${SHARED_DIR}/env"
+      echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE" --security-context-config=restricted
+    from: operator-sdk
+    resources:
+      requests:
+        cpu: 200m
+        memory: 300Mi
+  - ref: kueue-operator-image-patch
+  - as: e2e-kueue-dra
+    cli: latest
+    env:
+    - name: CONTAINER_IMAGE
+      default: ""
+    commands: |
+      source "${SHARED_DIR}/env"
+      echo "Running DRA e2e tests with CONTAINER_IMAGE=${CONTAINER_IMAGE}"
+      make e2e-ci-test-dra
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: "4"
+        memory: "4Gi"
+  documentation: |-
+    This chain runs the DRA e2e test suite for the Kueue operator.
+    It deploys NVIDIA GPU Operator, NFD, and DRA driver as prerequisites, then runs
+    Kueue DRA-specific tests that validate structured parameters quota accounting
+    with NVIDIA GPU DeviceClasses.

@@ -1,0 +1,100 @@
+ref:
+  as: acm-interop-p2p-cluster-install
+  from: cli
+  commands: acm-interop-p2p-cluster-install-commands.sh
+  timeout: 3h0m0s
+  grace_period: 30m0s
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  env:
+  - name: ACM_SPOKE_ARCH_TYPE
+    default: "amd64"
+    documentation: |-
+      CPU architecture for control plane and worker nodes (amd64, arm64).
+  - name: BASE_DOMAIN
+    default: "cspilp.interop.ccitredhat.com"
+    documentation: |-
+      Base DNS domain for the spoke cluster (e.g. example.com).
+  - name: ACM_SPOKE_WORKER_REPLICAS
+    default: "3"
+    documentation: |-
+      Number of worker nodes per spoke cluster.
+  - name: ACM_SPOKE_CP_REPLICAS
+    default: "3"
+    documentation: |-
+      Number of control plane nodes per spoke cluster.
+  - name: ACM_SPOKE_CLUSTER_NAME_PREFIX
+    default: "acm-spoke"
+    documentation: |-
+      Prefix for generated spoke cluster names.
+      Final name format: {prefix}-{hash}-{index} (e.g. acm-spoke-a1b2c-1).
+  - name: ACM_SPOKE_WORKER_TYPE
+    default: "c5n.metal"
+    documentation: |-
+      AWS EC2 instance type for worker nodes.
+  - name: ACM_SPOKE_CP_TYPE
+    default: "m6a.2xlarge"
+    documentation: |-
+      AWS EC2 instance type for control plane nodes.
+  - name: ACM_SPOKE_NETWORK_TYPE
+    default: "OVNKubernetes"
+    documentation: |-
+      OCP network plugin: OVNKubernetes or OpenShiftSDN.
+  - name: ACM_SPOKE_INSTALL_TIMEOUT_MINUTES
+    default: "150"
+    documentation: |-
+      Minutes to wait per cluster for ClusterDeployment.Provisioned=True.
+      All ClusterDeployments are submitted before waiting begins, so all clusters
+      provision in parallel. The effective wall-clock wait is approximately
+      max(cluster_install_times) rather than their sum.
+  - name: ACM_SPOKE_CLUSTER_INITIAL_VERSION
+    default: ""
+    documentation: |-
+      Target OCP minor version for the spoke ClusterImageSet (e.g. "4.21").
+      The step selects the latest available ClusterImageSet whose name starts
+      with "img{version}." — must be non-empty.
+  - name: ACM_SPOKE_CLUSTER_COUNT
+    default: "1"
+    documentation: |-
+      Number of spoke clusters to provision (1–3; values greater than 3 are
+      rejected). Each cluster receives a unique name, namespace, and set of
+      non-overlapping CIDRs.
+      Output files per cluster (N is 1-based index):
+        SHARED_DIR/managed-cluster-name-{N}          - cluster name
+        SHARED_DIR/managed-cluster-kubeconfig-{N}    - admin kubeconfig
+        SHARED_DIR/managed-cluster-metadata-{N}.json - Hive metadata
+      Batch files:
+        SHARED_DIR/managed-cluster-names   - one name per line
+        SHARED_DIR/managed-cluster-regions - one region per line
+  documentation: |-
+    Provisions one or more ACM spoke clusters using Hive ClusterDeployment.
+
+    Execution phases:
+      1. Create resources  — namespace, secrets, ClusterDeployment, ManagedCluster,
+                             KlusterletAddonConfig for every spoke cluster.
+      2. Wait for Hive     — polls ClusterDeployment.status.conditions for
+                             Provisioned=True; fast-fails on ProvisionStopped=True.
+      3. Extract creds     — decodes admin kubeconfig and metadata from Hive secrets
+                             and writes them to SHARED_DIR.
+
+    Networking: each spoke is assigned non-overlapping pod/VPC/service CIDRs
+    derived from its 1-based index so multi-spoke Submariner setups do not conflict
+    with the hub or with each other.
+
+    Env vars consumed:
+      ACM_SPOKE_ARCH_TYPE               - node architecture (default: amd64)
+      BASE_DOMAIN                       - cluster base domain
+      ACM_SPOKE_WORKER_TYPE             - worker EC2 instance type
+      ACM_SPOKE_CP_TYPE                 - control-plane EC2 instance type
+      ACM_SPOKE_WORKER_REPLICAS         - worker node count (default: 3)
+      ACM_SPOKE_CP_REPLICAS             - control-plane node count (default: 3)
+      ACM_SPOKE_CLUSTER_NAME_PREFIX     - spoke name prefix (default: acm-spoke)
+      ACM_SPOKE_NETWORK_TYPE            - OCP network plugin (default: OVNKubernetes)
+      ACM_SPOKE_INSTALL_TIMEOUT_MINUTES - per-cluster provisioning timeout (default: 150)
+      ACM_SPOKE_CLUSTER_INITIAL_VERSION - OCP minor version for ClusterImageSet
+      ACM_SPOKE_CLUSTER_COUNT           - number of spoke clusters (default: 1, max: 3)
+      MANAGED_CLUSTER_LEASED_RESOURCE   - space-separated AWS regions (one per cluster)
+      SHARED_DIR                        - cross-step shared directory
+      CLUSTER_PROFILE_DIR               - cluster profile with AWS creds and SSH keys

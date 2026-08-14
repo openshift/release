@@ -1,0 +1,40 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
+      RUN dnf -y install git go python3 python3-pip diffutils jq && python3 -m pip install yamllint
+      RUN curl -L -o /tmp/kube-compare.tar.gz https://github.com/openshift/kube-compare/releases/download/v0.12.0/kube-compare_linux_amd64.tar.gz && \
+          echo "32966e0d0b827f80b565df50caf57aca1e207ab1a877f5ec2339b215bc5fb2d0  /tmp/kube-compare.tar.gz" | sha256sum -c && \
+          tar -xzf /tmp/kube-compare.tar.gz -C /usr/bin kubectl-cluster_compare && \
+          rm /tmp/kube-compare.tar.gz
+      RUN curl -L -o /tmp/kube-compare-addon.tar.gz https://github.com/openshift/kube-compare/releases/download/v0.12.0/kube-compare_addon_tools_linux_amd64.tar.gz && \
+          echo "d0ef2da370baf0a735268e506dffa06761228ed43d79dd4bdd5f5d428c6d812f  /tmp/kube-compare-addon.tar.gz" | sha256sum -c && \
+          tar -xzf /tmp/kube-compare-addon.tar.gz -C /usr/bin helm-convert && \
+          rm /tmp/kube-compare-addon.tar.gz
+      RUN curl -L -o /tmp/helm.tar.gz https://get.helm.sh/helm-v3.16.1-linux-amd64.tar.gz && \
+          echo "e57e826410269d72be3113333dbfaac0d8dfdd1b0cc4e9cb08bdf97722731ca9  /tmp/helm.tar.gz" | sha256sum -c && \
+          tar -xzf /tmp/helm.tar.gz -C /usr/bin linux-amd64/helm --strip-components 1 && \
+          rm /tmp/helm.tar.gz
+      RUN curl -L -o /tmp/kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.8.1/kustomize_v5.8.1_linux_amd64.tar.gz && \
+          echo "029a7f0f4e1932c52a0476cf02a0fd855c0bb85694b82c338fc648dcb53a819d  /tmp/kustomize.tar.gz" | sha256sum -c && \
+          tar -xzf /tmp/kustomize.tar.gz -C /usr/bin && \
+          rm /tmp/kustomize.tar.gz
+  use_build_cache: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lintcheck
+  commands: |
+    make ci-validate
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: telco-reference

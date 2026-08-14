@@ -1,0 +1,37 @@
+ref:
+  as: nvidia-gpu-operator-install
+  from: cli
+  grace_period: 15m
+  commands: nvidia-gpu-operator-install-commands.sh
+  timeout: 60m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Installs the NVIDIA GPU Operator via OLM with CDI enabled for DRA support.
+
+    This step:
+    1. Creates the nvidia-gpu-operator namespace with cluster monitoring enabled
+    2. Creates an OperatorGroup for the namespace
+    3. Waits for certified-operators catalog source to be READY (up to 10 minutes)
+    4. Waits for GPU Operator packagemanifest to be available (up to 5 minutes)
+    5. Discovers the default channel from the packagemanifest
+    6. Creates Subscription to gpu-operator-certified from certified-operators catalog
+    7. Waits for the subscription CSV to be created (up to 10 minutes)
+    8. Waits for CSV to reach Succeeded phase (up to 10 minutes)
+    9. Creates ClusterPolicy with CDI enabled and crio runtime configured
+    10. Waits for ClusterPolicy to become ready (up to 50 minutes for driver compilation)
+    11. Verifies GPU nodes are properly labeled (FAILS if none found)
+    12. Verifies CDI is enabled in the ClusterPolicy
+
+    Prerequisites:
+    - OpenShift cluster with GPU-enabled worker nodes (g2-standard-4 or similar)
+    - NFD Operator installed and GPU nodes labeled with nvidia.com/gpu.present=true
+    - certified-operators catalog source available in openshift-marketplace
+
+    This step is REQUIRED before running NVIDIA DRA tests. CDI (Container Device Interface)
+    must be enabled for Dynamic Resource Allocation to function.
+
+    Note: Driver compilation on G2 instances (4 vCPUs) takes 30-40 minutes.
+    The step will FAIL if GPU nodes are not labeled, indicating NFD or provisioning issues.

@@ -1,0 +1,36 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibu-target-deploy-spoke-sno
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibu-target-deploy-spoke-sno-commands.sh
+  timeout: 5h
+  resources:
+    requests:
+      cpu: 100m
+  env:
+    - name: TARGET_SPOKE_VERSION
+      default: "4.18"
+      documentation: >-
+        OCP version of the target spoke; must match ztp-site-configs-ci path
+        siteconfig/<TARGET_SPOKE_VERSION>/<TARGET_SPOKE_CLUSTER>/
+    - name: TARGET_CLUSTER_NAME
+      default: "kni-qe-109"
+      documentation: IBU target hub cluster name (used to resolve kubeconfig path on the bastion)
+    - name: TARGET_SPOKE_CLUSTER
+      default: ""
+      documentation: >-
+        Target spoke cluster name in JSON array format, e.g. "['ibu-target']".
+        Must match the ZTP siteconfig directory name.
+    - name: ZTP_GIT_REPO
+      default: "https://gitlab.cee.redhat.com/telcov10n/ztp-site-configs-ci.git"
+      documentation: ZTP site configs repo
+    - name: ZTP_GIT_BRANCH
+      default: "main"
+      documentation: Branch to use in ztp-site-configs-ci repo
+  documentation: |-
+    Deploy target SNO spoke cluster via ZTP on the IBU target hub (kni-qe-109).
+    Reads target hub inventory from target-* prefixed files in SHARED_DIR saved by
+    ibu-target-hub-deploy. These files are unaffected by ibu-restore-seed-inventory and
+    are available as soon as ibu-target-hub-deploy completes.

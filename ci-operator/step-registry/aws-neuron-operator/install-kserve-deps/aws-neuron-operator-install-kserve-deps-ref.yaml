@@ -1,0 +1,40 @@
+ref:
+  as: aws-neuron-operator-install-kserve-deps
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  grace_period: 5m
+  commands: aws-neuron-operator-install-kserve-deps-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 45m
+  env:
+  - name: RHOAI_CHANNEL
+    default: "stable"
+    documentation: OLM channel for the RHOAI (rhods-operator) subscription.
+  - name: KSERVE_INFERENCE_NAMESPACE
+    default: "neuron-inference"
+    documentation: Namespace where KServe InferenceServices will be deployed.
+  - name: VLLM_NEURON_IMAGE
+    default: "registry.redhat.io/rhaiis/vllm-neuron-rhel9:3"
+    documentation: vLLM Neuron serving runtime container image.
+  - name: TENSOR_PARALLEL_SIZE
+    default: "1"
+    documentation: Tensor parallel size for the vLLM Neuron serving runtime.
+  - name: MAX_NUM_SEQS
+    default: "4"
+    documentation: Max number of concurrent sequences for the vLLM Neuron serving runtime.
+  - name: MAX_MODEL_LEN
+    default: "4096"
+    documentation: Max model context length for the vLLM Neuron serving runtime.
+  documentation: |-
+    Installs the KServe inference stack on an already-provisioned ROSA HCP
+    cluster with Neuron operators. On OCP < 4.21, deploys Service Mesh 2.x,
+    Serverless, and RHOAI via OLM with KServe in Serverless mode. On
+    OCP >= 4.21, skips Service Mesh and Serverless (SM 2.x is deprecated)
+    and configures KServe in RawDeployment mode instead. Creates a
+    DataScienceCluster, configures the inference namespace, and deploys
+    the vllm-neuron ServingRuntime.
