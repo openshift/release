@@ -270,12 +270,25 @@ function ValidateHubHealth () {
     fi
 
     echo "  Checking policy propagator..."
-    typeset propagatorReady
-    propagatorReady="$(oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -l name=governance-policy-propagator \
-        -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' \
-        || true)"
+    typeset propagatorReady=""
+    typeset -i propTimeout=300
+    typeset -i propStart
+    propStart="$(date +%s)"
+    while (( $(date +%s) - propStart < propTimeout )); do
+        propagatorReady="$(oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            -l name=governance-policy-propagator \
+            -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' \
+            || true)"
+        if [[ "${propagatorReady}" == "True" ]]; then
+            break
+        fi
+        sleep 15
+    done
     echo "  Policy propagator ready: ${propagatorReady}"
+    if [[ "${propagatorReady}" != "True" ]]; then
+        echo >&2 "ERROR: Policy propagator not ready after ${propTimeout}s"
+        return 1
+    fi
 
     echo "  Checking managed clusters..."
     typeset clusterOutput=""
@@ -314,61 +327,62 @@ echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChan
 targetChannel="$(ResolveTargetChannel)"
 echo "Target channel: ${targetChannel}"
 
+prePatchPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+    -o jsonpath='{.status.installPlanRef.name}' || true)"
+
 if [[ "${targetChannel}" == "${currentChannel}" ]]; then
     echo "Already on target channel ${targetChannel}; checking if upgrade is available..."
-    installPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
-        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.installPlanRef.name}' || true)"
-    if [[ -z "${installPlan}" ]]; then
+    if [[ -z "${prePatchPlan}" ]]; then
         echo "No pending upgrade on current channel; nothing to do"
         exit 0
     fi
-    planPhase="$(oc get installplan "${installPlan}" \
+    planPhase="$(oc get installplan "${prePatchPlan}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.status.phase}' || true)"
     if [[ "${planPhase}" == "Complete" ]]; then
-        echo "InstallPlan ${installPlan} already complete; no pending upgrade"
+        echo "InstallPlan ${prePatchPlan} already complete; no pending upgrade"
         exit 0
+    fi
+    installPlan="${prePatchPlan}"
+else
+    echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
+    oc patch subscription "${ACM_SUBSCRIPTION_NAME}" \
+        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+        --type merge \
+        -p "{\"spec\":{\"channel\":\"${targetChannel}\"}}"
+
+    echo "Waiting for new InstallPlan (pre-patch ref: ${prePatchPlan:-none})..."
+    sleep 10
+
+    installPlan=""
+    for _ in {1..18}; do
+        installPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            -o jsonpath='{.status.installPlanRef.name}' || true)"
+        if [[ -n "${installPlan}" && "${installPlan}" != "${prePatchPlan}" ]]; then
+            break
+        fi
+        installPlan=""
+        sleep 10
+    done
+
+    if [[ -z "${installPlan}" ]]; then
+        echo >&2 "ERROR: No new InstallPlan appeared after channel change (waited 3m)"
+        exit 2
     fi
 fi
 
-echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
-oc patch subscription "${ACM_SUBSCRIPTION_NAME}" \
+echo "InstallPlan: ${installPlan}"
+localApproval="$(oc get installplan "${installPlan}" \
     -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-    --type merge \
-    -p "{\"spec\":{\"channel\":\"${targetChannel}\"}}"
-
-echo "Waiting for InstallPlan to be created..."
-sleep 10
-
-installPlan=""
-for _ in {1..12}; do
-    installPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+    -o jsonpath='{.spec.approval}' || true)"
+if [[ "${localApproval}" == "Manual" ]]; then
+    echo "Approving manual InstallPlan..."
+    oc patch installplan "${installPlan}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.installPlanRef.name}' || true)"
-    if [[ -z "${installPlan}" ]]; then
-        installPlan="$(oc get installplan -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-            --sort-by=.metadata.creationTimestamp \
-            -o jsonpath='{.items[-1:].metadata.name}' || true)"
-    fi
-    if [[ -n "${installPlan}" ]]; then
-        break
-    fi
-    sleep 10
-done
-
-if [[ -n "${installPlan}" ]]; then
-    echo "InstallPlan: ${installPlan}"
-    localApproval="$(oc get installplan "${installPlan}" \
-        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.spec.approval}' || true)"
-    if [[ "${localApproval}" == "Manual" ]]; then
-        echo "Approving manual InstallPlan..."
-        oc patch installplan "${installPlan}" \
-            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-            --type merge \
-            -p '{"spec":{"approved":true}}'
-    fi
+        --type merge \
+        -p '{"spec":{"approved":true}}'
 fi
 
 echo "Waiting for ACM CSV to reach Succeeded phase..."
