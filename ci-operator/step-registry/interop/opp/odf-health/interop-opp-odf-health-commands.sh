@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eux -o pipefail
+set -euo pipefail
 shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
@@ -367,11 +367,27 @@ spec:
   securityContext:
     runAsNonRoot: true
     runAsUser: 65534
+  volumes:
+  - name: tmp
+    emptyDir: {}
   containers:
   - name: s3check
     image: amazon/aws-cli:2.22.35
     securityContext:
       allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: ["ALL"]
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    volumeMounts:
+    - name: tmp
+      mountPath: /tmp
     envFrom:
     - secretRef:
         name: ${secretRef}
