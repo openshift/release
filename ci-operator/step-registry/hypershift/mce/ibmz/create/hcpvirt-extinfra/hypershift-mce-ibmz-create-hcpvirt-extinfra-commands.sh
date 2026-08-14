@@ -51,8 +51,8 @@ hcp create cluster kubevirt \
   --root-volume-size 60 \
   --infra-namespace=ext-infra-vms-ns \
   --infra-kubeconfig-file="${SHARED_DIR}/infra-kubeconfig" \
-  --release-image quay.io/openshift-release-dev/ocp-release:4.22.9-multi
- # --release-image ${OCP_IMAGE_MULTI}
+  --release-image ${OCP_IMAGE_MULTI}
+  #--release-image quay.io/openshift-release-dev/ocp-release:4.22.9-multi
 
 echo "$(date) DEBUG: Sleeping 20 minutes after hcp create to let HC and NodePool settle"
 sleep 1200

@@ -205,6 +205,10 @@ spec: {}
 EOF
 sleep 5
 
+echo "Patching klusterlet clusterrole to add networkpolicies permissions"
+oc patch clusterrole klusterlet --type=json \
+  -p='[{"op":"add","path":"/rules/-","value":{"apiGroups":["networking.k8s.io"],"resources":["networkpolicies"],"verbs":["create","get","list","update","watch","patch","delete"]}}]'
+
 oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hypershift-preview","enabled": true}]}}}'
 echo "wait for mce to Available"
 oc wait --timeout=20m --for=condition=Available MultiClusterEngine/multiclusterengine-sample
