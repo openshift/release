@@ -100,6 +100,14 @@ log "  JOB_NAME:    ${JOB_NAME:-unknown}"
 
 cd "${REPO_ROOT}"  # gcp-hcp-infra repo root (from: src)
 
+# Patch render script to use cp instead of rsync if rsync is missing.
+# TODO: Remove once gcp-hcp-infra-base image includes rsync (GITOPS-10466 blocks rebuild).
+if ! command -v rsync >/dev/null 2>&1; then
+  log "rsync not available, patching e2e-render.sh to use cp..."
+  sed -i 's/rsync -a/cp -a/g' scripts/e2e-render.sh
+  sed -i "s/--exclude='\.terraform' //g" scripts/e2e-render.sh
+fi
+
 log "Rendering e2e template..."
 RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}")"
 
