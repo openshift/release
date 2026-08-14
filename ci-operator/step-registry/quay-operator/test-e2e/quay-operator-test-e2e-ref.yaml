@@ -1,0 +1,43 @@
+ref:
+  as: quay-operator-test-e2e
+  cli: latest
+  from: quay-playwright-runner
+  commands: quay-operator-test-e2e-commands.sh
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  timeout: 2h0m0s
+  grace_period: 15m0s
+  credentials:
+  - namespace: test-credentials
+    name: quay-qe-quay-secret
+    mount_path: /var/run/quay-qe-quay-secret
+  env:
+  - name: PLAYWRIGHT_GIT_REPO
+    default: "https://github.com/quay/quay.git"
+    documentation: |-
+      Git repository cloned for Playwright tests. The quay-playwright-runner
+      image supplies Node, browsers, and npm; test sources come from this repo.
+  - name: PLAYWRIGHT_GIT_BRANCH
+    default: ""
+    documentation: |-
+      Git branch or tag to clone for Playwright tests (for example redhat-3.18).
+      When empty, the branch is derived from QUAY_OPERATOR_CHANNEL
+      (stable-3.18 or preview-3.18 -> redhat-3.18). Set this to pin tests
+      independently of the installed operator channel.
+  - name: MULTISTAGE_PARAM_OVERRIDE_PLAYWRIGHT_GIT_BRANCH
+    default: ""
+    documentation: |-
+      Optional Gangway or rehearsal override for PLAYWRIGHT_GIT_BRANCH.
+      When set, it takes precedence over PLAYWRIGHT_GIT_BRANCH and channel mapping.
+  - name: QUAY_OPERATOR_CHANNEL
+    default: "stable-3.16"
+    documentation: |-
+      Installed Quay operator channel. Used to derive PLAYWRIGHT_GIT_BRANCH
+      when that value is empty (stable-X.Y -> redhat-X.Y).
+  documentation: |-
+    Execute Quay Playwright e2e smoke tests against a deployed Quay instance.
+    Test sources are cloned from PLAYWRIGHT_GIT_REPO at PLAYWRIGHT_GIT_BRANCH
+    (or the branch derived from QUAY_OPERATOR_CHANNEL) so they match the
+    installed Quay version rather than the image build branch.
