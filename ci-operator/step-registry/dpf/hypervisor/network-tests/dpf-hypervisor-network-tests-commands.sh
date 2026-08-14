@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
+REMOTE_HOST=$(cat /var/run/dpf-ci/remote-host)
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
