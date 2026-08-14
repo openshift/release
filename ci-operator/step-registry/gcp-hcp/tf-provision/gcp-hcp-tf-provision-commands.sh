@@ -181,18 +181,52 @@ fi
 
 log "Auto-destroy configured successfully"
 
-# --- Terraform Apply ---
+# --- Terraform Apply (with retry) ---
 
 log "Running terraform apply..."
 log "TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
 
-# Run apply with streaming output
-if ! terraform apply -auto-approve -no-color 2>&1 | tee -a "${LOG}"; then
-  log "ERROR: terraform apply failed"
-  log "Check logs at: ${LOG}"
-  log "Check TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
-  exit 1
-fi
+# Errors that retrying cannot fix — fail fast instead of wasting time
+NON_TRANSIENT_ERRORS="quota.*exceeded|forbidden|invalid.*configuration|unauthorized"
+
+MAX_APPLY_ATTEMPTS=5
+apply_attempt=1
+apply_wait=30
+
+while (( apply_attempt <= MAX_APPLY_ATTEMPTS )); do
+  log "APPLY ATTEMPT: ${apply_attempt}/${MAX_APPLY_ATTEMPTS}"
+
+  apply_output=$(terraform apply -auto-approve -no-color 2>&1)
+  apply_exit=$?
+  echo "${apply_output}" | tee -a "${LOG}"
+
+  if [[ ${apply_exit} -eq 0 ]]; then
+    log "Terraform apply succeeded on attempt ${apply_attempt}"
+    break
+  fi
+
+  # Fail fast on errors that retrying cannot fix
+  non_transient=$(echo "${apply_output}" | grep -iE "${NON_TRANSIENT_ERRORS}" || true)
+  if [[ -n "${non_transient}" ]]; then
+    log "ERROR: Non-transient failure on attempt ${apply_attempt}, aborting retries"
+    log "Error details:"
+    log "${non_transient}"
+    log "Check TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
+    exit 1
+  fi
+
+  if (( apply_attempt < MAX_APPLY_ATTEMPTS )); then
+    log "Transient failure — waiting ${apply_wait}s before retry..."
+    log "This is common due to GCP eventual consistency (IAM propagation, API enablement)"
+    sleep ${apply_wait}
+    apply_wait=$((apply_wait + 30))
+    ((apply_attempt++))
+  else
+    log "ERROR: Terraform apply failed after ${MAX_APPLY_ATTEMPTS} attempts"
+    log "Check TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
+    exit 1
+  fi
+done
 
 log "Infrastructure provisioned successfully"
 
