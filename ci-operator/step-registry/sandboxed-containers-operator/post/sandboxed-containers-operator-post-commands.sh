@@ -183,12 +183,31 @@ cleanup_aws() {
 	exit $?
 }
 
-# Remove our NSG on ARO+peer-pods (do nothing on plain azure)
+# Remove our NSG on ARO+peer-pods; also cleans up STS role assignments on plain azure
 cleanup_azure() {
 	local IS_ARO
 	IS_ARO=$(oc get crd clusters.aro.openshift.io &>/dev/null && echo true || echo false)
+
 	if [[ "${IS_ARO}" != "true" ]]; then
-		echo "We are not on ARO"
+		# STS mode: delete subscription-level role assignments saved during peerpods setup.
+		# These live outside the cluster resource group and survive cluster destroy.
+		if [[ "${IDENTITY_MODE:-cco}" == "sts" ]] && [[ -s "${SHARED_DIR}/osc-azure-role-assignment-ids" ]]; then
+			local AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+			az login \
+				--service-principal \
+				--username "$(jq -r .clientId "${AZURE_AUTH_LOCATION}")" \
+				--password "$(jq -r .clientSecret "${AZURE_AUTH_LOCATION}")" \
+				--tenant "$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")" \
+				--output none
+			echo "Deleting subscription-level role assignments for OSC managed identity..."
+			while IFS= read -r assignment_id; do
+				[[ -z "${assignment_id}" ]] && continue
+				az role assignment delete --ids "${assignment_id}" || \
+					echo "Warning: failed to delete role assignment ${assignment_id}"
+			done < "${SHARED_DIR}/osc-azure-role-assignment-ids"
+		else
+			echo "We are not on ARO"
+		fi
 		return
 	fi
 	if [[ "${ENABLEPEERPODS:-false}" != "true" ]]; then
