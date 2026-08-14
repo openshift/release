@@ -3,6 +3,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.39.2
+  hypershift-cli:
+    name: hypershift-cli
+    namespace: ci
+    tag: latest
   operator-sdk:
     name: "4.19"
     namespace: origin
@@ -151,205 +155,340 @@ tests:
   as: e2e-federation-sds
   optional: true
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: zero-trust-workload-identity-manager-bundle
     env:
-      OO_INSTALL_MODE: AllNamespaces
-      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
-      OO_SECURITY_CONTEXT: restricted
+      HYPERSHIFT_NODE_COUNT: "2"
     test:
-    - as: test
+    - as: create-cluster-b
       cli: latest
+      from: hypershift-cli
+      commands: |
+        set -euo pipefail
+
+        echo "=== Creating Cluster B (second HyperShift guest) ==="
+        export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+
+        HASH_B="$(echo -n "${PROW_JOB_ID}-cluster-b" | sha256sum)"
+        CLUSTER_B_NAME="${HASH_B:0:20}"
+        INFRA_B_ID="${HASH_B:20:5}"
+        echo "Cluster B name: ${CLUSTER_B_NAME}, infra-id: ${INFRA_B_ID}"
+        echo "CLUSTER_B_NAME=${CLUSTER_B_NAME}" > "${SHARED_DIR}/cluster_b_info.txt"
+        echo "INFRA_B_ID=${INFRA_B_ID}" >> "${SHARED_DIR}/cluster_b_info.txt"
+
+        RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}"
+        BASE_DOMAIN=""
+        if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+          BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
+        fi
+        if [[ -z "${BASE_DOMAIN}" ]]; then
+          echo "ERROR: Cannot determine base domain"; exit 1
+        fi
+
+        if [[ -f "${SHARED_DIR}/pull-secret-build-farm.json" ]]; then
+          jq -s '.[0] * .[1]' "${SHARED_DIR}/pull-secret-build-farm.json" /etc/ci-pull-credentials/.dockerconfigjson > /tmp/pull-secret-b.json
+        else
+          cp /etc/ci-pull-credentials/.dockerconfigjson /tmp/pull-secret-b.json
+        fi
+
+        EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+        echo "Creating Cluster B..."
+        /usr/bin/hypershift create cluster aws \
+          --name "${CLUSTER_B_NAME}" \
+          --infra-id "${INFRA_B_ID}" \
+          --node-pool-replicas 2 \
+          --base-domain "${BASE_DOMAIN}" \
+          --release-image "${RELEASE_IMAGE}" \
+          --control-plane-availability-policy "SingleReplica" \
+          --infra-availability-policy "SingleReplica" \
+          --instance-type "m5.xlarge" \
+          --region "us-east-1" \
+          --pull-secret /tmp/pull-secret-b.json \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" \
+          --node-selector "hypershift.openshift.io/control-plane=true" \
+          --olm-catalog-placement "management" \
+          --additional-tags "expirationDate=${EXPIRATION_DATE}" \
+          --annotations "prow.k8s.io/job=${JOB_NAME}" \
+          --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
+          --annotations hypershift.openshift.io/cleanup-cloud-resources="false"
+
+        echo "Waiting for Cluster B to become available..."
+        oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_B_NAME}
+
+        echo "Extracting Cluster B kubeconfig..."
+        for i in $(seq 1 60); do
+          KUBECONFIG_B_NAME=$(oc get hc/${CLUSTER_B_NAME} -n clusters -o jsonpath='{ .status.kubeconfig.name }') && [[ -n "${KUBECONFIG_B_NAME}" ]] && break
+          sleep 10
+        done
+        /usr/bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_B_NAME} > "${SHARED_DIR}/nested_kubeconfig_b"
+
+        echo "Waiting for Cluster B clusteroperators..."
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
+        timeout 20m bash -c 'until oc wait clusterversion/version --for="condition=Available=True" 2>/dev/null; do sleep 30; done'
+        echo "=== Cluster B is ready ==="
+        oc get clusterversion
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: RELEASE_IMAGE_LATEST
+        name: "release:latest"
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 45m0s
+    - as: install-ztwim
+      cli: latest
+      from: operator-sdk
+      commands: |
+        set -euo pipefail
+
+        echo "=== Installing ZTWIM on Cluster A ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        oc create namespace zero-trust-workload-identity-manager || true
+        operator-sdk run bundle --timeout=10m \
+          --security-context-config=restricted \
+          --install-mode=AllNamespaces \
+          -n zero-trust-workload-identity-manager \
+          "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n zero-trust-workload-identity-manager \
+          deployment zero-trust-workload-identity-manager-controller-manager --timeout=120s
+        echo "ZTWIM installed on Cluster A"
+
+        echo "=== Installing ZTWIM on Cluster B ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
+        oc create namespace zero-trust-workload-identity-manager || true
+        operator-sdk run bundle --timeout=10m \
+          --security-context-config=restricted \
+          --install-mode=AllNamespaces \
+          -n zero-trust-workload-identity-manager \
+          "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n zero-trust-workload-identity-manager \
+          deployment zero-trust-workload-identity-manager-controller-manager --timeout=120s
+        echo "ZTWIM installed on Cluster B"
+      dependencies:
+      - env: OO_BUNDLE
+        name: zero-trust-workload-identity-manager-bundle
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 25m0s
+    - as: test-federation
+      cli: latest
+      from: src
       commands: |
         set -euo pipefail
         NS="zero-trust-workload-identity-manager"
-        REMOTE_NS="spire-remote"
-        REMOTE_TD="remote.federation.test"
 
-        echo "=== Phase 1: Verify ZTWIM operator is healthy ==="
-        oc wait --for condition=Available -n ${NS} deployment zero-trust-workload-identity-manager-controller-manager --timeout=120s
-
-        echo "=== Phase 2: Create ZTWIM CR ==="
-        APPS_DOMAIN=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')
+        echo "=== Phase 1: Configure ZTWIM on Cluster A ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        APPS_DOMAIN_A=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')
+        TRUST_DOMAIN_A="cluster-a.${APPS_DOMAIN_A}"
         cat <<EOF | oc apply -f -
         apiVersion: operator.openshift.io/v1alpha1
         kind: ZeroTrustWorkloadIdentityManager
         metadata:
           name: cluster
         spec:
-          trustDomain: "primary.${APPS_DOMAIN}"
-          clusterName: "primary-cluster"
+          trustDomain: "${TRUST_DOMAIN_A}"
+          clusterName: "cluster-a"
           bundleConfigMap: "spire-bundle"
         EOF
 
-        echo "Waiting for SpireServer Ready..."
-        timeout 300 bash -c "until oc get spireserver cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
-        echo "Waiting for SpireAgent Ready..."
-        timeout 300 bash -c "until oc get spireagent cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
-
-        echo "=== Phase 3: Verify SDS config in ConfigMap ==="
-        SDS_BUNDLE=$(oc get configmap spire-agent -n ${NS} -o jsonpath='{.data.agent\.conf}' | python3 -c "
-        import json,sys
-        d=json.load(sys.stdin)
-        sds=d.get('agent',{}).get('sds',{})
-        print(sds.get('default_bundle_name','MISSING'))
-        print(sds.get('default_all_bundles_name','MISSING'))
-        ")
-        echo "SDS values: ${SDS_BUNDLE}"
-        echo "${SDS_BUNDLE}" | head -1 | grep -qx "null" || { echo "FAIL: default_bundle_name != null"; exit 1; }
-        echo "${SDS_BUNDLE}" | tail -1 | grep -qx "ROOTCA" || { echo "FAIL: default_all_bundles_name != ROOTCA"; exit 1; }
-        echo "SDS config PASSED"
-
-        echo "=== Phase 4: Deploy standalone SPIRE server (remote trust domain) ==="
-        oc create namespace ${REMOTE_NS} || true
+        echo "=== Phase 2: Configure ZTWIM on Cluster B ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
+        APPS_DOMAIN_B=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')
+        TRUST_DOMAIN_B="cluster-b.${APPS_DOMAIN_B}"
         cat <<EOF | oc apply -f -
-        apiVersion: v1
-        kind: ConfigMap
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: ZeroTrustWorkloadIdentityManager
         metadata:
-          name: spire-server-config
-          namespace: ${REMOTE_NS}
-        data:
-          server.conf: |
-            server {
-              bind_address = "0.0.0.0"
-              bind_port = "8081"
-              trust_domain = "${REMOTE_TD}"
-              data_dir = "/run/spire/data"
-              log_level = "DEBUG"
-              ca_ttl = "24h"
-              default_x509_svid_ttl = "1h"
-              federation {
-                bundle_endpoint {
-                  address = "0.0.0.0"
-                  port = 8443
-                }
-              }
-            }
-            plugins {
-              DataStore "sql" {
-                plugin_data {
-                  database_type = "sqlite3"
-                  connection_string = "/run/spire/data/datastore.sqlite3"
-                }
-              }
-              KeyManager "memory" {
-                plugin_data {}
-              }
-              NodeAttestor "join_token" {
-                plugin_data {}
-              }
-            }
-        ---
-        apiVersion: apps/v1
-        kind: Deployment
-        metadata:
-          name: spire-server-remote
-          namespace: ${REMOTE_NS}
+          name: cluster
         spec:
-          replicas: 1
-          selector:
-            matchLabels:
-              app: spire-server-remote
-          template:
-            metadata:
-              labels:
-                app: spire-server-remote
-            spec:
-              containers:
-              - name: spire-server
-                image: ghcr.io/spiffe/spire-server:1.11.1
-                args: ["-config", "/run/spire/config/server.conf"]
-                ports:
-                - containerPort: 8081
-                - containerPort: 8443
-                volumeMounts:
-                - name: config
-                  mountPath: /run/spire/config
-                - name: data
-                  mountPath: /run/spire/data
-              volumes:
-              - name: config
-                configMap:
-                  name: spire-server-config
-              - name: data
-                emptyDir: {}
-        ---
-        apiVersion: v1
-        kind: Service
-        metadata:
-          name: spire-server-remote
-          namespace: ${REMOTE_NS}
-        spec:
-          selector:
-            app: spire-server-remote
-          ports:
-          - name: federation
-            port: 8443
-            targetPort: 8443
-          - name: grpc
-            port: 8081
-            targetPort: 8081
+          trustDomain: "${TRUST_DOMAIN_B}"
+          clusterName: "cluster-b"
+          bundleConfigMap: "spire-bundle"
         EOF
 
-        echo "Waiting for remote SPIRE server..."
-        oc wait --for=condition=Available deployment/spire-server-remote -n ${REMOTE_NS} --timeout=120s
-        sleep 15
+        echo "=== Phase 3: Wait for SPIRE on both clusters ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        echo "Waiting for SPIRE on Cluster A..."
+        timeout 300 bash -c "until oc get spireserver cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
+        timeout 300 bash -c "until oc get spireagent cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
 
-        echo "=== Phase 5: Configure federation ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
+        echo "Waiting for SPIRE on Cluster B..."
+        timeout 300 bash -c "until oc get spireserver cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
+        timeout 300 bash -c "until oc get spireagent cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
+
+        echo "=== Phase 4: Expose SPIRE federation bundle endpoints via Routes ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        SPIRE_SVC_A=$(oc get svc -n ${NS} -l app.kubernetes.io/name=spire-server -o jsonpath='{.items[0].metadata.name}')
+        cat <<EOF | oc apply -f -
+        apiVersion: route.openshift.io/v1
+        kind: Route
+        metadata:
+          name: spire-federation-bundle
+          namespace: ${NS}
+        spec:
+          to:
+            kind: Service
+            name: ${SPIRE_SVC_A}
+          port:
+            targetPort: 8443
+          tls:
+            termination: passthrough
+        EOF
+        BUNDLE_ENDPOINT_A="https://$(oc get route spire-federation-bundle -n ${NS} -o jsonpath='{.spec.host}'):443"
+        echo "Cluster A bundle endpoint: ${BUNDLE_ENDPOINT_A}"
+
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
+        SPIRE_SVC_B=$(oc get svc -n ${NS} -l app.kubernetes.io/name=spire-server -o jsonpath='{.items[0].metadata.name}')
+        cat <<EOF | oc apply -f -
+        apiVersion: route.openshift.io/v1
+        kind: Route
+        metadata:
+          name: spire-federation-bundle
+          namespace: ${NS}
+        spec:
+          to:
+            kind: Service
+            name: ${SPIRE_SVC_B}
+          port:
+            targetPort: 8443
+          tls:
+            termination: passthrough
+        EOF
+        BUNDLE_ENDPOINT_B="https://$(oc get route spire-federation-bundle -n ${NS} -o jsonpath='{.spec.host}'):443"
+        echo "Cluster B bundle endpoint: ${BUNDLE_ENDPOINT_B}"
+
+        echo "=== Phase 5: Configure bidirectional federation ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
         cat <<EOF | oc apply -f -
         apiVersion: spire.spiffe.io/v1alpha1
         kind: ClusterFederatedTrustDomain
         metadata:
-          name: remote-federation-test
+          name: federation-cluster-b
         spec:
-          trustDomain: "${REMOTE_TD}"
-          bundleEndpointURL: "https://spire-server-remote.${REMOTE_NS}.svc.cluster.local:8443"
+          trustDomain: "${TRUST_DOMAIN_B}"
+          bundleEndpointURL: "${BUNDLE_ENDPOINT_B}"
           bundleEndpointProfile:
             type: "https_spiffe"
-            endpointSPIFFEID: "spiffe://${REMOTE_TD}/spire/server"
+            endpointSPIFFEID: "spiffe://${TRUST_DOMAIN_B}/spire/server"
         EOF
 
-        echo "Waiting for federation bundle propagation (90s)..."
-        sleep 90
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
+        cat <<EOF | oc apply -f -
+        apiVersion: spire.spiffe.io/v1alpha1
+        kind: ClusterFederatedTrustDomain
+        metadata:
+          name: federation-cluster-a
+        spec:
+          trustDomain: "${TRUST_DOMAIN_A}"
+          bundleEndpointURL: "${BUNDLE_ENDPOINT_A}"
+          bundleEndpointProfile:
+            type: "https_spiffe"
+            endpointSPIFFEID: "spiffe://${TRUST_DOMAIN_A}/spire/server"
+        EOF
 
-        echo "=== Phase 6: Verify federation bundle in agent ==="
-        AGENT_POD=$(oc get pods -n ${NS} -l app.kubernetes.io/name=spire-agent -o jsonpath='{.items[0].metadata.name}')
-        echo "Agent pod: ${AGENT_POD}"
+        echo "Waiting for federation bundles to propagate (120s)..."
+        sleep 120
 
-        BUNDLE_OUT=$(oc exec -n ${NS} ${AGENT_POD} -c spire-agent -- \
+        echo "=== Phase 6: Verify SDS config on both clusters ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        SDS_A=$(oc get configmap spire-agent -n ${NS} -o jsonpath='{.data.agent\.conf}' | python3 -c "
+        import json,sys; d=json.load(sys.stdin); sds=d.get('agent',{}).get('sds',{})
+        print(sds.get('default_bundle_name','MISSING')); print(sds.get('default_all_bundles_name','MISSING'))
+        ")
+        echo "Cluster A SDS: ${SDS_A}"
+        echo "${SDS_A}" | head -1 | grep -qx "null" || { echo "FAIL: Cluster A default_bundle_name != null"; exit 1; }
+        echo "${SDS_A}" | tail -1 | grep -qx "ROOTCA" || { echo "FAIL: Cluster A default_all_bundles_name != ROOTCA"; exit 1; }
+
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
+        SDS_B=$(oc get configmap spire-agent -n ${NS} -o jsonpath='{.data.agent\.conf}' | python3 -c "
+        import json,sys; d=json.load(sys.stdin); sds=d.get('agent',{}).get('sds',{})
+        print(sds.get('default_bundle_name','MISSING')); print(sds.get('default_all_bundles_name','MISSING'))
+        ")
+        echo "Cluster B SDS: ${SDS_B}"
+        echo "${SDS_B}" | head -1 | grep -qx "null" || { echo "FAIL: Cluster B default_bundle_name != null"; exit 1; }
+        echo "${SDS_B}" | tail -1 | grep -qx "ROOTCA" || { echo "FAIL: Cluster B default_all_bundles_name != ROOTCA"; exit 1; }
+        echo "SDS config PASSED on both clusters"
+
+        echo "=== Phase 7: Verify federated bundles in SPIRE Agents ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        AGENT_POD_A=$(oc get pods -n ${NS} -l app.kubernetes.io/name=spire-agent -o jsonpath='{.items[0].metadata.name}')
+        BUNDLE_A=$(oc exec -n ${NS} ${AGENT_POD_A} -c spire-agent -- \
           /opt/spire/bin/spire-agent api fetch bundle \
           -socketPath /tmp/spire-agent/public/spire-agent.sock 2>&1) || true
-        echo "Bundle output:"
-        echo "${BUNDLE_OUT}"
+        echo "Cluster A bundles:"; echo "${BUNDLE_A}"
 
-        if echo "${BUNDLE_OUT}" | grep -q "${REMOTE_TD}"; then
-          echo ""
-          echo "=== SUCCESS: Federated bundle for '${REMOTE_TD}' present in agent cache ==="
-          echo "buildAll() will serve both local + federated CAs via ROOTCA SDS request"
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
+        AGENT_POD_B=$(oc get pods -n ${NS} -l app.kubernetes.io/name=spire-agent -o jsonpath='{.items[0].metadata.name}')
+        BUNDLE_B=$(oc exec -n ${NS} ${AGENT_POD_B} -c spire-agent -- \
+          /opt/spire/bin/spire-agent api fetch bundle \
+          -socketPath /tmp/spire-agent/public/spire-agent.sock 2>&1) || true
+        echo "Cluster B bundles:"; echo "${BUNDLE_B}"
+
+        echo ""; echo "=== RESULTS ==="
+        PASS=true
+        if echo "${BUNDLE_A}" | grep -q "${TRUST_DOMAIN_B}"; then
+          echo "[PASS] Cluster A has federated bundle from B (${TRUST_DOMAIN_B})"
         else
-          echo ""
-          echo "=== PARTIAL: SDS config correct but federation bundle not yet visible ==="
-          echo "Checking server federation status..."
-          SERVER_POD=$(oc get pods -n ${NS} -l app.kubernetes.io/name=spire-server -o jsonpath='{.items[0].metadata.name}')
-          oc exec -n ${NS} ${SERVER_POD} -c spire-server -- \
-            /opt/spire/bin/spire-server bundle list \
-            -socketPath /tmp/spire-server/private/api.sock 2>&1 || true
-          echo ""
-          echo "Federation connectivity may need TLS/endpoint debugging."
-          echo "SDS config validation PASSED. Federation propagation needs investigation."
+          echo "[FAIL] Cluster A missing federated bundle from B"; PASS=false
         fi
+        if echo "${BUNDLE_B}" | grep -q "${TRUST_DOMAIN_A}"; then
+          echo "[PASS] Cluster B has federated bundle from A (${TRUST_DOMAIN_A})"
+        else
+          echo "[FAIL] Cluster B missing federated bundle from A"; PASS=false
+        fi
+        echo "[PASS] SDS config correct on both (ROOTCA)"
 
-        echo ""
-        echo "=== CLEANUP ==="
-        oc delete clusterfederatedtrustdomain remote-federation-test --ignore-not-found
-        oc delete namespace ${REMOTE_NS} --ignore-not-found --wait=false
-        echo "Done."
-      from: src
+        if [[ "${PASS}" == "true" ]]; then
+          echo ""; echo "=== ALL CHECKS PASSED ==="
+          echo "1. Two HyperShift clusters with ZTWIM deployed"
+          echo "2. Different trust domains configured"
+          echo "3. Bidirectional federation via ClusterFederatedTrustDomain"
+          echo "4. SDS default_all_bundles_name=ROOTCA on both"
+          echo "5. Federated bundles present in both agents"
+          echo "6. buildAll() serves local + federated CAs via ROOTCA on both clusters"
+        else
+          echo ""; echo "=== PARTIAL SUCCESS ==="
+          echo "SDS config correct. Federation bundle propagation incomplete."
+          exit 1
+        fi
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-aws
+      timeout: 20m0s
+    post:
+    - as: destroy-cluster-b
+      best_effort: true
+      cli: latest
+      from: hypershift-cli
+      commands: |
+        set -euo pipefail
+        if [[ ! -f "${SHARED_DIR}/cluster_b_info.txt" ]]; then
+          echo "No Cluster B info found, skipping"; exit 0
+        fi
+        source "${SHARED_DIR}/cluster_b_info.txt"
+        if [[ -z "${CLUSTER_B_NAME:-}" ]]; then
+          echo "No Cluster B to destroy"; exit 0
+        fi
+        export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+        echo "Destroying Cluster B: ${CLUSTER_B_NAME}"
+        /usr/bin/hypershift destroy cluster aws \
+          --name "${CLUSTER_B_NAME}" \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" \
+          --destroy-cloud-resources || true
+        echo "Cluster B destruction initiated"
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 30m0s
+    workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: operator-e2e-coverage
   cluster_claim:
