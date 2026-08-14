@@ -61,7 +61,7 @@ if [[ ${FLP_CONSUMER_REPLICAS:-} ]]; then
 fi
 
 createFlowCollector ${PARAMETERS}
-oc patch flowcollector/cluster --type=merge -p='{"spec":{"processor":{"informerCacheProxy":{"resources":{"limits":{"memory":"800Mi"}}}}}}'
+#oc patch flowcollector/cluster --type=merge -p='{"spec":{"processor":{"informerCacheProxy":{"resources":{"limits":{"memory":"800Mi"}}}}}}'
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
     patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
