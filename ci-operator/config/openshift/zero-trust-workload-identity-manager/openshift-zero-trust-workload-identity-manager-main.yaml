@@ -285,18 +285,13 @@ tests:
           oc create namespace zero-trust-workload-identity-manager || true
 
           # HyperShift hosted clusters don't have CI registry pull credentials.
-          # Merge the cluster's pull secret with CI credentials so operator-sdk
-          # can pull the bundle image from the CI registry.
-          oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > /tmp/cluster-pull-secret-${cluster_name}.json
-          if [[ -f /etc/ci-pull-credentials/.dockerconfigjson ]]; then
-            jq -s '.[0] * .[1]' /tmp/cluster-pull-secret-${cluster_name}.json /etc/ci-pull-credentials/.dockerconfigjson > /tmp/merged-pull-secret-${cluster_name}.json
-          else
-            cp /tmp/cluster-pull-secret-${cluster_name}.json /tmp/merged-pull-secret-${cluster_name}.json
-          fi
+          # Create a pull secret from CI credentials so operator-sdk can pull
+          # the bundle image from the CI registry.
           oc create secret docker-registry ci-pull-secret \
-            --from-file=.dockerconfigjson=/tmp/merged-pull-secret-${cluster_name}.json \
-            -n zero-trust-workload-identity-manager || true
-          oc secrets link default ci-pull-secret --for=pull -n zero-trust-workload-identity-manager
+            --from-file=.dockerconfigjson=/etc/ci-pull-credentials/.dockerconfigjson \
+            -n zero-trust-workload-identity-manager 2>/dev/null || true
+          oc secrets link default ci-pull-secret --for=pull \
+            -n zero-trust-workload-identity-manager 2>/dev/null || true
 
           operator-sdk run bundle --timeout=10m \
             --security-context-config=restricted \
