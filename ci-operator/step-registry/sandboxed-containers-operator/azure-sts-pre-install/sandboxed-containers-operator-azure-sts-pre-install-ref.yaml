@@ -1,0 +1,24 @@
+ref:
+  as: sandboxed-containers-operator-azure-sts-pre-install
+  from: upi-installer
+  commands: sandboxed-containers-operator-azure-sts-pre-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: CATALOG_SOURCE_NAME
+    default: "redhat-operators"
+    documentation: Catalog source to use for the pre-created subscription.
+  - name: OPERATOR_UPDATE_CHANNEL
+    default: "stable"
+    documentation: Channel to use for the pre-created subscription.
+  documentation: |-
+    Pre-creates the sandboxed-containers-operator Subscription with CLIENTID,
+    TENANTID, and SUBSCRIPTIONID in spec.config.env so OLM injects them into the
+    controller-manager pod on Azure STS clusters. Reads the identity values from
+    the osc-identity ConfigMap in the default namespace (written by
+    sandboxed-containers-operator-peerpods-param-cm). The test's
+    ensureOperatorIsSubscribed skips subscription creation when one already exists,
+    preserving the identity env vars needed for the Azure STS credential flow where
+    credentials_controller.go detects CLIENTID to create peer-pods-secret.
