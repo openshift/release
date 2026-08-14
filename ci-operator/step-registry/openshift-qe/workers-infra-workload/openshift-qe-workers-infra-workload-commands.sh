@@ -222,9 +222,9 @@ function create_machineset() {
                  --arg volumeIPOS "${VOLUME_IOPS}" \
                  --arg machinesetType "${MACHINESET_TYPE}" \
                  '.metadata.name = $machineset_name |
-                  .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.selector.matchLabels."cluster.x-k8s.io/set-name" = $machineset_name |
                   .spec.template.spec.providerSpec.value.instanceType = $node_instance_type |
-                  .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.template.metadata.labels."cluster.x-k8s.io/set-name" = $machineset_name |
                   .spec.template.spec.providerSpec.value.blockDevices[0].ebs.volumeType = $volumeType |
 		  .spec.template.spec.providerSpec.value.blockDevices[0].ebs.volumeSize = ($volumeSize|tonumber) |
 		  .spec.template.spec.providerSpec.value.blockDevices[0].ebs.iops = ($volumeIPOS|tonumber) |
@@ -245,9 +245,9 @@ function create_machineset() {
                  --arg volumeSize "${VOLUME_SIZE}" \
                  --arg machinesetType "${MACHINESET_TYPE}" \
                  '.metadata.name = $machineset_name |
-                  .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.selector.matchLabels."cluster.x-k8s.io/set-name" = $machineset_name |
                   .spec.template.spec.providerSpec.value.vmSize = $node_instance_type |
-                  .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.template.metadata.labels."cluster.x-k8s.io/set-name" = $machineset_name |
                   .spec.template.spec.providerSpec.value.osDisk.managedDisk.storageAccountType = $volumeType |
 		  .spec.template.spec.providerSpec.value.osDisk.diskSizeGB = ($volumeSize|tonumber) |
 	          .spec.template.metadata.labels."machine.openshift.io/cluster-api-machine-role" = $machinesetType |
@@ -267,9 +267,9 @@ function create_machineset() {
                  --arg volumeSize "${VOLUME_SIZE}" \
                  --arg machinesetType "${MACHINESET_TYPE}" \
                  '.metadata.name = $machineset_name |
-                  .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.selector.matchLabels."cluster.x-k8s.io/set-name" = $machineset_name |
                   .spec.template.spec.providerSpec.value.machineType = $node_instance_type |
-                  .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.template.metadata.labels."cluster.x-k8s.io/set-name" = $machineset_name |
                   .spec.template.spec.providerSpec.value.disks[0].type = $volumeType |
 		  .spec.template.spec.providerSpec.value.disks[0].sizeGb = ($volumeSize|tonumber) |
 	          .metadata.labels."machine.openshift.io/cluster-api-machine-role" = $machinesetType |
@@ -287,9 +287,9 @@ function create_machineset() {
                  --arg machineset_name "${machineset_name}" \
                  --arg machinesetType "${MACHINESET_TYPE}" \
                  '.metadata.name = $machineset_name |
-                  .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.selector.matchLabels."cluster.x-k8s.io/set-name" = $machineset_name |
                   .spec.template.spec.providerSpec.value.profile = $node_instance_type |
-                  .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.template.metadata.labels."cluster.x-k8s.io/set-name" = $machineset_name |
 	          .metadata.labels."machine.openshift.io/cluster-api-machine-role" = $machinesetType |
 	          .metadata.labels."machine.openshift.io/cluster-api-machine-type" = $machinesetType |
 	          .spec.template.metadata.labels."machine.openshift.io/cluster-api-machine-role" = $machinesetType |
@@ -307,9 +307,9 @@ function create_machineset() {
                  --arg volumeSize "${VOLUME_SIZE}" \
                  --arg machinesetType "${MACHINESET_TYPE}" \
                  '.metadata.name = $machineset_name |
-                  .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.selector.matchLabels."cluster.x-k8s.io/set-name" = $machineset_name |
                   .spec.template.spec.providerSpec.value.instanceType = $node_instance_type |
-                  .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.template.metadata.labels."cluster.x-k8s.io/set-name" = $machineset_name |
                   .spec.template.spec.providerSpec.value.systemDisk.category = $volumeType |
 		  .spec.template.spec.providerSpec.value.systemDisk.size = ($volumeSize|tonumber) |
 	          .metadata.labels."machine.openshift.io/cluster-api-machine-role" = $machinesetType |
@@ -339,11 +339,11 @@ function create_machineset() {
                  --arg volumeSize "${VOLUME_SIZE}" \
                  --arg machinesetType "${MACHINESET_TYPE}" \
                  '.metadata.name = $machineset_name |
-                  .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.selector.matchLabels."cluster.x-k8s.io/set-name" = $machineset_name |
 		  .spec.template.spec.providerSpec.value.numCPUs = ($node_instance_type|tonumber) |
 		  .spec.template.spec.providerSpec.value.numCoresPerSocket = ($numCoresPerSocket|tonumber) |
 		  .spec.template.spec.providerSpec.value.memoryMiB = ($ramSize|tonumber) |
-                  .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.template.metadata.labels."cluster.x-k8s.io/set-name" = $machineset_name |
 		  .spec.template.spec.providerSpec.value.diskGiB = ($volumeSize|tonumber) |
 	          .metadata.labels."machine.openshift.io/cluster-api-machine-role" = $machinesetType |
 	          .metadata.labels."machine.openshift.io/cluster-api-machine-type" = $machinesetType |
@@ -360,9 +360,9 @@ function create_machineset() {
                  --arg machineset_name "${machineset_name}" \
                  --arg machinesetType "${MACHINESET_TYPE}" \
                  '.metadata.name = $machineset_name |
-                  .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.selector.matchLabels."cluster.x-k8s.io/set-name" = $machineset_name |
 		  .spec.template.spec.providerSpec.value.flavor = $node_instance_type |
-                  .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.template.metadata.labels."cluster.x-k8s.io/set-name" = $machineset_name |
 	          .metadata.labels."machine.openshift.io/cluster-api-machine-role" = $machinesetType |
 	          .metadata.labels."machine.openshift.io/cluster-api-machine-type" = $machinesetType |
 	          .spec.template.metadata.labels."machine.openshift.io/cluster-api-machine-role" = $machinesetType |
@@ -390,11 +390,11 @@ function create_machineset() {
                  --arg machineset_name "${machineset_name}" \
                  --arg machinesetType "${MACHINESET_TYPE}" \
                  '.metadata.name = $machineset_name |
-                  .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.selector.matchLabels."cluster.x-k8s.io/set-name" = $machineset_name |
 		  .spec.template.spec.providerSpec.value.vcpuSockets = ($node_instance_type|tonumber) |
 		  .spec.template.spec.providerSpec.value.vcpusPerSocket = ($cpusPerSocket|tonumber) |
 		  .spec.template.spec.providerSpec.value.memorySize = $memorySize |
-                  .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = $machineset_name |
+                  .spec.template.metadata.labels."cluster.x-k8s.io/set-name" = $machineset_name |
 	          .metadata.labels."machine.openshift.io/cluster-api-machine-role" = $machinesetType |
 	          .metadata.labels."machine.openshift.io/cluster-api-machine-type" = $machinesetType |
 	          .spec.template.metadata.labels."machine.openshift.io/cluster-api-machine-role" = $machinesetType |
@@ -420,9 +420,9 @@ function create_machineset() {
     sed -i "/autoscaling.openshift.io/d" /tmp/machineset.json
     sed -i "/cluster-api-autoscaler/d" /tmp/machineset.json
     if [[ $MACHINESET_TYPE == "infra" ]];then
-        cat /tmp/machineset.json | jq '.spec.template.spec.metadata.labels."node-role.kubernetes.io/infra" = ""' | oc create -f -
+        cat /tmp/machineset.json | jq '.spec.template.metadata.labels."node-role.kubernetes.io/infra" = "" | del( .spec.template.metadata.labels."node-role.kubernetes.io/worker" )' | oc create -f -
     elif [[ $MACHINESET_TYPE == "workload" ]];then
-        cat /tmp/machineset.json | jq '.spec.template.spec.metadata.labels."node-role.kubernetes.io/workload" = ""' | oc create -f -
+        cat /tmp/machineset.json | jq '.spec.template.metadata.labels."node-role.kubernetes.io/workload" = "" | del( .spec.template.metadata.labels."node-role.kubernetes.io/worker" )' | oc create -f -
     else
         echo "No support label type, please check ..."
         exit 1
