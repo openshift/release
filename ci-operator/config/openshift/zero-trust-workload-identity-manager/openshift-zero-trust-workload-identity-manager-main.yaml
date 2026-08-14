@@ -276,10 +276,25 @@ tests:
       commands: |
         set -euo pipefail
 
-        # Configure local Docker auth so operator-sdk can pull bundle images
-        # from the CI registry. The ci-pull-credentials secret is mounted by ci-operator.
-        mkdir -p ${HOME}/.docker
-        cp /etc/ci-pull-credentials/.dockerconfigjson ${HOME}/.docker/config.json
+        # Local Docker auth for operator-sdk to pull bundle image from CI registry
+        mkdir -p "${HOME}/.docker"
+        cp /etc/ci-pull-credentials/.dockerconfigjson "${HOME}/.docker/config.json"
+
+        merge_pull_secrets() {
+          # Merges CI registry auth into a cluster's global pull-secret using pure bash.
+          # Both files are single-line JSON: {"auths":{"reg":{"auth":"..."},...}}
+          local existing ci_full ci_inner trimmed
+          existing=$(oc get secret/pull-secret -n openshift-config \
+            -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
+          ci_full=$(cat /etc/ci-pull-credentials/.dockerconfigjson)
+          # Strip {"auths":{ prefix and }} suffix from CI creds to get inner entries
+          ci_inner="${ci_full##*\"auths\":\{}"
+          ci_inner="${ci_inner%\}\}}"
+          # Strip trailing }} from existing pull-secret
+          trimmed="${existing%\}\}}"
+          # Combine: existing entries + CI entries + close braces
+          printf '%s,%s}}' "${trimmed}" "${ci_inner}" > /tmp/merged-pull-secret.json
+        }
 
         install_ztwim_on_cluster() {
           local cluster_name="$1"
@@ -288,30 +303,33 @@ tests:
           echo "=== Installing ZTWIM on ${cluster_name} ==="
           export KUBECONFIG="${kubeconfig_path}"
 
-          # Merge CI registry creds into the cluster's existing global pull-secret
-          oc get secret/pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | \
-            base64 -d > /tmp/cluster-pull-secret.json
-          python3 -c 'import json; c=json.load(open("/tmp/cluster-pull-secret.json")); i=json.load(open("/etc/ci-pull-credentials/.dockerconfigjson")); c.setdefault("auths",{}).update(i.get("auths",{})); json.dump(c,open("/tmp/merged-pull-secret.json","w"))'
+          # Verify cluster connectivity
+          oc whoami || { echo "ERROR: Cannot reach ${cluster_name} via ${kubeconfig_path}"; return 1; }
+
+          # Merge CI creds into global pull-secret (preserves quay.io, registry.redhat.io, etc.)
+          merge_pull_secrets
           oc set data secret/pull-secret -n openshift-config \
             --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json
 
-          # Create a namespace-scoped pull secret for operator-sdk
-          oc create namespace zero-trust-workload-identity-manager || true
-          oc create secret docker-registry ci-pull-secret \
+          # Create operator namespace and pull secret for OLM/operator-sdk
+          oc create namespace zero-trust-workload-identity-manager 2>/dev/null || true
+          oc create secret generic ci-pull-secret \
             --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
+            --type=kubernetes.io/dockerconfigjson \
             -n zero-trust-workload-identity-manager 2>/dev/null || true
           oc secrets link default ci-pull-secret --for=pull \
-            -n zero-trust-workload-identity-manager 2>/dev/null || true
+            -n zero-trust-workload-identity-manager
 
+          echo "Pull secrets configured on ${cluster_name}, installing operator..."
           operator-sdk run bundle --timeout=10m \
             --security-context-config=restricted \
             --install-mode=AllNamespaces \
             --pull-secret-name=ci-pull-secret \
             -n zero-trust-workload-identity-manager \
-            "$OO_BUNDLE" --verbose
-          oc wait --for condition=Available -n zero-trust-workload-identity-manager \
-            deployment zero-trust-workload-identity-manager-controller-manager --timeout=120s
-          echo "ZTWIM installed on ${cluster_name}"
+            "${OO_BUNDLE}" --verbose
+          oc wait --for=condition=Available -n zero-trust-workload-identity-manager \
+            deployment/zero-trust-workload-identity-manager-controller-manager --timeout=120s
+          echo "=== ZTWIM installed successfully on ${cluster_name} ==="
         }
 
         install_ztwim_on_cluster "cluster-a" "${SHARED_DIR}/nested_kubeconfig"
