@@ -300,17 +300,31 @@ until \
     sleep 5s
 done
 
-# Wait for NodePool to become ready on the management cluster
+# Wait for NodePool(s) to become ready on the management cluster
+# HyperShift creates NodePools with AZ suffixes (e.g. cluster-name-us-east-1a),
+# so we discover them dynamically via spec.clusterName instead of assuming the name.
 if [[ "${HYPERSHIFT_NODE_COUNT}" -gt 0 ]]; then
-  echo "Waiting for NodePool to become ready (HYPERSHIFT_NODE_COUNT=${HYPERSHIFT_NODE_COUNT})"
+  echo "Waiting for NodePool(s) to become ready (HYPERSHIFT_NODE_COUNT=${HYPERSHIFT_NODE_COUNT})"
   export KUBECONFIG=$MGMT_KUBECONFIG
-  oc wait --timeout=30m nodepool/${CLUSTER_NAME} -n clusters --for=condition=Ready || {
-    echo "NodePool did not become ready"
-    mkdir -p "${ARTIFACT_DIR}/hypershift-snapshot"
-    oc get "nodepool/${CLUSTER_NAME}" -n clusters -o yaml > "${ARTIFACT_DIR}/hypershift-snapshot/nodepool_failed.yaml" 2>/dev/null || true
+  NODEPOOLS=$(oc get nodepool -n clusters \
+    -o jsonpath='{range .items[?(@.spec.clusterName=="'"${CLUSTER_NAME}"'")]}{.metadata.name}{"\n"}{end}')
+  if [[ -z "${NODEPOOLS}" ]]; then
+    echo "ERROR: No NodePools found for cluster ${CLUSTER_NAME}"
+    oc get nodepool -n clusters -o custom-columns=NAME:.metadata.name,CLUSTER:.spec.clusterName 2>/dev/null || true
     exit 1
-  }
-  echo "NodePool is ready"
+  fi
+  for np in ${NODEPOOLS}; do
+    echo "Waiting for NodePool ${np} to become ready"
+    oc wait --timeout=30m "nodepool/${np}" -n clusters --for=condition=Ready || {
+      echo "NodePool ${np} did not become ready"
+      mkdir -p "${ARTIFACT_DIR}/hypershift-snapshot"
+      for failed_np in ${NODEPOOLS}; do
+        oc get "nodepool/${failed_np}" -n clusters -o yaml > "${ARTIFACT_DIR}/hypershift-snapshot/nodepool_${failed_np}.yaml" 2>/dev/null || true
+      done
+      exit 1
+    }
+    echo "NodePool ${np} is ready"
+  done
   export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 fi
 
