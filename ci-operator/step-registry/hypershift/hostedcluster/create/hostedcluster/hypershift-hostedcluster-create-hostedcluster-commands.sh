@@ -300,6 +300,19 @@ until \
     sleep 5s
 done
 
+# Wait for NodePool to become ready on the management cluster
+if [[ "${HYPERSHIFT_NODE_COUNT}" -gt 0 ]]; then
+  echo "Waiting for NodePool to become ready (HYPERSHIFT_NODE_COUNT=${HYPERSHIFT_NODE_COUNT})"
+  export KUBECONFIG=$MGMT_KUBECONFIG
+  oc wait --timeout=30m nodepool/${CLUSTER_NAME} -n clusters --for=condition=Ready || {
+    echo "NodePool did not become ready"
+    oc get nodepool/${CLUSTER_NAME} -n clusters -o yaml > $ARTIFACT_DIR/hypershift-snapshot/nodepool_failed.yaml 2>/dev/null || true
+    exit 1
+  }
+  echo "NodePool is ready"
+  export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+fi
+
 if [[ -n "${GUEST_FEATURE_SET}" ]]; then
   echo "checking if cluster has expected featureset"
   value_set=
