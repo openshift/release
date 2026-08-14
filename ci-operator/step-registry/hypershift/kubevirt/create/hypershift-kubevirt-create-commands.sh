@@ -162,90 +162,101 @@ spec:
   }'
 EOF
     EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network"
-  elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-mashreq" ]]; then
-    # Mashreq 2-Network Localnet Architecture:
-    # VMs get 2 localnet interfaces with --attach-default-network=false (no pod network).
-    # eth0 → localnet-primary (physnet:br-ex) with default gateway and DNS
-    # eth1 → localnet-secondary (physnet2:br-ex) without gateway
+  elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
+    # Multi-Network Localnet Architecture:
+    # VMs get LOCALNET_MULTI_NETWORK_COUNT localnet interfaces with --attach-default-network=false
+    # (no pod network). eth0 → localnet-1 (physnet:br-ex) with default gateway and DNS.
+    # eth1..ethN → localnet-2..localnet-N (physnet2..physnetN:br-ex) without gateway.
     # Guest OVN picks eth0 as br-ex (has default route) → EgressIP SNAT works natively.
 
     ns="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+    NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
+    echo "Setting up ${NETWORK_COUNT} localnet networks (no pod network)..."
 
-    # Add physnet2:br-ex bridge-mapping on all nodes.
-    # The default physnet:br-ex exists automatically. We need a second bridge-mapping
-    # name (physnet2) because OVN-K doesn't support multiple NADs with different configs
-    # on the same NetConf.Name. Both map to the same physical bridge br-ex.
-    echo "Adding physnet2:br-ex bridge-mapping on all nodes..."
-    for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
-      OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
-        --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
-      if [[ -z "${OVN_POD}" ]]; then
-        echo "WARNING: No ovnkube-node pod found on node ${NODE}, skipping"
-        continue
-      fi
-      CURRENT_MAPPINGS=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c ovnkube-node -- \
-        ovs-vsctl get Open_vSwitch . external-ids:ovn-bridge-mappings 2>/dev/null | tr -d '"')
-      if echo "${CURRENT_MAPPINGS}" | grep -q "physnet2:br-ex"; then
-        echo "physnet2:br-ex already present on node ${NODE}"
+    # Parse subnets from comma-separated LOCALNET_MULTI_SUBNETS into an array.
+    # Format: "192.168.111.0/24,192.168.224.0/24,..." — first subnet gets default gateway.
+    IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
+    if [[ ${#SUBNETS[@]} -lt ${NETWORK_COUNT} ]]; then
+      echo "ERROR: LOCALNET_MULTI_SUBNETS has ${#SUBNETS[@]} entries but LOCALNET_MULTI_NETWORK_COUNT=${NETWORK_COUNT}"
+      exit 1
+    fi
+
+    # Add physnet2..physnetN bridge-mappings on all nodes.
+    # The default physnet:br-ex exists automatically. Additional bridge-mapping names
+    # (physnet2, physnet3, ...) are needed because OVN-K doesn't support multiple NADs
+    # with different configs on the same NetConf.Name. All map to the same physical bridge br-ex.
+    if [[ ${NETWORK_COUNT} -gt 1 ]]; then
+      echo "Adding physnet2..physnet${NETWORK_COUNT} bridge-mappings on all nodes..."
+      for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+        OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+          --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
+        if [[ -z "${OVN_POD}" ]]; then
+          echo "WARNING: No ovnkube-node pod found on node ${NODE}, skipping"
+          continue
+        fi
+        CURRENT_MAPPINGS=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c ovnkube-node -- \
+          ovs-vsctl get Open_vSwitch . external-ids:ovn-bridge-mappings 2>/dev/null | tr -d '"' || true)
+        if [[ -z "${CURRENT_MAPPINGS}" ]]; then
+          CURRENT_MAPPINGS="physnet:br-ex"
+        fi
+        NEW_MAPPINGS="${CURRENT_MAPPINGS}"
+        for i in $(seq 2 "${NETWORK_COUNT}"); do
+          if ! echo "${NEW_MAPPINGS}" | grep -q "physnet${i}:br-ex"; then
+            NEW_MAPPINGS="${NEW_MAPPINGS},physnet${i}:br-ex"
+          fi
+        done
+        if [[ "${NEW_MAPPINGS}" != "${CURRENT_MAPPINGS}" ]]; then
+          oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c ovnkube-node -- \
+            ovs-vsctl set Open_vSwitch . external-ids:ovn-bridge-mappings="${NEW_MAPPINGS}" || true
+          echo "Updated bridge-mappings on node ${NODE}: ${NEW_MAPPINGS}"
+        else
+          echo "Bridge-mappings already correct on node ${NODE}: ${CURRENT_MAPPINGS}"
+        fi
+      done
+
+      # Verify bridge-mappings on all nodes
+      echo "Verifying bridge-mappings on all nodes..."
+      for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+        OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+          --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
+        MAPPINGS=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c ovnkube-node -- \
+          ovs-vsctl get Open_vSwitch . external-ids:ovn-bridge-mappings 2>/dev/null || true)
+        echo "  ${NODE}: ${MAPPINGS}"
+      done
+    fi
+
+    # Create localnet NADs: localnet-1 uses physnet, localnet-2 uses physnet2, etc.
+    for i in $(seq 1 "${NETWORK_COUNT}"); do
+      NAD_NAME="localnet-${i}"
+      if [[ ${i} -eq 1 ]]; then
+        PHYSNET_NAME="physnet"
       else
-        NEW_MAPPINGS="${CURRENT_MAPPINGS},physnet2:br-ex"
-        oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c ovnkube-node -- \
-          ovs-vsctl set Open_vSwitch . external-ids:ovn-bridge-mappings="${NEW_MAPPINGS}" 2>/dev/null
-        echo "Added physnet2:br-ex on node ${NODE}: ${NEW_MAPPINGS}"
+        PHYSNET_NAME="physnet${i}"
       fi
-    done
-
-    # Verify bridge-mappings on all nodes
-    echo "Verifying bridge-mappings on all nodes..."
-    for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
-      OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
-        --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
-      MAPPINGS=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c ovnkube-node -- \
-        ovs-vsctl get Open_vSwitch . external-ids:ovn-bridge-mappings 2>/dev/null)
-      echo "  ${NODE}: ${MAPPINGS}"
-    done
-
-    # Create primary localnet NAD (physnet:br-ex) — this becomes eth0 with default gateway
-    oc apply -f - <<EOF
+      SUBNET="${SUBNETS[$((i-1))]}"
+      oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
-  name: localnet-primary
+  name: ${NAD_NAME}
   namespace: ${ns}
 spec:
   config: '{
       "cniVersion": "0.3.1",
-      "name": "physnet",
+      "name": "${PHYSNET_NAME}",
       "type": "ovn-k8s-cni-overlay",
       "topology": "localnet",
-      "netAttachDefName": "${ns}/localnet-primary",
-      "subnets": "${MASHREQ_PRIMARY_SUBNET}"
+      "netAttachDefName": "${ns}/${NAD_NAME}",
+      "subnets": "${SUBNET}"
   }'
 EOF
-
-    # Create secondary localnet NAD (physnet2:br-ex) — this becomes eth1, no gateway
-    oc apply -f - <<EOF
-apiVersion: "k8s.cni.cncf.io/v1"
-kind: NetworkAttachmentDefinition
-metadata:
-  name: localnet-secondary
-  namespace: ${ns}
-spec:
-  config: '{
-      "cniVersion": "0.3.1",
-      "name": "physnet2",
-      "type": "ovn-k8s-cni-overlay",
-      "topology": "localnet",
-      "netAttachDefName": "${ns}/localnet-secondary",
-      "subnets": "${MASHREQ_SECONDARY_SUBNET}"
-  }'
-EOF
-
-    echo "Created localnet-primary and localnet-secondary NADs in namespace ${ns}"
+      echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:br-ex, subnet ${SUBNET})"
+    done
 
     EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false"
-    EXTRA_ARGS="${EXTRA_ARGS} --additional-network name:${ns}/localnet-primary"
-    EXTRA_ARGS="${EXTRA_ARGS} --additional-network name:${ns}/localnet-secondary"
+    for i in $(seq 1 "${NETWORK_COUNT}"); do
+      EXTRA_ARGS="${EXTRA_ARGS} --additional-network name:${ns}/localnet-${i}"
+    done
   else
     # Existing macvlan path
     oc apply -f - <<EOF
@@ -499,16 +510,19 @@ IPECHO_EOF
     python3 -c "import sys,json; nets=json.loads(sys.stdin.read()); [print(n['ips'][0]) for n in nets if 'localnet' in n.get('name','')]")
   echo "ip-echo localnet IP: ${IPECHO_LOCALNET_IP}:80"
   echo "${IPECHO_LOCALNET_IP}:80" > "${SHARED_DIR}/kubevirt_ipecho_url"
-elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-mashreq" ]]; then
-  # Mashreq 2-Network Localnet Post-Creation:
-  # Configure DHCP for both localnet interfaces. Primary gets router + DNS,
-  # secondary gets only lease_time (no gateway, no DNS). No enp2s0 forwarding
-  # needed since the primary localnet IS br-ex and EgressIP works natively.
-  MASHREQ_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
+  # Multi-Network Localnet Post-Creation:
+  # Configure DHCP for all localnet interfaces. First network (localnet-1) gets
+  # router + DNS, remaining networks get only lease_time (no gateway, no DNS).
+  # No enp2s0 forwarding needed since the primary localnet IS br-ex and EgressIP
+  # works natively.
+  MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
+  IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
 
   echo "Waiting for VMIs to be running..."
   for _ in $(seq 1 60); do
-    RUNNING_COUNT=$(oc get vmi -n "${MASHREQ_NAMESPACE}" --no-headers 2>/dev/null \
+    RUNNING_COUNT=$(oc get vmi -n "${MULTI_NAMESPACE}" --no-headers 2>/dev/null \
       | grep -c Running || true)
     if [[ "${RUNNING_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
       echo "All ${RUNNING_COUNT} VMIs are running"
@@ -518,9 +532,9 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-mashreq" ]]; then
     sleep 10
   done
 
-  echo "Configuring OVN DHCP for Mashreq dual-localnet interfaces..."
-  for VMI in $(oc get vmi -n "${MASHREQ_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}'); do
-    NODE=$(oc get vmi -n "${MASHREQ_NAMESPACE}" "${VMI}" -o jsonpath='{.status.nodeName}')
+  echo "Configuring OVN DHCP for multi (${NETWORK_COUNT})-localnet interfaces..."
+  for VMI in $(oc get vmi -n "${MULTI_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}'); do
+    NODE=$(oc get vmi -n "${MULTI_NAMESPACE}" "${VMI}" -o jsonpath='{.status.nodeName}')
     OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
       --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
 
@@ -529,75 +543,60 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-mashreq" ]]; then
       continue
     fi
 
-    # Find primary localnet LSP (associated with localnet-primary NAD)
-    PRIMARY_LSP=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
-      ovn-nbctl --columns=name --bare find Logical_Switch_Port \
-      "external_ids:k8s.ovn.org/nad=${MASHREQ_NAMESPACE}/localnet-primary" 2>/dev/null)
+    for i in $(seq 1 "${NETWORK_COUNT}"); do
+      NAD_NAME="localnet-${i}"
+      SUBNET="${SUBNETS[$((i-1))]}"
+      SUBNET_GW=$(echo "${SUBNET}" | sed 's|/.*||' | sed 's/\.0$/.1/')
+      SERVER_MAC=$(printf "c0:ff:ee:00:00:%02x" "${i}")
 
-    # Find secondary localnet LSP (associated with localnet-secondary NAD)
-    SECONDARY_LSP=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
-      ovn-nbctl --columns=name --bare find Logical_Switch_Port \
-      "external_ids:k8s.ovn.org/nad=${MASHREQ_NAMESPACE}/localnet-secondary" 2>/dev/null)
+      # Find LSP for this NAD
+      LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+        ovn-nbctl --columns=name --bare find Logical_Switch_Port \
+        "external_ids:k8s.ovn.org/nad=${MULTI_NAMESPACE}/${NAD_NAME}" 2>/dev/null || true)
 
-    # Fallback: if NAD-based lookup fails, try topology-based lookup and identify by IP subnet
-    if [[ -z "${PRIMARY_LSP}" || -z "${SECONDARY_LSP}" ]]; then
-      echo "NAD-based LSP lookup incomplete for VMI ${VMI} on node ${NODE}, trying topology fallback..."
-      ALL_LOCALNET_LSPS=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
-        ovn-nbctl --columns=name,dynamic_addresses --bare find Logical_Switch_Port \
-        "external_ids:k8s.ovn.org/topology=localnet" 2>/dev/null)
+      # Fallback: identify LSP by IP subnet if NAD-based lookup fails
+      if [[ -z "${LSP_NAME}" ]]; then
+        echo "  NAD-based LSP lookup failed for ${NAD_NAME} on ${NODE}, trying subnet fallback..."
+        SUBNET_PREFIX=$(echo "${SUBNET}" | cut -d'.' -f1-3)
+        LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+          ovn-nbctl --columns=name,dynamic_addresses --bare find Logical_Switch_Port \
+          "external_ids:k8s.ovn.org/topology=localnet" 2>/dev/null | \
+          while IFS= read -r line; do
+            name=$(echo "${line}" | awk '{print $1}')
+            ip=$(echo "${line}" | grep -oP '\d+\.\d+\.\d+\.\d+' || true)
+            if [[ "${ip}" == ${SUBNET_PREFIX}.* ]]; then echo "${name}"; break; fi
+          done || true)
+      fi
 
-      PRIMARY_PREFIX=$(echo "${MASHREQ_PRIMARY_SUBNET}" | cut -d'.' -f1-3)
-      SECONDARY_PREFIX=$(echo "${MASHREQ_SECONDARY_SUBNET}" | cut -d'.' -f1-3)
+      if [[ -z "${LSP_NAME}" ]]; then
+        echo "  WARNING: No LSP found for ${NAD_NAME} on node ${NODE} for VMI ${VMI}"
+        continue
+      fi
 
-      while IFS= read -r line; do
-        LSP_NAME=$(echo "${line}" | awk '{print $1}')
-        LSP_IP=$(echo "${line}" | grep -oP '\d+\.\d+\.\d+\.\d+' || true)
-        if [[ -z "${PRIMARY_LSP}" && "${LSP_IP}" == ${PRIMARY_PREFIX}.* ]]; then
-          PRIMARY_LSP="${LSP_NAME}"
-        elif [[ -z "${SECONDARY_LSP}" && "${LSP_IP}" == ${SECONDARY_PREFIX}.* ]]; then
-          SECONDARY_LSP="${LSP_NAME}"
-        fi
-      done <<< "${ALL_LOCALNET_LSPS}"
-    fi
+      # First network gets router + DNS (default gateway); others get only lease_time
+      if [[ ${i} -eq 1 ]]; then
+        DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+          ovn-nbctl create DHCP_Options cidr="${SUBNET}" \
+          options='"lease_time"="3500" "router"="'"${LOCALNET_MULTI_PRIMARY_GATEWAY}"'" "dns_server"="'"${LOCALNET_MULTI_PRIMARY_DNS}"'" "server_id"="'"${LOCALNET_MULTI_PRIMARY_GATEWAY}"'" "server_mac"="'"${SERVER_MAC}"'"' \
+          2>/dev/null)
+      else
+        DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+          ovn-nbctl create DHCP_Options cidr="${SUBNET}" \
+          options='"lease_time"="3500" "server_id"="'"${SUBNET_GW}"'" "server_mac"="'"${SERVER_MAC}"'"' \
+          2>/dev/null)
+      fi
 
-    if [[ -z "${PRIMARY_LSP}" ]]; then
-      echo "WARNING: No primary localnet LSP found on node ${NODE} for VMI ${VMI}"
-      continue
-    fi
-    if [[ -z "${SECONDARY_LSP}" ]]; then
-      echo "WARNING: No secondary localnet LSP found on node ${NODE} for VMI ${VMI}"
-      continue
-    fi
+      oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+        ovn-nbctl lsp-set-dhcpv4-options "${LSP_NAME}" "${DHCP_UUID}" 2>/dev/null
 
-    echo "  VMI ${VMI}: primary LSP=${PRIMARY_LSP}, secondary LSP=${SECONDARY_LSP}"
+      # Clear port security so EgressIP-SNATed packets can exit
+      oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+        ovn-nbctl clear Logical_Switch_Port "${LSP_NAME}" port_security 2>/dev/null
 
-    # Primary DHCP: router + DNS + server_id (default gateway network)
-    PRIMARY_DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
-      ovn-nbctl create DHCP_Options cidr="${MASHREQ_PRIMARY_SUBNET}" \
-      options='"lease_time"="3500" "router"="'"${MASHREQ_PRIMARY_GATEWAY}"'" "dns_server"="'"${MASHREQ_PRIMARY_DNS}"'" "server_id"="'"${MASHREQ_PRIMARY_GATEWAY}"'" "server_mac"="c0:ff:ee:00:00:01"' \
-      2>/dev/null)
-
-    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
-      ovn-nbctl lsp-set-dhcpv4-options "${PRIMARY_LSP}" "${PRIMARY_DHCP_UUID}" 2>/dev/null
-
-    # Secondary DHCP: NO router, NO dns_server — only lease_time and server identity
-    SECONDARY_DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
-      ovn-nbctl create DHCP_Options cidr="${MASHREQ_SECONDARY_SUBNET}" \
-      options='"lease_time"="3500" "server_id"="'"$(echo "${MASHREQ_SECONDARY_SUBNET}" | sed 's|/.*||' | sed 's/\.0$/.1/')"'" "server_mac"="c0:ff:ee:00:00:02"' \
-      2>/dev/null)
-
-    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
-      ovn-nbctl lsp-set-dhcpv4-options "${SECONDARY_LSP}" "${SECONDARY_DHCP_UUID}" 2>/dev/null
-
-    # Clear port security on both LSPs so EgressIP-SNATed packets can exit
-    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
-      ovn-nbctl clear Logical_Switch_Port "${PRIMARY_LSP}" port_security 2>/dev/null
-    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
-      ovn-nbctl clear Logical_Switch_Port "${SECONDARY_LSP}" port_security 2>/dev/null
-
-    echo "  Configured DHCP and cleared port security for VMI ${VMI} on node ${NODE}"
+      echo "  VMI ${VMI}: configured DHCP for ${NAD_NAME} (LSP=${LSP_NAME}, subnet=${SUBNET})"
+    done
   done
-  echo "OVN DHCP and port security configuration complete for Mashreq dual-localnet interfaces"
+  echo "OVN DHCP and port security configuration complete for multi (${NETWORK_COUNT})-localnet interfaces"
 
   # Deploy ip-echo on the management cluster with primary localnet NAD for
   # EgressIP source-IP verification.
@@ -611,7 +610,7 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-mashreq" ]]; then
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
-  name: localnet-primary
+  name: localnet-1
   namespace: ${IPECHO_NAMESPACE}
 spec:
   config: '{
@@ -619,8 +618,8 @@ spec:
       "name": "physnet",
       "type": "ovn-k8s-cni-overlay",
       "topology": "localnet",
-      "netAttachDefName": "${IPECHO_NAMESPACE}/localnet-primary",
-      "subnets": "${MASHREQ_PRIMARY_SUBNET}"
+      "netAttachDefName": "${IPECHO_NAMESPACE}/localnet-1",
+      "subnets": "${SUBNETS[0]}"
   }'
 IPECHO_NAD_EOF
 
@@ -631,7 +630,7 @@ metadata:
   name: egressip-ipecho
   namespace: ${IPECHO_NAMESPACE}
   annotations:
-    k8s.v1.cni.cncf.io/networks: localnet-primary
+    k8s.v1.cni.cncf.io/networks: localnet-1
 spec:
   containers:
   - name: ip-echo
