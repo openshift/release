@@ -306,7 +306,8 @@ if [[ "${HYPERSHIFT_NODE_COUNT}" -gt 0 ]]; then
   export KUBECONFIG=$MGMT_KUBECONFIG
   oc wait --timeout=30m nodepool/${CLUSTER_NAME} -n clusters --for=condition=Ready || {
     echo "NodePool did not become ready"
-    oc get nodepool/${CLUSTER_NAME} -n clusters -o yaml > $ARTIFACT_DIR/hypershift-snapshot/nodepool_failed.yaml 2>/dev/null || true
+    mkdir -p "${ARTIFACT_DIR}/hypershift-snapshot"
+    oc get "nodepool/${CLUSTER_NAME}" -n clusters -o yaml > "${ARTIFACT_DIR}/hypershift-snapshot/nodepool_failed.yaml" 2>/dev/null || true
     exit 1
   }
   echo "NodePool is ready"
