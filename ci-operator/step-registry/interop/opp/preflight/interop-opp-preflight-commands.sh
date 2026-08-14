@@ -316,36 +316,45 @@ function CheckMcpReadiness () {
 
     typeset failed=0 details=""
 
-    typeset mcpIssues
-    mcpIssues="$(oc get machineconfigpools --no-headers | \
-        awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}')" || true
-
-    if [[ -n "${mcpIssues}" ]]; then
-        : "Unhealthy MachineConfigPools: ${mcpIssues}"
-        details="unhealthy_mcps: ${mcpIssues}; "
+    typeset mcpRaw=""
+    if ! mcpRaw="$(oc get machineconfigpools --no-headers 2>&1)"; then
+        : "Failed to query MachineConfigPools"
+        details="machineconfigpools: query failed; "
         (( failed += 1 ))
-
-        for mcp in ${mcpIssues}; do
-            : "### MCP ${mcp} ###"
-            oc describe machineconfigpool "${mcp}" || true
-        done
     else
-        typeset mcpCount
-        mcpCount="$(oc get machineconfigpools --no-headers | wc -l)"
-        : "All ${mcpCount} MachineConfigPools are updated and not degraded"
-        details="all ${mcpCount} MCPs healthy (Updated=True, Updating=False, Degraded=False); "
+        typeset mcpIssues=""
+        mcpIssues="$(echo "${mcpRaw}" | \
+            awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}')" || true
+
+        if [[ -n "${mcpIssues}" ]]; then
+            : "Unhealthy MachineConfigPools: ${mcpIssues}"
+            details="unhealthy_mcps: ${mcpIssues}; "
+            (( failed += 1 ))
+
+            for mcp in ${mcpIssues}; do
+                : "### MCP ${mcp} ###"
+                oc describe machineconfigpool "${mcp}" || true
+            done
+        else
+            typeset mcpCount
+            mcpCount="$(echo "${mcpRaw}" | wc -l)"
+            : "All ${mcpCount} MachineConfigPools are updated and not degraded"
+            details="all ${mcpCount} MCPs healthy (Updated=True, Updating=False, Degraded=False); "
+        fi
     fi
 
     typeset mismatch=""
-    while IFS= read -r line; do
-        typeset mcpName ready desired
-        mcpName="$(echo "${line}" | awk '{print $1}')"
-        ready="$(echo "${line}" | awk '{print $7}')"
-        desired="$(echo "${line}" | awk '{print $6}')"
-        if [[ -n "${ready}" && -n "${desired}" && "${ready}" != "${desired}" ]]; then
-            mismatch="${mismatch}${mcpName} (ready=${ready}, desired=${desired}); "
-        fi
-    done < <(oc get machineconfigpools --no-headers || true)
+    if [[ -n "${mcpRaw:-}" ]]; then
+        while IFS= read -r line; do
+            typeset mcpName ready desired
+            mcpName="$(echo "${line}" | awk '{print $1}')"
+            ready="$(echo "${line}" | awk '{print $7}')"
+            desired="$(echo "${line}" | awk '{print $6}')"
+            if [[ -n "${ready}" && -n "${desired}" && "${ready}" != "${desired}" ]]; then
+                mismatch="${mismatch}${mcpName} (ready=${ready}, desired=${desired}); "
+            fi
+        done <<< "${mcpRaw}"
+    fi
 
     if [[ -n "${mismatch}" ]]; then
         : "MCP machine count mismatch: ${mismatch}"
