@@ -1,0 +1,57 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_path: web/playwright/Dockerfile
+    from: src
+    to: quay-playwright-runner
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: quay-operator-aws-s3-smoke
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-22@sha256:dc85edf1095b3be72cf2a3f4e727857944c0538d56face1f3b96700dc0846053
+      PLAYWRIGHT_GIT_BRANCH: redhat-3.18
+      QUAY_EXTRA_CONFIG: |
+        FEATURE_PROGRAMMATIC_BOOTSTRAP: false
+        FEATURE_REPO_MIRROR: true
+        FEATURE_USER_METADATA: true
+        FEATURE_IMMUTABLE_TAGS: true
+        SUPER_USERS:
+          - admin
+        GLOBAL_READONLY_SUPER_USERS:
+          - readonly
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+    post:
+    - ref: quay-operator-deprovision
+    test:
+    - ref: quay-operator-enable-catalogsource
+    - ref: quay-operator-deploy-aws-s3
+    - ref: quay-operator-test-e2e
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay
+  variant: aws-ocp422-e2e-install
