@@ -373,20 +373,21 @@ handle_azure() {
     oc adm policy add-scc-to-group anyuid system:authenticated system:serviceaccounts
     oc label --overwrite ns default pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/warn=baseline pod-security.kubernetes.io/audit=baseline
 
-    oc -n kube-system get secret azure-credentials -o json > azure_credentials.json
     if [ -n "${CLUSTER_PROFILE_DIR:-}" ]; then
         AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
         AZURE_CLIENT_ID="$(jq -r .clientId "${AZURE_AUTH_LOCATION}")"
         AZURE_CLIENT_SECRET="$(jq -r .clientSecret "${AZURE_AUTH_LOCATION}")"
         AZURE_TENANT_ID="$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")"
+        AZURE_SUBSCRIPTION_ID="$(jq -r .subscriptionId "${AZURE_AUTH_LOCATION}")"
     else
         # Useful when testing this script outside of ci-operator
+        oc -n kube-system get secret azure-credentials -o json > azure_credentials.json
         AZURE_CLIENT_ID="$(jq -r .data.azure_client_id azure_credentials.json|base64 -d)"
         AZURE_CLIENT_SECRET="$(jq -r .data.azure_client_secret azure_credentials.json|base64 -d)"
         AZURE_TENANT_ID="$(jq -r .data.azure_tenant_id azure_credentials.json|base64 -d)"
+        AZURE_SUBSCRIPTION_ID="$(jq -r .data.azure_subscription_id azure_credentials.json|base64 -d)"
+        rm -f azure_credentials.json
     fi
-    AZURE_SUBSCRIPTION_ID="$(jq -r .data.azure_subscription_id azure_credentials.json|base64 -d)"
-    rm -f azure_credentials.json
     # Login to Azure for NAT gateway creation
     az login --service-principal --username "${AZURE_CLIENT_ID}" --password "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
     az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
