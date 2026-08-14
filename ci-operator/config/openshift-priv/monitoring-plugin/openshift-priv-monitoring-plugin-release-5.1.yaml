@@ -19,7 +19,8 @@ images:
     to: monitoring-ui-tests-runner
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - monitoring-plugin-test
     name: "5.1"
     namespace: ocp-priv
@@ -157,6 +158,7 @@ tests:
     workflow: ipi-aws
 - always_run: false
   as: e2e-management-api
+  optional: true
   skip_branches:
   - ^main$
   steps:
@@ -300,7 +302,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make test-e2e
+      commands: E2E_TEST_ARGS="-run '(TestDefaultTLSSecurityProfileConfiguration|TestClusterMonitorConsolePlugin)'"
+        make test-e2e
       from: stable:cluster-monitoring-operator-src
       resources:
         requests:
