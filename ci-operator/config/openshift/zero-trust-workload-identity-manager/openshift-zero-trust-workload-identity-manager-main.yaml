@@ -276,29 +276,45 @@ tests:
       commands: |
         set -euo pipefail
 
-        echo "=== Installing ZTWIM on Cluster A ==="
-        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-        oc create namespace zero-trust-workload-identity-manager || true
-        operator-sdk run bundle --timeout=10m \
-          --security-context-config=restricted \
-          --install-mode=AllNamespaces \
-          -n zero-trust-workload-identity-manager \
-          "$OO_BUNDLE" --verbose
-        oc wait --for condition=Available -n zero-trust-workload-identity-manager \
-          deployment zero-trust-workload-identity-manager-controller-manager --timeout=120s
-        echo "ZTWIM installed on Cluster A"
+        install_ztwim_on_cluster() {
+          local cluster_name="$1"
+          local kubeconfig_path="$2"
 
-        echo "=== Installing ZTWIM on Cluster B ==="
-        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
-        oc create namespace zero-trust-workload-identity-manager || true
-        operator-sdk run bundle --timeout=10m \
-          --security-context-config=restricted \
-          --install-mode=AllNamespaces \
-          -n zero-trust-workload-identity-manager \
-          "$OO_BUNDLE" --verbose
-        oc wait --for condition=Available -n zero-trust-workload-identity-manager \
-          deployment zero-trust-workload-identity-manager-controller-manager --timeout=120s
-        echo "ZTWIM installed on Cluster B"
+          echo "=== Installing ZTWIM on ${cluster_name} ==="
+          export KUBECONFIG="${kubeconfig_path}"
+          oc create namespace zero-trust-workload-identity-manager || true
+
+          # HyperShift hosted clusters don't have CI registry pull credentials.
+          # Merge the cluster's pull secret with CI credentials so operator-sdk
+          # can pull the bundle image from the CI registry.
+          oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > /tmp/cluster-pull-secret-${cluster_name}.json
+          if [[ -f /etc/ci-pull-credentials/.dockerconfigjson ]]; then
+            jq -s '.[0] * .[1]' /tmp/cluster-pull-secret-${cluster_name}.json /etc/ci-pull-credentials/.dockerconfigjson > /tmp/merged-pull-secret-${cluster_name}.json
+          else
+            cp /tmp/cluster-pull-secret-${cluster_name}.json /tmp/merged-pull-secret-${cluster_name}.json
+          fi
+          oc create secret docker-registry ci-pull-secret \
+            --from-file=.dockerconfigjson=/tmp/merged-pull-secret-${cluster_name}.json \
+            -n zero-trust-workload-identity-manager || true
+          oc secrets link default ci-pull-secret --for=pull -n zero-trust-workload-identity-manager
+
+          operator-sdk run bundle --timeout=10m \
+            --security-context-config=restricted \
+            --install-mode=AllNamespaces \
+            --pull-secret-name=ci-pull-secret \
+            -n zero-trust-workload-identity-manager \
+            "$OO_BUNDLE" --verbose
+          oc wait --for condition=Available -n zero-trust-workload-identity-manager \
+            deployment zero-trust-workload-identity-manager-controller-manager --timeout=120s
+          echo "ZTWIM installed on ${cluster_name}"
+        }
+
+        install_ztwim_on_cluster "cluster-a" "${SHARED_DIR}/nested_kubeconfig"
+        install_ztwim_on_cluster "cluster-b" "${SHARED_DIR}/nested_kubeconfig_b"
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
       dependencies:
       - env: OO_BUNDLE
         name: zero-trust-workload-identity-manager-bundle
