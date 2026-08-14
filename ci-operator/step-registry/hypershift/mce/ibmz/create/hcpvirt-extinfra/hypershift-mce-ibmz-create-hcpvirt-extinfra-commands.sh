@@ -54,19 +54,30 @@ hcp create cluster kubevirt \
   --release-image quay.io/openshift-release-dev/ocp-release:4.22.9-multi
  # --release-image ${OCP_IMAGE_MULTI}
 
-echo "$(date) DEBUG: HostedCluster created, listing HC and NodePool status"
-oc get hostedcluster -n ${HC_NS} ${HC_NAME} -o yaml || true
-oc get nodepool -n ${HC_NS} || true
+echo "$(date) DEBUG: Sleeping 20 minutes after hcp create to let HC and NodePool settle"
+sleep 1200
 
-oc wait --timeout=40m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
-echo "$(date) Kubevirt cluster is available"
-
-echo "$(date) DEBUG: HostedCluster conditions after Available"
+echo "$(date) DEBUG: Management cluster state after 20m sleep"
+oc get no || true
+oc get hc -A || true
+oc describe hc -n ${HC_NS} ${HC_NAME} || true
 oc get hostedcluster -n ${HC_NS} ${HC_NAME} -o jsonpath='{.status.conditions}' | jq . || true
 echo "$(date) DEBUG: NodePool status"
+oc get np -A || true
+oc describe np -n ${HC_NS} || true
 oc get nodepool -n ${HC_NS} -o yaml || true
 echo "$(date) DEBUG: HCP control plane pods"
-oc get pods -n ${HC_NS}-${HC_NAME} || true
+oc get po -n ${HC_NS}-${HC_NAME} || true
+
+echo "$(date) DEBUG: Infra cluster nodes and VMIs after 20m sleep"
+export KUBECONFIG="${SHARED_DIR}/infra-kubeconfig"
+oc get no || true
+oc get vmi -A || true
+oc describe vmi -A || true
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+oc wait --timeout=25m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
+echo "$(date) Kubevirt cluster is available"
 
 # --- Step 3: Retrieve the guest cluster kubeconfig ---
 echo "$(date) Retrieving guest cluster kubeconfig"
@@ -209,6 +220,22 @@ if [[ -n "${UNAVAILABLE}" ]]; then
   oc get no --kubeconfig "${VIRT_KC}" -o wide || true
   echo "$(date) DEBUG: Guest cluster pods with issues:"
   oc get pods -A --kubeconfig "${VIRT_KC}" --field-selector=status.phase!=Running,status.phase!=Succeeded 2>/dev/null || true
+
+  echo "$(date) DEBUG: Management cluster state at CO failure"
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  oc get no || true
+  oc get hc -A || true
+  oc describe hc -n ${HC_NS} ${HC_NAME} || true
+  oc get np -A || true
+  oc describe np -n ${HC_NS} || true
+  oc get po -n ${HC_NS}-${HC_NAME} || true
+
+  echo "$(date) DEBUG: Infra cluster state at CO failure"
+  export KUBECONFIG="${SHARED_DIR}/infra-kubeconfig"
+  oc get no || true
+  oc get vmi -A || true
+  oc describe vmi -A || true
+
   exit 1
 fi
 
