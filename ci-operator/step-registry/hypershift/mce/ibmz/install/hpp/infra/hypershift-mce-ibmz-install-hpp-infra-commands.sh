@@ -43,12 +43,12 @@ EOF
 echo "Waiting for HostPathProvisioner to be ready..."
 oc wait pod -l app=hostpath-provisioner -n openshift-cnv --for=condition=Ready --timeout=5m || true
 
-# Get the storage pool name from HostPathProvisioner CR
-# If not found, use the default
+# Get the storage pool name from HostPathProvisioner CR (.spec.storagePools[].name)
+# The StorageClass storagePool parameter must be the pool NAME, not the path.
 ACTUAL_POOL_NAME="${STORAGE_POOL_NAME}"
-if oc get hostpathprovisioner hostpath-provisioner -A &>/dev/null; then
-  ACTUAL_POOL_NAME=$(oc get hostpathprovisioner hostpath-provisioner -A -o yaml | \
-    grep -A 5 "pathConfig:" | grep "path:" | awk '{print $NF}' | sed 's|/var/hpvolumes/||' || echo "${STORAGE_POOL_NAME}")
+if oc get hostpathprovisioner hostpath-provisioner &>/dev/null; then
+  ACTUAL_POOL_NAME=$(oc get hostpathprovisioner hostpath-provisioner \
+    -o jsonpath='{.spec.storagePools[0].name}' 2>/dev/null || echo "${STORAGE_POOL_NAME}")
 fi
 
 echo "Using storage pool name: ${ACTUAL_POOL_NAME}"
