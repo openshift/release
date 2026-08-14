@@ -1,46 +1,44 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: prow-controller-manager
+  name: sinker
   namespace: ci-staging
 ---
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: prow-controller-manager
+  name: sinker
   namespace: ci-staging
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - pods/log
-  verbs:
-  - create
-  - delete
-  - list
-  - watch
-  - get
-  - patch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - delete
+      - list
+      - watch
+      - get
+      - patch
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: prow-controller-manager
+  name: sinker
   namespace: ci-staging
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: prow-controller-manager
+  name: sinker
 subjects:
 - kind: ServiceAccount
-  name: prow-controller-manager
+  name: sinker
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: prow-controller-manager-token
+  name: sinker-token
   namespace: ci-staging
   annotations:
-    kubernetes.io/service-account.name: prow-controller-manager
+    kubernetes.io/service-account.name: sinker
 type: kubernetes.io/service-account-token

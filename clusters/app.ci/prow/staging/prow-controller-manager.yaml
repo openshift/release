@@ -16,12 +16,28 @@ spec:
         app: prow-controller-manager
     spec:
       serviceAccountName: prow-controller-manager
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/Prucek/release-staging.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release-staging
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release-staging
+          mountPath: /tmp/git-sync
       containers:
       - name: prow-controller-manager
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
         - --job-config-path=/etc/jobs
+        - --job-config-path=/var/repo/release-staging/ci-operator/jobs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --enable-controller=plank
@@ -52,6 +68,26 @@ spec:
         - name: job-configs
           mountPath: /etc/jobs
           readOnly: true
+        - name: release-staging
+          mountPath: /var/repo
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/Prucek/release-staging.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release-staging
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release-staging
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       volumes:
       - name: service-account-token
         projected:
@@ -70,3 +106,5 @@ spec:
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs
+      - name: release-staging
+        emptyDir: {}
