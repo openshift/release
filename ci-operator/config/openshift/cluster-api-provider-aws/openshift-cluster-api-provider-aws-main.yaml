@@ -32,7 +32,7 @@ images:
       COPY src/ /opt/app-root/src/
       WORKDIR /opt/app-root/src/cluster-api-provider-aws
       USER root
-      RUN dnf install -y git go make jq python3-pip && dnf clean all && python3 -m pip install --no-cache-dir yq
+      RUN dnf install -y git go make && dnf clean all
       RUN ln -s /usr/bin/podman /usr/local/bin/docker
     from: nested-podman
     inputs:
@@ -45,17 +45,17 @@ promotion:
   to:
   - excluded_images:
     - src-podman
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -70,8 +70,9 @@ tests:
   commands: openshift/unit-tests.sh
   container:
     from: src
-- as: e2e-aws-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-capi-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -88,8 +89,9 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
@@ -101,9 +103,10 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
-- as: e2e-aws-serial
+- always_run: false
+  as: e2e-aws-serial
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   shard_count: 2
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
@@ -120,8 +123,9 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: e2e-hypershift
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-hypershift
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external

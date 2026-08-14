@@ -8,7 +8,7 @@ export PATH=/usr/libexec/origin:$PATH
 
 # Initial check
 case "${CLUSTER_TYPE}" in
-libvirt-ppc64le*|libvirt-s390x*|powervs*|powervc*)
+libvirt-ppc64le*|libvirt-s390x*|powervs*|powervc*|power-s2s*)
     ;;
 *)
     >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -331,7 +331,10 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
 	powervs*)
 	    TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability,service-type-load-balancer-availability"
 		;;
-	libvirt-ppc64le*)
+	powervc*)
+	    TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability,service-type-load-balancer-availability"
+		;;
+	libvirt-ppc64le*|power-s2s*)
         TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability"
         ;;
 	esac

@@ -6,8 +6,14 @@ set -o pipefail
 run_tls_scan() {
 
   # TLS Scanner - scans TLS configurations of all pods in the cluster
-  local NAMESPACE="tls-scanner"
+  local NAMESPACE="${SCANNER_NAMESPACE:-tls-scanner}"
   local OWNS_NAMESPACE=true
+  # When SCANNER_NAMESPACE is explicitly set, deploy into an existing namespace
+  # (do not create/delete it). Check the variable itself, not the resolved value,
+  # so that SCANNER_NAMESPACE=tls-scanner is also treated as externally owned.
+  if [[ -n "${SCANNER_NAMESPACE:-}" ]]; then
+      OWNS_NAMESPACE=false
+  fi
   local SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
   local ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 
@@ -66,13 +72,21 @@ run_tls_scan() {
       echo "Using expected TLS profile type for compliance checks: ${TLS_PROFILE_TYPE}"
   fi
 
-  local scanner_cpu="${SCANNER_CPU}"
-  local scanner_memory="${SCANNER_MEMORY}"
+  # SCANNER_CPU / SCANNER_MEMORY are deprecated but still honoured as fallback
+  # defaults for both request and limit when the split vars aren't explicitly
+  # set, so that a lower CPU request (e.g. 500m) can get the Pod scheduled
+  # while still allowing it to burst up to the higher limit.
+  local scanner_cpu_request="${SCANNER_CPU_REQUEST:-${SCANNER_CPU}}"
+  local scanner_cpu_limit="${SCANNER_CPU_LIMIT:-${SCANNER_CPU}}"
+  local scanner_mem_request="${SCANNER_MEM_REQUEST:-${SCANNER_MEMORY}}"
+  local scanner_mem_limit="${SCANNER_MEM_LIMIT:-${SCANNER_MEMORY}}"
   if [[ "${TLS_SCANNER_CLUSTER_LABEL:-}" == "guest" ]]; then
-    scanner_cpu="${SCANNER_CPU_GUEST:-1}"
-    scanner_memory="${SCANNER_MEMORY_GUEST:-2Gi}"
+    scanner_cpu_request="${SCANNER_CPU_GUEST_REQUEST:-${SCANNER_CPU_GUEST}}"
+    scanner_cpu_limit="${SCANNER_CPU_GUEST_LIMIT:-${SCANNER_CPU_GUEST}}"
+    scanner_mem_request="${SCANNER_MEM_GUEST_REQUEST:-${SCANNER_MEMORY_GUEST}}"
+    scanner_mem_limit="${SCANNER_MEM_GUEST_LIMIT:-${SCANNER_MEMORY_GUEST}}"
   fi
-  echo "Scanner pod resources: cpu=${scanner_cpu} memory=${scanner_memory}"
+  echo "Scanner pod resources: cpu=${scanner_cpu_request}/${scanner_cpu_limit} memory=${scanner_mem_request}/${scanner_mem_limit}"
 
   mkdir -p "${SCANNER_ARTIFACT_DIR}"
 
@@ -191,11 +205,11 @@ spec:
       exit \${SCAN_EXIT_CODE}
     resources:
       requests:
-        cpu: "${scanner_cpu}"
-        memory: ${scanner_memory}
+        cpu: "${scanner_cpu_request}"
+        memory: ${scanner_mem_request}
       limits:
-        cpu: "${scanner_cpu}"
-        memory: ${scanner_memory}
+        cpu: "${scanner_cpu_limit}"
+        memory: ${scanner_mem_limit}
     securityContext:
 ${SECURITY_CONTEXT_YAML}
     volumeMounts:

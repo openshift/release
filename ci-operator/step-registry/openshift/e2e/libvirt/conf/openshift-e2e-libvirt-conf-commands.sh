@@ -276,9 +276,20 @@ elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
 "[sig-storage] PersistentVolumes GCEPD should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
 
+# Skip tests specific to the PowerVC (IPI) ppc64le environment:
+#   - egressFirewall test is unsupported in the PowerVC network topology
+#   - Internet connectivity (IPv4) is not available from PowerVC nodes
+#   - Image registry blob-pull redirect returns 200 instead of 307 due to
+#     node resource pressure; skip until root cause is resolved
+elif (echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 21)) { exit 0 } else {exit 1} }' || [[ "${BRANCH}" == "main" ]] || [[ "${BRANCH}" == "master" ]]) && [ "${ARCH}" == "ppc64le" ] && [ "${INSTALLER}" == "powervc" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network][Feature:EgressFirewall] egressFirewall should have no impact outside its namespace [Suite:openshift/conformance/parallel]"
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:Disconnected] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-imageregistry] Image registry [apigroup:route.openshift.io] should redirect on blob pull [apigroup:image.openshift.io] [Suite:openshift/conformance/parallel]"
+EOF
 # Excluding few loadbalancer tests with UDP from 4.13 and above Libvirt and PowerVS ppc64le jobs since power environment does not currently support loadbalancing UDP traffic
 # Skipping the DRA test case due to its current failure in libvirt CI. It will be re-enabled once the issue is resolved.
-elif (echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 13)) { exit 0 } else {exit 1} }' || [[ "${BRANCH}" == "main" ]] || [[ "${BRANCH}" == "master" ]]) && [ "${ARCH}" == "ppc64le" ] && [ "${CLUSTER_TYPE}" != "powervc" ]; then
+elif (echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 13)) { exit 0 } else {exit 1} }' || [[ "${BRANCH}" == "main" ]] || [[ "${BRANCH}" == "master" ]]) && [ "${ARCH}" == "ppc64le" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"

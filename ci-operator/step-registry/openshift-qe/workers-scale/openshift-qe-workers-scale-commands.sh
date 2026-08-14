@@ -27,9 +27,6 @@ read_profile_file() {
   fi
 }
 
-ROSA_SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
-ROSA_SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
-ROSA_TOKEN=$(read_profile_file "ocm-token")
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
@@ -38,14 +35,28 @@ else
   echo "Did not find compatible cloud provider cluster_profile"
 fi
 
-if [[ -n "${ROSA_SSO_CLIENT_ID}" && -n "${ROSA_SSO_CLIENT_SECRET}" ]]; then
-  echo "Logging into ${ROSA_LOGIN_ENV} with SSO credentials"
-  rosa login --env "${ROSA_LOGIN_ENV}" --client-id "${ROSA_SSO_CLIENT_ID}" --client-secret "${ROSA_SSO_CLIENT_SECRET}"
-elif [[ -n "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${ROSA_LOGIN_ENV} with offline token"
-  rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+CLUSTER_TYPE=""
+if [[ -f "${SHARED_DIR}/cluster-type" ]]; then
+  CLUSTER_TYPE=$(cat "${SHARED_DIR}/cluster-type")
+fi
+
+if [[ "$CLUSTER_TYPE" == "rosa" ]]; then
+  ROSA_SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+  ROSA_SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+  ROSA_TOKEN=$(read_profile_file "ocm-token")
+
+  if [[ -n "${ROSA_SSO_CLIENT_ID}" && -n "${ROSA_SSO_CLIENT_SECRET}" ]]; then
+    echo "Logging into ${ROSA_LOGIN_ENV} with SSO credentials"
+    rosa login --env "${ROSA_LOGIN_ENV}" --client-id "${ROSA_SSO_CLIENT_ID}" --client-secret "${ROSA_SSO_CLIENT_SECRET}"
+  elif [[ -n "${ROSA_TOKEN}" ]]; then
+    echo "Logging into ${ROSA_LOGIN_ENV} with offline token"
+    rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+  else
+    echo "ROSA cluster detected but no credentials found for rosa login"
+    exit 1
+  fi
 else
-  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
+  echo "Non-ROSA cluster detected (cluster-type: ${CLUSTER_TYPE:-not set}), skipping rosa login"
 fi
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"

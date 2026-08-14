@@ -3,6 +3,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.31.0
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   ubi-min9:
     name: ubi-minimal
     namespace: ocp
@@ -106,6 +110,47 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: install-bundle-tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      OO_INSTALL_NAMESPACE: oran-o2ims
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: oran-o2ims
+      SCANNER_NAMESPACE: oran-o2ims
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: oran-o2ims-wait-for-tls-pods
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- as: install-bundle-tls-scan-periodic
+  cron: 0 3 * * 5
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      OO_INSTALL_NAMESPACE: oran-o2ims
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: oran-o2ims
+      SCANNER_NAMESPACE: oran-o2ims
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: oran-o2ims-wait-for-tls-pods
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 - always_run: false
   as: markdownlint
   commands: |

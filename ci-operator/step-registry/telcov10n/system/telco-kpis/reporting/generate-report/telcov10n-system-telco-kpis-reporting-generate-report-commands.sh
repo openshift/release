@@ -9,10 +9,19 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 # fi
 
 export_env_vars_from_json 'generate_report' "${REPORTING_SETTINGS:-}" "${REPORTING_SETTINGS_DEFAULTS:-}"
+export_env_vars_from_json 'splunk' "${REPORTING_SETTINGS:-}" "${REPORTING_SETTINGS_DEFAULTS:-}"
 setup_continue_on_fail
 setup_debug_on_fail
 
+# Generate a telco-kpis Markdown report for a spoke cluster.
+# Aggregates test artifacts, optionally publishes to a git repo
+# and pushes results to Splunk. Sensitive credentials (tokens, URLs)
+# are passed via a temporary vars file to avoid leaking into logs.
+_yaml_quote() { local v="${1//\\/\\\\}"; v="${v//\"/\\\"}"; printf '%s' "$v"; }
+
 main() {
+    [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
+
     echo "Generating report for spoke: ${SPOKE_CLUSTER}"
 
     setup_ansible_inventory "${SPOKE_CLUSTER}" "${HUB_CLUSTER}"
@@ -31,20 +40,84 @@ main() {
         DEBUG_FLAG="-vvv"
     fi
 
-    FILTER_FLAG=""
+    FILTER_FLAG=()
     if [[ -n "${TEST_FILTER}" ]]; then
-        FILTER_FLAG="-e test_filter=${TEST_FILTER}"
+        FILTER_FLAG=(-e "test_filter=${TEST_FILTER}")
     fi
 
-    echo "Running generate-report playbook (development_mode: ${DEVELOPMENT_MODE})"
+    FORCE_REPORT_FLAG=()
+    if [ "${FORCE_REPORT:-false}" = "true" ]; then
+        FORCE_REPORT_FLAG=(-e force_report=true)
+    fi
+
+    # Write sensitive credentials to a temporary extra-vars file so they
+    # never appear in command-line expansions or xtrace output.
+    # If rotating splunk_hec_token or git_repo_token, also update the
+    # hypervisor vaults (teams/telco-kpis/hypervisors/) to keep Jenkins in sync.
+    SENSITIVE_VARS_FILE=$(mktemp /tmp/sensitive-vars-XXXXXX.yml)
+    trap 'rm -f "${SENSITIVE_VARS_FILE}"' EXIT
+    echo "---" > "${SENSITIVE_VARS_FILE}"
+
+    SPLUNK_FLAG=()
+    if [ "${PUSH_ENABLED:-false}" = "true" ]; then
+        SPLUNK_FLAG=(-e splunk_push_enabled=true)
+        if [ -z "${HEC_URL:-}" ]; then
+            echo "WARNING: HEC_URL is unset or empty; Splunk push will likely fail"
+        fi
+        if [ -f /var/splunk/splunk_hec_token ]; then
+            set +x
+            {
+                echo "splunk_hec_url: \"$(_yaml_quote "${HEC_URL:-}")\""
+                echo "splunk_hec_token: \"$(_yaml_quote "$(cat /var/splunk/splunk_hec_token)")\""
+            } >> "${SENSITIVE_VARS_FILE}"
+            $_was_tracing && set -x
+        else
+            echo "WARNING: Splunk push enabled but splunk_hec_token not found at /var/splunk/"
+            SPLUNK_FLAG=()
+        fi
+        if [ ${#SPLUNK_FLAG[@]} -gt 0 ]; then
+            SPLUNK_FLAG+=(-e "formal_test=${FORMAL_TEST:-false}")
+            SPLUNK_FLAG+=(-e splunk_ci_type=prow)
+            SPLUNK_FLAG+=(-e "splunk_ci_job_name=${JOB_NAME:-unknown}")
+            SPLUNK_FLAG+=(-e "splunk_ci_build_number=${BUILD_ID:-unknown}")
+        fi
+    fi
+
+    _has_report_repo=false
+    if [ "${DEVELOPMENT_MODE}" != "true" ] && [ -n "${REPORT_REPO_URL:-}" ]; then
+        if [ -f /var/reports-repo/git_repo_token ]; then
+            set +x
+            {
+                echo "report_repo_url: \"$(_yaml_quote "${REPORT_REPO_URL}")\""
+                echo "report_repo_branch: \"$(_yaml_quote "${REPORT_REPO_BRANCH:-telco-kpis-reports}")\""
+                echo "report_repo_token: \"$(_yaml_quote "$(cat /var/reports-repo/git_repo_token)")\""
+            } >> "${SENSITIVE_VARS_FILE}"
+            $_was_tracing && set -x
+            _has_report_repo=true
+        else
+            echo "WARNING: Production report repo URL set but token not found at /var/reports-repo/git_repo_token"
+        fi
+    fi
+
+    if [ -n "${DEBUG_FLAG}" ] && [ "$(wc -l < "${SENSITIVE_VARS_FILE}")" -gt 1 ]; then
+        echo "WARNING: -vvv is active with sensitive credentials in vars file; ensure tasks use no_log: true"
+    fi
+
+    echo "Running generate-report playbook (development_mode: ${DEVELOPMENT_MODE}, splunk: ${PUSH_ENABLED:-false}, report_repo: ${_has_report_repo}, force: ${FORCE_REPORT:-false})"
+
+    set +x
     ansible-playbook ./playbooks/telco-kpis/generate-report.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e spoke_cluster="${SPOKE_CLUSTER}" \
         -e output_filename="${OUTPUT_FILENAME}" \
         -e timestamp="${TIMESTAMP}" \
         -e development_mode="${DEVELOPMENT_MODE}" \
-        ${FILTER_FLAG} \
+        -e "@${SENSITIVE_VARS_FILE}" \
+        "${FILTER_FLAG[@]}" \
+        "${SPLUNK_FLAG[@]}" \
+        "${FORCE_REPORT_FLAG[@]}" \
         ${DEBUG_FLAG}
+    $_was_tracing && set -x
 
     echo "Report generation completed for ${SPOKE_CLUSTER}"
 }

@@ -18,17 +18,17 @@ images:
   - to: cluster-ingress-operator
 promotion:
   to:
-  - name: "5.0"
+  - name: "5.1"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -162,12 +162,11 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
-  as: e2e-aws-ovn-upgrade-haproxy28-techpreview
+  as: e2e-aws-ovn-upgrade-haproxy28
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       HAPROXY_VERSION: "2.8"
     pre:
     - chain: ipi-conf-aws
@@ -182,13 +181,12 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
-  as: e2e-aws-ovn-serial-haproxy28-techpreview
+  as: e2e-aws-ovn-serial-haproxy28
   optional: true
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       HAPROXY_VERSION: "2.8"
     pre:
     - chain: ipi-conf-aws
@@ -225,8 +223,7 @@ tests:
     workflow: ipi-aws
 - always_run: false
   as: e2e-aws-gatewayapi-conformance
-  optional: true
-  pipeline_run_if_changed: ^(pkg/manifests/assets/gateway-api/.*|cmd/ingress-operator/.*|hack/.*|pkg/operator/controller/gatewayapi/.*|test/e2e/.*)$
+  pipeline_run_if_changed: ^(manifests/.*|pkg/manifests/assets/gateway-api/.*|cmd/ingress-operator/.*|hack/.*|pkg/operator/controller/gateway.*/.*|vendor/github.com/istio-ecosystem/sail-operator/.*|vendor/sigs.k8s.io/gateway-api/.*|test/e2e/.*)$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -316,12 +313,11 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - always_run: false
-  as: e2e-aws-ovn-haproxy28-techpreview
+  as: e2e-aws-ovn-haproxy28
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       HAPROXY_VERSION: "2.8"
     pre:
     - chain: ipi-conf-aws
@@ -359,12 +355,25 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - always_run: false
-  as: e2e-aws-operator-haproxy28-techpreview
+  as: e2e-aws-ovn-fips-haproxy28
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      HAPROXY_VERSION: "2.8"
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: fips-check
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-operator-haproxy28
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
       HAPROXY_VERSION: "2.8"
     pre:
     - chain: ipi-conf-aws

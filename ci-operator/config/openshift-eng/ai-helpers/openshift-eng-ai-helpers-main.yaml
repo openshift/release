@@ -94,6 +94,38 @@ tests:
       EVAL_SETUP_SCRIPT: plugins/ci/evals/scripts/setup-prow-job-analysis.sh
     workflow: openshift-claude-agent-eval
 - always_run: false
+  as: eval-bulk-triage-regressions
+  optional: true
+  steps:
+    env:
+      EVAL_CONFIG: plugins/ci/evals/eval-bulk-triage-regressions.yaml
+      EVAL_MAX_TURNS: "2500"
+      EVAL_MODEL: claude-opus-4-6
+      EVAL_PARALLELISM: "5"
+    workflow: openshift-claude-agent-eval
+- as: eval-bulk-triage-regressions-changed
+  optional: true
+  run_if_changed: ^plugins/ci/evals/cases/bulk-triage-regressions/
+  steps:
+    env:
+      EVAL_CASES_DIR: plugins/ci/evals/cases/bulk-triage-regressions
+      EVAL_CHANGED_ONLY: "true"
+      EVAL_CONFIG: plugins/ci/evals/eval-bulk-triage-regressions.yaml
+      EVAL_MAX_TURNS: "2500"
+      EVAL_MODEL: claude-opus-4-6
+      EVAL_PARALLELISM: "5"
+    workflow: openshift-claude-agent-eval
+- always_run: false
+  as: eval-bulk-triage-regressions-minimal
+  optional: true
+  steps:
+    env:
+      EVAL_CASES: case-004-ocpbugs-100392-securitypenetration-interference
+      EVAL_CONFIG: plugins/ci/evals/eval-bulk-triage-regressions.yaml
+      EVAL_MAX_TURNS: "250"
+      EVAL_MODEL: claude-opus-4-6
+    workflow: openshift-claude-agent-eval
+- always_run: false
   as: eval-classify-review-comment
   optional: true
   steps:

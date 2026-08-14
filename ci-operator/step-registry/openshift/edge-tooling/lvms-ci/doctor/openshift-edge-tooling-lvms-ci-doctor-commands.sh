@@ -9,8 +9,6 @@ mkdir -p "${WORKDIR}"
 CLAUDE_HOME="/home/claude/.claude"
 mkdir -p "${CLAUDE_HOME}"
 
-CLAUDE_DOCTOR_LOG="${WORKDIR}/claude-doctor.log"
-
 github_app_token() {
     local -r jwt="$1"
     local -r repo="$2"
@@ -94,24 +92,6 @@ atexit_handler() {
         echo "ERROR: No HTML report was generated"
         return 1
     fi
-
-    # Check if the Claude session completed successfully
-    if [ ! -f "${CLAUDE_DOCTOR_LOG}" ]; then
-        echo "WARNING: Log file '${CLAUDE_DOCTOR_LOG}' not found"
-        return 1
-    fi
-
-    local result_line
-    result_line="$(grep '"type":"result"' "${CLAUDE_DOCTOR_LOG}" | tail -1 || true)"
-    if [[ -z "${result_line}" ]]; then
-        echo "ERROR: No Claude result event found in '${CLAUDE_DOCTOR_LOG}'"
-        return 1
-    fi
-    if ! echo "$result_line" | grep -q '"subtype":"success"' ||
-       ! echo "$result_line" | grep -q '"is_error":false'; then
-        echo "ERROR: Claude session did not complete successfully"
-        return 1
-    fi
 }
 
 configure_claude() {
@@ -156,14 +136,11 @@ SRC_DIR="${EDGE_TOOLING_DIR}"
 PLUGIN_DIR="${SRC_DIR}/plugins/lvms-ci"
 cd "${SRC_DIR}"
 
-# Run analysis on all releases.
-# Time-box analysis and limit turns to avoid uncontrolled billable minutes.
-echo "Running Claude to analyze LVMS CI jobs..."
-timeout 4800 claude \
+# Run the deterministic doctor pipeline.
+echo "Running CI doctor pipeline..."
+python3 "${PLUGIN_DIR}/scripts/run-doctor.py" \
+    --releases "${RELEASE_VERSIONS}" \
+    --workdir "${WORKDIR}" \
     --model "${CLAUDE_MODEL}" \
-    --max-turns 100 \
-    --output-format stream-json \
-    --plugin-dir "${PLUGIN_DIR}" \
-    -p "/lvms-ci:doctor ${RELEASE_VERSIONS}" \
-    --verbose &> "${CLAUDE_DOCTOR_LOG}"
-echo "Analysis for LVMS CI jobs completed"
+    --pull-requests
+echo "CI doctor pipeline completed"

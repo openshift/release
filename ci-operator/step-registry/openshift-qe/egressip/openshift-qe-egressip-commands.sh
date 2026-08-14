@@ -52,6 +52,15 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=egressip
 
+current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
+
+if [[ -n "${ITERATIONS}" ]]; then
+  export ITERATIONS
+else
+  ITERATIONS=$(awk "BEGIN {printf \"%d\", int($ITERATION_MULTIPLIER * $current_worker_count)}")
+  export ITERATIONS
+fi
+
 EXTRA_FLAGS="--gc-metrics=false --pod-ready-threshold=$POD_READY_THRESHOLD --addresses-per-iteration=$ADDRESSES_PER_ITERATION --profile-type=${PROFILE_TYPE}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"

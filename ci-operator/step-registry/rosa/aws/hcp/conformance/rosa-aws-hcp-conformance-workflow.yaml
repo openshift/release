@@ -3,6 +3,7 @@ workflow:
   steps:
     env:
       CHANNEL_GROUP: nightly
+      CLEAR_CLUSTERVERSION_CHANNEL: "true"
       HOSTED_CP: "true"
       OPENSHIFT_VERSION: "release:latest"
       REPLICAS: "3"
@@ -44,7 +45,7 @@ workflow:
         GatewayAPIController.*Ensure LB.*service.*and dnsRecord are created for a Gateway object\|
         AWSServiceLBNetworkSecurityGroup
     pre:
-      - chain: rosa-aws-sts-hcp-provision
+      - chain: rosa-aws-sts-hcp-provision-nightly
       - ref: rosa-cluster-credentials-hypershift-mgmt
       - ref: osd-ccs-conf-idp-htpasswd-multi-users
       - ref: rosa-cluster-wait-ready-nodes
@@ -52,6 +53,7 @@ workflow:
       - chain: hypershift-conformance
     post:
       - ref: osd-gather-extra
+      - ref: rosa-cluster-mc-restore-image-policy
       - chain: rosa-cluster-deprovision
         best_effort: true
       - chain: rosa-sts-oidc-config-delete

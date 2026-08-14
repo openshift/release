@@ -139,6 +139,7 @@ run_tests() {
     export PR_NUMBER=\"${PULL_NUMBER:-}\"
     export OLM=\"${OLM:-true}\"
     export EXPECTED_REGISTRY=\"${EXPECTED_REGISTRY:-}\"
+    export GINKGO_LABEL_FILTER=\"${GINKGO_LABEL_FILTER:-}\"
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work

@@ -42,6 +42,28 @@ tests:
       LOCATION: uksouth
       VAULT_SECRET_PROFILE: int-rh
     workflow: aro-hcp-persistent-e2e
+- as: integration-e2e-parallel-westus3
+  capabilities:
+  - gcp
+  max_concurrency: 4
+  postsubmit: true
+  reporter_config:
+    channel: '#aro-hcp-failures-int'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  run_if_changed: ^$
+  steps:
+    env:
+      ALLOWED_LOCATIONS: westus3
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_SUITE_NAME: integration/parallel
+      LOCATION: westus3
+      VAULT_SECRET_PROFILE: int-rh
+    workflow: aro-hcp-persistent-e2e
 - as: stage-e2e-parallel
   capabilities:
   - gcp
@@ -78,26 +100,8 @@ tests:
   run_if_changed: ^$
   steps:
     env:
-      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E
-      ARO_HCP_CLOUD: public
-      ARO_HCP_DEPLOY_ENV: prod
-      ARO_HCP_SUITE_NAME: prod/parallel
-      LOCATION: uksouth
-      VAULT_SECRET_PROFILE: prod
-    workflow: aro-hcp-persistent-e2e
-- as: prod-e2e-parallel-slot-manager
-  postsubmit: true
-  reporter_config:
-    channel: '#aro-hcp-failures-prod'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
-  run_if_changed: ^$
-  steps:
-    env:
-      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E,ARO HCP E2E Hosted Clusters - Prod - 00,ARO
+        HCP E2E Hosted Clusters - Prod - 01
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_SUITE_NAME: prod/parallel

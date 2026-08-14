@@ -20,6 +20,11 @@ if [[ -n "${SHARED_DIR:-}" ]]; then
     OPERATOR_NAMESPACE=$(cat "${SHARED_DIR}/operator-e2e-namespace" 2>/dev/null || true)
 fi
 
+# Fallback for MC mode where install step doesn't run
+if [[ -z "${OPERATOR_NAMESPACE}" && -n "${OPERATOR_NAME:-}" ]]; then
+    OPERATOR_NAMESPACE="openshift-${OPERATOR_NAME}"
+fi
+
 # Collect operator logs as artifacts for debugging
 if [[ -n "${OPERATOR_NAMESPACE}" && -n "${ARTIFACT_DIR:-}" ]]; then
     log "Collecting operator logs from ${OPERATOR_NAMESPACE}"
@@ -30,6 +35,15 @@ if [[ -n "${OPERATOR_NAMESPACE}" && -n "${ARTIFACT_DIR:-}" ]]; then
     done
     oc get events -n "${OPERATOR_NAMESPACE}" --sort-by='.lastTimestamp' \
         > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
+fi
+
+# Restore reconcile-interval if it was overridden for MC e2e testing
+RMO_NS="openshift-route-monitor-operator"
+RMO_CM="route-monitor-operator-config"
+if oc get configmap "${RMO_CM}" -n "${RMO_NS}" -o jsonpath='{.data.reconcile-interval}' 2>/dev/null | grep -q .; then
+    log "Restoring default reconcile-interval on ${RMO_CM}"
+    oc patch configmap "${RMO_CM}" -n "${RMO_NS}" --type json \
+        -p '[{"op":"remove","path":"/data/reconcile-interval"}]' 2>/dev/null || true
 fi
 
 if [[ -z "${CLUSTER_PACKAGE_NAME}" ]]; then
