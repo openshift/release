@@ -301,14 +301,19 @@ create_osc_managed_identity() {
 
     echo "OSC operator managed identity clientId: ${OSC_CLIENT_ID}"
 
-    # Assign required roles (matching Jenkins implementation)
+    # Assign required roles (matching Jenkins implementation).
+    # Use --assignee-object-id to bypass Graph API lookup, avoiding the race condition
+    # where the service principal hasn't propagated to Graph yet after identity creation.
     echo "Assigning roles to managed identity..."
     for ROLE in "Reader" "Virtual Machine Contributor" "Network Contributor" "Storage Account Contributor" "Compute Gallery Artifacts Publisher"; do
         echo "Assigning role: ${ROLE}"
-        az role assignment create \
+        ASSIGNMENT_ID=$(az role assignment create \
             --role "${ROLE}" \
-            --assignee "${OSC_IDENTITY_PRINCIPAL_ID}" \
-            --scope "${SUBSCRIPTION_SCOPE}"
+            --assignee-object-id "${OSC_IDENTITY_PRINCIPAL_ID}" \
+            --assignee-principal-type ServicePrincipal \
+            --scope "${SUBSCRIPTION_SCOPE}" \
+            --query id -o tsv)
+        echo "${ASSIGNMENT_ID}" >> "${SHARED_DIR}/osc-azure-role-assignment-ids"
     done
 
     # Get OIDC issuer URL from cluster
