@@ -320,7 +320,7 @@ echo "Prometheus URL:  $(cat "${PROMETHEUS_URL_FILE}")"
 # - Subscription OTEL_* env → control-plane tracing tests (OTEL_* on manager)
 # ---------------------------------------------------------------------------
 KUADRANT_NS="${KUADRANT_NAMESPACE:-kuadrant-system}"
-KUADRANT_SUB="${KUADRANT_SUBSCRIPTION_NAME:-kuadrant-operator}"
+KUADRANT_SUB="${KUADRANT_SUBSCRIPTION_NAME:-rhcl-operator}"
 JAEGER_COLLECTOR_ENDPOINT="rpc://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4317"
 # OTLP HTTP for operator logs/metrics; gRPC (rpc://) for traces — matches examples/otel.
 OTEL_HTTP_ENDPOINT="http://jaeger-collector.${TOOLS_NS}.svc.cluster.local:4318"

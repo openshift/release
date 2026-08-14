@@ -30,27 +30,37 @@ ref:
     documentation: |-
       Subscription channel for the cert-manager operator.
   - name: KUADRANT_CATALOG_SOURCE_IMAGE
-    default: "quay.io/kuadrant/kuadrant-operator-catalog:v1.5.2"
+    default: ""
     documentation: |-
-      Kuadrant operator catalog image. The quay.io/kuadrant/kuadrant-operator-catalog
-      images are published multi-arch including linux/s390x. When set, a grpc
-      CatalogSource named "kuadrant-operator-catalog" is created in KUADRANT_NAMESPACE
-      and used as the subscription source. Set to empty to instead use an existing
-      catalog named by KUADRANT_CATALOG_SOURCE.
+      Optional grpc CatalogSource image for upstream Kuadrant (quay.io/kuadrant/…).
+      When set, a CatalogSource named "kuadrant-operator-catalog" is created in
+      KUADRANT_NAMESPACE. Leave empty for downstream RHCL from redhat-operators
+      (recommended; matches rhcl-mc1 after migration).
   - name: KUADRANT_CATALOG_SOURCE
-    default: "kuadrant-operator-catalog"
+    default: "redhat-operators"
     documentation: |-
-      Catalog source name used to subscribe the Kuadrant operator when
-      KUADRANT_CATALOG_SOURCE_IMAGE is empty (assumed to already exist in KUADRANT_NAMESPACE).
+      Catalog source used to subscribe the operator when KUADRANT_CATALOG_SOURCE_IMAGE
+      is empty. Use redhat-operators for downstream RHCL 1.4.x (rhcl-operator package).
+  - name: OPERATOR_CATALOG_NAMESPACE
+    default: "openshift-marketplace"
+    documentation: |-
+      Namespace of KUADRANT_CATALOG_SOURCE when not using a custom grpc catalog image.
   - name: KUADRANT_SUBSCRIPTION_NAME
-    default: "kuadrant-operator"
+    default: "rhcl-operator"
     documentation: |-
-      Package name of the Kuadrant operator. Installing it pulls in the Authorino,
-      Limitador and DNS operators as dependencies.
+      OLM package name to subscribe. Use rhcl-operator for downstream RHCL; pulls in
+      Authorino, Limitador and DNS operators as dependencies.
   - name: KUADRANT_CHANNEL
     default: "stable"
     documentation: |-
-      Subscription channel for the Kuadrant operator. Set to "!default" to use the package default channel.
+      Subscription channel for the operator. Set to "!default" to use the package default channel.
+  - name: RHCL_STARTING_CSV
+    default: "rhcl-operator.v1.4.2"
+    documentation: |-
+      Pin downstream RHCL to an exact CSV (e.g. rhcl-operator.v1.4.2). When set,
+      the subscription uses Manual install-plan approval and only the install plan
+      for this CSV is approved. Set empty to track the channel head with Automatic
+      approval.
   - name: DNS_PROVIDER_SECRET_NAME
     default: "coredns-credentials"
     documentation: |-
@@ -88,12 +98,12 @@ ref:
       (CSV + Deployment patch). Leave empty to use the catalog CSV image (recommended
       for stable releases). Set only for experimental operator builds.
   documentation: |-
-    Installs cert-manager and the Kuadrant operator (which deploys the Authorino,
-    Limitador and DNS operators) via OLM on a provisioned s390x OCP cluster.
-    By default uses the catalog CSV images as-is (no operator/wasm patches).
-    Optionally sets RELATED_IMAGE_WASMSHIM via Subscription config.env and/or
-    overrides the manager image when those env vars are non-empty. Ensures DNS is
-    Available before any image restart, creates the bootstrap Kuadrant CR (required
-    by testsuite conftest), a self-signed ClusterIssuer, the test namespaces
-    (kuadrant, kuadrant2, tools) and the DNS provider Secret. Writes
-    operator/wasm diagnostics to ARTIFACT_DIR.
+    Installs cert-manager and the RHCL operator (rhcl-operator from redhat-operators,
+    or upstream Kuadrant via a custom grpc catalog image) on a provisioned s390x OCP
+    cluster. By default pins RHCL 1.4.2 via RHCL_STARTING_CSV and uses downstream
+    registry.redhat.io/rhcl-1/* operand images from the CSV. Optionally sets
+    RELATED_IMAGE_WASMSHIM via Subscription config.env and/or overrides the manager
+    image when those env vars are non-empty. Ensures DNS is Available before any
+    image restart, creates the bootstrap Kuadrant CR (required by testsuite
+    conftest), a self-signed ClusterIssuer, the test namespaces (kuadrant, kuadrant2,
+    tools) and the DNS provider Secret. Writes operator/wasm diagnostics to ARTIFACT_DIR.

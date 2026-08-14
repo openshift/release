@@ -3,21 +3,46 @@
 set -euo pipefail
 
 wait_for_csv() {
-  # $1 = namespace, $2 = subscription name
-  local ns="$1" sub="$2" csv phase
+  # $1 = namespace, $2 = subscription name, $3 = optional expected CSV name
+  local ns="$1" sub="$2" expected_csv="${3:-}" csv phase
   echo "Waiting for CSV of subscription ${sub} in ${ns} ..."
   for _ in $(seq 1 90); do
     csv="$(oc get subscription "${sub}" -n "${ns}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
     if [[ -n "${csv}" ]]; then
       phase="$(oc get csv "${csv}" -n "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
       echo "  ${csv} phase: ${phase:-<none>}"
-      [[ "${phase}" == "Succeeded" ]] && return 0
+      if [[ "${phase}" == "Succeeded" ]]; then
+        if [[ -n "${expected_csv}" && "${csv}" != "${expected_csv}" ]]; then
+          echo "  waiting for CSV ${expected_csv} (installed ${csv}) ..."
+        else
+          return 0
+        fi
+      fi
     fi
     sleep 10
   done
   echo "ERROR: CSV for ${sub} did not reach Succeeded" >&2
   oc get subscription "${sub}" -n "${ns}" -o yaml >&2 || true
   return 1
+}
+
+approve_installplan_for_csv() {
+  local ns="$1" csv_name="$2"
+  local approved=false
+  echo "=== Approving the install plan for ${csv_name} in ${ns} ==="
+  for _ in $(seq 1 60); do
+    IP="$(oc get installplan -n "${ns}" \
+      -o jsonpath="{range .items[?(@.spec.approved==false)]}{.metadata.name}{' '}{.spec.clusterServiceVersionNames[*]}{'\n'}{end}" 2>/dev/null \
+      | grep -F "${csv_name}" | awk '{print $1}' | head -n1 || true)"
+    if [[ -n "${IP}" ]]; then
+      oc patch installplan "${IP}" -n "${ns}" --type merge -p '{"spec":{"approved":true}}'
+      echo "Approved install plan ${IP}"
+      approved=true
+      break
+    fi
+    sleep 10
+  done
+  [[ "${approved}" == "true" ]] || { echo "ERROR: no install plan found for ${csv_name} in ${ns}" >&2; return 1; }
 }
 
 echo "=== Installing cert-manager operator ==="
@@ -53,13 +78,12 @@ wait_for_csv cert-manager-operator "${CERT_MANAGER_SUBSCRIPTION_NAME}"
 echo "=== Creating the Kuadrant namespace ==="
 oc get ns "${KUADRANT_NAMESPACE}" >/dev/null 2>&1 || oc create ns "${KUADRANT_NAMESPACE}"
 
-echo "=== Creating the Kuadrant CatalogSource ==="
-# The quay.io/kuadrant/kuadrant-operator-catalog images are published multi-arch
-# (including linux/s390x), so the grpc catalog runs natively on IBM Z.
 KUADRANT_SOURCE="${KUADRANT_CATALOG_SOURCE}"
-KUADRANT_SOURCE_NS="${KUADRANT_NAMESPACE}"
+KUADRANT_SOURCE_NS="${OPERATOR_CATALOG_NAMESPACE}"
 if [[ -n "${KUADRANT_CATALOG_SOURCE_IMAGE}" ]]; then
+  echo "=== Creating upstream Kuadrant grpc CatalogSource ==="
   KUADRANT_SOURCE="kuadrant-operator-catalog"
+  KUADRANT_SOURCE_NS="${KUADRANT_NAMESPACE}"
   cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -82,9 +106,16 @@ EOF
     [[ "${state}" == "READY" ]] && break
     sleep 10
   done
+else
+  echo "=== Using downstream operator catalog ${KUADRANT_SOURCE} (${KUADRANT_SOURCE_NS}) ==="
 fi
 
-echo "=== Installing the Kuadrant operator (pulls in Authorino, Limitador, DNS operators) ==="
+OPERATOR_APPROVAL="Automatic"
+if [[ -n "${RHCL_STARTING_CSV}" ]]; then
+  OPERATOR_APPROVAL="Manual"
+fi
+
+echo "=== Installing ${KUADRANT_SUBSCRIPTION_NAME} (approval=${OPERATOR_APPROVAL}, startingCSV=${RHCL_STARTING_CSV:-<head>}) ==="
 # Set RELATED_IMAGE_WASMSHIM via Subscription.spec.config.env so OLM owns the
 # Deployment env and does not reconcile away a direct oc set env patch.
 WASMSHIM_SUB_CONFIG=""
@@ -115,12 +146,17 @@ metadata:
   namespace: ${KUADRANT_NAMESPACE}
 spec:
   channel: ${KUADRANT_CHANNEL}
-  installPlanApproval: Automatic
+  installPlanApproval: ${OPERATOR_APPROVAL}
   name: ${KUADRANT_SUBSCRIPTION_NAME}
   source: ${KUADRANT_SOURCE}
   sourceNamespace: ${KUADRANT_SOURCE_NS}
+$( [[ -n "${RHCL_STARTING_CSV}" ]] && echo "  startingCSV: ${RHCL_STARTING_CSV}" )
 ${WASMSHIM_SUB_CONFIG}
 EOF
+
+if [[ "${OPERATOR_APPROVAL}" == "Manual" && -n "${RHCL_STARTING_CSV}" ]]; then
+  approve_installplan_for_csv "${KUADRANT_NAMESPACE}" "${RHCL_STARTING_CSV}"
+fi
 
 if [[ "${KUADRANT_CHANNEL}" == "!default" ]]; then
   DEFAULT_CHANNEL="$(oc get packagemanifest "${KUADRANT_SUBSCRIPTION_NAME}" -n openshift-marketplace -o jsonpath='{.status.defaultChannel}')"
@@ -128,7 +164,7 @@ if [[ "${KUADRANT_CHANNEL}" == "!default" ]]; then
     -p "{\"spec\":{\"channel\":\"${DEFAULT_CHANNEL}\"}}"
 fi
 
-wait_for_csv "${KUADRANT_NAMESPACE}" "${KUADRANT_SUBSCRIPTION_NAME}"
+wait_for_csv "${KUADRANT_NAMESPACE}" "${KUADRANT_SUBSCRIPTION_NAME}" "${RHCL_STARTING_CSV}"
 
 echo "=== Waiting for the operator deployments (kuadrant, authorino, limitador, dns) ==="
 oc wait --for=condition=Available deployment --all -n "${KUADRANT_NAMESPACE}" --timeout=300s || true
