@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -37,19 +37,19 @@ images:
     to: cluster-kube-apiserver-operator
 promotion:
   to:
-  - name: "5.0"
+  - name: "5.1"
     namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp-priv
 resources:
   '*':
@@ -183,6 +183,18 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - always_run: false
+  as: e2e-gcp-operator-encryption-perf-aescbc-ote
+  optional: true
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      ENCRYPTION_PROVIDER: aescbc
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-perf
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp
+- always_run: false
   as: e2e-gcp-operator-encryption-perf-aesgcm
   optional: true
   pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
@@ -199,6 +211,18 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-operator-encryption-perf-aesgcm-ote
+  optional: true
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      ENCRYPTION_PROVIDER: aesgcm
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-perf
+    test:
+    - ref: openshift-e2e-test
     workflow: ipi-gcp
 - always_run: false
   as: e2e-aws-ovn-serial
@@ -299,6 +323,20 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: openshift-e2e-gcp-single-node
+- always_run: false
+  as: e2e-gcp-operator-encryption-perf-single-node-ote
+  optional: true
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      ENCRYPTION_PROVIDER: aescbc
+      TEST_ARGS: --disable-monitor=legacy-node-invariants,legacy-test-framework-invariants
+        --cluster-stability=Disruptive
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-perf
+    test:
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-single-node
 - always_run: false
   as: e2e-azure-ovn

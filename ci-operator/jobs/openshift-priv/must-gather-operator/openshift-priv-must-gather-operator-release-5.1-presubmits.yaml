@@ -15,6 +15,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
+      - images/ci/Dockerfile.coverage
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -81,6 +82,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
+      - images/ci/Dockerfile.coverage
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -162,6 +164,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
+      - images/ci/Dockerfile.coverage
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -255,6 +258,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
+      - images/ci/Dockerfile.coverage
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -349,6 +353,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
+      - images/ci/Dockerfile.coverage
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -429,6 +434,105 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-operator-rhcos10-fips,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5\.1$
+    - ^release-5\.1-
+    cluster: build08
+    context: ci/prow/e2e-operator-coverage
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.openshift
+      - images/ci/Dockerfile.coverage
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-must-gather-operator-release-5.1-e2e-operator-coverage
+    path_alias: github.com/openshift/must-gather-operator
+    rerun_command: /test e2e-operator-coverage
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-operator-coverage
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(e2e-operator-coverage|remaining-required),?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^release-5\.1$
@@ -443,6 +547,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
+      - images/ci/Dockerfile.coverage
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -509,6 +614,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
+      - images/ci/Dockerfile.coverage
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -583,6 +689,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
+      - images/ci/Dockerfile.coverage
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -657,6 +764,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
+      - images/ci/Dockerfile.coverage
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -732,6 +840,7 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
+      - images/ci/Dockerfile.coverage
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen

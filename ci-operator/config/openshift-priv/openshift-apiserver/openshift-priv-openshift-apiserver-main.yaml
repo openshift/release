@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp-priv
     tag: cli
 binary_build_commands: make build --warn-undefined-variables
@@ -23,19 +23,19 @@ images:
     to: openshift-apiserver
 promotion:
   to:
-  - name: "5.0"
+  - name: "5.1"
     namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp-priv
 resources:
   '*':
@@ -47,11 +47,19 @@ tests:
 - as: verify
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: openshift-org-gcp
     test:
     - as: verify
       commands: |
+        oc registry login
         make verify -k --warn-undefined-variables
+      dependencies:
+      - env: HYPERKUBE_IMAGE
+        name: hyperkube
+      - env: ETCD_IMAGE
+        name: etcd
+      env:
+      - default: /tmp/registry-auth.json
+        name: REGISTRY_AUTH_FILE
       from: bin-with-oc
       resources:
         requests:
