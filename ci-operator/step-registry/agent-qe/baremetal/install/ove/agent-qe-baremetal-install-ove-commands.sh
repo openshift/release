@@ -54,9 +54,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
    name=$(echo "$bmhost" | jq -r '.name')
    host=$(echo "$bmhost" | jq -r '.host')
    transfer_protocol_type=$(echo "$bmhost" | jq -r '.transfer_protocol_type // ""')
-   if [ "${transfer_protocol_type}" == "cifs" ]; then
+   if [ "${transfer_protocol_type}" == "NFS" ]; then
      IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-     iso_path="${IP_ADDRESS}/isos/${AGENT_ISO}"
+     timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" ln -s "${OVE_ISO_STORAGE_HOST}/${CLUSTER_NAME}.agent-ove.x86_64.iso" "/opt/nfs/${CLUSTER_NAME}.agent-ove.x86_64.iso"
+     iso_path="${IP_ADDRESS}/${AGENT_ISO}"
    else
      # Assuming HTTP or HTTPS
      # IF _SNAPSHOT_ is not empty, this is a konflux job
