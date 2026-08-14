@@ -270,6 +270,24 @@ RunTestCase2() {
 # Set trap to generate JUnit XML on exit (regardless of success or failure)
 trap GenerateJunitXml EXIT
 
+if [ "${MAP_TESTS:-}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget --timeout=30 -qO-) || _fURL=(curl --connect-timeout 10 --max-time 30 -fsSL)
+        "${_fURL[@]}" \
+            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
+        trap '
+            GenerateJunitXml
+            LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+                ExitTrap--PostProcessPrep
+        ' EXIT
+    else
+        : "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping"
+    fi
+fi
+
 ################################################################################
 # Pre-flight Checks
 ################################################################################
