@@ -287,18 +287,21 @@ tests:
 
           echo "=== Installing ZTWIM on ${cluster_name} ==="
           export KUBECONFIG="${kubeconfig_path}"
-          oc create namespace zero-trust-workload-identity-manager || true
 
-          # Create a pull secret on the guest cluster for OLM catalog pods
+          # Merge CI registry creds into the cluster's existing global pull-secret
+          oc get secret/pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | \
+            base64 -d > /tmp/cluster-pull-secret.json
+          python3 -c 'import json; c=json.load(open("/tmp/cluster-pull-secret.json")); i=json.load(open("/etc/ci-pull-credentials/.dockerconfigjson")); c.setdefault("auths",{}).update(i.get("auths",{})); json.dump(c,open("/tmp/merged-pull-secret.json","w"))'
+          oc set data secret/pull-secret -n openshift-config \
+            --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json
+
+          # Create a namespace-scoped pull secret for operator-sdk
+          oc create namespace zero-trust-workload-identity-manager || true
           oc create secret docker-registry ci-pull-secret \
-            --from-file=.dockerconfigjson=${HOME}/.docker/config.json \
+            --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
             -n zero-trust-workload-identity-manager 2>/dev/null || true
           oc secrets link default ci-pull-secret --for=pull \
             -n zero-trust-workload-identity-manager 2>/dev/null || true
-
-          # Also patch the global pull-secret so all pods can pull CI images
-          oc set data secret/pull-secret -n openshift-config \
-            --from-file=.dockerconfigjson=${HOME}/.docker/config.json || true
 
           operator-sdk run bundle --timeout=10m \
             --security-context-config=restricted \
