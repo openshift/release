@@ -203,7 +203,19 @@ metadata:
   name: multiclusterengine-sample
 spec: {}
 EOF
-sleep 5
+echo "Waiting for klusterlet clusterrole to be created by MCE operator"
+for ((i=1; i<=60; i++)); do
+  if oc get clusterrole klusterlet &>/dev/null; then
+    echo "klusterlet clusterrole found after $((i * 10))s"
+    break
+  fi
+  if [[ ${i} -eq 60 ]]; then
+    echo "ERROR: klusterlet clusterrole not found after 600s"
+    exit 1
+  fi
+  echo "Waiting for klusterlet clusterrole... ($i/60)"
+  sleep 10
+done
 
 echo "Patching klusterlet clusterrole to add networkpolicies permissions"
 oc patch clusterrole klusterlet --type=json \
