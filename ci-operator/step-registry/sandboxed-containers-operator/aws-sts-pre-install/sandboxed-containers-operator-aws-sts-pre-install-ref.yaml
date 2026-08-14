@@ -1,0 +1,22 @@
+ref:
+  as: sandboxed-containers-operator-aws-sts-pre-install
+  from: upi-installer
+  commands: sandboxed-containers-operator-aws-sts-pre-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: CATALOG_SOURCE_NAME
+    default: "redhat-operators"
+    documentation: Catalog source to use for the pre-created subscription.
+  - name: OPERATOR_UPDATE_CHANNEL
+    default: "stable"
+    documentation: Channel to use for the pre-created subscription.
+  documentation: |-
+    Pre-creates the sandboxed-containers-operator Subscription with ROLEARN
+    in spec.config.env so OLM injects it into the controller-manager pod on
+    AWS STS clusters. Reads the role ARN from SHARED_DIR/osc-irsa-role-arn
+    (written by sandboxed-containers-operator-peerpods-param-cm). The test's
+    ensureOperatorIsSubscribed skips subscription creation when one already
+    exists, preserving the ROLEARN injection needed for the STS credential flow.
