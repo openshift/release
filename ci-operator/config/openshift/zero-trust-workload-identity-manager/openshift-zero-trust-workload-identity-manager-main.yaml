@@ -281,19 +281,17 @@ tests:
         cp /etc/ci-pull-credentials/.dockerconfigjson "${HOME}/.docker/config.json"
 
         merge_pull_secrets() {
-          # Merges CI registry auth into a cluster's global pull-secret using pure bash.
-          # Both files are single-line JSON: {"auths":{"reg":{"auth":"..."},...}}
-          local existing ci_full ci_inner trimmed
+          # Merges CI registry auth into a cluster's global pull-secret.
+          # Both are single-line JSON: {"auths":{"reg":{"auth":"..."},...}}
+          local existing ci_inner trimmed
           existing=$(oc get secret/pull-secret -n openshift-config \
             -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
-          ci_full=$(cat /etc/ci-pull-credentials/.dockerconfigjson)
-          # Strip {"auths":{ prefix and }} suffix from CI creds to get inner entries
-          ci_inner="${ci_full##*\"auths\":\{}"
-          ci_inner="${ci_inner%\}\}}"
-          # Strip trailing }} from existing pull-secret
-          trimmed="${existing%\}\}}"
-          # Combine: existing entries + CI entries + close braces
-          printf '%s,%s}}' "${trimmed}" "${ci_inner}" > /tmp/merged-pull-secret.json
+          # Extract inner auth entries from CI creds (strip {"auths":{ and }})
+          ci_inner=$(sed -e 's/.*"auths":{//' -e 's/}}$//' /etc/ci-pull-credentials/.dockerconfigjson)
+          # Remove trailing }} from existing pull-secret
+          trimmed=$(printf '%s\n' "$existing" | sed 's/}}$//')
+          # Combine: existing entries + CI entries + closing braces
+          printf '%s,%s}}' "$trimmed" "$ci_inner" > /tmp/merged-pull-secret.json
         }
 
         install_ztwim_on_cluster() {
