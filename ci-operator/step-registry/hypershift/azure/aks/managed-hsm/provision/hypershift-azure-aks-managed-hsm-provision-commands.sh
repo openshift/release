@@ -86,7 +86,7 @@ az keyvault create \
   --no-wait \
   --output none
 
-az keyvault wait \
+az keyvault wait-hsm \
   --hsm-name "${HSM_NAME}" \
   --resource-group "${RESOURCE_GROUP}" \
   --created
