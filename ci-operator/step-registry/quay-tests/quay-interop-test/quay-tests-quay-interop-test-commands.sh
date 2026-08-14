@@ -47,7 +47,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
         trap '
             copyArtifacts
             LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
-                ExitTrap--PostProcessPrep
+                ExitTrap--PostProcessPrep junit--quay-interop-test.xml
         ' EXIT
     else
         echo "WARNING: ExitTrap--PostProcessPrep not available, falling back to copyArtifacts only" >&2

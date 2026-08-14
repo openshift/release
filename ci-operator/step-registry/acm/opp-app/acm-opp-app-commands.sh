@@ -281,7 +281,7 @@ if [ "${MAP_TESTS:-}" = "true" ]; then
         trap '
             GenerateJunitXml
             LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
-                ExitTrap--PostProcessPrep
+                ExitTrap--PostProcessPrep junit--acm-opp-app.xml
         ' EXIT
     else
         : "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping"
