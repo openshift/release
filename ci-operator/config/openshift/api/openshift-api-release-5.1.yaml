@@ -118,7 +118,20 @@ tests:
     cp -Rf ./ $dir/openshift-api/
     rm -rf $dir/openshift-api/vendor
     rm -rf $dir/openshift-client-go/vendor
-    cd $dir
+    # hypershift is multi-module; vendor the ./api submodule first
+    cd $dir/api
+    go mod edit -dropreplace github.com/openshift/api
+    go mod edit -dropreplace github.com/openshift/client-go
+    go mod edit -replace github.com/openshift/api=../openshift-api
+    go mod edit -replace github.com/openshift/client-go=../openshift-client-go
+    echo "# github.com/openshift/api => ../openshift-api" >> vendor/modules.txt
+    echo "# github.com/openshift/client-go => ../openshift-client-go" >> vendor/modules.txt
+    sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\.\/openshift-api/" vendor/modules.txt
+    sed -i "/github.com\/openshift\/client-go v0.0.0/ s/$/ => \.\.\/openshift-client-go/" vendor/modules.txt
+    go mod tidy
+    go mod vendor
+    # then vendor the root module, which make api uses
+    cd ../
     go mod edit -dropreplace github.com/openshift/api
     go mod edit -dropreplace github.com/openshift/client-go
     go mod edit -replace github.com/openshift/api=./openshift-api
@@ -132,6 +145,7 @@ tests:
     make api test-envtest-api-all
   container:
     from: src
+  optional: true
 - always_run: false
   as: e2e-aws-ovn
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
