@@ -221,7 +221,9 @@ import sys, re
 path = sys.argv[1]
 content = open(path).read()
 if 'pullNumber' not in content:
-    m = re.search(r'([ \t]*)jobType:', content)
+    # Match the full jobType line (including its value) so we insert after it,
+    # not in the middle of it.
+    m = re.search(r'([ \t]*)jobType:[^\n]*', content)
     if m:
         indent = m.group(1)
         content = content.replace(
