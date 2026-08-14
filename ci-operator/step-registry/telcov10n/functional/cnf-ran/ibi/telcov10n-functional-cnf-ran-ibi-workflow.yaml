@@ -2,11 +2,11 @@ workflow:
   as: telcov10n-functional-cnf-ran-ibi
   documentation: |-
     IBI (Image Based Installation) workflow for CNF RAN testing.
-    Pre: deploy seed hub (kni-qe-127) at VERSION, install operators,
-         mirror spoke operators to seed bastion's disconnected registry,
-         then deploy seed SNO spoke (helix81) via ZTP.
-         Target hub (kni-qe-128) and IBI installation steps TBD.
-    Test: TBD - seedgeneration, IBI install, deploymenttypes, IBBF/IBR, ZTP IBI tests.
+    Pre: deploy seed hub (kni-qe-127) and target hub (kni-qe-128) at VERSION,
+         install operators on both, mirror operators and OCP images,
+         deploy seed SNO spoke (helix81) via ZTP on seed hub,
+         generate seed image, mirror to target registry.
+    Test: TBD - IBI install on target spoke (helix82), deploymenttypes, IBBF/IBR, ZTP IBI tests.
     Post: TBD - report results, Slack notification.
   steps:
     pre:
@@ -15,10 +15,26 @@ workflow:
     - ref: telcov10n-functional-cnf-ran-hub-config
     - ref: telcov10n-functional-cnf-ran-mirror-spoke-operators
     # Target hub setup — kni-qe-128 deployed at VERSION
+    # Note: ibi-target-hub-deploy saves target-* prefixed inventory files in SHARED_DIR
+    #       alongside the flat copies so they survive ibu-restore-seed-inventory below.
     - ref: telcov10n-functional-cnf-ran-ibi-target-hub-deploy
     - ref: telcov10n-functional-cnf-ran-ibi-target-hub-config
     - ref: telcov10n-functional-cnf-ran-ibi-target-mirror-spoke-operators
+    # Mirror OCP release images to target bastion registry (while on target inventory)
+    - ref: telcov10n-functional-cnf-ran-ibu-target-mirror-ocp
+    # Restore seed hub (kni-qe-127) flat inventory overwritten by ibi-target-hub-deploy
+    # Note: no ibu-target-deploy-minio — IBI stores seed image in container registry, not MinIO
+    - ref: telcov10n-functional-cnf-ran-ibu-restore-seed-inventory
+    # Deploy seed SNO spoke (helix81) via ZTP on seed hub (kni-qe-127)
+    # Note: no ibu-deploy-spoke-master-vms — helix81 is real bare metal
+    - ref: telcov10n-functional-cnf-ran-deploy-spoke-sno
+    # Prune ArgoCD apps and remove seed spoke from ACM before seed image generation
+    - ref: telcov10n-functional-cnf-ran-ibu-prune-argocd-apps
+    # Run seedgeneration tests and power off seed spoke (helix81)
+    - ref: telcov10n-functional-cnf-ran-ibu-eco-gotests-seed
+    # Mirror generated seed image from seed bastion registry to target bastion registry
+    - ref: telcov10n-functional-cnf-ran-ibu-mirror-seed-image
 
-    # post:
-    # - ref: wait
+    post:
+    - ref: wait
 
