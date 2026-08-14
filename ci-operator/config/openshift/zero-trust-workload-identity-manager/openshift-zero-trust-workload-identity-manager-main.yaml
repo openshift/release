@@ -161,10 +161,34 @@ tests:
       OO_BUNDLE: zero-trust-workload-identity-manager-bundle
     env:
       HYPERSHIFT_NODE_COUNT: "2"
+    post:
+    - as: destroy-cluster-b
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        if [[ ! -f "${SHARED_DIR}/cluster_b_info.txt" ]]; then
+          echo "No Cluster B info found, skipping"; exit 0
+        fi
+        source "${SHARED_DIR}/cluster_b_info.txt"
+        if [[ -z "${CLUSTER_B_NAME:-}" ]]; then
+          echo "No Cluster B to destroy"; exit 0
+        fi
+        export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+        echo "Destroying Cluster B: ${CLUSTER_B_NAME}"
+        /usr/bin/hypershift destroy cluster aws \
+          --name "${CLUSTER_B_NAME}" \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" \
+          --destroy-cloud-resources || true
+        echo "Cluster B destruction initiated"
+      from: hypershift-cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 30m0s
     test:
     - as: create-cluster-b
       cli: latest
-      from: hypershift-cli
       commands: |
         set -euo pipefail
 
@@ -235,14 +259,14 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: RELEASE_IMAGE_LATEST
-        name: "release:latest"
+        name: release:latest
+      from: hypershift-cli
       resources:
         requests:
           cpu: 100m
       timeout: 45m0s
     - as: install-ztwim
       cli: latest
-      from: operator-sdk
       commands: |
         set -euo pipefail
 
@@ -272,13 +296,13 @@ tests:
       dependencies:
       - env: OO_BUNDLE
         name: zero-trust-workload-identity-manager-bundle
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
       timeout: 25m0s
     - as: test-federation
       cli: latest
-      from: src
       commands: |
         set -euo pipefail
         NS="zero-trust-workload-identity-manager"
@@ -459,35 +483,11 @@ tests:
           echo "SDS config correct. Federation bundle propagation incomplete."
           exit 1
         fi
+      from: src
       resources:
         requests:
           cpu: 100m
       timeout: 20m0s
-    post:
-    - as: destroy-cluster-b
-      best_effort: true
-      cli: latest
-      from: hypershift-cli
-      commands: |
-        set -euo pipefail
-        if [[ ! -f "${SHARED_DIR}/cluster_b_info.txt" ]]; then
-          echo "No Cluster B info found, skipping"; exit 0
-        fi
-        source "${SHARED_DIR}/cluster_b_info.txt"
-        if [[ -z "${CLUSTER_B_NAME:-}" ]]; then
-          echo "No Cluster B to destroy"; exit 0
-        fi
-        export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
-        echo "Destroying Cluster B: ${CLUSTER_B_NAME}"
-        /usr/bin/hypershift destroy cluster aws \
-          --name "${CLUSTER_B_NAME}" \
-          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" \
-          --destroy-cloud-resources || true
-        echo "Cluster B destruction initiated"
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 30m0s
     workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: operator-e2e-coverage
