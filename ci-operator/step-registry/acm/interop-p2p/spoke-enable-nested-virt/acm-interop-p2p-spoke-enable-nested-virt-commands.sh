@@ -22,9 +22,13 @@ export KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+# proxy-conf.sh may export HTTPS_PROXY=http://user:pass@... — disable xtrace so
+# the assignment is not traced into CI logs; re-enable immediately after.
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+    set +x
     # shellcheck disable=SC1091
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 # Read the spoke cluster AWS region (first line; one spoke in this job)
