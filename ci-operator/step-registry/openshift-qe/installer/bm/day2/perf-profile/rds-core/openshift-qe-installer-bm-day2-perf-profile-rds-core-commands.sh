@@ -59,8 +59,9 @@ EOF
 # Added a 15 minutes delay as SNO cluster will go for reboot after applying the performance profile
 if [[ $TYPE == "sno" ]]; then
   sleep 900
+  oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=40m
 else
   sleep 300
+  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=60m mcp worker
+  oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
 fi
-
-oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=40m
