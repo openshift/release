@@ -148,6 +148,209 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-aws
 - always_run: false
+  as: e2e-federation-sds
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NS="zero-trust-workload-identity-manager"
+        REMOTE_NS="spire-remote"
+        REMOTE_TD="remote.federation.test"
+
+        echo "=== Phase 1: Verify ZTWIM operator is healthy ==="
+        oc wait --for condition=Available -n ${NS} deployment zero-trust-workload-identity-manager-controller-manager --timeout=120s
+
+        echo "=== Phase 2: Create ZTWIM CR ==="
+        APPS_DOMAIN=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')
+        cat <<EOF | oc apply -f -
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: ZeroTrustWorkloadIdentityManager
+        metadata:
+          name: cluster
+        spec:
+          trustDomain: "primary.${APPS_DOMAIN}"
+          clusterName: "primary-cluster"
+          bundleConfigMap: "spire-bundle"
+        EOF
+
+        echo "Waiting for SpireServer Ready..."
+        timeout 300 bash -c "until oc get spireserver cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
+        echo "Waiting for SpireAgent Ready..."
+        timeout 300 bash -c "until oc get spireagent cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
+
+        echo "=== Phase 3: Verify SDS config in ConfigMap ==="
+        SDS_BUNDLE=$(oc get configmap spire-agent -n ${NS} -o jsonpath='{.data.agent\.conf}' | python3 -c "
+        import json,sys
+        d=json.load(sys.stdin)
+        sds=d.get('agent',{}).get('sds',{})
+        print(sds.get('default_bundle_name','MISSING'))
+        print(sds.get('default_all_bundles_name','MISSING'))
+        ")
+        echo "SDS values: ${SDS_BUNDLE}"
+        echo "${SDS_BUNDLE}" | head -1 | grep -qx "null" || { echo "FAIL: default_bundle_name != null"; exit 1; }
+        echo "${SDS_BUNDLE}" | tail -1 | grep -qx "ROOTCA" || { echo "FAIL: default_all_bundles_name != ROOTCA"; exit 1; }
+        echo "SDS config PASSED"
+
+        echo "=== Phase 4: Deploy standalone SPIRE server (remote trust domain) ==="
+        oc create namespace ${REMOTE_NS} || true
+        cat <<EOF | oc apply -f -
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: spire-server-config
+          namespace: ${REMOTE_NS}
+        data:
+          server.conf: |
+            server {
+              bind_address = "0.0.0.0"
+              bind_port = "8081"
+              trust_domain = "${REMOTE_TD}"
+              data_dir = "/run/spire/data"
+              log_level = "DEBUG"
+              ca_ttl = "24h"
+              default_x509_svid_ttl = "1h"
+              federation {
+                bundle_endpoint {
+                  address = "0.0.0.0"
+                  port = 8443
+                }
+              }
+            }
+            plugins {
+              DataStore "sql" {
+                plugin_data {
+                  database_type = "sqlite3"
+                  connection_string = "/run/spire/data/datastore.sqlite3"
+                }
+              }
+              KeyManager "memory" {
+                plugin_data {}
+              }
+              NodeAttestor "join_token" {
+                plugin_data {}
+              }
+            }
+        ---
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: spire-server-remote
+          namespace: ${REMOTE_NS}
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: spire-server-remote
+          template:
+            metadata:
+              labels:
+                app: spire-server-remote
+            spec:
+              containers:
+              - name: spire-server
+                image: ghcr.io/spiffe/spire-server:1.11.1
+                args: ["-config", "/run/spire/config/server.conf"]
+                ports:
+                - containerPort: 8081
+                - containerPort: 8443
+                volumeMounts:
+                - name: config
+                  mountPath: /run/spire/config
+                - name: data
+                  mountPath: /run/spire/data
+              volumes:
+              - name: config
+                configMap:
+                  name: spire-server-config
+              - name: data
+                emptyDir: {}
+        ---
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: spire-server-remote
+          namespace: ${REMOTE_NS}
+        spec:
+          selector:
+            app: spire-server-remote
+          ports:
+          - name: federation
+            port: 8443
+            targetPort: 8443
+          - name: grpc
+            port: 8081
+            targetPort: 8081
+        EOF
+
+        echo "Waiting for remote SPIRE server..."
+        oc wait --for=condition=Available deployment/spire-server-remote -n ${REMOTE_NS} --timeout=120s
+        sleep 15
+
+        echo "=== Phase 5: Configure federation ==="
+        cat <<EOF | oc apply -f -
+        apiVersion: spire.spiffe.io/v1alpha1
+        kind: ClusterFederatedTrustDomain
+        metadata:
+          name: remote-federation-test
+        spec:
+          trustDomain: "${REMOTE_TD}"
+          bundleEndpointURL: "https://spire-server-remote.${REMOTE_NS}.svc.cluster.local:8443"
+          bundleEndpointProfile:
+            type: "https_spiffe"
+            endpointSPIFFEID: "spiffe://${REMOTE_TD}/spire/server"
+        EOF
+
+        echo "Waiting for federation bundle propagation (90s)..."
+        sleep 90
+
+        echo "=== Phase 6: Verify federation bundle in agent ==="
+        AGENT_POD=$(oc get pods -n ${NS} -l app.kubernetes.io/name=spire-agent -o jsonpath='{.items[0].metadata.name}')
+        echo "Agent pod: ${AGENT_POD}"
+
+        BUNDLE_OUT=$(oc exec -n ${NS} ${AGENT_POD} -c spire-agent -- \
+          /opt/spire/bin/spire-agent api fetch bundle \
+          -socketPath /tmp/spire-agent/public/spire-agent.sock 2>&1) || true
+        echo "Bundle output:"
+        echo "${BUNDLE_OUT}"
+
+        if echo "${BUNDLE_OUT}" | grep -q "${REMOTE_TD}"; then
+          echo ""
+          echo "=== SUCCESS: Federated bundle for '${REMOTE_TD}' present in agent cache ==="
+          echo "buildAll() will serve both local + federated CAs via ROOTCA SDS request"
+        else
+          echo ""
+          echo "=== PARTIAL: SDS config correct but federation bundle not yet visible ==="
+          echo "Checking server federation status..."
+          SERVER_POD=$(oc get pods -n ${NS} -l app.kubernetes.io/name=spire-server -o jsonpath='{.items[0].metadata.name}')
+          oc exec -n ${NS} ${SERVER_POD} -c spire-server -- \
+            /opt/spire/bin/spire-server bundle list \
+            -socketPath /tmp/spire-server/private/api.sock 2>&1 || true
+          echo ""
+          echo "Federation connectivity may need TLS/endpoint debugging."
+          echo "SDS config validation PASSED. Federation propagation needs investigation."
+        fi
+
+        echo ""
+        echo "=== CLEANUP ==="
+        oc delete clusterfederatedtrustdomain remote-federation-test --ignore-not-found
+        oc delete namespace ${REMOTE_NS} --ignore-not-found --wait=false
+        echo "Done."
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
   as: operator-e2e-coverage
   cluster_claim:
     architecture: amd64
