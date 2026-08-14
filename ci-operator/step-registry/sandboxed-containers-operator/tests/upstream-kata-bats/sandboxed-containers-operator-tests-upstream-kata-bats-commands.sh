@@ -6,11 +6,30 @@ if [[ "${TEST_UPSTREAM_KATA_BATS_ENABLE:-}" == "false" ]]; then
     exit 0
 fi
 
-# Smoke and full BATS file lists (embedded; REVISIT *-tests.yaml mechanics later)
-SMOKE_FILES="tests/integration/kubernetes/k8s-smoke.bats"
-SMOKE_TIMEOUT="30m"
+DEFAULT_SMOKE_FILES="k8s-env.bats k8s-exec.bats k8s-job.bats k8s-hostname.bats k8s-nginx-connectivity.bats k8s-copy-file.bats"
 
-FULL_FILES="tests/integration/kubernetes/k8s-sandbox.bats tests/integration/kubernetes/k8s-env.bats"
+DEFAULT_FULL_FILES="\
+k8s-empty-image.bats k8s-guest-pull-image.bats k8s-sealed-secret.bats \
+k8s-attach-handlers.bats k8s-block-volume.bats k8s-caps.bats \
+k8s-configmap.bats k8s-copy-file.bats k8s-cpu-ns.bats \
+k8s-credentials-secrets.bats k8s-cron-job.bats k8s-custom-dns.bats \
+k8s-empty-dirs.bats k8s-env.bats k8s-exec.bats \
+k8s-file-volume.bats k8s-graceful-termination.bats k8s-hostname.bats \
+k8s-hostpath-volume.bats k8s-inotify.bats k8s-ip6tables.bats \
+k8s-job.bats k8s-kill-all-process-in-container.bats k8s-limit-range.bats \
+k8s-liveness-probes.bats k8s-memory.bats k8s-nested-configmap-secret.bats \
+k8s-oom.bats k8s-openvpn.bats k8s-termination-log.bats \
+k8s-optional-empty-configmap.bats k8s-optional-empty-secret.bats \
+k8s-pid-ns.bats k8s-plain-ephemeral-data-storage.bats k8s-pod-quota.bats \
+k8s-port-forward.bats k8s-privileged.bats k8s-projected-volume.bats \
+k8s-replication.bats k8s-sandbox-cgroup.bats k8s-sandbox-cgroup-placement.bats \
+k8s-seccomp.bats k8s-sysctls.bats k8s-security-context.bats \
+k8s-shared-volume.bats k8s-volume.bats k8s-nginx-connectivity.bats \
+k8s-l3forwarding-connectivity.bats"
+
+SMOKE_FILES="${TEST_UPSTREAM_KATA_BATS_SMOKE_FILES:-${DEFAULT_SMOKE_FILES}}"
+FULL_FILES="${TEST_UPSTREAM_KATA_BATS_FULL_FILES:-${DEFAULT_FULL_FILES}}"
+SMOKE_TIMEOUT="30m"
 FULL_TIMEOUT="60m"
 
 echo "Cloning ${TEST_UPSTREAM_KATA_BATS_REPO} branch ${TEST_UPSTREAM_KATA_BATS_BRANCH}..."
@@ -33,6 +52,7 @@ fi
 
 echo "bats version: $(bats --version)"
 
+BATS_DIR="tests/integration/kubernetes"
 mkdir -p "${ARTIFACT_DIR}"
 
 run_bats() {
@@ -44,10 +64,16 @@ run_bats() {
 
     echo "Running ${label} BATS tests (timeout=${timeout})..."
     echo "  files: ${files[*]}"
+
+    local prefixed=()
+    for f in "${files[@]}"; do
+        prefixed+=("${BATS_DIR}/${f}")
+    done
+
     local rc=0
     timeout "${timeout}" bats \
         --formatter junit \
-        "${files[@]}" \
+        "${prefixed[@]}" \
         > "${junit_file}" 2>&1 \
         || rc=$?
 
