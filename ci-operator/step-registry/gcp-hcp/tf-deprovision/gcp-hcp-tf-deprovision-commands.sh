@@ -19,6 +19,12 @@ else
   log "Reconstructed workspace: ${WORKSPACE_NAME}"
 fi
 
+# Validate run-id format
+if [[ ! "${RUN_ID}" =~ ^[a-z][a-z0-9]{2,15}$ ]]; then
+  log "ERROR: Invalid run-id '${RUN_ID}'"
+  exit 0  # Don't fail job
+fi
+
 # Validate TFC token mount exists
 if [[ ! -f "/etc/terraform-cloud/token" ]]; then
   log "ERROR: /etc/terraform-cloud/token not found"
@@ -79,14 +85,21 @@ REGION="${GCP_REGION:-us-central1}"
 log "Re-rendering template for run ID: ${RUN_ID}"
 RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}")"
 
+if [[ ! -d "${RENDERED_DIR}" ]]; then
+  log "ERROR: Render script failed - directory not created"
+  log "Auto-destroy will clean up resources in 24h"
+  exit 0  # Don't fail job
+fi
+
 cd "${RENDERED_DIR}"
 
 # Configure TFC authentication via .terraformrc (avoids token in env vars)
-cat > "$HOME/.terraformrc" <<TFRC
+(umask 077 && cat > "$HOME/.terraformrc" <<TFRC
 credentials "app.terraform.io" {
   token = "$(cat /etc/terraform-cloud/token)"
 }
 TFRC
+)
 
 export TF_INPUT=false
 export TF_IN_AUTOMATION=true
@@ -102,12 +115,46 @@ TFC_ORG="hp-platform-engineering"
 log "Running terraform destroy..."
 log "TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
 
-if ! terraform destroy -auto-approve -no-color 2>&1 | tee -a "${LOG}"; then
-  log "WARNING: terraform destroy failed"
-  log "Resources will be cleaned up by auto-destroy after 24h of inactivity"
-  log "Check TFC workspace for details: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
-  exit 0  # Don't fail job - this is cleanup only
-fi
+# Errors that retrying cannot fix
+NON_TRANSIENT_ERRORS="quota.*exceeded|forbidden|invalid.*configuration|unauthorized"
+
+MAX_DESTROY_ATTEMPTS=3
+destroy_attempt=1
+destroy_wait=30
+
+while (( destroy_attempt <= MAX_DESTROY_ATTEMPTS )); do
+  log "DESTROY ATTEMPT: ${destroy_attempt}/${MAX_DESTROY_ATTEMPTS}"
+
+  destroy_output=$(terraform destroy -auto-approve -no-color 2>&1)
+  destroy_exit=$?
+  echo "${destroy_output}" | tee -a "${LOG}"
+
+  if [[ ${destroy_exit} -eq 0 ]]; then
+    log "Terraform destroy succeeded on attempt ${destroy_attempt}"
+    break
+  fi
+
+  # Fail fast on errors that retrying cannot fix
+  non_transient=$(echo "${destroy_output}" | grep -iE "${NON_TRANSIENT_ERRORS}" || true)
+  if [[ -n "${non_transient}" ]]; then
+    log "WARNING: Non-transient destroy failure, stopping retries"
+    log "Auto-destroy will clean up resources in 24h"
+    log "Check TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
+    exit 0  # Don't fail job
+  fi
+
+  if (( destroy_attempt < MAX_DESTROY_ATTEMPTS )); then
+    log "Transient failure — waiting ${destroy_wait}s before retry..."
+    sleep ${destroy_wait}
+    destroy_wait=$((destroy_wait + 30))
+    ((destroy_attempt++))
+  else
+    log "WARNING: Terraform destroy failed after ${MAX_DESTROY_ATTEMPTS} attempts"
+    log "Auto-destroy will clean up resources in 24h"
+    log "Check TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
+    exit 0  # Don't fail job — auto-destroy is the safety net
+  fi
+done
 
 log ""
 log "=== Deprovision Complete ==="

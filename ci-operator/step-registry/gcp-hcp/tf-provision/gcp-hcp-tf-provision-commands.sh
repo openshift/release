@@ -53,10 +53,15 @@ tfc_api_call() {
 # The 'src' image already contains the gcp-hcp-infra repo at the working directory.
 # Read terraform version from .tool-versions to ensure consistency with local dev.
 REPO_ROOT="$(pwd)"
-TERRAFORM_VERSION="$(grep '^terraform' "${REPO_ROOT}/.tool-versions" | awk '{print $2}')"
+TERRAFORM_VERSION="$(awk '$1 == "terraform" { print $2; exit }' "${REPO_ROOT}/.tool-versions")"
 
 if [[ -z "${TERRAFORM_VERSION}" ]]; then
   log "ERROR: Failed to read terraform version from .tool-versions"
+  exit 1
+fi
+
+if [[ ! "${TERRAFORM_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9]+)?$ ]]; then
+  log "ERROR: Invalid terraform version format: ${TERRAFORM_VERSION}"
   exit 1
 fi
 
@@ -122,15 +127,16 @@ log "Template rendered to: ${RENDERED_DIR}"
 
 cd "${RENDERED_DIR}"
 
+# Read TFC token once — used for both .terraformrc and API calls
+TFC_TOKEN="$(cat /etc/terraform-cloud/token)"
+
 # Configure TFC authentication via .terraformrc (avoids token in env vars)
-cat > "$HOME/.terraformrc" <<TFRC
+(umask 077 && cat > "$HOME/.terraformrc" <<TFRC
 credentials "app.terraform.io" {
-  token = "$(cat /etc/terraform-cloud/token)"
+  token = "${TFC_TOKEN}"
 }
 TFRC
-
-# TFC token still needed for API calls (minimize scope)
-TF_TOKEN_app_terraform_io="$(cat /etc/terraform-cloud/token)"
+)
 
 # Disable terraform's interactive prompts
 export TF_INPUT=false
@@ -155,7 +161,7 @@ TFC_ORG="hp-platform-engineering"
 # Get workspace ID from TFC API (with retry)
 WORKSPACE_RESPONSE=$(tfc_api_call \
   "https://app.terraform.io/api/v2/organizations/${TFC_ORG}/workspaces/${WORKSPACE_NAME}" \
-  -H "Authorization: Bearer ${TF_TOKEN_app_terraform_io}" \
+  -H "Authorization: Bearer ${TFC_TOKEN}" \
   -H "Content-Type: application/vnd.api+json")
 
 WORKSPACE_ID=$(echo "${WORKSPACE_RESPONSE}" | jq -r '.data.id')
@@ -171,15 +177,15 @@ log "Workspace ID: ${WORKSPACE_ID}"
 # Set auto-destroy to 24h (with retry)
 if ! tfc_api_call -X PATCH \
   "https://app.terraform.io/api/v2/workspaces/${WORKSPACE_ID}" \
-  -H "Authorization: Bearer ${TF_TOKEN_app_terraform_io}" \
+  -H "Authorization: Bearer ${TFC_TOKEN}" \
   -H "Content-Type: application/vnd.api+json" \
   -d "{\"data\":{\"type\":\"workspaces\",\"attributes\":{\"auto-destroy-activity-duration\":\"24h\"}}}" \
   > /dev/null; then
   log "WARNING: Failed to set auto-destroy after retries (non-fatal)"
   log "Resources may need manual cleanup if pipeline crashes"
+else
+  log "Auto-destroy configured successfully"
 fi
-
-log "Auto-destroy configured successfully"
 
 # --- Terraform Apply (with retry) ---
 
@@ -243,7 +249,7 @@ terraform output -json > /tmp/tf-outputs.json
 # Validate output file is valid JSON
 if ! jq empty /tmp/tf-outputs.json 2>/dev/null; then
   log "ERROR: terraform output produced invalid JSON"
-  cat /tmp/tf-outputs.json | head -20 | tee -a "${LOG}"
+  head -20 /tmp/tf-outputs.json | tee -a "${LOG}"
   exit 1
 fi
 
