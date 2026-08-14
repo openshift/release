@@ -305,9 +305,10 @@ sys.exit(0 if len(images) > 0 else 1)
 # Main execution
 ################################################################################
 
-RunPushPull || true
-RunOdfPvcCheck || true
-RunAcsScan || true
+typeset -i status=0
+RunPushPull || status=1
+RunOdfPvcCheck || status=1
+RunAcsScan || status=1
 
 if [[ "${MAP_TESTS}" == "true" ]]; then
     eval "$(
@@ -322,4 +323,4 @@ if [[ "${MAP_TESTS}" == "true" ]]; then
     fi
 fi
 
-exit 0
+exit "${status}"
