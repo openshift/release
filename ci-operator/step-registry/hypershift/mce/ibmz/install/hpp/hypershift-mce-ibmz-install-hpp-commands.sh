@@ -19,11 +19,18 @@ apiVersion: hostpathprovisioner.kubevirt.io/v1beta1
 kind: HostPathProvisioner
 metadata:
   name: hostpath-provisioner
+  namespace: openshift-cnv
 spec:
+  storagePools:
+    - pvcTemplate:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+      name: local
+      path: "/var/hpvolumes"
   imagePullPolicy: IfNotPresent
-  pathConfig:
-    path: "/var/hpvolumes"
-    useNamingPrefix: false
 EOF
 
 # Wait for HostPathProvisioner to be ready
