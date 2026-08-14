@@ -10,23 +10,22 @@ ref:
 
     This step:
     1. Sets up SSH access to hypervisor
-    2. Copies kubeconfig from Vault (existing cluster)
-    3. Uses sanity-env from Vault for configuration
-    4. Runs 'make run-dpf-sanity'
-    5. Cleans up temporary files
+    2. Runs make verify-workers, verify-dpu-nodes, verify-deployment,
+       verify-dpudeployment via SSH on the bastion host
+    3. Runs make run-dpf-sanity via SSH on the bastion host
+
+    Prerequisites:
+    - dpf-hypervisor-load-kubeconfig must run before this step to
+      provide a working kubeconfig and .env in ${SHARED_DIR}
 
     Use this for quick validation on doca8 or other existing clusters.
     Does NOT create or destroy any cluster resources.
 
     Required Vault secrets:
     - private-key: SSH key for hypervisor
-    - kubeconfig: Base64 kubeconfig for existing cluster
-    - sanity-env: Base64 env file with CLUSTER_NAME, etc.
+    - remote-host: IP address of the hypervisor bastion host
 
     Expected duration: 15-30 minutes
-  env:
-  - default: "10.6.135.45"
-    name: REMOTE_HOST
   from: dpf-ci
   resources:
     requests:
