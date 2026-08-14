@@ -58,14 +58,14 @@ section() {
 check_arch_and_deps() {
     section "STEP 0: Architecture and Dependency Check"
 
-    ARCH=$(uname -m)
-    echo "Detected architecture: ${ARCH}"
-    if [ "${ARCH}" != "s390x" ]; then
-        echo "ERROR: This script is intended for s390x (IBM Z) architecture."
-        echo "       Detected: ${ARCH}. Exiting."
+    CLUSTER_ARCH=$(oc get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}' 2>/dev/null || echo "unknown")
+    echo "Detected cluster architecture: ${CLUSTER_ARCH}"
+    if [ "${CLUSTER_ARCH}" != "s390x" ]; then
+        echo "ERROR: This script is intended for s390x (IBM Z) clusters."
+        echo "       Detected cluster architecture: ${CLUSTER_ARCH}. Exiting."
         exit 1
     fi
-    echo "Architecture check passed: s390x confirmed."
+    echo "Architecture check passed: s390x cluster confirmed."
 
     echo
     echo "Checking and installing required tools..."
