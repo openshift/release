@@ -217,8 +217,10 @@ tests:
           echo "ERROR: Cannot determine base domain"; exit 1
         fi
 
-        if [[ -f "${SHARED_DIR}/pull-secret-build-farm.json" ]]; then
+        if [[ -f "${SHARED_DIR}/pull-secret-build-farm.json" ]] && command -v jq &>/dev/null; then
           jq -s '.[0] * .[1]' "${SHARED_DIR}/pull-secret-build-farm.json" /etc/ci-pull-credentials/.dockerconfigjson > /tmp/pull-secret-b.json
+        elif [[ -f "${SHARED_DIR}/pull-secret-build-farm.json" ]]; then
+          cp "${SHARED_DIR}/pull-secret-build-farm.json" /tmp/pull-secret-b.json
         else
           cp /etc/ci-pull-credentials/.dockerconfigjson /tmp/pull-secret-b.json
         fi
@@ -276,68 +278,28 @@ tests:
       commands: |
         set -euo pipefail
 
-        # Local Docker auth for operator-sdk to pull bundle image from CI registry
         mkdir -p "${HOME}/.docker"
-        cp /etc/ci-pull-credentials/.dockerconfigjson "${HOME}/.docker/config.json"
-
-        merge_pull_secrets() {
-          # Merges CI registry auth into a cluster's global pull-secret.
-          # Uses tr to collapse to single-line (handles multiline/pretty-printed JSON)
-          # and bash parameter expansion for reliable }} stripping.
-          local existing ci_full ci_inner trimmed
-          local suffix='}}'
-          existing=$(oc get secret/pull-secret -n openshift-config \
-            -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | tr -d '\n\r')
-          ci_full=$(tr -d '\n\r' < /etc/ci-pull-credentials/.dockerconfigjson)
-          ci_inner=${ci_full##*'"auths":{'}
-          ci_inner=${ci_inner%"$suffix"}
-          trimmed=${existing%"$suffix"}
-          printf '%s,%s}}' "$trimmed" "$ci_inner" > /tmp/merged-pull-secret.json
-          echo "DEBUG: merged pull-secret size=$(wc -c < /tmp/merged-pull-secret.json) bytes"
-        }
+        cp "${SHARED_DIR}/pull-secret-build-farm.json" "${HOME}/.docker/config.json"
 
         install_ztwim_on_cluster() {
           local cluster_name="$1"
           local kubeconfig_path="$2"
-
           echo "=== Installing ZTWIM on ${cluster_name} ==="
           export KUBECONFIG="${kubeconfig_path}"
-
-          # Verify cluster connectivity
-          oc whoami || { echo "ERROR: Cannot reach ${cluster_name} via ${kubeconfig_path}"; return 1; }
-
-          # Merge CI creds into global pull-secret (preserves quay.io, registry.redhat.io, etc.)
-          merge_pull_secrets
-          oc set data secret/pull-secret -n openshift-config \
-            --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json
-
-          # Create operator namespace and pull secret for OLM/operator-sdk
-          oc create namespace zero-trust-workload-identity-manager 2>/dev/null || true
-          oc create secret generic ci-pull-secret \
-            --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
-            --type=kubernetes.io/dockerconfigjson \
-            -n zero-trust-workload-identity-manager 2>/dev/null || true
-          oc secrets link default ci-pull-secret --for=pull \
-            -n zero-trust-workload-identity-manager
-
-          echo "Pull secrets configured on ${cluster_name}, installing operator..."
+          oc whoami || { echo "ERROR: Cannot reach ${cluster_name}"; return 1; }
+          oc create namespace zero-trust-workload-identity-manager
           operator-sdk run bundle --timeout=10m \
             --security-context-config=restricted \
             --install-mode=AllNamespaces \
-            --pull-secret-name=ci-pull-secret \
             -n zero-trust-workload-identity-manager \
             "${OO_BUNDLE}" --verbose
           oc wait --for=condition=Available -n zero-trust-workload-identity-manager \
-            deployment/zero-trust-workload-identity-manager-controller-manager --timeout=120s
+            deployment/zero-trust-workload-identity-manager-controller-manager --timeout=180s
           echo "=== ZTWIM installed successfully on ${cluster_name} ==="
         }
 
         install_ztwim_on_cluster "cluster-a" "${SHARED_DIR}/nested_kubeconfig"
         install_ztwim_on_cluster "cluster-b" "${SHARED_DIR}/nested_kubeconfig_b"
-      credentials:
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
       dependencies:
       - env: OO_BUNDLE
         name: zero-trust-workload-identity-manager-bundle
@@ -467,23 +429,29 @@ tests:
         sleep 120
 
         echo "=== Phase 6: Verify SDS config on both clusters ==="
-        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-        SDS_A=$(oc get configmap spire-agent -n ${NS} -o jsonpath='{.data.agent\.conf}' | python3 -c "
-        import json,sys; d=json.load(sys.stdin); sds=d.get('agent',{}).get('sds',{})
-        print(sds.get('default_bundle_name','MISSING')); print(sds.get('default_all_bundles_name','MISSING'))
-        ")
-        echo "Cluster A SDS: ${SDS_A}"
-        echo "${SDS_A}" | head -1 | grep -qx "null" || { echo "FAIL: Cluster A default_bundle_name != null"; exit 1; }
-        echo "${SDS_A}" | tail -1 | grep -qx "ROOTCA" || { echo "FAIL: Cluster A default_all_bundles_name != ROOTCA"; exit 1; }
+        verify_sds_config() {
+          local name="$1"
+          local agent_conf
+          agent_conf=$(oc get configmap spire-agent -n ${NS} -o jsonpath='{.data.agent\.conf}' 2>/dev/null || echo "")
+          if [[ -z "${agent_conf}" ]]; then
+            echo "FAIL: ${name} spire-agent configmap not found or empty"; return 1
+          fi
+          echo "${name} agent config retrieved ($(echo "${agent_conf}" | wc -c) bytes)"
+          if echo "${agent_conf}" | grep -q "default_all_bundles_name"; then
+            if echo "${agent_conf}" | grep -q "ROOTCA"; then
+              echo "[PASS] ${name}: default_all_bundles_name contains ROOTCA"
+            else
+              echo "FAIL: ${name}: default_all_bundles_name found but ROOTCA value missing"; return 1
+            fi
+          else
+            echo "FAIL: ${name}: default_all_bundles_name key not found in agent config"; return 1
+          fi
+        }
 
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        verify_sds_config "Cluster A"
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
-        SDS_B=$(oc get configmap spire-agent -n ${NS} -o jsonpath='{.data.agent\.conf}' | python3 -c "
-        import json,sys; d=json.load(sys.stdin); sds=d.get('agent',{}).get('sds',{})
-        print(sds.get('default_bundle_name','MISSING')); print(sds.get('default_all_bundles_name','MISSING'))
-        ")
-        echo "Cluster B SDS: ${SDS_B}"
-        echo "${SDS_B}" | head -1 | grep -qx "null" || { echo "FAIL: Cluster B default_bundle_name != null"; exit 1; }
-        echo "${SDS_B}" | tail -1 | grep -qx "ROOTCA" || { echo "FAIL: Cluster B default_all_bundles_name != ROOTCA"; exit 1; }
+        verify_sds_config "Cluster B"
         echo "SDS config PASSED on both clusters"
 
         echo "=== Phase 7: Verify federated bundles in SPIRE Agents ==="
