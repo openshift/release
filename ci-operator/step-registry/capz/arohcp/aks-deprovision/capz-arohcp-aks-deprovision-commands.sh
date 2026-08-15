@@ -1,0 +1,1 @@
+../../test/aks-deprovision/capz-test-aks-deprovision-commands.sh

@@ -1,0 +1,127 @@
+ref:
+  as: p2p-mtv-execute-live-migration
+  from: cli
+  commands: p2p-mtv-execute-live-migration-commands.sh
+  timeout: 3h0m0s
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Execute MTV cross-cluster live migration (CCLM) from source spoke to destination spoke.
+
+    Runs on the ACM hub (KUBECONFIG). Creates Plan and Migration CRs, waits for Succeeded,
+    and verifies the VM is Running on the destination spoke. Requires p2p-mtv-mig-config
+    (providers + maps Ready), p2p-create-migration-test-vm (source VM Running),
+    p2p-acm-cnv-install-policy (DecentralizedLiveMigration + sync controller on spokes),
+    and acm-interop-p2p-submariner-install (no Globalnet; :8443 pod reachability).
+
+    Live preflight: sync-controller ready, no submariner-globalnet, TCP probe to dest
+    sync-controller from source virt-launcher. During migration wait, fails early if
+    Synchronization stays stuck (source Synchronizing / dest WaitingForSync).
+
+    Spoke kubeconfigs default to SHARED_DIR/managed-cluster-kubeconfig-1 (source) and
+    managed-cluster-kubeconfig-2 (destination).
+
+    Writes ${ARTIFACT_DIR}/mtv-live-migration-status.txt; diagnostics on failure under
+    ${ARTIFACT_DIR}/mtv-live-migration-diagnostics/.
+  env:
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV Plan and Migration CRs live.
+  - name: MTV_SOURCE_PROVIDER
+    default: "spoke-1"
+    documentation: MTV source Provider CR name (migration origin).
+  - name: MTV_DESTINATION_PROVIDER
+    default: "spoke-2"
+    documentation: MTV destination Provider CR name (migration target).
+  - name: MTV_TEST_VM_NAME
+    default: "test-vm-1"
+    documentation: VirtualMachine name to migrate (must match p2p-create-migration-test-vm).
+  - name: MTV_TEST_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Source namespace of the VM to migrate.
+  - name: MTV_TEST_VM_TARGET_NAMESPACE
+    default: ""
+    documentation: Destination namespace on spoke-2. Empty uses MTV_TEST_VM_NAMESPACE.
+  - name: MTV_PLAN_NAME
+    default: "cclm-plan"
+    documentation: Plan metadata.name on the hub.
+  - name: MTV_MIGRATION_NAME
+    default: "cclm-run-1"
+    documentation: Migration metadata.name on the hub.
+  - name: MTV_NETWORK_MAP_NAME
+    default: "spoke-network-map"
+    documentation: NetworkMap referenced by the Plan.
+  - name: MTV_STORAGE_MAP_NAME
+    default: "spoke-storage-map"
+    documentation: StorageMap referenced by the Plan.
+  - name: MTV_PLAN_TYPE
+    default: "live"
+    documentation: Plan spec.type — live for CCLM, cold for powered-off migration.
+  - name: MTV_PLAN_READY_TIMEOUT
+    default: "15m"
+    documentation: Timeout for Provider/Map/Plan Ready waits.
+  - name: MTV_MIGRATION_TIMEOUT
+    default: "2h"
+    documentation: Max duration to wait for Migration Succeeded.
+  - name: MTV_MIGRATION_POLL_INTERVAL_SECONDS
+    default: "30"
+    documentation: Sleep between Migration status polls.
+  - name: MTV_SOURCE_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional source spoke kubeconfig path. Defaults to SHARED_DIR index 1.
+  - name: MTV_DEST_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional destination spoke kubeconfig path. Defaults to SHARED_DIR index 2.
+  - name: MTV_SOURCE_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based SHARED_DIR kubeconfig index for the source spoke.
+  - name: MTV_DEST_SPOKE_INDEX
+    default: "2"
+    documentation: 1-based SHARED_DIR kubeconfig index for the destination spoke.
+  - name: MTV_CNV_NAMESPACE
+    default: "openshift-cnv"
+    documentation: OpenShift Virtualization namespace on spokes (KubeVirt/HCO).
+  - name: MTV_KUBEVIRT_NAME
+    default: "kubevirt-kubevirt-hyperconverged"
+    documentation: KubeVirt CR name on spokes (HCO-managed). MTV inventory reads developerConfiguration.featureGates here.
+  - name: MTV_HCO_NAME
+    default: "kubevirt-hyperconverged"
+    documentation: HyperConverged CR name patched when ensuring DecentralizedLiveMigration.
+  - name: MTV_ENSURE_DECENTRALIZED_LIVE_MIGRATION
+    default: "true"
+    documentation: Patch HCO developerConfiguration.featureGates on spokes when gate is missing (live plans only).
+  - name: MTV_FORKLIFT_CONTROLLER_NAME
+    default: "forklift-controller"
+    documentation: ForkliftController / deployment name on the hub (CCLM preflight).
+  - name: MTV_PROVIDER_INVENTORY_REFRESH_WAIT
+    default: "5m"
+    documentation: Wait for providers Ready after inventory refresh before Plan creation.
+  - name: MTV_SYNC_CONTROLLER_WAIT
+    default: "10m"
+    documentation: Wait for virt-synchronization-controller Available on each spoke before live migration.
+  - name: MTV_CCLM_SYNC_PROBE
+    default: "true"
+    documentation: TCP-probe dest sync-controller :8443 from source virt-launcher before migration.
+  - name: MTV_CCLM_SYNC_PORT
+    default: "8443"
+    documentation: KubeVirt cross-cluster sync controller TCP port (virt-synchronization-controller HTTPS listener).
+  - name: MTV_CCLM_SYNC_PROBE_TIMEOUT
+    default: "10"
+    documentation: Seconds to wait for the pre-migration CCLM sync TCP probe.
+  - name: MTV_CCLM_SYNC_PROBE_RETRIES
+    default: "5"
+    documentation: |-
+      Max attempts for the pre-migration CCLM sync port TCP probe (10s between retries).
+      The virt-synchronization-controller TCP listener may start after the Deployment
+      reaches Available; retries bridge that window without masking real failures.
+  - name: MTV_SYNC_STUCK_MINUTES
+    default: "20"
+    documentation: Fail migration wait if Synchronization pipeline stays Running with VMIM stuck in sync phases longer than this (0 disables).
+  - name: P2P_CCLM_DEBUG_MODE
+    default: "false"
+    documentation: |-
+      When true, log failures and exit 0 so downstream debug steps (e.g. acm-interop-p2p-test-poc)
+      can run. Set P2P_CCLM_DEBUG_MODE=true in the job env during CCLM investigation.

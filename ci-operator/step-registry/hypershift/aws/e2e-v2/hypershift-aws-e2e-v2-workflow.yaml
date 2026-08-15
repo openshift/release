@@ -1,0 +1,33 @@
+workflow:
+  as: hypershift-aws-e2e-v2
+  documentation: |-
+    The HyperShift AWS e2e v2 workflow provisions a nested management cluster,
+    installs the HyperShift operator, creates AWS guest clusters via the
+    create-guests binary (driven by platform config), and runs the v2 test suite
+    via run-tests. Each test group produces a separate JUnit XML entry for Sippy.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+    - Bryan Cox (brcox@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/CNTRLPLANE/summary
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create-guests
+    test:
+    - chain: hypershift-aws-run-e2e-v2
+    post:
+    - chain: hypershift-aws-dump-guests
+    - chain: hypershift-aws-destroy-guests
+    - chain: hypershift-destroy-nested-management-cluster
+    env:
+      HYPERSHIFT_PLATFORM: "aws"

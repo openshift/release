@@ -1,0 +1,25 @@
+chain:
+  as: openshift-upgrade-qe-test-cpou
+  steps:
+  - ref: idp-htpasswd
+  - ref: cucushift-pre
+  - ref: openshift-extended-upgrade-pre
+  - ref: cucushift-upgrade-prepare
+  - ref: cucushift-upgrade-prehealthcheck
+  - ref: cucushift-upgrade-cpou-pause-worker-mcp
+  - ref: cucushift-chainupgrade-toimage
+  - ref: cucushift-upgrade-cpou-unpause-worker-mcp
+  - ref: cucushift-upgrade-rhel-worker
+  - ref: cucushift-upgrade-healthcheck
+  - ref: openshift-extended-upgrade-post
+  - ref: cucushift-upgrade-check
+  - ref: openshift-upgrade-qe-test-report
+  env:
+  - name: E2E_RUN_TAGS
+    default: "@upgrade-sanity"
+  - name: FILTERS_ADDITIONAL
+    default: "~TELCO&"
+  documentation: |-
+    The chain executes upgrade-prepare, which creates test data on a cluster;
+    then conduct paused upgrade;
+    then execute upgrade-check, which checks the prepared test data.
