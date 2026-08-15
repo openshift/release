@@ -314,86 +314,127 @@ tests:
         set -euo pipefail
         NS="zero-trust-workload-identity-manager"
 
-        echo "=== Phase 1: Configure ZTWIM on Cluster A ==="
+        deploy_operand_crs() {
+          local cluster_name="$1"
+          local trust_domain="$2"
+          local apps_domain="$3"
+          echo "--- Creating operand CRs on ${cluster_name} ---"
+          cat <<SEOF | oc apply -f -
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: ZeroTrustWorkloadIdentityManager
+        metadata:
+          name: cluster
+        spec:
+          trustDomain: "${trust_domain}"
+          clusterName: "${cluster_name}"
+          bundleConfigMap: "spire-bundle"
+        SEOF
+          cat <<SEOF | oc apply -f -
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpireServer
+        metadata:
+          name: cluster
+        spec:
+          logLevel: info
+          logFormat: text
+          jwtIssuer: "https://oidc-discovery.${apps_domain}"
+          caValidity: 24h
+          defaultX509Validity: 1h
+          defaultJWTValidity: 5m
+          caKeyType: rsa-2048
+          caSubject:
+            commonName: "SPIRE CA"
+            organization: "E2E Test"
+            country: "US"
+          datastore:
+            databaseType: sqlite3
+            connectionString: "/run/spire/data/datastore.sqlite3"
+          persistence:
+            size: "1Gi"
+            accessMode: ReadWriteOnce
+          federation:
+            bundleEndpoint:
+              profile: https_spiffe
+              refreshHint: 300
+            managedRoute: "true"
+        SEOF
+          cat <<SEOF | oc apply -f -
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpireAgent
+        metadata:
+          name: cluster
+        spec:
+          logLevel: info
+          logFormat: text
+          nodeAttestor:
+            k8sPSATEnabled: "true"
+          workloadAttestors:
+            k8sEnabled: "true"
+            workloadAttestorsVerification:
+              type: auto
+        SEOF
+          cat <<SEOF | oc apply -f -
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpiffeCSIDriver
+        metadata:
+          name: cluster
+        spec:
+          agentSocketPath: "/run/spire/agent-sockets"
+          pluginName: "csi.spiffe.io"
+        SEOF
+          echo "--- All operand CRs applied on ${cluster_name} ---"
+        }
+
+        echo "=== Phase 1: Configure ZTWIM + operands on Cluster A ==="
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
         APPS_DOMAIN_A=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')
         TRUST_DOMAIN_A="cluster-a.${APPS_DOMAIN_A}"
-        cat <<EOF | oc apply -f -
-        apiVersion: operator.openshift.io/v1alpha1
-        kind: ZeroTrustWorkloadIdentityManager
-        metadata:
-          name: cluster
-        spec:
-          trustDomain: "${TRUST_DOMAIN_A}"
-          clusterName: "cluster-a"
-          bundleConfigMap: "spire-bundle"
-        EOF
+        deploy_operand_crs "cluster-a" "${TRUST_DOMAIN_A}" "${APPS_DOMAIN_A}"
 
-        echo "=== Phase 2: Configure ZTWIM on Cluster B ==="
+        echo "=== Phase 2: Configure ZTWIM + operands on Cluster B ==="
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
         APPS_DOMAIN_B=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')
         TRUST_DOMAIN_B="cluster-b.${APPS_DOMAIN_B}"
-        cat <<EOF | oc apply -f -
-        apiVersion: operator.openshift.io/v1alpha1
-        kind: ZeroTrustWorkloadIdentityManager
-        metadata:
-          name: cluster
-        spec:
-          trustDomain: "${TRUST_DOMAIN_B}"
-          clusterName: "cluster-b"
-          bundleConfigMap: "spire-bundle"
-        EOF
+        deploy_operand_crs "cluster-b" "${TRUST_DOMAIN_B}" "${APPS_DOMAIN_B}"
 
         echo "=== Phase 3: Wait for SPIRE on both clusters ==="
-        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-        echo "Waiting for SPIRE on Cluster A..."
-        timeout 300 bash -c "until oc get spireserver cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
-        timeout 300 bash -c "until oc get spireagent cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
+        wait_for_spire() {
+          local cluster_name="$1"
+          echo "Waiting for SPIRE server on ${cluster_name}..."
+          if ! timeout 600 bash -c "until oc get spireserver cluster -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 15; done"; then
+            echo "TIMEOUT: SpireServer not Ready on ${cluster_name}. Diagnostics:"
+            oc get spireserver cluster -o yaml 2>/dev/null || echo "  spireserver CR not found"
+            oc get pods -n ${NS} -l app.kubernetes.io/name=spire-server 2>/dev/null || true
+            oc describe pods -n ${NS} -l app.kubernetes.io/name=spire-server 2>/dev/null | tail -30 || true
+            return 1
+          fi
+          echo "SpireServer Ready on ${cluster_name}"
+          echo "Waiting for SPIRE agent on ${cluster_name}..."
+          if ! timeout 300 bash -c "until oc get spireagent cluster -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 15; done"; then
+            echo "TIMEOUT: SpireAgent not Ready on ${cluster_name}. Diagnostics:"
+            oc get spireagent cluster -o yaml 2>/dev/null || echo "  spireagent CR not found"
+            oc get pods -n ${NS} -l app.kubernetes.io/name=spire-agent 2>/dev/null || true
+            return 1
+          fi
+          echo "SpireAgent Ready on ${cluster_name}"
+        }
 
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        wait_for_spire "Cluster A"
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
-        echo "Waiting for SPIRE on Cluster B..."
-        timeout 300 bash -c "until oc get spireserver cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
-        timeout 300 bash -c "until oc get spireagent cluster -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
+        wait_for_spire "Cluster B"
 
-        echo "=== Phase 4: Expose SPIRE federation bundle endpoints via Routes ==="
+        echo "=== Phase 4: Get operator-managed federation route endpoints ==="
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-        SPIRE_SVC_A=$(oc get svc -n ${NS} -l app.kubernetes.io/name=spire-server -o jsonpath='{.items[0].metadata.name}')
-        cat <<EOF | oc apply -f -
-        apiVersion: route.openshift.io/v1
-        kind: Route
-        metadata:
-          name: spire-federation-bundle
-          namespace: ${NS}
-        spec:
-          to:
-            kind: Service
-            name: ${SPIRE_SVC_A}
-          port:
-            targetPort: 8443
-          tls:
-            termination: passthrough
-        EOF
-        BUNDLE_ENDPOINT_A="https://$(oc get route spire-federation-bundle -n ${NS} -o jsonpath='{.spec.host}'):443"
+        echo "Waiting for federation route on Cluster A..."
+        timeout 120 bash -c "until oc get route spire-server-federation -n ${NS} -o jsonpath='{.spec.host}' 2>/dev/null | grep -q '.'; do sleep 10; done"
+        BUNDLE_ENDPOINT_A="https://$(oc get route spire-server-federation -n ${NS} -o jsonpath='{.spec.host}'):443"
         echo "Cluster A bundle endpoint: ${BUNDLE_ENDPOINT_A}"
 
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
-        SPIRE_SVC_B=$(oc get svc -n ${NS} -l app.kubernetes.io/name=spire-server -o jsonpath='{.items[0].metadata.name}')
-        cat <<EOF | oc apply -f -
-        apiVersion: route.openshift.io/v1
-        kind: Route
-        metadata:
-          name: spire-federation-bundle
-          namespace: ${NS}
-        spec:
-          to:
-            kind: Service
-            name: ${SPIRE_SVC_B}
-          port:
-            targetPort: 8443
-          tls:
-            termination: passthrough
-        EOF
-        BUNDLE_ENDPOINT_B="https://$(oc get route spire-federation-bundle -n ${NS} -o jsonpath='{.spec.host}'):443"
+        echo "Waiting for federation route on Cluster B..."
+        timeout 120 bash -c "until oc get route spire-server-federation -n ${NS} -o jsonpath='{.spec.host}' 2>/dev/null | grep -q '.'; do sleep 10; done"
+        BUNDLE_ENDPOINT_B="https://$(oc get route spire-server-federation -n ${NS} -o jsonpath='{.spec.host}'):443"
         echo "Cluster B bundle endpoint: ${BUNDLE_ENDPOINT_B}"
 
         echo "=== Phase 5: Configure bidirectional federation ==="
@@ -500,7 +541,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 20m0s
+      timeout: 35m0s
     workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: operator-e2e-coverage
