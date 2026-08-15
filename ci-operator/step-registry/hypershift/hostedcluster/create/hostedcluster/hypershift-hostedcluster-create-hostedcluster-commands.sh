@@ -290,7 +290,6 @@ if [[ ! -f ${SHARED_DIR}/kubeadmin-password ]]; then
 fi
 
 echo "Waiting for clusteroperators to be ready"
-ln -s ${SHARED_DIR}/nested_kubeconfig ${SHARED_DIR}/kubeconfig
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 
 until \
@@ -347,6 +346,12 @@ if [[ -n "${GUEST_FEATURE_SET}" ]]; then
     exit 1
   fi
 fi
+
+# Create the kubeconfig symlink only AFTER all readiness checks (clusteroperators,
+# NodePools, feature set) have passed.  The EphemeralCluster controller watches for
+# this file to set the ClusterReady condition; placing it earlier causes tests to
+# start before the cluster is actually ready, leading to DNS resolution failures.
+ln -s ${SHARED_DIR}/nested_kubeconfig ${SHARED_DIR}/kubeconfig
 
 # Data for cluster bot.
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
