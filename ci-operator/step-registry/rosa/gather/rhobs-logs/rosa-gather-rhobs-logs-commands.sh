@@ -101,6 +101,18 @@ if [[ -n "${MC_CLUSTER_ID}" && "${MC_CLUSTER_ID}" != "null" ]]; then
     -C "${MC_CLUSTER_ID}" --hive-ocm-url "${HIVE_OCM_URL}" \
     -n "cert-manager" \
     --since "${SINCE}" --limit 5000 --direction forward -o text
+
+  # 7. route-monitor-operator logs (probe reconciliation, RouteMonitor lifecycle)
+  collect_logs "route-monitor-operator logs" "route-monitor-operator.log" \
+    -C "${MC_CLUSTER_ID}" --hive-ocm-url "${HIVE_OCM_URL}" \
+    -n "openshift-route-monitor-operator" \
+    --since "${SINCE}" --limit 5000 --direction forward -o text
+
+  # 8. aws-vpce-operator logs (VPC endpoint provisioning, readiness)
+  collect_logs "aws-vpce-operator logs" "aws-vpce-operator.log" \
+    -C "${MC_CLUSTER_ID}" --hive-ocm-url "${HIVE_OCM_URL}" \
+    -n "openshift-aws-vpce-operator" \
+    --since "${SINCE}" --limit 5000 --direction forward -o text
 fi
 
 # 7. CS provisioning logs via RHOBS Loki API (global cell)
