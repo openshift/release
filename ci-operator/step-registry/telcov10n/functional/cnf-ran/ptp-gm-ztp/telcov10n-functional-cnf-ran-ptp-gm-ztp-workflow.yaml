@@ -1,0 +1,26 @@
+workflow:
+  as: telcov10n-functional-cnf-ran-ptp-gm-ztp
+  documentation: |-
+    Full ZTP workflow for CNF RAN PTP GM testing:
+    1. Hub setup (kni-qe-111_hub-sno): deploy, configure, mirror operators
+    2. Spoke PTP Grand Master cluster (helix48): deploy via ZTP, run tests, report
+
+    PTP_CYCLE_CONFIGS: set ntpfailover cycle for OCP 4.18+, empty list otherwise.
+    ECO_GOTESTS_LABELS: skip test 85906 (!85906) for all versions except 5.0.
+  steps:
+    pre:
+    # Hub cluster setup
+    - ref: telcov10n-functional-cnf-ran-hub-deploy
+    - ref: telcov10n-functional-cnf-ran-hub-config
+    - ref: telcov10n-functional-cnf-ran-mirror-spoke-operators
+    # Spoke cluster setup
+    - ref: telcov10n-functional-cnf-ran-deploy-spoke-sno
+    test:
+    - ref: telcov10n-functional-cnf-ran-cnf-gotests-ptp-gm
+    - ref: telcov10n-functional-cnf-ran-eco-gotests-ptp-gm
+    post:
+    - ref: telcov10n-functional-report
+    - ref: telcov10n-functional-cnf-ran-send-slack-notification
+    # PTP GM reports are verified on the bastion (not copied to the CI pod SHARED_DIR)
+    # to avoid the 1 MB Kubernetes secret size limit.
+    - ref: telcov10n-verify-junit-reports-bastion

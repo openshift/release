@@ -1,0 +1,30 @@
+ref:
+  as: platform-external-cluster-wait-for-ccm-nodes-initialized
+  from: cli
+  commands: platform-external-cluster-wait-for-ccm-nodes-initialized-commands.sh
+  grace_period: 10m
+  timeout: 35m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: PLATFORM_EXTERNAL_CCM_ENABLED
+      default: "no"
+      documentation: |-
+        When set to "yes" the step will check if CCM has initialized all cluster nodes.
+  documentation: |-
+    Waits for CCM to initialize all cluster nodes (masters and workers) by:
+    1. Verifying all nodes have providerID set
+    2. Confirming CCM removed the node.cloudprovider.kubernetes.io/uninitialized taint
+
+    This step only runs when PLATFORM_EXTERNAL_CCM_ENABLED=yes.
+
+    This step addresses a timing issue in Platform External (UPI with external CCM) setups
+    where CCM may take longer to initialize nodes compared to integrated platform (IPI).
+    Without this wait, install-complete may fail because cluster operators cannot schedule
+    pods on uninitialized nodes.
+
+    The step is platform-agnostic and checks for any providerID format (AWS, OCI, etc).
+
+    Timeout: 30 minutes (configurable via MAX_ITERATIONS in script)
