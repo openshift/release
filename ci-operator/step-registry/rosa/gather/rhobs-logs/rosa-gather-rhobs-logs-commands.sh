@@ -101,9 +101,21 @@ if [[ -n "${MC_CLUSTER_ID}" && "${MC_CLUSTER_ID}" != "null" ]]; then
     -C "${MC_CLUSTER_ID}" --hive-ocm-url "${HIVE_OCM_URL}" \
     -n "cert-manager" \
     --since "${SINCE}" --limit 5000 --direction forward -o text
+
+  # 7. RMO (Route Monitor Operator) logs
+  collect_logs "RMO logs" "rmo-logs.log" \
+    -C "${MC_CLUSTER_ID}" --hive-ocm-url "${HIVE_OCM_URL}" \
+    -n "openshift-route-monitor-operator" \
+    --since "${SINCE}" --limit 5000 --direction forward -o text
+
+  # 8. AVO (AWS VPCE Operator) logs
+  collect_logs "AVO logs" "avo-logs.log" \
+    -C "${MC_CLUSTER_ID}" --hive-ocm-url "${HIVE_OCM_URL}" \
+    -n "openshift-aws-vpce-operator" \
+    --since "${SINCE}" --limit 5000 --direction forward -o text
 fi
 
-# 7. CS provisioning logs via RHOBS Loki API (global cell)
+# 9. CS provisioning logs via RHOBS Loki API (global cell)
 if [[ -f /usr/local/rhobs-oidc/client_id ]]; then
   echo "Collecting CS provisioning logs from RHOBS..."
 
