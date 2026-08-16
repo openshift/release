@@ -17,27 +17,23 @@ ref:
   - name: PLAYWRIGHT_GIT_REPO
     default: "https://github.com/quay/quay.git"
     documentation: |-
-      Git repository cloned for Playwright tests. The quay-playwright-runner
-      image supplies Node, browsers, and npm; test sources come from this repo.
+      Git repository cloned when PLAYWRIGHT_GIT_BRANCH is set. Unused when
+      tests run from the quay-playwright-runner image sources.
   - name: PLAYWRIGHT_GIT_BRANCH
     default: ""
     documentation: |-
-      Git branch or tag to clone for Playwright tests (for example redhat-3.18).
-      When empty, the branch is derived from QUAY_OPERATOR_CHANNEL
-      (stable-3.18 or preview-3.18 -> redhat-3.18). Set this to pin tests
-      independently of the installed operator channel.
+      Optional git branch or tag to clone for Playwright tests. When empty,
+      tests run from the quay-playwright-runner image (same git ref as the
+      ci-operator src / image build). Set this only to override the image.
   - name: MULTISTAGE_PARAM_OVERRIDE_PLAYWRIGHT_GIT_BRANCH
     default: ""
     documentation: |-
       Optional Gangway or rehearsal override for PLAYWRIGHT_GIT_BRANCH.
-      When set, it takes precedence over PLAYWRIGHT_GIT_BRANCH and channel mapping.
+      When set, tests are cloned from that ref instead of using the image.
   - name: QUAY_OPERATOR_CHANNEL
     default: "stable-3.16"
-    documentation: |-
-      Installed Quay operator channel. Used to derive PLAYWRIGHT_GIT_BRANCH
-      when that value is empty (stable-X.Y -> redhat-X.Y).
+    documentation: Installed Quay operator channel (informational in this step).
   documentation: |-
     Execute Quay Playwright e2e smoke tests against a deployed Quay instance.
-    Test sources are cloned from PLAYWRIGHT_GIT_REPO at PLAYWRIGHT_GIT_BRANCH
-    (or the branch derived from QUAY_OPERATOR_CHANNEL) so they match the
-    installed Quay version rather than the image build branch.
+    By default tests and browsers come from the quay-playwright-runner image.
+    Set PLAYWRIGHT_GIT_BRANCH to clone a different quay.git ref at runtime.
