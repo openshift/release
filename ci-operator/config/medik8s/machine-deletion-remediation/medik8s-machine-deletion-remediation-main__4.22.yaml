@@ -3,10 +3,6 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
-  operator-sdk:
-    name: "4.17"
-    namespace: origin
-    tag: operator-sdk
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -60,12 +56,12 @@ tests:
         oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
         oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/machine-deletion-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION"
+        OPERATOR_NAMESPACE="$INSTALL_NAMESPACE" BUNDLE_IMG=quay.io/medik8s/machine-deletion-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
         oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
       env:
       - name: INSTALL_NAMESPACE
       - name: OPERATOR_RELEASED_VERSION
-      from: operator-sdk
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -73,14 +69,14 @@ tests:
     - as: e2e-upgrade
       cli: latest
       commands: |
-        operator-sdk run bundle-upgrade -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        OPERATOR_NAMESPACE="$INSTALL_NAMESPACE" BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
         oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: machine-deletion-remediation-bundle
       env:
       - name: INSTALL_NAMESPACE
-      from: operator-sdk
+      from: src
       resources:
         requests:
           cpu: 100m
