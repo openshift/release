@@ -39,6 +39,42 @@ ref:
       Specifies the security context to use for the catalog pod created by operator-sdk.
       Allowed: `restricted`, `legacy`. (default: `restricted`)
     default: "restricted"
+  - name: OO_PSA_ENFORCE_PRIVILEGED
+    documentation: |-
+      When true, force pod-security.kubernetes.io/enforce=privileged on
+      OO_INSTALL_NAMESPACE regardless of its name. By default, namespaces
+      prefixed `openshift-` only get security.openshift.io/scc.podSecurityLabelSync=true
+      (PSA level derived from whatever SCCs are granted, which can lag behind
+      what operator-sdk's own internal registry pod actually needs and reject
+      it under PodSecurity "restricted"). Namespaces not prefixed `openshift-`
+      already get the explicit-privileged treatment unconditionally; this
+      flag extends that same treatment to an `openshift-*` namespace.
+    default: "false"
+  - name: OO_MIRROR_TO_CLUSTER_REGISTRY
+    documentation: |-
+      When true, mirror OO_BUNDLE into the test cluster's own internal
+      image registry first (exposing its default route, marking it as an
+      insecure registry cluster-wide, and granting anonymous pull on
+      OO_INSTALL_NAMESPACE), and install from that internal copy instead
+      of OO_BUNDLE directly. Works around a real, still only partially
+      understood failure where operator-sdk's own containerd-based bundle
+      pull cannot be given working credentials for some external
+      registries (observed against a CI registry proxy) even when the
+      exact same credential is independently confirmed valid via
+      `oc image mirror`/`oc image info`.
+
+      This is opt-in and defaults to false because it mutates
+      cluster-wide config (image registry route, insecureRegistries,
+      MachineConfigPool rollout) beyond OO_INSTALL_NAMESPACE -- only
+      enable it for a consumer that has actually hit the failure above.
+      Assumes an ephemeral, single-use test cluster; none of these
+      mutations are torn down.
+
+      Sizing job/test timeouts: enabling this adds up to ~30 minutes
+      (the MachineConfigPool rollout wait) on top of this step's own
+      grace_period and OO_INSTALL_TIMEOUT_MINUTES, before OO_BUNDLE's
+      own install even starts.
+    default: "false"
   - name: OO_BUNDLE
     documentation: |-
       Specifies a non ci-bundle image
