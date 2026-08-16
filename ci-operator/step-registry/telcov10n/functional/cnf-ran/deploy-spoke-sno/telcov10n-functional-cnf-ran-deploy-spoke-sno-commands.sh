@@ -35,7 +35,7 @@ echo "Running ZTP deployment for sno spoke cluster: ${SPOKE_CLUSTER}"
 ansible-playbook ./playbooks/ran/deploy-spoke-sno.yaml \
     -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} \
-        spoke_clusters='["${SPOKE_CLUSTER}"]' \
+        spoke_clusters='${SPOKE_CLUSTER}' \
         ztp_git_repo_url=${ZTP_GIT_REPO} \
         ztp_clusters_git_path=siteconfig/${VERSION} \
         ztp_policies_git_path=policygentemplates/${VERSION} \
