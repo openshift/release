@@ -1,0 +1,36 @@
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: maas-perf-odh
+  cron: 0 6 * * 1-5
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      CONCURRENCY_LEVELS: "8"
+      EXTRA_FLAGS: --metrics-profile=maas-gateway-perf-metrics.yml,metrics.yml --local-indexing=true
+        --profile-type=regular --timeout=10h
+      OPERATOR_TYPE: odh
+      PAYLOAD_SIZES: small
+      PROVIDERS: gpt-4o-openai
+      SAMPLES: "1"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-maas-gateway-perf
+    workflow: ipi-aws
+  timeout: 10h0m0s
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: models-as-a-service
+  variant: maas-perf-odh
