@@ -5,7 +5,19 @@ build_root:
     tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
-  - dockerfile_path: web/playwright/Dockerfile
+  - dockerfile_literal: |
+      FROM src
+      RUN dnf module enable -y nodejs:20 && \
+          dnf install -y nodejs \
+          alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
+          libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
+          libxkbcommon libXfixes libXcursor libXext libXi libXtst \
+          libwayland-client && \
+          dnf clean all
+      WORKDIR /go/src/github.com/quay/quay/web
+      RUN npm ci
+      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+      RUN npx playwright install chromium
     from: src
     to: quay-playwright-runner
 releases:
@@ -31,7 +43,6 @@ tests:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
       MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-22@sha256:dc85edf1095b3be72cf2a3f4e727857944c0538d56face1f3b96700dc0846053
-      PLAYWRIGHT_GIT_BRANCH: redhat-3.18
       QUAY_EXTRA_CONFIG: |
         FEATURE_PROGRAMMATIC_BOOTSTRAP: false
         FEATURE_REPO_MIRROR: true
@@ -51,7 +62,7 @@ tests:
     - ref: quay-operator-test-e2e
     workflow: ipi-aws
 zz_generated_metadata:
-  branch: master
+  branch: redhat-3.18
   org: quay
   repo: quay
   variant: aws-ocp422-e2e-install

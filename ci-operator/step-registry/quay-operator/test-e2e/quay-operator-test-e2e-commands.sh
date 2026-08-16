@@ -33,29 +33,13 @@ export QUAY_USERNAME
 export QUAY_PASSWORD
 export CI=true
 
-PLAYWRIGHT_WORKDIR=""
+PLAYWRIGHT_WORKDIR="/go/src/github.com/quay/quay/web"
 PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_GIT_REPO:-https://github.com/quay/quay.git}"
 
 # Gangway / rehearsal override wins over PLAYWRIGHT_GIT_BRANCH.
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_PLAYWRIGHT_GIT_BRANCH:-}" ]]; then
   PLAYWRIGHT_GIT_BRANCH="${MULTISTAGE_PARAM_OVERRIDE_PLAYWRIGHT_GIT_BRANCH}"
 fi
-
-# Map operator channel (stable-3.18, preview-3.18) to the matching quay.git branch.
-resolve_playwright_branch() {
-  if [[ -n "${PLAYWRIGHT_GIT_BRANCH:-}" ]]; then
-    printf '%s' "${PLAYWRIGHT_GIT_BRANCH}"
-    return
-  fi
-
-  local channel="${QUAY_OPERATOR_CHANNEL:-}"
-  if [[ "${channel}" =~ ^(stable|preview)-([0-9]+\.[0-9]+)$ ]]; then
-    printf 'redhat-%s' "${BASH_REMATCH[2]}"
-    return
-  fi
-
-  printf 'master'
-}
 
 clone_playwright_sources() {
   local repo="$1"
@@ -88,24 +72,44 @@ clone_playwright_sources() {
   rm -f "${archive}"
 }
 
-PLAYWRIGHT_BRANCH="$(resolve_playwright_branch)"
-CLONE_DIR="/tmp/quay-playwright-src"
-echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (branch ${PLAYWRIGHT_BRANCH})"
-echo "QUAY_OPERATOR_CHANNEL=${QUAY_OPERATOR_CHANNEL:-<unset>}"
-clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_BRANCH}" "${CLONE_DIR}"
+# Default: use tests and browsers baked into quay-playwright-runner (same git
+# ref as the image build). Clone only when PLAYWRIGHT_GIT_BRANCH is set.
+if [[ -n "${PLAYWRIGHT_GIT_BRANCH:-}" ]]; then
+  CLONE_DIR="/tmp/quay-playwright-src"
+  echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (branch ${PLAYWRIGHT_GIT_BRANCH})"
+  clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_BRANCH}" "${CLONE_DIR}"
+  PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
+  if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
+    echo "ERROR: cloned sources have no web/ directory at ${PLAYWRIGHT_WORKDIR}" >&2
+    exit 1
+  fi
 
-PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
-if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
-  echo "ERROR: cloned sources have no web/ directory at ${PLAYWRIGHT_WORKDIR}" >&2
-  exit 1
+  echo "Installing npm dependencies for Playwright branch ${PLAYWRIGHT_GIT_BRANCH}..."
+  pushd "${PLAYWRIGHT_WORKDIR}"
+  npm ci
+
+  # Image browsers live in /opt/playwright as root. Test pods cannot write there.
+  IMAGE_BROWSERS=/opt/playwright
+  if [[ -d "${IMAGE_BROWSERS}" && -w "${IMAGE_BROWSERS}" ]]; then
+    export PLAYWRIGHT_BROWSERS_PATH="${IMAGE_BROWSERS}"
+  else
+    export PLAYWRIGHT_BROWSERS_PATH=/tmp/playwright-browsers
+    mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
+    if [[ -d "${IMAGE_BROWSERS}" ]]; then
+      echo "Seeding writable browser cache from ${IMAGE_BROWSERS}..."
+      cp -a "${IMAGE_BROWSERS}/." "${PLAYWRIGHT_BROWSERS_PATH}/" || true
+    fi
+  fi
+  echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH}"
+  npx playwright install chromium
+  popd
+else
+  echo "Using Playwright tests from image at ${PLAYWRIGHT_WORKDIR} (PLAYWRIGHT_GIT_BRANCH unset)"
+  if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
+    echo "ERROR: image is missing ${PLAYWRIGHT_WORKDIR}" >&2
+    exit 1
+  fi
 fi
-
-echo "Installing npm dependencies for Playwright branch ${PLAYWRIGHT_BRANCH}..."
-pushd "${PLAYWRIGHT_WORKDIR}"
-npm ci
-# Image browsers may not match the cloned @playwright/test version.
-npx playwright install chromium
-popd
 
 function copyArtifacts {
   echo "Copying test artifacts..."
@@ -160,7 +164,7 @@ echo "Test user pre-creation complete"
 # ignoreHTTPSErrors). Without this, config fetch throws and smoke tests never run.
 export NODE_TLS_REJECT_UNAUTHORIZED=0
 
-echo "Running Playwright smoke tests from ${PLAYWRIGHT_WORKDIR} (${PLAYWRIGHT_BRANCH})..."
+echo "Running Playwright smoke tests from ${PLAYWRIGHT_WORKDIR} (branch ${PLAYWRIGHT_GIT_BRANCH:-image})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
 npx playwright test \
   --grep '@smoke' \
