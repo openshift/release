@@ -10,9 +10,6 @@ ACM_SUBSCRIPTION_NAMESPACE="${ACM_SUBSCRIPTION_NAMESPACE:-open-cluster-managemen
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
 
-# shellcheck disable=SC2034
-typeset -i exitCode=0
-
 function CollectDiagnostics () {
     typeset artifactFile="${ARTIFACT_DIR}/acm-upgrade-diagnostics.txt"
     {
@@ -32,7 +29,7 @@ function CollectDiagnostics () {
     true
 }
 
-trap '{( exitCode=$?; if (( exitCode != 0 )); then CollectDiagnostics; fi )}' EXIT
+trap 'if (( $? != 0 )); then CollectDiagnostics; fi' EXIT
 
 function GetCurrentCsv () {
     oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
@@ -303,6 +300,12 @@ function ValidateHubHealth () {
     availableCount="$(echo "${availableOutput}" | wc -w)"
     echo "  Managed clusters: ${availableCount}/${clusterCount} available"
 
+    if (( clusterCount > 0 && availableCount == 0 )); then
+        echo >&2 "WARNING: All ${clusterCount} managed cluster(s) are unavailable after upgrade"
+    elif (( clusterCount > 0 && availableCount < clusterCount )); then
+        echo >&2 "WARNING: ${availableCount}/${clusterCount} managed cluster(s) available (some may be reconciling post-upgrade)"
+    fi
+
     echo "ACM hub health validation complete"
     return 0
 }
@@ -327,9 +330,14 @@ echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChan
 targetChannel="$(ResolveTargetChannel)"
 echo "Target channel: ${targetChannel}"
 
-prePatchPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+prePatchPlan=""
+if ! prePatchPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
     -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-    -o jsonpath='{.status.installPlanRef.name}' || true)"
+    -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null)"; then
+    echo "WARNING: Could not query current installPlanRef; treating as empty"
+    prePatchPlan=""
+fi
+echo "Pre-patch InstallPlan: ${prePatchPlan:-none}"
 
 if [[ "${targetChannel}" == "${currentChannel}" ]]; then
     echo "Already on target channel ${targetChannel}; checking if upgrade is available..."
