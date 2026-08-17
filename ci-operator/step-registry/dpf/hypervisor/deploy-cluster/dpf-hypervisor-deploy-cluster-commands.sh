@@ -9,14 +9,14 @@ cat ${SHARED_DIR}/testing.txt
 CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
 
 # Configuration
-REMOTE_HOST=$(cat /var/run/dpf-ci/remote-host)
+REMOTE_HOST=$(cat ${CLUSTER_PROFILE_DIR}/remote-host)
 echo "Remote host: ${REMOTE_HOST}"
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
 # Prepare SSH key from Vault (add trailing newline if missing)
 echo "Configuring SSH private key..."
-cat /var/run/dpf-ci/private-key | base64 -d > /tmp/id_rsa
+cat ${CLUSTER_PROFILE_DIR}/private-key | base64 -d > /tmp/id_rsa
 echo "" >> /tmp/id_rsa
 chmod 600 /tmp/id_rsa
 
@@ -136,30 +136,32 @@ else
   fi
 fi
 
-# Generate the .env file using the env.user file on hypervisor
-echo "Verify env.user_${CLUSTER_NAME} source file exists on hypervisor ..."
-if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}"; then
-  echo "ERROR: File env.user_${CLUSTER_NAME} file does not exist: ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}"
+# Generate the .env file using user-env from Vault cluster profile
+USER_ENV_FILE="${CLUSTER_PROFILE_DIR}/user-env"
+echo "Verifying user-env file from Vault cluster profile exists..."
+if [[ ! -f "${USER_ENV_FILE}" ]]; then
+  echo "ERROR: user-env file not found at ${USER_ENV_FILE}"
   exit 1
 fi
 
-echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hypervisor"
+echo "Copying user-env from Vault cluster profile to hypervisor..."
+if ! scp ${SSH_OPTS} "${USER_ENV_FILE}" root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/user.env; then
+  echo "ERROR: Failed to copy user-env to hypervisor"
+  exit 1
+fi
 
-echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
-  cd ${REMOTE_WORK_DIR}/openshift-dpf; \
+echo "Generating .env file from Vault-provided user.env..."
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; \
   pwd; \
-  env; \
   set -a; \
-  source env.user_${CLUSTER_NAME}; \
-  env; \
+  source user.env; \
   set +a; \
   make generate-env; \
   ls -ltra .env; \
   cat .env"; then
-  echo ".env file from sourced env.user_${CLUSTER_NAME} was generated successfully"
+  echo ".env file generated successfully from Vault user-env"
 else
-  echo "ERROR: Failed to generate .env file from sourced env.user_${CLUSTER_NAME} file"
+  echo "ERROR: Failed to generate .env file from Vault user-env"
   exit 1
 fi
 
