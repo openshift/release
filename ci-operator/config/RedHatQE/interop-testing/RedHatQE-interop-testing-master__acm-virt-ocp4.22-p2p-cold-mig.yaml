@@ -1,0 +1,136 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  fetch-managed-clusters:
+    name: autotest
+    namespace: acm-qe
+    tag: fetch-managed-clusters
+  installer:
+    name: "4.22"
+    namespace: ocp
+    tag: installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.20
+images:
+  items:
+  - dockerfile_literal: |
+      FROM this-is-ignored
+      RUN <<run-EOF
+      set -exo pipefail; shopt -s inherit_errexit
+      dnf install -y git python39
+      dnf clean all
+      run-EOF
+    from: cli
+    optional: true
+    to: cli-with-git
+releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.22"
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: cold-vm-mig-aws-p2p-lp-interop
+  cron: 0 23 28 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      ACM_SPOKE_CLUSTER_COUNT: "2"
+      ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.22"
+      ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
+      ACM_SPOKE_CP_TYPE: m6a.2xlarge
+      ACM_SPOKE_WORKER_TYPE: c5n.metal
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "cucushift-*", "failure_type": "all", "classification": "Cluster Health Check", "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
+              {"step": "acm-interop-p2p-cluster-install"           , "failure_type": "all"          , "classification": "Spoke cluster Installation"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
+              {"step": "acm-interop-p2p-cluster-uninstall"           , "failure_type": "all"          , "classification": "Spoke cluster Un-Installation"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
+              {"step": "p2p-acm-cnv-install-policy"           , "failure_type": "all"          , "classification": "CNV installation policy deploy"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
+              {"step": "acm-fetch-managed-clusters", "failure_type": "all", "classification": "ACM cluster failure", "jira_project": "!default", "group": {"name": "opp-tests", "priority": 4}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
+              {"step": "interop-tests-deploy-odf", "failure_type": "all", "classification": "ODF deploy failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
+              {"step": "p2p-install-odf-spokes", "failure_type": "all", "classification": "ODF spoke cluster install failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
+              {"step": "p2p-mtv-additional-config", "failure_type": "all", "classification": "MTV ForkliftController configuration failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
+              {"step": "p2p-mtv-register-providers", "failure_type": "all", "classification": "MTV provider registration failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
+              {"step": "p2p-mtv-create-migration-maps", "failure_type": "all", "classification": "MTV migration maps failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
+              {"step": "p2p-cold-vm-multi-migration", "failure_type": "all", "classification": "Cold multi-VM migration failure", "jira_project": "!default", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "acm-mch", "failure_type": "all", "classification": "ACM MCH install", "jira_project": "!default", "group": {"name": "interop-p2p-tests", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-p2p","ipi-aws-p2p","mpiit-acm-virt","mpiit_product2product","mpiit_virt","cold-migration-poc"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: vshakya@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA","mpiit_p2p"]'
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8652
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      MTV_COLD_VM_COUNT: "3"
+      MTV_DESTINATION_PROVIDER: spoke-2
+      MTV_PROVIDER_NAMES: spoke-1,spoke-2
+      MTV_SOURCE_PROVIDER: spoke-1
+      MTV_SPOKE_CLUSTER_COUNT: "2"
+      ODF_OPERATOR_CHANNEL: stable-4.21
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
+          {"name": "mtv-operator", "source": "redhat-operators", "channel": "release-v2.11", "install_namespace": "openshift-mtv", "target_namespaces": "openshift-mtv", "operator_group": "openshift-mtv-operatorgroup"}
+        ]
+      USER_TAGS: |
+        scenario acm-cnv-p2p-cold-migration
+    leases:
+    - count: 1
+      env: LEASED_RESOURCE
+      resource_type: aws-cspi-qe-quota-slice
+    - count: 2
+      env: MANAGED_CLUSTER_LEASED_RESOURCE
+      resource_type: aws-cspi-qe-quota-slice
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: acm-inspector
+    - ref: gather-aws-console
+    - ref: acm-interop-p2p-cluster-uninstall
+    - chain: ipi-deprovision
+    - ref: firewatch-report-issues
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-interop-p2p-cluster-install
+    - ref: acm-fetch-managed-clusters
+    - ref: p2p-acm-cnv-install-policy
+    - ref: p2p-install-odf-spokes
+    - chain: p2p-mtv-mig-config
+    - ref: p2p-cold-vm-multi-migration
+  timeout: 9h0m0s
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: acm-virt-ocp4.22-p2p-cold-mig
