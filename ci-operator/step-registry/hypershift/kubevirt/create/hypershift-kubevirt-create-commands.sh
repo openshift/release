@@ -44,6 +44,41 @@ function support_np_skew() {
   echo "$EXTRA_FLARGS"
 }
 
+# discover_ovn_container_names sets OVN_OVS_CONTAINER and OVN_NBDB_CONTAINER
+# based on the containers available in the ovnkube-node pod.
+# In OCP 4.17+ (INTERCONNECT mode), ovnkube-node container was replaced by ovnkube-controller.
+discover_ovn_container_names() {
+  local pod_name="$1"
+  local containers
+
+  containers=$(oc get pod -n openshift-ovn-kubernetes "${pod_name}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
+
+  # Discover OVS container (for ovs-vsctl commands)
+  for candidate in ovnkube-controller ovnkube-node; do
+    if [[ " ${containers} " == *" ${candidate} "* ]]; then
+      OVN_OVS_CONTAINER="${candidate}"
+      break
+    fi
+  done
+
+  # Discover NBDB container (for ovn-nbctl commands)
+  for candidate in nbdb ovnkube-controller ovnkube-node; do
+    if [[ " ${containers} " == *" ${candidate} "* ]]; then
+      OVN_NBDB_CONTAINER="${candidate}"
+      break
+    fi
+  done
+
+  if [[ -z "${OVN_OVS_CONTAINER}" ]] || [[ -z "${OVN_NBDB_CONTAINER}" ]]; then
+    echo "ERROR: unable to discover OVN containers in pod ${pod_name}" >&2
+    echo "  Available containers: ${containers}" >&2
+    return 1
+  fi
+
+  echo "INFO: Discovered OVN containers - OVS: ${OVN_OVS_CONTAINER}, NBDB: ${OVN_NBDB_CONTAINER}"
+  return 0
+}
+
 if [[ ! -f $HCP_CLI ]]; then
   # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
   HCP_CLI="/usr/bin/hypershift"
@@ -173,6 +208,17 @@ EOF
     NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
     echo "Setting up ${NETWORK_COUNT} localnet networks (no pod network)..."
 
+    # Discover OVN container names before first oc exec usage
+    if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
+      # Get first ovnkube-node pod for container discovery
+      local discovery_pod
+      discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
+      if ! discover_ovn_container_names "${discovery_pod}"; then
+        echo "ERROR: Failed to discover OVN container names" >&2
+        exit 1
+      fi
+    fi
+
     # Parse subnets from comma-separated LOCALNET_MULTI_SUBNETS into an array.
     # Format: "192.168.111.0/24,192.168.224.0/24,..." — first subnet gets default gateway.
     IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
@@ -194,7 +240,7 @@ EOF
           echo "WARNING: No ovnkube-node pod found on node ${NODE}, skipping"
           continue
         fi
-        CURRENT_MAPPINGS=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c ovnkube-node -- \
+        CURRENT_MAPPINGS=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_OVS_CONTAINER}" -- \
           ovs-vsctl get Open_vSwitch . external-ids:ovn-bridge-mappings 2>/dev/null | tr -d '"' || true)
         if [[ -z "${CURRENT_MAPPINGS}" ]]; then
           CURRENT_MAPPINGS="physnet:br-ex"
@@ -206,7 +252,7 @@ EOF
           fi
         done
         if [[ "${NEW_MAPPINGS}" != "${CURRENT_MAPPINGS}" ]]; then
-          oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c ovnkube-node -- \
+          oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_OVS_CONTAINER}" -- \
             ovs-vsctl set Open_vSwitch . external-ids:ovn-bridge-mappings="${NEW_MAPPINGS}" || true
           echo "Updated bridge-mappings on node ${NODE}: ${NEW_MAPPINGS}"
         else
@@ -219,7 +265,7 @@ EOF
       for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
         OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
           --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
-        MAPPINGS=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c ovnkube-node -- \
+        MAPPINGS=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_OVS_CONTAINER}" -- \
           ovs-vsctl get Open_vSwitch . external-ids:ovn-bridge-mappings 2>/dev/null || true)
         echo "  ${NODE}: ${MAPPINGS}"
       done
@@ -370,6 +416,17 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
   LOCALNET_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
   LOCALNET_SUBNET="192.168.223.0/24"
 
+  # Discover OVN container names before first oc exec usage
+  if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
+    # Get first ovnkube-node pod for container discovery
+    local discovery_pod
+    discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
+    if ! discover_ovn_container_names "${discovery_pod}"; then
+      echo "ERROR: Failed to discover OVN container names" >&2
+      exit 1
+    fi
+  fi
+
   echo "Waiting for VMIs to be running..."
   for _ in $(seq 1 60); do
     RUNNING_COUNT=$(oc get vmi -n "${LOCALNET_NAMESPACE}" --no-headers 2>/dev/null \
@@ -388,7 +445,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
     OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
       --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
 
-    LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+    LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
       ovn-nbctl --columns=name --bare find Logical_Switch_Port \
       "external_ids:k8s.ovn.org/topology=localnet" 2>/dev/null)
 
@@ -397,18 +454,18 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
       continue
     fi
 
-    DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+    DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
       ovn-nbctl create DHCP_Options cidr="${LOCALNET_SUBNET}" \
       options='"lease_time"="3500" "router"="192.168.223.1" "server_id"="192.168.223.1" "server_mac"="c0:ff:ee:00:00:01"' \
       2>/dev/null)
 
-    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
       ovn-nbctl lsp-set-dhcpv4-options "${LSP_NAME}" "${DHCP_UUID}" 2>/dev/null
 
     # Clear port security on the VM's localnet port so EgressIP-SNATed packets
     # can exit the management cluster's OVN. Without this, OVN drops packets
     # whose source IP is the EgressIP (not the VM's assigned localnet IP).
-    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
       ovn-nbctl clear Logical_Switch_Port "${LSP_NAME}" port_security 2>/dev/null
 
     echo "Configured DHCP and cleared port security for VMI ${VMI} on node ${NODE}"
@@ -440,7 +497,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
     for OVN_NODE_POD in $(KUBECONFIG="${NESTED_KUBECONFIG}" oc get pods -n openshift-ovn-kubernetes \
       -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
       KUBECONFIG="${NESTED_KUBECONFIG}" oc exec -n openshift-ovn-kubernetes "${OVN_NODE_POD}" \
-        -c ovnkube-controller -- sysctl -w net.ipv4.conf.enp2s0.forwarding=1 2>/dev/null || true
+        -c "${OVN_OVS_CONTAINER}" -- sysctl -w net.ipv4.conf.enp2s0.forwarding=1 2>/dev/null || true
       echo "Enabled enp2s0 forwarding on ${OVN_NODE_POD}"
     done
     echo "IP forwarding configuration complete for hosted cluster nodes"
@@ -550,7 +607,7 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
       SERVER_MAC=$(printf "c0:ff:ee:00:00:%02x" "${i}")
 
       # Find LSP for this NAD
-      LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
         ovn-nbctl --columns=name --bare find Logical_Switch_Port \
         "external_ids:k8s.ovn.org/nad=${MULTI_NAMESPACE}/${NAD_NAME}" 2>/dev/null || true)
 
@@ -558,7 +615,7 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
       if [[ -z "${LSP_NAME}" ]]; then
         echo "  NAD-based LSP lookup failed for ${NAD_NAME} on ${NODE}, trying subnet fallback..."
         SUBNET_PREFIX=$(echo "${SUBNET}" | cut -d'.' -f1-3)
-        LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+        LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
           ovn-nbctl --columns=name,dynamic_addresses --bare find Logical_Switch_Port \
           "external_ids:k8s.ovn.org/topology=localnet" 2>/dev/null | \
           while IFS= read -r line; do
@@ -575,22 +632,22 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
 
       # First network gets router + DNS (default gateway); others get only lease_time
       if [[ ${i} -eq 1 ]]; then
-        DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+        DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
           ovn-nbctl create DHCP_Options cidr="${SUBNET}" \
           options='"lease_time"="3500" "router"="'"${LOCALNET_MULTI_PRIMARY_GATEWAY}"'" "dns_server"="'"${LOCALNET_MULTI_PRIMARY_DNS}"'" "server_id"="'"${LOCALNET_MULTI_PRIMARY_GATEWAY}"'" "server_mac"="'"${SERVER_MAC}"'"' \
           2>/dev/null)
       else
-        DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+        DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
           ovn-nbctl create DHCP_Options cidr="${SUBNET}" \
           options='"lease_time"="3500" "server_id"="'"${SUBNET_GW}"'" "server_mac"="'"${SERVER_MAC}"'"' \
           2>/dev/null)
       fi
 
-      oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
         ovn-nbctl lsp-set-dhcpv4-options "${LSP_NAME}" "${DHCP_UUID}" 2>/dev/null
 
       # Clear port security so EgressIP-SNATed packets can exit
-      oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
         ovn-nbctl clear Logical_Switch_Port "${LSP_NAME}" port_security 2>/dev/null
 
       echo "  VMI ${VMI}: configured DHCP for ${NAD_NAME} (LSP=${LSP_NAME}, subnet=${SUBNET})"
