@@ -120,10 +120,12 @@ function PreflightCheck () {
 }
 
 function CreateTestOrg () {
+    typeset signinPayload
+    signinPayload=$(python3 -c "import json,sys; print(json.dumps({'user':sys.argv[1],'pass':sys.argv[2]}))" "${QUAY_USER}" "${QUAY_PASSWORD}")
     typeset token
     token=$(curl -sk -X POST "https://${QUAY_HOST}/api/v1/signin" \
         -H "Content-Type: application/json" \
-        -d "{\"user\":\"${QUAY_USER}\",\"pass\":\"${QUAY_PASSWORD}\"}" | \
+        -d "${signinPayload}" | \
         python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null || echo "")
 
     if [[ -z "${token}" ]]; then
@@ -148,11 +150,6 @@ function RunPushPull () {
     typeset testName="[sig-interop][Jira:INTEROP][Feature:Quay] Push and pull image via Quay route"
     typeset -i start elapsed
     start=$(date +%s)
-
-    DiscoverQuay
-    GetQuayAuth
-    PreflightCheck || { elapsed=$(( $(date +%s) - start )); RecordResult "${testName}" "failed" "Quay route not reachable" "${elapsed}"; return 1; }
-    CreateTestOrg
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
     typeset authFile="/tmp/quay-auth.json"
@@ -306,10 +303,17 @@ sys.exit(0 if len(images) > 0 else 1)
 ################################################################################
 
 function Main () {
+    DiscoverQuay
+    GetQuayAuth
+    PreflightCheck || { echo "FATAL: Quay not reachable; skipping all tests" >&2; exit 1; }
+    CreateTestOrg
+
     typeset -i status=0
     RunPushPull || status=1
     RunOdfPvcCheck || status=1
     RunAcsScan || status=1
+
+    rm -f /tmp/quay-auth.json
 
     if [[ "${MAP_TESTS}" == "true" ]]; then
         eval "$(
