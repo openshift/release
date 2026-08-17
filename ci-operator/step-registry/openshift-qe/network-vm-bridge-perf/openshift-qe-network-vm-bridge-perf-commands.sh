@@ -48,6 +48,28 @@ echo "Waiting for NNCP ${NNCP_NAME} to become Available..."
 oc wait nncp/"${NNCP_NAME}" --for=condition=Available --timeout=10m
 oc get nncp "${NNCP_NAME}" -o yaml
 
+cleanup_nncp() {
+  if [ "${CLEAN_UP}" != "true" ]; then
+    return 0
+  fi
+  echo "Tearing down NNCP ${NNCP_NAME}..."
+  oc apply -f - <<EOF
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: ${NNCP_NAME}
+spec:
+  desiredState:
+    interfaces:
+      - name: ${BRIDGE}
+        type: linux-bridge
+        state: absent
+EOF
+  oc wait nncp/"${NNCP_NAME}" --for=condition=Available --timeout=10m || true
+  oc delete nncp/"${NNCP_NAME}" --ignore-not-found=true --wait=true
+}
+trap cleanup_nncp EXIT
+
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
