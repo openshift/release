@@ -46,7 +46,7 @@ On workflow change or periodic update please use the
 [create-prowjob](../../../step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh)
 command to refresh the default templates using the pre-defined defaults
 by running: ``sandboxed-containers-operator-create-prowjob-commands.sh update_templates``.
-Avoid modifying the templates directly, always use the ``update_template``!
+Avoid modifying the templates directly, always use the ``update_templates``!
 
 ## OWNERS
 

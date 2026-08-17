@@ -291,8 +291,8 @@ The [sandboxed-containers-operator-tests](./tests/) chain runs all test suites f
 The chain references three test steps, each with `best_effort: true` so that **all three always attempt regardless of earlier failures**:
 
 1. **[openshift-extended](./tests/openshift-extended/)** — a sub-chain that conditionally runs the existing `openshift-extended-test` ref. A gate step checks `TEST_OPENSHIFT_EXTENDED_ENABLE`; if `"false"`, it exits non-zero to skip the test (the parent chain's `best_effort: true` ensures the other tests still run). When not skipped, the original `openshift-extended-test` runs unchanged with all its existing env vars.
-2. **[e2e-poc](./tests/e2e-poc/)** — golang Ginkgo tests (placeholder).
-3. **[upstream-kata-bats](./tests/upstream-kata-bats/)** — upstream kata BATS tests (placeholder).
+2. **[e2e-poc](./tests/e2e-poc/)** — golang Ginkgo tests from `TEST_E2E_POC_REPO`/`TEST_E2E_POC_BRANCH`.
+3. **[upstream-kata-bats](./tests/upstream-kata-bats/)** — upstream kata-containers BATS integration tests.
 
 Individual steps are skipped only when `TEST_<subdir>_ENABLE` is explicitly set to `"false"`. Unset or any other value means the step runs.
 
@@ -335,12 +335,12 @@ You have 2 main options:
   - creates OCP cluster
   - gives you KUBECONFIG via clusterbot
   - **does not install OSC**, but prepares cm and mirrorlists to let you install it yourself via `extended-platform-tests`
-  - allows extended reservation via `SLEEP_DURATION` timeout, but you have to delete `launch-cucushift-installer-wait` pod do return it!
+  - allows extended reservation via `SLEEP_DURATION` timeout, but you have to delete `launch-cucushift-installer-wait` pod to return it!
 - `workflow-test`
   - creates OCP cluster
   - clusterbot will not send you KUBECONFIG, but you can obtain it from the build farm secrets
   - allows creating multiple OCP clusters concurrently
-  - allows extended reservation after the testing is done via `SLEEP_DURATION` timeout, but you have to delete `launch-cucushift-installer-wait` pod do return it!
+  - allows extended reservation after the testing is done via `SLEEP_DURATION` timeout, but you have to delete `launch-cucushift-installer-wait` pod to return it!
   - **can install OSC** when any of `[sig-kata]` tests are specified in `TEST_SCENARIOS` parameter
   - can be used to simply test your RPM/scratch/... build against the usual set of sig-kata tests by setting `TEST_SCENARIOS` and `SLEEP_DURATION=0` (to avoid the need to return the cluster)
 
@@ -401,7 +401,7 @@ replace the suffix `-azure` with `-aws` to do the same on `aws`:
   - kata - `workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=0s","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=false","RUNTIMECLASS=kata","TEST_SCENARIOS=sig-kata.*","WORKLOAD_TO_TEST=kata","TEST_TIMEOUT=90"`
   - peer-pods - `workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=0s","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","TEST_SCENARIOS=sig-kata.*","WORKLOAD_TO_TEST=peer-pods","TEST_TIMEOUT=90"`
   - coco - `workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","TEST_SCENARIOS=sig-kata.*","WORKLOAD_TO_TEST=coco","TEST_TIMEOUT=90"`
-- Get a cluster without OSC installed for ~8h - `workflow-launch sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h"` (clusterbot will send you `KUBECONFIG` of the testing OSC, you can use `extended-platform-tests` to install sandboxed constainers operator as all the config maps are prepared, you need to use `done` followed by deleting the `launch-cucushift-installer-wait` pod from the `main build OCP` to return it)
+- Get a cluster without OSC installed for ~8h - `workflow-launch sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h"` (clusterbot will send you `KUBECONFIG` of the testing OSC, you can use `extended-platform-tests` to install sandboxed containers operator as all the config maps are prepared, you need to use `done` followed by deleting the `launch-cucushift-installer-wait` pod from the `main build OCP` to return it)
 - Get a cluster with OSC installed for ~8h - `workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","TEST_SCENARIOS=sig-kata.*Operator installation","WORKLOAD_TO_TEST=peer-pods","TEST_TIMEOUT=90"` (clusterbot will **not** notify you nor give you `KUBECONFIG`, see below how to get access; after the testing you have to delete the `launch-cucushift-installer-wait` pod from the `main build OCP` to return it)
 
 
@@ -471,7 +471,7 @@ you need to get to the `main build OCP`. To do so:
 1. open the `job started...` link by clusterbot
 2. unwrap the `Build Log`
 3. click on the link next to `Using namespace ...` (close to
-  the beginning of the log
+  the beginning of the log)
 4. Login via SSO
 5. look at `secrets/launch` and find `kubeconfig` entry there,
   which is the `KUBECONFIG` of your `testing OCP`.
