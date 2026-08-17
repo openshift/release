@@ -2,6 +2,7 @@
 set -euo pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+export MCP_EVAL_KUBECONFIG="${KUBECONFIG}"
 
 # Source credentials written by the preceding setup step
 if [[ -f "${SHARED_DIR}/mcpchecker-creds.env" ]]; then

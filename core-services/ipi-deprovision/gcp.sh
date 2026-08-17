@@ -102,15 +102,37 @@ function cleanup_orphaned_service_accounts() {
     return 1
   fi
 
-  echo "pruning orphaned IAM service accounts with a createTime before ${gce_cluster_age_cutoff} ..."
+  # Ensure we never delete SAs younger than MIN_SA_AGE_HOURS (default 12h).
+  # This protects SAs belonging to concurrent CI jobs whose VPC networks
+  # may already have been torn down but whose workloads are still running.
+  local min_sa_age_hours="${MIN_SA_AGE_HOURS:-12}"
+  # Validate: must be a positive integer between 1 and 168 (1 week)
+  if ! [[ "${min_sa_age_hours}" =~ ^[1-9][0-9]?[0-9]?$ ]] || [[ "${min_sa_age_hours}" -gt 168 ]]; then
+    echo "WARNING: invalid MIN_SA_AGE_HOURS='${MIN_SA_AGE_HOURS:-}', using default 12"
+    min_sa_age_hours=12
+  fi
+  local min_sa_age_seconds=$((10#${min_sa_age_hours} * 3600))
+  local now_seconds
+  now_seconds="$(date '+%s')"
+  local min_age_cutoff_seconds=$((now_seconds - min_sa_age_seconds))
+  # Use the more conservative (older) of the two cutoffs so SAs younger
+  # than either threshold are always kept.
+  local effective_cutoff_seconds
+  if [[ "${gce_cluster_age_cutoff_seconds}" -lt "${min_age_cutoff_seconds}" ]]; then
+    effective_cutoff_seconds="${gce_cluster_age_cutoff_seconds}"
+  else
+    effective_cutoff_seconds="${min_age_cutoff_seconds}"
+  fi
+
+  echo "pruning orphaned IAM service accounts older than ${effective_cutoff_seconds} epoch-seconds (minimum age floor: ${min_sa_age_hours}h) ..."
   sa_filter="email~'^ci-op-.*' OR email~'^ci-[0-9a-z]{4,}-.*'"
   if ! gcloud --project="${GCP_PROJECT}" iam service-accounts list \
     --filter "${sa_filter}" --format=json >"${sa_json_file}"; then
     rm -f "${active_ids_file}" "${sa_json_file}" "${sa_list_file}"
     return 1
   fi
-  if ! jq -r --argjson cutoff "${gce_cluster_age_cutoff_seconds}" \
-    '.[] | select(.createTime == null or ((.createTime | sub("\\.[0-9]+"; "") | fromdateiso8601) < $cutoff)) | [.email, (.displayName // "")] | @tsv' \
+  if ! jq -r --argjson cutoff "${effective_cutoff_seconds}" \
+    '.[] | select(.createTime != null) | select((.createTime | sub("\\.[0-9]+"; "") | fromdateiso8601) < $cutoff) | [.email, (.displayName // "")] | @tsv' \
     "${sa_json_file}" >"${sa_list_file}"; then
     rm -f "${active_ids_file}" "${sa_json_file}" "${sa_list_file}"
     return 1
