@@ -25,7 +25,6 @@ REGION=${GCP_REGION:-us-central1}
 echo "  Region Project:      ${REGION_PROJECT}"
 echo "  MC Project:          ${MC_PROJECT}"
 echo "  MC Cluster Name:     ${MC_CLUSTER_NAME}"
-echo "  MC Cluster Endpoint: ${MC_CLUSTER_ENDPOINT}"
 echo "  Region:              ${REGION}"
 echo ""
 
