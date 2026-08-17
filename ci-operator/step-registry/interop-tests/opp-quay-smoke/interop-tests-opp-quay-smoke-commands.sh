@@ -4,8 +4,8 @@ shopt -s inherit_errexit
 
 ARTIFACT_DIR="${ARTIFACT_DIR:=/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
-JUNIT_FILE="${ARTIFACT_DIR}/junit_quay_interop.xml"
-IMAGE_TAG="${BUILD_ID:-$(date +%s)}"
+typeset junitFile="${ARTIFACT_DIR}/junit_quay_interop.xml"
+typeset imageTag="${BUILD_ID:-$(date +%s)}"
 
 typeset -A testStatus
 typeset -A testDuration
@@ -25,7 +25,7 @@ done
 typeset -i suiteStart=0
 suiteStart=$(date +%s)
 
-RecordResult() {
+function RecordResult () {
     typeset name="${1}"; shift
     typeset status="${1}"; shift
     typeset msg="${1:-}"; shift || true
@@ -36,7 +36,7 @@ RecordResult() {
 }
 
 # shellcheck disable=SC2329
-GenerateJunit() {
+function GenerateJunit () {
     typeset -i total=${#allTests[@]}
     typeset -i failures=0 skipped=0
     typeset -i elapsed=$(( $(date +%s) - suiteStart ))
@@ -46,7 +46,7 @@ GenerateJunit() {
         [[ "${testStatus[${t}]}" == "skipped" ]] && skipped=$((skipped + 1))
     done
 
-    cat > "${JUNIT_FILE}" <<EOF
+    cat > "${junitFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
   <testsuite name="interop-tests-opp-quay-smoke" tests="${total}" failures="${failures}" errors="0" skipped="${skipped}" time="${elapsed}">
@@ -59,24 +59,24 @@ EOF
         escaped_msg=$(printf '%s' "${testFailureMsg[${t}]}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
 
         if [[ "${testStatus[${t}]}" == "failed" ]]; then
-            echo "    <testcase name=\"${escaped_name}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"><failure message=\"${escaped_msg}\"><![CDATA[${testFailureMsg[${t}]}]]></failure></testcase>" >> "${JUNIT_FILE}"
+            echo "    <testcase name=\"${escaped_name}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"><failure message=\"${escaped_msg}\"><![CDATA[${testFailureMsg[${t}]}]]></failure></testcase>" >> "${junitFile}"
         elif [[ "${testStatus[${t}]}" == "skipped" ]]; then
-            echo "    <testcase name=\"${escaped_name}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"><skipped message=\"${escaped_msg}\"/></testcase>" >> "${JUNIT_FILE}"
+            echo "    <testcase name=\"${escaped_name}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"><skipped message=\"${escaped_msg}\"/></testcase>" >> "${junitFile}"
         else
-            echo "    <testcase name=\"${escaped_name}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"/>" >> "${JUNIT_FILE}"
+            echo "    <testcase name=\"${escaped_name}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"/>" >> "${junitFile}"
         fi
     done
 
-    cat >> "${JUNIT_FILE}" <<EOF
+    cat >> "${junitFile}" <<EOF
   </testsuite>
 </testsuites>
 EOF
-    cat "${JUNIT_FILE}"
+    cat "${junitFile}"
 }
 
 trap GenerateJunit EXIT
 
-DiscoverQuay() {
+function DiscoverQuay () {
     QUAY_NS=$(oc get quayregistry --all-namespaces -o jsonpath='{.items[0].metadata.namespace}')
     QUAY_REGISTRY=$(oc get quayregistry -n "${QUAY_NS}" -o jsonpath='{.items[0].metadata.name}')
     QUAY_HOST=$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpath='{.status.registryEndpoint}')
@@ -84,7 +84,7 @@ DiscoverQuay() {
     export QUAY_NS QUAY_REGISTRY QUAY_HOST
 }
 
-GetQuayAuth() {
+function GetQuayAuth () {
     typeset configSecret
     configSecret=$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpath='{.spec.configBundleSecret}')
     if [[ -z "${configSecret}" ]]; then
@@ -112,14 +112,14 @@ GetQuayAuth() {
     export QUAY_USER QUAY_PASSWORD
 }
 
-PreflightCheck() {
+function PreflightCheck () {
     if ! curl -sk --connect-timeout 15 "https://${QUAY_HOST}/api/v1/discovery" | grep -qi "quay"; then
         echo "ERROR: Quay route not reachable at ${QUAY_HOST}" >&2
         return 1
     fi
 }
 
-CreateTestOrg() {
+function CreateTestOrg () {
     typeset token
     token=$(curl -sk -X POST "https://${QUAY_HOST}/api/v1/signin" \
         -H "Content-Type: application/json" \
@@ -144,7 +144,7 @@ CreateTestOrg() {
 ################################################################################
 # Test Case 1: Push and pull image via Quay route
 ################################################################################
-RunPushPull() {
+function RunPushPull () {
     typeset testName="[sig-interop][Jira:INTEROP][Feature:Quay] Push and pull image via Quay route"
     typeset -i start elapsed
     start=$(date +%s)
@@ -154,7 +154,7 @@ RunPushPull() {
     PreflightCheck || { elapsed=$(( $(date +%s) - start )); RecordResult "${testName}" "failed" "Quay route not reachable" "${elapsed}"; return 1; }
     CreateTestOrg
 
-    typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${IMAGE_TAG}"
+    typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
     typeset authFile="/tmp/quay-auth.json"
 
     cat > "${authFile}" <<EOF
@@ -186,7 +186,7 @@ EOF
 ################################################################################
 # Test Case 2: Verify ODF PVC backing Quay storage
 ################################################################################
-RunOdfPvcCheck() {
+function RunOdfPvcCheck () {
     typeset testName="[sig-interop][Jira:INTEROP][Feature:Quay] Verify ODF PVC backing Quay storage"
     typeset -i start elapsed
     start=$(date +%s)
@@ -253,7 +253,7 @@ print('true' if odf else 'false')
 ################################################################################
 # Test Case 3: ACS scan of pushed Quay image
 ################################################################################
-RunAcsScan() {
+function RunAcsScan () {
     typeset testName="[sig-interop][Jira:INTEROP][Feature:Quay] ACS scan of pushed Quay image"
     typeset -i start elapsed
     start=$(date +%s)
@@ -273,7 +273,7 @@ RunAcsScan() {
         return 1
     fi
 
-    typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${IMAGE_TAG}"
+    typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
     typeset -i attempts=0 maxAttempts=20
 
     while (( attempts < maxAttempts )); do
@@ -305,22 +305,26 @@ sys.exit(0 if len(images) > 0 else 1)
 # Main execution
 ################################################################################
 
-typeset -i status=0
-RunPushPull || status=1
-RunOdfPvcCheck || status=1
-RunAcsScan || status=1
+function Main () {
+    typeset -i status=0
+    RunPushPull || status=1
+    RunOdfPvcCheck || status=1
+    RunAcsScan || status=1
 
-if [[ "${MAP_TESTS}" == "true" ]]; then
-    eval "$(
-        typeset -a _fURL=()
-        type -t wget 1>/dev/null && _fURL=(wget --timeout=30 -qO-) || _fURL=(curl --connect-timeout 10 --max-time 30 -fsSL)
-        "${_fURL[@]}" \
-            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-    )" || true
-    if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
-        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
-            ExitTrap--PostProcessPrep || true
+    if [[ "${MAP_TESTS}" == "true" ]]; then
+        eval "$(
+            typeset -a _fURL=()
+            type -t wget 1>/dev/null && _fURL=(wget --timeout=30 -qO-) || _fURL=(curl --connect-timeout 10 --max-time 30 -fsSL)
+            "${_fURL[@]}" \
+                https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+        )" || true
+        if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
+            LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+                ExitTrap--PostProcessPrep || true
+        fi
     fi
-fi
 
-exit "${status}"
+    exit "${status}"
+}
+
+Main "$@"
