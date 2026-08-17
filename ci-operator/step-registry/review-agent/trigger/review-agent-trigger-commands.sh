@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== HyperShift Review Agent Trigger ==="
+echo "=== Review Agent Trigger ==="
 
 PR_NUMBER="${PULL_NUMBER:-}"
 if [ -z "$PR_NUMBER" ]; then

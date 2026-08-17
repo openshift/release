@@ -1,20 +1,21 @@
 ref:
-  as: hypershift-review-agent-trigger
+  as: review-agent-trigger
   from: claude-ai-helpers
-  commands: hypershift-review-agent-trigger-commands.sh
+  commands: review-agent-trigger-commands.sh
   env:
   - name: GANGWAY_API
     default: "https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
     documentation: |-
       Gangway API endpoint for triggering periodic jobs.
   - name: PERIODIC_JOB_NAME
-    default: "periodic-ci-openshift-hypershift-main-periodic-review-agent"
     documentation: |-
-      Name of the periodic job to trigger via gangway.
+      Name of the periodic job to trigger via gangway. Required — set by
+      the repo-specific trigger workflow (e.g.
+      periodic-ci-openshift-hypershift-main-periodic-review-agent).
   - name: REVIEW_AGENT_UPSTREAM_REPO
-    default: "openshift/hypershift"
     documentation: |-
       Upstream owner/repo for posting PR comments (e.g. openshift/hypershift).
+      Required — set by the repo-specific trigger workflow.
   - name: REVIEW_AGENT_PAT_KEY
     default: "gh-pat"
     documentation: |-
@@ -29,7 +30,10 @@ ref:
     name: hypershift-team-claude-prow
     mount_path: /var/run/claude-code-service-account
   documentation: |-
-    Trigger step for the HyperShift Review Agent.
-    Instead of running the review agent inline (which aborts the presubmit
-    when it pushes), this step triggers the periodic review-agent job via
-    gangway and posts a comment on the PR with a link to the triggered job.
+    Shared trigger step for the Review Agent, used by both the Installer
+    and HyperShift review-agent workflows. Instead of running the review
+    agent inline (which aborts the presubmit when it pushes), this step
+    triggers the periodic review-agent job via gangway and posts a comment
+    on the PR with a link to the triggered job. Repo-specific settings
+    (PERIODIC_JOB_NAME, REVIEW_AGENT_UPSTREAM_REPO) are provided by the
+    calling workflow.
