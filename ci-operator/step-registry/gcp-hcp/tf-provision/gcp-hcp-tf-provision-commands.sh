@@ -30,7 +30,7 @@ tfc_api_call() {
   local attempt=1
   
   while (( attempt <= max_retries )); do
-    if output=$(curl -sf "$@" 2>&1); then
+    if output=$(curl -sf --connect-timeout 10 --max-time 60 "$@" 2>&1); then
       echo "${output}"
       return 0
     fi
@@ -194,8 +194,12 @@ apply_wait=30
 while (( apply_attempt <= MAX_APPLY_ATTEMPTS )); do
   log "APPLY ATTEMPT: ${apply_attempt}/${MAX_APPLY_ATTEMPTS}"
 
-  apply_output=$(terraform apply -auto-approve -no-color 2>&1)
-  apply_exit=$?
+  # Capture terraform output and exit code without triggering errexit
+  if apply_output=$(terraform apply -auto-approve -no-color 2>&1); then
+    apply_exit=0
+  else
+    apply_exit=$?
+  fi
   echo "${apply_output}" | tee -a "${LOG}"
 
   if [[ ${apply_exit} -eq 0 ]]; then

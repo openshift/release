@@ -117,8 +117,12 @@ destroy_wait=30
 while (( destroy_attempt <= MAX_DESTROY_ATTEMPTS )); do
   log "DESTROY ATTEMPT: ${destroy_attempt}/${MAX_DESTROY_ATTEMPTS}"
 
-  destroy_output=$(terraform destroy -auto-approve -no-color 2>&1)
-  destroy_exit=$?
+  # Capture terraform output and exit code without triggering errexit
+  if destroy_output=$(terraform destroy -auto-approve -no-color 2>&1); then
+    destroy_exit=0
+  else
+    destroy_exit=$?
+  fi
   echo "${destroy_output}" | tee -a "${LOG}"
 
   if [[ ${destroy_exit} -eq 0 ]]; then
