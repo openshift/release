@@ -28,11 +28,17 @@ tests:
   cron: 0 9 * * 1
   nested_podman: true
   steps:
+    allow_best_effort_post_steps: true
     env:
       OCM_FVT_JOB_NAME: osdfm-basic-periodic-stage
       OCM_FVT_OCM_ENV: stage
       OCM_FVT_REPORT_JIRA: "false"
       OCM_FVT_SERVICE: osdfm
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    pre:
+    - ref: rosa-e2e-record-start-time
     test:
     - ref: rosa-e2e-ocm-fvt-longrunning
   timeout: 10h0m0s
