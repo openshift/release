@@ -22,7 +22,7 @@ if ! git clone --depth 1 --branch "${TEST_E2E_POC_BRANCH}" "${TEST_E2E_POC_REPO}
     echo "ERROR: git clone failed."
     exit 0
 fi
-cd "${WORKDIR}/${SUITE_DIR}"
+cd "${WORKDIR}/${SUITE_DIR}" || { echo "ERROR: cd failed"; exit 0; }
 
 echo "Building e2e test binary..."
 if ! go test -c -o e2e-poc.test .; then
@@ -59,8 +59,7 @@ if [[ "${smoke_rc}" -ne 0 ]]; then
 fi
 
 if [[ "${TEST_E2E_POC_FULL_ENABLE:-}" == "true" ]]; then
-    full_rc=0
-    run_suite "full" "${FULL_FOCUS}" "${FULL_TIMEOUT}" || full_rc=$?
+    run_suite "full" "${FULL_FOCUS}" "${FULL_TIMEOUT}" || true
 
     if [[ -f "${ARTIFACT_DIR}/junit_smoke.xml" && -f "${ARTIFACT_DIR}/junit_full.xml" ]]; then
         echo "Merging smoke and full JUnit results..."
