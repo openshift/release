@@ -151,14 +151,15 @@ if ! scp ${SSH_OPTS} "${USER_ENV_FILE}" root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/o
 fi
 
 echo "Generating .env file from Vault-provided user.env..."
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; \
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -e; \
+  cd ${REMOTE_WORK_DIR}/openshift-dpf; \
   pwd; \
   set -a; \
   source user.env; \
   set +a; \
   make generate-env; \
   ls -ltra .env; \
-  cat .env"; then
+  test -s .env"; then
   echo ".env file generated successfully from Vault user-env"
 else
   echo "ERROR: Failed to generate .env file from Vault user-env"
