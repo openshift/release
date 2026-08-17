@@ -68,6 +68,18 @@ fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
+# Billing account (required for HCP clusters)
+BILLING_ACCOUNT=""
+BILLING_ACCOUNT_MASK=""
+if [[ -f "${CLUSTER_PROFILE_DIR}/aws_billing_account" ]]; then
+  BILLING_ACCOUNT=$(head -n 1 "${CLUSTER_PROFILE_DIR}/aws_billing_account")
+  BILLING_ACCOUNT_MASK=$(echo "${BILLING_ACCOUNT:0:4}***")
+fi
+if [[ -z "${BILLING_ACCOUNT}" ]]; then
+  echo "Error: Billing account not found in cluster profile (aws_billing_account). Required for HCP clusters."
+  exit 1
+fi
+
 # Get OpenShift version
 # When offset > 0, skips that many z-stream releases from the latest to avoid
 # picking versions whose kernel module images may not yet be published upstream.
@@ -170,6 +182,7 @@ rosa_args=(
   create cluster -y
   --sts
   --hosted-cp
+  --billing-account "${BILLING_ACCOUNT}"
   --cluster-name "${CLUSTER_NAME}"
   --region "${CLOUD_PROVIDER_REGION}"
   --version "${SELECTED_VERSION}"
@@ -186,15 +199,18 @@ rosa_args=(
 )
 
 log "Running command:"
-echo "rosa ${rosa_args[*]}" | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g"
+echo "rosa ${rosa_args[*]}" | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g" | sed "s/${BILLING_ACCOUNT}/${BILLING_ACCOUNT_MASK}/g"
 
 # Execute and capture output
 OUTPUT_FILE=$(mktemp)
 exit_code=0
-rosa "${rosa_args[@]}" 2>&1 | tee "${OUTPUT_FILE}" || exit_code=$?
+rosa "${rosa_args[@]}" > "${OUTPUT_FILE}" 2>&1 || exit_code=$?
 
 cmd_output=$(cat "${OUTPUT_FILE}")
 rm -f "${OUTPUT_FILE}"
+
+# Print output with sensitive values masked
+echo "$cmd_output" | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g" | sed "s/${BILLING_ACCOUNT}/${BILLING_ACCOUNT_MASK}/g"
 
 echo ""
 log "rosa create cluster exited with code: ${exit_code}"
@@ -245,6 +261,6 @@ echo "Cluster ${CLUSTER_NAME} created with ID: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
 
 # Save cluster info to artifacts
-echo "$cmd_output" | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g" > "${ARTIFACT_DIR}/cluster.txt"
+echo "$cmd_output" | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g" | sed "s/${BILLING_ACCOUNT}/${BILLING_ACCOUNT_MASK}/g" > "${ARTIFACT_DIR}/cluster.txt"
 
 log "Cluster provision step completed successfully"
