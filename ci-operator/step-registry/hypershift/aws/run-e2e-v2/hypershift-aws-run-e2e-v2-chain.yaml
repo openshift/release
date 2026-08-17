@@ -1,0 +1,33 @@
+chain:
+  as: hypershift-aws-run-e2e-v2
+  steps:
+  - as: tests
+    cli: latest
+    env:
+    - name: HYPERSHIFT_PLATFORM
+      default: ""
+      documentation: "The cloud platform for the clusters (e.g. aws). Set in the workflow env block."
+    commands: |-
+      set -xuo pipefail
+      export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+      export AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+      export AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+      export PULL_SECRET_FILE="/etc/ci-pull-credentials/.dockerconfigjson"
+      /hypershift/bin/run-tests
+    timeout: 150m
+    grace_period: 5m
+    from: hypershift-tests
+    dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST
+    resources:
+      requests:
+        cpu: "1"
+        memory: 200Mi
+    credentials:
+    - mount_path: /etc/hypershift-ci-jobs-awscreds
+      name: hypershift-ci-jobs-awscreds
+      namespace: test-credentials
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials

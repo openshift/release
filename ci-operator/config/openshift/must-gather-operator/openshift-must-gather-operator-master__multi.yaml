@@ -1,0 +1,115 @@
+base_images:
+  base-rhel9:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-enterprise-base-multi-openshift-4.19
+binary_build_commands: make go-build
+build_root:
+  from_repository: true
+images:
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.openshift
+    from: base-rhel9
+    to: must-gather-operator
+  - additional_architectures:
+    - arm64
+    dockerfile_literal: |
+      FROM quay.io/operator-framework/operator-sdk:v1.39.2 as osdk
+      FROM src
+      COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+    from: src
+    to: cli-operator-sdk
+operator:
+  bundles:
+  - as: must-gather-operator-bundle
+    context_dir: bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-support-log-gather-operator:latest
+    with: pipeline:must-gather-operator
+  - pullspec: quay.io/openshift/origin-must-gather:latest
+    with: stable:must-gather
+releases:
+  initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.0"
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make e2e-binary-build
+tests:
+- as: e2e-aws-operator-multi-weekly
+  cron: '@weekly'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: must-gather-operator-bundle
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: m6g.xlarge
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: must-gather-operator
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ipi-install-heterogeneous
+    - as: create-ns
+      cli: latest
+      commands: |
+        oc new-project must-gather-operator && echo "must-gather-operator" > "$SHARED_DIR"/operator-install-namespace.txt
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: optional-operators-operator-sdk
+    test:
+    - as: verify-install
+      cli: latest
+      commands: |
+        oc -n must-gather-operator rollout status deployment must-gather-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: must-gather-operator-bundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: must-gather-operator
+  variant: multi

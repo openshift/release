@@ -1,0 +1,32 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: stream9
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: images/Dockerfile
+    from: os
+    to: openshift-client-python
+promotion:
+  to:
+  - namespace: dpcr
+    tag: v1
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: ./run_unittests.sh
+  container:
+    from: openshift-client-python
+zz_generated_metadata:
+  branch: v1
+  org: openshift
+  repo: openshift-client-python
