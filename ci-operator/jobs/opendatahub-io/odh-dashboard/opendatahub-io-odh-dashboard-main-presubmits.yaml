@@ -21,6 +21,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -87,6 +88,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -179,6 +181,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -270,6 +273,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -361,6 +365,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -453,6 +458,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -545,6 +551,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -637,6 +644,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -729,6 +737,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -821,6 +830,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -913,6 +923,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1005,6 +1016,7 @@ presubmits:
       - packages/maas/Dockerfile.workspace
       - packages/mlflow/Dockerfile.workspace
       - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1076,3 +1088,96 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )odh-mod-arch-model-registry-pr-image-mirror,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
+    context: ci/prow/odh-mod-arch-notebooks-pr-image-mirror
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Dockerfile
+      - dashboard-operator/Dockerfile
+      - distributions/core-bff/Dockerfile.workspace
+      - packages/agent-ops/Dockerfile.workspace
+      - packages/automl/Dockerfile.workspace
+      - packages/autorag/Dockerfile.workspace
+      - packages/eval-hub/Dockerfile.workspace
+      - packages/gen-ai/Dockerfile.workspace
+      - packages/maas/Dockerfile.workspace
+      - packages/mlflow/Dockerfile.workspace
+      - packages/model-registry/Dockerfile.workspace
+      - packages/notebooks/Dockerfile.workspace
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-opendatahub-io-odh-dashboard-main-odh-mod-arch-notebooks-pr-image-mirror
+    rerun_command: /test odh-mod-arch-notebooks-pr-image-mirror
+    run_if_changed: ^packages/notebooks/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=odh-mod-arch-notebooks-pr-image-mirror
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )odh-mod-arch-notebooks-pr-image-mirror,?($|\s.*)
