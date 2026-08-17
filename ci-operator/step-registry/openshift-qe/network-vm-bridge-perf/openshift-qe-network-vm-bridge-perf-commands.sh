@@ -65,7 +65,7 @@ spec:
         type: linux-bridge
         state: absent
 EOF
-  oc wait nncp/"${NNCP_NAME}" --for=condition=Available --timeout=10m || true
+  oc wait nncp/"${NNCP_NAME}" --for=condition=Available --timeout=10m
   oc delete nncp/"${NNCP_NAME}" --ignore-not-found=true --wait=true
 }
 trap cleanup_nncp EXIT
