@@ -38,6 +38,42 @@ set -x
 HC_NAME=hcpvirt-oz-ci
 HC_NS=hcpvirt-oz-ci-ns
 
+# --- Pre-flight: wait for the hypershift webhook endpoint to be live ---
+# oc wait deployment Available=True does NOT guarantee the mutating webhook
+# server is accepting connections. On s390x the 15m sleep in hypershift-mce-install
+# is skipped (x86_64-only), so the endpoint may not be up yet.
+echo "$(date) Waiting for hypershift operator webhook endpoint to become live..."
+WEBHOOK_TIMEOUT=300
+WEBHOOK_INTERVAL=10
+WEBHOOK_ELAPSED=0
+while [[ ${WEBHOOK_ELAPSED} -lt ${WEBHOOK_TIMEOUT} ]]; do
+  READY=$(oc get endpoints operator -n hypershift \
+    -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null || true)
+  if [[ -n "${READY}" ]]; then
+    echo "$(date) Hypershift operator webhook endpoint is live: ${READY}"
+    break
+  fi
+  echo "$(date) Webhook endpoint not ready yet (${WEBHOOK_ELAPSED}s elapsed), retrying in ${WEBHOOK_INTERVAL}s..."
+  sleep ${WEBHOOK_INTERVAL}
+  WEBHOOK_ELAPSED=$((WEBHOOK_ELAPSED + WEBHOOK_INTERVAL))
+done
+if [[ -z "${READY}" ]]; then
+  echo "$(date) ERROR: hypershift operator webhook endpoint did not become ready within ${WEBHOOK_TIMEOUT}s"
+  echo "--- endpoints in hypershift ns ---"
+  oc get endpoints -n hypershift || true
+  echo "--- all pods in hypershift ns ---"
+  oc get pods -n hypershift -o wide || true
+  echo "--- describe operator deployment ---"
+  oc describe deployment operator -n hypershift || true
+  echo "--- operator pod logs (last 50 lines) ---"
+  oc logs -n hypershift -l app=operator --tail=50 || true
+  echo "--- operator pod events ---"
+  oc get events -n hypershift --sort-by='.lastTimestamp' | tail -30 || true
+  echo "--- webhook configurations targeting hypershift ---"
+  oc get mutatingwebhookconfiguration -o json | jq '.items[] | select(.webhooks[]?.clientConfig.service.namespace == "hypershift") | {name: .metadata.name, webhooks: [.webhooks[].name]}' || true
+  exit 1
+fi
+
 hcp create cluster kubevirt \
   --name ${HC_NAME} \
   --node-pool-replicas 2 \
