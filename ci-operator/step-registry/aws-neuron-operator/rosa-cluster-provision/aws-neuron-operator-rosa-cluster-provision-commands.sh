@@ -73,12 +73,16 @@ BILLING_ACCOUNT=""
 BILLING_ACCOUNT_MASK=""
 if [[ -f "${CLUSTER_PROFILE_DIR}/aws_billing_account" ]]; then
   BILLING_ACCOUNT=$(head -n 1 "${CLUSTER_PROFILE_DIR}/aws_billing_account")
-  BILLING_ACCOUNT_MASK=$(echo "${BILLING_ACCOUNT:0:4}***")
 fi
 if [[ -z "${BILLING_ACCOUNT}" ]]; then
   echo "Error: Billing account not found in cluster profile (aws_billing_account). Required for HCP clusters."
   exit 1
 fi
+if ! [[ "${BILLING_ACCOUNT}" =~ ^[0-9]{12}$ ]]; then
+  echo "Error: Billing account must be exactly 12 digits, got: '${BILLING_ACCOUNT:0:4}***'"
+  exit 1
+fi
+BILLING_ACCOUNT_MASK=$(echo "${BILLING_ACCOUNT:0:4}***")
 
 # Get OpenShift version
 # When offset > 0, skips that many z-stream releases from the latest to avoid
@@ -203,6 +207,7 @@ echo "rosa ${rosa_args[*]}" | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g"
 
 # Execute and capture output
 OUTPUT_FILE=$(mktemp)
+trap 'rm -f "${OUTPUT_FILE}"' EXIT
 exit_code=0
 rosa "${rosa_args[@]}" > "${OUTPUT_FILE}" 2>&1 || exit_code=$?
 
