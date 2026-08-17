@@ -48,6 +48,18 @@ tests:
         fi
         export GITHUB_TOKEN=$(echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
+        # --- TEMPORARY (remove after OSDK PR #458 merges): rehearsal verification ---
+        # Under pj-rehearse the src image is built from ocp-release-operator-sdk main,
+        # which does not yet contain hack/auto-rebase.sh. Swap in the PR #458 fork branch
+        # and force DRY_RUN so no rebase branch/PR is pushed.
+        if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
+          echo "Rehearsal detected: using neha037:oape-829-helm-auto-rebase (PR #458), DRY_RUN"
+          git config --global --add safe.directory "$(pwd)" || true
+          git fetch --depth=1 https://github.com/neha037/ocp-release-operator-sdk.git oape-829-helm-auto-rebase
+          git checkout --force FETCH_HEAD
+          export DRY_RUN=1
+        fi
+
         ./hack/auto-rebase.sh
       credentials:
       - mount_path: /var/run/github-app
