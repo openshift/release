@@ -17,22 +17,21 @@ gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet
 # Read terraform outputs written by gcp-hcp-tf-provision step
 echo "Reading terraform outputs from provision step..."
 REGION_PROJECT=$(<"${SHARED_DIR}/region-project-id")
+REGION_CLUSTER_NAME=$(<"${SHARED_DIR}/region-cluster-name")
 MC_PROJECT=$(<"${SHARED_DIR}/mc-project-id")
 MC_CLUSTER_NAME=$(<"${SHARED_DIR}/mc-cluster-name")
-MC_CLUSTER_ENDPOINT=$(<"${SHARED_DIR}/mc-cluster-endpoint")
 REGION=${GCP_REGION:-us-central1}
 
-echo "  Region Project:      ${REGION_PROJECT}"
-echo "  MC Project:          ${MC_PROJECT}"
-echo "  MC Cluster Name:     ${MC_CLUSTER_NAME}"
-echo "  Region:              ${REGION}"
+echo "  Region Project:       ${REGION_PROJECT}"
+echo "  Region Cluster:       ${REGION_CLUSTER_NAME}"
+echo "  MC Project:           ${MC_PROJECT}"
+echo "  MC Cluster Name:      ${MC_CLUSTER_NAME}"
+echo "  Region:               ${REGION}"
 echo ""
 
 # Generate region cluster kubeconfig
-# Note: The provision step currently uses "mc-cluster-name" for the region cluster
-# This is a naming inconsistency we're preserving for compatibility
 echo "Generating region cluster kubeconfig..."
-gcloud container clusters get-credentials "${MC_CLUSTER_NAME}" \
+gcloud container clusters get-credentials "${REGION_CLUSTER_NAME}" \
   --region="${REGION}" \
   --project="${REGION_PROJECT}" \
   --quiet
@@ -41,22 +40,22 @@ gcloud container clusters get-credentials "${MC_CLUSTER_NAME}" \
 kubectl config view --flatten --minify > "${SHARED_DIR}/region-kubeconfig"
 echo "  ✓ Region kubeconfig written to ${SHARED_DIR}/region-kubeconfig"
 
-# Generate MC cluster kubeconfig
-# TODO: Once terraform outputs are updated to distinguish region vs MC clusters,
-# this will need to use separate cluster names
+# Generate MC cluster kubeconfig (optional - tests skip MC validation if unavailable)
 echo "Generating management cluster kubeconfig..."
-gcloud container clusters get-credentials "${MC_CLUSTER_NAME}" \
+if gcloud container clusters get-credentials "${MC_CLUSTER_NAME}" \
   --region="${REGION}" \
   --project="${MC_PROJECT}" \
-  --quiet
-
-kubectl config view --flatten --minify > "${SHARED_DIR}/mc-kubeconfig"
-echo "  ✓ MC kubeconfig written to ${SHARED_DIR}/mc-kubeconfig"
+  --quiet 2>/dev/null; then
+  kubectl config view --flatten --minify > "${SHARED_DIR}/mc-kubeconfig"
+  echo "  ✓ MC kubeconfig written to ${SHARED_DIR}/mc-kubeconfig"
+  export MC_KUBECONFIG="${SHARED_DIR}/mc-kubeconfig"
+else
+  echo "  ⚠ MC cluster unavailable - tests will skip management cluster validation"
+fi
 echo ""
 
 # Set environment variables for Ginkgo test
 export REGION_KUBECONFIG="${SHARED_DIR}/region-kubeconfig"
-export MC_KUBECONFIG="${SHARED_DIR}/mc-kubeconfig"
 
 # Optional: Override sync timeouts (defaults to 30m in test code)
 # export REGION_SYNC_TIMEOUT="30m"

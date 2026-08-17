@@ -247,6 +247,7 @@ fi
 
 # Write individual outputs to SHARED_DIR for downstream steps
 jq -r '.region.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-project-id"
+jq -r '.region.value.cluster_name // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-cluster-name"
 jq -r '.management_cluster.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-project-id"
 jq -r '.management_cluster.value.cluster_name // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-name"
 jq -r '.management_cluster.value.cluster_endpoint // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-endpoint"
@@ -256,7 +257,7 @@ echo "${WORKSPACE_NAME}" > "${SHARED_DIR}/workspace-name"
 echo "${RUN_ID}" > "${SHARED_DIR}/run-id"
 
 # Validate critical outputs were written
-for output_file in region-project-id mc-project-id mc-cluster-name mc-cluster-endpoint workspace-name run-id; do
+for output_file in region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint workspace-name run-id; do
   if [[ ! -s "${SHARED_DIR}/${output_file}" ]]; then
     log "ERROR: Output file ${output_file} is empty or missing"
     exit 1
