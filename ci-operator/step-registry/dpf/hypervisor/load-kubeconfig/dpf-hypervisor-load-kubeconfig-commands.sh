@@ -4,7 +4,7 @@ set -euo pipefail
 shopt -s inherit_errexit
 
 # Configuration
-REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
+REMOTE_HOST=$(cat /var/run/dpf-ci/remote-host)
 CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
 REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 

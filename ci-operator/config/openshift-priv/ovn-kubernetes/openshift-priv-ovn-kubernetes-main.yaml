@@ -26,26 +26,26 @@ images:
     to: ovn-kubernetes-microshift
 promotion:
   to:
-  - name: "5.0"
+  - name: "5.1"
     namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp-priv
   nightly-arm64:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "5.0"
+      version: "5.1"
 resources:
   '*':
     requests:
@@ -353,8 +353,13 @@ tests:
     from: src
 - as: lint
   commands: |
+    status=0
     cd go-controller
-    make lint
+    make lint || status=$?
+    cd ../openshift
+    go mod vendor
+    make -f ../go-controller/Makefile lint || status=$?
+    exit $status
   container:
     from: src
 - as: gofmt

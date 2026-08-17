@@ -150,9 +150,6 @@ export PROV_BM_MAC=$(getExtraVal PROV_BM_MAC '')
 EOF
 
     scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" "$NODESFILE" "root@${IP}:"
-    if [ "$(cat "$CIRFILE" | jq -r .type)" == "cluster_moc" ] ; then
-        scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/esi_cloud_yaml" "root@${IP}:esi_cloud_yaml"
-    fi
 }
 
 # dev-scripts setup for baremetal clusters
@@ -231,86 +228,6 @@ function manage_baremetal_instances(){
         nmcli con add type ethernet ifname eth2 master \${CLUSTER_NAME}bm con-name \${CLUSTER_NAME}bm-eth2
         nmcli con reload
         sleep 10
-    # MOC baremetal envinronments
-    else
-
-        # Calculate MOC env specific vars
-        export PROV_BM_IP=\${EXTERNAL_SUBNET_V4%.*}.1
-        export PROV_BM_IP_APPS=\${EXTERNAL_SUBNET_V4%.*}.4
-        export PROV_BM_IP_API=\${EXTERNAL_SUBNET_V4%.*}.5
-        export PROV_BM_GATE=\${EXTERNAL_SUBNET_V4%.*}.254
-        export VLANID_PR=\${PRO_IF/*.}
-        export VLANID_BM=\${INT_IF/*.}
-
-        echo "export NTP_SERVERS=\${PROV_BM_IP}" >> /root/dev-scripts/config_root.sh
-
-        # The MOC hosts have a single net interface on which the external network is on a vlan, we need to set this up
-        # with a static net config
-        # TODO: get the details from the CIR
-        export NETWORK_CONFIG_FOLDER=/root/dev-scripts/network-configs/vlan-over-prov
-        mkdir -p network-configs/vlan-over-prov
-        while IFS=',' read -r NAME MAC ; do
-            cat - << EOF2 > network-configs/vlan-over-prov/\${NAME}.yaml
-networkConfig:
-  interfaces:
-  - name: eno1
-    type: ethernet
-    state: up
-    ipv4:
-      dhcp: true
-      enabled: true
-    ipv6:
-      enabled: true
-      dhcp: false
-  - name: eno1.\${VLANID_BM}
-    type: vlan
-    state: up
-    mac-address: "\${MAC}"
-    vlan:
-      base-iface: eno1
-      id: \${VLANID_BM}
-    ipv4:
-      dhcp: true
-      enabled: true
-  - name: enp2s0
-    type: ethernet
-    state: down
-EOF2
-        done <<< "\$(cat ~/cir-nodes | jq -r '.[] | "\( .name ),\( .bmmac )"')"
-
-        podman pull quay.io/metal3-io/ironic
-
-        nmcli c modify "System eth0" ipv4.dns \$PROV_BM_IP ipv4.ignore-auto-dns yes
-        nmcli c down "System eth0"
-        nmcli c up "System eth0"
-        nmcli connection add type vlan con-name eth0.\$VLANID_PR dev eth0 id \$VLANID_PR ipv4.method disabled ipv6.method disabled
-        nmcli con add type bridge con-name \${CLUSTER_NAME}bm ifname \${CLUSTER_NAME}bm ipv4.method manual ipv4.address "\$PROV_BM_IP/24" ipv4.gateway "\$PROV_BM_GATE" ipv4.dns \$PROV_BM_IP ipv4.ignore-auto-dns yes
-        nmcli connection add type vlan con-name eth0.\$VLANID_BM dev eth0 id \$VLANID_BM ipv4.method disabled ipv6.method disabled 802-3-ethernet.cloned-mac-address \$PROV_BM_MAC master \${CLUSTER_NAME}bm
-        nmcli con reload
-        sleep 10
-
-        mkdir ~/resources ~/.sushy-tools
-            cat - << EOF2 > ~/resources/dnsmasq.conf
-# Set the domain name
-domain=\${CLUSTER_NAME}.\${BASE_DOMAIN}
-
-server=8.8.8.8
-interface=\${CLUSTER_NAME}bm
-bind-dynamic
-
-# Add additional DNS entries
-address=/virthost.\${CLUSTER_NAME}.\${BASE_DOMAIN}/\$PROV_BM_IP
-address=/api.\${CLUSTER_NAME}.\${BASE_DOMAIN}/\$PROV_BM_IP_API
-address=/.apps.\${CLUSTER_NAME}.\${BASE_DOMAIN}/\$PROV_BM_IP_APPS
-EOF2
-        podman run --name dnsmasqbm -d --privileged --net host -v ~/resources:/conf quay.io/metal3-io/ironic dnsmasq -C /conf/dnsmasq.conf -d -q
-
-        # Start a redfish emulator, sitting in front of MOC ironic (ESI)
-        virtualenv-3.6 --python python3.9 venv
-        ./venv/bin/pip install git+https://github.com/derekhiggins/sushy-tools.git@esi python-openstackclient python-ironicclient
-        echo -e "SUSHY_EMULATOR_IRONIC_CLOUD = 'openstack'" >> ~/.sushy-tools/conf.py
-        cat ~/esi_cloud_yaml | base64 -d > clouds.yaml
-        nohup ./venv/bin/sushy-emulator --config /root/.sushy-tools/conf.py -i :: >> sushy-emulator.log 2>&1 &
     fi
 
     sudo firewall-cmd --reload

@@ -31,6 +31,7 @@ operator:
     context_dir: .
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
+    skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   substitutions:
   - pullspec: REPLACE_IMAGE
     with: pipeline:windows-machine-config-operator-test
@@ -38,6 +39,7 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
+    disabled: true
     name: "5.1"
     namespace: ocp-priv
 prowgen:
@@ -112,7 +114,7 @@ tests:
       CONTROL_PLANE_REPLICAS: "1"
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
-      TEST_ARGS: --disable-monitor=pod-network-avalibility,required-scc-annotation-checker,termination-message-policy,kubelet-log-collector
+      TEST_ARGS: --monitor=e2e-test-analyzer
       TEST_SUITE: windows-machine-config-operator/all
     test:
     - as: wmco-setup-and-test

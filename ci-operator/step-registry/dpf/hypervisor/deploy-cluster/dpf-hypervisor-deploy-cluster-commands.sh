@@ -9,7 +9,7 @@ cat ${SHARED_DIR}/testing.txt
 CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
 
 # Configuration
-REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
+REMOTE_HOST=$(cat /var/run/dpf-ci/remote-host)
 echo "Remote host: ${REMOTE_HOST}"
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"

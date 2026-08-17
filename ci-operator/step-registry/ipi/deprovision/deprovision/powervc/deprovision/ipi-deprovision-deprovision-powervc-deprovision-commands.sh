@@ -6,8 +6,8 @@ set -o errexit
 set -o pipefail
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.4.6"
-readonly YQ_VERSION="v4.53.2"
+readonly POWERVC_TOOL_VERSION="v2.4.7"
+readonly YQ_VERSION="v4.53.3"
 readonly MAX_DESTROY_ATTEMPTS=3
 readonly SECRETS_DIR="/var/run/powervc-ipi-cicd-secrets/powervc-creds"
 

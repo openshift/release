@@ -4,9 +4,7 @@ set -euo pipefail
 CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
 
 # Configuration
-REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
-
-CLUSTER_API_IP=$(cat "${CLUSTER_PROFILE_DIR}/cluster-api-ip")
+REMOTE_HOST=$(cat /var/run/dpf-ci/remote-host)
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
@@ -45,8 +43,8 @@ datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
 SANITY_TESTS_RESULT=""
 REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
-# Extract the kubeconfig from the last DPF openshift-dpf install dir on hypervisor
-echo "=== SCP the kubeconfig from the last DPF openshift-dpf install dir on hypervisor ==="
+# Locate the last DPF openshift-dpf install dir on the hypervisor
+echo "=== Locating last openshift-dpf install dir on hypervisor ==="
 
 scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION} /tmp
 
@@ -62,24 +60,6 @@ else
   exit 1
 fi
 
-# scp DPF managment cluster kubeconfig from last dpf install dir
-echo "SCP DPF managment cluster kubeconfig from last dpf install dir to /tmp locally"
-
-scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME} /tmp
-
-ls -ltr /tmp
-cp /tmp/kubeconfig.${CLUSTER_NAME} /tmp/kubeconfig.${CLUSTER_NAME}_ORIG
-
-echo " Substitute the hypervisor domain name 'api.${CLUSTER_NAME}.nvidia.eng.rdu2.dc.redhat.com' for cluster api ip address '${CLUSTER_API_IP}'"
-
-sed -i "s|server: https://api.${CLUSTER_NAME}.nvidia.eng.rdu2.dc.redhat.com:6443|server: https://${CLUSTER_API_IP}:6443|" /tmp/kubeconfig.${CLUSTER_NAME}
-
-cat /tmp/kubeconfig.${CLUSTER_NAME} | grep 6443
-
-export KUBECONFIG=/tmp/kubeconfig.${CLUSTER_NAME}
-
-
-
 # Containerfile is updated in openshift-dpf to dnf install oc client, and the openshift-dpf
 # latest main clone should be mounted in /root/dpf-ci
 echo "=== Checking if the openshift-dpf latest PR clone is mounted in /root/dpf-ci dir on this running pod"
@@ -88,11 +68,11 @@ ls -ltr /root/dpf-ci
 which oc
 echo "=== Running oc commands on the DPF cluster from extracted kubeconfig"
 
-oc --insecure-skip-tls-verify=true get co
-oc --insecure-skip-tls-verify=true get nodes -o wide
-oc --insecure-skip-tls-verify=true get dpu -A
-oc --insecure-skip-tls-verify=true get dpuservice -A
-oc --insecure-skip-tls-verify=true get application -A
+oc get co
+oc get nodes -o wide
+oc get dpu -A
+oc get dpuservice -A
+oc get application -A
 
 echo "=== DPF Make Target checks on Existing Cluster ==="
 echo "Using openshift-dpf dir from last cluster-deploy: '${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}'"

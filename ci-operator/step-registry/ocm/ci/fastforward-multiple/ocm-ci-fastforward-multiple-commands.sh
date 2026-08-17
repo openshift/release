@@ -995,6 +995,7 @@ echo "Fast-forward workflow inputs:
 * REPO_MAP_PATH: ${REPO_MAP_PATH}
 * DESTINATION_VERSIONS: ${DESTINATION_VERSIONS}
 * LAST_RELEASE_VERSION: ${LAST_RELEASE_VERSION:-<not set>}
+* SKIP_VERSIONS_PATH: ${SKIP_VERSIONS_PATH:-<not set>}
 * ARTIFACT_DIR: ${ARTIFACT_DIR:-<not set>}
 "
 
@@ -1045,6 +1046,60 @@ SKIPPED_REPOS=(
   "grafana-dashboard-loader"
   "memcached"
 )
+
+# Per-repo version exclusions loaded from SKIP_VERSIONS_PATH (YAML file)
+SKIPPED_REPO_VERSIONS=()
+
+if [[ -n "${SKIP_VERSIONS_PATH:-}" ]]; then
+  if [[ ! -f "${SKIP_VERSIONS_PATH}" ]]; then
+    echo "ERROR: SKIP_VERSIONS_PATH set but file not found: ${SKIP_VERSIONS_PATH}"
+    exit 1
+  fi
+
+  echo "INFO: Loading per-repo version exclusions from ${SKIP_VERSIONS_PATH}"
+  yq_output=""
+  if ! yq_output=$(yq '.skip_versions[] | .repo as $r | .versions[] | $r + ":" + .' "${SKIP_VERSIONS_PATH}"); then
+    echo "ERROR: Failed to parse ${SKIP_VERSIONS_PATH}"
+    exit 1
+  fi
+
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] && SKIPPED_REPO_VERSIONS+=("$entry")
+  done <<< "$yq_output"
+
+  echo "INFO: Loaded ${#SKIPPED_REPO_VERSIONS[@]} repo:version exclusion(s)"
+  for entry in "${SKIPPED_REPO_VERSIONS[@]+"${SKIPPED_REPO_VERSIONS[@]}"}"; do
+    echo "  - ${entry}"
+  done
+fi
+
+is_repo_version_skipped() {
+  local repo=$1
+  local version=$2
+  if [[ ${#SKIPPED_REPO_VERSIONS[@]} -eq 0 ]]; then
+    return 1
+  fi
+  for entry in "${SKIPPED_REPO_VERSIONS[@]}"; do
+    if [[ "${entry}" == "${repo}:${version}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Returns 0 if version_a >= version_b (major.minor comparison)
+is_version_gte() {
+  local a_major="${1%%.*}"
+  local a_minor="${1##*.}"
+  local b_major="${2%%.*}"
+  local b_minor="${2##*.}"
+  if [[ $a_major -gt $b_major ]]; then
+    return 0
+  elif [[ $a_major -eq $b_major && $a_minor -ge $b_minor ]]; then
+    return 0
+  fi
+  return 1
+}
 
 # Repos with release-* default branch - exclude from main fast-forward
 # These are processed separately to handle non-main default branches
@@ -1146,7 +1201,18 @@ for product in mce acm globalhub; do
       # NORMAL REPO HANDLING: default branch is main/master
       echo "INFO: Using normal fast-forward (${default_branch} → release branches)"
 
+      # Build filtered version list for this repo (excluding per-repo version skips)
+      REPO_DEST_VERSIONS=""
       for version in ${DESTINATION_VERSIONS}; do
+        if is_repo_version_skipped "${repo}" "${version}"; then
+          echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (per-repo version exclusion)"
+          continue
+        fi
+        REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS} ${version}"
+      done
+      REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS# }"
+
+      for version in ${REPO_DEST_VERSIONS}; do
         branch="${branch_prefix}-${version}"
         echo "INFO: Fast-forwarding ${owner_repo} ${default_branch} → ${branch}"
         log_file="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${branch}.log"
@@ -1177,13 +1243,18 @@ for product in mce acm globalhub; do
         fi
       done
 
-      # After fast-forward, create Tekton files for all destination versions
+      if [[ -z "${REPO_DEST_VERSIONS}" ]]; then
+        echo "INFO: All versions skipped for ${owner_repo}, skipping Tekton file creation"
+        continue
+      fi
+
+      # After fast-forward, create Tekton files for non-skipped versions
       echo "INFO: Creating Tekton files for ${owner_repo}"
       tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}.log"
 
       TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
 
-      if create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "${default_branch}" "${DESTINATION_VERSIONS}" "${tekton_log_file}"; then
+      if create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "${default_branch}" "${REPO_DEST_VERSIONS}" "${tekton_log_file}"; then
         status=0
       else
         status=$?
@@ -1291,11 +1362,23 @@ for product in mce acm globalhub; do
 
       # Fast-forward to destination branches and transform Tekton files
       for version in ${DESTINATION_VERSIONS}; do
+        # Check per-repo version exclusion
+        if is_repo_version_skipped "${repo}" "${version}"; then
+          echo "INFO: Skipping ${owner_repo} → ${repo_branch_prefix}-${version} (per-repo version exclusion)"
+          continue
+        fi
+
         dest_branch="${repo_branch_prefix}-${version}"
 
         # Skip if dest_branch same as default_branch
         if [[ "${dest_branch}" == "${default_branch}" ]]; then
           echo "INFO: Skipping ${dest_branch} (same as default branch)"
+          continue
+        fi
+
+        # Skip destination versions older than default — can't fast-forward backwards
+        if ! is_version_gte "${version}" "${default_version}"; then
+          echo "INFO: Skipping ${owner_repo} → ${dest_branch} (${version} is older than default ${default_version})"
           continue
         fi
 
