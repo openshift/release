@@ -103,10 +103,11 @@ function CheckOdfCsv () {
     : "=== Check 1: ODF Operator CSV ==="
 
     typeset csvPhase=""
-    if ! csvPhase="$(oc get csv -n "${ODF_NAMESPACE}" -o json | jq -r '
-        [.items[] | select(.metadata.name | test("^(odf-|ocs-)operator"))] |
-        first | .status.phase // "NotFound"
-    ')"; then
+    if ! csvPhase="$(oc get csv -n "${ODF_NAMESPACE}" -o json | python3 -c "
+import sys,json,re; d=json.load(sys.stdin)
+m=[i for i in d.get('items',[]) if re.match(r'^(odf-|ocs-)operator',i['metadata']['name'])]
+print((m[0].get('status',{}).get('phase','NotFound')) if m else 'NotFound')
+")"; then
         AddResult "odf-csv-phase" "fail" "Failed to query ODF CSVs in ${ODF_NAMESPACE}"
         return
     fi
@@ -130,9 +131,10 @@ function CheckStorageCluster () {
     : "=== Check 2: StorageCluster Ready ==="
 
     typeset scPhase=""
-    if ! scPhase="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json | jq -r '
-        .items[0].status.phase // "NotFound"
-    ')"; then
+    if ! scPhase="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+print(d['items'][0]['status'].get('phase','NotFound') if d.get('items') else 'NotFound')
+")"; then
         AddResult "storagecluster-ready" "fail" "Failed to query StorageCluster"
         return
     fi
@@ -156,9 +158,10 @@ function CheckCephCluster () {
     : "=== Check 3: CephCluster health ==="
 
     typeset cephHealth=""
-    if ! cephHealth="$(oc get cephcluster -n "${ODF_NAMESPACE}" -o json | jq -r '
-        .items[0].status.ceph.health // "NotFound"
-    ')"; then
+    if ! cephHealth="$(oc get cephcluster -n "${ODF_NAMESPACE}" -o json | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+print(d['items'][0].get('status',{}).get('ceph',{}).get('health','NotFound') if d.get('items') else 'NotFound')
+")"; then
         AddResult "cephcluster-health" "fail" "Failed to query CephCluster"
         return
     fi
@@ -218,7 +221,7 @@ function CheckPvcProvision () {
         typeset scName="${scTests[$idx]}"
         typeset accessMode="${scModes[$idx]}"
         typeset testId="pvc-provision-${scName##*-}"
-        typeset pvcName="odf-health-${scName##*-}-$$"
+        typeset pvcName="odf-health-${scName##*-}-${RANDOM}"
         typeset pvcYaml
         pvcYaml=$(cat <<EOF
 apiVersion: v1
@@ -273,9 +276,10 @@ function CheckNoobaa () {
     : "=== Check 6: NooBaa S3 functional ==="
 
     typeset nbPhase=""
-    if ! nbPhase="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | jq -r '
-        .items[0].status.phase // "NotFound"
-    ')"; then
+    if ! nbPhase="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+print(d['items'][0]['status'].get('phase','NotFound') if d.get('items') else 'NotFound')
+")"; then
         AddResult "noobaa-s3-functional" "fail" "Failed to query NooBaa"
         return
     fi
@@ -292,7 +296,7 @@ function CheckNoobaa () {
 
     : "NooBaa phase=Ready, creating OBC for S3 functional check..."
 
-    typeset obcName="odf-health-obc-$$"
+    typeset obcName="odf-health-obc-${RANDOM}"
     typeset obcYaml
     obcYaml=$(cat <<EOF
 apiVersion: objectbucket.io/v1alpha1
@@ -343,18 +347,20 @@ EOF
     fi
 
     typeset s3Endpoint=""
-    s3Endpoint="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | jq -r '
-        .items[0].status.services.serviceS3.internalDNS[0] // empty
-    ')" || true
+    s3Endpoint="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+v=d['items'][0].get('status',{}).get('services',{}).get('serviceS3',{}).get('internalDNS',[])
+print(v[0] if v else '')
+")" || true
     if [[ -z "${s3Endpoint}" ]]; then
         s3Endpoint="https://s3.${ODF_NAMESPACE}.svc:443"
     fi
 
-    typeset testKey="health-check-$$"
+    typeset testKey="health-check-${RANDOM}"
     typeset testData=""
     testData="odf-health-$(date +%s)"
 
-    typeset podName="odf-health-s3-check-$$"
+    typeset podName="odf-health-s3-check-${RANDOM}"
     typeset podManifest=""
     podManifest=$(cat <<EOF
 apiVersion: v1
@@ -447,19 +453,21 @@ function CheckCephHealth () {
     : "=== Check 7: Ceph health detail ==="
 
     typeset cephDetail=""
-    if ! cephDetail="$(oc get cephcluster -n "${ODF_NAMESPACE}" -o json | jq -r '
-        .items[0].status.ceph.details // {} | to_entries[] |
-        select(.value.severity != "HEALTH_OK") |
-        "\(.key): \(.value.message // "unknown")"
-    ')"; then
+    if ! cephDetail="$(oc get cephcluster -n "${ODF_NAMESPACE}" -o json | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+details=d['items'][0].get('status',{}).get('ceph',{}).get('details',{}) if d.get('items') else {}
+for k,v in details.items():
+ if v.get('severity')!='HEALTH_OK': print(f\"{k}: {v.get('message','unknown')}\")
+")"; then
         AddResult "ceph-health-detail" "fail" "Failed to query CephCluster details"
         return
     fi
 
     typeset cephHealth=""
-    cephHealth="$(oc get cephcluster -n "${ODF_NAMESPACE}" -o json | jq -r '
-        .items[0].status.ceph.health // "unknown"
-    ')" || true
+    cephHealth="$(oc get cephcluster -n "${ODF_NAMESPACE}" -o json | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+print(d['items'][0].get('status',{}).get('ceph',{}).get('health','unknown') if d.get('items') else 'unknown')
+")" || true
 
     if [[ "${cephHealth}" == "HEALTH_OK" ]]; then
         : "PASS: Ceph health=HEALTH_OK"
