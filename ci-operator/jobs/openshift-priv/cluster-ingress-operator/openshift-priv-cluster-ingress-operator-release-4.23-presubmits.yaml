@@ -3,7 +3,7 @@ presubmits:
   - agent: kubernetes
     always_run: false
     annotations:
-      pipeline_run_if_changed: ^(pkg/manifests/assets/gateway-api/.*|cmd/ingress-operator/.*|hack/.*|pkg/operator/controller/gatewayapi/.*|test/e2e/.*)$
+      pipeline_run_if_changed: ^(manifests/.*|pkg/manifests/assets/gateway-api/.*|cmd/ingress-operator/.*|hack/.*|pkg/operator/controller/gateway.*/.*|vendor/github.com/istio-ecosystem/sail-operator/.*|vendor/sigs.k8s.io/gateway-api/.*|test/e2e/.*)$
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
@@ -24,7 +24,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-gatewayapi-conformance
-    optional: true
     path_alias: github.com/openshift/cluster-ingress-operator
     rerun_command: /test e2e-aws-gatewayapi-conformance
     spec:
@@ -290,8 +289,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
-    context: ci/prow/e2e-aws-operator-haproxy28-techpreview
+    context: ci/prow/e2e-aws-operator-haproxy28
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -306,10 +304,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-operator-haproxy28-techpreview
+    name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-operator-haproxy28
     optional: true
     path_alias: github.com/openshift/cluster-ingress-operator
-    rerun_command: /test e2e-aws-operator-haproxy28-techpreview
+    rerun_command: /test e2e-aws-operator-haproxy28
     spec:
       containers:
       - args:
@@ -319,7 +317,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-operator-haproxy28-techpreview
+        - --target=e2e-aws-operator-haproxy28
         command:
         - ci-operator
         env:
@@ -378,7 +376,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-operator-haproxy28-techpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-operator-haproxy28,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -573,8 +571,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
-    context: ci/prow/e2e-aws-ovn-haproxy28-techpreview
+    context: ci/prow/e2e-aws-ovn-fips-haproxy28
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -589,10 +586,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-ovn-haproxy28-techpreview
+    name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-ovn-fips-haproxy28
     optional: true
     path_alias: github.com/openshift/cluster-ingress-operator
-    rerun_command: /test e2e-aws-ovn-haproxy28-techpreview
+    rerun_command: /test e2e-aws-ovn-fips-haproxy28
     spec:
       containers:
       - args:
@@ -602,7 +599,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ovn-haproxy28-techpreview
+        - --target=e2e-aws-ovn-fips-haproxy28
         command:
         - ci-operator
         env:
@@ -661,7 +658,100 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-haproxy28-techpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-fips-haproxy28,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.23$
+    - ^release-4\.23-
+    context: ci/prow/e2e-aws-ovn-haproxy28
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-ovn-haproxy28
+    optional: true
+    path_alias: github.com/openshift/cluster-ingress-operator
+    rerun_command: /test e2e-aws-ovn-haproxy28
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-haproxy28
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-haproxy28,?($|\s.*)
   - agent: kubernetes
     always_run: false
     annotations:
@@ -954,8 +1044,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
-    context: ci/prow/e2e-aws-ovn-serial-haproxy28-techpreview-1of2
+    context: ci/prow/e2e-aws-ovn-serial-haproxy28-1of2
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -970,10 +1059,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-ovn-serial-haproxy28-techpreview-1of2
+    name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-ovn-serial-haproxy28-1of2
     optional: true
     path_alias: github.com/openshift/cluster-ingress-operator
-    rerun_command: /test e2e-aws-ovn-serial-haproxy28-techpreview-1of2
+    rerun_command: /test e2e-aws-ovn-serial-haproxy28-1of2
     spec:
       containers:
       - args:
@@ -984,7 +1073,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ovn-serial-haproxy28-techpreview
+        - --target=e2e-aws-ovn-serial-haproxy28
         command:
         - ci-operator
         env:
@@ -1043,14 +1132,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-haproxy28-techpreview-1of2,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-haproxy28-1of2,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
-    context: ci/prow/e2e-aws-ovn-serial-haproxy28-techpreview-2of2
+    context: ci/prow/e2e-aws-ovn-serial-haproxy28-2of2
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -1065,10 +1153,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-ovn-serial-haproxy28-techpreview-2of2
+    name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-ovn-serial-haproxy28-2of2
     optional: true
     path_alias: github.com/openshift/cluster-ingress-operator
-    rerun_command: /test e2e-aws-ovn-serial-haproxy28-techpreview-2of2
+    rerun_command: /test e2e-aws-ovn-serial-haproxy28-2of2
     spec:
       containers:
       - args:
@@ -1079,7 +1167,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ovn-serial-haproxy28-techpreview
+        - --target=e2e-aws-ovn-serial-haproxy28
         command:
         - ci-operator
         env:
@@ -1138,7 +1226,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-haproxy28-techpreview-2of2,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-haproxy28-2of2,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1427,8 +1515,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
-    context: ci/prow/e2e-aws-ovn-upgrade-haproxy28-techpreview
+    context: ci/prow/e2e-aws-ovn-upgrade-haproxy28
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -1443,10 +1530,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-ovn-upgrade-haproxy28-techpreview
+    name: pull-ci-openshift-priv-cluster-ingress-operator-release-4.23-e2e-aws-ovn-upgrade-haproxy28
     optional: true
     path_alias: github.com/openshift/cluster-ingress-operator
-    rerun_command: /test e2e-aws-ovn-upgrade-haproxy28-techpreview
+    rerun_command: /test e2e-aws-ovn-upgrade-haproxy28
     spec:
       containers:
       - args:
@@ -1456,7 +1543,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ovn-upgrade-haproxy28-techpreview
+        - --target=e2e-aws-ovn-upgrade-haproxy28
         command:
         - ci-operator
         env:
@@ -1515,7 +1602,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-upgrade-haproxy28-techpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-upgrade-haproxy28,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
