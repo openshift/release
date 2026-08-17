@@ -5,6 +5,9 @@ import json
 import yaml
 
 CONFIG = {
+    'ibmcloud-perfscale-quota-slice': {
+        'us-east': 30,
+    },
     'aws-us-east-1-quota-slice': {
         'us-east-1': 15,
     },
@@ -370,7 +373,7 @@ CONFIG = {
         'ap-northeast-1': 3,
     },
     'gcd-quota-slice': {
-        'u-germany-northeast1': 2,
+        'u-germany-northeast1': 7,
     },
     'gcp-qe-quota-slice': {
         'us-central1': 45,
@@ -418,6 +421,7 @@ CONFIG = {
     },
     'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-s390x-vpn-oz-quota-slice': {},
+    'libvirt-s390x-vpn-hcp-quota-slice': {},
     'libvirt-s390x-vpn-virt-quota-slice': {},
     'libvirt-s390x-vpn-virt-sno-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
@@ -739,6 +743,13 @@ del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
 for i in range(4):
     for j in range(4):
         CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-{}-{}'.format(i, j)] = 1
+# Move lnxocp14 slots 2-3 from vpn-oz to the HCP VPN profile (same lease names / host)
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-2']
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-3']
+
+# HCP on OZ lnxocp14: reuse former vpn-oz leases oz-3-2 and oz-3-3
+CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-2'] = 1
+CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-3'] = 1
 
 # Orange zone (OZ) kubevirt06 (0) + kubevirt07 (1), 1 HA + 1 SNO lease each
 for i in range(2):
@@ -825,13 +836,13 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
 # BEGIN ARO-HCP E2E SLOT RESOURCES
-for i in range(6):
+for i in range(5):
     CONFIG['aro-hcp-dev-shard0-slot']['aro-hcp-dev-shard0-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(6):
+for i in range(5):
     CONFIG['aro-hcp-dev-shard1-slot']['aro-hcp-dev-shard1-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(6):
+for i in range(5):
     CONFIG['aro-hcp-dev-shard2-slot']['aro-hcp-dev-shard2-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(6):
+for i in range(5):
     CONFIG['aro-hcp-dev-shard3-slot']['aro-hcp-dev-shard3-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-dev-hypershift-westus3-slot']['aro-hcp-dev-hypershift-westus3-slot-{i:0>2}'.format(i=i)] = 1

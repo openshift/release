@@ -69,6 +69,24 @@ gcloud kms keys add-iam-policy-binding "${KEY_NAME}" \
   --role="roles/cloudkms.cryptoKeyEncrypterDecrypter"
 echo "IAM binding granted to ${CE_SERVICE_AGENT}."
 
+# Grant the Cloud Storage service agent permission to use the KMS key.
+# The installer creates a CMEK-encrypted GCS bucket for bootstrap ignition
+# data when defaultMachinePlatform specifies a KMS key. The GCS service
+# agent must have the encrypter/decrypter role to perform server-side
+# encryption with the customer-managed key.
+echo "$(date -u --rfc-3339=seconds) - Activating Cloud Storage service agent..."
+GCS_SERVICE_AGENT="$(gcloud storage service-agent --project="${GOOGLE_PROJECT_ID}")"
+echo "Cloud Storage service agent: ${GCS_SERVICE_AGENT}"
+
+echo "$(date -u --rfc-3339=seconds) - Granting roles/cloudkms.cryptoKeyEncrypterDecrypter to Cloud Storage Service Agent..."
+gcloud kms keys add-iam-policy-binding "${KEY_NAME}" \
+  --keyring="${KEY_RING_NAME}" \
+  --location="${LOCATION}" \
+  --project="${GOOGLE_PROJECT_ID}" \
+  --member="serviceAccount:${GCS_SERVICE_AGENT}" \
+  --role="roles/cloudkms.cryptoKeyEncrypterDecrypter"
+echo "IAM binding granted to ${GCS_SERVICE_AGENT}."
+
 # Also grant the CI provisioner service account permission on the KMS key.
 # The ipi-conf-gcp-osdisk-encryption-key step sets kmsKeyServiceAccount to
 # this SA, which means GCE delegates the disk encryption operation to it

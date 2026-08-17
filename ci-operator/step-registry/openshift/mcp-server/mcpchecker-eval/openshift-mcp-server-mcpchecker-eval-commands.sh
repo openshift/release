@@ -2,6 +2,7 @@
 set -euo pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+export MCP_EVAL_KUBECONFIG="${KUBECONFIG}"
 
 # Source credentials written by the preceding setup step
 if [[ -f "${SHARED_DIR}/mcpchecker-creds.env" ]]; then
@@ -22,10 +23,16 @@ export MCP_CONFIG_DIR=dev/config/mcp-configs
 
 trap 'make stop-server || true' EXIT
 
-GOFLAGS='-mod=readonly' make build
 GOFLAGS='' make mcpchecker
 
-make run-server TOOLSETS="${TOOLSETS}"
+# CI pods expose in-cluster env (build farm). Without forcing kubeconfig,
+# the MCP server auto-selects in-cluster and gets RBAC denials. Unset the
+# env signals and pass MCP_EVAL_KUBECONFIG so make run-server targets the IPI cluster 
+unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT
+export MCP_EVAL_KUBECONFIG="${KUBECONFIG}"
+
+GOFLAGS='-mod=readonly' make run-server TOOLSETS="${TOOLSETS}"
+
 make run-evals EVAL_CONFIG="${EVAL_CONFIG}" EVAL_LABEL_SELECTOR="${EVAL_LABEL_SELECTOR}"
 
 RESULTS_FILE="$(find . -maxdepth 1 -name 'mcpchecker-*-out.json' | sort | tail -1)"
@@ -37,6 +44,8 @@ fi
 MCPCHECKER="$(pwd)/_output/tools/bin/mcpchecker"
 cp "${RESULTS_FILE}" "${ARTIFACT_DIR}/mcpchecker-out.json"
 
+# Emit JUnit before verify so Spyglass/Sippy still get artifacts when the
+# pass-rate gate fails.
 "${MCPCHECKER}" result convert junit "${ARTIFACT_DIR}/mcpchecker-out.json" \
     --output-file "${ARTIFACT_DIR}/junit_mcpchecker.xml"
 

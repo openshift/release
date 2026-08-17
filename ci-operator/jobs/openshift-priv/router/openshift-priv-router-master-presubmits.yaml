@@ -2,6 +2,8 @@ presubmits:
   openshift-priv/router:
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     branches:
     - ^master$
     - ^master-
@@ -27,7 +29,6 @@ presubmits:
     name: pull-ci-openshift-priv-router-master-e2e-agnostic
     path_alias: github.com/openshift/router
     rerun_command: /test e2e-agnostic
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -103,7 +104,7 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build13
-    context: ci/prow/e2e-agnostic-haproxy28-techpreview
+    context: ci/prow/e2e-agnostic-haproxy28
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -121,10 +122,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-router-master-e2e-agnostic-haproxy28-techpreview
+    name: pull-ci-openshift-priv-router-master-e2e-agnostic-haproxy28
     optional: true
     path_alias: github.com/openshift/router
-    rerun_command: /test e2e-agnostic-haproxy28-techpreview
+    rerun_command: /test e2e-agnostic-haproxy28
     spec:
       containers:
       - args:
@@ -134,7 +135,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-agnostic-haproxy28-techpreview
+        - --target=e2e-agnostic-haproxy28
         command:
         - ci-operator
         env:
@@ -193,9 +194,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-agnostic-haproxy28-techpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-agnostic-haproxy28,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     branches:
     - ^master$
     - ^master-
@@ -221,7 +224,6 @@ presubmits:
     name: pull-ci-openshift-priv-router-master-e2e-aws-fips
     path_alias: github.com/openshift/router
     rerun_command: /test e2e-aws-fips
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -297,6 +299,105 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build07
+    context: ci/prow/e2e-aws-fips-haproxy28
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/router/base/Dockerfile.ocp
+      - images/router/haproxy/Dockerfile.ocp
+      - images/router/haproxy28/Dockerfile.ocp
+      - images/router/haproxy32/Dockerfile.ocp
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-router-master-e2e-aws-fips-haproxy28
+    optional: true
+    path_alias: github.com/openshift/router
+    rerun_command: /test e2e-aws-fips-haproxy28
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-fips-haproxy28
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-fips-haproxy28,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build07
     context: ci/prow/e2e-aws-serial-1of2
     decorate: true
     decoration_config:
@@ -318,7 +419,6 @@ presubmits:
     name: pull-ci-openshift-priv-router-master-e2e-aws-serial-1of2
     path_alias: github.com/openshift/router
     rerun_command: /test e2e-aws-serial-1of2
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -391,6 +491,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-aws-serial-1of2,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     branches:
     - ^master$
     - ^master-
@@ -416,7 +518,6 @@ presubmits:
     name: pull-ci-openshift-priv-router-master-e2e-aws-serial-2of2
     path_alias: github.com/openshift/router
     rerun_command: /test e2e-aws-serial-2of2
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -493,7 +594,7 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build07
-    context: ci/prow/e2e-aws-serial-haproxy28-techpreview-1of2
+    context: ci/prow/e2e-aws-serial-haproxy28-1of2
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -511,10 +612,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-router-master-e2e-aws-serial-haproxy28-techpreview-1of2
+    name: pull-ci-openshift-priv-router-master-e2e-aws-serial-haproxy28-1of2
     optional: true
     path_alias: github.com/openshift/router
-    rerun_command: /test e2e-aws-serial-haproxy28-techpreview-1of2
+    rerun_command: /test e2e-aws-serial-haproxy28-1of2
     spec:
       containers:
       - args:
@@ -525,7 +626,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-serial-haproxy28-techpreview
+        - --target=e2e-aws-serial-haproxy28
         command:
         - ci-operator
         env:
@@ -584,14 +685,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-serial-haproxy28-techpreview-1of2,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-serial-haproxy28-1of2,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build07
-    context: ci/prow/e2e-aws-serial-haproxy28-techpreview-2of2
+    context: ci/prow/e2e-aws-serial-haproxy28-2of2
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -609,10 +710,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-router-master-e2e-aws-serial-haproxy28-techpreview-2of2
+    name: pull-ci-openshift-priv-router-master-e2e-aws-serial-haproxy28-2of2
     optional: true
     path_alias: github.com/openshift/router
-    rerun_command: /test e2e-aws-serial-haproxy28-techpreview-2of2
+    rerun_command: /test e2e-aws-serial-haproxy28-2of2
     spec:
       containers:
       - args:
@@ -623,7 +724,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-serial-haproxy28-techpreview
+        - --target=e2e-aws-serial-haproxy28
         command:
         - ci-operator
         env:
@@ -682,7 +783,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-serial-haproxy28-techpreview-2of2,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-serial-haproxy28-2of2,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -979,10 +1080,12 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-router,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build07
     context: ci/prow/e2e-upgrade
     decorate: true
     decoration_config:
@@ -1004,7 +1107,6 @@ presubmits:
     name: pull-ci-openshift-priv-router-master-e2e-upgrade
     path_alias: github.com/openshift/router
     rerun_command: /test e2e-upgrade
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1079,8 +1181,8 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
-    context: ci/prow/e2e-upgrade-haproxy28-techpreview
+    cluster: build07
+    context: ci/prow/e2e-upgrade-haproxy28
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -1098,10 +1200,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-router-master-e2e-upgrade-haproxy28-techpreview
+    name: pull-ci-openshift-priv-router-master-e2e-upgrade-haproxy28
     optional: true
     path_alias: github.com/openshift/router
-    rerun_command: /test e2e-upgrade-haproxy28-techpreview
+    rerun_command: /test e2e-upgrade-haproxy28
     spec:
       containers:
       - args:
@@ -1111,7 +1213,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-upgrade-haproxy28-techpreview
+        - --target=e2e-upgrade-haproxy28
         command:
         - ci-operator
         env:
@@ -1170,13 +1272,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-upgrade-haproxy28-techpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-upgrade-haproxy28,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build07
     context: ci/prow/fips-image-scan-haproxy-router
     decorate: true
     decoration_config:
@@ -1270,7 +1372,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build07
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1530,11 +1632,108 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )perfscale-aws-ingress-perf,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build07
+    context: ci/prow/perfscale-aws-ingress-perf-haproxy28
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/router/base/Dockerfile.ocp
+      - images/router/haproxy/Dockerfile.ocp
+      - images/router/haproxy28/Dockerfile.ocp
+      - images/router/haproxy32/Dockerfile.ocp
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-router-master-perfscale-aws-ingress-perf-haproxy28
+    optional: true
+    path_alias: github.com/openshift/router
+    rerun_command: /test perfscale-aws-ingress-perf-haproxy28
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=perfscale-aws-ingress-perf-haproxy28
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )perfscale-aws-ingress-perf-haproxy28,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build07
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -1611,7 +1810,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build07
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -1688,7 +1887,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build07
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:

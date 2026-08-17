@@ -9,10 +9,24 @@ images:
     - arm64
     dockerfile_path: Dockerfile
     to: oadp-operator
+  - dockerfile_path: build/ci-Dockerfile
+    to: test-oadp-operator
+operator:
+  bundles:
+  - as: oadp-operator-bundle
+    dockerfile_path: build/Dockerfile.bundle
+    skip_building_index: true
 promotion:
   to:
-  - name: oadp-operator
+  - excluded_images:
+    - test-oadp-operator
+    name: oadp-operator
     namespace: konveyor
+  - additional_images:
+      oadp-operator-bundle: oadp-operator-bundle
+      oadp-operator-e2e-tests: test-oadp-operator
+    namespace: konveyor
+    tag: oadp-dev
 resources:
   '*':
     limits:

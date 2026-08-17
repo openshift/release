@@ -16,7 +16,8 @@ images:
     to: cluster-autoscaler-operator
 promotion:
   to:
-  - name: "5.1"
+  - disabled: true
+    name: "5.1"
     namespace: ocp
 releases:
   initial:
@@ -54,21 +55,25 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
-- as: e2e-aws
-  skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     env:
       PQC_CHECK: "true"
       SCAN_NAMESPACE: openshift-machine-api
-      SCANNER_CPU: 500m
-      SCANNER_MEMORY: 1Gi
+      SCANNER_CPU_LIMIT: 500m
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 1Gi
+      SCANNER_MEM_REQUEST: 1Gi
     test:
     - ref: openshift-e2e-test
     - ref: tls-scanner-run
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -80,8 +85,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-upgrade
-  skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-upgrade
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws

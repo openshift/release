@@ -52,9 +52,12 @@ tests:
     test:
     - as: monitor
       commands: |
+        set -euo pipefail
         set +x
         source /tmp/nutanix-creds/secrets.sh
+        umask 077
         mkdir -p /tmp/nutanix-auth
+        trap 'rm -rf /tmp/nutanix-auth' EXIT
         echo -n "${prism_central_username}" > /tmp/nutanix-auth/nutanix-username
         echo -n "${prism_central_password}" > /tmp/nutanix-auth/nutanix-password
         set -x
@@ -68,6 +71,67 @@ tests:
       - mount_path: /tmp/nutanix-creds
         name: nutanix-pc
         namespace: test-credentials
+      from: src
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+- as: capacity-monitor
+  cluster: build01
+  cron: 0 */6 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: Capacity Monitor alert - check logs for details. <{{.Status.URL}}|View
+      logs>
+  steps:
+    cluster_profile: nutanix
+    test:
+    - as: monitor
+      commands: |
+        set -euo pipefail
+        set +x
+        source /tmp/nutanix-creds/secrets.sh
+        umask 077
+        mkdir -p /tmp/nutanix-auth
+        trap 'rm -rf /tmp/nutanix-auth' EXIT
+        echo -n "${prism_central_username}" > /tmp/nutanix-auth/nutanix-username
+        echo -n "${prism_central_password}" > /tmp/nutanix-auth/nutanix-password
+        set -x
+        make build
+        ./bin/capacity-monitor --config config/nutanix.yaml \
+          --credentials-dir /tmp/nutanix-auth \
+          --endpoint "${prism_central_host}" \
+          --port "${prism_central_port}"
+      credentials:
+      - mount_path: /tmp/nutanix-creds
+        name: nutanix-pc
+        namespace: test-credentials
+      from: src
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+- as: job-health-monitor
+  cron: 0 */6 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: Job Health Monitor alert - check logs for details. <{{.Status.URL}}|View
+      logs>
+  steps:
+    test:
+    - as: monitor
+      commands: |
+        set -euo pipefail
+        make build
+        ./bin/job-health-monitor --config config/jobs.yaml
       from: src
       resources:
         requests:

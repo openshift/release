@@ -78,19 +78,21 @@ tests:
     if [[ -z "$PULLSPEC" ]]; then echo "ERROR: empty pullSpec" >&2; exit 1; fi
     echo "Release: $PULLSPEC"
     IMAGES=$(oc adm release info "$PULLSPEC" -a "$REGISTRY_AUTH_FILE" --pullspecs -o json \
-      | jq -r '[.references.spec.tags[] | select(.from.name != null) | .from.name] | .[0:15] | .[]')
+      | jq -r '[.references.spec.tags[] | select(.from.name != null) | "\(.name // "")=\(.from.name)"] | .[0:15] | .[]')
     if [[ -z "$IMAGES" ]]; then echo "ERROR: no images resolved" >&2; exit 1; fi
     total=0 failed=0
-    for img in $IMAGES; do
+    for entry in $IMAGES; do
+      tag="${entry%%=*}"
+      img="${entry#*=}"
       total=$((total+1))
-      echo "--- [$total] Scanning: $img"
+      echo "--- [$total] Scanning: $tag ($img)"
       rm -rf /tmp/unpacked && mkdir -p /tmp/unpacked
       if ! oc image extract "$img" -a "$REGISTRY_AUTH_FILE" --path /:/tmp/unpacked --confirm; then
         echo "ERROR: failed to extract $img" >&2
         failed=$((failed+1))
         continue
       fi
-      /check-payload scan local --path=/tmp/unpacked -V "$VERSION" -v=1 || failed=$((failed+1))
+      /check-payload scan local --path=/tmp/unpacked --tag "$tag" -V "$VERSION" -v=1 || failed=$((failed+1))
     done
     echo "Result: scanned $total images, $failed failed"
     if [[ $failed -gt 0 ]]; then exit 1; fi
@@ -112,19 +114,21 @@ tests:
     if [[ -z "$PULLSPEC" ]]; then echo "ERROR: empty pullSpec" >&2; exit 1; fi
     echo "Release: $PULLSPEC"
     IMAGES=$(oc adm release info "$PULLSPEC" -a "$REGISTRY_AUTH_FILE" --pullspecs -o json \
-      | jq -r '[.references.spec.tags[] | select(.from.name != null) | .from.name] | .[0:15] | .[]')
+      | jq -r '[.references.spec.tags[] | select(.from.name != null) | "\(.name // "")=\(.from.name)"] | .[0:15] | .[]')
     if [[ -z "$IMAGES" ]]; then echo "ERROR: no images resolved" >&2; exit 1; fi
     total=0 failed=0
-    for img in $IMAGES; do
+    for entry in $IMAGES; do
+      tag="${entry%%=*}"
+      img="${entry#*=}"
       total=$((total+1))
-      echo "--- [$total] Scanning: $img"
+      echo "--- [$total] Scanning: $tag ($img)"
       rm -rf /tmp/unpacked && mkdir -p /tmp/unpacked
       if ! oc image extract "$img" -a "$REGISTRY_AUTH_FILE" --path /:/tmp/unpacked --confirm; then
         echo "ERROR: failed to extract $img" >&2
         failed=$((failed+1))
         continue
       fi
-      /check-payload scan local --path=/tmp/unpacked -V "$VERSION" -v=1 || failed=$((failed+1))
+      /check-payload scan local --path=/tmp/unpacked --tag "$tag" -V "$VERSION" -v=1 || failed=$((failed+1))
     done
     echo "Result: scanned $total images, $failed failed"
     if [[ $failed -gt 0 ]]; then exit 1; fi
@@ -146,19 +150,21 @@ tests:
     if [[ -z "$PULLSPEC" ]]; then echo "ERROR: empty pullSpec" >&2; exit 1; fi
     echo "Release: $PULLSPEC"
     IMAGES=$(oc adm release info "$PULLSPEC" -a "$REGISTRY_AUTH_FILE" --pullspecs -o json \
-      | jq -r '[.references.spec.tags[] | select(.from.name != null) | .from.name] | .[0:15] | .[]')
+      | jq -r '[.references.spec.tags[] | select(.from.name != null) | "\(.name // "")=\(.from.name)"] | .[0:15] | .[]')
     if [[ -z "$IMAGES" ]]; then echo "ERROR: no images resolved" >&2; exit 1; fi
     total=0 failed=0
-    for img in $IMAGES; do
+    for entry in $IMAGES; do
+      tag="${entry%%=*}"
+      img="${entry#*=}"
       total=$((total+1))
-      echo "--- [$total] Scanning: $img"
+      echo "--- [$total] Scanning: $tag ($img)"
       rm -rf /tmp/unpacked && mkdir -p /tmp/unpacked
       if ! oc image extract "$img" -a "$REGISTRY_AUTH_FILE" --path /:/tmp/unpacked --confirm; then
         echo "ERROR: failed to extract $img" >&2
         failed=$((failed+1))
         continue
       fi
-      /check-payload scan local --path=/tmp/unpacked -V "$VERSION" -v=1 || failed=$((failed+1))
+      /check-payload scan local --path=/tmp/unpacked --tag "$tag" -V "$VERSION" -v=1 || failed=$((failed+1))
     done
     echo "Result: scanned $total images, $failed failed"
     if [[ $failed -gt 0 ]]; then exit 1; fi
@@ -180,19 +186,21 @@ tests:
     if [[ -z "$PULLSPEC" ]]; then echo "ERROR: empty pullSpec" >&2; exit 1; fi
     echo "Release: $PULLSPEC"
     IMAGES=$(oc adm release info "$PULLSPEC" -a "$REGISTRY_AUTH_FILE" --pullspecs -o json \
-      | jq -r '[.references.spec.tags[] | select(.from.name != null) | .from.name] | .[0:15] | .[]')
+      | jq -r '[.references.spec.tags[] | select(.from.name != null) | "\(.name // "")=\(.from.name)"] | .[0:15] | .[]')
     if [[ -z "$IMAGES" ]]; then echo "ERROR: no images resolved" >&2; exit 1; fi
     total=0 failed=0
-    for img in $IMAGES; do
+    for entry in $IMAGES; do
+      tag="${entry%%=*}"
+      img="${entry#*=}"
       total=$((total+1))
-      echo "--- [$total] Scanning: $img"
+      echo "--- [$total] Scanning: $tag ($img)"
       rm -rf /tmp/unpacked && mkdir -p /tmp/unpacked
       if ! oc image extract "$img" -a "$REGISTRY_AUTH_FILE" --path /:/tmp/unpacked --confirm; then
         echo "ERROR: failed to extract $img" >&2
         failed=$((failed+1))
         continue
       fi
-      /check-payload scan local --path=/tmp/unpacked -V "$VERSION" -v=1 || failed=$((failed+1))
+      /check-payload scan local --path=/tmp/unpacked --tag "$tag" -V "$VERSION" -v=1 || failed=$((failed+1))
     done
     echo "Result: scanned $total images, $failed failed"
     if [[ $failed -gt 0 ]]; then exit 1; fi

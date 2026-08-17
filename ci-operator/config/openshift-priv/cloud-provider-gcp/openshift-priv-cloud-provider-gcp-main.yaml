@@ -12,7 +12,7 @@ base_images:
     namespace: ci
     tag: latest
   rhel-coreos-base:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp-priv
     tag: rhel-coreos
   tests-private:
@@ -54,7 +54,7 @@ promotion:
       cloud-provider-gcp-rpms: rpms
     excluded_images:
     - rhel-coreos
-    name: "5.0"
+    name: "5.1"
     namespace: ocp-priv
 prowgen:
   private: true
@@ -65,12 +65,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp-priv
 resources:
   '*':
@@ -86,13 +86,15 @@ tests:
   commands: gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/")
   container:
     from: src
-- as: e2e-gcp-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-ovn-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-gcp-ovn-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upgrade

@@ -11,10 +11,10 @@ if [ "${MAP_TESTS}" = "true" ]; then
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
         trap '
             LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
-                ExitTrap--PostProcessPrep
+                ExitTrap--PostProcessPrep junit--acm-observability.xml
         ' EXIT
     else
-        echo "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping" >&2
+        : "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping"
     fi
 fi
 

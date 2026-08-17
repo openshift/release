@@ -70,6 +70,9 @@ declare -a MIRRORED_IMAGES=(
   # agnhost:2.59 is not available in "openshift-tests images" command output, so we need to mirror it from source to avoid test failures
   # remove after image is available in "openshift-tests images" command output
   "quay.io/openshift/community-e2e-images:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-59-l6lMl0FrhVtCSA-8 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-59-l6lMl0FrhVtCSA-8"
+  # agnhost:2.63 is not available in "openshift-tests images" command output, so we need to mirror it from source to avoid test failures
+  # remove after image is available in "openshift-tests images" command output
+  "quay.io/openshift/community-e2e-images:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-63-0-t_yPbigw-dJBrfQ9 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-2-registry-k8s-io-e2e-test-images-agnhost-2-63-0-t_yPbigw-dJBrfQ9"
 )
 
 function run-oc-image-mirror() {

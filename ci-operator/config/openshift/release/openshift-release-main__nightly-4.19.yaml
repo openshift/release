@@ -1022,6 +1022,8 @@ tests:
   interval: 168h
   steps:
     cluster_profile: openshift-org-gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
     observers:
       enable:
       - observers-resource-watch
@@ -1675,6 +1677,8 @@ tests:
   cron: 50 2 * * 6
   steps:
     cluster_profile: openshift-org-gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
     observers:
       enable:
       - observers-resource-watch
@@ -1744,10 +1748,10 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
       *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      :rainbow: {{else}} <!subteam^S0B7Q6G7XQR> :red_jenkins_circle: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :volcano: {{end}}'
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
   steps:
     cluster_profile: rosa-e2e-02
     observers:
@@ -1762,14 +1766,16 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
       *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      :rainbow: {{else}} <!subteam^S0B7Q6G7XQR> :red_jenkins_circle: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :volcano: {{end}}'
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
   steps:
-    cluster_profile: rosa-e2e-02
+    cluster_profile: rosa-e2e-01
     env:
+      CLUSTER_SECTOR: rosa-e2e
       ENABLE_BILLING_ACCOUNT: "yes"
+      REGION: us-west-2
     observers:
       enable:
       - observers-resource-watch
@@ -1814,6 +1820,18 @@ tests:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     workflow: openshift-e2e-vsphere-csi
+- as: e2e-aws-disruptive-longrunning
+  cron: 0 12 * * 0
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_REQUIRES_SSH: "yes"
+      TEST_SUITE: openshift/disruptive-longrunning
+      TEST_TYPE: suite
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-disruption
 zz_generated_metadata:
   branch: main
   org: openshift

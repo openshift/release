@@ -47,11 +47,19 @@ tests:
 - as: verify
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: openshift-org-gcp
     test:
     - as: verify
       commands: |
+        oc registry login
         make verify -k --warn-undefined-variables
+      dependencies:
+      - env: HYPERKUBE_IMAGE
+        name: hyperkube
+      - env: ETCD_IMAGE
+        name: etcd
+      env:
+      - default: /tmp/registry-auth.json
+        name: REGISTRY_AUTH_FILE
       from: oauth-apiserver-bin-with-oc
       resources:
         requests:
@@ -62,11 +70,13 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-component
+- always_run: false
+  as: e2e-component
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -79,7 +89,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-component-serial-ote
+- always_run: false
+  as: e2e-gcp-component-serial-ote
   optional: true
   steps:
     cluster_profile: openshift-org-gcp
@@ -88,7 +99,8 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-gcp
-- as: e2e-gcp-component-serial-disruptive-ote
+- always_run: false
+  as: e2e-gcp-component-serial-disruptive-ote
   optional: true
   steps:
     cluster_profile: openshift-org-gcp
@@ -97,11 +109,13 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-gcp
-- as: e2e-aws-upgrade
+- always_run: false
+  as: e2e-aws-upgrade
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-aws-serial
+- always_run: false
+  as: e2e-aws-serial
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
