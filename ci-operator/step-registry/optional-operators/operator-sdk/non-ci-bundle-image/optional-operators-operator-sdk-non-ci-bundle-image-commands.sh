@@ -100,7 +100,7 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
     ./oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
 
     DEST_HOST=""
-    for i in $(seq 1 30); do
+    for _ in $(seq 1 30); do
         DEST_HOST=$(./oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}' 2>/dev/null || true)
         [[ -n "${DEST_HOST}" ]] && break
         sleep 5
@@ -184,7 +184,7 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
         # hasn't started rolling out yet (Updated can still read "True"
         # from before our own patch).
         echo "[$(date --utc +%FT%T.%3NZ)] Waiting for MachineConfigPools to finish rolling out the insecure-registry trust change"
-        for i in $(seq 1 90); do
+        for _ in $(seq 1 90); do
             ALL_DONE=true
             DEGRADED_MCP=""
             while IFS='=' read -r mcp_name old_config; do
@@ -258,7 +258,7 @@ type: kubernetes.io/service-account-token
 EOF
 
     ROBOT_TOKEN=""
-    for i in $(seq 1 30); do
+    for _ in $(seq 1 30); do
         ROBOT_TOKEN=$(./oc get secret "${OO_ROBOT_SA}-token" -n "${OO_INSTALL_NAMESPACE}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || true)
         [[ -n "${ROBOT_TOKEN}" ]] && break
         sleep 2

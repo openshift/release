@@ -80,7 +80,7 @@ tests:
         PATCH=$(printf '{"spec":{"config":{"env":[{"name":"RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER","value":"%s"}]}}}' "${KDM_CONTROLLER_IMAGE}")
         oc patch subscription "${SUB}" -n "${OO_INSTALL_NAMESPACE}" --type merge -p "${PATCH}"
         echo "Waiting for Deployment to observe RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER=${KDM_CONTROLLER_IMAGE}"
-        for i in $(seq 1 60); do
+        for _ in $(seq 1 60); do
           CURRENT=$(oc get deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" -o jsonpath="{.spec.template.spec.containers[?(@.name==\"manager\")].env[?(@.name==\"RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER\")].value}" 2>/dev/null || true)
           [ "${CURRENT}" = "${KDM_CONTROLLER_IMAGE}" ] && break
           sleep 5
