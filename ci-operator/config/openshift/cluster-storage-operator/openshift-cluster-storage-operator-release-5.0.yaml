@@ -18,8 +18,7 @@ images:
   - to: cluster-storage-operator
 promotion:
   to:
-  - disabled: true
-    name: "5.0"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -224,14 +223,74 @@ tests:
       HYPERSHIFT_AZURE_LOCATION: eastus
     workflow: hypershift-azure-aks-e2e
 - always_run: false
-  as: tls-scanner-vsphere-problem-detector
+  as: tls-scanner-aws-ebs
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- always_run: false
+  as: tls-scanner-azure-disk-azure-file
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-azure
+- always_run: false
+  as: tls-scanner-gcp-pd
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-gcp
+- always_run: false
+  as: tls-scanner-ibm-vpc-block
+  optional: true
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-ibmcloud
+- always_run: false
+  as: tls-scanner-vsphere
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
-      SCAN_NAMESPACE: openshift-cluster-storage-operator
-      SCANNER_CPU: "1"
-      SCANNER_MEMORY: 1Gi
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "2"
+      SCANNER_MEMORY: 2Gi
       TLS_13_ENABLE_TLS_ADHERENCE: "true"
       TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     test:

@@ -227,7 +227,50 @@ tests:
     test:
     - ref: rosa-operator-e2e
 - as: rosa-hcp-mc-e2e
-  cron: 0 8 * * 0
+  optional: true
+  run_if_changed: ^(controllers/hostedcontrolplane/|test/e2e/mc_probe_verification)
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CLUSTER_SECTOR: rosa-e2e
+      GINKGO_FOCUS: MC Probe Verification
+      HOSTED_CP: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.21"
+      OPERATOR_NAME: route-monitor-operator
+      REGION: us-west-2
+    workflow: rosa-operator-mc-e2e
+- as: rosa-hcp-mc-e2e-promotion-int
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CLUSTER_SECTOR: rosa-e2e
+      GINKGO_FOCUS: MC Probe Verification
+      HOSTED_CP: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.21"
+      OPERATOR_NAME: route-monitor-operator
+      REGION: us-west-2
+    workflow: rosa-operator-mc-e2e
+- as: rosa-hcp-mc-e2e-promotion-stage
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: rosa-e2e-01
     env:
