@@ -53,7 +53,7 @@ trap '{ EXIT_CODE=143; DebugOnExit; trap - EXIT; exit 143; }' TERM
 #  was removed IN that minor version (i.e. no longer available).
 #  Source: Kubernetes deprecation guide + OCP release notes.
 # ──────────────────────────────────────────────────────────────────────
-declare -A REMOVED_APIS
+typeset -A REMOVED_APIS
 REMOVED_APIS["12"]="batch/v1beta1/CronJob policy/v1beta1/PodDisruptionBudget policy/v1beta1/PodSecurityPolicy discovery.k8s.io/v1beta1/EndpointSlice events.k8s.io/v1beta1/Event autoscaling/v2beta1/HorizontalPodAutoscaler"
 REMOVED_APIS["14"]="storage.k8s.io/v1beta1/CSIStorageCapacity"
 REMOVED_APIS["17"]="flowcontrol.apiserver.k8s.io/v1beta2/FlowSchema flowcontrol.apiserver.k8s.io/v1beta2/PriorityLevelConfiguration"
@@ -64,7 +64,7 @@ REMOVED_APIS["18"]="flowcontrol.apiserver.k8s.io/v1beta3/FlowSchema flowcontrol.
 #  Maps OCP minor version to minimum required operator major.minor.
 #  Format: "operator_csv_prefix:min_major.min_minor"
 # ──────────────────────────────────────────────────────────────────────
-declare -A OPP_COMPAT
+typeset -A OPP_COMPAT
 OPP_COMPAT["4.14"]="advanced-cluster-management:2.9 rhacs-operator:4.3 odf-operator:4.14 quay-operator:3.10"
 OPP_COMPAT["4.15"]="advanced-cluster-management:2.10 rhacs-operator:4.4 odf-operator:4.15 quay-operator:3.11"
 OPP_COMPAT["4.16"]="advanced-cluster-management:2.11 rhacs-operator:4.5 odf-operator:4.16 quay-operator:3.12"

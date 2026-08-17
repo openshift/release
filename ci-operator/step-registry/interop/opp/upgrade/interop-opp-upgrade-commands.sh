@@ -115,7 +115,6 @@ function CheckSigned () {
         : "Image is not signed"
         return 1
     fi
-    true
 }
 
 function AdminAck () {
@@ -171,7 +170,6 @@ function AdminAck () {
     done
     : "Timed out waiting for admin acks"
     return 1
-    true
 }
 
 function UpdateCcoAnnotation () {
@@ -215,7 +213,6 @@ function UpdateCcoAnnotation () {
     done
     : "Timed out waiting for CCO annotation"
     return 1
-    true
 }
 
 function InitiateUpgrade () {
@@ -299,7 +296,6 @@ function MonitorUpgrade () {
     : "Upgrade timed out after ${UPGRADE_TIMEOUT} minutes at $(date '+%F %T')"
     : "Elapsed: $(( (endTime - startTime) / 60 ))m"
     exit 2
-    true
 }
 
 function StabilizeCluster () {
@@ -428,12 +424,10 @@ function Main () {
 
     targetVersion="$(oc adm release info "${upgradeTarget}" -o jsonpath='{.metadata.version}')"
     targetMinorVersion="$(echo "${targetVersion}" | cut -f2 -d.)"
-    typeset -g targetVersion targetMinorVersion
     : "Target release: ${targetVersion} (minor: ${targetMinorVersion})"
 
     sourceVersion="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')"
     sourceMinorVersion="$(echo "${sourceVersion}" | cut -f2 -d.)"
-    typeset -g sourceVersion sourceMinorVersion
     : "Source release: ${sourceVersion} (minor: ${sourceMinorVersion})"
 
     isForceUpdate="false"
