@@ -1,0 +1,48 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+build_root:
+  from_repository: true
+releases:
+  initial:
+    integration:
+      name: "5.0"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-karpenter-core-regression
+  cron: 0 6 * * 6
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      HYPERSHIFT_AUTONODE: "true"
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - as: karpenter-core-regression
+      cli: latest
+      commands: make karpenter-core-regression
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    workflow: hypershift-aws-e2e-cluster
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: karpenter-operator
+  variant: periodics
