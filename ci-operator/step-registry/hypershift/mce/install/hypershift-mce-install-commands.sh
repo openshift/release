@@ -326,6 +326,8 @@ fi
 HYPERSHIFT_NAME=hcp
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
+  echo "DEBUG: sleeping 15m before hcp CLI download to allow live debugging"
+  sleep 900
   downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
   cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
   chmod +x /tmp/${HYPERSHIFT_NAME}
