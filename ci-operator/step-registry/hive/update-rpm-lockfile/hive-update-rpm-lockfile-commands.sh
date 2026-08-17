@@ -42,12 +42,10 @@ GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
 
 # --- Tooling ---------------------------------------------------------------
 
-info "installing subscription-manager, python, and rpm-lockfile-prototype dependencies"
-dnf install -y subscription-manager python3 python3-pip python3-dnf skopeo
-
 export SMDEV_CONTAINER_OFF=1
+# /etc/rhsm-host is pre-removed in the lockfile-tools image; this is a safety guard
 if [[ -e /etc/rhsm-host ]]; then
-  unlink /etc/rhsm-host
+  unlink /etc/rhsm-host || true
 fi
 
 info "registering with subscription-manager"

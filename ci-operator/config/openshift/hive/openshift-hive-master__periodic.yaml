@@ -20,6 +20,15 @@ build_root:
 images:
   items:
   - dockerfile_literal: |
+      FROM src
+      USER root
+      RUN dnf install -y python3-pip python3-dnf skopeo && dnf clean all && \
+          rm -f /etc/rhsm-host && \
+          mkdir -p /etc/pki/entitlement /var/lib/rhsm && \
+          chmod -R 777 /etc/pki/entitlement /var/lib/rhsm /etc/rhsm
+    from: src
+    to: lockfile-tools
+  - dockerfile_literal: |
       FROM ubi9-minimal
       RUN rm -rf /etc/yum.repos.d/*
       RUN curl http://base-4-22-rhel9.ocp.svc > /etc/yum.repos.d/base-4-22-rhel9.repo
