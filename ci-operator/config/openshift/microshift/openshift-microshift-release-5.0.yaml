@@ -29,7 +29,9 @@ images:
           setcap cap_setuid+ep /usr/bin/newuidmap && \
           setcap cap_setgid+ep /usr/bin/newgidmap && \
           touch /etc/subgid /etc/subuid && \
-          chmod g=u /etc/subuid /etc/subgid
+          chmod g=u /etc/subuid /etc/subgid && \
+          chmod g=u /etc/passwd /etc/group
+      ENV BUILDAH_ISOLATION=chroot
       USER 1000
     inputs:
       src:
@@ -38,9 +40,9 @@ images:
     to: rebase-cryptoscan-src
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - microshift-test-rpm
+    - rebase-cryptoscan-src
     name: "5.0"
     namespace: ocp
 releases:

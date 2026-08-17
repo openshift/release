@@ -22,9 +22,9 @@ set -o errtrace
 #   DEBUG - Enable debug logging (default: false)
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.4.6"
-readonly YQ_VERSION="v4.53.2"
-readonly IBMCLOUD_VERSION="2.45.0"
+readonly POWERVC_TOOL_VERSION="v2.4.7"
+readonly YQ_VERSION="v4.53.3"
+readonly IBMCLOUD_VERSION="2.46.0"
 
 # Color codes for output (only use if terminal supports it)
 if [[ -t 2 ]]; then

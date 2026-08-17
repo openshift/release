@@ -5,6 +5,9 @@ import json
 import yaml
 
 CONFIG = {
+    'ibmcloud-perfscale-quota-slice': {
+        'us-east': 30,
+    },
     'aws-us-east-1-quota-slice': {
         'us-east-1': 15,
     },
@@ -719,7 +722,7 @@ CONFIG = {
         'default': 1,
     },
     'amd-gpu-quota-slice': {
-        '10.8.231.19': 1,
+        '10.6.135.55': 1,
     },
     'aws-osp-qe-quota-slice': {
         'us-east-1': 10,

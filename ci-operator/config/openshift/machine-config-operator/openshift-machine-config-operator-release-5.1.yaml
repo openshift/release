@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -71,7 +71,8 @@ images:
     to: zacks-toolbox
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - custom-os-image
     - src-with-skopeo
     - zacks-toolbox
@@ -163,6 +164,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
     pre:
     - chain: ipi-aws-pre
@@ -172,7 +175,7 @@ tests:
     workflow: ipi-aws
 - always_run: false
   as: e2e-aws-ovn
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
@@ -253,7 +256,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-op-part1
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -271,7 +274,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-op-part2
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -290,7 +293,7 @@ tests:
   timeout: 4h0m0s
 - always_run: false
   as: e2e-gcp-op-ocl-part1
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -305,7 +308,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-op-ocl-part2
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -337,7 +340,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-aws-ovn-upgrade
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
@@ -409,6 +412,7 @@ tests:
 - always_run: false
   as: e2e-vsphere-mco-bootimages
   optional: true
+  run_if_changed: ^pkg/controller/bootimage/vsphere_helpers(_test)?\.go$|^test/extended-priv/util/vsphere\.go$|^test/extended-priv/mco_bootimages\.go$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -421,6 +425,7 @@ tests:
 - always_run: false
   as: e2e-vsphere-zones-mco-bootimages
   optional: true
+  run_if_changed: ^pkg/controller/bootimage/vsphere_helpers(_test)?\.go$|^test/extended-priv/util/vsphere\.go$|^test/extended-priv/mco_bootimages\.go$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -434,6 +439,7 @@ tests:
 - always_run: false
   as: e2e-vsphere-multi-vcenter-mco-bootimages
   optional: true
+  run_if_changed: ^pkg/controller/bootimage/vsphere_helpers(_test)?\.go$|^test/extended-priv/util/vsphere\.go$|^test/extended-priv/mco_bootimages\.go$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -544,7 +550,7 @@ tests:
     workflow: openshift-e2e-gcp-single-node
 - always_run: false
   as: e2e-gcp-op-single-node
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -593,7 +599,7 @@ tests:
     workflow: openshift-e2e-openstack-external-lb
 - always_run: false
   as: e2e-hypershift
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
@@ -839,7 +845,7 @@ tests:
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: tls-pqc-readiness
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^test/extended|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-aws
     env:
