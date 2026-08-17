@@ -1,5 +1,6 @@
 #!/bin/bash
 set -eux -o pipefail
+shopt -s inherit_errexit
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -86,9 +87,9 @@ allprojects {
 INIT
 
 echo "[smoke] Running testSMOKE..."
-TEST_EXIT=0
+typeset -i testExit=0
 ./gradlew testSMOKE --no-daemon --init-script /tmp/fix-proto-deps.gradle \
-    -Dorg.gradle.jvmargs="-Xmx2g" || TEST_EXIT=$?
+    -Dorg.gradle.jvmargs="-Xmx2g" || testExit=$?
 
 echo "[smoke] Copying JUnit results to ARTIFACT_DIR..."
 if [[ -d build/test-results/testSMOKE ]]; then
@@ -101,13 +102,14 @@ if [[ -d build/reports/tests/testSMOKE ]]; then
         -exec cp -r {} "${ARTIFACT_DIR}/smoke-report/" \;
 fi
 
-echo "[smoke] Test run finished with exit code: ${TEST_EXIT}"
-if [[ "${TEST_EXIT}" -ne 0 ]] && [[ -d build/test-results/testSMOKE ]]; then
-    TOTAL="$(find build/test-results/testSMOKE -name '*.xml' -exec grep -l 'testcase' {} \; | wc -l)"
-    if [[ "${TOTAL}" -gt 0 ]]; then
+echo "[smoke] Test run finished with exit code: ${testExit}"
+if [[ "${testExit}" -ne 0 ]] && [[ -d build/test-results/testSMOKE ]]; then
+    typeset total=""
+    total="$(find build/test-results/testSMOKE -name '*.xml' -exec grep -l 'testcase' {} \; | wc -l)"
+    if [[ "${total}" -gt 0 ]]; then
         echo "[smoke] Tests executed and results captured; treating as informational (exit 0)."
         echo "[smoke] Review JUnit XML in ARTIFACT_DIR for individual test failures."
         exit 0
     fi
 fi
-exit "${TEST_EXIT}"
+exit "${testExit}"
