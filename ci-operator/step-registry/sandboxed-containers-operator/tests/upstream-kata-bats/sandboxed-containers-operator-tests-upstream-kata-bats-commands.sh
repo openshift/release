@@ -38,15 +38,15 @@ if ! git clone --depth 1 --branch "${TEST_UPSTREAM_KATA_BATS_BRANCH}" "${TEST_UP
     echo "ERROR: git clone failed."
     exit 0
 fi
-cd "${WORKDIR}"
+cd "${WORKDIR}" || { echo "ERROR: cd failed"; exit 0; }
 
 # Install bats if not already available
 if ! command -v bats &>/dev/null; then
     echo "Installing bats..."
     if [[ -d "tests/bats" ]]; then
-        cd tests/bats
+        cd tests/bats || { echo "ERROR: cd tests/bats failed"; exit 0; }
         ./install.sh /usr/local
-        cd "${WORKDIR}"
+        cd "${WORKDIR}" || { echo "ERROR: cd workdir failed"; exit 0; }
     else
         git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core
         /tmp/bats-core/install.sh /usr/local
@@ -96,8 +96,7 @@ fi
 
 if [[ "${TEST_UPSTREAM_KATA_BATS_FULL_ENABLE:-}" == "true" ]]; then
     # shellcheck disable=SC2086
-    full_rc=0
-    run_bats "full" "${FULL_TIMEOUT}" ${FULL_FILES} || full_rc=$?
+    run_bats "full" "${FULL_TIMEOUT}" ${FULL_FILES} || true
 
     # Merge smoke + full JUnit into a single file
     if [[ -f "${ARTIFACT_DIR}/junit_smoke.xml" && -f "${ARTIFACT_DIR}/junit_full.xml" ]]; then
