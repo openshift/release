@@ -1,5 +1,6 @@
 #!/bin/bash
 set -eux -o pipefail
+shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
 # ACS OPP Readiness Gate
@@ -16,9 +17,9 @@ if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 fi
 
-POLL_INTERVAL=30
-TIMEOUT=600
-ELAPSED=0
+typeset -i pollInterval=30
+typeset -i timeout=600
+typeset -i elapsed=0
 
 function WaitFor () {
     typeset description="$1"
@@ -26,20 +27,20 @@ function WaitFor () {
     typeset checkFn="$1"
     shift
 
-    ELAPSED=0
+    elapsed=0
     echo "[readiness] Waiting for: ${description}"
     while true; do
         if "${checkFn}" "$@"; then
             echo "[readiness] OK: ${description}"
             return 0
         fi
-        ELAPSED=$((ELAPSED + POLL_INTERVAL))
-        if [[ ${ELAPSED} -ge ${TIMEOUT} ]]; then
-            echo "[readiness] TIMEOUT after ${TIMEOUT}s waiting for: ${description}"
+        elapsed=$((elapsed + pollInterval))
+        if [[ ${elapsed} -ge ${timeout} ]]; then
+            echo "[readiness] TIMEOUT after ${timeout}s waiting for: ${description}"
             return 1
         fi
-        echo "[readiness]   ...retrying in ${POLL_INTERVAL}s (${ELAPSED}/${TIMEOUT}s)"
-        sleep "${POLL_INTERVAL}"
+        echo "[readiness]   ...retrying in ${pollInterval}s (${elapsed}/${timeout}s)"
+        sleep "${pollInterval}"
     done
     true
 }
@@ -52,55 +53,57 @@ function JsonLength () {
 # Namespace discovery via CRs (never hardcode)
 # ---------------------------------------------------------------------------
 function DiscoverCentralNs () {
-    CENTRAL_NS="$(oc get centrals.platform.stackrox.io --all-namespaces \
+    centralNs="$(oc get centrals.platform.stackrox.io --all-namespaces \
         -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
-        && [[ -n "${CENTRAL_NS}" ]]
+        && [[ -n "${centralNs}" ]]
 }
 
 function DiscoverScNs () {
-    SC_NS="$(oc get securedclusters.platform.stackrox.io --all-namespaces \
+    scNs="$(oc get securedclusters.platform.stackrox.io --all-namespaces \
         -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
-        && [[ -n "${SC_NS}" ]]
+        && [[ -n "${scNs}" ]]
 }
 
-CENTRAL_NS=""
-SC_NS=""
+typeset centralNs=""
+typeset scNs=""
 
 WaitFor "Central CR namespace discovery" DiscoverCentralNs
-echo "[readiness] Central namespace discovered"
+echo "[readiness] Central namespace: ${centralNs}"
 
 WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs
-echo "[readiness] SecuredCluster namespace discovered"
+echo "[readiness] SecuredCluster namespace: ${scNs}"
 
 # ---------------------------------------------------------------------------
 # Check 1: Central route exists
 # ---------------------------------------------------------------------------
+typeset centralUrl=""
+
 function CheckCentralRoute () {
-    oc get route central -n "${CENTRAL_NS}" -o jsonpath='{.spec.host}' 2>/dev/null
+    oc get route central -n "${centralNs}" -o jsonpath='{.spec.host}' 2>/dev/null
 }
 
 WaitFor "Central route" CheckCentralRoute
 
 set +x
-CENTRAL_URL="$(oc get route central -n "${CENTRAL_NS}" -o jsonpath='{.spec.host}')"
+centralUrl="$(oc get route central -n "${centralNs}" -o jsonpath='{.spec.host}')"
 set -x
 echo "[readiness] Central route discovered"
 
 # ---------------------------------------------------------------------------
 # Extract ROX_ADMIN_PASSWORD before API checks
 # ---------------------------------------------------------------------------
-echo "[readiness] Extracting ROX_ADMIN_PASSWORD..."
-ROX_ADMIN_PASSWORD=""
+typeset roxAdminPassword=""
+echo "[readiness] Extracting roxAdminPassword..."
 set +x
-ROX_ADMIN_PASSWORD="$(oc get secret -n "${CENTRAL_NS}" central-htpasswd \
+roxAdminPassword="$(oc get secret -n "${centralNs}" central-htpasswd \
     -o jsonpath='{.data.password}' | base64 -d)"
 set -x
 
-if [[ -z "${ROX_ADMIN_PASSWORD}" ]]; then
-    echo "[readiness] FATAL: could not extract ROX_ADMIN_PASSWORD"
+if [[ -z "${roxAdminPassword}" ]]; then
+    echo "[readiness] FATAL: could not extract roxAdminPassword"
     exit 1
 fi
-echo "[readiness] ROX_ADMIN_PASSWORD extracted successfully"
+echo "[readiness] roxAdminPassword extracted successfully"
 
 # ---------------------------------------------------------------------------
 # Check 2: Central API health (authenticated v1/metadata)
@@ -109,8 +112,8 @@ function CheckCentralApi () {
     set +x
     typeset httpCode=""
     httpCode="$(curl -sk -o /dev/null -w '%{http_code}' \
-        -u "admin:${ROX_ADMIN_PASSWORD}" \
-        "https://${CENTRAL_URL}/v1/metadata" --max-time 10)" || { set -x; return 1; }
+        -u "admin:${roxAdminPassword}" \
+        "https://${centralUrl}/v1/metadata" --max-time 10)" || { set -x; return 1; }
     set -x
     [[ "${httpCode}" == "200" ]]
 }
@@ -123,8 +126,8 @@ WaitFor "Central API health (v1/metadata)" CheckCentralApi
 function CheckClustersConnected () {
     set +x
     typeset clusterCount=""
-    clusterCount="$(curl -sk -u "admin:${ROX_ADMIN_PASSWORD}" \
-        "https://${CENTRAL_URL}/v1/clusters" --max-time 10 \
+    clusterCount="$(curl -sk -u "admin:${roxAdminPassword}" \
+        "https://${centralUrl}/v1/clusters" --max-time 10 \
         | JsonLength clusters)" || { set -x; return 1; }
     set -x
     [[ "${clusterCount}" -ge 1 ]]
@@ -137,7 +140,7 @@ WaitFor "secured cluster connected (v1/clusters)" CheckClustersConnected
 # ---------------------------------------------------------------------------
 function CheckSensorPods () {
     typeset podCount=""
-    podCount="$(oc get pods -n "${SC_NS}" -l app=sensor \
+    podCount="$(oc get pods -n "${scNs}" -l app=sensor \
         -o json 2>/dev/null | JsonLength items)" || return 1
     if [[ "${podCount}" -eq 0 ]]; then
         echo "[readiness]   no sensor pods found yet"
@@ -145,7 +148,7 @@ function CheckSensorPods () {
     fi
 
     typeset sensorJson=""
-    sensorJson="$(oc get pods -n "${SC_NS}" -l app=sensor -o json 2>/dev/null)" || return 1
+    sensorJson="$(oc get pods -n "${scNs}" -l app=sensor -o json 2>/dev/null)" || return 1
     typeset oomContainers=""
     if [[ -n "${sensorJson}" ]]; then
         oomContainers="$(echo "${sensorJson}" | python3 -c "
@@ -163,7 +166,7 @@ for pod in d.get('items',[]):
     fi
 
     typeset podConditions=""
-    podConditions="$(oc get pods -n "${SC_NS}" -l app=sensor \
+    podConditions="$(oc get pods -n "${scNs}" -l app=sensor \
         -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[*]}{.type}={.status}{" "}{end}{"\n"}{end}' 2>/dev/null)" || return 1
     typeset notReady=""
     notReady="$(echo "${podConditions}" | while IFS= read -r line; do
@@ -175,7 +178,7 @@ for pod in d.get('items',[]):
     [[ -z "${notReady}" ]]
 }
 
-WaitFor "sensor pods Running in ${SC_NS}" CheckSensorPods
+WaitFor "sensor pods Running in ${scNs}" CheckSensorPods
 
 # ---------------------------------------------------------------------------
 # Check 5: Default policies loaded (count > 80)
@@ -183,8 +186,8 @@ WaitFor "sensor pods Running in ${SC_NS}" CheckSensorPods
 function CheckPoliciesLoaded () {
     set +x
     typeset policyCount=""
-    policyCount="$(curl -sk -u "admin:${ROX_ADMIN_PASSWORD}" \
-        "https://${CENTRAL_URL}/v1/policies?query=" --max-time 10 \
+    policyCount="$(curl -sk -u "admin:${roxAdminPassword}" \
+        "https://${centralUrl}/v1/policies?query=" --max-time 10 \
         | JsonLength policies)" || { set -x; return 1; }
     set -x
     echo "[readiness]   policy count: ${policyCount}"
@@ -196,11 +199,11 @@ WaitFor "default policies loaded (>80)" CheckPoliciesLoaded
 echo "[readiness] Writing connection details to SHARED_DIR..."
 
 set +x
-echo "${ROX_ADMIN_PASSWORD}" > "${SHARED_DIR}/ROX_ADMIN_PASSWORD"
-echo "${CENTRAL_URL}"        > "${SHARED_DIR}/CENTRAL_URL"
+echo "${roxAdminPassword}" > "${SHARED_DIR}/ROX_ADMIN_PASSWORD"
+echo "${centralUrl}"       > "${SHARED_DIR}/CENTRAL_URL"
 set -x
 
-echo "${CENTRAL_NS}"   > "${SHARED_DIR}/CENTRAL_NS"
-echo "${SC_NS}"        > "${SHARED_DIR}/SC_NS"
+echo "${centralNs}"  > "${SHARED_DIR}/CENTRAL_NS"
+echo "${scNs}"       > "${SHARED_DIR}/SC_NS"
 
 echo "[readiness] All checks passed. ACS is ready for SMOKE tests."

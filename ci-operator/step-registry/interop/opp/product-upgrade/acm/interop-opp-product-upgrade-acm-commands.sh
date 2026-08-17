@@ -312,108 +312,116 @@ function ValidateHubHealth () {
 
 # === Main ===
 
-echo "=== ACM Operator Upgrade Step ==="
-echo "Namespace: ${ACM_SUBSCRIPTION_NAMESPACE}"
-echo "Subscription: ${ACM_SUBSCRIPTION_NAME}"
-echo "Timeout: ${ACM_UPGRADE_TIMEOUT}"
+function Main () {
+    typeset currentCsv currentVersion currentChannel targetChannel
+    typeset prePatchPlan planPhase installPlan localApproval
+    typeset newCsv newVersion
 
-currentCsv="$(GetCurrentCsv)"
-if [[ -z "${currentCsv}" ]]; then
-    echo >&2 "ERROR: No ACM subscription found or no currentCSV set"
-    exit 3
-fi
+    echo "=== ACM Operator Upgrade Step ==="
+    echo "Namespace: ${ACM_SUBSCRIPTION_NAMESPACE}"
+    echo "Subscription: ${ACM_SUBSCRIPTION_NAME}"
+    echo "Timeout: ${ACM_UPGRADE_TIMEOUT}"
 
-currentVersion="$(GetInstalledVersion)"
-currentChannel="$(GetCurrentChannel)"
-echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
+    currentCsv="$(GetCurrentCsv)"
+    if [[ -z "${currentCsv}" ]]; then
+        echo >&2 "ERROR: No ACM subscription found or no currentCSV set"
+        exit 3
+    fi
 
-targetChannel="$(ResolveTargetChannel)"
-echo "Target channel: ${targetChannel}"
+    currentVersion="$(GetInstalledVersion)"
+    currentChannel="$(GetCurrentChannel)"
+    echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
 
-prePatchPlan=""
-if ! prePatchPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
-    -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-    -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null)"; then
-    echo "WARNING: Could not query current installPlanRef; treating as empty"
+    targetChannel="$(ResolveTargetChannel)"
+    echo "Target channel: ${targetChannel}"
+
     prePatchPlan=""
-fi
-echo "Pre-patch InstallPlan: ${prePatchPlan:-none}"
-
-if [[ "${targetChannel}" == "${currentChannel}" ]]; then
-    echo "Already on target channel ${targetChannel}; checking if upgrade is available..."
-    if [[ -z "${prePatchPlan}" ]]; then
-        echo "No pending upgrade on current channel; nothing to do"
-        exit 0
-    fi
-    planPhase="$(oc get installplan "${prePatchPlan}" \
+    if ! prePatchPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.phase}' || true)"
-    if [[ "${planPhase}" == "Complete" ]]; then
-        echo "InstallPlan ${prePatchPlan} already complete; no pending upgrade"
-        exit 0
+        -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null)"; then
+        echo "WARNING: Could not query current installPlanRef; treating as empty"
+        prePatchPlan=""
     fi
-    installPlan="${prePatchPlan}"
-else
-    echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
-    oc patch subscription "${ACM_SUBSCRIPTION_NAME}" \
-        -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        --type merge \
-        -p "{\"spec\":{\"channel\":\"${targetChannel}\"}}"
+    echo "Pre-patch InstallPlan: ${prePatchPlan:-none}"
 
-    echo "Waiting for new InstallPlan (pre-patch ref: ${prePatchPlan:-none})..."
-    sleep 10
-
-    installPlan=""
-    for _ in {1..18}; do
-        installPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
-            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-            -o jsonpath='{.status.installPlanRef.name}' || true)"
-        if [[ -n "${installPlan}" && "${installPlan}" != "${prePatchPlan}" ]]; then
-            break
+    if [[ "${targetChannel}" == "${currentChannel}" ]]; then
+        echo "Already on target channel ${targetChannel}; checking if upgrade is available..."
+        if [[ -z "${prePatchPlan}" ]]; then
+            echo "No pending upgrade on current channel; nothing to do"
+            exit 0
         fi
-        installPlan=""
+        planPhase="$(oc get installplan "${prePatchPlan}" \
+            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            -o jsonpath='{.status.phase}' || true)"
+        if [[ "${planPhase}" == "Complete" ]]; then
+            echo "InstallPlan ${prePatchPlan} already complete; no pending upgrade"
+            exit 0
+        fi
+        installPlan="${prePatchPlan}"
+    else
+        echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
+        oc patch subscription "${ACM_SUBSCRIPTION_NAME}" \
+            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            --type merge \
+            -p "{\"spec\":{\"channel\":\"${targetChannel}\"}}"
+
+        echo "Waiting for new InstallPlan (pre-patch ref: ${prePatchPlan:-none})..."
         sleep 10
-    done
 
-    if [[ -z "${installPlan}" ]]; then
-        echo >&2 "ERROR: No new InstallPlan appeared after channel change (waited 3m)"
-        exit 2
+        installPlan=""
+        for _ in {1..18}; do
+            installPlan="$(oc get subscription "${ACM_SUBSCRIPTION_NAME}" \
+                -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+                -o jsonpath='{.status.installPlanRef.name}' || true)"
+            if [[ -n "${installPlan}" && "${installPlan}" != "${prePatchPlan}" ]]; then
+                break
+            fi
+            installPlan=""
+            sleep 10
+        done
+
+        if [[ -z "${installPlan}" ]]; then
+            echo >&2 "ERROR: No new InstallPlan appeared after channel change (waited 3m)"
+            exit 2
+        fi
     fi
-fi
 
-echo "InstallPlan: ${installPlan}"
-localApproval="$(oc get installplan "${installPlan}" \
-    -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-    -o jsonpath='{.spec.approval}' || true)"
-if [[ "${localApproval}" == "Manual" ]]; then
-    echo "Approving manual InstallPlan..."
-    oc patch installplan "${installPlan}" \
+    echo "InstallPlan: ${installPlan}"
+    localApproval="$(oc get installplan "${installPlan}" \
         -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-        --type merge \
-        -p '{"spec":{"approved":true}}'
-fi
+        -o jsonpath='{.spec.approval}' || true)"
+    if [[ "${localApproval}" == "Manual" ]]; then
+        echo "Approving manual InstallPlan..."
+        oc patch installplan "${installPlan}" \
+            -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+            --type merge \
+            -p '{"spec":{"approved":true}}'
+    fi
 
-echo "Waiting for ACM CSV to reach Succeeded phase..."
-WaitForCsvSucceeded "${currentCsv}"
-newCsv="$(GetCurrentCsv)"
-newVersion="$(GetInstalledVersion)"
-echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
+    echo "Waiting for ACM CSV to reach Succeeded phase..."
+    WaitForCsvSucceeded "${currentCsv}"
+    newCsv="$(GetCurrentCsv)"
+    newVersion="$(GetInstalledVersion)"
+    echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
 
-ValidateMceUpgrade
-ValidateHubHealth
+    ValidateMceUpgrade
+    ValidateHubHealth
 
-{
-    printf '=== ACM Operator Upgrade Summary ===\n'
-    printf 'Previous: %s (%s)\n' "${currentVersion}" "${currentChannel}"
-    printf 'Current:  %s (%s)\n' "${newVersion}" "${targetChannel}"
-    printf 'CSV:      %s\n' "${newCsv}"
-    printf 'Status:   SUCCESS\n'
-} > "${ARTIFACT_DIR}/acm-upgrade-summary.txt"
+    {
+        printf '=== ACM Operator Upgrade Summary ===\n'
+        printf 'Previous: %s (%s)\n' "${currentVersion}" "${currentChannel}"
+        printf 'Current:  %s (%s)\n' "${newVersion}" "${targetChannel}"
+        printf 'CSV:      %s\n' "${newCsv}"
+        printf 'Status:   SUCCESS\n'
+    } > "${ARTIFACT_DIR}/acm-upgrade-summary.txt"
 
-if [[ -n "${SHARED_DIR:-}" ]]; then
-    echo "${newVersion}" > "${SHARED_DIR}/acm-upgraded-version"
-    echo "${targetChannel}" > "${SHARED_DIR}/acm-upgraded-channel"
-fi
+    if [[ -n "${SHARED_DIR:-}" ]]; then
+        echo "${newVersion}" > "${SHARED_DIR}/acm-upgraded-version"
+        echo "${targetChannel}" > "${SHARED_DIR}/acm-upgraded-channel"
+    fi
 
-echo "=== ACM Operator Upgrade: SUCCESS ==="
-true
+    echo "=== ACM Operator Upgrade: SUCCESS ==="
+    true
+}
+
+Main "$@"
