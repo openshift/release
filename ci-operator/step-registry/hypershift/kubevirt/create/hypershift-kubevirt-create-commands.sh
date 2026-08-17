@@ -215,7 +215,6 @@ EOF
     # Discover OVN container names before first oc exec usage
     if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
       # Get first ovnkube-node pod for container discovery
-      local discovery_pod
       discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
       if ! discover_ovn_container_names "${discovery_pod}"; then
         echo "ERROR: Failed to discover OVN container names" >&2
@@ -423,7 +422,6 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
   # Discover OVN container names before first oc exec usage
   if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
     # Get first ovnkube-node pod for container discovery
-    local discovery_pod
     discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
     if ! discover_ovn_container_names "${discovery_pod}"; then
       echo "ERROR: Failed to discover OVN container names" >&2
