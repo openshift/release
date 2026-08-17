@@ -1,0 +1,28 @@
+ref:
+  as: azure-provision-vnet-hypershift
+  from_image:
+    namespace: ocp
+    name: "4.16"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-provision-vnet-hypershift-commands.sh
+  env:
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: ""
+  - name: USE_HYPERSHIFT_AZURE_CREDS
+    default: "false"
+    documentation: "If true, use hypershift azure credentials"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+    - mount_path: /etc/hypershift-ci-jobs-azurecreds
+      name: hypershift-ci-jobs-azurecreds
+      namespace: test-credentials
+  documentation: |-
+    This steps creates a vnet that can be provided as BYO vnet when creating a Hypershift hosted cluster. 
+    The following resources are created:
+    - A vnet in its own resource group
+    - A subnet within the vnet in the vnet's resource group
+    - A nsg, referenced by the subnet, in its own resource group

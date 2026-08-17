@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci-staging
+  name: horologium
+  labels:
+    app: horologium
+spec:
+  replicas: 1 # Do not scale up.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: horologium
+  template:
+    metadata:
+      labels:
+        app: horologium
+    spec:
+      serviceAccountName: "horologium"
+      terminationGracePeriodSeconds: 30
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/Prucek/release-staging.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release-staging
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release-staging
+          mountPath: /tmp/git-sync
+      containers:
+      - name: horologium
+        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260729-7f8580d8d
+        args:
+        - --dry-run=false
+        - --config-path=/etc/config/config.yaml
+        - --job-config-path=/etc/jobs
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: job-configs
+          mountPath: /etc/jobs
+          readOnly: true
+        - name: release-staging
+          mountPath: /var/repo
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/Prucek/release-staging.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release-staging
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release-staging
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      volumes:
+      - name: config
+        configMap:
+          name: config
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+      - name: release-staging
+        emptyDir: {}

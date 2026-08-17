@@ -1,0 +1,28 @@
+workflow:
+  as: rosa-e2e-osd-gcp
+  steps:
+    env:
+      COMPUTE_MACHINE_TYPE: "custom-4-16384"
+      COMPUTE_NODES: "2"
+      CLUSTER_TOPOLOGY: osd-gcp
+      ENABLE_WIF: "yes"
+      HOSTED_CP: "false"
+    pre:
+      - ref: osd-ccs-gcp-wif-config-provision
+      - ref: osd-ccs-cluster-provision-gcp
+      - ref: osd-ccs-conf-idp-htpasswd
+      - ref: osd-ccs-conf-idp-htpasswd-multi-users
+      - ref: osd-ccs-cluster-operators-wait-ready
+    test:
+      - ref: rosa-e2e-test
+    post:
+      - chain: gather
+        best_effort: true
+      - ref: osd-ccs-cluster-deprovision
+        best_effort: true
+      - ref: osd-ccs-gcp-wif-config-deprovision
+        best_effort: true
+  documentation: |-
+    This workflow provisions a GCP WIF config, creates an OSD GCP WIF cluster,
+    runs the rosa-e2e managed service validation suite, then tears down the
+    cluster and deletes the WIF config.
