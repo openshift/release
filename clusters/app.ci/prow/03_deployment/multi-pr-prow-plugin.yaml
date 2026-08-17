@@ -99,11 +99,15 @@ spec:
         - --root=/tmp/git-sync
         - --one-time=true
         - --link=release
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --depth=1
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout
+          mountPath: /etc/git-sync
+          readOnly: true
       containers:
       - name: multi-pr-prow-plugin
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_multi-pr-prow-plugin_latest
@@ -167,11 +171,15 @@ spec:
         - --period=30s
         - --root=/tmp/git-sync
         - --link=release
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         - --max-failures=3
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: sparse-checkout
+          mountPath: /etc/git-sync
+          readOnly: true
         resources:
           requests:
             memory: "1Gi"
@@ -192,3 +200,9 @@ spec:
           claimName: multi-pr-prow-plugin
       - name: release
         emptyDir: {}
+      - name: sparse-checkout
+        configMap:
+          name: git-sync-sparse-checkout
+          items:
+          - key: ci-config
+            path: sparse-checkout
