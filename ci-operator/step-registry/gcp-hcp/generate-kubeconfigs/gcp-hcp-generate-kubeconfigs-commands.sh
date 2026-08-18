@@ -35,10 +35,19 @@ REGION_CA=$(gcloud container clusters describe "${REGION_CLUSTER_NAME}" \
   --project="${REGION_PROJECT}" \
   --format='value(masterAuth.clusterCaCertificate)')
 
+# Get DNS endpoint if available (falls back to public IP endpoint)
 REGION_ENDPOINT=$(gcloud container clusters describe "${REGION_CLUSTER_NAME}" \
   --region="${REGION}" \
   --project="${REGION_PROJECT}" \
-  --format='value(endpoint)')
+  --format='value(dnsConfig.clusterDns)')
+
+# Fallback to public IP endpoint if DNS endpoint is not configured
+if [[ -z "${REGION_ENDPOINT}" ]]; then
+  REGION_ENDPOINT=$(gcloud container clusters describe "${REGION_CLUSTER_NAME}" \
+    --region="${REGION}" \
+    --project="${REGION_PROJECT}" \
+    --format='value(privateClusterConfig.publicEndpoint)')
+fi
 
 ACCESS_TOKEN=$(gcloud auth print-access-token)
 
@@ -71,11 +80,24 @@ set +x  # Hide sensitive token
 if MC_CA=$(gcloud container clusters describe "${MC_CLUSTER_NAME}" \
   --region="${REGION}" \
   --project="${MC_PROJECT}" \
-  --format='value(masterAuth.clusterCaCertificate)' 2>/dev/null) && \
-   MC_ENDPOINT=$(gcloud container clusters describe "${MC_CLUSTER_NAME}" \
-  --region="${REGION}" \
-  --project="${MC_PROJECT}" \
-  --format='value(endpoint)' 2>/dev/null); then
+  --format='value(masterAuth.clusterCaCertificate)' 2>/dev/null); then
+  
+  # Get DNS endpoint if available (falls back to public IP endpoint)
+  MC_ENDPOINT=$(gcloud container clusters describe "${MC_CLUSTER_NAME}" \
+    --region="${REGION}" \
+    --project="${MC_PROJECT}" \
+    --format='value(dnsConfig.clusterDns)' 2>/dev/null)
+  
+  # Fallback to public IP endpoint if DNS endpoint is not configured
+  if [[ -z "${MC_ENDPOINT}" ]]; then
+    MC_ENDPOINT=$(gcloud container clusters describe "${MC_CLUSTER_NAME}" \
+      --region="${REGION}" \
+      --project="${MC_PROJECT}" \
+      --format='value(privateClusterConfig.publicEndpoint)' 2>/dev/null)
+  fi
+  
+  # Only create kubeconfig if we successfully got an endpoint
+  if [[ -n "${MC_ENDPOINT}" ]]; then
 
   cat > "${SHARED_DIR}/mc-kubeconfig" << EOF
 apiVersion: v1
@@ -97,7 +119,10 @@ users:
     token: ${ACCESS_TOKEN}
 EOF
 
-  echo "  ✓ MC kubeconfig written"
+    echo "  ✓ MC kubeconfig written"
+  else
+    echo "  ⚠ MC endpoint unavailable - tests will skip MC validation"
+  fi
 else
   echo "  ⚠ MC cluster unavailable - tests will skip MC validation"
 fi
