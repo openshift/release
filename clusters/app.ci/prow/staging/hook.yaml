@@ -38,8 +38,11 @@ spec:
         - --link=release-staging
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
-        - name: job-configs
+        - name: combined-jobs
           mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
       containers:
       - name: hook
         image: us-docker.pkg.dev/k8s-infra-prow/images/hook:v20260729-7f8580d8d
@@ -72,8 +75,11 @@ spec:
         - name: plugins
           mountPath: /etc/plugins
           readOnly: true
-        - name: job-configs
+        - name: combined-jobs
           mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -99,7 +105,7 @@ spec:
         - --link=release-staging
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
-        - name: job-configs
+        - name: combined-jobs
           mountPath: /etc/jobs
         resources:
           requests:
@@ -115,6 +121,8 @@ spec:
       - name: plugins
         configMap:
           name: plugins
+      - name: combined-jobs
+        emptyDir: {}
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs
