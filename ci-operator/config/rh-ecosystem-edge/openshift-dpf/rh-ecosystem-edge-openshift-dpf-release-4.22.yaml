@@ -118,7 +118,20 @@ tests:
   steps:
     cluster_profile: metal-dpf-doca8
     env:
-      TEST_SKIPS: NetworkSegmentation
+      TEST_SKIPS: |-
+        NetworkSegmentation\(DPF clusters dont support UDN yet, pods on DPU host get device ID must be provided with UserDefinedPrimaryNetworks\)\{0\}
+        should have a runbook_url\(issue in LVMS which we depend on\)\{0\}
+        should have description and summary\(issue in NFD which we depend on\)\{0\}
+        alerts in firing state\(issue in MetalLB which we depend on\)\{0\}
+        Baremetal platform should have\(control-plane BMHs are stub objects from the assisted installer with no BMC address, issue with any assisted-installed cluster not just DPF, not interesting\)\{0\}
+        annotated correctly for\(openshift-gitops,nfd,storage namespaces missing annotations, not our problem\)\{0\}
+        cluster infrastructure should be configured correctly\(also missing annotations in dependency operators, not our problem\)\{0\}
+        must have stable versions\(unstable CRD versions in dependency operators, not our problem\)\{0\}
+        should have subresource.status\(HyperShift dependency CRD missing subresource.status, not our problem\)\{0\}
+        Managed cluster should ensure control plane pods do not run in best-effort QoS\(dependency operators csr-auto-approver, nfd, metallb running in best-effort QoS, not our problem\)\{0\}
+        Managed cluster should ensure platform components have system-\* priority class\(dependency operator pods with empty priority class, not our problem\)\{0\}
+        Managed cluster should set requests but not limits\(OVN webhook injects VF limits on platform DaemonSets, kubernetes requires limits==requests for extended resources so this is unavoidable, the convention targets CPU/memory throttling/OOM but VF limits are discrete device counts not a throttling risk, test gap not a real violation, also gitops sets limits and metallb speaker missing requests\)\{0\}
+        Managed cluster should only include cluster daemonsets that have maxUnavailable\(nfd-worker, speaker, vg-manager use maxUnavailable=1 instead of percentage-based update strategy, dependency operator issue, not our problem\)\{0\}
     test:
     - ref: dpf-hypervisor-load-kubeconfig
     - ref: dpf-setup-image-registry
