@@ -29,7 +29,10 @@ az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 CAPRES_RG="${NAMESPACE}-${UNIQUE_HASH}-capres-rg"
 CRG_NAME="${NAMESPACE}-${UNIQUE_HASH}-crg"
-CR_NAME="${NAMESPACE}-${UNIQUE_HASH}-cr"
+CONTROL_PLANE_CR_NAME="${NAMESPACE}-${UNIQUE_HASH}-master-cr"
+COMPUTE_CR_NAME="${NAMESPACE}-${UNIQUE_HASH}-worker-cr"
+
+echo "${CAPRES_RG}" > "${SHARED_DIR}/capacity_reservation_rg"
 
 echo "Creating capacity reservation resource group: ${CAPRES_RG}"
 az group create -l "${REGION}" -n "${CAPRES_RG}" --output none
@@ -42,24 +45,39 @@ az capacity reservation group create \
     --zones "${CAPACITY_RESERVATION_ZONE}" \
     --output none
 
-echo "Creating capacity reservation: ${CR_NAME} (SKU: ${CAPACITY_RESERVATION_SKU}, count: ${CAPACITY_RESERVATION_COUNT})"
-az capacity reservation create \
-    --resource-group "${CAPRES_RG}" \
-    --capacity-reservation-group "${CRG_NAME}" \
-    --capacity-reservation-name "${CR_NAME}" \
-    --sku "${CAPACITY_RESERVATION_SKU}" \
-    --capacity "${CAPACITY_RESERVATION_COUNT}" \
-    --zone "${CAPACITY_RESERVATION_ZONE}" \
-    --output none
+create_capacity_reservation() {
+    local name="$1"
+    local sku="$2"
+    local count="$3"
 
-echo "Capacity reservation created successfully"
-az capacity reservation show \
+    echo "Creating capacity reservation: ${name} (SKU: ${sku}, count: ${count})"
+    az capacity reservation create \
+        --resource-group "${CAPRES_RG}" \
+        --capacity-reservation-group "${CRG_NAME}" \
+        --capacity-reservation-name "${name}" \
+        --sku "${sku}" \
+        --capacity "${count}" \
+        --zone "${CAPACITY_RESERVATION_ZONE}" \
+        --output none
+}
+
+create_capacity_reservation \
+    "${CONTROL_PLANE_CR_NAME}" \
+    "${CONTROL_PLANE_CAPACITY_RESERVATION_SKU}" \
+    "${CONTROL_PLANE_CAPACITY_RESERVATION_COUNT}"
+create_capacity_reservation \
+    "${COMPUTE_CR_NAME}" \
+    "${COMPUTE_CAPACITY_RESERVATION_SKU}" \
+    "${COMPUTE_CAPACITY_RESERVATION_COUNT}"
+
+echo "Capacity reservations created successfully"
+az capacity reservation list \
     --resource-group "${CAPRES_RG}" \
     --capacity-reservation-group "${CRG_NAME}" \
-    --capacity-reservation-name "${CR_NAME}" \
     --output table
 
-echo "${CAPRES_RG}" > "${SHARED_DIR}/capacity_reservation_rg"
 echo "${CRG_NAME}" > "${SHARED_DIR}/capacity_reservation_group_name"
+echo "${CONTROL_PLANE_CR_NAME}" > "${SHARED_DIR}/capacity_reservation_control_plane_name"
+echo "${COMPUTE_CR_NAME}" > "${SHARED_DIR}/capacity_reservation_compute_name"
 echo "${AZURE_AUTH_SUBSCRIPTION_ID}" > "${SHARED_DIR}/capacity_reservation_subscription_id"
 echo "${CAPACITY_RESERVATION_ZONE}" > "${SHARED_DIR}/capacity_reservation_zone"
