@@ -91,14 +91,18 @@ spec:
     source: registry.access.redhat.com/openshift4/ose-oauth-proxy
 EOF
 
-  QUAY_USERNAME=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username)
-  QUAY_PASSWORD=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_pullsecret)
-  oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
-  QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
-  jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io:443": {"auth":$QUAY_AUTH,"email":""}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
+  # Merge abi-pull-secret (contains quay.io:443/acm-d credentials) into the cluster pull secret
+  VAULT_PULL_SECRET="/etc/hypershift-agent-ibmz-credentials/abi-pull-secret"
+  echo "Merging ${VAULT_PULL_SECRET} into cluster pull secret..."
+  oc get secret pull-secret -n openshift-config \
+    -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > /tmp/global-pull-secret.json
+  jq -s '.[0].auths * .[1].auths | {auths: .}' \
+    /tmp/global-pull-secret.json \
+    "${VAULT_PULL_SECRET}" > /tmp/global-pull-secret.json.tmp
   mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
   rm /tmp/global-pull-secret.json
+  echo "Pull secret updated successfully."
 fi
 
 sleep 60
