@@ -196,7 +196,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-agent-connected-ovn-ipv4-metal-backuprestore
     decorate: true
     decoration_config:
@@ -482,6 +482,102 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aks-4-22,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5\.2$
+    - ^release-5\.2-
+    cluster: build01
+    context: ci/prow/e2e-aks-managed-hsm
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
+      - Dockerfile.e2e
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: hypershift-aks
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-hypershift-release-5.2-e2e-aks-managed-hsm
+    optional: true
+    path_alias: github.com/openshift/hypershift
+    rerun_command: /test e2e-aks-managed-hsm
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aks-managed-hsm
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aks-managed-hsm,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2318,7 +2414,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-kubevirt-aws-ovn
     decorate: true
     decoration_config:
@@ -2416,7 +2512,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build10
+    cluster: build09
     context: ci/prow/e2e-kubevirt-aws-ovn-reduced
     decorate: true
     decoration_config:
@@ -2607,7 +2703,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-kubevirt-metal-ovn-backuprestore
     decorate: true
     decoration_config:
@@ -3669,7 +3765,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build03
+    cluster: build12
     context: ci/prow/images
     decorate: true
     decoration_config:

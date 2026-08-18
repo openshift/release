@@ -23,24 +23,24 @@ spec:
         args:
         - --repo=https://github.com/Prucek/release-staging.git
         - --ref=main
-        - --root=/tmp/git-sync
+        - --root=/etc/jobs/git-synced
         - --one-time=true
         - --depth=1
         - --link=release-staging
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
-        - name: release-staging
-          mountPath: /tmp/git-sync
+        - name: job-configs
+          mountPath: /etc/jobs
       containers:
       - name: prow-controller-manager
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
         - --job-config-path=/etc/jobs
-        - --job-config-path=/var/repo/release-staging/ci-operator/jobs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --enable-controller=plank
+        - --enable-controller=scheduler
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --projected-token-file=/var/sa-token/token
@@ -52,7 +52,7 @@ spec:
             secretKeyRef:
               name: openshift-prow-github-app
               key: appid
-        image: quay.io/prucek/prow:prow-controller-manager_db
+        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260729-7f8580d8d
         volumeMounts:
         - name: service-account-token
           mountPath: /var/sa-token
@@ -67,9 +67,6 @@ spec:
           readOnly: true
         - name: job-configs
           mountPath: /etc/jobs
-          readOnly: true
-        - name: release-staging
-          mountPath: /var/repo
       - name: git-sync
         command:
         - /git-sync
@@ -77,13 +74,13 @@ spec:
         - --repo=https://github.com/Prucek/release-staging.git
         - --ref=main
         - --period=30s
-        - --root=/tmp/git-sync
+        - --root=/etc/jobs/git-synced
         - --max-failures=3
         - --link=release-staging
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
-        - name: release-staging
-          mountPath: /tmp/git-sync
+        - name: job-configs
+          mountPath: /etc/jobs
         resources:
           requests:
             memory: "1Gi"
@@ -106,5 +103,3 @@ spec:
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs
-      - name: release-staging
-        emptyDir: {}
