@@ -71,17 +71,63 @@ write_cypress_spyglass_report() {
   local gcsweb_base="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
   local artifacts_base=""
   local step_base=""
-  local report="${ARTIFACT_DIR}/custom-link-cypress.html"
+  local report=""
   local status_label="PASSED"
   local status_color="#81c784"
   local screenshot_count=0
   local video_count=0
   local junit_count=0
+  local write_rc=0
+  local screenshots_tmp="" videos_tmp="" failures_tmp=""
+  local enc="" href="" label=""
+
+  # HTML-escape a string for safe use in text nodes or attribute values.
+  # Use sed: bash ${var//\"/&quot;} treats & as the matched text.
+  html_escape() {
+    printf '%s' "${1-}" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g' -e "s/'/\&#39;/g"
+  }
+
+  # Percent-encode one path segment (keeps unreserved RFC 3986 chars).
+  urlencode_component() {
+    local LC_ALL=C
+    local s="${1-}" i c out=""
+    for (( i = 0; i < ${#s}; i++ )); do
+      c="${s:i:1}"
+      case "${c}" in
+        [a-zA-Z0-9.~_-]) out+="${c}" ;;
+        *) printf -v out '%s%%%02X' "${out}" "'${c}" ;;
+      esac
+    done
+    printf '%s' "${out}"
+  }
+
+  # Percent-encode each path component of a relative artifact path; preserve '/'.
+  urlencode_path() {
+    local path="${1-}" result="" part first=1
+    while [[ "${path}" == *"/"* ]]; do
+      part="${path%%/*}"
+      path="${path#*/}"
+      if [[ "${first}" -eq 1 ]]; then
+        first=0
+      else
+        result+="/"
+      fi
+      result+="$(urlencode_component "${part}")"
+    done
+    if [[ "${first}" -eq 1 ]]; then
+      result="$(urlencode_component "${path}")"
+    else
+      result+="/$(urlencode_component "${path}")"
+    fi
+    printf '%s' "${result}"
+  }
 
   if [[ -z "${ARTIFACT_DIR:-}" ]]; then
     echo "====> ARTIFACT_DIR unset; skipping Cypress Spyglass report"
     return 0
   fi
+
+  report="${ARTIFACT_DIR}/custom-link-cypress.html"
 
   if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
     gcs_job_path="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
@@ -98,7 +144,6 @@ write_cypress_spyglass_report() {
   fi
 
   # Collect relative paths (portable; avoid mapfile for older bash)
-  local screenshots_tmp videos_tmp failures_tmp
   screenshots_tmp="$(mktemp)"
   videos_tmp="$(mktemp)"
   failures_tmp="$(mktemp)"
@@ -173,15 +218,15 @@ write_cypress_spyglass_report() {
 <body>
   <h1>NetObserv Cypress debug</h1>
   <div class="status">${status_label}</div>
-  <p class="muted">Step <code>${step_name}</code> · job <code>${JOB_NAME:-unknown}</code> · build <code>${BUILD_ID:-unknown}</code></p>
+  <p class="muted">Step <code>${step_name}</code> · job <code>$(html_escape "${JOB_NAME:-unknown}")</code> · build <code>$(html_escape "${BUILD_ID:-unknown}")</code></p>
 
   <h2>Quick links</h2>
-  <a class="btn" href="${artifacts_base}/cypress-console.log" target="_blank">Cypress console log</a>
-  <a class="btn" href="${step_base}/build-log.txt" target="_blank">Step build log</a>
-  <a class="btn" href="${artifacts_base}/" target="_blank">Artifacts folder</a>
-  <a class="btn" href="${artifacts_base}/junit/" target="_blank">JUnit folder</a>
-  <a class="btn" href="${artifacts_base}/cypress/screenshots/" target="_blank">Screenshots folder</a>
-  <a class="btn" href="${artifacts_base}/cypress/videos/" target="_blank">Videos folder</a>
+  <a class="btn" href="$(html_escape "${artifacts_base}/cypress-console.log")" target="_blank">Cypress console log</a>
+  <a class="btn" href="$(html_escape "${step_base}/build-log.txt")" target="_blank">Step build log</a>
+  <a class="btn" href="$(html_escape "${artifacts_base}/")" target="_blank">Artifacts folder</a>
+  <a class="btn" href="$(html_escape "${artifacts_base}/junit/")" target="_blank">JUnit folder</a>
+  <a class="btn" href="$(html_escape "${artifacts_base}/cypress/screenshots/")" target="_blank">Screenshots folder</a>
+  <a class="btn" href="$(html_escape "${artifacts_base}/cypress/videos/")" target="_blank">Videos folder</a>
 
   <h2>Failure messages (${junit_count} JUnit file(s))</h2>
 EOF
@@ -214,8 +259,10 @@ EOF
       echo "  <ul>"
       while IFS= read -r rel; do
         [[ -z "${rel}" ]] && continue
-        enc="${rel// /%20}"
-        echo "    <li><a href=\"${artifacts_base}/${enc}\" target=\"_blank\">${rel}</a></li>"
+        enc="$(urlencode_path "${rel}")"
+        href="$(html_escape "${artifacts_base}/${enc}")"
+        label="$(html_escape "${rel}")"
+        echo "    <li><a href=\"${href}\" target=\"_blank\">${label}</a></li>"
       done < "${screenshots_tmp}"
       echo "  </ul>"
     else
@@ -227,8 +274,10 @@ EOF
       echo "  <ul>"
       while IFS= read -r rel; do
         [[ -z "${rel}" ]] && continue
-        enc="${rel// /%20}"
-        echo "    <li><a href=\"${artifacts_base}/${enc}\" target=\"_blank\">${rel}</a></li>"
+        enc="$(urlencode_path "${rel}")"
+        href="$(html_escape "${artifacts_base}/${enc}")"
+        label="$(html_escape "${rel}")"
+        echo "    <li><a href=\"${href}\" target=\"_blank\">${label}</a></li>"
       done < "${videos_tmp}"
       echo "  </ul>"
     else
@@ -240,11 +289,14 @@ EOF
 </body>
 </html>
 EOF
-  } > "${report}"
+  } > "${report}" || write_rc=$?
 
-  echo "====> Wrote Cypress Spyglass report: ${report}"
-  echo "====> Spyglass / GCSWEB artifacts base: ${artifacts_base}/"
+  if [[ "${write_rc}" -eq 0 ]]; then
+    echo "====> Wrote Cypress Spyglass report: ${report}"
+    echo "====> Spyglass / GCSWEB artifacts base: ${artifacts_base}/"
+  fi
   rm -f "${screenshots_tmp}" "${videos_tmp}" "${failures_tmp}"
+  return "${write_rc}"
 }
 
 write_cypress_spyglass_report "${FRONTEND_EXIT}" || echo "====> Warning: failed to write Cypress Spyglass report"
