@@ -9,5 +9,8 @@ export HYPERSHIFT_BINARY="${HYPERSHIFT_BINARY:-/hypershift/bin/hypershift}"
 if [[ -f "${SHARED_DIR}/nodepool_release_images" ]]; then
     source "${SHARED_DIR}/nodepool_release_images"
 fi
+if [[ -n "${EXTRA_ARGS:-}" ]]; then
+    export EXTRA_ARGS
+fi
 
 /hypershift/bin/create-guests
