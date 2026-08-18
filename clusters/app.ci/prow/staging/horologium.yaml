@@ -26,14 +26,14 @@ spec:
         args:
         - --repo=https://github.com/Prucek/release-staging.git
         - --ref=main
-        - --root=/tmp/git-sync
+        - --root=/etc/jobs/git-synced
         - --one-time=true
         - --depth=1
         - --link=release-staging
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
-        - name: release-staging
-          mountPath: /tmp/git-sync
+        - name: job-configs
+          mountPath: /etc/jobs
       containers:
       - name: horologium
         image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260729-7f8580d8d
@@ -47,9 +47,6 @@ spec:
           readOnly: true
         - name: job-configs
           mountPath: /etc/jobs
-          readOnly: true
-        - name: release-staging
-          mountPath: /var/repo
       - name: git-sync
         command:
         - /git-sync
@@ -57,13 +54,13 @@ spec:
         - --repo=https://github.com/Prucek/release-staging.git
         - --ref=main
         - --period=30s
-        - --root=/tmp/git-sync
+        - --root=/etc/jobs/git-synced
         - --max-failures=3
         - --link=release-staging
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
-        - name: release-staging
-          mountPath: /tmp/git-sync
+        - name: job-configs
+          mountPath: /etc/jobs
         resources:
           requests:
             memory: "1Gi"
@@ -75,5 +72,3 @@ spec:
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs
-      - name: release-staging
-        emptyDir: {}
