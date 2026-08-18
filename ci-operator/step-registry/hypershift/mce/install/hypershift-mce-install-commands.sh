@@ -109,6 +109,10 @@ IMG="${_REPO}:${MCE_VERSION}-latest"
 if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
   IMG="${_REPO}:latest-${MCE_VERSION}"
 fi
+if [[ -n "${MCE_CATALOG_IMAGE}" ]]; then
+  echo "Overriding MCE catalog image with MCE_CATALOG_IMAGE=${MCE_CATALOG_IMAGE}"
+  IMG="${MCE_CATALOG_IMAGE}"
+fi
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
