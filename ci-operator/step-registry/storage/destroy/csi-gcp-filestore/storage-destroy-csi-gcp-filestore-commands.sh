@@ -14,7 +14,7 @@ function backoff() {
 	local failed=0
 	echo "INFO: Running Command '$*'" >&2
 	while true; do
-		eval "$*" && failed=0 || failed=1
+		"$@" && failed=0 || failed=1
 		if [[ $failed -eq 0 ]]; then
 			break
 		fi
@@ -48,7 +48,7 @@ fi
 
 backoff gcloud config set project "$(jq -r .gcp.projectID "${SHARED_DIR}/metadata.json")"
 
-INSTANCES=$(backoff gcloud filestore instances list --filter labels.kubernetes-io-cluster-$CLUSTER_ID=owned --uri)
+INSTANCES=$(backoff gcloud filestore instances list --filter "labels.kubernetes-io-cluster-$CLUSTER_ID=owned" --uri)
 for i in $INSTANCES; do
     echo "Deleting Filestore instance $i"
     backoff gcloud filestore instances delete "$i" --async --force --quiet
