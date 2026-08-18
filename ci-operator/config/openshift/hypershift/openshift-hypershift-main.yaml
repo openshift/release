@@ -99,6 +99,11 @@ releases:
       include_built_images: true
       name: "5.1"
       namespace: ocp
+  latest-50:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.0"
   latest-421:
     candidate:
       product: ocp
@@ -402,6 +407,17 @@ tests:
       NODEPOOL_N4_VERSION: "4.18"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       RUN_KARPENTER_TESTS: "true"
+    workflow: hypershift-aws-e2e-nested
+- always_run: false
+  as: e2e-aws-major-version-upgrade
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest-50
+      OCP_IMAGE_PREVIOUS: release:latest-422
+    env:
+      CI_TESTS_RUN: TestNodePoolMajorVersionUpgrade
     workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-kubevirt-aws-ovn-reduced
