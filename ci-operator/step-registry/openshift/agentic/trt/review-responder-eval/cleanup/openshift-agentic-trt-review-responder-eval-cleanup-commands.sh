@@ -16,7 +16,7 @@ if [[ -z "${GITHUB_TOKEN}" ]]; then
     exit 0
 fi
 
-prow-agent-eval cleanup \
+prow-agent-eval-python cleanup \
     --shared-dir="${SHARED_DIR}" || true
 
 echo "=== TRT Review Responder Eval Cleanup Complete ==="

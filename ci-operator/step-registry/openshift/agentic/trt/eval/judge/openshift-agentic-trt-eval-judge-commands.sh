@@ -13,9 +13,10 @@ export GITHUB_TOKEN
 
 EVAL_CONFIG="${EVAL_CONFIG:-/opt/ai-helpers/evals/trt-agentic-solve/solve-eval.yaml}"
 
-prow-agent-eval judge \
+prow-agent-eval-python judge \
     --config="${EVAL_CONFIG}" \
     --shared-dir="${SHARED_DIR}" \
-    --artifact-dir="${ARTIFACT_DIR}"
+    --artifact-dir="${ARTIFACT_DIR}" \
+    --mode=solve
 
 echo "=== TRT Eval Judge Complete ==="

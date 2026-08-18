@@ -22,7 +22,7 @@ if [[ -n "${EVAL_CASE:-}" ]]; then
     CASE_ARGS+=("--case=${EVAL_CASE}")
 fi
 
-prow-agent-eval init \
+prow-agent-eval-python init \
     --config="${EVAL_CONFIG}" \
     --shared-dir="${SHARED_DIR}" \
     --mode=solve \
