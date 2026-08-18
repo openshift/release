@@ -43,11 +43,14 @@ generate_token() {
 }
 
 # Resolve app slug (used by review-responder for bot identity)
-APP_SLUG=$(curl -sf --connect-timeout 10 --max-time 15 \
+app_json=$(curl -sf --connect-timeout 10 --max-time 15 \
     -H "Authorization: Bearer $(generate_jwt 120)" \
     -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/app" \
-    | python3 -c "import sys,json; print(json.load(sys.stdin).get('slug',''))")
+    "https://api.github.com/app") || {
+    echo "ERROR: GET https://api.github.com/app failed."
+    exit 1
+}
+APP_SLUG=$(echo "${app_json}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('slug',''))")
 [[ -n "${APP_SLUG}" ]] || { echo "ERROR: Failed to resolve app slug from /app endpoint."; exit 1; }
 echo "${APP_SLUG}[bot]" > "${SHARED_DIR}/gh-app-bot-login"
 echo "App slug: ${APP_SLUG} (bot login: ${APP_SLUG}[bot])"
