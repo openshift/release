@@ -101,6 +101,7 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
     echo "ERROR: backplane login did not write kubeconfig at ${KUBECONFIG}" >&2
     exit 1
   fi
+  chmod 0600 "${hive_kubeconfig_src}"
 
   # Elevated kubeconfig for osdfm AAO secret reads.
   hive_kubeconfig="$(mktemp /tmp/hive-kubeconfig.XXXXXX)"
