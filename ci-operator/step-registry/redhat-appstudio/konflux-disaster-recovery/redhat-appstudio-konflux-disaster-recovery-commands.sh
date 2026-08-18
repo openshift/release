@@ -145,9 +145,8 @@ echo "[INFO] UPGRADE_BRANCH: $UPGRADE_BRANCH"
 echo "[INFO] UPGRADE_FORK_ORGANIZATION: $UPGRADE_FORK_ORGANIZATION"
 
 # Clone infra-deployments for DR test code
-# TODO(manish-jangra): revert to upstream/main once infra-deployments PR is merged
 INFRA_DIR="/tmp/infra-deployments"
-git clone --branch K-2236-03 "https://github.com/manish-jangra/infra-deployments.git" "$INFRA_DIR"
+git clone --branch main "https://github.com/redhat-appstudio/infra-deployments.git" "$INFRA_DIR"
 
 # The clone is from a fork — add upstream so performKonfluxUpgrade can merge
 # remotes/upstream/main during the upgrade phase.
