@@ -109,6 +109,11 @@ releases:
       product: ocp
       stream: nightly
       version: "5.0"
+  temp-latest-422:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -374,6 +379,17 @@ tests:
       NODEPOOL_N4_VERSION: "4.18"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       RUN_KARPENTER_TESTS: "true"
+    workflow: hypershift-aws-e2e-nested
+- always_run: false
+  as: e2e-aws-major-version-upgrade
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest
+      OCP_IMAGE_PREVIOUS: release:temp-latest-422
+    env:
+      CI_TESTS_RUN: TestNodePoolMajorVersionUpgrade
     workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-kubevirt-aws-ovn-reduced
