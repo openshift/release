@@ -29,7 +29,12 @@ fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
-if [[ "$(az group exists -n "${CAPRES_RG}")" == "true" ]]; then
+if ! group_exists="$(az group exists -n "${CAPRES_RG}")"; then
+    echo "Failed to determine whether capacity reservation resource group exists: ${CAPRES_RG}" >&2
+    exit 1
+fi
+
+if [[ "${group_exists}" == "true" ]]; then
     echo "Deleting capacity reservation resource group: ${CAPRES_RG}"
     az group delete -y -n "${CAPRES_RG}"
     echo "Capacity reservation resource group deleted"
