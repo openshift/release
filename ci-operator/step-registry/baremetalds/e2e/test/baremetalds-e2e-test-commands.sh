@@ -110,7 +110,8 @@ function mirror_test_images() {
         openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} | grep ${DEVSCRIPTS_TEST_IMAGE_REPO}  > /tmp/mirror
         scp "${SSHOPTS[@]}" /tmp/mirror "root@${IP}:/tmp/mirror"
 
-        MIRROR_RESULT=$(run_mirror_test_images_ssh_commands || echo "fail")
+        MIRROR_RESULT="success"
+        run_mirror_test_images_ssh_commands || MIRROR_RESULT="fail"
 
         JUNIT_IMAGE_FILE="$ARTIFACT_DIR/junit_image-mirroring.xml"
 
