@@ -167,7 +167,7 @@ export NODE_TLS_REJECT_UNAUTHORIZED=0
 echo "Running Playwright smoke tests from ${PLAYWRIGHT_WORKDIR} (branch ${PLAYWRIGHT_GIT_BRANCH:-image})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
 npx playwright test \
-  --grep '@smoke' \
+  --grep-invert '@auth:OIDC|@auth:LDAP|@webhook|@feature:MAILING|@feature:BUILD_SUPPORT|@feature:BILLING|@feature:SECURITY_SCANNER|@feature:QUOTA_NOTIFICATIONS|@feature:REPO_MIRROR|@feature:LOG_EXPORT|@feature:USER_METADATA|@feature:TEAM_SYNCING|@feature:STORAGE_REPLICATION|@feature:SPARSE_INDEX|@feature:INVITE_ONLY_USER_CREATION|@config:ROBOTS_DISALLOW|@marketplace|@PROJQUAY-11629|@PROJQUAY-6631' \
   --reporter=junit,html \
   2>&1 | tee "${ARTIFACT_DIR}/playwright-output.log"
 popd
