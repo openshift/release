@@ -13,13 +13,28 @@ if [ -f "${SHARED_DIR}/ds-vars.conf" ]; then
   IP_STACK=${DS_IP_STACK:-v4}
 fi
 
-oc create -f - <<EOF
+echo "Waiting for MetalLB webhook to be ready..."
+oc wait deployment metallb-operator-controller-manager \
+  -n metallb-system --for=condition=Available --timeout=300s
+
+for attempt in $(seq 1 5); do
+  if oc create -f - <<'METALLB_EOF'
 apiVersion: metallb.io/v1beta1
 kind: MetalLB
 metadata:
   name: metallb
   namespace: metallb-system
-EOF
+METALLB_EOF
+  then
+    break
+  fi
+  if [[ ${attempt} -eq 5 ]]; then
+    echo "MetalLB CR creation failed after ${attempt} attempts"
+    exit 1
+  fi
+  echo "MetalLB CR creation attempt ${attempt} failed, retrying in 10s..."
+  sleep 10
+done
 
 echo "Configure IPAddressPool for IP_STACK=${IP_STACK}"
 if [[ $IP_STACK == "v4" ]]; then
