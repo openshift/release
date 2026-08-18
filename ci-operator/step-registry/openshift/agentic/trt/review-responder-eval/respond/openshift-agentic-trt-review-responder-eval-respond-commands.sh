@@ -13,7 +13,7 @@ export GH_FORK_TOKEN
 GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
 export GITHUB_TOKEN
 
-# prow-agent-eval-python writes metadata with a case-name prefix.
+# prow-agent-eval writes metadata with a case-name prefix.
 # Read the first case and resolve prefixed filenames.
 CASE_NAME=$(head -1 "${SHARED_DIR}/eval-cases")
 PR_NUM=$(cat "${SHARED_DIR}/${CASE_NAME}.pr-number")
