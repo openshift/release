@@ -28,28 +28,13 @@ echo "  subscriptionId: ${SUBSCRIPTION_ID}"
 echo "  zone: ${ZONE}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-PATCH="/tmp/install-config-capacity-reservation.yaml.patch"
 
-cat > "${PATCH}" << EOF
-controlPlane:
-  platform:
-    azure:
-      zones:
-      - "${ZONE}"
-      capacityReservationGroup:
-        subscriptionId: ${SUBSCRIPTION_ID}
-        resourceGroup: ${CAPRES_RG}
-        name: ${CRG_NAME}
-compute:
-- platform:
-    azure:
-      zones:
-      - "${ZONE}"
-      capacityReservationGroup:
-        subscriptionId: ${SUBSCRIPTION_ID}
-        resourceGroup: ${CAPRES_RG}
-        name: ${CRG_NAME}
-EOF
-
-yq-go m -x -i "${CONFIG}" "${PATCH}"
+yq-go w -i "${CONFIG}" "controlPlane.platform.azure.zones[0]" "${ZONE}"
+yq-go w -i "${CONFIG}" "controlPlane.platform.azure.capacityReservationGroup.subscriptionId" "${SUBSCRIPTION_ID}"
+yq-go w -i "${CONFIG}" "controlPlane.platform.azure.capacityReservationGroup.resourceGroup" "${CAPRES_RG}"
+yq-go w -i "${CONFIG}" "controlPlane.platform.azure.capacityReservationGroup.name" "${CRG_NAME}"
+yq-go w -i "${CONFIG}" "compute[0].platform.azure.zones[0]" "${ZONE}"
+yq-go w -i "${CONFIG}" "compute[0].platform.azure.capacityReservationGroup.subscriptionId" "${SUBSCRIPTION_ID}"
+yq-go w -i "${CONFIG}" "compute[0].platform.azure.capacityReservationGroup.resourceGroup" "${CAPRES_RG}"
+yq-go w -i "${CONFIG}" "compute[0].platform.azure.capacityReservationGroup.name" "${CRG_NAME}"
 echo "install-config.yaml patched successfully"
