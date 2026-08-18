@@ -403,6 +403,25 @@ spec:
       cpuRequestToLimitPercent: 25
       limitCPUToMemoryPercent: 200
 EOF
+
+  echo "=== Waiting for ClusterResourceOverride CR to become Available ==="
+  condition=""
+  for i in $(seq 1 60); do
+    condition="$(oc get clusterresourceoverride cluster -n "${CRO_NAMESPACE}" \
+      -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
+    if [[ "${condition}" == "True" ]]; then
+      echo "ClusterResourceOverride CR is Available"
+      break
+    fi
+    echo "  Waiting for CR Available... (${i}/60) status=${condition:-<none>}"
+    sleep 10
+  done
+  if [[ "${condition}" != "True" ]]; then
+    echo "ERROR: ClusterResourceOverride CR did not become Available" >&2
+    oc get clusterresourceoverride cluster -n "${CRO_NAMESPACE}" -o yaml >&2 || true
+    dump_deployment_debug "cr-not-available"
+    exit 1
+  fi
   oc get clusterresourceoverride cluster -n "${CRO_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/clusterresourceoverride-cr.yaml" || true
 fi
 
