@@ -421,22 +421,32 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   fi
 
   echo "Waiting for VMIs to be running before configuring DHCP..."
-  for _ in $(seq 1 60); do
+  VMIS_READY=false
+  for _ in $(seq 1 120); do
     RUNNING_COUNT=$(oc get vmi -n "${MULTI_NAMESPACE}" --no-headers 2>/dev/null \
       | grep -c Running || true)
     if [[ "${RUNNING_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
       echo "All ${RUNNING_COUNT} VMIs are running"
+      VMIS_READY=true
       break
     fi
     echo "Waiting for VMIs... (${RUNNING_COUNT}/${HYPERSHIFT_NODE_COUNT} running)"
     sleep 10
   done
 
+  if [[ "${VMIS_READY}" != "true" ]]; then
+    echo "WARNING: Only ${RUNNING_COUNT}/${HYPERSHIFT_NODE_COUNT} VMIs running after 20 minutes, proceeding with DHCP config for available VMIs"
+  fi
+
   echo "Configuring OVN DHCP for multi (${NETWORK_COUNT})-localnet interfaces..."
   for VMI in $(oc get vmi -n "${MULTI_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}'); do
-    NODE=$(oc get vmi -n "${MULTI_NAMESPACE}" "${VMI}" -o jsonpath='{.status.nodeName}')
+    NODE=$(oc get vmi -n "${MULTI_NAMESPACE}" "${VMI}" -o jsonpath='{.status.nodeName}' 2>/dev/null)
+    if [[ -z "${NODE}" ]]; then
+      echo "WARNING: VMI ${VMI} has no nodeName yet, skipping DHCP config"
+      continue
+    fi
     OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
-      --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
+      --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
 
     if [[ -z "${OVN_POD}" ]]; then
       echo "WARNING: No ovnkube-node pod found on node ${NODE} for VMI ${VMI}"
