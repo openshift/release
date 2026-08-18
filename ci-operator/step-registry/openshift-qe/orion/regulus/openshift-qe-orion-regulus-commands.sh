@@ -74,7 +74,8 @@ done
 
 # ── Install ORION dependencies ────────────────────────────────────
 pushd regulus/ORION || exit 1
-pip install -q --retries "$MAX_RETRIES" requests pyyaml
+# Orion CLI already installed above; this covers ORION/ script deps (requests, pyyaml)
+pip install -q --retries "$MAX_RETRIES" -r requirements.txt
 echo "✅ Dependencies installed"
 
 # ── Run prow-entry.sh ─────────────────────────────────────────────────────────
