@@ -81,7 +81,6 @@ if [[ "${ENABLE_HTTPS_PROXY}" == "yes" ]]; then
   proxy_private_https_url=$(< "${SHARED_DIR}/proxy_private_https_url")
   cat >> "${CONFIG_PATCH}" << EOF
   httpsProxy: ${proxy_private_https_url}
-  noProxy: ${NO_PROXY}
 EOF
   additional_trust_bundle="${SHARED_DIR}/additional_trust_bundle"
   client_ca_file="/var/run/vault/mirror-registry/client_ca.crt"
