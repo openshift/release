@@ -1,0 +1,32 @@
+ref:
+  as: gcp-hcp-tf-provision
+  from: src
+  commands: gcp-hcp-tf-provision-commands.sh
+  credentials:
+  - mount_path: /etc/terraform-cloud
+    name: tfcloud-ci-secret
+    namespace: ci
+  env:
+  - name: GCP_REGION
+    default: "us-central1"
+    documentation: "GCP region for e2e infrastructure deployment"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 90m0s
+  grace_period: 10m0s
+  documentation: |-
+    Provisions full GCP HCP e2e infrastructure (region + management cluster)
+    using Terraform Cloud ephemeral workspaces.
+    
+    Requires:
+    - TFC token mounted at /etc/terraform-cloud/token (ci-operator credential)
+    
+    Outputs to SHARED_DIR:
+    - region-project-id
+    - mc-project-id
+    - mc-cluster-name
+    - mc-cluster-endpoint
+    - workspace-name (for deprovision)
+    - run-id (for tracking)

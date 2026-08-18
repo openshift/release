@@ -7,6 +7,10 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
   ubi:
     name: ubi-minimal
     namespace: ocp
@@ -97,7 +101,7 @@ tests:
       cli: latest
       commands: |
         unset GOFLAGS
-        make e2e-test -e E2E_TEST_FLAGS="-timeout 80m" -e OPERATOR_NAMESPACE=opendatahub-operator
+        make e2e-test -e E2E_TEST_FLAGS="-timeout 80m" -e OPERATOR_NAMESPACE=opendatahub-operator -e E2E_AUTO_RESOLVE=true
       from: src
       resources:
         requests:
@@ -121,6 +125,8 @@ tests:
       SOURCE_IMAGE_REF: opendatahub-operator-rhoai
     env:
       IMAGE_REPO: opendatahub-operator
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: redhat-ods-operator,redhat-ods-applications,redhat-ods-monitoring,rhoai-model-registries
     pre:
     - ref: ipi-install-rbac
     - ref: opendatahub-operator-e2e-cluster-preflight-health-check
@@ -146,13 +152,25 @@ tests:
       cli: latest
       commands: |
         unset GOFLAGS
-        E2E_TEST_DSC_MONITORING_NAMESPACE=redhat-ods-monitoring make e2e-test -e ODH_PLATFORM_TYPE=rhoai -e E2E_TEST_FLAGS="-timeout 80m" -e OPERATOR_NAMESPACE=redhat-ods-operator
+        E2E_TEST_DSC_MONITORING_NAMESPACE=redhat-ods-monitoring make e2e-test -e ODH_PLATFORM_TYPE=rhoai -e E2E_TEST_FLAGS="-timeout 80m" -e OPERATOR_NAMESPACE=redhat-ods-operator -e E2E_AUTO_RESOLVE=true
       from: src
       resources:
         requests:
           cpu: 2000m
           memory: 3Gi
       timeout: 3h0m0s
+    - as: cleanup-olm-catalog
+      cli: latest
+      commands: |
+        oc delete catalogsource --all -n redhat-ods-operator --ignore-not-found
+        oc wait --for=delete pod -l olm.catalogSource -n redhat-ods-operator --timeout=60s || true
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2m0s
+    - ref: tls-scanner-run
     workflow: generic-claim
 - as: opendatahub-operator-image-mirror
   postsubmit: true

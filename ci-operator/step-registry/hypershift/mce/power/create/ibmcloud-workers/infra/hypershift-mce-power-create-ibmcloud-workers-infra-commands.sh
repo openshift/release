@@ -103,9 +103,9 @@ update_agentserviceconfig() {
 set_power_configs() {
   # PowerVS VSI(Virtual Server Instance) configs
   POWERVS_VSI_NAME="power-${HOSTED_CLUSTER_NAME}-worker"
-  POWERVS_VSI_MEMORY=$(jq -r '.powervsVSIMemory' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
-  POWERVS_VSI_PROCESSORS=$(jq -r '.powervsVSIProcessors' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
-  POWERVS_VSI_PROC_TYPE=$(jq -r '.powervsVSIProcType' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
+  POWERVS_VSI_MEMORY=${POWERVS_VSI_MEMORY:-$(jq -r '.powervsVSIMemory' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")}
+  POWERVS_VSI_PROCESSORS=${POWERVS_VSI_PROCESSORS:-$(jq -r '.powervsVSIProcessors' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")}
+  POWERVS_VSI_PROC_TYPE=${POWERVS_VSI_PROC_TYPE:-$(jq -r '.powervsVSIProcType' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")}
   if [ ${IS_HETEROGENEOUS} == "yes" ]; then
       # NOTE: Using e980 as a workaround for VPC Load Balancer connectivity issues with
       # s922 in heterogeneous node pools, until a permanent fix.

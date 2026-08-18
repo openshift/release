@@ -26,7 +26,8 @@ images:
     to: ovn-kubernetes-microshift
 promotion:
   to:
-  - name: "5.1"
+  - disabled: true
+    name: "5.1"
     namespace: ocp-priv
 prowgen:
   private: true
@@ -353,8 +354,13 @@ tests:
     from: src
 - as: lint
   commands: |
+    status=0
     cd go-controller
-    make lint
+    make lint || status=$?
+    cd ../openshift
+    go mod vendor
+    make -f ../go-controller/Makefile lint || status=$?
+    exit $status
   container:
     from: src
 - as: gofmt

@@ -579,7 +579,7 @@ suite-conformance)
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
     ;;
 suite)
-    suite
+    TEST_LIMIT_START_TIME="$(date +%s)" suite
     ;;
 ipsec-suite)
      # Rollout IPsec Full mode and run the suite.

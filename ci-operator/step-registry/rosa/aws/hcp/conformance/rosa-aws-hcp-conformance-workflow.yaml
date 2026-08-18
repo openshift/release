@@ -27,6 +27,8 @@ workflow:
         Node Lifecycle should run through the lifecycle of a node\|
         check registry.redhat.io is available and samples operator can import sample imagestreams\|
         NetworkPolicy between server and client should allow ingress access from updated pod\|
+        NetworkPolicy between server and client should deny ingress access to updated pod\|
+        NetworkPolicy between server and client should stop enforcing policies after they are deleted\|
         In-tree Volumes.*Driver: local.*subPath should support\|
         DRA.*kubelet.*DynamicResourceAllocation\|
         decrease memory limit below usage\|
@@ -43,16 +45,27 @@ workflow:
         Cluster scoped load balancer healthcheck port and path should be 10256\|
         GatewayAPIController.*Ensure HTTPRoute object is created\|
         GatewayAPIController.*Ensure LB.*service.*and dnsRecord are created for a Gateway object\|
-        AWSServiceLBNetworkSecurityGroup
+        AWSServiceLBNetworkSecurityGroup\|
+        cloud-provider-aws-e2e.*BYO.*Security Group\|
+        cloud-provider-aws-e2e.*transition from.*SG\|
+        InPlace Resize Container\|
+        Monitor:apiserver-incluster-availability.*monitor test apiserver-incluster-availability\|
+        CSI.*csi-hostpath.*provisioning\|
+        Security should support seccomp runtime/default\|
+        PersistentVolumes-local.*block\|
+        Pre-provisioned PV.*ntfs
     pre:
-      - chain: rosa-aws-sts-hcp-provision
+      - chain: rosa-aws-sts-hcp-provision-nightly
       - ref: rosa-cluster-credentials-hypershift-mgmt
       - ref: osd-ccs-conf-idp-htpasswd-multi-users
       - ref: rosa-cluster-wait-ready-nodes
     test:
       - chain: hypershift-conformance
     post:
+      - chain: rosa-gather-hcp-diagnostics
+        best_effort: true
       - ref: osd-gather-extra
+      - ref: rosa-cluster-mc-restore-image-policy
       - chain: rosa-cluster-deprovision
         best_effort: true
       - chain: rosa-sts-oidc-config-delete

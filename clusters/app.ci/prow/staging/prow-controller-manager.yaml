@@ -16,6 +16,21 @@ spec:
         app: prow-controller-manager
     spec:
       serviceAccountName: prow-controller-manager
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/Prucek/release-staging.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release-staging
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release-staging
+          mountPath: /tmp/git-sync
       containers:
       - name: prow-controller-manager
         args:
@@ -25,6 +40,7 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --enable-controller=plank
+        - --enable-controller=scheduler
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --projected-token-file=/var/sa-token/token
@@ -36,7 +52,7 @@ spec:
             secretKeyRef:
               name: openshift-prow-github-app
               key: appid
-        image: quay.io/prucek/prow:prow-controller-manager_db
+        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260729-7f8580d8d
         volumeMounts:
         - name: service-account-token
           mountPath: /var/sa-token
@@ -52,6 +68,26 @@ spec:
         - name: job-configs
           mountPath: /etc/jobs
           readOnly: true
+        - name: release-staging
+          mountPath: /var/repo
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/Prucek/release-staging.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release-staging
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release-staging
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       volumes:
       - name: service-account-token
         projected:
@@ -70,3 +106,5 @@ spec:
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs
+      - name: release-staging
+        emptyDir: {}

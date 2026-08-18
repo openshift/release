@@ -4,7 +4,7 @@ set -euo pipefail
 shopt -s inherit_errexit
 
 # Configuration
-REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
+REMOTE_HOST=$(cat /var/run/dpf-ci/remote-host)
 CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
 REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
@@ -76,3 +76,8 @@ oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config unset "clusters.${CLUSTER
 
 cp /tmp/kubeconfig.${CLUSTER_NAME} "${SHARED_DIR}/kubeconfig"
 echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig successfully"
+
+# Copy the .env file from the last install dir on the hypervisor
+echo "=== Copying .env from ${LAST_OPENSHIFT_DPF} on hypervisor ==="
+scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/.env "${SHARED_DIR}/.env"
+echo ".env copied to \${SHARED_DIR}/.env successfully"

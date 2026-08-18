@@ -2,10 +2,40 @@
 
 set -euo pipefail
 
+echo "=== Waiting for ODF StorageClass ${STORAGE_CLASS} ==="
+COUNTER=0
+while [ $COUNTER -lt 300 ]; do
+  if oc get storageclass "${STORAGE_CLASS}" &>/dev/null; then
+    echo "StorageClass ${STORAGE_CLASS} found"
+    break
+  fi
+  sleep 10
+  COUNTER=$((COUNTER + 10))
+  echo "Waiting ${COUNTER}s for StorageClass ${STORAGE_CLASS}..."
+done
+
 echo "=== Setting ODF StorageClass as default ==="
 oc patch storageclass "${STORAGE_CLASS}" \
   -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 echo "StorageClass ${STORAGE_CLASS} set as default"
+
+echo "=== Waiting for HCO CLI download route ==="
+CLI_ROUTE=$(oc get route hyperconverged-cluster-cli-download -n "${TARGET_NAMESPACE}" \
+  -o jsonpath='{.status.ingress[0].host}' 2>/dev/null || echo "")
+if [[ -n "${CLI_ROUTE}" ]]; then
+  COUNTER=0
+  while [ $COUNTER -lt 120 ]; do
+    if curl -sk -o /dev/null -w '%{http_code}' "https://${CLI_ROUTE}/" 2>/dev/null | grep -qE '^(200|301|302)'; then
+      echo "HCO CLI download route is ready"
+      break
+    fi
+    sleep 10
+    COUNTER=$((COUNTER + 10))
+    echo "Waiting ${COUNTER}s for HCO CLI route to respond..."
+  done
+else
+  echo "WARNING: HCO CLI download route not found, skipping readiness check"
+fi
 
 echo "=== Discovering validation image from CNV CSV ==="
 CSV_NAME=$(oc get csv -n "${TARGET_NAMESPACE}" -o json | \
