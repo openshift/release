@@ -14,14 +14,12 @@ workflow:
         EXTRA_NETWORK_NAMES="extranet"
         EXTRANET_NETWORK_SUBNET_V4='192.168.221.0/24'
         EXTRANET_NETWORK_SUBNET_V6='fd2e:6f44:5dd8:ca56::/120'
-      ADVERTISE_DEFAULT_NETWORK: "false"
       KONFLUX_TARGET_OPERATORS: nmstate
       TEST_SUITE: openshift/conformance/serial
       TEST_SKIPS: Services should fallback to local terminating endpoints when there
         are no ready endpoints with externalTrafficPolicy=Local\|CPU Partitioning
         cluster platform workloads should be annotated correctly for Deployments\|should
-        validate the communication matrix ports match the node's listening ports\|Managed
-        cluster should grow and decrease when scaling different machineSets simultaneously
+        validate the communication matrix ports match the node's listening ports
     pre:
       - ref: baremetalds-devscripts-conf-featureset
       - ref: baremetalds-devscripts-conf-extranetwork
@@ -37,6 +35,7 @@ workflow:
       - chain: baremetalds-ofcir-post
   documentation: |-
     Like baremetalds-e2e-ovn-bgp-dualstack-local-gw, but runs openshift/conformance/serial
-    with extra workers and serial-specific TEST_SKIPS. Default-network BGP advertisements are
-    disabled (ADVERTISE_DEFAULT_NETWORK=false); only the additional machine/extranet network is
-    advertised for VRF-Lite. Local gateway mode and nmstate are still configured.
+    with extra workers (NUM_EXTRA_WORKERS=1, APPLY_EXTRA_WORKERS=true) and serial-specific
+    TEST_SKIPS. Default-network BGP advertisements are enabled; spare baremetal hosts in the
+    ostestbm pool are pre-seeded as external FRR neighbors so scaled-up workers have peering
+    from the start. 
