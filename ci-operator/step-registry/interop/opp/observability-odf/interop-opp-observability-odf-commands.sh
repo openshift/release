@@ -502,7 +502,7 @@ else:
         if [[ "${httpCode}" =~ ^(401|403)$ ]]; then
             AddResult "thanos-query" "fail" "Thanos query route auth failed (HTTP ${httpCode}); no data flow verified"
         else
-            AddResult "thanos-query" "fail" "Thanos query unreachable at ${queryRoute} (HTTP ${httpCode:-timeout})"
+            AddResult "thanos-query" "fail" "Thanos query route unreachable (HTTP ${httpCode:-timeout})"
         fi
         return
     fi
