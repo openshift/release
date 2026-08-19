@@ -38,7 +38,7 @@ InstallSubctl() {
     if [[ -x "${subctlBin}" ]]; then
         return 0
     fi
-    VERSION="${SUBMARINER_SUBCTL_VERSION:-release-0.24}" curl -Ls https://get.submariner.io | bash
+    curl -Ls https://get.submariner.io | VERSION="${SUBMARINER_SUBCTL_VERSION:-release-0.24}" bash
     cp "${HOME}/.local/bin/subctl" "${subctlBin}"
     chmod +x "${subctlBin}"
     true
