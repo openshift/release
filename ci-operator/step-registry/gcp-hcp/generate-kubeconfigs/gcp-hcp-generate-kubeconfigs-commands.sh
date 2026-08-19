@@ -41,13 +41,12 @@ REGION_ENDPOINT=$(gcloud container clusters describe "${REGION_CLUSTER_NAME}" \
   --project="${REGION_PROJECT}" \
   --format='value(dnsConfig.clusterDns)')
 
-# Fallback to private endpoint if DNS endpoint is not configured
-# Use private endpoint for cluster-to-cluster connectivity from Prow pod
+# Fallback to public IP endpoint if DNS endpoint is not configured
 if [[ -z "${REGION_ENDPOINT}" ]]; then
   REGION_ENDPOINT=$(gcloud container clusters describe "${REGION_CLUSTER_NAME}" \
     --region="${REGION}" \
     --project="${REGION_PROJECT}" \
-    --format='value(privateClusterConfig.privateEndpoint)')
+    --format='value(privateClusterConfig.publicEndpoint)')
 fi
 
 ACCESS_TOKEN=$(gcloud auth print-access-token)
@@ -89,13 +88,12 @@ if MC_CA=$(gcloud container clusters describe "${MC_CLUSTER_NAME}" \
     --project="${MC_PROJECT}" \
     --format='value(dnsConfig.clusterDns)' 2>/dev/null)
   
-  # Fallback to private endpoint if DNS endpoint is not configured
-  # Use private endpoint for cluster-to-cluster connectivity from Prow pod
+  # Fallback to public IP endpoint if DNS endpoint is not configured
   if [[ -z "${MC_ENDPOINT}" ]]; then
     MC_ENDPOINT=$(gcloud container clusters describe "${MC_CLUSTER_NAME}" \
       --region="${REGION}" \
       --project="${MC_PROJECT}" \
-      --format='value(privateClusterConfig.privateEndpoint)' 2>/dev/null)
+      --format='value(privateClusterConfig.publicEndpoint)' 2>/dev/null)
   fi
   
   # Only create kubeconfig if we successfully got an endpoint
