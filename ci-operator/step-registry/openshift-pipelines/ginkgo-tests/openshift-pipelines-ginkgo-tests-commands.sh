@@ -15,12 +15,23 @@ ALLOWED_SECRETS=(
     QUAY_USER
     QUAY_PASS
     QUAY_API_TOKEN
+    CHAINS_REPOSITORY
+    CHAINS_DOCKER_CONFIG_JSON
+    JIB_MAVEN_REPOSITORY
+    JIB_MAVEN_DOCKER_CONFIG_JSON
 )
 
 if [ -s "${KUBECONFIG}" ]; then
     oc whoami
 else
-    (set +x; eval "$(cat "${SHARED_DIR}/api.login")")
+    login_file="${SHARED_DIR}/api.login"
+    if [[ ! -r "${login_file}" ]]; then
+        echo "ERROR: ${login_file} not found or not readable"
+        exit 1
+    fi
+    set +x
+    login_cmd="$(cat "${login_file}")"
+    eval "${login_cmd}"
 fi
 
 if [ -d "${SECRETS_DIR}" ]; then
