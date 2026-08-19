@@ -111,7 +111,7 @@ oc get vmi -A || true
 oc describe vmi -A || true
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-oc wait --timeout=25m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
+oc wait --timeout=45m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
 echo "$(date) Kubevirt cluster is available"
 
 # --- Step 3: Retrieve the guest cluster kubeconfig ---
