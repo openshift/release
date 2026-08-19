@@ -718,7 +718,7 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build08
-    context: ci/prow/security
+    context: ci/prow/snyk
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -727,8 +727,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-hive-master-security
-    rerun_command: /test security
+    name: pull-ci-openshift-hive-master-snyk
+    optional: true
+    rerun_command: /test snyk
     skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -738,7 +739,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=security
+        - --target=snyk
         command:
         - ci-operator
         env:
@@ -794,7 +795,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )security,?($|\s.*)
+    trigger: (?m)^/test( | .* )snyk,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

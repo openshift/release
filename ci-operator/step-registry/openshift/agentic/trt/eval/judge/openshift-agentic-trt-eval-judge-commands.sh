@@ -16,6 +16,7 @@ EVAL_CONFIG="${EVAL_CONFIG:-/opt/ai-helpers/evals/trt-agentic-solve/solve-eval.y
 prow-agent-eval judge \
     --config="${EVAL_CONFIG}" \
     --shared-dir="${SHARED_DIR}" \
-    --artifact-dir="${ARTIFACT_DIR}"
+    --artifact-dir="${ARTIFACT_DIR}" \
+    --mode=solve
 
 echo "=== TRT Eval Judge Complete ==="

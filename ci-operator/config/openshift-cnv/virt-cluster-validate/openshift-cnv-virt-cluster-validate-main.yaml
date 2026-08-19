@@ -215,6 +215,202 @@ tests:
           {"name": "self-node-remediation", "source": "redhat-operators-v4-22", "channel": "!default", "install_namespace": "openshift-operators"}
         ]
     test:
+    - as: setup-rwx-storage
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        NS=nfs-storage
+        oc create namespace $NS
+
+        # NFS server service account with privileged SCC
+        oc create serviceaccount nfs-server -n $NS
+        oc adm policy add-scc-to-user privileged -z nfs-server -n $NS
+
+        # NFS provisioner service account with hostmount-anyuid SCC
+        oc create serviceaccount nfs-provisioner -n $NS
+        oc adm policy add-scc-to-user hostmount-anyuid -z nfs-provisioner -n $NS
+
+        # RBAC for the provisioner
+        oc create -f - <<'EOF'
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: nfs-provisioner-runner
+        rules:
+        - apiGroups: [""]
+          resources: ["nodes"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: [""]
+          resources: ["persistentvolumes"]
+          verbs: ["get", "list", "watch", "create", "delete"]
+        - apiGroups: [""]
+          resources: ["persistentvolumeclaims"]
+          verbs: ["get", "list", "watch", "update"]
+        - apiGroups: ["storage.k8s.io"]
+          resources: ["storageclasses"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: [""]
+          resources: ["events"]
+          verbs: ["create", "update", "patch"]
+        EOF
+        oc create clusterrolebinding nfs-provisioner-runner \
+          --clusterrole=nfs-provisioner-runner \
+          --serviceaccount=$NS:nfs-provisioner
+        oc create role nfs-provisioner-leader-locking -n $NS \
+          --verb=get,list,watch,create,update,patch --resource=endpoints
+        oc create rolebinding nfs-provisioner-leader-locking -n $NS \
+          --role=nfs-provisioner-leader-locking \
+          --serviceaccount=$NS:nfs-provisioner
+
+        # PVC for NFS server backing storage (uses default GCP PD StorageClass)
+        oc create -f - <<'EOF'
+        apiVersion: v1
+        kind: PersistentVolumeClaim
+        metadata:
+          name: nfs-data
+          namespace: nfs-storage
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 500Gi
+        EOF
+
+        # Deploy NFS server
+        oc create -f - <<'EOF'
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: nfs-server
+          namespace: nfs-storage
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: nfs-server
+          template:
+            metadata:
+              labels:
+                app: nfs-server
+            spec:
+              serviceAccountName: nfs-server
+              automountServiceAccountToken: false
+              containers:
+              - name: nfs-server
+                image: registry.k8s.io/volume-nfs:0.8
+                ports:
+                - name: nfs
+                  containerPort: 2049
+                - name: mountd
+                  containerPort: 20048
+                - name: rpcbind
+                  containerPort: 111
+                securityContext:
+                  privileged: true  # kernel NFS server requires privileged mode
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 128Mi
+                volumeMounts:
+                - name: nfs-data
+                  mountPath: /exports
+              volumes:
+              - name: nfs-data
+                persistentVolumeClaim:
+                  claimName: nfs-data
+        ---
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: nfs-server
+          namespace: nfs-storage
+        spec:
+          ports:
+          - name: nfs
+            port: 2049
+          - name: mountd
+            port: 20048
+          - name: rpcbind
+            port: 111
+          selector:
+            app: nfs-server
+        EOF
+
+        echo "Waiting for NFS server to become ready..."
+        oc wait -n $NS deployment/nfs-server --for=condition=Available --timeout=5m
+        NFS_SERVER=$(oc get svc nfs-server -n $NS -o jsonpath='{.spec.clusterIP}')
+        echo "NFS server is ready"
+
+        # Deploy nfs-subdir-external-provisioner
+        oc create -f - <<EOF
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: nfs-provisioner
+          namespace: nfs-storage
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: nfs-provisioner
+          template:
+            metadata:
+              labels:
+                app: nfs-provisioner
+            spec:
+              serviceAccountName: nfs-provisioner
+              containers:
+              - name: nfs-provisioner
+                image: registry.k8s.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2
+                env:
+                - name: NFS_SERVER
+                  value: "${NFS_SERVER}"
+                - name: NFS_PATH
+                  value: /exports
+                - name: PROVISIONER_NAME
+                  value: nfs-storage/nfs-provisioner
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 128Mi
+                volumeMounts:
+                - name: nfs-root
+                  mountPath: /persistentvolumes
+              volumes:
+              - name: nfs-root
+                nfs:
+                  server: "${NFS_SERVER}"
+                  path: /exports
+        EOF
+
+        echo "Waiting for NFS provisioner to become ready..."
+        oc wait -n $NS deployment/nfs-provisioner --for=condition=Available --timeout=5m
+
+        # Create RWX StorageClass and set it as default virt class
+        oc get storageclass -o name | xargs -I{} oc patch {} -p '{"metadata":{"annotations":{"storageclass.kubevirt.io/is-default-virt-class":"false"}}}' --type=merge 2>/dev/null || true
+        oc create -f - <<'EOF'
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata:
+          name: nfs-rwx
+          annotations:
+            storageclass.kubevirt.io/is-default-virt-class: "true"
+        provisioner: nfs-storage/nfs-provisioner
+        parameters:
+          archiveOnDelete: "false"
+        mountOptions:
+        - nolock
+        reclaimPolicy: Delete
+        volumeBindingMode: Immediate
+        allowVolumeExpansion: true
+        EOF
+        echo "Created nfs-rwx StorageClass as default virt class"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 12m0s
     - as: install-cnv
       cli: latest
       commands: |
@@ -255,6 +451,27 @@ tests:
           cpu: 100m
           memory: 600Mi
       timeout: 1h0m0s
+    - as: patch-storageprofile
+      cli: latest
+      commands: |
+        set -euo pipefail
+        echo "Waiting for StorageProfile to be created by CDI..."
+        for i in $(seq 1 30); do
+          if oc get storageprofile nfs-rwx &>/dev/null; then
+            echo "StorageProfile nfs-rwx exists"
+            break
+          fi
+          echo "StorageProfile not yet created, waiting... ($i/30)"
+          sleep 5
+        done
+        oc wait storageprofile nfs-rwx --for=jsonpath='{.status.provisioner}'=nfs-storage/nfs-provisioner --timeout=2m
+        oc patch storageprofile nfs-rwx --type=merge -p '{"spec":{"claimPropertySets":[{"accessModes":["ReadWriteMany"],"volumeMode":"Filesystem"}]}}'
+        echo "StorageProfile patched with ReadWriteMany access mode"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 7m0s
     - as: setup-catalog
       cli: latest
       commands: |
@@ -279,17 +496,43 @@ tests:
         requests:
           cpu: 100m
     - ref: install-operators
+    - as: wait-for-golden-images
+      cli: latest
+      commands: |
+        set -euo pipefail
+        echo "Waiting for DataImportCron objects to appear..."
+        for i in $(seq 1 30); do
+          COUNT=$(oc get dataimportcron -n openshift-virtualization-os-images --no-headers 2>/dev/null | wc -l)
+          if [ "$COUNT" -gt 0 ]; then
+            echo "Found $COUNT DataImportCron objects"
+            break
+          fi
+          echo "No DataImportCron objects yet, waiting... ($i/30)"
+          sleep 10
+        done
+        echo "Waiting for all golden images to be up to date..."
+        oc wait dataimportcron --all \
+          -n openshift-virtualization-os-images \
+          --for=condition=UpToDate=true \
+          --timeout=25m
+        echo "All golden images imported successfully"
+        oc get pvc -n openshift-virtualization-os-images
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 30m0s
     - as: validate
       cli: latest
       commands: |
         set -e
         # CI-specific exclusions (these checks detect real issues on customer clusters):
         # 20-bare-metal: CI clusters are cloud-hosted, bare-metal detection always fails
-        # 70-live-migration: CI default StorageClass is RWO, live migration needs RWX
         # 75-snapshots: CI StorageClass has no VolumeSnapshotClass configured
         # 80-high-performance: CI nodes lack dedicated CPU manager configuration
-        SKIP_CHECKS="20-bare-metal,70-live-migration,75-snapshots,80-high-performance"
-        oc adm must-gather --image="${VCV_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- SKIP_CHECKS=${SKIP_CHECKS} /usr/bin/gather
+        SKIP_CHECKS="20-bare-metal,75-snapshots,80-high-performance"
+        # NFS host-assisted copy clone can take 10m+; increase per-test and VM readiness timeouts
+        oc adm must-gather --image="${VCV_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- SKIP_CHECKS=${SKIP_CHECKS} TIMEOUT=17m VM_READY_TIMEOUT=15m /usr/bin/gather
         MG_SUBDIR=$(find ${ARTIFACT_DIR}/must-gather-output -path "*/virt-cluster-validate" -type d | head -1)
         if [[ -z "${MG_SUBDIR}" ]]; then
           echo "ERROR: virt-cluster-validate output directory not found in must-gather output"

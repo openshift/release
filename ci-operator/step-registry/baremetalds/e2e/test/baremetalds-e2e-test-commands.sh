@@ -110,11 +110,9 @@ function mirror_test_images() {
         openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} | grep ${DEVSCRIPTS_TEST_IMAGE_REPO}  > /tmp/mirror
         scp "${SSHOPTS[@]}" /tmp/mirror "root@${IP}:/tmp/mirror"
 
-        MIRROR_RESULT=$(run_mirror_test_images_ssh_commands || echo "fail")
-
         JUNIT_IMAGE_FILE="$ARTIFACT_DIR/junit_image-mirroring.xml"
 
-        if [[ "$MIRROR_RESULT" == "fail" ]]; then
+        if ! run_mirror_test_images_ssh_commands; then
             cat > "$JUNIT_IMAGE_FILE" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="Image Mirroring" tests="1" failures="1">
@@ -223,11 +221,9 @@ function mirror_release_image_for_disconnected_upgrade() {
     if [[ "${DS_IP_STACK}" == "v6" ]]; then
       echo "### Mirroring release images for disconnected upgrade ###"
 
-      MIRROR_RESULT=$(run_mirror_release_image_for_disconnected_upgrade_ssh_commands || echo "fail")
-
       JUNIT_IMAGE_FILE="$ARTIFACT_DIR/junit_image-mirroring-disconnected-upgrade.xml"
 
-        if [[ "$MIRROR_RESULT" == "fail" ]]; then
+        if ! run_mirror_release_image_for_disconnected_upgrade_ssh_commands; then
             cat > "$JUNIT_IMAGE_FILE" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="Image Mirroring for Disconnected Upgrade" tests="1" failures="1">

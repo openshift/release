@@ -1043,7 +1043,7 @@ periodics:
   - base_ref: main
     org: openshift
     repo: release
-  - base_ref: openshift-5.0
+  - base_ref: openshift-5.1
     org: openshift
     repo: ocp-build-data
   labels:
@@ -1062,9 +1062,8 @@ periodics:
       - --git-email=148852131+openshift-merge-bot[bot]@users.noreply.github.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
-      - --current-release=5.0
-      - --future-release=4.23
-      - --future-release=5.1
+      - --current-release=5.1
+      - --future-release=5.2
       - --self-approve=true
       - --assign=openshift/test-platform
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
@@ -1553,8 +1552,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=5.0
-      - --future-release=5.1
+      - --current-release=5.1
+      - --future-release=5.2
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -1604,6 +1603,52 @@ periodics:
       resources:
         requests:
           cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 6 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-mcp-server-fast-forward
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        dnf install -y git
+        export HOME=/tmp
+        cd /tmp
+        # Avoid putting credentials in argv/env/logs
+        git_cmd() {
+          git -c credential.helper= -c credential.helper='!f() { echo username=openshift-merge-robot; printf password=; cat /etc/github/oauth; echo; }; f' "$@"
+        }
+        src=main
+        dst=release-0.5
+        repo_url=https://github.com/openshift/openshift-mcp-server.git
+        echo "Fast-forwarding ${src} -> ${dst} for openshift/openshift-mcp-server"
+        git_cmd clone -b "${dst}" "${repo_url}" repo
+        cd repo
+        git_cmd pull --ff-only origin "${src}"
+        git_cmd push
+      command:
+      - /bin/bash
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-jq_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 100m
       volumeMounts:
       - mountPath: /etc/github
         name: token
@@ -1678,9 +1723,9 @@ periodics:
       - --dry-run=false
       - --config-dir=./ci-operator/config/
       - --current-release=4.22
-      - --current-release=5.0
+      - --current-release=5.1
       - --future-release=4.23
-      - --future-release=5.1
+      - --future-release=5.2
       command:
       - blocking-issue-creator
       env:

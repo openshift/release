@@ -1,0 +1,76 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.18
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: dpf-ci
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- always_run: false
+  as: deploy-cluster
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca8
+    test:
+    - ref: dpf-hypervisor-deploy-cluster
+  timeout: 6h0m0s
+- always_run: false
+  as: deploy-cluster-doca4
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca4
+    test:
+    - ref: dpf-hypervisor-deploy-cluster
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: openshift-dpf
+  variant: nightly-4.22

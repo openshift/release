@@ -6,7 +6,7 @@ set -o errexit
 set -o pipefail
 
 # PowerVC helper release to download for this step.
-readonly POWERVC_TOOL_VERSION="v2.4.6"
+readonly POWERVC_TOOL_VERSION="v2.4.7"
 
 #######################################
 # Log an informational message with a timestamp.

@@ -311,6 +311,25 @@ tests:
       OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external-oidc
+- as: e2e-azure-aks-external-oidc
+  cron: 0 9 * * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: TestExternalOIDC
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-external-oidc
+- as: e2e-azure-aks-external-oidc-techpreview
+  cron: 0 20 9,18,25 * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: TestExternalOIDC
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-azure-aks-external-oidc
 - as: e2e-powervs-ovn
   cron: 0 4 1 12 *
   steps:
@@ -358,6 +377,20 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-e2e-v2-self-managed
+- as: e2e-aks-managed-hsm
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: ^TestCreateClusterCustomConfig$
+      HYPERSHIFT_AZURE_MANAGED_HSM: "true"
+      HYPERSHIFT_AZURE_MANAGED_HSM_LOCATION: eastus
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    workflow: hypershift-azure-aks-e2e
 - as: e2e-azure-kubevirt-ovn
   cron: 0 4 * * *
   steps:

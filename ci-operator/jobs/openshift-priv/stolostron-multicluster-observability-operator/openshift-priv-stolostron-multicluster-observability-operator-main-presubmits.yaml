@@ -13,11 +13,11 @@ presubmits:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - collectors/metrics/Dockerfile
-      - loaders/dashboards/Dockerfile
-      - operators/endpointmetrics/Dockerfile
-      - operators/multiclusterobservability/Dockerfile
-      - proxy/Dockerfile
+      - collectors/metrics/Containerfile.operator
+      - loaders/dashboards/Containerfile.operator
+      - operators/endpointmetrics/Containerfile.operator
+      - operators/multiclusterobservability/Containerfile.operator
+      - proxy/Containerfile.operator
       - tests/Dockerfile
     hidden: true
     labels:
@@ -101,11 +101,11 @@ presubmits:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - collectors/metrics/Dockerfile
-      - loaders/dashboards/Dockerfile
-      - operators/endpointmetrics/Dockerfile
-      - operators/multiclusterobservability/Dockerfile
-      - proxy/Dockerfile
+      - collectors/metrics/Containerfile.operator
+      - loaders/dashboards/Containerfile.operator
+      - operators/endpointmetrics/Containerfile.operator
+      - operators/multiclusterobservability/Containerfile.operator
+      - proxy/Containerfile.operator
       - tests/Dockerfile
     hidden: true
     labels:
@@ -171,11 +171,11 @@ presubmits:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - collectors/metrics/Dockerfile
-      - loaders/dashboards/Dockerfile
-      - operators/endpointmetrics/Dockerfile
-      - operators/multiclusterobservability/Dockerfile
-      - proxy/Dockerfile
+      - collectors/metrics/Containerfile.operator
+      - loaders/dashboards/Containerfile.operator
+      - operators/endpointmetrics/Containerfile.operator
+      - operators/multiclusterobservability/Containerfile.operator
+      - proxy/Containerfile.operator
       - tests/Dockerfile
     hidden: true
     labels:
@@ -252,6 +252,73 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build12
+    context: ci/prow/opp-images
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.interop
+    hidden: true
+    labels:
+      ci-operator.openshift.io/variant: opp
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-stolostron-multicluster-observability-operator-main-opp-images
+    path_alias: github.com/stolostron/multicluster-observability-operator
+    rerun_command: /test opp-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=opp
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )opp-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build12
     context: ci/prow/pr-image-mirror-endpoint-monitoring-operator
     decorate: true
     decoration_config:
@@ -259,11 +326,11 @@ presubmits:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - collectors/metrics/Dockerfile
-      - loaders/dashboards/Dockerfile
-      - operators/endpointmetrics/Dockerfile
-      - operators/multiclusterobservability/Dockerfile
-      - proxy/Dockerfile
+      - collectors/metrics/Containerfile.operator
+      - loaders/dashboards/Containerfile.operator
+      - operators/endpointmetrics/Containerfile.operator
+      - operators/multiclusterobservability/Containerfile.operator
+      - proxy/Containerfile.operator
       - tests/Dockerfile
     hidden: true
     labels:
@@ -347,11 +414,11 @@ presubmits:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - collectors/metrics/Dockerfile
-      - loaders/dashboards/Dockerfile
-      - operators/endpointmetrics/Dockerfile
-      - operators/multiclusterobservability/Dockerfile
-      - proxy/Dockerfile
+      - collectors/metrics/Containerfile.operator
+      - loaders/dashboards/Containerfile.operator
+      - operators/endpointmetrics/Containerfile.operator
+      - operators/multiclusterobservability/Containerfile.operator
+      - proxy/Containerfile.operator
       - tests/Dockerfile
     hidden: true
     labels:
@@ -435,11 +502,11 @@ presubmits:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - collectors/metrics/Dockerfile
-      - loaders/dashboards/Dockerfile
-      - operators/endpointmetrics/Dockerfile
-      - operators/multiclusterobservability/Dockerfile
-      - proxy/Dockerfile
+      - collectors/metrics/Containerfile.operator
+      - loaders/dashboards/Containerfile.operator
+      - operators/endpointmetrics/Containerfile.operator
+      - operators/multiclusterobservability/Containerfile.operator
+      - proxy/Containerfile.operator
       - tests/Dockerfile
     hidden: true
     labels:
@@ -523,11 +590,11 @@ presubmits:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - collectors/metrics/Dockerfile
-      - loaders/dashboards/Dockerfile
-      - operators/endpointmetrics/Dockerfile
-      - operators/multiclusterobservability/Dockerfile
-      - proxy/Dockerfile
+      - collectors/metrics/Containerfile.operator
+      - loaders/dashboards/Containerfile.operator
+      - operators/endpointmetrics/Containerfile.operator
+      - operators/multiclusterobservability/Containerfile.operator
+      - proxy/Containerfile.operator
       - tests/Dockerfile
     hidden: true
     labels:
@@ -611,11 +678,11 @@ presubmits:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - collectors/metrics/Dockerfile
-      - loaders/dashboards/Dockerfile
-      - operators/endpointmetrics/Dockerfile
-      - operators/multiclusterobservability/Dockerfile
-      - proxy/Dockerfile
+      - collectors/metrics/Containerfile.operator
+      - loaders/dashboards/Containerfile.operator
+      - operators/endpointmetrics/Containerfile.operator
+      - operators/multiclusterobservability/Containerfile.operator
+      - proxy/Containerfile.operator
       - tests/Dockerfile
     hidden: true
     labels:
@@ -699,11 +766,11 @@ presubmits:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - collectors/metrics/Dockerfile
-      - loaders/dashboards/Dockerfile
-      - operators/endpointmetrics/Dockerfile
-      - operators/multiclusterobservability/Dockerfile
-      - proxy/Dockerfile
+      - collectors/metrics/Containerfile.operator
+      - loaders/dashboards/Containerfile.operator
+      - operators/endpointmetrics/Containerfile.operator
+      - operators/multiclusterobservability/Containerfile.operator
+      - proxy/Containerfile.operator
       - tests/Dockerfile
     hidden: true
     labels:
@@ -788,11 +855,11 @@ presubmits:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - collectors/metrics/Dockerfile
-      - loaders/dashboards/Dockerfile
-      - operators/endpointmetrics/Dockerfile
-      - operators/multiclusterobservability/Dockerfile
-      - proxy/Dockerfile
+      - collectors/metrics/Containerfile.operator
+      - loaders/dashboards/Containerfile.operator
+      - operators/endpointmetrics/Containerfile.operator
+      - operators/multiclusterobservability/Containerfile.operator
+      - proxy/Containerfile.operator
       - tests/Dockerfile
     hidden: true
     labels:

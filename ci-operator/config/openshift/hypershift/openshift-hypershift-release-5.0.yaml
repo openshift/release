@@ -61,8 +61,7 @@ images:
     to: hypershift-cli
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - custom-verify-src
     - hypershift-cli
     - hypershift-operator
@@ -110,6 +109,11 @@ releases:
       product: ocp
       stream: nightly
       version: "5.0"
+  temp-latest-422:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -377,6 +381,17 @@ tests:
       RUN_KARPENTER_TESTS: "true"
     workflow: hypershift-aws-e2e-nested
 - always_run: false
+  as: e2e-aws-major-version-upgrade
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest
+      OCP_IMAGE_PREVIOUS: release:temp-latest-422
+    env:
+      CI_TESTS_RUN: TestNodePool/HostedCluster/TestNodePoolMajorVersionUpgrade
+    workflow: hypershift-aws-e2e-nested
+- always_run: false
   as: e2e-kubevirt-aws-ovn-reduced
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
   steps:
@@ -641,6 +656,16 @@ tests:
       OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external-oidc
+- always_run: false
+  as: e2e-azure-aks-external-oidc
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: TestExternalOIDC
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-external-oidc
 - always_run: false
   as: e2e-azure-aks-external-oidc-techpreview
   optional: true

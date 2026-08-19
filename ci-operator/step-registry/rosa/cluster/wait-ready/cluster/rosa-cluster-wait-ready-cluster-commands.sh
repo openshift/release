@@ -12,6 +12,12 @@ BYO_OIDC=${BYO_OIDC:-false}
 ENABLE_BYOVPC=${ENABLE_BYOVPC:-false}
 ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
+STALL_TIMEOUT=${STALL_TIMEOUT:-3600}
+PROVISIONER_LAUNCH_TIMEOUT=${PROVISIONER_LAUNCH_TIMEOUT:-900}
+if [[ ! "${PROVISIONER_LAUNCH_TIMEOUT}" =~ ^[0-9]+$ ]]; then
+  log "ERROR: PROVISIONER_LAUNCH_TIMEOUT must be a non-negative integer, got '${PROVISIONER_LAUNCH_TIMEOUT}'. Using default 900."
+  PROVISIONER_LAUNCH_TIMEOUT=900
+fi
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
 log(){
@@ -153,6 +159,7 @@ start_time=$(date +"%s")
 dyn_start_time=${start_time}
 CLUSTER_PREVIOUS_STATE="claim"
 record_cluster "timers" "status" "claim"
+loop_count=0
 while true; do
   rosa describe cluster -c "${CLUSTER_ID}" -o json > ${cluster_info_json}
   CLUSTER_STATE=$(cat ${cluster_info_json} | jq -r '.state')
@@ -172,6 +179,51 @@ while true; do
       break
     fi
   else
+      # Stall detection: fail early if state is stuck for too long
+      stall_elapsed=$(( current_time - dyn_start_time ))
+      if (( stall_elapsed >= STALL_TIMEOUT )) && [[ "${CLUSTER_STATE}" == "installing" || "${CLUSTER_STATE}" == "pending" ]]; then
+        log "ERROR: Cluster state '${CLUSTER_STATE}' has not changed for $(( stall_elapsed / 60 )) minutes (stall timeout: $(( STALL_TIMEOUT / 60 )) minutes)"
+        log "Cluster appears to be stalled. Failing early."
+        record_cluster "timers" "status" "${CLUSTER_STATE}"
+        FAILED_INSTALL="yes"
+        break
+      fi
+
+      # Install log health check: every 5 iterations, check for fatal errors
+      loop_count=$((loop_count + 1))
+      if (( loop_count % 5 == 0 )); then
+        log "Checking install logs for fatal errors..."
+        install_log_output=$(rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
+        fatal_pattern=$(echo "${install_log_output}" | grep -E "ProvisionFailed|failed to create|InvalidSubnet|LimitExceeded|QuotaExceeded|InsufficientFreeAddresses|UnauthorizedAccess" || true)
+        if [[ -n "${fatal_pattern}" ]]; then
+          log "ERROR: Fatal error detected in install logs:"
+          log "${fatal_pattern}"
+          log "Failing early due to unrecoverable error."
+          record_cluster "timers" "status" "${CLUSTER_STATE}"
+          FAILED_INSTALL="yes"
+          break
+        fi
+
+        # Provisioner launch detection: for Classic clusters, check if Hive ever started
+        if [[ "${HOSTED_CP}" != "true" ]] && [[ "${CLUSTER_STATE}" == "installing" ]]; then
+          infra_id_check=$(jq -r '.infra_id' "${cluster_info_json}")
+          installing_elapsed=$(( current_time - dyn_start_time ))
+
+          if [[ "${infra_id_check}" == "null" ]] && (( installing_elapsed >= PROVISIONER_LAUNCH_TIMEOUT )); then
+            install_log_check=$(rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
+            if echo "${install_log_check}" | grep -q "waiting for installation to begin"; then
+              log "FATAL: Hive provisioner never launched."
+              log "  infra_id is null after $(( installing_elapsed / 60 )) minutes in 'installing' state."
+              log "  Install logs still show: 'waiting for installation to begin'"
+              log "  This indicates the OCM-to-Hive handoff failed."
+              record_cluster "timers" "status" "provisioner_stall"
+              FAILED_INSTALL="yes"
+              break
+            fi
+          fi
+        fi
+      fi
+
       if [[ ${CLUSTER_STATE} == "installing" ]]; then
       	sleep 60
       else
@@ -186,7 +238,13 @@ done
 cat $cluster_config_file | jq -r '.timers'
 
 if [[ "$FAILED_INSTALL" == "yes" ]]; then
-  rosa logs install -c ${CLUSTER_ID} > "${ARTIFACT_DIR}/.install.log"
+  # Save full cluster description for diagnostics
+  rosa describe cluster -c "${CLUSTER_ID}" -o json > "${ARTIFACT_DIR}/cluster-description.json" || true
+  # Log the cluster status description
+  status_desc=$(jq -r '.status.description // "N/A"' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || echo "N/A")
+  log "Cluster status description: ${status_desc}"
+  # Save install logs
+  rosa logs install -c ${CLUSTER_ID} > "${ARTIFACT_DIR}/.install.log" || true
   exit 1
 fi
 

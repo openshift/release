@@ -3,10 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
-  operator-sdk:
-    name: "4.17"
-    namespace: origin
-    tag: operator-sdk
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -51,6 +51,9 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       INSTALL_NAMESPACE: nhc-install
       OPERATOR_RELEASED_VERSION: 0.12.0
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
     test:
     - as: e2e-install
       cli: latest
@@ -61,13 +64,13 @@ tests:
         oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
         oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/self-node-remediation-operator-bundle:latest
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/node-healthcheck-operator-bundle:v"$OPERATOR_RELEASED_VERSION"
+        OPERATOR_NAMESPACE="$INSTALL_NAMESPACE" BUNDLE_IMG=quay.io/medik8s/self-node-remediation-operator-bundle:latest make bundle-run
+        OPERATOR_NAMESPACE="$INSTALL_NAMESPACE" BUNDLE_IMG=quay.io/medik8s/node-healthcheck-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
         oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-healthcheck-controller-manager
       env:
       - name: INSTALL_NAMESPACE
       - name: OPERATOR_RELEASED_VERSION
-      from: operator-sdk
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -75,14 +78,14 @@ tests:
     - as: e2e-upgrade
       cli: latest
       commands: |
-        operator-sdk run bundle-upgrade -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        OPERATOR_NAMESPACE="$INSTALL_NAMESPACE" BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
         oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-healthcheck-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: my-bundle
       env:
       - name: INSTALL_NAMESPACE
-      from: operator-sdk
+      from: src
       resources:
         requests:
           cpu: 100m
