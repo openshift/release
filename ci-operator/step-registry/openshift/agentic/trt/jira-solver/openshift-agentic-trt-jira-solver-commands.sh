@@ -172,7 +172,10 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         --continue \
         --max-turns 10 \
         || true
-elif [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
+fi
+PHASE_SOLVE_DURATION=$(( $(date +%s) - PHASE_SOLVE_START ))
+
+if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
     echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
     # Write failure metadata before exiting so post-step can emit metrics
     PR_RESULT="failed"
@@ -200,7 +203,6 @@ elif [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
         }' > "${SHARED_DIR}/metrics-metadata-solve.json"
     exit "${CLAUDE_EXIT}"
 fi
-PHASE_SOLVE_DURATION=$(( $(date +%s) - PHASE_SOLVE_START ))
 
 # --- Create PR ---
 PHASE_PR_START=$(date +%s)
