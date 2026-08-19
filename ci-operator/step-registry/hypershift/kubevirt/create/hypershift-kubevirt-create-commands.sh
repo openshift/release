@@ -420,55 +420,64 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
     fi
   fi
 
-  echo "Waiting for OVN LSPs to exist so we can configure DHCP before VM boots..."
-  LSP_READY=false
-  for attempt in $(seq 1 120); do
-    READY_COUNT=0
-    for i in $(seq 1 "${NETWORK_COUNT}"); do
-      NAD_NAME="localnet-${i}"
-      OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-      if [[ -z "${OVN_POD}" ]]; then
-        break
-      fi
-
-      LSP_COUNT=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
-        ovn-nbctl --columns=name --bare find Logical_Switch_Port \
-        "external_ids:k8s.ovn.org/nad=${MULTI_NAMESPACE}/${NAD_NAME}" 2>/dev/null | wc -w)
-
-      if [[ ${LSP_COUNT} -gt 0 ]]; then
-        ((READY_COUNT++))
-      fi
-    done
-
-    if [[ ${READY_COUNT} -eq ${NETWORK_COUNT} ]]; then
-      echo "All ${NETWORK_COUNT} NAD LSPs created, configuring DHCP options now (before VM boots)..."
-      LSP_READY=true
+  echo "Waiting for VMIs to be running so we can configure DHCP before they complete first boot..."
+  VMIS_READY=false
+  for _ in $(seq 1 120); do
+    RUNNING_COUNT=$(oc get vmi -n "${MULTI_NAMESPACE}" --no-headers 2>/dev/null \
+      | grep -c Running || true)
+    if [[ "${RUNNING_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+      echo "All ${RUNNING_COUNT} VMIs are running, now configuring DHCP..."
+      VMIS_READY=true
       break
     fi
-
-    echo "Waiting for OVN LSPs to exist... (${READY_COUNT}/${NETWORK_COUNT} ready, attempt ${attempt}/120)"
-    sleep 5
+    echo "Waiting for VMIs... (${RUNNING_COUNT}/${HYPERSHIFT_NODE_COUNT} running)"
+    sleep 10
   done
 
-  if [[ "${LSP_READY}" != "true" ]]; then
-    echo "WARNING: Not all LSPs ready after 10 minutes, proceeding with available LSPs"
+  if [[ "${VMIS_READY}" != "true" ]]; then
+    echo "WARNING: Only ${RUNNING_COUNT}/${HYPERSHIFT_NODE_COUNT} VMIs running after 20 minutes, proceeding with DHCP config for available VMIs"
   fi
 
   echo "Configuring OVN DHCP for multi (${NETWORK_COUNT})-localnet interfaces..."
-  OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
-  if [[ -n "${OVN_POD}" ]]; then
+  for VMI in $(oc get vmi -n "${MULTI_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}'); do
+    NODE=$(oc get vmi -n "${MULTI_NAMESPACE}" "${VMI}" -o jsonpath='{.status.nodeName}' 2>/dev/null)
+    if [[ -z "${NODE}" ]]; then
+      echo "WARNING: VMI ${VMI} has no nodeName yet, skipping DHCP config"
+      continue
+    fi
+    OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+    if [[ -z "${OVN_POD}" ]]; then
+      echo "WARNING: No ovnkube-node pod found on node ${NODE} for VMI ${VMI}"
+      continue
+    fi
+
     for i in $(seq 1 "${NETWORK_COUNT}"); do
       NAD_NAME="localnet-${i}"
       SUBNET="${SUBNETS[$((i-1))]}"
       SUBNET_GW=$(echo "${SUBNET}" | sed 's|/.*||' | sed 's/\.0$/.1/')
       SERVER_MAC=$(printf "c0:ff:ee:00:00:%02x" "${i}")
 
-      LSP_NAMES=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
+      LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
         ovn-nbctl --columns=name --bare find Logical_Switch_Port \
         "external_ids:k8s.ovn.org/nad=${MULTI_NAMESPACE}/${NAD_NAME}" 2>/dev/null || true)
 
-      if [[ -z "${LSP_NAMES}" ]]; then
-        echo "  WARNING: No LSPs found yet for ${NAD_NAME}, they may appear later"
+      if [[ -z "${LSP_NAME}" ]]; then
+        echo "  NAD-based LSP lookup failed for ${NAD_NAME} on ${NODE}, trying subnet fallback..."
+        SUBNET_PREFIX=$(echo "${SUBNET}" | cut -d'.' -f1-3)
+        LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
+          ovn-nbctl --columns=name,dynamic_addresses --bare find Logical_Switch_Port \
+          "external_ids:k8s.ovn.org/topology=localnet" 2>/dev/null | \
+          while IFS= read -r line; do
+            name=$(echo "${line}" | awk '{print $1}')
+            ip=$(echo "${line}" | grep -oP '\d+\.\d+\.\d+\.\d+' || true)
+            if [[ "${ip}" == ${SUBNET_PREFIX}.* ]]; then echo "${name}"; break; fi
+          done || true)
+      fi
+
+      if [[ -z "${LSP_NAME}" ]]; then
+        echo "  WARNING: No LSP found for ${NAD_NAME} on node ${NODE} for VMI ${VMI}"
         continue
       fi
 
@@ -484,32 +493,16 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
           2>/dev/null)
       fi
 
-      for LSP_NAME in ${LSP_NAMES}; do
-        oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
-          ovn-nbctl lsp-set-dhcpv4-options "${LSP_NAME}" "${DHCP_UUID}" 2>/dev/null
+      oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
+        ovn-nbctl lsp-set-dhcpv4-options "${LSP_NAME}" "${DHCP_UUID}" 2>/dev/null
 
-        oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
-          ovn-nbctl clear Logical_Switch_Port "${LSP_NAME}" port_security 2>/dev/null
+      oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
+        ovn-nbctl clear Logical_Switch_Port "${LSP_NAME}" port_security 2>/dev/null
 
-        echo "  Configured DHCP for ${NAD_NAME} on LSP ${LSP_NAME} (UUID=${DHCP_UUID})"
-      done
+      echo "  VMI ${VMI}: configured DHCP for ${NAD_NAME} (LSP=${LSP_NAME}, subnet=${SUBNET})"
     done
-  fi
-  echo "OVN DHCP and port security configuration complete for multi (${NETWORK_COUNT})-localnet interfaces"
-
-  echo "Waiting for VMIs to boot with gateway already configured..."
-  VMIS_READY=false
-  for _ in $(seq 1 120); do
-    RUNNING_COUNT=$(oc get vmi -n "${MULTI_NAMESPACE}" --no-headers 2>/dev/null \
-      | grep -c Running || true)
-    if [[ "${RUNNING_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
-      echo "All ${RUNNING_COUNT} VMIs are running with DHCP gateway configured"
-      VMIS_READY=true
-      break
-    fi
-    echo "Waiting for VMIs to boot... (${RUNNING_COUNT}/${HYPERSHIFT_NODE_COUNT} running)"
-    sleep 10
   done
+  echo "OVN DHCP and port security configuration complete for multi (${NETWORK_COUNT})-localnet interfaces"
 fi
 
 echo "Waiting for cluster to become available"
