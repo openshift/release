@@ -1,0 +1,51 @@
+chain:
+  as: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private-custom-dns-provision
+  steps:
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: aws-c2s-get-project-info
+    - ref: aws-provision-bastionhost
+    - ref: proxy-config-generate
+    - ref: aws-c2s-instance-metadata
+    - ref: aws-c2s-mirror-images
+    - ref: mirror-images-by-oc-adm
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-network-c2s
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-mirror
+    - ref: ipi-install-monitoringpvc
+    - ref: aws-c2s-init-token-service
+    - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+    - ref: ipi-install-install-aws
+    - ref: ipi-install-times-collection
+    - ref: aws-provision-private-custom-dns
+    - ref: bastion-dnsmasq
+    - ref: cucushift-installer-check-aws-custom-vpc
+    - ref: cucushift-installer-check-aws-c2s
+    - ref: cucushift-installer-check-user-provisioned-dns
+    - ref: mirror-images-qe-test-images
+    - ref: enable-qe-catalogsource-disconnected
+    - ref: mirror-images-tag-images
+    - ref: set-sample-operator-disconnected
+    - chain: cucushift-installer-check
+  env:
+  - name: SIZE_VARIANT
+    default: "large"
+    documentation: "Instance type, known issue https://bugzilla.redhat.com/show_bug.cgi?id=2020181"
+  - name: BASTION_HOST_AMI
+    default: "ami-0cb19faa9c6c86a91"
+    documentation: "Image id for bastion host."
+  - name: PUBLISH
+    default: "Internal"
+    documentation: "Cluster publish strategy."
+  - name: USER_PROVISIONED_DNS
+    default: "yes"
+    documentation: |-
+      Enable the user provisioned DNS option through the install-config. Valid options are "yes" and "no".
+      When "yes", ipi-conf-aws patches platform.aws.userProvisionedDNS: Enabled, and the private custom DNS
+      records are served from the bastion host via dnsmasq (no public DNS provider is reachable in C2S/SC2S).
+  documentation: |-
+    Create an IPI cluster on AWS C2S/SC2S with user provisioned DNS for QE e2e tests.
