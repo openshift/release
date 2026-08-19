@@ -26,7 +26,7 @@ echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}
 
 # --- Metrics instrumentation ---
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
-OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 
 agentic_ci() {
     local timeout_seconds=""
@@ -280,6 +280,30 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         || true
 elif [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
     echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
+    # Write failure metadata before exiting so post-step can emit metrics
+    PR_RESULT="failed"
+    jq -n \
+        --arg agent "trt-jira-solver" \
+        --arg phase "solve" \
+        --arg issue_key "${JIRA_ISSUE_KEY}" \
+        --arg result "${PR_RESULT}" \
+        --arg pr_url "" \
+        --arg upstream_repo "${UPSTREAM_REPO}" \
+        --argjson claude_exit "${CLAUDE_EXIT}" \
+        --argjson phase_durations "$(jq -n \
+            --argjson setup "${PHASE_SETUP_DURATION}" \
+            --argjson solve "${PHASE_SOLVE_DURATION}" \
+            '{setup: $setup, solve: $solve, pr: 0}')" \
+        '{
+          agent: $agent,
+          phase: $phase,
+          issue_key: $issue_key,
+          result: $result,
+          pr_url: $pr_url,
+          upstream_repo: $upstream_repo,
+          claude_exit: $claude_exit,
+          phase_durations: $phase_durations
+        }' > "${SHARED_DIR}/metrics-metadata-solve.json"
     exit "${CLAUDE_EXIT}"
 fi
 PHASE_SOLVE_DURATION=$(( $(date +%s) - PHASE_SOLVE_START ))
@@ -374,8 +398,8 @@ jq -n \
       upstream_repo: $upstream_repo,
       claude_exit: $claude_exit,
       phase_durations: $phase_durations
-    }' > "${SHARED_DIR}/metrics-metadata.json"
+    }' > "${SHARED_DIR}/metrics-metadata-solve.json"
 
-echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata.json"
+echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-solve.json"
 
 echo "=== TRT Jira Solver Complete ==="

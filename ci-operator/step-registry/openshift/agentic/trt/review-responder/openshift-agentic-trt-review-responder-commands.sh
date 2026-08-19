@@ -20,7 +20,7 @@ fi
 
 # --- Metrics instrumentation ---
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
-OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 
 agentic_ci() {
     local timeout_seconds=""
@@ -426,6 +426,7 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
     else
         idle_streak=0
         review_rounds=$(( review_rounds + 1 ))
+        REVIEW_EXIT=0
 
         if [[ "${has_review}" == "true" ]]; then
             echo "Invoking worker to address review comments..."
@@ -436,7 +437,7 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
                 --disallowedTools "${DISALLOWED_TOOLS[@]}" \
                 --output-format stream-json \
                 --append-system-prompt-file "${SYSTEM_PROMPT}" \
-                || true
+                || REVIEW_EXIT=$?
         fi
 
         if [[ "${has_ci}" == "true" ]]; then
@@ -452,7 +453,7 @@ Your GitHub login is ${BOT_LOGIN}." \
                 --disallowedTools "${DISALLOWED_TOOLS[@]}" \
                 --output-format stream-json \
                 --append-system-prompt-file "${CI_PROMPT}" \
-                || true
+                || REVIEW_EXIT=$?
         fi
 
         push_current_branch
@@ -476,12 +477,14 @@ PHASE_REVIEW_DURATION=$(( $(date +%s) - PHASE_REVIEW_START ))
 
 # --- Write metrics metadata for post-step ---
 PR_URL=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json url -q '.url' 2>/dev/null || echo "")
+REVIEW_RESULT="success"
+[[ "${REVIEW_EXIT:-0}" -ne 0 ]] && REVIEW_RESULT="failed"
 
 jq -n \
     --arg agent "trt-review-responder" \
     --arg phase "review" \
     --arg issue_key "${JIRA_ISSUE_KEY}" \
-    --arg result "success" \
+    --arg result "${REVIEW_RESULT}" \
     --arg pr_url "${PR_URL}" \
     --arg upstream_repo "${UPSTREAM_REPO}" \
     --argjson num_review_rounds "${review_rounds}" \
@@ -499,8 +502,8 @@ jq -n \
       iteration: $iteration,
       idle_streak: $idle_streak,
       phase_durations: $phase_durations
-    }' > "${SHARED_DIR}/metrics-metadata.json"
+    }' > "${SHARED_DIR}/metrics-metadata-review.json"
 
-echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata.json"
+echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-review.json"
 
 echo "=== TRT Review Responder Complete ==="

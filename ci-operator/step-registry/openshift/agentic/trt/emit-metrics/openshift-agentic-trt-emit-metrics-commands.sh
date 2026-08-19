@@ -7,56 +7,42 @@ set -o pipefail
 echo "=== TRT Metrics Emission ==="
 
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
-OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 
-# Read metadata written by the main step (jira-solver or review-responder)
-if [[ ! -f "${SHARED_DIR}/metrics-metadata.json" ]]; then
+# Read metadata written by the main steps (jira-solver and/or review-responder)
+METADATA_FILES=("${SHARED_DIR}"/metrics-metadata-*.json)
+if [[ ! -e "${METADATA_FILES[0]}" ]]; then
     echo "No metrics metadata found in SHARED_DIR. Skipping metrics emission."
     exit 0
 fi
 
-METADATA=$(cat "${SHARED_DIR}/metrics-metadata.json")
-AGENT=$(echo "${METADATA}" | jq -r '.agent')
-PHASE=$(echo "${METADATA}" | jq -r '.phase')
-ISSUE_KEY=$(echo "${METADATA}" | jq -r '.issue_key')
-RESULT=$(echo "${METADATA}" | jq -r '.result')
-PR_URL=$(echo "${METADATA}" | jq -r '.pr_url // ""')
-UPSTREAM_REPO=$(echo "${METADATA}" | jq -r '.upstream_repo')
-NUM_REVIEW_ROUNDS=$(echo "${METADATA}" | jq -r '.num_review_rounds // 0')
-
-# Phase durations (solver: setup/solve/pr, review-responder: review)
-PHASE_DURATIONS=$(echo "${METADATA}" | jq -r '.phase_durations // {}')
-
-echo "Agent: ${AGENT}, Phase: ${PHASE}, Issue: ${ISSUE_KEY}"
+echo "Found ${#METADATA_FILES[@]} metadata file(s)"
 
 # --- Session metrics (cost, tokens) for BigQuery claude_session_metrics table ---
-# Skip autodl emission for eval runs to keep test data out of BigQuery
-if [[ "${EVAL_MODE:-}" != "true" ]]; then
-    if [[ -f "${EXTRACT_METRICS}" ]] && [[ -f "${OTEL_LOG}" ]]; then
-        echo "Extracting session metrics..."
-        python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json" \
-            2>&1 || echo "Warning: Failed to extract session metrics"
-    fi
+if [[ -f "${EXTRACT_METRICS}" ]] && [[ -f "${OTEL_LOG}" ]]; then
+    echo "Extracting session metrics..."
+    python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json" \
+        2>&1 || echo "Warning: Failed to extract session metrics"
+fi
 
-    # --- Domain autodl for BigQuery jira_agent table ---
-    echo "Generating domain autodl..."
-    ANALYZED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# --- Domain autodl for BigQuery jira_agent table ---
+echo "Generating domain autodl..."
+ANALYZED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-    # Base schema (all agents)
-    SCHEMA='{
-      session_id: "string",
-      agent: "string",
-      phase: "string",
-      issue_key: "string",
-      pr_url: "string",
-      result: "string",
-      upstream_repo: "string",
-      analyzed_at: "string",
-      job_name: "string",
-      build_id: "string"
-    }'
+# Build rows array from all metadata files
+ROWS="[]"
+for metadata_file in "${METADATA_FILES[@]}"; do
+    METADATA=$(cat "${metadata_file}")
+    AGENT=$(echo "${METADATA}" | jq -r '.agent')
+    PHASE=$(echo "${METADATA}" | jq -r '.phase')
+    ISSUE_KEY=$(echo "${METADATA}" | jq -r '.issue_key')
+    RESULT=$(echo "${METADATA}" | jq -r '.result')
+    PR_URL=$(echo "${METADATA}" | jq -r '.pr_url // ""')
+    UPSTREAM_REPO=$(echo "${METADATA}" | jq -r '.upstream_repo')
+    NUM_REVIEW_ROUNDS=$(echo "${METADATA}" | jq -r '.num_review_rounds // 0')
 
-    # Base row (all agents)
+    echo "Processing ${AGENT} metadata (phase: ${PHASE}, issue: ${ISSUE_KEY}, result: ${RESULT})"
+
     ROW=$(jq -n \
         --arg agent "${AGENT}" \
         --arg phase "${PHASE}" \
@@ -82,29 +68,53 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
 
     # Add num_review_rounds for review-responder
     if [[ "${AGENT}" == "trt-review-responder" ]]; then
-        SCHEMA=$(echo "${SCHEMA}" | jq '. + {num_review_rounds: "integer"}')
         ROW=$(echo "${ROW}" | jq --argjson num_review_rounds "${NUM_REVIEW_ROUNDS}" '. + {num_review_rounds: $num_review_rounds}')
     fi
 
-    jq -n \
-        --argjson schema "${SCHEMA}" \
-        --argjson row "${ROW}" \
-        '{
-          table_name: "jira_agent",
-          schema: $schema,
-          schema_mapping: null,
-          rows: [$row],
-          chunk_size: 0,
-          expiration_days: 0,
-          partition_column: ""
-        }' > "${ARTIFACT_DIR}/jira-agent-trt-autodl.json"
-    echo "Domain autodl written to ${ARTIFACT_DIR}/jira-agent-trt-autodl.json"
-fi
+    ROWS=$(echo "${ROWS}" | jq --argjson row "${ROW}" '. + [$row]')
+done
 
-# --- JUnit XML for phase duration tracking (always emit, even in eval) ---
+# Schema includes num_review_rounds (will be null for solver rows)
+SCHEMA='{
+  session_id: "string",
+  agent: "string",
+  phase: "string",
+  issue_key: "string",
+  pr_url: "string",
+  result: "string",
+  upstream_repo: "string",
+  num_review_rounds: "integer",
+  analyzed_at: "string",
+  job_name: "string",
+  build_id: "string"
+}'
+
+jq -n \
+    --argjson schema "${SCHEMA}" \
+    --argjson rows "${ROWS}" \
+    '{
+      table_name: "jira_agent",
+      schema: $schema,
+      schema_mapping: null,
+      rows: $rows,
+      chunk_size: 0,
+      expiration_days: 0,
+      partition_column: ""
+    }' > "${ARTIFACT_DIR}/jira-agent-trt-autodl.json"
+echo "Domain autodl written to ${ARTIFACT_DIR}/jira-agent-trt-autodl.json (${ROWS} rows)"
+
+# --- JUnit XML for phase duration tracking ---
 echo "Generating JUnit XML..."
-JUNIT_FILE="${ARTIFACT_DIR}/junit_agentic-trt-${PHASE}.xml"
-PHASE_PREFIX="[sig-trt-agentic]"
+
+# Process each metadata file for JUnit output
+for metadata_file in "${METADATA_FILES[@]}"; do
+    METADATA=$(cat "${metadata_file}")
+    AGENT=$(echo "${METADATA}" | jq -r '.agent')
+    PHASE=$(echo "${METADATA}" | jq -r '.phase')
+    PHASE_DURATIONS=$(echo "${METADATA}" | jq -r '.phase_durations // {}')
+
+    JUNIT_FILE="${ARTIFACT_DIR}/junit_agentic-trt-${PHASE}.xml"
+    PHASE_PREFIX="[sig-trt-agentic]"
 
 if [[ "${AGENT}" == "trt-jira-solver" ]]; then
     # Solver: setup/solve/pr phases + timeout check
@@ -125,10 +135,10 @@ if [[ "${AGENT}" == "trt-jira-solver" ]]; then
         TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_SOLVE}\"/>"
     fi
 
-    TEST_COUNT=4
+    # 3 phase testcases + 1 timeout testcase = 4 total
     cat > "${JUNIT_FILE}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="agentic-trt-jira-solver" tests="${TEST_COUNT}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
+<testsuite name="agentic-trt-jira-solver" tests="4" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
   <testcase name="${PHASE_PREFIX} Phase: setup" time="${PHASE_SETUP}"/>
   <testcase name="${PHASE_PREFIX} Phase: solve" time="${PHASE_SOLVE}"/>
   <testcase name="${PHASE_PREFIX} Phase: pr-creation" time="${PHASE_PR}"/>
@@ -141,6 +151,7 @@ elif [[ "${AGENT}" == "trt-review-responder" ]]; then
     PHASE_REVIEW=$(echo "${PHASE_DURATIONS}" | jq -r '.review // 0')
     ITERATION=$(echo "${METADATA}" | jq -r '.iteration // 0')
     IDLE_STREAK=$(echo "${METADATA}" | jq -r '.idle_streak // 0')
+    NUM_REVIEW_ROUNDS=$(echo "${METADATA}" | jq -r '.num_review_rounds // 0')
 
     cat > "${JUNIT_FILE}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -153,5 +164,7 @@ elif [[ "${AGENT}" == "trt-review-responder" ]]; then
 EOF
 fi
 
-echo "JUnit XML written to ${JUNIT_FILE}"
+    echo "JUnit XML written to ${JUNIT_FILE}"
+done
+
 echo "=== TRT Metrics Emission Complete ==="
