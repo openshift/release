@@ -798,8 +798,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build12
-    context: ci/prow/security
+    context: ci/prow/snyk
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -812,9 +811,10 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-hive-master-security
+    name: pull-ci-openshift-priv-hive-master-snyk
+    optional: true
     path_alias: github.com/openshift/hive
-    rerun_command: /test security
+    rerun_command: /test snyk
     skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -825,7 +825,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=security
+        - --target=snyk
         command:
         - ci-operator
         env:
@@ -884,7 +884,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )security,?($|\s.*)
+    trigger: (?m)^/test( | .* )snyk,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
