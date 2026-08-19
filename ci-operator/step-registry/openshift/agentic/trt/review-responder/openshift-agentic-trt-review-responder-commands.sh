@@ -18,6 +18,47 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
 fi
 
+# --- Metrics instrumentation ---
+EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+
+agentic_ci() {
+    local timeout_seconds=""
+    local extra_args=()
+    while [[ "${1:-}" == --* ]]; do
+        case "$1" in
+            --timeout) timeout_seconds="$2"; shift 2 ;;
+            *) extra_args+=("$1"); shift ;;
+        esac
+    done
+    local prompt="$1"; shift
+    local cmd=(
+        agentic-ci run
+        --backend local
+        --harness claude-code
+        --model "${CLAUDE_MODEL}"
+        --workdir "${WORKDIR}"
+        "${extra_args[@]+"${extra_args[@]}"}"
+        "${prompt}"
+        --
+        --permission-mode default
+        --allowedTools "${ALLOWED_TOOLS}"
+        --verbose
+        "$@"
+    )
+    local rc=0
+    if [[ -n "${timeout_seconds}" ]]; then
+        timeout "${timeout_seconds}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
+    else
+        "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
+    fi
+    for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
+        [ -f "$f" ] && cat "$f" >> "${OTEL_LOG}"
+    done
+    rm -rf /tmp/agentic-ci-run.*
+    return $rc
+}
+
 # --- Find PR number ---
 if [[ -f "${SHARED_DIR}/pr-number" ]]; then
     PR_NUM=$(cat "${SHARED_DIR}/pr-number")
@@ -305,6 +346,8 @@ push_current_branch() {
 
 iteration=0
 idle_streak=0
+review_rounds=0
+PHASE_REVIEW_START=$(date +%s)
 PREV_FAILING='[]'
 PREV_HEAD=""
 GATE_FAILURE_THRESHOLD="${GATE_FAILURE_THRESHOLD:-3}"
@@ -382,37 +425,34 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
         echo "Nothing to do (idle streak: ${idle_streak}/3)."
     else
         idle_streak=0
+        review_rounds=$(( review_rounds + 1 ))
 
         if [[ "${has_review}" == "true" ]]; then
             echo "Invoking worker to address review comments..."
-            timeout 1800 claude \
-                --model "${CLAUDE_MODEL}" \
-                --allowedTools "${ALLOWED_TOOLS}" \
+            agentic_ci --timeout 1800 \
+                "Address review comments on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the Review Response Process instructions in your system prompt. This is CI mode (--ci).
+
+Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login." \
                 --disallowedTools "${DISALLOWED_TOOLS[@]}" \
                 --output-format stream-json \
                 --append-system-prompt-file "${SYSTEM_PROMPT}" \
-                -p "Address review comments on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the Review Response Process instructions in your system prompt. This is CI mode (--ci).
-
-Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login." \
-                --verbose 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || true
+                || true
         fi
 
         if [[ "${has_ci}" == "true" ]]; then
             CHECKS_FILE="${WORKDIR}/artifacts/failing-checks-${iteration}.json"
             printf '%s\n' "${extracted}" > "${CHECKS_FILE}"
             echo "Invoking worker to triage CI failures..."
-            timeout 1800 claude \
-                --model "${CLAUDE_MODEL}" \
-                --allowedTools "${ALLOWED_TOOLS}" \
-                --disallowedTools "${DISALLOWED_TOOLS[@]}" \
-                --output-format stream-json \
-                --append-system-prompt-file "${CI_PROMPT}" \
-                -p "Triage CI failures on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the CI Failure Process instructions in your system prompt. This is CI mode (--ci).
+            agentic_ci --timeout 1800 \
+                "Triage CI failures on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the CI Failure Process instructions in your system prompt. This is CI mode (--ci).
 
 Read failing checks from ${CHECKS_FILE} and treat that JSON as --failing-checks.
 The git remote for ${UPSTREAM_REPO} is origin. Do not run git remote -v.
 Your GitHub login is ${BOT_LOGIN}." \
-                --verbose 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || true
+                --disallowedTools "${DISALLOWED_TOOLS[@]}" \
+                --output-format stream-json \
+                --append-system-prompt-file "${CI_PROMPT}" \
+                || true
         fi
 
         push_current_branch
@@ -431,5 +471,36 @@ Your GitHub login is ${BOT_LOGIN}." \
     echo "Waiting 5 minutes before next check..."
     sleep 300
 done
+
+PHASE_REVIEW_DURATION=$(( $(date +%s) - PHASE_REVIEW_START ))
+
+# --- Write metrics metadata for post-step ---
+PR_URL=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json url -q '.url' 2>/dev/null || echo "")
+
+jq -n \
+    --arg agent "trt-review-responder" \
+    --arg phase "review" \
+    --arg issue_key "${JIRA_ISSUE_KEY}" \
+    --arg result "success" \
+    --arg pr_url "${PR_URL}" \
+    --arg upstream_repo "${UPSTREAM_REPO}" \
+    --argjson num_review_rounds "${review_rounds}" \
+    --argjson iteration "${iteration}" \
+    --argjson idle_streak "${idle_streak}" \
+    --argjson phase_durations "$(jq -n --argjson review "${PHASE_REVIEW_DURATION}" '{review: $review}')" \
+    '{
+      agent: $agent,
+      phase: $phase,
+      issue_key: $issue_key,
+      result: $result,
+      pr_url: $pr_url,
+      upstream_repo: $upstream_repo,
+      num_review_rounds: $num_review_rounds,
+      iteration: $iteration,
+      idle_streak: $idle_streak,
+      phase_durations: $phase_durations
+    }' > "${SHARED_DIR}/metrics-metadata.json"
+
+echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata.json"
 
 echo "=== TRT Review Responder Complete ==="
