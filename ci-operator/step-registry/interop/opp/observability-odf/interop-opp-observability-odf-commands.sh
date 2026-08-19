@@ -117,12 +117,21 @@ if not items:
 else:
     print(items[0].get('status',{}).get('phase','Unknown'))
 ")"; then
-        AddResult "rgw-ready" "fail" "Failed to query CephObjectStore"
+        AddResult "odf-storage-ready" "fail" "Failed to query CephObjectStore"
         return
     fi
 
     if [[ "${rgwPhase}" == "NotFound" ]]; then
-        AddResult "rgw-ready" "skip" "No CephObjectStore found; ODF RGW not deployed"
+        typeset noobaaPhase=""
+        noobaaPhase="$(oc get noobaa -n "${ODF_NAMESPACE}" \
+            -o jsonpath='{.items[0].status.phase}' 2>/dev/null)" || true
+        if [[ "${noobaaPhase}" == "Ready" ]]; then
+            AddResult "odf-storage-ready" "pass" "NooBaa Ready (RGW not deployed)"
+        elif [[ -n "${noobaaPhase}" ]]; then
+            AddResult "odf-storage-ready" "fail" "NooBaa phase=${noobaaPhase} (expected Ready); RGW not deployed"
+        else
+            AddResult "odf-storage-ready" "skip" "Neither CephObjectStore nor NooBaa found in ${ODF_NAMESPACE}"
+        fi
         return
     fi
 
@@ -159,9 +168,9 @@ else:
 
     if [[ -z "${failMsg}" ]]; then
         : "PASS: CephObjectStore Ready, RGW pods Running, StorageClass exists"
-        AddResult "rgw-ready" "pass"
+        AddResult "odf-storage-ready" "pass"
     else
-        AddResult "rgw-ready" "fail" "${failMsg}"
+        AddResult "odf-storage-ready" "fail" "${failMsg}"
     fi
     true
 }
@@ -208,8 +217,8 @@ else:
 function CheckStorageEndpoint () {
     : "=== Check 3: Object storage endpoint ==="
 
-    typeset secretName=""
-    if ! secretName="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
+    typeset storageConfig=""
+    if ! storageConfig="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
         --all-namespaces -o json 2>/dev/null | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
@@ -219,16 +228,21 @@ if not items:
 else:
     spec=items[0].get('spec',{})
     storage=spec.get('storageConfig',{}).get('metricObjectStorage',{})
-    print(storage.get('name',''))
+    name=storage.get('name','')
+    key=storage.get('key','thanos.yaml')
+    print(f'{name}|{key}' if name else '')
 ")"; then
         AddResult "storage-endpoint" "fail" "Failed to read MCO storage config"
         return
     fi
 
-    if [[ -z "${secretName}" ]]; then
+    if [[ -z "${storageConfig}" ]]; then
         AddResult "storage-endpoint" "skip" "No metricObjectStorage secret configured in MCO"
         return
     fi
+
+    typeset secretName="${storageConfig%%|*}"
+    typeset secretKey="${storageConfig#*|}"
 
     typeset secretJson=""
     secretJson="$(oc get secret "${secretName}" -n "${OBS_NAMESPACE}" -o json 2>/dev/null)" || true
@@ -237,21 +251,30 @@ else:
         endpointCheck="$(printf '%s' "${secretJson}" | python3 -c "
 import sys,json,base64,re
 d=json.load(sys.stdin)
-odf_pattern=re.compile(r'(openshift-storage|noobaa|ceph|rgw|rook|ocs)', re.IGNORECASE)
-for k,v in d.get('data',{}).items():
-    decoded=base64.b64decode(v).decode('utf-8','replace')
-    if 'endpoint' in decoded.lower() or 'bucket' in decoded.lower():
-        if odf_pattern.search(decoded):
-            print('odf-backed')
-        else:
-            print('external')
-        sys.exit(0)
-print('no-endpoint')
-" 2>/dev/null)" || true
+target_key=sys.argv[1] if len(sys.argv)>1 else 'thanos.yaml'
+raw=d.get('data',{}).get(target_key,'')
+if not raw:
+    print('no-endpoint')
+    sys.exit(0)
+decoded=base64.b64decode(raw).decode('utf-8','replace')
+try:
+    import yaml
+    cfg=yaml.safe_load(decoded)
+    endpoint=cfg.get('config',{}).get('endpoint','') if isinstance(cfg,dict) else ''
+except Exception:
+    import re as re2
+    m=re2.search(r'endpoint:\s*(.+)',decoded)
+    endpoint=m.group(1).strip() if m else ''
+if not endpoint:
+    print('no-endpoint')
+    sys.exit(0)
+odf=re.compile(r'(openshift-storage|noobaa|ceph|rgw|rook|ocs|mcg)',re.IGNORECASE)
+print('odf-backed' if odf.search(endpoint) else 'external')
+" "${secretKey}" 2>/dev/null)" || true
     fi
 
     if [[ "${endpointCheck}" == "no-endpoint" || -z "${endpointCheck}" ]]; then
-        AddResult "storage-endpoint" "fail" "Secret ${secretName} exists but no endpoint/bucket config found"
+        AddResult "storage-endpoint" "fail" "Secret ${secretName} exists but no endpoint config found in key ${secretKey}"
         return
     fi
 
@@ -324,12 +347,26 @@ function CheckThanosHealth () {
         fi
     done
 
+    typeset -a s3CriticalNames=("thanos-receive" "thanos-compact" "thanos-store")
+    typeset -a missingCritical=()
+    typeset mc=""
+    for mc in "${missingComponents[@]}"; do
+        typeset cc=""
+        for cc in "${s3CriticalNames[@]}"; do
+            if [[ "${mc}" == "${cc}" ]]; then
+                missingCritical+=("${mc}")
+            fi
+        done
+    done
+
     if (( foundCount == 0 )); then
         AddResult "thanos-health" "fail" "No Thanos/observability components found in ${OBS_NAMESPACE}"
     elif [[ -n "${failMsg}" ]]; then
         AddResult "thanos-health" "fail" "Unhealthy Thanos components: ${failMsg}"
+    elif (( ${#missingCritical[@]} > 0 )); then
+        AddResult "thanos-health" "fail" "Missing S3-critical components: ${missingCritical[*]}"
     elif (( ${#missingComponents[@]} > 0 )); then
-        AddResult "thanos-health" "pass" "Running (missing: ${missingComponents[*]})"
+        AddResult "thanos-health" "pass" "Running (optional missing: ${missingComponents[*]})"
     else
         AddResult "thanos-health" "pass"
     fi
@@ -461,17 +498,22 @@ print('ok')
 function CheckThanosQuery () {
     : "=== Check 6: Thanos query functional ==="
 
+    typeset routeJson=""
+    routeJson="$(oc get routes -n "${OBS_NAMESPACE}" -o json 2>/dev/null)" || true
     typeset queryRoute=""
-    queryRoute="$(oc get routes -n "${OBS_NAMESPACE}" -o json 2>/dev/null \
-        | python3 -c "
+    if [[ -n "${routeJson}" ]]; then
+        queryRoute="$(printf '%s' "${routeJson}" | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
-routes=[i for i in d.get('items',[]) if 'query' in i['metadata'].get('name','').lower() or 'observ' in i['metadata'].get('name','').lower()]
-if routes:
-    print(routes[0]['spec']['host'])
-else:
-    print('')
+routes=d.get('items',[])
+exact=[r for r in routes if r['metadata']['name']=='observability-thanos-query']
+if exact:
+    print(exact[0]['spec']['host'])
+    sys.exit(0)
+fuzzy=[r for r in routes if 'thanos' in r['metadata']['name'] and 'query' in r['metadata']['name']]
+print(fuzzy[0]['spec']['host'] if fuzzy else '')
 " 2>/dev/null)" || true
+    fi
 
     if [[ -z "${queryRoute}" ]]; then
         typeset svcHost="observability-thanos-query-frontend.${OBS_NAMESPACE}.svc:9090"
