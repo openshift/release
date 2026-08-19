@@ -46,8 +46,8 @@ copy_artifacts() {
         if [[ -d "/workspace/${case_name}/artifacts" ]]; then
             cp "/workspace/${case_name}/artifacts/"* "${ARTIFACT_DIR}/${case_name}/" 2>/dev/null || true
         fi
-        if [[ -f "${REAL_SHARED_DIR}/${case_name}.claude-otel.jsonl" ]]; then
-            cp "${REAL_SHARED_DIR}/${case_name}.claude-otel.jsonl" "${ARTIFACT_DIR}/${case_name}/claude-otel.jsonl"
+        if [[ -f "/tmp/eval-otel/${case_name}.claude-otel.jsonl" ]]; then
+            cp "/tmp/eval-otel/${case_name}.claude-otel.jsonl" "${ARTIFACT_DIR}/${case_name}/claude-otel.jsonl"
         fi
     done
     podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
@@ -63,7 +63,8 @@ trap copy_artifacts EXIT TERM INT
 #   reads:  gh-fork-token, gh-upstream-token, jira-issue-key, jira-issue.json, eval-base-branch, eval-case
 #   writes: claude-branch, pr-number, pr-description.md, claude-otel.jsonl
 RESULTS_DIR="/tmp/eval-results"
-mkdir -p "${RESULTS_DIR}"
+OTEL_DIR="/tmp/eval-otel"
+mkdir -p "${RESULTS_DIR}" "${OTEL_DIR}"
 RUNNING=0
 
 for case_name in "${CASE_LIST[@]}"; do
@@ -89,12 +90,16 @@ for case_name in "${CASE_LIST[@]}"; do
         export EVAL_MODE=true
         /opt/scripts/solve.sh
 
-        # Copy outputs back as flat files for judge/cleanup
-        for f in claude-branch pr-number pr-description.md claude-otel.jsonl; do
+        # Copy small outputs to SHARED_DIR for judge/cleanup. OTEL stays on
+        # local disk / artifacts — SHARED_DIR is a 3MiB kube secret.
+        for f in claude-branch pr-number pr-description.md; do
             if [[ -f "${CASE_SHARED}/${f}" ]]; then
                 cp "${CASE_SHARED}/${f}" "${REAL_SHARED_DIR}/${case_name}.${f}"
             fi
         done
+        if [[ -f "${CASE_SHARED}/claude-otel.jsonl" ]]; then
+            cp "${CASE_SHARED}/claude-otel.jsonl" "${OTEL_DIR}/${case_name}.claude-otel.jsonl"
+        fi
 
         echo "pass" > "${RESULTS_DIR}/${case_name}"
     ) > "${ARTIFACT_DIR}/solve-${case_name}.log" 2>&1 &
@@ -124,14 +129,14 @@ done
 
 echo "Completed: ${#CASE_LIST[@]} cases, ${FAILURES} failures."
 
-# Combine per-case OTEL and reshape with extract_metrics + jq into the
-# harness run_result.json that prow-agent-eval uses for Run Configuration.
-# Temp autodl stays out of ARTIFACT_DIR so nothing is pushed to BigQuery.
-OTEL_COMBINED="${REAL_SHARED_DIR}/claude-otel.jsonl"
+# Combine per-case OTEL on local disk and reshape with extract_metrics + jq
+# into eval-solve-run-result.json for prow-agent-eval. Do not put JSONL in
+# SHARED_DIR (ci-operator persists it as a 3MiB secret).
+OTEL_COMBINED="${OTEL_DIR}/claude-otel.jsonl"
 : > "${OTEL_COMBINED}"
 for case_name in "${CASE_LIST[@]}"; do
-    if [[ -f "${REAL_SHARED_DIR}/${case_name}.claude-otel.jsonl" ]]; then
-        cat "${REAL_SHARED_DIR}/${case_name}.claude-otel.jsonl" >> "${OTEL_COMBINED}"
+    if [[ -f "${OTEL_DIR}/${case_name}.claude-otel.jsonl" ]]; then
+        cat "${OTEL_DIR}/${case_name}.claude-otel.jsonl" >> "${OTEL_COMBINED}"
     fi
 done
 if [[ -s "${OTEL_COMBINED}" ]]; then

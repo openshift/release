@@ -114,7 +114,7 @@ if [[ -s "${OTEL_LOG}" ]]; then
     else
         echo "WARNING: extract_metrics produced no usable row; Run Configuration will be omitted"
     fi
-    rm -f "${METRICS_TMP}"
+    rm -f "${METRICS_TMP}" "${SHARED_DIR}/claude-otel.jsonl"
 else
     echo "WARNING: no OTEL JSONL collected; Run Configuration will be omitted"
 fi
