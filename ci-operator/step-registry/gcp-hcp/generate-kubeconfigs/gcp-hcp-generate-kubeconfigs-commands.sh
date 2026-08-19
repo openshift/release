@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== GCP HCP Generate Kubeconfigs ==="
+echo "=== GCP HCP Generate Kubeconfigs (Connect Gateway) ==="
 echo ""
 
 # Authenticate with WIF credential
@@ -27,37 +27,33 @@ echo "  MC Cluster:      ${MC_CLUSTER_NAME}"
 echo "  Region:          ${REGION}"
 echo ""
 
-# Generate region cluster kubeconfig with embedded token
-echo "Generating region cluster kubeconfig..."
+# Generate region cluster kubeconfig with Connect Gateway endpoint
+echo "Generating region cluster kubeconfig (Connect Gateway)..."
 set +x  # Hide sensitive token
+
+# Get project number for Connect Gateway URL
+REGION_PROJECT_NUMBER=$(gcloud projects describe "${REGION_PROJECT}" --format='value(projectNumber)')
+
+# Get cluster CA certificate
 REGION_CA=$(gcloud container clusters describe "${REGION_CLUSTER_NAME}" \
   --region="${REGION}" \
   --project="${REGION_PROJECT}" \
   --format='value(masterAuth.clusterCaCertificate)')
 
-# Get DNS endpoint if available (falls back to public IP endpoint)
-REGION_ENDPOINT=$(gcloud container clusters describe "${REGION_CLUSTER_NAME}" \
-  --region="${REGION}" \
-  --project="${REGION_PROJECT}" \
-  --format='value(dnsConfig.clusterDns)')
+# Build Connect Gateway endpoint
+# Format: https://{region}-connectgateway.googleapis.com/v1/projects/{projectNumber}/locations/{region}/gkeMemberships/{clusterName}
+REGION_ENDPOINT="${REGION}-connectgateway.googleapis.com/v1/projects/${REGION_PROJECT_NUMBER}/locations/${REGION}/gkeMemberships/${REGION_CLUSTER_NAME}"
 
-# Fallback to public IP endpoint if DNS endpoint is not configured
-if [[ -z "${REGION_ENDPOINT}" ]]; then
-  REGION_ENDPOINT=$(gcloud container clusters describe "${REGION_CLUSTER_NAME}" \
-    --region="${REGION}" \
-    --project="${REGION_PROJECT}" \
-    --format='value(privateClusterConfig.publicEndpoint)')
-fi
-
+# Get access token (valid for 1 hour - sufficient for CI jobs)
 ACCESS_TOKEN=$(gcloud auth print-access-token)
 
-cat > "${SHARED_DIR}/region-kubeconfig" << EOF
+cat > "${SHARED_DIR}/region-kubeconfig" << 'KUBECONFIG_EOF'
 apiVersion: v1
 kind: Config
 clusters:
 - cluster:
-    certificate-authority-data: ${REGION_CA}
-    server: https://${REGION_ENDPOINT}
+    certificate-authority-data: REGION_CA_PLACEHOLDER
+    server: https://REGION_ENDPOINT_PLACEHOLDER
   name: region-cluster
 contexts:
 - context:
@@ -68,44 +64,39 @@ current-context: region-context
 users:
 - name: gcp-user
   user:
-    token: ${ACCESS_TOKEN}
-EOF
+    token: ACCESS_TOKEN_PLACEHOLDER
+KUBECONFIG_EOF
 
-echo "  ✓ Region kubeconfig written"
+# Replace placeholders
+sed -i "s|REGION_CA_PLACEHOLDER|${REGION_CA}|g" "${SHARED_DIR}/region-kubeconfig"
+sed -i "s|REGION_ENDPOINT_PLACEHOLDER|${REGION_ENDPOINT}|g" "${SHARED_DIR}/region-kubeconfig"
+sed -i "s|ACCESS_TOKEN_PLACEHOLDER|${ACCESS_TOKEN}|g" "${SHARED_DIR}/region-kubeconfig"
+
+echo "  ✓ Region kubeconfig written (Connect Gateway)"
+echo "  Endpoint: https://${REGION_ENDPOINT}"
 set -x
 
 # Generate MC cluster kubeconfig (optional - test skips if unavailable)
-echo "Generating management cluster kubeconfig..."
+echo "Generating management cluster kubeconfig (Connect Gateway)..."
 set +x  # Hide sensitive token
 if MC_CA=$(gcloud container clusters describe "${MC_CLUSTER_NAME}" \
   --region="${REGION}" \
   --project="${MC_PROJECT}" \
   --format='value(masterAuth.clusterCaCertificate)' 2>/dev/null); then
   
-  # Get DNS endpoint if available (falls back to public IP endpoint)
-  MC_ENDPOINT=$(gcloud container clusters describe "${MC_CLUSTER_NAME}" \
-    --region="${REGION}" \
-    --project="${MC_PROJECT}" \
-    --format='value(dnsConfig.clusterDns)' 2>/dev/null)
+  # Get MC project number
+  MC_PROJECT_NUMBER=$(gcloud projects describe "${MC_PROJECT}" --format='value(projectNumber)')
   
-  # Fallback to public IP endpoint if DNS endpoint is not configured
-  if [[ -z "${MC_ENDPOINT}" ]]; then
-    MC_ENDPOINT=$(gcloud container clusters describe "${MC_CLUSTER_NAME}" \
-      --region="${REGION}" \
-      --project="${MC_PROJECT}" \
-      --format='value(privateClusterConfig.publicEndpoint)' 2>/dev/null)
-  fi
+  # Build Connect Gateway endpoint for MC
+  MC_ENDPOINT="${REGION}-connectgateway.googleapis.com/v1/projects/${MC_PROJECT_NUMBER}/locations/${REGION}/gkeMemberships/${MC_CLUSTER_NAME}"
   
-  # Only create kubeconfig if we successfully got an endpoint
-  if [[ -n "${MC_ENDPOINT}" ]]; then
-
-  cat > "${SHARED_DIR}/mc-kubeconfig" << EOF
+  cat > "${SHARED_DIR}/mc-kubeconfig" << 'KUBECONFIG_EOF'
 apiVersion: v1
 kind: Config
 clusters:
 - cluster:
-    certificate-authority-data: ${MC_CA}
-    server: https://${MC_ENDPOINT}
+    certificate-authority-data: MC_CA_PLACEHOLDER
+    server: https://MC_ENDPOINT_PLACEHOLDER
   name: mc-cluster
 contexts:
 - context:
@@ -116,17 +107,20 @@ current-context: mc-context
 users:
 - name: gcp-user
   user:
-    token: ${ACCESS_TOKEN}
-EOF
+    token: ACCESS_TOKEN_PLACEHOLDER
+KUBECONFIG_EOF
 
-    echo "  ✓ MC kubeconfig written"
-  else
-    echo "  ⚠ MC endpoint unavailable - tests will skip MC validation"
-  fi
+  # Replace placeholders
+  sed -i "s|MC_CA_PLACEHOLDER|${MC_CA}|g" "${SHARED_DIR}/mc-kubeconfig"
+  sed -i "s|MC_ENDPOINT_PLACEHOLDER|${MC_ENDPOINT}|g" "${SHARED_DIR}/mc-kubeconfig"
+  sed -i "s|ACCESS_TOKEN_PLACEHOLDER|${ACCESS_TOKEN}|g" "${SHARED_DIR}/mc-kubeconfig"
+
+  echo "  ✓ MC kubeconfig written (Connect Gateway)"
+  echo "  Endpoint: https://${MC_ENDPOINT}"
 else
   echo "  ⚠ MC cluster unavailable - tests will skip MC validation"
 fi
 set -x
 
 echo ""
-echo "✓ Kubeconfig generation completed"
+echo "✓ Kubeconfig generation completed (Connect Gateway)"
