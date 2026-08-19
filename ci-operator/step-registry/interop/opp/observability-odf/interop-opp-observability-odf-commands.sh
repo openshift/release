@@ -402,6 +402,43 @@ else:
 # Check 6: Thanos metrics query functional (basic data flow)
 # ---------------------------------------------------------------------------
 
+function ValidateThanosResponse () {
+    typeset body="${1:-}"; (($#)) && shift
+    typeset via="${1:-unknown}"; (($#)) && shift
+
+    typeset validation=""
+    validation="$(echo "${body}" | python3 -c "
+import sys,json
+try:
+    d=json.load(sys.stdin)
+except Exception:
+    print('parse-error')
+    sys.exit(0)
+if d.get('status')!='success':
+    print('status=' + str(d.get('status','')))
+    sys.exit(0)
+data=d.get('data',{})
+if data.get('resultType')!='vector':
+    print('resultType=' + str(data.get('resultType','')))
+    sys.exit(0)
+result=data.get('result',[])
+if not isinstance(result,list) or len(result)==0:
+    print('empty-result')
+    sys.exit(0)
+print('ok')
+" 2>/dev/null)" || true
+
+    if [[ "${validation}" == "ok" ]]; then
+        AddResult "thanos-query" "pass"
+    elif [[ "${validation}" == "empty-result" ]]; then
+        AddResult "thanos-query" "fail" "Thanos query succeeded via ${via} but returned empty result vector"
+    elif [[ "${validation}" == "parse-error" || -z "${validation}" ]]; then
+        AddResult "thanos-query" "fail" "Thanos query via ${via} returned unparseable response"
+    else
+        AddResult "thanos-query" "fail" "Thanos query via ${via} returned ${validation}"
+    fi
+}
+
 function CheckThanosQuery () {
     : "=== Check 6: Thanos query functional ==="
 
@@ -444,38 +481,33 @@ else:
             return
         fi
 
-        typeset queryStatus=""
-        queryStatus="$(echo "${queryResult}" | python3 -c "
-import sys,json
-d=json.load(sys.stdin)
-print(d.get('status',''))
-" 2>/dev/null)" || true
-
-        if [[ "${queryStatus}" == "success" ]]; then
-            : "PASS: Thanos query returned success via exec"
-            AddResult "thanos-query" "pass"
-        else
-            AddResult "thanos-query" "fail" "Thanos query returned status=${queryStatus}"
-        fi
+        ValidateThanosResponse "${queryResult}" "exec"
         return
     fi
 
     typeset token=""
     token="$(oc whoami -t 2>/dev/null)" || true
 
+    typeset responseBody=""
     typeset httpCode=""
-    httpCode="$(curl -sk -o /dev/null -w '%{http_code}' \
+    responseBody="$(curl -sk -w '\n%{http_code}' \
         -H "Authorization: Bearer ${token}" \
         "https://${queryRoute}/api/v1/query?query=up" \
         --max-time 30)" || true
 
-    if [[ "${httpCode}" == "200" ]]; then
-        AddResult "thanos-query" "pass"
-    elif [[ "${httpCode}" =~ ^(401|403)$ ]]; then
-        AddResult "thanos-query" "fail" "Thanos query route reachable but auth failed (HTTP ${httpCode}); no data flow verified"
-    else
-        AddResult "thanos-query" "fail" "Thanos query unreachable at ${queryRoute} (HTTP ${httpCode:-timeout})"
+    httpCode="$(echo "${responseBody}" | tail -1)"
+    responseBody="$(echo "${responseBody}" | sed '$d')"
+
+    if [[ "${httpCode}" != "200" ]]; then
+        if [[ "${httpCode}" =~ ^(401|403)$ ]]; then
+            AddResult "thanos-query" "fail" "Thanos query route auth failed (HTTP ${httpCode}); no data flow verified"
+        else
+            AddResult "thanos-query" "fail" "Thanos query unreachable at ${queryRoute} (HTTP ${httpCode:-timeout})"
+        fi
+        return
     fi
+
+    ValidateThanosResponse "${responseBody}" "route"
     true
 }
 
