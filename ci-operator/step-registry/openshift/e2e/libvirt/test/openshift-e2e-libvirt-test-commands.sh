@@ -284,6 +284,27 @@ function oc_adm_top_nodes_loop() {
 	done
 }
 
+function collect_storage_debug() {
+    echo "=== COLLECTING CSI DRIVER & STORAGE LOGS ==="
+    mkdir -p "${ARTIFACT_DIR}/csi-logs"
+    oc get sc -o wide > "${ARTIFACT_DIR}/storage-sc.log" 2>&1 || true
+    oc get pv -o yaml > "${ARTIFACT_DIR}/pv.yaml" 2>&1 || true
+    oc get pvc -A -o yaml > "${ARTIFACT_DIR}/pvc.yaml" 2>&1 || true
+    oc get volumeattachments -o yaml > "${ARTIFACT_DIR}/volumeattachments.yaml" 2>&1 || true
+    oc get pods -n openshift-cluster-csi-drivers -o wide > "${ARTIFACT_DIR}/storage-csi-pods.log" 2>&1 || true
+
+    for pod in $(oc get pods -n openshift-cluster-csi-drivers -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+        oc logs -n openshift-cluster-csi-drivers "${pod}" --all-containers --tail=500 > "${ARTIFACT_DIR}/csi-logs/${pod}.log" 2>&1 || true
+    done
+
+    # Capture events and pod state from test namespaces
+    for ns in $(oc get ns -o name 2>/dev/null | grep -E 'e2e-pvc|e2e-storage' || true); do
+        NS=$(basename "$ns")
+        oc get events -n "$NS" --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/csi-logs/events-${NS}.txt" 2>&1 || true
+        oc describe pods -n "$NS"                       > "${ARTIFACT_DIR}/csi-logs/pods-${NS}.txt" 2>&1 || true
+    done
+}
+
 function suite() {
     if [ -f "${SHARED_DIR}/excluded_tests" ]; then
         cat > ${SHARED_DIR}/invert_excluded.py <<EOSCRIPT
@@ -339,15 +360,24 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
         ;;
 	esac
 
+    # Pre-test storage snapshot
+    oc get sc -o wide > "${ARTIFACT_DIR}/storage-sc-pre.log" 2>&1 || true
+    oc get pods -n openshift-cluster-csi-drivers -o wide > "${ARTIFACT_DIR}/storage-csi-pods-pre.log" 2>&1 || true
+
     VERBOSITY="" # "--v 9"
     set -x
+    local test_rc=0
     openshift-tests run \
         ${VERBOSITY} \
         "${TEST_SUITE}" \
         ${TEST_ARGS:-} \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" &
-    wait "$!"
+    wait "$!" || test_rc=$?
+    set +x
+
+    collect_storage_debug
+    return ${test_rc}
 }
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
