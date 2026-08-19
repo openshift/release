@@ -510,6 +510,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   # pod on the same node as each VMI to perform the renewal.
   SSH_KEY_SECRET="${CLUSTER_NAME}-ssh-key"
   if oc get secret -n "${CLUSTER_NAMESPACE_PREFIX}" "${SSH_KEY_SECRET}" &>/dev/null; then
+    oc label namespace "${MULTI_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
     # Copy the SSH key secret into the cluster namespace so the renewal pods
     # can mount it (secrets don't cross namespace boundaries).
     oc get secret -n "${CLUSTER_NAMESPACE_PREFIX}" "${SSH_KEY_SECRET}" -o json \
