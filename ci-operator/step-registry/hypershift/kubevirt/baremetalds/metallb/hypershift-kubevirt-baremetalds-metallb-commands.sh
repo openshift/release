@@ -37,8 +37,9 @@ METALLB_EOF
 done
 
 echo "Configure IPAddressPool for IP_STACK=${IP_STACK}"
-if [[ $IP_STACK == "v4" ]]; then
-  oc create -f - <<EOF
+for attempt in $(seq 1 5); do
+  if [[ $IP_STACK == "v4" ]]; then
+    if oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
@@ -48,11 +49,9 @@ spec:
   addresses:
   - 192.168.111.30-192.168.111.50
 EOF
-elif [[ $IP_STACK == "v4v6" ]] || [[ $IP_STACK == "v6v4" ]]; then
-  # For dual-stack, provide both IPv4 and IPv6 address pools
-  # The order doesn't matter for MetalLB - it just makes both ranges available
-  # The fd2e:6f44:5dd8:c956:: prefix is standard for baremetalds environments
-  oc create -f - <<EOF
+    then break; fi
+  elif [[ $IP_STACK == "v4v6" ]] || [[ $IP_STACK == "v6v4" ]]; then
+    if oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
@@ -63,8 +62,9 @@ spec:
   - 192.168.111.30-192.168.111.50
   - fd2e:6f44:5dd8:c956::100-fd2e:6f44:5dd8:c956::110
 EOF
-elif [[ $IP_STACK == "v6" ]]; then
-  oc create -f - <<EOF
+    then break; fi
+  elif [[ $IP_STACK == "v6" ]]; then
+    if oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
@@ -74,12 +74,21 @@ spec:
   addresses:
   - fd2e:6f44:5dd8:c956::100-fd2e:6f44:5dd8:c956::110
 EOF
-else
-  echo "Unsupported IP_STACK: $IP_STACK"
-  exit 1
-fi
+    then break; fi
+  else
+    echo "Unsupported IP_STACK: $IP_STACK"
+    exit 1
+  fi
+  if [[ ${attempt} -eq 5 ]]; then
+    echo "IPAddressPool creation failed after ${attempt} attempts"
+    exit 1
+  fi
+  echo "IPAddressPool creation attempt ${attempt} failed, retrying in 10s..."
+  sleep 10
+done
 
-oc create -f - <<EOF
+for attempt in $(seq 1 5); do
+  if oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
@@ -89,3 +98,11 @@ spec:
   ipAddressPools:
    - metallb
 EOF
+  then break; fi
+  if [[ ${attempt} -eq 5 ]]; then
+    echo "L2Advertisement creation failed after ${attempt} attempts"
+    exit 1
+  fi
+  echo "L2Advertisement creation attempt ${attempt} failed, retrying in 10s..."
+  sleep 10
+done
