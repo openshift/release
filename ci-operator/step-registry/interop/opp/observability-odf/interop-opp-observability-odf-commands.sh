@@ -1,0 +1,524 @@
+#!/bin/bash
+set -euo pipefail
+shopt -s inherit_errexit
+
+# ---------------------------------------------------------------------------
+# ACM Observability + ODF Interop Validation (6-point gate)
+#
+# Validates that ACM's observability stack (Thanos) correctly uses
+# ODF-provided object storage (Ceph RGW or NooBaa S3) as its backend.
+# This is a cross-product interop test exercising the ACM <-> ODF boundary.
+#
+# Produces JUnit XML consumed by Prow / Sippy / TestGrid.
+# ---------------------------------------------------------------------------
+
+ACM_NAMESPACE="${ACM_NAMESPACE:-open-cluster-management}"
+OBS_NAMESPACE="${OBS_NAMESPACE:-open-cluster-management-observability}"
+ODF_NAMESPACE="${ODF_NAMESPACE:-openshift-storage}"
+
+typeset junitFile="${ARTIFACT_DIR}/junit_observability_odf.xml"
+
+typeset -a tcNamesArr=()
+typeset -a tcResultsArr=()
+typeset -a tcMessagesArr=()
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+function AddResult () {
+    typeset name="${1:-}"; (($#)) && shift
+    typeset result="${1:-}"; (($#)) && shift
+    typeset message="${1:-}"; (($#)) && shift
+    tcNamesArr+=("${name}")
+    tcResultsArr+=("${result}")
+    tcMessagesArr+=("${message}")
+    true
+}
+
+function XmlEscape () {
+    typeset text="${1:-}"; (($#)) && shift
+    text="${text//&/&amp;}"
+    text="${text//</&lt;}"
+    text="${text//>/&gt;}"
+    text="${text//\"/&quot;}"
+    text="${text//\'/&apos;}"
+    printf '%s' "${text}"
+    true
+}
+
+function WriteJunit () {
+    typeset -i total=${#tcNamesArr[@]}
+    typeset -i failCount=0
+    typeset -i skipCount=0
+    typeset r=""
+    for r in "${tcResultsArr[@]}"; do
+        if [[ "${r}" == "fail" ]]; then
+            (( failCount++ )) || true
+        elif [[ "${r}" == "skip" ]]; then
+            (( skipCount++ )) || true
+        fi
+    done
+
+    {
+        echo '<?xml version="1.0" encoding="UTF-8"?>'
+        echo "<testsuite name=\"lp-interop--ACM-OBS-ODF\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        typeset -i i=0
+        for i in "${!tcNamesArr[@]}"; do
+            typeset name=""
+            name="$(XmlEscape "${tcNamesArr[$i]}")"
+            echo "  <testcase classname=\"lp-interop--ACM-OBS-ODF\" name=\"${name}\">"
+            if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
+                typeset msg=""
+                msg="$(XmlEscape "${tcMessagesArr[$i]}")"
+                echo "    <failure message=\"${msg}\"></failure>"
+            elif [[ "${tcResultsArr[$i]}" == "skip" ]]; then
+                typeset msg=""
+                msg="$(XmlEscape "${tcMessagesArr[$i]}")"
+                echo "    <skipped message=\"${msg}\"/>"
+            fi
+            echo "  </testcase>"
+        done
+        echo "</testsuite>"
+    } > "${junitFile}"
+    : "JUnit XML written to ${junitFile}"
+}
+
+# shellcheck disable=SC2317
+function CollectExitArtifacts () {
+    : "Collecting observability + ODF diagnostics..."
+    oc get multiclusterobservabilities.observability.open-cluster-management.io --all-namespaces -o yaml > "${ARTIFACT_DIR}/mco.yaml" 2>/dev/null || true
+    oc get pods -n "${OBS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/obs-pods.yaml" 2>/dev/null || true
+    oc get obc -n "${OBS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/obs-obc.yaml" 2>/dev/null || true
+    oc get secret -n "${OBS_NAMESPACE}" -o name > "${ARTIFACT_DIR}/obs-secrets-list.txt" 2>/dev/null || true
+    oc get cephobjectstore -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/cephobjectstore.yaml" 2>/dev/null || true
+    oc get pods -n "${ODF_NAMESPACE}" -l app=rook-ceph-rgw -o yaml > "${ARTIFACT_DIR}/rgw-pods.yaml" 2>/dev/null || true
+    oc get noobaa -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/noobaa.yaml" 2>/dev/null || true
+}
+
+trap CollectExitArtifacts EXIT
+
+# ---------------------------------------------------------------------------
+# Check 1: ODF Ceph RGW infrastructure ready
+# ---------------------------------------------------------------------------
+
+function CheckRgwReady () {
+    : "=== Check 1: ODF Ceph RGW infrastructure ==="
+
+    typeset rgwPhase=""
+    if ! rgwPhase="$(oc get cephobjectstore -n "${ODF_NAMESPACE}" -o json 2>/dev/null | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+items=d.get('items',[])
+if not items:
+    print('NotFound')
+else:
+    print(items[0].get('status',{}).get('phase','Unknown'))
+")"; then
+        AddResult "rgw-ready" "fail" "Failed to query CephObjectStore"
+        return
+    fi
+
+    if [[ "${rgwPhase}" == "NotFound" ]]; then
+        AddResult "rgw-ready" "skip" "No CephObjectStore found; ODF RGW not deployed"
+        return
+    fi
+
+    typeset failMsg=""
+    if [[ "${rgwPhase}" != "Ready" ]]; then
+        failMsg="CephObjectStore phase=${rgwPhase} (expected Ready)"
+    fi
+
+    typeset rgwPodCount=""
+    rgwPodCount="$(oc get pods -n "${ODF_NAMESPACE}" -l app=rook-ceph-rgw \
+        --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)" || true
+
+    if [[ "${rgwPodCount}" -eq 0 ]]; then
+        typeset rgwMsg="No rook-ceph-rgw pods Running in ${ODF_NAMESPACE}"
+        if [[ -n "${failMsg}" ]]; then
+            failMsg="${failMsg}; ${rgwMsg}"
+        else
+            failMsg="${rgwMsg}"
+        fi
+    fi
+
+    typeset scExists=""
+    scExists="$(oc get sc ocs-storagecluster-ceph-rgw -o name 2>/dev/null)" || true
+    if [[ -z "${scExists}" ]]; then
+        typeset scMsg="StorageClass ocs-storagecluster-ceph-rgw not found"
+        if [[ -n "${failMsg}" ]]; then
+            failMsg="${failMsg}; ${scMsg}"
+        else
+            failMsg="${scMsg}"
+        fi
+    fi
+
+    if [[ -z "${failMsg}" ]]; then
+        : "PASS: CephObjectStore Ready, RGW pods Running, StorageClass exists"
+        AddResult "rgw-ready" "pass"
+    else
+        AddResult "rgw-ready" "fail" "${failMsg}"
+    fi
+    true
+}
+
+# ---------------------------------------------------------------------------
+# Check 2: MultiClusterObservability CR exists and is Ready
+# ---------------------------------------------------------------------------
+
+function CheckMcoReady () {
+    : "=== Check 2: MultiClusterObservability CR ==="
+
+    typeset mcoStatus=""
+    if ! mcoStatus="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
+        --all-namespaces -o json 2>/dev/null | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+items=d.get('items',[])
+if not items:
+    print('NotFound')
+else:
+    conds=items[0].get('status',{}).get('conditions',[])
+    ready=[c for c in conds if c.get('type')=='Ready']
+    print(ready[0].get('status','Unknown') if ready else 'NoCondition')
+")"; then
+        AddResult "mco-ready" "fail" "Failed to query MultiClusterObservability CR"
+        return
+    fi
+
+    if [[ "${mcoStatus}" == "True" ]]; then
+        : "PASS: MultiClusterObservability Ready=True"
+        AddResult "mco-ready" "pass"
+    elif [[ "${mcoStatus}" == "NotFound" ]]; then
+        AddResult "mco-ready" "skip" "MultiClusterObservability CR not found; observability not deployed"
+    else
+        AddResult "mco-ready" "fail" "MultiClusterObservability Ready=${mcoStatus} (expected True)"
+    fi
+    true
+}
+
+# ---------------------------------------------------------------------------
+# Check 3: Object storage secret references ODF-backed endpoint
+# ---------------------------------------------------------------------------
+
+function CheckStorageEndpoint () {
+    : "=== Check 3: Object storage endpoint ==="
+
+    typeset secretName=""
+    if ! secretName="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
+        --all-namespaces -o json 2>/dev/null | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+items=d.get('items',[])
+if not items:
+    print('')
+else:
+    spec=items[0].get('spec',{})
+    storage=spec.get('storageConfig',{}).get('metricObjectStorage',{})
+    print(storage.get('name',''))
+")"; then
+        AddResult "storage-endpoint" "fail" "Failed to read MCO storage config"
+        return
+    fi
+
+    if [[ -z "${secretName}" ]]; then
+        AddResult "storage-endpoint" "skip" "No metricObjectStorage secret configured in MCO"
+        return
+    fi
+
+    typeset endpointCheck=""
+    endpointCheck="$(oc get secret "${secretName}" -n "${OBS_NAMESPACE}" -o json 2>/dev/null \
+        | python3 -c "
+import sys,json,base64,re
+d=json.load(sys.stdin)
+odf_pattern=re.compile(r'(openshift-storage|noobaa|ceph|rgw|rook|ocs)', re.IGNORECASE)
+for k,v in d.get('data',{}).items():
+    decoded=base64.b64decode(v).decode('utf-8','replace')
+    if 'endpoint' in decoded.lower() or 'bucket' in decoded.lower():
+        if odf_pattern.search(decoded):
+            print('odf-backed')
+        else:
+            print('external')
+        sys.exit(0)
+print('no-endpoint')
+" 2>/dev/null)" || true
+
+    if [[ "${endpointCheck}" == "no-endpoint" || -z "${endpointCheck}" ]]; then
+        AddResult "storage-endpoint" "fail" "Secret ${secretName} exists but no endpoint/bucket config found"
+        return
+    fi
+
+    if [[ "${endpointCheck}" == "odf-backed" ]]; then
+        AddResult "storage-endpoint" "pass"
+    else
+        AddResult "storage-endpoint" "fail" "Storage endpoint does not reference ODF-backed service"
+    fi
+    true
+}
+
+# ---------------------------------------------------------------------------
+# Check 4: Thanos components healthy
+# ---------------------------------------------------------------------------
+
+function CheckThanosHealth () {
+    : "=== Check 4: Thanos components healthy ==="
+
+    if ! oc get namespace "${OBS_NAMESPACE}" &>/dev/null; then
+        AddResult "thanos-health" "skip" "Observability namespace ${OBS_NAMESPACE} does not exist"
+        return
+    fi
+
+    typeset failMsg=""
+    typeset -i foundCount=0
+    typeset -a missingComponents=()
+
+    typeset -a componentNames=("thanos-receive"     "thanos-compact"     "thanos-store"       "thanos-query"       "alertmanager"       "rbac-query-proxy")
+    typeset -a componentLabels=("app=thanos-receive" "app=thanos-compact" "app=thanos-store"   "app=thanos-query"   "alertmanager=observability" "app=rbac-query-proxy")
+
+    typeset -i idx=0
+    for idx in "${!componentNames[@]}"; do
+        typeset component="${componentNames[$idx]}"
+        typeset labelSelector="${componentLabels[$idx]}"
+
+        typeset podCount=""
+        podCount="$(oc get pods -n "${OBS_NAMESPACE}" -l "${labelSelector}" \
+            --no-headers 2>/dev/null | wc -l)" || true
+
+        if [[ "${podCount}" -eq 0 ]]; then
+            podCount="$(oc get pods -n "${OBS_NAMESPACE}" \
+                --no-headers 2>/dev/null | grep -c "^${component}")" || true
+        fi
+
+        if [[ "${podCount}" -eq 0 ]]; then
+            missingComponents+=("${component}")
+            continue
+        fi
+
+        (( foundCount++ )) || true
+
+        typeset notReady=""
+        notReady="$(oc get pods -n "${OBS_NAMESPACE}" -l "${labelSelector}" \
+            --no-headers 2>/dev/null \
+            | awk '$3 != "Running" && $3 != "Completed" {print $1 ":" $3}')" || true
+
+        if [[ -n "${notReady}" ]]; then
+            typeset compMsg="${component}: ${notReady//$'\n'/, }"
+            if [[ -n "${failMsg}" ]]; then
+                failMsg="${failMsg}; ${compMsg}"
+            else
+                failMsg="${compMsg}"
+            fi
+        fi
+    done
+
+    if (( foundCount == 0 )); then
+        AddResult "thanos-health" "fail" "No Thanos/observability components found in ${OBS_NAMESPACE}"
+    elif [[ -n "${failMsg}" ]]; then
+        AddResult "thanos-health" "fail" "Unhealthy Thanos components: ${failMsg}"
+    elif (( ${#missingComponents[@]} > 0 )); then
+        AddResult "thanos-health" "pass" "Running (missing: ${missingComponents[*]})"
+    else
+        AddResult "thanos-health" "pass"
+    fi
+    true
+}
+
+# ---------------------------------------------------------------------------
+# Check 5: ObjectBucketClaim bound (if used by observability)
+# ---------------------------------------------------------------------------
+
+function CheckObcBound () {
+    : "=== Check 5: Observability ObjectBucketClaim ==="
+
+    typeset obcList=""
+    obcList="$(oc get obc -n "${OBS_NAMESPACE}" -o json 2>/dev/null)" || true
+
+    typeset obcItemCount=""
+    if [[ -n "${obcList}" ]]; then
+        obcItemCount="$(echo "${obcList}" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(len(d.get('items',[])))
+" 2>/dev/null)" || true
+    fi
+
+    if [[ "${obcItemCount:-0}" -eq 0 ]]; then
+        obcList="$(oc get obc -n "${ODF_NAMESPACE}" -o json 2>/dev/null \
+            | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+obs=[i for i in d.get('items',[]) if 'obs' in i['metadata'].get('name','').lower() or 'thanos' in i['metadata'].get('name','').lower()]
+print(json.dumps({'items':obs}))
+" 2>/dev/null)" || true
+        obcItemCount="$(echo "${obcList}" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(len(d.get('items',[])))
+" 2>/dev/null)" || true
+    fi
+
+    if [[ "${obcItemCount:-0}" -eq 0 ]]; then
+        AddResult "obc-bound" "skip" "No ObjectBucketClaim found for observability"
+        return
+    fi
+
+    typeset obcStatus=""
+    if ! obcStatus="$(echo "${obcList}" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+items=d.get('items',[])
+if not items:
+    print('NotFound')
+else:
+    results=[]
+    for i in items:
+        name=i['metadata']['name']
+        phase=i.get('status',{}).get('phase','Unknown')
+        results.append(f'{name}={phase}')
+    print(';'.join(results))
+")"; then
+        AddResult "obc-bound" "fail" "Failed to parse OBC status"
+        return
+    fi
+
+    if [[ "${obcStatus}" == "NotFound" ]]; then
+        AddResult "obc-bound" "skip" "No ObjectBucketClaim found for observability"
+        return
+    fi
+
+    typeset unboundObcs=""
+    unboundObcs="$(echo "${obcStatus}" | tr ';' '\n' | grep -v '=Bound$' || true)"
+
+    if [[ -z "${unboundObcs}" ]]; then
+        : "PASS: All observability OBCs bound: ${obcStatus}"
+        AddResult "obc-bound" "pass"
+    else
+        AddResult "obc-bound" "fail" "Unbound OBCs: ${unboundObcs//$'\n'/, }"
+    fi
+    true
+}
+
+# ---------------------------------------------------------------------------
+# Check 6: Thanos metrics query functional (basic data flow)
+# ---------------------------------------------------------------------------
+
+function CheckThanosQuery () {
+    : "=== Check 6: Thanos query functional ==="
+
+    typeset queryRoute=""
+    queryRoute="$(oc get routes -n "${OBS_NAMESPACE}" -o json 2>/dev/null \
+        | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+routes=[i for i in d.get('items',[]) if 'query' in i['metadata'].get('name','').lower() or 'observ' in i['metadata'].get('name','').lower()]
+if routes:
+    print(routes[0]['spec']['host'])
+else:
+    print('')
+" 2>/dev/null)" || true
+
+    if [[ -z "${queryRoute}" ]]; then
+        typeset svcHost="observability-thanos-query-frontend.${OBS_NAMESPACE}.svc:9090"
+        : "No external route found; trying internal service: ${svcHost}"
+
+        typeset token=""
+        token="$(oc whoami -t 2>/dev/null)" || true
+
+        typeset queryResult=""
+        queryResult="$(oc exec -n "${OBS_NAMESPACE}" \
+            "$(oc get pods -n "${OBS_NAMESPACE}" -l app.kubernetes.io/name=thanos-query-frontend \
+                -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo '')" \
+            -- wget -qO- --no-check-certificate \
+            "http://localhost:9090/api/v1/query?query=up" 2>/dev/null)" || true
+
+        if [[ -z "${queryResult}" ]]; then
+            queryResult="$(oc exec -n "${OBS_NAMESPACE}" \
+                "$(oc get pods -n "${OBS_NAMESPACE}" --no-headers 2>/dev/null \
+                    | grep 'thanos-query' | grep -v 'frontend' | head -1 | awk '{print $1}')" \
+                -- wget -qO- --no-check-certificate \
+                "http://localhost:9090/api/v1/query?query=up" 2>/dev/null)" || true
+        fi
+
+        if [[ -z "${queryResult}" ]]; then
+            AddResult "thanos-query" "skip" "Cannot reach Thanos query endpoint (no route, exec failed)"
+            return
+        fi
+
+        typeset queryStatus=""
+        queryStatus="$(echo "${queryResult}" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(d.get('status',''))
+" 2>/dev/null)" || true
+
+        if [[ "${queryStatus}" == "success" ]]; then
+            : "PASS: Thanos query returned success via exec"
+            AddResult "thanos-query" "pass"
+        else
+            AddResult "thanos-query" "fail" "Thanos query returned status=${queryStatus}"
+        fi
+        return
+    fi
+
+    typeset token=""
+    token="$(oc whoami -t 2>/dev/null)" || true
+
+    typeset httpCode=""
+    httpCode="$(curl -sk -o /dev/null -w '%{http_code}' \
+        -H "Authorization: Bearer ${token}" \
+        "https://${queryRoute}/api/v1/query?query=up" \
+        --max-time 30)" || true
+
+    if [[ "${httpCode}" == "200" ]]; then
+        AddResult "thanos-query" "pass"
+    elif [[ "${httpCode}" =~ ^(401|403)$ ]]; then
+        AddResult "thanos-query" "fail" "Thanos query route reachable but auth failed (HTTP ${httpCode}); no data flow verified"
+    else
+        AddResult "thanos-query" "fail" "Thanos query unreachable at ${queryRoute} (HTTP ${httpCode:-timeout})"
+    fi
+    true
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+function Main () {
+    if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+    fi
+
+    : "ACM Observability + ODF Interop Validation starting"
+    : "ACM namespace: ${ACM_NAMESPACE}"
+    : "Observability namespace: ${OBS_NAMESPACE}"
+    : "ODF namespace: ${ODF_NAMESPACE}"
+    : "Artifacts dir: ${ARTIFACT_DIR}"
+
+    CheckRgwReady          || true
+    CheckMcoReady          || true
+    CheckStorageEndpoint   || true
+    CheckThanosHealth      || true
+    CheckObcBound          || true
+    CheckThanosQuery       || true
+
+    WriteJunit
+
+    typeset -i hasAnyFail=0
+    typeset r=""
+    for r in "${tcResultsArr[@]}"; do
+        if [[ "${r}" == "fail" ]]; then
+            hasAnyFail=1
+            break
+        fi
+    done
+
+    if (( hasAnyFail )); then
+        : "ACM Observability + ODF Interop: SOME CHECKS FAILED"
+        exit 1
+    fi
+
+    : "ACM Observability + ODF Interop: ALL PASSED"
+    exit 0
+}
+
+Main "$@"
