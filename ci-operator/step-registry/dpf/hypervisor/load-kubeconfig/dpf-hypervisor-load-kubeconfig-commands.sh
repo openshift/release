@@ -47,33 +47,6 @@ fi
 echo "=== Copying kubeconfig from ${LAST_OPENSHIFT_DPF} on hypervisor ==="
 scp ${SSH_OPTS} root@${REMOTE_HOST}:${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME} /tmp/kubeconfig.${CLUSTER_NAME}
 
-# The kubeconfig's API server is addressed by an internal hostname that is
-# not resolvable from the CI cluster's network. Resolve it from the
-# hypervisor (which can reach internal DNS) and substitute the IP so the
-# kubeconfig is usable from the CI pod.
-CLUSTER_NAME="$(oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config view -o jsonpath='{.clusters[0].name}')"
-CLUSTER_API_SERVER_HOSTNAME="$(oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config view -o jsonpath='{.clusters[0].cluster.server}' | sed -E 's#https://([^:]+):.*#\1#')"
-echo "Resolving cluster API server hostname '${CLUSTER_API_SERVER_HOSTNAME}' from the hypervisor..."
-CLUSTER_API_IP="$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "getent hosts ${CLUSTER_API_SERVER_HOSTNAME} | awk '{print \$1}'")"
-
-if [[ -z "${CLUSTER_API_IP}" ]]; then
-    echo "ERROR: Failed to resolve '${CLUSTER_API_SERVER_HOSTNAME}' from the hypervisor"
-    exit 1
-fi
-
-echo "Resolved '${CLUSTER_API_SERVER_HOSTNAME}' to '${CLUSTER_API_IP}'"
-
-# The API server's serving certificate is issued for the hypervisor hostname
-# (and internal cluster IPs), not the IP substituted above, so TLS hostname
-# verification against it would fail. Mark the cluster as insecure and drop
-# the CA data (the two are mutually exclusive in a kubeconfig) so consumers
-# of this kubeconfig don't need to pass --insecure-skip-tls-verify
-# themselves.
-oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config set-cluster "${CLUSTER_NAME}" \
-    --server="https://${CLUSTER_API_IP}:6443" \
-    --insecure-skip-tls-verify=true
-oc --kubeconfig=/tmp/kubeconfig.${CLUSTER_NAME} config unset "clusters.${CLUSTER_NAME}.certificate-authority-data"
-
 cp /tmp/kubeconfig.${CLUSTER_NAME} "${SHARED_DIR}/kubeconfig"
 echo "Kubeconfig copied to \${SHARED_DIR}/kubeconfig successfully"
 
