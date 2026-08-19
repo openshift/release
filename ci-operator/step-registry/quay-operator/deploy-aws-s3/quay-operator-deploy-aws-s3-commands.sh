@@ -17,7 +17,6 @@ https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/mai
 fi
 
 QUAY_NS="quay-enterprise"
-declare -A LOGGED_FAILING_PODS=()
 
 function archive_pod_info() {
   local ns="${QUAY_NS}"
@@ -32,63 +31,6 @@ function archive_pod_info() {
       oc logs "${pod}" -n "${ns}" -c "${container}" --previous > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}_previous.log" 2>&1 || true
     done
   done < <(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n')
-}
-
-function print_quay_heartbeat() {
-  local attempt="$1"
-  local ns="${QUAY_NS}"
-  local available
-  available="$(oc -n "${ns}" get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
-  echo "----- QuayRegistry heartbeat (${attempt}/60) Available=${available:-unknown} -----" >&2
-  echo "QuayRegistry conditions:" >&2
-  oc -n "${ns}" get quayregistry quay -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} msg={.message}{"\n"}{end}' 2>&1 || true
-  echo "Deployments / statefulsets:" >&2
-  oc -n "${ns}" get deploy,sts -o wide 2>&1 || true
-  echo "Pods:" >&2
-  oc -n "${ns}" get pods -o wide 2>&1 || true
-}
-
-function pod_is_failing() {
-  local status="$1"
-  case "${status}" in
-    CrashLoopBackOff|Error|ErrImagePull|ImagePullBackOff|CreateContainerConfigError|CreateContainerError|InvalidImageName|OOMKilled|Init:CrashLoopBackOff|Init:Error|Failed)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
-function dump_failing_pod_logs() {
-  local force="${1:-}"
-  local ns="${QUAY_NS}"
-  local name ready status restarts age
-  local dumped=0
-  while read -r name ready status restarts age; do
-    [[ -z "${name}" ]] && continue
-    if ! pod_is_failing "${status}"; then
-      continue
-    fi
-    if [[ "${force}" != "force" && -n "${LOGGED_FAILING_PODS[${name}]:-}" ]]; then
-      continue
-    fi
-    LOGGED_FAILING_PODS["${name}"]=1
-    dumped=1
-    echo "===== Failing pod ${name} status=${status} restarts=${restarts} =====" >&2
-    oc -n "${ns}" describe pod "${name}" 2>&1 | tail -80 >&2 || true
-    local containers
-    containers=$(oc get pod "${name}" -n "${ns}" -o jsonpath='{.spec.initContainers[*].name} {.spec.containers[*].name}' 2>/dev/null || true)
-    for container in ${containers}; do
-      echo "----- ${name}/${container} logs (tail 80) -----" >&2
-      oc logs "${name}" -n "${ns}" -c "${container}" --tail=80 2>&1 || true
-      echo "----- ${name}/${container} previous logs (tail 40) -----" >&2
-      oc logs "${name}" -n "${ns}" -c "${container}" --previous --tail=40 2>&1 || true
-    done
-  done < <(oc get pods -n "${ns}" --no-headers 2>/dev/null || true)
-  if [[ "${dumped}" -eq 1 ]]; then
-    echo "Printed logs from failing pods for debug; continuing to wait for Available=True." >&2
-  fi
 }
 
 #Get the credentials and Email of new Quay User
@@ -305,6 +247,30 @@ if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	curl -sL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
 		-o /tmp/yq && chmod +x /tmp/yq
 	/tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
+	# Strip field-group keys for components this CR keeps managed. The operator
+	# injects those values; leaving them in configBundleSecret blocks rollout.
+	/tmp/yq -i '
+		del(
+			.FEATURE_SECURITY_SCANNER,
+			.FEATURE_SECURITY_NOTIFICATIONS,
+			.SECURITY_SCANNER_ENDPOINT,
+			.SECURITY_SCANNER_INDEXING_INTERVAL,
+			.SECURITY_SCANNER_V4_ENDPOINT,
+			.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
+			.SECURITY_SCANNER_V4_PSK,
+			.FEATURE_REPO_MIRROR,
+			.REPO_MIRROR_INTERVAL,
+			.REPO_MIRROR_SERVER_HOSTNAME,
+			.REPO_MIRROR_TLS_VERIFY,
+			.BUILDLOGS_REDIS,
+			.USER_EVENTS_REDIS,
+			.DB_URI,
+			.DB_CONNECTION_ARGS,
+			.SERVER_HOSTNAME,
+			.PREFERRED_URL_SCHEME,
+			.EXTERNAL_TLS_TERMINATION
+		)
+	' config.yaml
 fi
 
 oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
@@ -336,16 +302,13 @@ spec:
   - kind: route
     managed: true
 EOF
-echo "QuayRegistry CR applied; polling deployments until Available=True (up to 15m)." >&2
 
-for attempt in {1..60}; do
-  print_quay_heartbeat "${attempt}"
-  dump_failing_pod_logs
-  if [[ "$(oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
-    echo "QuayRegistry deployments are successful; Available=True. Exiting wait loop." >&2
-    oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
-    oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
-    quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
+for _ in {1..60}; do
+  if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
+    echo "Quay is in ready status" >&2
+    oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+    oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
+    quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
     archive_pod_info
@@ -354,6 +317,5 @@ for attempt in {1..60}; do
   sleep 15
 done
 echo "Timed out waiting for Quay to become ready after 15 mins" >&2
-dump_failing_pod_logs force
 archive_pod_info
 exit 1
