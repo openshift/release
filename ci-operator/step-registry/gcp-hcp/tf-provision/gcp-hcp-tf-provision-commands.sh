@@ -187,6 +187,66 @@ log "TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPA
 # Errors that retrying cannot fix — fail fast instead of wasting time
 NON_TRANSIENT_ERRORS="quota.*exceeded|forbidden|invalid.*configuration|unauthorized"
 
+# Workaround for hashicorp/terraform-provider-google#22533:
+# google_firestore_database has a read-after-write consistency bug on newly
+# created projects. The provider creates the database, but the immediate GET
+# returns 404, so the resource is dropped from state. The next apply attempt
+# then fails with 409 "already exists" because the database is in GCP but not
+# in state. Fix: detect the 409, extract the project ID, and import the
+# orphaned resources before retrying.
+import_orphaned_firestore() {
+  local output="$1"
+
+  # Check for the Firestore 409 pattern
+  if ! echo "${output}" | grep -q "google_firestore_database.*Database already exists"; then
+    return 1
+  fi
+
+  log "Detected Firestore provider bug (hashicorp/terraform-provider-google#22533)"
+  log "Database exists in GCP but not in state — attempting import..."
+
+  # Extract MC project ID from terraform state (the project resource is
+  # created before Firestore, so it should be in state)
+  local mc_project
+  mc_project=$(terraform output -json 2>/dev/null | jq -r '.management_cluster.value.project_id // empty' 2>/dev/null || echo "")
+
+  if [[ -z "${mc_project}" ]]; then
+    log "WARNING: Could not extract MC project ID from outputs, trying state..."
+    mc_project=$(terraform show -json 2>/dev/null | \
+      jq -r '.. | objects | select(.address? == "module.management_cluster.module.project.google_project.main") | .values.project_id // empty' 2>/dev/null || echo "")
+  fi
+
+  if [[ -z "${mc_project}" ]]; then
+    log "ERROR: Could not determine MC project ID for import"
+    return 1
+  fi
+
+  log "MC Project ID: ${mc_project}"
+
+  local imported=0
+  for db_name in specs status; do
+    local address="module.management_cluster.google_firestore_database.${db_name}"
+    local import_id="projects/${mc_project}/databases/${db_name}"
+
+    # Only import if the error mentions this specific database
+    if echo "${output}" | grep -q "google_firestore_database.${db_name}"; then
+      log "Importing ${address} <- ${import_id}"
+      if terraform import -no-color "${address}" "${import_id}" 2>&1 | tee -a "${LOG}"; then
+        log "Successfully imported ${db_name} database"
+        imported=$((imported + 1))
+      else
+        log "WARNING: Failed to import ${db_name} database"
+      fi
+    fi
+  done
+
+  if [[ ${imported} -gt 0 ]]; then
+    log "Imported ${imported} orphaned Firestore database(s)"
+    return 0
+  fi
+  return 1
+}
+
 MAX_APPLY_ATTEMPTS=5
 apply_attempt=1
 apply_wait=30
@@ -215,6 +275,12 @@ while (( apply_attempt <= MAX_APPLY_ATTEMPTS )); do
     log "${non_transient}"
     log "Check TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
     exit 1
+  fi
+
+  # Handle Firestore provider bug: import orphaned databases before retry
+  if import_orphaned_firestore "${apply_output}"; then
+    log "Firestore import succeeded — retrying apply immediately"
+    apply_wait=10  # Short wait after import
   fi
 
   if (( apply_attempt < MAX_APPLY_ATTEMPTS )); then
