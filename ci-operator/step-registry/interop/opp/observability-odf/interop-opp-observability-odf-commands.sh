@@ -121,12 +121,16 @@ else:
     fi
 
     if [[ "${rgwPhase}" == "NotFound" ]]; then
+        typeset noobaaJson=""
+        noobaaJson="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json)" || true
         typeset noobaaPhase=""
-        noobaaPhase="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | python3 -c "
+        if [[ -n "${noobaaJson}" ]]; then
+            noobaaPhase="$(printf '%s' "${noobaaJson}" | python3 -c "
 import sys,json
 items=json.load(sys.stdin).get('items',[])
 print(items[0].get('status',{}).get('phase','') if items else '')
-")" || true
+")"
+        fi
         if [[ "${noobaaPhase}" == "Ready" ]]; then
             AddResult "odf-storage-ready" "pass" "NooBaa Ready (RGW not deployed)"
         elif [[ -n "${noobaaPhase}" ]]; then
@@ -272,7 +276,7 @@ if not endpoint:
     sys.exit(0)
 odf=re.compile(r'(openshift-storage|noobaa|ceph|rgw|rook|ocs|mcg)',re.IGNORECASE)
 print('odf-backed' if odf.search(endpoint) else 'external')
-" "${secretKey}")" || true
+" "${secretKey}")"
     fi
 
     if [[ "${endpointCheck}" == "no-endpoint" || -z "${endpointCheck}" ]]; then
@@ -332,12 +336,9 @@ function CheckThanosHealth () {
 
         (( ++foundCount ))
 
-        typeset labeledPods=""
-        labeledPods="$(oc get pods -n "${OBS_NAMESPACE}" -l "${labelSelector}" \
-            --no-headers)" || true
         typeset notReady=""
-        notReady="$(printf '%s' "${labeledPods}" \
-            | awk '$3 != "Running" && $3 != "Completed" {print $1 ":" $3}')" || true
+        notReady="$(printf '%s' "${podList}" \
+            | awk '$3 != "Running" && $3 != "Completed" {print $1 ":" $3}')"
 
         if [[ -n "${notReady}" ]]; then
             typeset compMsg="${component}: ${notReady//$'\n'/, }"
@@ -391,7 +392,7 @@ function CheckObcBound () {
 import sys,json
 d=json.load(sys.stdin)
 print(len(d.get('items',[])))
-")" || true
+")"
     fi
 
     if [[ "${obcItemCount:-0}" -eq 0 ]]; then
@@ -403,14 +404,14 @@ import sys,json
 d=json.load(sys.stdin)
 obs=[i for i in d.get('items',[]) if 'obs' in i['metadata'].get('name','').lower() or 'thanos' in i['metadata'].get('name','').lower()]
 print(json.dumps({'items':obs}))
-")" || true
+")"
         fi
         if [[ -n "${obcList}" ]]; then
             obcItemCount="$(echo "${obcList}" | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 print(len(d.get('items',[])))
-")" || true
+")"
         fi
     fi
 
@@ -483,7 +484,7 @@ if not isinstance(result,list) or len(result)==0:
     print('empty-result')
     sys.exit(0)
 print('ok')
-")" || true
+")"
 
     if [[ "${validation}" == "ok" ]]; then
         AddResult "thanos-query" "pass"
@@ -514,20 +515,24 @@ if exact:
     sys.exit(0)
 fuzzy=[r for r in routes if 'thanos' in r['metadata']['name'] and 'query' in r['metadata']['name']]
 print(fuzzy[0]['spec']['host'] if fuzzy else '')
-")" || true
+")"
     fi
 
     if [[ -z "${queryRoute}" ]]; then
         typeset svcHost="observability-thanos-query-frontend.${OBS_NAMESPACE}.svc:9090"
         : "No external route found; trying internal service: ${svcHost}"
 
+        typeset queryFrontendJson=''
+        queryFrontendJson="$(oc get pods -n "${OBS_NAMESPACE}" \
+            -l app.kubernetes.io/name=thanos-query-frontend -o json)" || true
         typeset queryFrontendPod=''
-        queryFrontendPod="$(oc get pods -n "${OBS_NAMESPACE}" \
-            -l app.kubernetes.io/name=thanos-query-frontend -o json | python3 -c "
+        if [[ -n "${queryFrontendJson}" ]]; then
+            queryFrontendPod="$(printf '%s' "${queryFrontendJson}" | python3 -c "
 import sys,json
 items=json.load(sys.stdin).get('items',[])
 print(items[0]['metadata']['name'] if items else '')
-")" || true
+")"
+        fi
 
         typeset queryResult=""
         if [[ -n "${queryFrontendPod}" ]]; then
@@ -537,9 +542,13 @@ print(items[0]['metadata']['name'] if items else '')
         fi
 
         if [[ -z "${queryResult}" ]]; then
+            typeset allQueryPods=''
+            allQueryPods="$(oc get pods -n "${OBS_NAMESPACE}" --no-headers)" || true
             typeset queryPod=''
-            queryPod="$(oc get pods -n "${OBS_NAMESPACE}" --no-headers \
-                | awk '/thanos-query/ && !/frontend/ {print $1; exit}')" || true
+            if [[ -n "${allQueryPods}" ]]; then
+                queryPod="$(printf '%s' "${allQueryPods}" \
+                    | awk '/thanos-query/ && !/frontend/ {print $1; exit}')"
+            fi
             if [[ -n "${queryPod}" ]]; then
                 queryResult="$(oc exec -n "${OBS_NAMESPACE}" "${queryPod}" \
                     -- wget -qO- --no-check-certificate \
