@@ -1,6 +1,5 @@
 #!/bin/bash
-set -euxo pipefail
-shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
 # ACM Observability + ODF Interop Validation (6-point gate)
@@ -12,9 +11,9 @@ shopt -s inherit_errexit
 # Produces JUnit XML consumed by Prow / Sippy / TestGrid.
 # ---------------------------------------------------------------------------
 
-ACM_NAMESPACE="${ACM_NAMESPACE:-open-cluster-management}"
-OBS_NAMESPACE="${OBS_NAMESPACE:-open-cluster-management-observability}"
-ODF_NAMESPACE="${ODF_NAMESPACE:-openshift-storage}"
+typeset ACM_NAMESPACE="${ACM_NAMESPACE:-open-cluster-management}"
+typeset OBS_NAMESPACE="${OBS_NAMESPACE:-open-cluster-management-observability}"
+typeset ODF_NAMESPACE="${ODF_NAMESPACE:-openshift-storage}"
 
 typeset junitFile="${ARTIFACT_DIR}/junit_observability_odf.xml"
 
@@ -54,9 +53,9 @@ function WriteJunit () {
     typeset r=""
     for r in "${tcResultsArr[@]}"; do
         if [[ "${r}" == "fail" ]]; then
-            (( failCount++ )) || true
+            (( ++failCount ))
         elif [[ "${r}" == "skip" ]]; then
-            (( skipCount++ )) || true
+            (( ++skipCount ))
         fi
     done
 
@@ -88,13 +87,13 @@ function WriteJunit () {
 # shellcheck disable=SC2317,SC2329
 function CollectExitArtifacts () {
     : "Collecting observability + ODF diagnostics..."
-    oc get multiclusterobservabilities.observability.open-cluster-management.io --all-namespaces -o yaml > "${ARTIFACT_DIR}/mco.yaml" 2>/dev/null || true
-    oc get pods -n "${OBS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/obs-pods.yaml" 2>/dev/null || true
-    oc get obc -n "${OBS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/obs-obc.yaml" 2>/dev/null || true
-    oc get secret -n "${OBS_NAMESPACE}" -o name > "${ARTIFACT_DIR}/obs-secrets-list.txt" 2>/dev/null || true
-    oc get cephobjectstore -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/cephobjectstore.yaml" 2>/dev/null || true
-    oc get pods -n "${ODF_NAMESPACE}" -l app=rook-ceph-rgw -o yaml > "${ARTIFACT_DIR}/rgw-pods.yaml" 2>/dev/null || true
-    oc get noobaa -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/noobaa.yaml" 2>/dev/null || true
+    oc get multiclusterobservabilities.observability.open-cluster-management.io --all-namespaces -o yaml > "${ARTIFACT_DIR}/mco.yaml" || true
+    oc get pods -n "${OBS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/obs-pods.yaml" || true
+    oc get obc -n "${OBS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/obs-obc.yaml" || true
+    oc get secret -n "${OBS_NAMESPACE}" -o name > "${ARTIFACT_DIR}/obs-secrets-list.txt" || true
+    oc get cephobjectstore -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/cephobjectstore.yaml" || true
+    oc get pods -n "${ODF_NAMESPACE}" -l app=rook-ceph-rgw -o yaml > "${ARTIFACT_DIR}/rgw-pods.yaml" || true
+    oc get noobaa -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/noobaa.yaml" || true
     true
 }
 
@@ -108,7 +107,7 @@ function CheckRgwReady () {
     : "=== Check 1: ODF Ceph RGW infrastructure ==="
 
     typeset rgwPhase=""
-    if ! rgwPhase="$(oc get cephobjectstore -n "${ODF_NAMESPACE}" -o json 2>/dev/null | python3 -c "
+    if ! rgwPhase="$(oc get cephobjectstore -n "${ODF_NAMESPACE}" -o json | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 items=d.get('items',[])
@@ -123,8 +122,11 @@ else:
 
     if [[ "${rgwPhase}" == "NotFound" ]]; then
         typeset noobaaPhase=""
-        noobaaPhase="$(oc get noobaa -n "${ODF_NAMESPACE}" \
-            -o jsonpath='{.items[0].status.phase}' 2>/dev/null)" || true
+        noobaaPhase="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | python3 -c "
+import sys,json
+items=json.load(sys.stdin).get('items',[])
+print(items[0].get('status',{}).get('phase','') if items else '')
+")" || true
         if [[ "${noobaaPhase}" == "Ready" ]]; then
             AddResult "odf-storage-ready" "pass" "NooBaa Ready (RGW not deployed)"
         elif [[ -n "${noobaaPhase}" ]]; then
@@ -142,9 +144,9 @@ else:
 
     typeset rgwPods=""
     rgwPods="$(oc get pods -n "${ODF_NAMESPACE}" -l app=rook-ceph-rgw \
-        --field-selector=status.phase=Running --no-headers 2>/dev/null)" || true
+        --field-selector=status.phase=Running --no-headers)" || true
     typeset rgwPodCount=""
-    rgwPodCount="$(printf '%s' "${rgwPods}" | grep -c . || true)"
+    rgwPodCount="$(printf '%s' "${rgwPods}" | awk 'END{print NR}')"
 
     if [[ "${rgwPodCount}" -eq 0 ]]; then
         typeset rgwMsg="No rook-ceph-rgw pods Running in ${ODF_NAMESPACE}"
@@ -156,7 +158,7 @@ else:
     fi
 
     typeset scExists=""
-    scExists="$(oc get sc ocs-storagecluster-ceph-rgw -o name 2>/dev/null)" || true
+    scExists="$(oc get sc ocs-storagecluster-ceph-rgw -o name)" || true
     if [[ -z "${scExists}" ]]; then
         typeset scMsg="StorageClass ocs-storagecluster-ceph-rgw not found"
         if [[ -n "${failMsg}" ]]; then
@@ -184,7 +186,7 @@ function CheckMcoReady () {
 
     typeset mcoStatus=""
     if ! mcoStatus="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
-        --all-namespaces -o json 2>/dev/null | python3 -c "
+        --all-namespaces -o json | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 items=d.get('items',[])
@@ -219,7 +221,7 @@ function CheckStorageEndpoint () {
 
     typeset storageConfig=""
     if ! storageConfig="$(oc get multiclusterobservabilities.observability.open-cluster-management.io \
-        --all-namespaces -o json 2>/dev/null | python3 -c "
+        --all-namespaces -o json | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 items=d.get('items',[])
@@ -245,7 +247,7 @@ else:
     typeset secretKey="${storageConfig#*|}"
 
     typeset secretJson=""
-    secretJson="$(oc get secret "${secretName}" -n "${OBS_NAMESPACE}" -o json 2>/dev/null)" || true
+    secretJson="$(oc get secret "${secretName}" -n "${OBS_NAMESPACE}" -o json)" || true
     typeset endpointCheck=""
     if [[ -n "${secretJson}" ]]; then
         endpointCheck="$(printf '%s' "${secretJson}" | python3 -c "
@@ -270,7 +272,7 @@ if not endpoint:
     sys.exit(0)
 odf=re.compile(r'(openshift-storage|noobaa|ceph|rgw|rook|ocs|mcg)',re.IGNORECASE)
 print('odf-backed' if odf.search(endpoint) else 'external')
-" "${secretKey}" 2>/dev/null)" || true
+" "${secretKey}")" || true
     fi
 
     if [[ "${endpointCheck}" == "no-endpoint" || -z "${endpointCheck}" ]]; then
@@ -293,7 +295,7 @@ print('odf-backed' if odf.search(endpoint) else 'external')
 function CheckThanosHealth () {
     : "=== Check 4: Thanos components healthy ==="
 
-    if ! oc get namespace "${OBS_NAMESPACE}" -o name 2>/dev/null; then
+    if ! oc get namespace "${OBS_NAMESPACE}" -o name; then
         AddResult "thanos-health" "skip" "Observability namespace ${OBS_NAMESPACE} does not exist"
         return
     fi
@@ -312,15 +314,15 @@ function CheckThanosHealth () {
 
         typeset podList=""
         podList="$(oc get pods -n "${OBS_NAMESPACE}" -l "${labelSelector}" \
-            --no-headers 2>/dev/null)" || true
+            --no-headers)" || true
         typeset podCount=""
-        podCount="$(printf '%s' "${podList}" | grep -c . || true)"
+        podCount="$(printf '%s' "${podList}" | awk 'END{print NR}')"
 
         if [[ "${podCount}" -eq 0 ]]; then
             typeset allPods=""
             allPods="$(oc get pods -n "${OBS_NAMESPACE}" \
-                --no-headers 2>/dev/null)" || true
-            podCount="$(printf '%s' "${allPods}" | grep -c "^${component}" || true)"
+                --no-headers)" || true
+            podCount="$(printf '%s' "${allPods}" | awk -v pat="^${component}" '$0 ~ pat {c++} END{print c+0}')"
         fi
 
         if [[ "${podCount}" -eq 0 ]]; then
@@ -328,11 +330,11 @@ function CheckThanosHealth () {
             continue
         fi
 
-        (( foundCount++ )) || true
+        (( ++foundCount ))
 
         typeset labeledPods=""
         labeledPods="$(oc get pods -n "${OBS_NAMESPACE}" -l "${labelSelector}" \
-            --no-headers 2>/dev/null)" || true
+            --no-headers)" || true
         typeset notReady=""
         notReady="$(printf '%s' "${labeledPods}" \
             | awk '$3 != "Running" && $3 != "Completed" {print $1 ":" $3}')" || true
@@ -381,7 +383,7 @@ function CheckObcBound () {
     : "=== Check 5: Observability ObjectBucketClaim ==="
 
     typeset obcList=""
-    obcList="$(oc get obc -n "${OBS_NAMESPACE}" -o json 2>/dev/null)" || true
+    obcList="$(oc get obc -n "${OBS_NAMESPACE}" -o json)" || true
 
     typeset obcItemCount=""
     if [[ -n "${obcList}" ]]; then
@@ -389,26 +391,26 @@ function CheckObcBound () {
 import sys,json
 d=json.load(sys.stdin)
 print(len(d.get('items',[])))
-" 2>/dev/null)" || true
+")" || true
     fi
 
     if [[ "${obcItemCount:-0}" -eq 0 ]]; then
         typeset odfObcJson=""
-        odfObcJson="$(oc get obc -n "${ODF_NAMESPACE}" -o json 2>/dev/null)" || true
+        odfObcJson="$(oc get obc -n "${ODF_NAMESPACE}" -o json)" || true
         if [[ -n "${odfObcJson}" ]]; then
             obcList="$(printf '%s' "${odfObcJson}" | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 obs=[i for i in d.get('items',[]) if 'obs' in i['metadata'].get('name','').lower() or 'thanos' in i['metadata'].get('name','').lower()]
 print(json.dumps({'items':obs}))
-" 2>/dev/null)" || true
+")" || true
         fi
         if [[ -n "${obcList}" ]]; then
             obcItemCount="$(echo "${obcList}" | python3 -c "
 import sys,json
 d=json.load(sys.stdin)
 print(len(d.get('items',[])))
-" 2>/dev/null)" || true
+")" || true
         fi
     fi
 
@@ -442,7 +444,7 @@ else:
     fi
 
     typeset unboundObcs=""
-    unboundObcs="$(echo "${obcStatus}" | tr ';' '\n' | grep -v '=Bound$')" || true
+    unboundObcs="$(echo "${obcStatus}" | tr ';' '\n' | sed '/=Bound$/d')"
 
     if [[ -z "${unboundObcs}" ]]; then
         : "PASS: All observability OBCs bound: ${obcStatus}"
@@ -481,7 +483,7 @@ if not isinstance(result,list) or len(result)==0:
     print('empty-result')
     sys.exit(0)
 print('ok')
-" 2>/dev/null)" || true
+")" || true
 
     if [[ "${validation}" == "ok" ]]; then
         AddResult "thanos-query" "pass"
@@ -499,7 +501,7 @@ function CheckThanosQuery () {
     : "=== Check 6: Thanos query functional ==="
 
     typeset routeJson=""
-    routeJson="$(oc get routes -n "${OBS_NAMESPACE}" -o json 2>/dev/null)" || true
+    routeJson="$(oc get routes -n "${OBS_NAMESPACE}" -o json)" || true
     typeset queryRoute=""
     if [[ -n "${routeJson}" ]]; then
         queryRoute="$(printf '%s' "${routeJson}" | python3 -c "
@@ -512,26 +514,37 @@ if exact:
     sys.exit(0)
 fuzzy=[r for r in routes if 'thanos' in r['metadata']['name'] and 'query' in r['metadata']['name']]
 print(fuzzy[0]['spec']['host'] if fuzzy else '')
-" 2>/dev/null)" || true
+")" || true
     fi
 
     if [[ -z "${queryRoute}" ]]; then
         typeset svcHost="observability-thanos-query-frontend.${OBS_NAMESPACE}.svc:9090"
         : "No external route found; trying internal service: ${svcHost}"
 
+        typeset queryFrontendPod=''
+        queryFrontendPod="$(oc get pods -n "${OBS_NAMESPACE}" \
+            -l app.kubernetes.io/name=thanos-query-frontend -o json | python3 -c "
+import sys,json
+items=json.load(sys.stdin).get('items',[])
+print(items[0]['metadata']['name'] if items else '')
+")" || true
+
         typeset queryResult=""
-        queryResult="$(oc exec -n "${OBS_NAMESPACE}" \
-            "$(oc get pods -n "${OBS_NAMESPACE}" -l app.kubernetes.io/name=thanos-query-frontend \
-                -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo '')" \
-            -- wget -qO- --no-check-certificate \
-            "http://localhost:9090/api/v1/query?query=up" 2>/dev/null)" || true
+        if [[ -n "${queryFrontendPod}" ]]; then
+            queryResult="$(oc exec -n "${OBS_NAMESPACE}" "${queryFrontendPod}" \
+                -- wget -qO- --no-check-certificate \
+                "http://localhost:9090/api/v1/query?query=up")" || true
+        fi
 
         if [[ -z "${queryResult}" ]]; then
-            queryResult="$(oc exec -n "${OBS_NAMESPACE}" \
-                "$(oc get pods -n "${OBS_NAMESPACE}" --no-headers 2>/dev/null \
-                    | grep 'thanos-query' | grep -v 'frontend' | head -1 | awk '{print $1}')" \
-                -- wget -qO- --no-check-certificate \
-                "http://localhost:9090/api/v1/query?query=up" 2>/dev/null)" || true
+            typeset queryPod=''
+            queryPod="$(oc get pods -n "${OBS_NAMESPACE}" --no-headers \
+                | awk '/thanos-query/ && !/frontend/ {print $1; exit}')" || true
+            if [[ -n "${queryPod}" ]]; then
+                queryResult="$(oc exec -n "${OBS_NAMESPACE}" "${queryPod}" \
+                    -- wget -qO- --no-check-certificate \
+                    "http://localhost:9090/api/v1/query?query=up")" || true
+            fi
         fi
 
         if [[ -z "${queryResult}" ]]; then
@@ -545,7 +558,7 @@ print(fuzzy[0]['spec']['host'] if fuzzy else '')
 
     set +x
     typeset token=""
-    token="$(oc whoami -t 2>/dev/null)" || true
+    token="$(oc whoami -t)" || true
 
     typeset responseBody=""
     typeset httpCode=""
