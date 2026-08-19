@@ -89,8 +89,8 @@ hcp create cluster kubevirt \
   --infra-kubeconfig-file="${SHARED_DIR}/infra-kubeconfig" \
   --release-image quay.io/openshift-release-dev/ocp-release:4.22.9-multi
 
-echo "$(date) DEBUG: Sleeping 20 minutes after hcp create to let HC and NodePool settle"
-sleep 1200
+echo "$(date) DEBUG: Sleeping 40 minutes after hcp create to let HC and NodePool settle"
+sleep 2400
 
 echo "$(date) DEBUG: Management cluster state after 20m sleep"
 oc get no || true
