@@ -38,6 +38,8 @@ InstallSubctl() {
     if [[ -x "${subctlBin}" ]]; then
         return 0
     fi
+    # release-0.24 ships as .tar.xz; ensure xz decompressor is present.
+    command -v xz 1>/dev/null || dnf install -y xz 2>/dev/null || yum install -y xz 2>/dev/null || true
     curl -Ls https://get.submariner.io | VERSION="${SUBMARINER_SUBCTL_VERSION:-release-0.24}" bash
     cp "${HOME}/.local/bin/subctl" "${subctlBin}"
     chmod +x "${subctlBin}"

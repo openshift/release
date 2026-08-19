@@ -49,6 +49,8 @@ InstallSubctl() {
     if [[ -x "${subctlBin}" ]]; then
         return 0
     fi
+    # release-0.24 ships as .tar.xz; ensure xz decompressor is present.
+    command -v xz 1>/dev/null || dnf install -y xz 2>/dev/null || yum install -y xz 2>/dev/null || true
     curl -Ls https://get.submariner.io | VERSION="${SUBMARINER_SUBCTL_VERSION:-release-0.24}" bash
     cp "${HOME}/.local/bin/subctl" "${subctlBin}"
     chmod +x "${subctlBin}"
@@ -230,29 +232,6 @@ JoinCluster() {
     true
 }
 
-# ── PatchRoutingViaHost — enable local gateway mode on a spoke ────────────────
-#
-# routingViaHost=true makes the route agent route cross-cluster traffic via the
-# host network stack (table 150 → xfrm → NIC) instead of OVN Logical Router
-# Policies. This resolves two stacked issues on OCP 4.21/4.22 + OVN-K shared GW:
-#   - Routing loop: table 149 hairpin and ovn-k8s-mp0 → table 150 → ovn-k8s-mp0
-#     loop no longer apply because ovn-k8s-mp0 is not used for cross-cluster routing.
-#   - nftables SNAT: mgmtport-snat only fires on traffic egressing ovn-k8s-mp0;
-#     host-routed IPsec traffic exits via the physical NIC, bypassing that chain.
-# The Submariner operator detects the CR change and triggers a routeagent rollout;
-# WaitSubmarinerReady (called after this) waits for the rollout to complete.
-PatchRoutingViaHost() {
-    typeset kubeconfig="${1:?}"; (($#)) && shift
-    typeset spokeName="${1:?}"; (($#)) && shift
-
-    [[ "${SUBMARINER_ROUTING_VIA_HOST:-true}" == "true" ]] || return 0
-
-    KUBECONFIG="${kubeconfig}" oc patch submariner submariner \
-        -n submariner-operator \
-        --type=merge \
-        -p '{"spec":{"routingViaHost":true}}' 1>/dev/null
-    : "PatchRoutingViaHost: routingViaHost=true applied on '${spokeName}'"
-}
 
 # ── WaitForObjectToExist — poll until a Kubernetes resource exists ────────────
 WaitForObjectToExist() {
@@ -407,7 +386,6 @@ typeset -i submarinerStepRc=0
     typeset -i i
     for ((i = 0; i < spokeCount; i++)); do
         JoinCluster "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
-        PatchRoutingViaHost "${spokeKubeconfigsArr[i]}" "${spokeNamesArr[i]}"
     done
 
     for ((i = 0; i < spokeCount; i++)); do

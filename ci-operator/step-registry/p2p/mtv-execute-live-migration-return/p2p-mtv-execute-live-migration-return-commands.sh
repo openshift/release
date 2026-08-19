@@ -332,6 +332,41 @@ PreflightVmStorageMapped() {
     [[ "${mapped}" == "true" ]]
 }
 
+# CleanupDestinationStaleResources — remove VM/DV/PVC left on the return-leg destination
+# (spoke-1) after a successful forward live migration. MTV PrepareTarget fails if they
+# still exist ("Target VM already exists" / "MAC address conflicts").
+# Skips cleanup when the destination VMI is already Running (idempotent re-run guard).
+CleanupDestinationStaleResources() {
+    typeset vmiPhase
+    vmiPhase="$(DestOc get "virtualmachineinstance/${MTV_TEST_VM_NAME}" \
+        -n "${targetNs}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    [[ "${vmiPhase}" == "Running" ]] && return 0
+
+    DestOc delete "virtualmachine/${MTV_TEST_VM_NAME}" -n "${targetNs}" \
+        --ignore-not-found --wait=false 1>/dev/null || true
+    DestOc delete "virtualmachineinstance/${MTV_TEST_VM_NAME}" -n "${targetNs}" \
+        --ignore-not-found --wait=false 1>/dev/null || true
+
+    typeset dvName="${MTV_TEST_VM_NAME}-rootdisk"
+    DestOc delete "datavolume/${dvName}" -n "${targetNs}" \
+        --ignore-not-found --wait=false 1>/dev/null || true
+
+    while read -r pvcName; do
+        [[ -n "${pvcName}" ]] || continue
+        DestOc patch "persistentvolumeclaim/${pvcName}" -n "${targetNs}" \
+            --type merge -p '{"metadata":{"finalizers":null}}' 1>/dev/null || true
+        DestOc delete "persistentvolumeclaim/${pvcName}" -n "${targetNs}" \
+            --ignore-not-found --wait=false 1>/dev/null || true
+    done < <(DestOc get pvc -n "${targetNs}" -o json 2>/dev/null \
+        | jq -r --arg dv "${dvName}" \
+            '.items[].metadata.name | select(test("^(" + $dv + "|prime-))"))' \
+        || true)
+
+    DestOc wait --for=delete "datavolume/${dvName}" -n "${targetNs}" \
+        --timeout=3m 1>/dev/null 2>/dev/null || true
+    true
+}
+
 # PreflightHub — providers and maps must be Ready before Plan creation.
 PreflightHub() {
     WaitProviderReady "${MTV_SOURCE_PROVIDER}"
@@ -807,6 +842,7 @@ typeset -i cclmStepRc=0
     JStep "Preflight: Source VM Running"                 PreflightSourceVm
     JStep "Preflight: CCLM Sync Port Reachable"         PreflightCclmSyncConnectivity
     JStep "Preflight: VM Storage Class Mapped"           PreflightVmStorageMapped
+    JStep "Pre-migration: Manually Cleanup stale target resources" CleanupDestinationStaleResources
     JStep "Migration: Apply Plan"                        ApplyPlan
     JStep "Migration: Plan Ready"                        WaitPlanReady
     JStep "Migration: Apply Migration"                   ApplyMigration
