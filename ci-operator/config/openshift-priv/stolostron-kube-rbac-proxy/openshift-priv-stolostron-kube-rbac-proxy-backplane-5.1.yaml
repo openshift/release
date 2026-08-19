@@ -12,16 +12,16 @@ build_root:
     name: builder
     namespace: stolostron
     tag: go1.26-linux
-canonical_go_repository: github.com/stolostron/kube-state-metrics
+canonical_go_repository: github.com/stolostron/kube-rbac-proxy
 images:
   items:
-  - dockerfile_path: Containerfile.operator
+  - dockerfile_path: Dockerfile.prow
     from: base
     inputs:
       stolostron_builder_go1.26-linux:
         as:
         - registry.ci.openshift.org/stolostron/builder:go1.26-linux
-    to: kube-state-metrics
+    to: kube-rbac-proxy-mce
 promotion:
   to:
   - disabled: true
@@ -38,25 +38,23 @@ resources:
       memory: 1Gi
 test_binary_build_commands: "true"
 tests:
-- as: test
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow test-unit
+- as: vendor
+  commands: go mod vendor && git diff --exit-code
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
-- as: ocm-ci-rbac
-  steps:
-    workflow: ocm-ci-rbac
-- as: pr-image-mirror
+- as: test-unit
+  commands: make test-unit
+  container:
+    from: src
+- as: pr-image-mirror-mce
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: kube-state-metrics
+      SOURCE_IMAGE_REF: kube-rbac-proxy-mce
     env:
-      IMAGE_REPO: kube-state-metrics
+      IMAGE_REPO: kube-rbac-proxy-mce
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-5.1
+  branch: backplane-5.1
   org: openshift-priv
-  repo: stolostron-kube-state-metrics
+  repo: stolostron-kube-rbac-proxy
