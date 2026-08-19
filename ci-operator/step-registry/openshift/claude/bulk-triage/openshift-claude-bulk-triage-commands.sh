@@ -25,6 +25,22 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL:-}" ]]; then
     CLAUDE_MODEL="${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL}"
 fi
 
+# --- Load JIRA credentials for read-only lookups ---
+# Mounted from the openshift-qse-managers-bot test-credentials secret. The
+# ai-helpers skill reads JIRA_USERNAME/JIRA_API_TOKEN to look up existing bugs
+# (e.g. searching OCPBUGS); this dry run must not perform any JIRA writes.
+# Disable tracing so the token is never echoed into the CI logs.
+set +x
+if [[ -f "${JIRA_EMAIL_PATH:-}" && -f "${JIRA_PAT_PATH:-}" ]]; then
+    export JIRA_USERNAME JIRA_API_TOKEN JIRA_URL
+    JIRA_USERNAME="$(cat "${JIRA_EMAIL_PATH}")"
+    JIRA_API_TOKEN="$(cat "${JIRA_PAT_PATH}")"
+    JIRA_URL="${JIRA_URL:-https://redhat.atlassian.net}"
+    echo "JIRA credentials loaded for read-only lookups."
+else
+    echo "Warning: JIRA credentials not found (JIRA_EMAIL_PATH/JIRA_PAT_PATH); JIRA lookups will be skipped."
+fi
+
 # --- Optional: replace the baked-in ai-helpers with a custom repo/branch ---
 # The image's Claude plugin marketplace points at the /opt/ai-helpers
 # directory (group-writable), so replacing its contents is sufficient.
@@ -153,7 +169,7 @@ SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer on Component
 
 **CRITICAL**: You have many ci skills at your disposal. You MUST load the relevant skills using the Skill tool BEFORE you begin any work. Do NOT improvise or guess. This applies equally to subagents: instruct every subagent to review its available skills and load the appropriate ones before beginning its investigation.
 
-**THIS IS A DRY RUN — READ-ONLY MODE**: You must NOT perform any write operations of any kind. Do not create or update triage records, do not file or comment on JIRA issues, do not set release blockers, do not create Sippy labels or symptoms, do not apply retroactive re-evaluation, and do not post anything anywhere. You have no write credentials; every write step of the skill must instead be captured as a recommended action in your report."
+**THIS IS A DRY RUN — READ-ONLY MODE**: You must NOT perform any write operations of any kind. Do not create or update triage records, do not file or comment on JIRA issues, do not set release blockers, do not create Sippy labels or symptoms, do not apply retroactive re-evaluation, and do not post anything anywhere. JIRA credentials are provided for READ-ONLY lookups only (e.g. searching existing OCPBUGS to reference in your report) — never use them to create, edit, comment on, or transition a JIRA issue. You have no Sippy write credentials; every write step of the skill must instead be captured as a recommended action in your report."
 
 PROMPT="Load and follow the ci:bulk-triage-regressions skill for view '${TRIAGE_VIEW}' covering ${COMPONENTS_CLAUSE}. Execute Phases 1-3 and the analysis parts of Phase 4-5 fully, but perform NO writes (dry run): every action the skill would take (extend triage, new triage, new bug, symptom label) must be recorded as a recommendation instead.
 

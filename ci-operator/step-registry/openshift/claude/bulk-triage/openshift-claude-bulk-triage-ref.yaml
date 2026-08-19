@@ -6,6 +6,9 @@ ref:
   - namespace: test-credentials
     name: sa-claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: openshift-qse-managers-bot
+    mount_path: /var/run/qse-managers-bot
   env:
   - name: TRIAGE_VIEW
     default: ""
@@ -53,6 +56,18 @@ ref:
     default: "openshift-ci-prow-agents"
   - name: GOOGLE_APPLICATION_CREDENTIALS
     default: "/var/run/claude-code-service-account/google-token"
+  - name: JIRA_EMAIL_PATH
+    default: "/var/run/qse-managers-bot/jira-email"
+    documentation: |-
+      Path to the Atlassian account email from the openshift-qse-managers-bot
+      credential. The commands script reads it and exports JIRA_USERNAME for
+      the skill's read-only JIRA lookups.
+  - name: JIRA_PAT_PATH
+    default: "/var/run/qse-managers-bot/jira-pat"
+    documentation: |-
+      Path to the JIRA API token (PAT) from the openshift-qse-managers-bot
+      credential. The commands script reads it and exports JIRA_API_TOKEN for
+      the skill's read-only JIRA lookups.
   - name: CLAUDE_MODEL
     default: "claude-opus-4-8"
     documentation: |-
@@ -73,5 +88,7 @@ ref:
     (read-only) mode for a Component Readiness view: lists untriaged
     regressions, clusters them into root-cause buckets, deep-dives
     artifacts, and writes a markdown duty report with recommended
-    triage actions to the artifacts directory. No triage records,
-    JIRA issues, or Sippy labels are created.
+    triage actions to the artifacts directory. JIRA credentials
+    (openshift-qse-managers-bot) are mounted for read-only lookups of
+    existing bugs; no triage records, JIRA issues, or Sippy labels are
+    created.
