@@ -52,16 +52,18 @@ agentic_ci() {
         --verbose
         "$@"
     )
+    # Isolate TMPDIR so parallel eval cases cannot steal/delete each other's
+    # /tmp/agentic-ci-run.* OTEL files.
+    local run_tmp
+    run_tmp=$(mktemp -d /tmp/agentic-ci-wrapper.XXXXXX)
     local rc=0
     if [[ -n "${timeout_seconds}" ]]; then
-        timeout "${timeout_seconds}" "${cmd[@]}" || rc=$?
+        TMPDIR="${run_tmp}" timeout "${timeout_seconds}" "${cmd[@]}" || rc=$?
     else
-        "${cmd[@]}" || rc=$?
+        TMPDIR="${run_tmp}" "${cmd[@]}" || rc=$?
     fi
-    for f in /tmp/agentic-ci-run.*/claude-otel.jsonl; do
-        [ -f "$f" ] && cat "$f" >> "${OTEL_LOG}"
-    done
-    rm -rf /tmp/agentic-ci-run.*
+    find "${run_tmp}" -name 'claude-otel.jsonl' -type f -exec cat {} + >> "${OTEL_LOG}" 2>/dev/null || true
+    rm -rf "${run_tmp}"
     return $rc
 }
 
