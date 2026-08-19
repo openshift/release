@@ -1,6 +1,7 @@
 workflow:
   as: sandboxed-containers-operator-e2e-aws
   steps:
+    allow_best_effort_post_steps: true
     env:
       TEST_PARALLEL: 1
       COMPUTE_NODE_REPLICAS: 2
@@ -8,7 +9,6 @@ workflow:
       CONTROL_PLANE_INSTANCE_TYPE: "t3a.xlarge"
       CONTROL_PLANE_REPLICAS: 3
       SPOT_INSTANCES: "false"
-      FORCE_SUCCESS_EXIT: "no"
       MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
       MUST_GATHER_TIMEOUT: "35m"
       ENABLE_MUST_GATHER: "true"
@@ -29,16 +29,13 @@ workflow:
     - ref: sandboxed-containers-operator-post
     - chain: ipi-aws-post
     test:
-    - chain: sandboxed-containers-operator-tests-openshift-extended
-      best_effort: true
-    - ref: sandboxed-containers-operator-tests-upstream-kata-bats
-      best_effort: true
-    - ref: sandboxed-containers-operator-tests-e2e-poc
-      best_effort: true
+    - chain: sandboxed-containers-operator-tests
   documentation: |-
     This workflow runs sandboxed-containers-operator e2e tests on an
-    AWS cluster. All three test steps always attempt regardless of
-    earlier failures. Individual steps are skipped when their
-    TEST_<step>_ENABLE is "false".
+    AWS cluster. allow_best_effort_post_steps enables best_effort
+    in the test phase so all test steps run regardless of failures.
+    The sandboxed-containers-operator-tests chain groups all test
+    steps; individual steps are skipped when TEST_<step>_ENABLE
+    is "false".
     AWS_REGION_OVERRIDE from sandboxed-containers-operator-aws-region-override
     defines the region to create the cluster in.
