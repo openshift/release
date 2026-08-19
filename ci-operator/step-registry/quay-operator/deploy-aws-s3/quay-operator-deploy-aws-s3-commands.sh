@@ -44,6 +44,9 @@ QUAY_AWS_S3_BUCKET="quayprowci$RANDOM"
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
 
+export AWS_ACCESS_KEY_ID="${QUAY_AWS_ACCESS_KEY}"
+export AWS_SECRET_ACCESS_KEY="${QUAY_AWS_SECRET_KEY}"
+
 mkdir -p QUAY_AWS && cd QUAY_AWS
 cat >>variables.tf <<EOF
 variable "region" {
@@ -58,8 +61,6 @@ EOF
 cat >>create_aws_bucket.tf <<EOF
 provider "aws" {
   region = "us-east-2"
-  access_key = "${QUAY_AWS_ACCESS_KEY}"
-  secret_key = "${QUAY_AWS_SECRET_KEY}"
 }
 
 resource "aws_s3_bucket" "quayaws" {
