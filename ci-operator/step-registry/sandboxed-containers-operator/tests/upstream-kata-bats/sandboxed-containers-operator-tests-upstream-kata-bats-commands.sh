@@ -52,17 +52,19 @@ if ! git clone --depth 1 --branch "${TEST_UPSTREAM_KATA_BATS_BRANCH}" "${TEST_UP
 fi
 cd "${WORKDIR}" || { echo "ERROR: cd failed"; fail_junit "cd to workdir failed"; exit 0; }
 
-# Install bats if not already available
+# Install bats to a user-writable location
+BATS_PREFIX="/tmp/bats-install"
 if ! command -v bats &>/dev/null; then
     echo "Installing bats..."
     if [[ -d "tests/bats" ]]; then
         cd tests/bats || { echo "ERROR: cd tests/bats failed"; fail_junit "cd tests/bats failed"; exit 0; }
-        ./install.sh /usr/local
+        ./install.sh "${BATS_PREFIX}"
         cd "${WORKDIR}" || { echo "ERROR: cd workdir failed"; fail_junit "cd workdir failed"; exit 0; }
     else
         git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core
-        /tmp/bats-core/install.sh /usr/local
+        /tmp/bats-core/install.sh "${BATS_PREFIX}"
     fi
+    export PATH="${BATS_PREFIX}/bin:${PATH}"
 fi
 
 echo "bats version: $(bats --version)"
