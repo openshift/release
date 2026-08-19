@@ -20,7 +20,7 @@ fi
 
 # --- Metrics instrumentation ---
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
-OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 
 agentic_ci() {
     local timeout_seconds=""
@@ -323,6 +323,7 @@ while true; do
             FAILING_CHECKS_BODY=$(echo "${failing_checks}" | jq -r '.[] | "- \(.name) (\(.state))"' 2>/dev/null || echo "")
         fi
 
+        REVIEW_EXIT=0
         agentic_ci --timeout 1800 \
             "Address the review comments and fix any failing CI checks for ${JIRA_ISSUE_KEY}. The PR is #${PR_NUM} on ${UPSTREAM_REPO}.
 
@@ -350,7 +351,7 @@ ${PR_COMMENTS_BODY}
 Failing CI checks:
 ${FAILING_CHECKS_BODY}" \
             --append-system-prompt-file "${FOLLOWUP_PROMPT}" \
-            || true
+            || REVIEW_EXIT=$?
 
         if [[ "${EVAL_MODE:-}" == "true" ]]; then
             echo "Eval mode: single pass complete."
@@ -374,12 +375,14 @@ PHASE_REVIEW_DURATION=$(( $(date +%s) - PHASE_REVIEW_START ))
 
 # --- Write metrics metadata for post-step ---
 PR_URL=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json url -q '.url' 2>/dev/null || echo "")
+REVIEW_RESULT="success"
+[[ "${REVIEW_EXIT:-0}" -ne 0 ]] && REVIEW_RESULT="failed"
 
 jq -n \
     --arg agent "trt-review-responder" \
     --arg phase "review" \
     --arg issue_key "${JIRA_ISSUE_KEY}" \
-    --arg result "success" \
+    --arg result "${REVIEW_RESULT}" \
     --arg pr_url "${PR_URL}" \
     --arg upstream_repo "${UPSTREAM_REPO}" \
     --argjson num_review_rounds "${review_rounds}" \
@@ -397,8 +400,8 @@ jq -n \
       iteration: $iteration,
       idle_streak: $idle_streak,
       phase_durations: $phase_durations
-    }' > "${SHARED_DIR}/metrics-metadata.json"
+    }' > "${SHARED_DIR}/metrics-metadata-review.json"
 
-echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata.json"
+echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-review.json"
 
 echo "=== TRT Review Responder Complete ==="
