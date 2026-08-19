@@ -39,6 +39,7 @@ images:
   - additional_architectures:
     - arm64
     to: hypershift-operator
+  - to: hypershift-operator-pr
   - additional_architectures:
     - arm64
     dockerfile_path: Dockerfile.control-plane
@@ -66,6 +67,7 @@ promotion:
     - custom-verify-src
     - hypershift-cli
     - hypershift-operator
+    - hypershift-operator-pr
     - hypershift-tests
     name: "5.1"
     namespace: ocp
@@ -245,6 +247,17 @@ tests:
     post:
     - ref: hypershift-analyze-e2e-failure
     - chain: hypershift-destroy-nested-management-cluster
+    workflow: hypershift-aws-e2e-nested
+- always_run: false
+  as: e2e-aws-backport
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-pr
+    env:
+      CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
+      INSTALL_FROM_LATEST: "true"
     workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-v2-aws
