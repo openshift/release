@@ -34,12 +34,6 @@ set +x  # Hide sensitive token
 # Get project number for Connect Gateway URL
 REGION_PROJECT_NUMBER=$(gcloud projects describe "${REGION_PROJECT}" --format='value(projectNumber)')
 
-# Get cluster CA certificate
-REGION_CA=$(gcloud container clusters describe "${REGION_CLUSTER_NAME}" \
-  --region="${REGION}" \
-  --project="${REGION_PROJECT}" \
-  --format='value(masterAuth.clusterCaCertificate)')
-
 # Build Connect Gateway endpoint
 # Format: https://{region}-connectgateway.googleapis.com/v1/projects/{projectNumber}/locations/{region}/gkeMemberships/{clusterName}
 REGION_ENDPOINT="${REGION}-connectgateway.googleapis.com/v1/projects/${REGION_PROJECT_NUMBER}/locations/${REGION}/gkeMemberships/${REGION_CLUSTER_NAME}"
@@ -47,12 +41,14 @@ REGION_ENDPOINT="${REGION}-connectgateway.googleapis.com/v1/projects/${REGION_PR
 # Get access token (valid for 1 hour - sufficient for CI jobs)
 ACCESS_TOKEN=$(gcloud auth print-access-token)
 
+# Connect Gateway uses Google's public TLS certificates (Google Trust Services),
+# NOT the cluster's self-signed CA. No certificate-authority-data needed —
+# the system CA bundle validates Google's certs automatically.
 cat > "${SHARED_DIR}/region-kubeconfig" << 'KUBECONFIG_EOF'
 apiVersion: v1
 kind: Config
 clusters:
 - cluster:
-    certificate-authority-data: REGION_CA_PLACEHOLDER
     server: https://REGION_ENDPOINT_PLACEHOLDER
   name: region-cluster
 contexts:
@@ -68,34 +64,26 @@ users:
 KUBECONFIG_EOF
 
 # Replace placeholders
-sed -i "s|REGION_CA_PLACEHOLDER|${REGION_CA}|g" "${SHARED_DIR}/region-kubeconfig"
 sed -i "s|REGION_ENDPOINT_PLACEHOLDER|${REGION_ENDPOINT}|g" "${SHARED_DIR}/region-kubeconfig"
 sed -i "s|ACCESS_TOKEN_PLACEHOLDER|${ACCESS_TOKEN}|g" "${SHARED_DIR}/region-kubeconfig"
 
-echo "  ✓ Region kubeconfig written (Connect Gateway)"
+echo "  Region kubeconfig written (Connect Gateway)"
 echo "  Endpoint: https://${REGION_ENDPOINT}"
 set -x
 
 # Generate MC cluster kubeconfig (optional - test skips if unavailable)
 echo "Generating management cluster kubeconfig (Connect Gateway)..."
 set +x  # Hide sensitive token
-if MC_CA=$(gcloud container clusters describe "${MC_CLUSTER_NAME}" \
-  --region="${REGION}" \
-  --project="${MC_PROJECT}" \
-  --format='value(masterAuth.clusterCaCertificate)' 2>/dev/null); then
-  
-  # Get MC project number
-  MC_PROJECT_NUMBER=$(gcloud projects describe "${MC_PROJECT}" --format='value(projectNumber)')
-  
+if MC_PROJECT_NUMBER=$(gcloud projects describe "${MC_PROJECT}" --format='value(projectNumber)' 2>/dev/null); then
+
   # Build Connect Gateway endpoint for MC
   MC_ENDPOINT="${REGION}-connectgateway.googleapis.com/v1/projects/${MC_PROJECT_NUMBER}/locations/${REGION}/gkeMemberships/${MC_CLUSTER_NAME}"
-  
+
   cat > "${SHARED_DIR}/mc-kubeconfig" << 'KUBECONFIG_EOF'
 apiVersion: v1
 kind: Config
 clusters:
 - cluster:
-    certificate-authority-data: MC_CA_PLACEHOLDER
     server: https://MC_ENDPOINT_PLACEHOLDER
   name: mc-cluster
 contexts:
@@ -111,16 +99,15 @@ users:
 KUBECONFIG_EOF
 
   # Replace placeholders
-  sed -i "s|MC_CA_PLACEHOLDER|${MC_CA}|g" "${SHARED_DIR}/mc-kubeconfig"
   sed -i "s|MC_ENDPOINT_PLACEHOLDER|${MC_ENDPOINT}|g" "${SHARED_DIR}/mc-kubeconfig"
   sed -i "s|ACCESS_TOKEN_PLACEHOLDER|${ACCESS_TOKEN}|g" "${SHARED_DIR}/mc-kubeconfig"
 
-  echo "  ✓ MC kubeconfig written (Connect Gateway)"
+  echo "  MC kubeconfig written (Connect Gateway)"
   echo "  Endpoint: https://${MC_ENDPOINT}"
 else
-  echo "  ⚠ MC cluster unavailable - tests will skip MC validation"
+  echo "  MC cluster unavailable - tests will skip MC validation"
 fi
 set -x
 
 echo ""
-echo "✓ Kubeconfig generation completed (Connect Gateway)"
+echo "Kubeconfig generation completed (Connect Gateway)"
