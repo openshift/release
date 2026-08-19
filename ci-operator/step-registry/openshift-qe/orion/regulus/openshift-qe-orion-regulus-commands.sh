@@ -11,6 +11,7 @@
 # 4. Install ORION dependencies
 # 5. Run prow-entry.sh (bridges Prow env vars to analyze-batch.py)
 #
+set -o errexit
 set -o nounset
 set -o pipefail
 
@@ -85,8 +86,11 @@ echo "Running Orion Regulus Analysis"
 echo "=================================="
 echo ""
 
-./scripts/prow-entry.sh
-analysis_exit_status=$?
+if ./scripts/prow-entry.sh; then
+  analysis_exit_status=0
+else
+  analysis_exit_status=$?
+fi
 
 popd || true
 popd || true
