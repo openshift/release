@@ -4,7 +4,8 @@ set -o errexit
 set -o pipefail
 
 CREDS_DIR=/usr/local/osdfm-qe-credentials
-OCM_BACKEND_TESTS_REF=${OCM_BACKEND_TESTS_REF:-master}
+GITHUB_CREDS_DIR=/usr/local/github-credentials
+ROSA_BACKEND_TESTS_REF=${ROSA_BACKEND_TESTS_REF:-master}
 
 # This is a post step, which ci-operator always runs regardless of whether
 # the preceding test step passed or failed. Only proceed with the stage
@@ -30,9 +31,12 @@ if [[ ! -f "${CREDS_DIR}/osdfm_webhook_url" ]]; then
   exit 1
 fi
 
-# Keep xtrace off through both the credential reads and the wget below: the
-# wget URL embeds an internal GitLab hostname, and we don't want either the
-# tokens or that internal hostname/URL structure showing up in trace output.
+if [[ ! -s "${GITHUB_CREDS_DIR}/oauth" ]]; then
+  echo "ERROR: ${GITHUB_CREDS_DIR}/oauth is missing or empty; cannot clone private GitHub repos" >&2
+  exit 1
+fi
+
+# Keep xtrace off while the GitHub token is in git config / env.
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
 
@@ -41,21 +45,51 @@ export OSDFM_WEBHOOK_URL
 OSDFM_GITLAB_TOKEN=$(<"${CREDS_DIR}/osdfm_gitlab_token")
 OSDFM_WEBHOOK_URL=$(<"${CREDS_DIR}/osdfm_webhook_url")
 
-workdir=$(mktemp -d)
-trap 'rm -rf "${workdir}"' EXIT
+# Optional: older osdfm_release.sh still requires a deploy key env/file
+# before it clones. Prow mounts it from osdfm-qe-credentials (not
+# cs-qe-credentials). HTTPS auth below is what actually authenticates
+# git clone; the key is exported so older osdfm_release.sh does not exit early.
+if [[ -f "${CREDS_DIR}/osdfm_github_deploy_key" ]]; then
+  export OSDFM_GITHUB_DEPLOY_KEY
+  OSDFM_GITHUB_DEPLOY_KEY=$(<"${CREDS_DIR}/osdfm_github_deploy_key")
+fi
 
-tarball="${workdir}/ocm-backend-tests-${OCM_BACKEND_TESTS_REF}.tar.gz"
-wget -q \
-  "https://gitlab.cee.redhat.com/service/ocm-backend-tests/-/archive/${OCM_BACKEND_TESTS_REF}/ocm-backend-tests-${OCM_BACKEND_TESTS_REF}.tar.gz" \
-  -O "${tarball}"
+# rosa-e2e jobs are public, so ci-operator does not auto-mount the private
+# git-cloner token. Rehearsal showed url.insteadOf with the token as the
+# HTTPS username never rewrote the remote (git still prompted for a
+# username). Use the same credential.helper pattern as hive/mco, and a
+# writable HOME so --global config is picked up by this clone and by
+# osdfm_release.sh's later osd-fleet-manager clone. mktemp -d (mode 0700)
+# avoids a predictable /tmp path for .gitconfig, which contains the token.
+export HOME
+HOME=$(mktemp -d)
+trap 'rm -rf "${HOME}"' EXIT
+workdir=$(mktemp -d)
+trap 'rm -rf "${workdir}" "${HOME}"' EXIT
+GITHUB_TOKEN=$(tr -d '[:space:]' < "${GITHUB_CREDS_DIR}/oauth")
+if [[ -z "${GITHUB_TOKEN}" ]]; then
+  echo "ERROR: ${GITHUB_CREDS_DIR}/oauth is empty" >&2
+  exit 1
+fi
+git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN}; }; f"
+# --add is required: two insteadOf on the same url.* key otherwise overwrite each other.
+git config --global url."https://github.com/".insteadOf "git@github.com:"
+git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
+
+echo "Cloning openshift-online/rosa-backend-tests (ref ${ROSA_BACKEND_TESTS_REF})"
+unset GIT_ASKPASS || true
+GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "${ROSA_BACKEND_TESTS_REF}" \
+  https://github.com/openshift-online/rosa-backend-tests.git \
+  "${workdir}/rosa-backend-tests"
 
 $WAS_TRACING && set -x
 
-tar -zxf "${tarball}" -C "${workdir}"
-cd "${workdir}/ocm-backend-tests-${OCM_BACKEND_TESTS_REF}"
+cd "${workdir}/rosa-backend-tests"
 
 if [[ -n "${COMMIT_SHA:-}" ]]; then
   export COMMIT_SHA
 fi
 
+# osdfm_release.sh still embeds GitLab tokens in git remotes; keep tracing off.
+set +x
 ./osdfm_release.sh
