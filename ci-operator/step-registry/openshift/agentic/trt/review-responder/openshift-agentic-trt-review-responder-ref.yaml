@@ -26,6 +26,8 @@ ref:
     default: "/var/run/claude-code-service-account/google-token"
   - name: CLAUDE_MODEL
     default: "claude-opus-4-6"
+  - name: GATE_MODEL
+    default: "claude-haiku-4-5"
   nested_podman: true
   resources:
     requests:
@@ -34,10 +36,11 @@ ref:
   timeout: 3h0m0s
   grace_period: 1m0s
   documentation: |-
-    Polls for review comments and CI check failures on a PR, invoking
-    Claude to address them. Checks every 5 minutes until at least 6
-    iterations have passed AND 3 consecutive idle iterations occur.
-    Fetches inline review comments, PR reviews, and PR conversation
-    comments. Checks presubmit CI status and attempts to fix failures.
-    Filters to trusted users only (openshift org members + coderabbit).
+    Polls every 5 minutes until at least 6 iterations have passed AND
+    3 consecutive idle iterations occur. A small-model gate runs the
+    has-review-work skill (authorized unanswered comments or new CI
+    failures) before invoking the address-review-pr worker. A short
+    CI/security block matching jira-solver is prepended; repo-specific
+    .agentic/followup-config.md is appended last. Credential-dumping
+    shell tools are disallowed. Bash pushes after the worker finishes.
     Reads PR number from SHARED_DIR (written by jira-solver or pr-followup).
