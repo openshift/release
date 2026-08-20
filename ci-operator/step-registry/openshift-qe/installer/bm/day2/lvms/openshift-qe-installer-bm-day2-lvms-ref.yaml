@@ -1,0 +1,33 @@
+ref:
+  as: openshift-qe-installer-bm-day2-lvms
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-installer-bm-day2-lvms-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+    - name: LVM_DEVICE_PATHS
+      default: "auto"
+      documentation: |-
+        Comma-separated device paths (e.g. /dev/sdb,/dev/sdc) or "auto" to
+        let LVMS auto-discover available unused disks on each worker node.
+    - name: LVM_VG_NAME
+      default: "vg1"
+      documentation: |-
+        Volume group name (StorageClass will be lvms-<name>)
+    - name: LVM_DISK_TYPE
+      default: "nvme"
+      documentation: |-
+        Which disk types to wipe and use in auto mode: "nvme", "sata", or "all".
+        Ignored when LVM_DEVICE_PATHS is not "auto".
+  documentation: |-
+    Installs the LVMS operator and creates an LVMCluster on bare-metal worker nodes.
+    In auto mode (default), wipes stale signatures via bastion SSH and lets LVMS
+    auto-discover unused disks. Use LVM_DISK_TYPE to target only NVMe or SATA.
+    In explicit mode, wipes and uses only the specified device paths.
+    The resulting StorageClass is lvms-<LVM_VG_NAME>.
