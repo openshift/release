@@ -9,6 +9,9 @@ ref:
   - namespace: test-credentials
     name: openshift-qse-managers-bot
     mount_path: /var/run/qse-managers-bot
+  - namespace: test-credentials
+    name: claude-bulk-triage-dpcr-token
+    mount_path: /var/run/dpcr-token
   env:
   - name: TRIAGE_VIEW
     default: ""
@@ -68,6 +71,14 @@ ref:
       Path to the JIRA API token (PAT) from the openshift-qse-managers-bot
       credential. The commands script reads it and exports JIRA_API_TOKEN for
       the skill's read-only JIRA lookups.
+  - name: DPCR_TOKEN_PATH
+    default: "/var/run/dpcr-token/token"
+    documentation: |-
+      Path to the DPCR (Sippy) service-account bearer token from the
+      claude-bulk-triage-dpcr-token credential. The commands script reads it
+      and exports DPCR_TOKEN, used to authenticate to
+      sippy-auth.dptools.openshift.org for creating/updating Component
+      Readiness triage records.
   - name: CLAUDE_MODEL
     default: "claude-opus-4-8"
     documentation: |-
@@ -84,11 +95,12 @@ ref:
   timeout: 4h0m0s
   grace_period: 1m0s
   documentation: |-
-    Runs the ai-helpers bulk-triage-regressions skill in dry-run
-    (read-only) mode for a Component Readiness view: lists untriaged
-    regressions, clusters them into root-cause buckets, deep-dives
-    artifacts, and writes a markdown duty report with recommended
-    triage actions to the artifacts directory. JIRA credentials
-    (openshift-qse-managers-bot) are mounted for read-only lookups of
-    existing bugs; no triage records, JIRA issues, or Sippy labels are
+    Runs the ai-helpers bulk-triage-regressions skill for a Component
+    Readiness view: lists untriaged regressions, clusters them into
+    root-cause buckets, deep-dives artifacts, creates/updates Sippy triage
+    records (linking regressions to existing JIRA bugs) using the DPCR
+    service-account token, and writes a markdown duty report to the
+    artifacts directory. JIRA access (openshift-qse-managers-bot) is
+    read-only: filing new JIRA bugs, JIRA comments, release blockers, and
+    new Sippy labels/symptoms are recommended in the report rather than
     created.

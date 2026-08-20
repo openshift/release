@@ -28,7 +28,8 @@ fi
 # --- Load JIRA credentials for read-only lookups ---
 # Mounted from the openshift-qse-managers-bot test-credentials secret. The
 # ai-helpers skill reads JIRA_USERNAME/JIRA_API_TOKEN to look up existing bugs
-# (e.g. searching OCPBUGS); this dry run must not perform any JIRA writes.
+# (e.g. searching OCPBUGS). JIRA access is read-only: the skill must not perform
+# any JIRA writes.
 # Disable tracing so the token is never echoed into the CI logs.
 set +x
 if [[ -f "${JIRA_EMAIL_PATH:-}" && -f "${JIRA_PAT_PATH:-}" ]]; then
@@ -39,6 +40,20 @@ if [[ -f "${JIRA_EMAIL_PATH:-}" && -f "${JIRA_PAT_PATH:-}" ]]; then
     echo "JIRA credentials loaded for read-only lookups."
 else
     echo "Warning: JIRA credentials not found (JIRA_EMAIL_PATH/JIRA_PAT_PATH); JIRA lookups will be skipped."
+fi
+
+# --- Load DPCR (Sippy) bearer token for triage-record writes ---
+# Mounted from the claude-bulk-triage-dpcr-token test-credentials secret (a
+# service-account token from the TRT-owned sippy namespace on DPCR). Used to
+# authenticate to sippy-auth.dptools.openshift.org for creating/updating triage
+# records and the reevaluate symptom probe. Still under 'set +x' so it is never
+# echoed into the CI logs.
+if [[ -f "${DPCR_TOKEN_PATH:-}" ]]; then
+    export DPCR_TOKEN
+    DPCR_TOKEN="$(cat "${DPCR_TOKEN_PATH}")"
+    echo "DPCR bearer token loaded (Sippy triage writes enabled)."
+else
+    echo "Warning: DPCR token not found (DPCR_TOKEN_PATH); Sippy triage writes and the reevaluate probe will be unavailable."
 fi
 
 # --- Optional: replace the baked-in ai-helpers with a custom repo/branch ---
@@ -169,9 +184,9 @@ SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer on Component
 
 **CRITICAL**: You have many ci skills at your disposal. You MUST load the relevant skills using the Skill tool BEFORE you begin any work. Do NOT improvise or guess. This applies equally to subagents: instruct every subagent to review its available skills and load the appropriate ones before beginning its investigation.
 
-**THIS IS A DRY RUN — READ-ONLY MODE**: You must NOT perform any write operations of any kind. Do not create or update triage records, do not file or comment on JIRA issues, do not set release blockers, do not create Sippy labels or symptoms, do not apply retroactive re-evaluation, and do not post anything anywhere. JIRA credentials are provided for READ-ONLY lookups only (e.g. searching existing OCPBUGS to reference in your report) — never use them to create, edit, comment on, or transition a JIRA issue. You have no Sippy write credentials; every write step of the skill must instead be captured as a recommended action in your report."
+**WRITE SCOPE — READ CAREFULLY**: A DPCR Sippy bearer token is available in the environment variable \$DPCR_TOKEN. You ARE authorized to create and update Component Readiness triage records with it (via the ci:triage-regression skill — pass it as --token \"\$DPCR_TOKEN\"), and to run the authenticated reevaluate symptom probe in dry-run (detection) mode; use \$DPCR_TOKEN directly rather than running 'oc login'. You may link triage records ONLY to JIRA bugs that ALREADY EXIST. JIRA access is READ-ONLY: do NOT file new JIRA issues, comment on or transition issues, or set release blockers — recommend these in the report instead. Do NOT create or modify Sippy labels or symptoms (their creation requires human confirmation) — propose them in the report. Do NOT post anything to Slack or anywhere else. Capture every action you are not authorized to perform as a recommended action in your report."
 
-PROMPT="Load and follow the ci:bulk-triage-regressions skill for view '${TRIAGE_VIEW}' covering ${COMPONENTS_CLAUSE}. Execute Phases 1-3 and the analysis parts of Phase 4-5 fully, but perform NO writes (dry run): every action the skill would take (extend triage, new triage, new bug, symptom label) must be recorded as a recommendation instead.
+PROMPT="Load and follow the ci:bulk-triage-regressions skill for view '${TRIAGE_VIEW}' covering ${COMPONENTS_CLAUSE}. Execute Phases 1-5 fully. You ARE authorized to create or extend Sippy triage records (use \$DPCR_TOKEN) for buckets whose root cause maps to a JIRA bug that already exists. For buckets that need a NEW JIRA bug, a release blocker, or a new Sippy symptom/label, record a recommendation in the report instead of performing the action (JIRA is read-only; symptom and blocker creation need human confirmation).
 
 Write the complete duty report as GitHub-flavored markdown to ${WORKDIR}/${REPORT_FILE}. The report must contain: the untriaged-regression inventory table, the bucket list with member regression IDs and evidence (error signatures, failure stage, representative run links, suspect PRs), the recommended disposition per bucket (extend triage <id> / link to <JIRA> / file new bug against <component> with a draft summary), deliberately-untriaged leftovers with reasons, and cross-cutting observations. Every claim must cite artifact paths or run URLs."
 
