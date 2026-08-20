@@ -141,13 +141,12 @@ sed -e "s|\${CLAUDE_SKILL_DIR}|${REVIEW_SKILL_DIR}|g" \
     -e 's/\$1/'"${PR_NUM}"'/g' \
     "${REVIEW_SKILL}" >> "${SYSTEM_PROMPT}"
 
-# Eval comments are posted by the GitHub App, which the skill would skip.
+# Eval comments are posted by the openshift-trt user via GITHUB_SEED_TOKEN.
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
     echo "" >> "${SYSTEM_PROMPT}"
     echo "# Eval Mode" >> "${SYSTEM_PROMPT}"
     echo "" >> "${SYSTEM_PROMPT}"
-    echo "This is a CI evaluation run. Skip author authorization and process the" >> "${SYSTEM_PROMPT}"
-    echo "seeded review comments on this PR." >> "${SYSTEM_PROMPT}"
+    echo "This is a CI evaluation run. Process the seeded review comments on this PR." >> "${SYSTEM_PROMPT}"
     if [[ -f "${SHARED_DIR}/comment-map.json" ]]; then
         echo "" >> "${SYSTEM_PROMPT}"
         echo "Only address comments whose GitHub IDs appear in this map:" >> "${SYSTEM_PROMPT}"
@@ -227,58 +226,57 @@ push_failures=0
 while true; do
     iteration=$(( iteration + 1 ))
     if [[ "${EVAL_MODE:-}" == "true" ]]; then
-        echo "Eval mode: skipping wait and gate (iteration ${iteration})..."
-        has_work=true
+        echo "Eval mode: skipping wait (iteration ${iteration})..."
     else
         echo "Waiting 5 minutes before checking (iteration ${iteration})..."
         sleep 300
+    fi
 
-        echo "Running gate (${GATE_MODEL})..."
-        GATE_LOG="${WORKDIR}/artifacts/gate-${iteration}.log"
-        set +e
-        timeout 120 claude \
-            --model "${GATE_MODEL}" \
-            --allowedTools "Bash" \
-            --disallowedTools "${DISALLOWED_TOOLS[@]}" \
-            --max-turns 20 \
-            --output-format text \
-            --append-system-prompt-file "${GATE_PROMPT}" \
-            -p "Decide if PR #${PR_NUM} in ${UPSTREAM_REPO} has review work. Follow the Gate Process. This is CI mode (--ci).
+    echo "Running gate (${GATE_MODEL})..."
+    GATE_LOG="${WORKDIR}/artifacts/gate-${iteration}.log"
+    set +e
+    timeout 120 claude \
+        --model "${GATE_MODEL}" \
+        --allowedTools "Bash" \
+        --disallowedTools "${DISALLOWED_TOOLS[@]}" \
+        --max-turns 20 \
+        --output-format text \
+        --append-system-prompt-file "${GATE_PROMPT}" \
+        -p "Decide if PR #${PR_NUM} in ${UPSTREAM_REPO} has review work. Follow the Gate Process. This is CI mode (--ci).
 
 Our GitHub login is ${BOT_LOGIN}. Ignore comments from this login.
 Previous FAILING_CHECKS JSON array: ${PREV_FAILING}" \
-            --verbose 2>&1 | tee "${GATE_LOG}"
-        gate_rc=${PIPESTATUS[0]}
-        set -e
-        echo "Gate exit status: ${gate_rc}"
-        cat "${GATE_LOG}" >> "${WORKDIR}/artifacts/claude-output.log" 2>/dev/null || true
+        --verbose 2>&1 | tee "${GATE_LOG}"
+    gate_rc=${PIPESTATUS[0]}
+    set -e
+    echo "Gate exit status: ${gate_rc}"
+    cat "${GATE_LOG}" >> "${WORKDIR}/artifacts/claude-output.log" 2>/dev/null || true
 
-        if [[ "${gate_rc}" -ne 0 ]]; then
-            gate_failures=$(( gate_failures + 1 ))
-            echo "Gate failed (${gate_failures}/${GATE_FAILURE_THRESHOLD})"
-            if [[ "${gate_failures}" -ge "${GATE_FAILURE_THRESHOLD}" ]]; then
-                echo "ERROR: gate failed ${gate_failures} consecutive times; giving up"
-                exit 1
-            fi
-            has_work=false
-            continue
+    if [[ "${gate_rc}" -ne 0 ]]; then
+        gate_failures=$(( gate_failures + 1 ))
+        echo "Gate failed (${gate_failures}/${GATE_FAILURE_THRESHOLD})"
+        if [[ "${gate_failures}" -ge "${GATE_FAILURE_THRESHOLD}" ]]; then
+            echo "ERROR: gate failed ${gate_failures} consecutive times; giving up"
+            exit 1
         fi
-        gate_failures=0
-
-        decision=$(grep -Eo '^WORK=(yes|no)' "${GATE_LOG}" | tail -1 || true)
-        if extracted=$(extract_failing_checks "${GATE_LOG}"); then
-            PREV_FAILING="${extracted}"
-        fi
-        if [[ "${decision}" == "WORK=no" ]]; then
-            has_work=false
-        else
-            if [[ "${decision}" != "WORK=yes" ]]; then
-                echo "Gate did not return WORK=yes|no (got '${decision}'); treating as work."
-            fi
-            has_work=true
-        fi
-        echo "Gate decision: ${decision:-<none>} (has_work=${has_work})"
+        has_work=false
+        continue
     fi
+    gate_failures=0
+
+    decision=$(grep -Eo '^WORK=(yes|no)' "${GATE_LOG}" | tail -1 || true)
+    if extracted=$(extract_failing_checks "${GATE_LOG}"); then
+        PREV_FAILING="${extracted}"
+    fi
+    if [[ "${decision}" == "WORK=yes" ]]; then
+        has_work=true
+    elif [[ "${decision}" == "WORK=no" ]]; then
+        has_work=false
+    else
+        echo "Gate did not return WORK=yes|no (got '${decision}'); treating as work."
+        has_work=true
+    fi
+    echo "Gate decision: ${decision:-<none>} (has_work=${has_work})"
 
     if [[ "${has_work}" == "true" ]]; then
         echo "Invoking worker to address review comments..."
@@ -322,6 +320,10 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
     else
         idle_streak=$(( idle_streak + 1 ))
         echo "Nothing to do (idle streak: ${idle_streak}/3)."
+        if [[ "${EVAL_MODE:-}" == "true" ]]; then
+            echo "Eval mode: single pass complete."
+            break
+        fi
     fi
 
     if [[ "${iteration}" -ge 6 && "${idle_streak}" -ge 3 ]]; then
