@@ -118,6 +118,8 @@ ${DNS_BLOCK}
       password: "testPassword"
   httpbin:
     image: "${HTTPBIN_IMAGE}"
+  grpcbin:
+    image: "${GRPCBIN_IMAGE}"
   tracing:
     backend: "jaeger"
     collector_url: "${JAEGER_COLLECTOR_URL}"
