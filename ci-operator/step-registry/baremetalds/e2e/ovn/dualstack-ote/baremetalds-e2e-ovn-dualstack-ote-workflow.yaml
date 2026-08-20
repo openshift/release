@@ -1,0 +1,24 @@
+workflow:
+  as: baremetalds-e2e-ovn-dualstack-ote
+  steps:
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        # EgressIP E2Es require at least 3 Ready schedulable nodes. dev-scripts
+        # defaults to NUM_WORKERS=2 and IPI taints the masters when workers exist.
+        NUM_WORKERS=3
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="secondarynet"
+        SECONDARYNET_NETWORK_SUBNET_V4='10.10.10.0/24'
+        SECONDARYNET_NETWORK_SUBNET_V6='2001:db8:abcd:1234::/64'
+    pre:
+      - ref: baremetalds-devscripts-conf-extranetwork
+      - chain: baremetalds-ofcir-pre
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    Like baremetalds-e2e-ovn-dualstack, but also provisions a secondary network on the cluster
+    nodes so that OTE EgressIP E2Es requiring an EgressIP on a secondary host interface can run.
+    The subnets must match bmSecondaryIPv4Subnet / bmSecondaryIPv6Subnet in openshift/ovn-kubernetes.
