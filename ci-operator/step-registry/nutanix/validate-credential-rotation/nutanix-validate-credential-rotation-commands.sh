@@ -408,6 +408,6 @@ EOF
 cat ${SHARED_DIR}/credential-rotation-validation-summary.txt
 
 echo "Validation artifacts saved to ${SHARED_DIR}/"
-ls -la ${SHARED_DIR}/ | grep -E "credential|rotation" || true
+find "${SHARED_DIR}/" -maxdepth 1 \( -name '*credential*' -o -name '*rotation*' \) -exec ls -la {} \; 2>/dev/null || true
 
 echo "✓ Nutanix credential rotation validation completed successfully!"
