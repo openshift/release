@@ -1,9 +1,33 @@
+base_images:
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
   items:
   - dockerfile_path: build/Dockerfile
-    to: unused
+    to: cloud-ingress-operator
+  - dockerfile_literal: |
+      FROM scratch
+      COPY deploy_pko/ /package/
+    to: operator-pko
+  - dockerfile_literal: |
+      FROM src
+      RUN CGO_ENABLED=0 go test ./test/e2e -v -c --tags=osde2e -o /usr/local/bin/e2e.test
+    from: src
+    to: operator-e2e
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -48,6 +72,70 @@ tests:
   commands: make validate
   container:
     from: src
+- as: rosa-osd-aws-e2e
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:cloud-ingress-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      GINKGO_FOCUS: cloud-ingress-operator
+      LEASE_TYPE: osd-aws
+      OPERATOR_CRDS: apischemes.cloudingress.managed.openshift.io,publishingstrategies.cloudingress.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: cloud-ingress-operator
+      OPERATOR_NAME: cloud-ingress-operator
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: rosa-osd-aws-e2e-promotion-int
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:cloud-ingress-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      GINKGO_FOCUS: cloud-ingress-operator
+      LEASE_ENV: integration
+      LEASE_TYPE: osd-aws
+      OCM_LOGIN_ENV: integration
+      OPERATOR_CRDS: apischemes.cloudingress.managed.openshift.io,publishingstrategies.cloudingress.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: cloud-ingress-operator
+      OPERATOR_NAME: cloud-ingress-operator
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: rosa-osd-aws-e2e-promotion-stage
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:cloud-ingress-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      GINKGO_FOCUS: cloud-ingress-operator
+      LEASE_ENV: staging
+      LEASE_TYPE: osd-aws
+      OPERATOR_CRDS: apischemes.cloudingress.managed.openshift.io,publishingstrategies.cloudingress.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: cloud-ingress-operator
+      OPERATOR_NAME: cloud-ingress-operator
+    workflow: rosa-cluster-lease-e2e-workflow
 zz_generated_metadata:
   branch: master
   org: openshift
