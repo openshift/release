@@ -190,9 +190,17 @@ provision_osd_aws_cluster() {
         return 1
     fi
 
+    local aws_account_id
+    aws_account_id=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)
+    if [[ -z "${aws_account_id}" ]]; then
+        log "WARNING: Cannot determine AWS account ID. Skipping ${name}."
+        return 1
+    fi
+
     ocm create cluster "${name}" \
         --ccs \
         --provider aws \
+        --aws-account-id "${aws_account_id}" \
         --aws-access-key-id "${aws_access_key_id}" \
         --aws-secret-access-key "${aws_secret_access_key}" \
         --region "${region}" \
