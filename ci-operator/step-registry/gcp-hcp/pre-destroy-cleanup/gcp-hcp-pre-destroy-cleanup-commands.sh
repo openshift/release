@@ -8,7 +8,7 @@ echo "terraform destroy: NEGs (block VPC deletion), DNS records (block"
 echo "zone deletion), and Gateway API resources (create NEGs)."
 echo ""
 
-# Authenticate with WIF credential
+# Authenticate with WIF credential (fresh token for this step)
 if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
   echo "WARNING: WIF credential not found, skipping cleanup"
   exit 0
@@ -29,7 +29,18 @@ echo "Region: ${REGION_PROJECT} / ${REGION_CLUSTER_NAME}"
 echo "MC:     ${MC_PROJECT} / ${MC_CLUSTER_NAME}"
 echo ""
 
-# Build kubeconfigs using Connect Gateway (fresh token — original may have expired)
+# Safe count: strip whitespace from wc -l output for arithmetic
+safe_count() {
+  local result
+  result=$(echo "$1" | tr -d '[:space:]')
+  result=${result:-0}
+  echo "${result}"
+}
+
+# Build kubeconfigs using Connect Gateway with a FRESH access token.
+# The original kubeconfigs from generate-kubeconfigs embed a static token
+# that expires after 1 hour. This step runs in the post phase, potentially
+# 1+ hours after the token was generated.
 build_kubeconfig() {
   local project_number=$1
   local cluster_name=$2
@@ -94,8 +105,7 @@ stop_argocd() {
   local elapsed=0
   while [[ ${elapsed} -lt 60 ]]; do
     local count
-    count=$(kc "${kubeconfig}" -n argocd get applications --no-headers 2>/dev/null | wc -l || echo "0")
-    count=$((count + 0))
+    count=$(safe_count "$(kc "${kubeconfig}" -n argocd get applications --no-headers 2>/dev/null | wc -l)")
     if [[ ${count} -eq 0 ]]; then
       echo "  All Applications deleted"
       break
@@ -117,8 +127,7 @@ delete_gateway_resources() {
 
   for kind in gcpbackendpolicy healthcheckpolicy httproute gateway; do
     local count
-    count=$(kc "${kubeconfig}" get "${kind}" --all-namespaces --no-headers 2>/dev/null | wc -l || echo "0")
-    count=$((count + 0))
+    count=$(safe_count "$(kc "${kubeconfig}" get "${kind}" --all-namespaces --no-headers 2>/dev/null | wc -l)")
     if [[ ${count} -gt 0 ]]; then
       echo "  Deleting ${count} ${kind} resource(s)"
       kc "${kubeconfig}" delete "${kind}" --all --all-namespaces --wait=false --timeout=30s 2>/dev/null || true
@@ -203,7 +212,7 @@ delete_negs() {
 # Execute cleanup on both clusters
 # =====================================================================
 
-# Build fresh kubeconfigs (tokens from generate-kubeconfigs may have expired)
+# Build fresh kubeconfigs with new access tokens
 CLEANUP_REGION_KC="/tmp/cleanup-region-kubeconfig"
 CLEANUP_MC_KC="/tmp/cleanup-mc-kubeconfig"
 
@@ -214,26 +223,47 @@ if [[ -n "${REGION_PROJECT_NUMBER}" ]]; then
   build_kubeconfig "${REGION_PROJECT_NUMBER}" "${MC_CLUSTER_NAME}" "${CLEANUP_MC_KC}"
 fi
 
+# Verify connectivity before proceeding
+echo "Verifying cluster connectivity..."
+if [[ -f "${CLEANUP_REGION_KC}" ]] && kc "${CLEANUP_REGION_KC}" get nodes --request-timeout=10s &>/dev/null; then
+  echo "  Region cluster: connected"
+  REGION_CONNECTED=true
+else
+  echo "  Region cluster: unreachable (Connect Gateway or cluster may be unavailable)"
+  REGION_CONNECTED=false
+fi
+
+if [[ -f "${CLEANUP_MC_KC}" ]] && kc "${CLEANUP_MC_KC}" get nodes --request-timeout=10s &>/dev/null; then
+  echo "  MC cluster: connected"
+  MC_CONNECTED=true
+else
+  echo "  MC cluster: unreachable (Connect Gateway or cluster may be unavailable)"
+  MC_CONNECTED=false
+fi
+echo ""
+
 # Phase 1: Stop ArgoCD (MC first, then region)
-if [[ -f "${CLEANUP_MC_KC}" ]]; then
+if [[ "${MC_CONNECTED}" == "true" ]]; then
   stop_argocd "${CLEANUP_MC_KC}" "MC" || true
 fi
-if [[ -f "${CLEANUP_REGION_KC}" ]]; then
+if [[ "${REGION_CONNECTED}" == "true" ]]; then
   stop_argocd "${CLEANUP_REGION_KC}" "Region" || true
 fi
 
 # Phase 2: Delete Gateway API resources
-if [[ -f "${CLEANUP_MC_KC}" ]]; then
+if [[ "${MC_CONNECTED}" == "true" ]]; then
   delete_gateway_resources "${CLEANUP_MC_KC}" "MC" || true
 fi
-if [[ -f "${CLEANUP_REGION_KC}" ]]; then
+if [[ "${REGION_CONNECTED}" == "true" ]]; then
   delete_gateway_resources "${CLEANUP_REGION_KC}" "Region" || true
 fi
 
 # Wait for GKE controller to clean up NEGs after Gateway deletion
-echo ""
-echo "Waiting 60s for GKE to process Gateway/NEG deletions..."
-sleep 60
+if [[ "${REGION_CONNECTED}" == "true" || "${MC_CONNECTED}" == "true" ]]; then
+  echo ""
+  echo "Waiting 60s for GKE to process Gateway/NEG deletions..."
+  sleep 60
+fi
 
 # Phase 3: Delete DNS records from regional zones
 delete_dns_records "${REGION_PROJECT}" "Region" || true
@@ -246,9 +276,9 @@ delete_negs "${MC_PROJECT}" "MC" || true
 echo ""
 echo "=== Final NEG check ==="
 echo "Region:"
-gcloud compute network-endpoint-groups list --project="${REGION_PROJECT}" 2>/dev/null || echo "  Unable to list"
+gcloud compute network-endpoint-groups list --project="${REGION_PROJECT}" --format="table(name,zone)" 2>/dev/null || echo "  (unable to list — project may be in deletion)"
 echo "MC:"
-gcloud compute network-endpoint-groups list --project="${MC_PROJECT}" 2>/dev/null || echo "  Unable to list"
+gcloud compute network-endpoint-groups list --project="${MC_PROJECT}" --format="table(name,zone)" 2>/dev/null || echo "  (unable to list — project may be in deletion)"
 
 echo ""
 echo "=== Pre-destroy cleanup complete ==="
