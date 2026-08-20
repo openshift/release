@@ -1,0 +1,39 @@
+base_images:
+  obsctl-reloader-rules-checker:
+    name: obsctl-reloader-rules-checker
+    namespace: ci
+    tag: 1.0.7
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.23
+images:
+  items:
+  - dockerfile_literal: |
+      FROM obsctl-reloader-rules-checker
+      COPY src/ /work
+      WORKDIR /work
+    from: obsctl-reloader-rules-checker
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-online/rosa-rhobs-dashboards
+    to: rules-checker-with-src
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rules-check
+  commands: |
+    cd /work
+    obsctl-reloader-rules-checker -t osd -d rules -y -p -T test/rules
+  container:
+    from: rules-checker-with-src
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-rhobs-dashboards
