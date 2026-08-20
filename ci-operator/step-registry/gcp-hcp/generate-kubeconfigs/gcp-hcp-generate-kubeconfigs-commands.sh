@@ -74,10 +74,11 @@ set -x
 # Generate MC cluster kubeconfig (optional - test skips if unavailable)
 echo "Generating management cluster kubeconfig (Connect Gateway)..."
 set +x  # Hide sensitive token
-if MC_PROJECT_NUMBER=$(gcloud projects describe "${MC_PROJECT}" --format='value(projectNumber)' 2>/dev/null); then
+if gcloud projects describe "${MC_PROJECT}" --format='value(projectNumber)' &>/dev/null; then
 
-  # Build Connect Gateway endpoint for MC
-  MC_ENDPOINT="${REGION}-connectgateway.googleapis.com/v1/projects/${MC_PROJECT_NUMBER}/locations/${REGION}/gkeMemberships/${MC_CLUSTER_NAME}"
+  # MC clusters are registered in the REGION project's fleet (not their own).
+  # Connect Gateway URLs must reference the project that owns the fleet membership.
+  MC_ENDPOINT="${REGION}-connectgateway.googleapis.com/v1/projects/${REGION_PROJECT_NUMBER}/locations/${REGION}/gkeMemberships/${MC_CLUSTER_NAME}"
 
   cat > "${SHARED_DIR}/mc-kubeconfig" << 'KUBECONFIG_EOF'
 apiVersion: v1
