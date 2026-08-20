@@ -42,8 +42,23 @@ done
 
 typeset -a secondaryPoliciesArr=(
   policy-acs
+  policy-acs-monitor-certs
+  policy-acs-operator-central
+  policy-acs-sync-resources
+  policy-advanced-managed-cluster-security
   policy-advanced-managed-cluster-status
+  policy-compliance-operator-install
+  policy-config-quay
   policy-hub-quay-bridge
+  policy-install-quay
+  policy-observability-operator
+  policy-observability-storage
+  policy-observability-storage-status
+  policy-odf
+  policy-odf-cluster
+  policy-odf-noobaa
+  policy-odf-status
+  policy-quay-bridge
   policy-quay-status
 )
 
