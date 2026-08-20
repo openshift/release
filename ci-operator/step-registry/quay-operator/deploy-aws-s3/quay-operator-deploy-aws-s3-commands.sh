@@ -320,19 +320,38 @@ spec:
     managed: true
 EOF
 
-for _ in {1..60}; do
-  if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
-    echo "Quay is in ready status" >&2
-    oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
-    oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
-    quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
+echo "Waiting for Quay to become ready (timeout: 15m)..." >&2
+for i in $(seq 1 90); do
+  status="$(oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
+  if [[ "$status" == "True" ]]; then
+    echo "Quay is ready (after $((i * 10))s)" >&2
+    oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+    oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
+    quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
     archive_pod_info
     exit 0
   fi
-  sleep 15
+  if (( i % 6 == 0 )); then
+    echo "[$((i * 10))s] Quay not ready yet. Component status:" >&2
+    oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{range .status.conditions[*]}{.type}: {.status} ({.reason}) {.message}{"\n"}{end}' 2>/dev/null >&2 || true
+  fi
+  sleep 10
 done
-echo "Timed out waiting for Quay to become ready after 15 mins" >&2
+
+echo "Timed out waiting for Quay to become ready" >&2
+echo "Final QuayRegistry conditions:" >&2
+oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{range .status.conditions[*]}{.type}: {.status} ({.reason}) {.message}{"\n"}{end}' 2>/dev/null >&2 || true
+echo "Pods in ${QUAY_NS} namespace:" >&2
+oc -n "${QUAY_NS}" get pods -o wide >&2 || true
+echo "Events in ${QUAY_NS} namespace:" >&2
+oc -n "${QUAY_NS}" get events --sort-by='.lastTimestamp' >&2 || true
+
+oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml" || true
+oc -n "${QUAY_NS}" get pods -o yaml >"$ARTIFACT_DIR/quay-pods.yaml" || true
+oc -n "${QUAY_NS}" get events --sort-by='.lastTimestamp' -o yaml >"$ARTIFACT_DIR/quay-events.yaml" || true
+oc -n "${QUAY_NS}" get deployments -o yaml >"$ARTIFACT_DIR/quay-deployments.yaml" || true
 archive_pod_info
 exit 1
+
