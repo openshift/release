@@ -118,41 +118,6 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: ipi-aws
-- as: tls13-adherence
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: medik8s-aws
-    env:
-      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
-      INSTALL_NAMESPACE: mdr-install
-      PQC_CHECK: "false"
-      SCAN_NAMESPACE: mdr-install
-      SCANNER_CPU: "2"
-      TLS_13_ENABLE_TLS_ADHERENCE: "true"
-      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
-    test:
-    - as: install-operator
-      cli: latest
-      commands: |
-        oc create namespace "$INSTALL_NAMESPACE"
-        oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
-        oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
-        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
-      dependencies:
-      - env: OO_BUNDLE
-        name: machine-deletion-remediation-bundle
-      env:
-      - name: INSTALL_NAMESPACE
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - ref: tls-13
-    - ref: tls-scanner-run
-    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-0.7
   org: medik8s
