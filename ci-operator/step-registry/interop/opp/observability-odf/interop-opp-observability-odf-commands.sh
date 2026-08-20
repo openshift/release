@@ -319,15 +319,16 @@ function CheckThanosHealth () {
         typeset podList=""
         podList="$(oc get pods -n "${OBS_NAMESPACE}" -l "${labelSelector}" \
             --no-headers)" || true
-        typeset podCount=""
-        podCount="$(printf '%s' "${podList}" | awk 'END{print NR}')"
 
-        if [[ "${podCount}" -eq 0 ]]; then
+        if [[ -z "${podList}" ]]; then
             typeset allPods=""
             allPods="$(oc get pods -n "${OBS_NAMESPACE}" \
                 --no-headers)" || true
-            podCount="$(printf '%s' "${allPods}" | awk -v pat="^${component}" '$0 ~ pat {c++} END{print c+0}')"
+            podList="$(printf '%s' "${allPods}" | awk -v pat="^${component}" '$0 ~ pat')"
         fi
+
+        typeset podCount=""
+        podCount="$(printf '%s' "${podList}" | awk 'NF {c++} END{print c+0}')"
 
         if [[ "${podCount}" -eq 0 ]]; then
             missingComponents+=("${component}")
@@ -519,8 +520,7 @@ print(fuzzy[0]['spec']['host'] if fuzzy else '')
     fi
 
     if [[ -z "${queryRoute}" ]]; then
-        typeset svcHost="observability-thanos-query-frontend.${OBS_NAMESPACE}.svc:9090"
-        : "No external route found; trying internal service: ${svcHost}"
+        : "No external route found; trying internal query service"
 
         typeset queryFrontendJson=''
         queryFrontendJson="$(oc get pods -n "${OBS_NAMESPACE}" \
