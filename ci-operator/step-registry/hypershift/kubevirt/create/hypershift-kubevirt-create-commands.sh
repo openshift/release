@@ -192,7 +192,10 @@ renew_localnet_multi_dhcp_on_vmi() {
 
   echo "Forcing DHCP renewal on VMI ${vmi} (${vmi_ip}) via pod on ${vmi_node}..."
   renew_pod="dhcp-renew-${vmi##*-}"
-  cat <<RENEW_EOF | oc apply -f -
+  # Unquoted heredoc: escape inner-shell vars (e.g. \${VMI_IP}) so set -u does not
+  # expand them in the outer shell before oc apply.
+  # Renewal is a best-effort fallback; do not fail cluster creation if it cannot run.
+  if ! cat <<RENEW_EOF | oc apply -f -; then
 apiVersion: v1
 kind: Pod
 metadata:
@@ -231,7 +234,7 @@ spec:
       chmod 600 /tmp/key
       for attempt in 1 2 3 4 5; do
         if ssh -i /tmp/key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-             -o ConnectTimeout=15 "core@${VMI_IP}" \
+             -o ConnectTimeout=15 "core@\${VMI_IP}" \
              "i=2; while [ \"\${i}\" -le \"${network_count}\" ]; do \
                 sudo nmcli connection modify \"Wired connection \${i}\" ipv6.method disabled 2>/dev/null; \
                 sudo nmcli connection down \"Wired connection \${i}\" 2>/dev/null; \
@@ -247,6 +250,9 @@ spec:
         sleep 5
       done
 RENEW_EOF
+    echo "WARNING: Failed to create DHCP renewal pod ${renew_pod} for ${vmi}, continuing"
+    return 0
+  fi
   oc wait pod/"${renew_pod}" -n "${multi_ns}" \
     --for=jsonpath='{.status.phase}'=Succeeded --timeout=180s 2>&1 || true
   echo "--- DHCP renewal output for ${vmi} ---"
