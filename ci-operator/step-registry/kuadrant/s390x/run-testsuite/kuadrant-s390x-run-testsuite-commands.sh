@@ -416,7 +416,6 @@ _ZONE = os.environ.get("KUADRANT_COREDNS_ZONE", "k.example.com").strip(".").lowe
 _DNS_HOST = os.environ.get("KUADRANT_COREDNS_DNS_HOST", "")
 _DNS_PORT = int(os.environ.get("KUADRANT_COREDNS_DNS_PORT", "53"))
 _ORIG_GETADDRINFO = socket.getaddrinfo
-_CACHE: dict[str, str] = {}
 
 
 def _belongs_to_zone(host: str) -> bool:
@@ -433,9 +432,8 @@ def _encode_name(name: str) -> bytes:
 
 
 def _dns_query_a(name: str) -> str | None:
-    cached = _CACHE.get(name)
-    if cached:
-        return cached
+    # Always query CoreDNS (no positive cache). DNSPolicy removal/TTL tests must
+    # observe record deletion; a stale cache caused has_dns_error() to stay False.
     question = _encode_name(name) + struct.pack("!HH", 1, 1)  # A IN
     header = struct.pack("!HHHHHH", 0xC0DE, 0x0100, 1, 0, 0, 0)
     payload = header + question
@@ -492,9 +490,7 @@ def _dns_query_a(name: str) -> str | None:
         rdata = data[i : i + rdlen]
         i += rdlen
         if rtype == 1 and rdlen == 4:
-            ip = socket.inet_ntoa(rdata)
-            _CACHE[name] = ip
-            return ip
+            return socket.inet_ntoa(rdata)
     return None
 
 
@@ -512,7 +508,12 @@ def _patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
             print(f"[kuadrant_coredns_resolve] {host_str} -> {ip} (via CoreDNS)", file=sys.stderr)
             return _ORIG_GETADDRINFO(ip, port, family, type, proto, flags)
         else:
-            print(f"[kuadrant_coredns_resolve] {host_str} -> NO ANSWER from CoreDNS at {_DNS_HOST}:{_DNS_PORT}", file=sys.stderr)
+            print(
+                f"[kuadrant_coredns_resolve] {host_str} -> NO ANSWER from CoreDNS at {_DNS_HOST}:{_DNS_PORT}",
+                file=sys.stderr,
+            )
+            # Zone hostnames must resolve only via CoreDNS; do not fall through to system DNS.
+            raise socket.gaierror(socket.EAI_NONAME, "Name or service not known")
     return _ORIG_GETADDRINFO(host, port, family, type, proto, flags)
 
 

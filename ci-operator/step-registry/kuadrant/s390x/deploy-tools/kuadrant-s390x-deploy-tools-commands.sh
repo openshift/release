@@ -12,6 +12,21 @@ echo "=== Deploying testing tools into namespace ${TOOLS_NS} ==="
 oc get ns "${TOOLS_NS}" >/dev/null 2>&1 || oc create ns "${TOOLS_NS}"
 
 # ---------------------------------------------------------------------------
+# Egress tests read openshift-ingress/custom-cert for TLS origination CA
+# (testsuite/tests/singlecluster/egress/conftest.py ingress_ca_secret).
+# OCP provides router-certs-default; the testsuite expects custom-cert.
+# ---------------------------------------------------------------------------
+echo "=== openshift-ingress custom-cert (egress TLS origination) ==="
+if ! oc get secret custom-cert -n openshift-ingress >/dev/null 2>&1; then
+  oc get secret router-certs-default -n openshift-ingress -o yaml \
+    | sed 's/name: router-certs-default/name: custom-cert/' \
+    | oc apply -f -
+  echo "Created custom-cert from router-certs-default"
+else
+  echo "custom-cert already exists"
+fi
+
+# ---------------------------------------------------------------------------
 # OpenShift cluster monitoring (same approach as rhcl-mc1): do NOT install a
 # separate Prometheus. Enable User Workload Monitoring so ServiceMonitors are
 # scraped, then point the testsuite at thanos-querier (openshift-monitoring).
