@@ -1,0 +1,53 @@
+ref:
+  as: upi-install-libvirt-heterogeneous
+  from: libvirt-installer
+  commands: upi-install-libvirt-heterogeneous-commands.sh
+  grace_period: 30m
+  env:
+  - name: ARCH
+  - name: BRANCH
+  - name: ADDITIONAL_WORKER_ARCHITECTURE
+    default: "x86_64"
+    documentation: |-
+      Architecture of day-2 workers.
+      ZX (s390x CP + amd64 workers): x86_64 or amd64
+      XZ (amd64 CP + s390x workers): s390x
+  - name: DOMAIN_MEMORY
+    documentation: The memory to allocate for each additional guest, in KiB
+    default: "25156824"
+  - name: DOMAIN_DISK_SIZE
+    documentation: The disk size to allocate for each additional guest, in B
+    default: "107374182400"
+  - name: DOMAIN_VCPUS
+    documentation: Number of VCPUs to allocate for each additional guest
+    default: "6"
+  - name: USE_EXTERNAL_DNS
+    default: "false"
+  - name: OPENSHIFT_CLIENT_VERSION_OVERRIDE
+    default: ""
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    Adds day-2 multi-architecture compute nodes to an already-installed VPN libvirt
+    cluster using lease metadata from ${CLUSTER_PROFILE_DIR}/leases.
+
+    Supports both topologies:
+      ZX — ARCH=s390x, ADDITIONAL_WORKER_ARCHITECTURE=x86_64|amd64
+      XZ — ARCH=amd64, ADDITIONAL_WORKER_ARCHITECTURE=s390x
+
+    Expected lease fields for ${LEASED_RESOURCE} (in addition to homogeneous VPN fields):
+      hostname: control-plane hypervisor (httpd/rootfs host)
+      hostname-additional: preferred generic key for the additional-arch hypervisor
+        (fallback: hostname-amd64 for x86 workers, hostname-s390x for s390x workers)
+      httpd-ip / httpd-port: ignition + rootfs HTTP endpoint
+      additional-compute: list of {mac, ip, gateway, prefix?, interface?, nameserver?, network?}
+
+    Homogeneous fields still required for the control-plane install that precedes this step
+    (subnet, bootstrap, control-plane, …).
