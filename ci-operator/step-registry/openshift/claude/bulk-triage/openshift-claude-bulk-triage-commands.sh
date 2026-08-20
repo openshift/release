@@ -26,7 +26,7 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL:-}" ]]; then
 fi
 
 # --- Load JIRA credentials for read-only lookups ---
-# Mounted from the openshift-qse-managers-bot test-credentials secret. The
+# Mounted from the openshift-qse-bot-managers test-credentials secret. The
 # ai-helpers skill reads JIRA_USERNAME/JIRA_API_TOKEN to look up existing bugs
 # (e.g. searching OCPBUGS). JIRA access is read-only: the skill must not perform
 # any JIRA writes.
