@@ -18,38 +18,29 @@ typeset -a spokeKubeconfigsArr=()
 typeset -a spokeNamesArr=()
 
 # InstallSubctl — install subctl to /tmp/bin/ at step runtime.
-# Downloads the pinned release tarball from GitHub, verifies its SHA-256 checksum,
-# then extracts the binary.  Uses SUBCTL_VERSION (set in ref.yaml env) so the
-# version can be bumped without touching the script.
+# Downloads from GitHub releases using SUBMARINER_SUBCTL_VERSION (matches the
+# env var name used by submariner-cloud-prepare, broker-join, and verify steps).
+# Requires xz (pre-installed in the cli-with-git step image).
+# Returns 1 (non-fatal) if any step fails; callers check exit status.
 #
 # WHY not SHARED_DIR: large binaries cause CI operator "Request entity too large"
 # when serialising SHARED_DIR into a Kubernetes Secret between steps (3 MB limit).
-# Returns 1 (non-fatal) if any step fails; callers check exit status.
 InstallSubctl() {
     mkdir -p /tmp/bin || return 1
-    if [[ -x "${subctlBin}" ]]; then
-        return 0
-    fi
+    [[ -x "${subctlBin}" ]] && return 0
 
-    typeset version="${SUBCTL_VERSION:?SUBCTL_VERSION must be set}"
-    typeset arch="linux-amd64"
-    typeset tarball="subctl-v${version}-${arch}.tar.xz"
-    typeset baseURL="https://github.com/submariner-io/subctl/releases/download/v${version}"
-    typeset workDir
-    workDir="$(mktemp -d /tmp/subctl-install-XXXXXX)" || return 1
+    typeset version="${SUBMARINER_SUBCTL_VERSION:?SUBMARINER_SUBCTL_VERSION must be set}"
+    typeset tarUrl="https://github.com/submariner-io/subctl/releases/download/subctl-${version}/subctl-${version}-linux-amd64.tar.xz"
+    typeset tmpTar; tmpTar="$(mktemp /tmp/subctl-XXXXXX.tar.xz)" || return 1
+    typeset tmpDir; tmpDir="$(mktemp -d /tmp/subctl-dir-XXXXXX)" || return 1
 
-    (
-        cd "${workDir}" || return 1
-        curl -fsSL -o "${tarball}"        "${baseURL}/${tarball}"        || return 1
-        curl -fsSL -o "${tarball}.sha256" "${baseURL}/${tarball}.sha256" || return 1
-        # Verify integrity before executing anything from the archive.
-        sha256sum --check "${tarball}.sha256" || return 1
-        tar -xJf "${tarball}" "subctl-v${version}-${arch}/subctl"       || return 1
-        cp "subctl-v${version}-${arch}/subctl" "${subctlBin}"           || return 1
-        chmod +x "${subctlBin}"                                          || return 1
-    ) || { rm -rf "${workDir}"; return 1; }
-
-    rm -rf "${workDir}"
+    curl -fsSL "${tarUrl}" -o "${tmpTar}"           || { rm -rf "${tmpTar}" "${tmpDir}"; return 1; }
+    tar -xJf "${tmpTar}" -C "${tmpDir}"             || { rm -rf "${tmpTar}" "${tmpDir}"; return 1; }
+    typeset extracted; extracted="$(find "${tmpDir}" -maxdepth 2 -name 'subctl' -type f | head -1)"
+    [[ -n "${extracted}" ]]                         || { rm -rf "${tmpTar}" "${tmpDir}"; return 1; }
+    cp "${extracted}" "${subctlBin}"                || { rm -rf "${tmpTar}" "${tmpDir}"; return 1; }
+    chmod +x "${subctlBin}"
+    rm -rf "${tmpTar}" "${tmpDir}"
     true
 }
 

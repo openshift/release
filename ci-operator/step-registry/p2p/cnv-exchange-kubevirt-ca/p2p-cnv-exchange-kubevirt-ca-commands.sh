@@ -9,6 +9,11 @@
 # CA. MTV 2.12.x does not inject the destination CA — this step provides that exchange.
 #
 set -euxo pipefail; shopt -s inherit_errexit
+eval "$(
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+)"; EnsureReqs jq
 
 typeset -i spokeCount="${CNV_EXCHANGE_KUBEVIRT_CA__SPOKE_COUNT}"
 typeset cnvNs="${CNV_EXCHANGE_KUBEVIRT_CA__CNV_NS}"
@@ -60,42 +65,55 @@ ExtractUniqueCerts() {
 }
 
 # PatchKubevirtCaBundle — idempotently apply a PEM bundle to a spoke's kubevirt-ca ConfigMap.
+# set +x guard: combinedPem contains PEM certificate data; xtrace would log it in full.
 PatchKubevirtCaBundle() {
     typeset kc="${1:?}"
     typeset combinedPem="${2:?}"
 
+    [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+    set +x
     oc --kubeconfig="${kc}" patch configmap kubevirt-ca \
         -n "${cnvNs}" \
         --type merge \
         -p "$(jq -n --arg bundle "${combinedPem}" '{"data":{"ca-bundle":$bundle}}')" \
         1>/dev/null
+    [[ "${_wasTracing}" == "true" ]] && set -x || true
 }
 
 CollectSpokeKubeconfigs
 
+# Disable xtrace: ca= and spokeCasArr+=() assignments would expand and log PEM content.
 typeset -i i
+set +x
 for ((i = 0; i < spokeCount; i++)); do
     typeset ca
     ca="$(GetKubevirtCaBundle "${spokeKubeconfigsArr[i]}")"
     [[ -n "${ca}" ]]
     spokeCasArr+=("${ca}")
 done
+set -x
 
 # Build a single combined PEM bundle of all unique spoke CAs, then apply to every spoke.
+# Disable xtrace: combinedBundle= assignment would expand and log the full combined PEM.
 typeset combinedBundle
+set +x
 combinedBundle="$(
     for ((i = 0; i < spokeCount; i++)); do
         printf '%s\n' "${spokeCasArr[i]}"
     done | ExtractUniqueCerts
 )"
+set -x
 
 typeset -i combinedCount
-combinedCount="$(printf '%s\n' "${combinedBundle}" | grep -c 'BEGIN CERTIFICATE' || true)"
+# set +x in subshell: printf expands combinedBundle inside the subshell xtrace.
+combinedCount="$(set +x; printf '%s\n' "${combinedBundle}" | grep -c 'BEGIN CERTIFICATE' || true)"
 : "combined unique KubeVirt CA count: ${combinedCount}"
 ((combinedCount >= spokeCount))
 
 for ((i = 0; i < spokeCount; i++)); do
-    PatchKubevirtCaBundle "${spokeKubeconfigsArr[i]}" "${combinedBundle}"
+    # Run in subshell: no parent-context side effects, so xtrace restores automatically.
+    # Avoids tracing combinedBundle as a positional argument at the call site.
+    ( set +x; PatchKubevirtCaBundle "${spokeKubeconfigsArr[i]}" "${combinedBundle}" )
 
     typeset newCount
     newCount="$(GetKubevirtCaBundle "${spokeKubeconfigsArr[i]}" \
