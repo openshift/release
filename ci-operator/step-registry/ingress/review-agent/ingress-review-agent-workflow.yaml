@@ -2,29 +2,18 @@ workflow:
   as: ingress-review-agent
   steps:
     pre:
-      - ref: jira-agent-setup
-      - ref: jira-agent-github-app-auth
-      - ref: jira-agent-slack-pr-notify
-      - ref: jira-agent-claude-helpers
-      - ref: jira-agent-jira-helpers
-      - ref: jira-agent-git-helpers
+      - ref: review-agent-setup
     test:
-      - ref: jira-agent-process
+      - ref: review-agent-process
     post:
-      - ref: jira-agent-report
+      - ref: review-agent-report
     env:
-      JIRA_AGENT_AUTH_MODE: "pat"
-      JIRA_AGENT_FORK_ORG: "jira-solve-bot"
-      JIRA_AGENT_UPSTREAM_REPO: "openshift/cluster-ingress-operator"
-      JIRA_AGENT_JQL: '(project = NE OR (project = OCPBUGS AND component = "Networking / router")) AND resolution = Unresolved AND status in (New, "To Do") AND labels = review-for-agent AND labels != agent-processed'
-      JIRA_AGENT_TARGET_STATUS: '{"OCPBUGS":"ASSIGNED","NE":"ASSIGNED"}'
-      JIRA_AGENT_TOOL_SETUP_SCRIPT: "GOFLAGS='' go install golang.org/x/tools/gopls@v0.21.0"
-      JIRA_AGENT_REVIEW_LANGUAGE: "go"
-      JIRA_AGENT_SLACK_EMOJI: ":robot:"
+      REVIEW_AGENT_AUTH_MODE: "pat"
+      REVIEW_AGENT_FORK_ORG: "jira-solve-bot"
+      REVIEW_AGENT_UPSTREAM_REPO: "openshift/cluster-ingress-operator"
   documentation: |-
-    Ingress operator-specific wrapper for the generic Jira Agent workflow (review mode).
+    Ingress operator-specific wrapper for the generic review-agent workflow.
     Uses PAT auth mode — auto-forks openshift/cluster-ingress-operator
-    into jira-solve-bot and creates PRs against the upstream repo.
-    Processes issues labeled with review-for-agent instead of issue-for-agent.
+    into jira-solve-bot for push operations.
 
     Credentials: Uses hypershift-team-claude-prow (shared secret with gh-pat).
