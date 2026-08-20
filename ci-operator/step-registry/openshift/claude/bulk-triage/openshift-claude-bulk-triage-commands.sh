@@ -101,7 +101,7 @@ else
     COMPONENTS_CLAUSE="components: ${TRIAGE_COMPONENTS}"
 fi
 
-echo "Starting claude bulk-triage dry run"
+echo "Starting claude bulk-triage-regressions run"
 echo "View: ${TRIAGE_VIEW}"
 echo "Components: ${TRIAGE_COMPONENTS_DISPLAY}"
 echo "Model: ${CLAUDE_MODEL}"
@@ -310,7 +310,7 @@ EOF
 echo "JUnit XML written to ${JUNIT_FILE}"
 
 if [[ -s "${WORKDIR}/${REPORT_FILE}" ]]; then
-    echo "Dry-run triage analysis complete. Report: ${REPORT_FILE}"
+    echo "Triage analysis complete. Report: ${REPORT_FILE}"
 else
     echo "ERROR: No markdown report was generated."
     exit 1
