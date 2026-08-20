@@ -38,10 +38,18 @@ QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 
+# Create AWS S3 storage bucket. Names are globally unique; $RANDOM (0-32767)
+# collides with leftover quay-tests buckets that use the same quayprowci prefix.
+function new_s3_bucket_name() {
+  local suffix
+  suffix="${NAMESPACE:-ns}-${UNIQUE_HASH:-$(date +%s)}-${RANDOM}-$(date +%s)"
+  suffix="$(printf '%s' "${suffix}" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-')"
+  printf 'quayprowci-%s\n' "${suffix}"
+}
+
 #Create AWS S3 Storage Bucket
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
-QUAY_AWS_S3_BUCKET="quayprowci$RANDOM"
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
@@ -85,11 +93,20 @@ resource "aws_s3_bucket_acl" "quayaws_bucket_acl" {
 }
 EOF
 
-echo "quay aws s3 bucket name is ${QUAY_AWS_S3_BUCKET}"
-export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
 terraform init
-tf_apply_rc=0
-terraform apply -auto-approve || tf_apply_rc=$?
+tf_apply_rc=1
+for _ in 1 2 3 4 5; do
+  QUAY_AWS_S3_BUCKET="$(new_s3_bucket_name)"
+  echo "quay aws s3 bucket name is ${QUAY_AWS_S3_BUCKET}"
+  export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
+  tf_apply_rc=0
+  terraform apply -auto-approve || tf_apply_rc=$?
+  if [[ "${tf_apply_rc}" -eq 0 ]]; then
+    break
+  fi
+  echo "terraform apply failed with exit code ${tf_apply_rc}; retrying with a new bucket name" >&2
+  terraform destroy -auto-approve || true
+done
 
 #Share Terraform Var and Terraform Directory for deprovision on success and failure
 echo "${QUAY_AWS_S3_BUCKET}" > ${SHARED_DIR}/QUAY_AWS_S3_BUCKET
