@@ -219,6 +219,21 @@ tests:
       NODEPOOL_N3_VERSION: "4.20"
       NODEPOOL_N4_VERSION: "4.19"
     workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-capi-storage-migration
+  cron: 0 4 * * 1-5
+  steps:
+    cluster_profile: hypershift-aks
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      INSTALL_FROM_LATEST: "true"
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
+    workflow: hypershift-azure-aks-e2e-capi-migration
 - always_run: false
   as: e2e-aro-hcp
   optional: true
@@ -378,6 +393,21 @@ tests:
       INSTALL_FROM_LATEST: "true"
       RUN_UPGRADE_TEST: "true"
     workflow: hypershift-aws-e2e-nested
+- as: e2e-aws-capi-storage-migration
+  capabilities:
+  - build-tmpfs
+  cron: 0 4 * * 1-5
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      INSTALL_FROM_LATEST: "true"
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-destroy-nested-management-cluster
+    workflow: hypershift-aws-e2e-nested-capi-migration
 - as: e2e-aws-override
   capabilities:
   - build-tmpfs
@@ -408,6 +438,24 @@ tests:
       REQUEST_SERVING_COMPONENT_TEST: "true"
       RUN_KARPENTER_TESTS: "true"
     workflow: hypershift-aws-e2e-nested
+- as: e2e-kubevirt-aws-capi-storage-migration
+  cron: 0 4 * * 1-5
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ETCD_STORAGE_CLASS: gp3-csi
+      INSTALL_FROM_LATEST: "true"
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    workflow: hypershift-kubevirt-e2e-aws-capi-migration
 - always_run: false
   as: e2e-aws-major-version-upgrade
   optional: true
