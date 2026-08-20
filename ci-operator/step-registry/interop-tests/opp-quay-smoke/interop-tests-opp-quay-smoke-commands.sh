@@ -180,8 +180,15 @@ function RunPushPull () {
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
     typeset authFile="/tmp/quay-auth.json"
 
+    typeset registryAuth
+    if [[ -n "${QUAY_TOKEN}" ]]; then
+        registryAuth=$(echo -n "\$oauthtoken:${QUAY_TOKEN}" | base64)
+    else
+        registryAuth=$(echo -n "${QUAY_USER}:${QUAY_PASSWORD}" | base64)
+    fi
+
     cat > "${authFile}" <<EOF
-{"auths":{"${QUAY_HOST}":{"auth":"$(echo -n "${QUAY_USER}:${QUAY_PASSWORD}" | base64)"}}}
+{"auths":{"${QUAY_HOST}":{"auth":"${registryAuth}"}}}
 EOF
 
     if ! skopeo copy --dest-tls-verify=false \
