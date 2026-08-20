@@ -485,6 +485,16 @@ print(d['items'][0].get('status',{}).get('ceph',{}).get('health','unknown') if d
 # Main
 # ---------------------------------------------------------------------------
 
+function CheckOdfInstalled () {
+    if ! oc get namespace "${ODF_NAMESPACE}" &>/dev/null; then
+        return 1
+    fi
+    typeset csvCount
+    csvCount="$(oc get csv -n "${ODF_NAMESPACE}" -o json 2>/dev/null | \
+        python3 -c "import sys,json; print(len([i for i in json.load(sys.stdin).get('items',[]) if 'odf' in i['metadata']['name'].lower() or 'ocs' in i['metadata']['name'].lower()]))" 2>/dev/null)" || csvCount="0"
+    [[ "${csvCount}" -gt 0 ]]
+}
+
 function Main () {
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -493,6 +503,20 @@ function Main () {
     : "ODF Health Check (7-point gate) starting"
     : "Namespace: ${ODF_NAMESPACE}"
     : "Artifacts dir: ${ARTIFACT_DIR}"
+
+    if ! CheckOdfInstalled; then
+        typeset skipMsg="ODF is not installed (no ODF/OCS CSV in ${ODF_NAMESPACE})"
+        typeset -a checkNames=("odf-csv-phase" "storagecluster-ready" "cephcluster-health"
+            "storageclasses-available" "pvc-provision-rbd" "pvc-provision-cephfs"
+            "noobaa-s3-functional" "ceph-health-detail")
+        typeset name=""
+        for name in "${checkNames[@]}"; do
+            AddResult "${name}" "skip" "${skipMsg}"
+        done
+        WriteJunit
+        : "ODF Health Check: ALL SKIPPED (ODF not installed)"
+        exit 0
+    fi
 
     CheckOdfCsv          || true
     CheckStorageCluster  || true
