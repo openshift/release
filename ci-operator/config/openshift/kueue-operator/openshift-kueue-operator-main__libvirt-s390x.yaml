@@ -1,0 +1,174 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  libvirt-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: libvirt-installer
+  operator-sdk:
+    name: "4.17"
+    namespace: origin
+    tag: operator-sdk
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+      RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+      RUN dnf install -y jq skopeo git && dnf clean all
+    from: src
+    to: kueue-operator-src
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN wget -qO /usr/local/bin/jq https://github.com/jqlang/jq/releases/latest/download/jq-linux64 && chmod +x /usr/local/bin/jq
+      RUN dnf install -y skopeo git podman && dnf clean all
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-with-oc-and-kubectl
+operator:
+  bundles:
+  - as: kueue-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: registry.redhat.io/kueue/kueue-rhel9-operator:latest
+    with: pipeline:kueue-operator
+  - pullspec: registry.redhat.io/kueue/kueue-rhel9:latest
+    with: pipeline:kueue-operand
+  - pullspec: registry.redhat.io/kueue/kueue-must-gather-rhel9:latest
+    with: pipeline:kueue-must-gather
+prowgen:
+  disable_sparse_checkout: true
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: "4"
+      memory: 4Gi
+tests:
+- as: test-e2e-downstream-4-22
+  capabilities:
+  - intranet
+  cluster: build12
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      BRANCH: "4.22"
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - ref: gather-extra
+    - ref: gather-audit-logs
+    - ref: upi-libvirt-cleanup-post
+    test:
+    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
+    - chain: kueue-operator-test-e2e-downstream
+    workflow: kueue-operator-libvirt-s390x
+- always_run: false
+  as: test-e2e-downstream-4-22-disruptive
+  capabilities:
+  - intranet
+  cluster: build12
+  minimum_interval: 96h
+  presubmit: true
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      BRANCH: "4.22"
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - ref: gather-extra
+    - ref: gather-audit-logs
+    - ref: upi-libvirt-cleanup-post
+    test:
+    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
+    - chain: kueue-operator-test-e2e-downstream-disruptive
+    workflow: kueue-operator-libvirt-s390x
+- as: test-e2e-upstream-4-22
+  capabilities:
+  - intranet
+  cluster: build12
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      BRANCH: "4.22"
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - ref: gather-extra
+    - ref: gather-audit-logs
+    - ref: upi-libvirt-cleanup-post
+    test:
+    - ref: kueue-operator-libvirt-s390x-origin-cli-mirror
+    - chain: kueue-operator-test-e2e-upstream
+    workflow: kueue-operator-libvirt-s390x
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: kueue-operator
+  variant: libvirt-s390x
