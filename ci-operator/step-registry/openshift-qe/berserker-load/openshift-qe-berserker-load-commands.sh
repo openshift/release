@@ -63,6 +63,12 @@ fi
 git clone $REPO_URL $TAG_OPTION --depth 1 e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
+# Download berserker-default-containers.yml since ReadFile template function reads from filesystem
+# Determine kube-burner-ocp version from e2e-benchmarking run.sh
+KB_OCP_VERSION=$(grep "KUBE_BURNER_VERSION=" run.sh | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+curl -sSfL "https://raw.githubusercontent.com/kube-burner/kube-burner-ocp/v${KB_OCP_VERSION}/cmd/config/berserker-load/berserker-default-containers.yml" -o berserker-default-containers.yml
+export BERSERKER_CONTAINERS_FILE="$PWD/berserker-default-containers.yml"
+
 export PPROF=false  # Workaround for custom e2e-benchmarking fork that still references PPROF
 export WORKLOAD=berserker-load
 EXTRA_FLAGS="${BERSERKER_EXTRA_FLAGS} ${KB_FLAGS} --gc=${BERSERKER_GC} --profile-type=${PROFILE_TYPE}"
