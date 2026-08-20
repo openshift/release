@@ -126,10 +126,70 @@ spec:
 EOF
 fi
 
-# Write 99-chrony-{worker,master}.yaml from a base64-encoded chrony.conf.
-# upi-install-libvirt copies these into the install manifests when present.
-write_chrony_machineconfigs() {
-  local chrony_b64="$1"
+# Add the chrony config for ppc64le
+# setting it to clock.corp.redhat.com
+if [ ${ARCH} = "ppc64le" ]; then
+  echo "Saving chrony worker yaml config..."
+  cat >> ${SHARED_DIR}/99-chrony-worker.yaml << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-chrony-worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,c2VydmVyIGNsb2NrLmNvcnAucmVkaGF0LmNvbSBpYnVyc3QKZHJpZnRmaWxlIC92YXIvbGliL2Nocm9ueS9kcmlmdAptYWtlc3RlcCAxLjAgMwpydGNzeW5jCmxvZ2RpciAvdmFyL2xvZy9jaHJvbnkK
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/chrony.conf
+EOF
+
+  echo "Saving chrony master yaml config..."
+  cat >> ${SHARED_DIR}/99-chrony-master.yaml << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 99-chrony-master
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,c2VydmVyIGNsb2NrLmNvcnAucmVkaGF0LmNvbSBpYnVyc3QKZHJpZnRmaWxlIC92YXIvbGliL2Nocm9ueS9kcmlmdAptYWtlc3RlcCAxLjAgMwpydGNzeW5jCmxvZ2RpciAvdmFyL2xvZy9jaHJvbnkK
+        filesystem: root
+        mode: 420
+        overwrite: true
+        path: /etc/chrony.conf
+EOF
+elif [ "${ARCH}" = "s390x" ]; then
+  # RHCOS 10 KVM guests use a broken PHC refclock and cannot reach
+  # clock.corp.redhat.com. LPARs already allow 192.168.0.0/16; point chrony
+  # at this lease's libvirt gateway plus known VPN subnets as fallbacks.
+  s390x_gateway="192.168.$(leaseLookup subnet).1"
+  echo "Saving chrony config for s390x using LPAR gateway ${s390x_gateway}..."
+  chrony_b64="$(base64 -w0 <<EOF
+server ${s390x_gateway} iburst
+server 192.168.1.1 iburst
+server 192.168.2.1 iburst
+server 192.168.3.1 iburst
+server 192.168.126.1 iburst
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
+logdir /var/log/chrony
+EOF
+)"
   echo "Saving chrony worker yaml config..."
   cat > "${SHARED_DIR}/99-chrony-worker.yaml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
@@ -173,27 +233,4 @@ spec:
         overwrite: true
         path: /etc/chrony.conf
 EOF
-}
-
-# ppc64le: clock.corp.redhat.com (MULTIARCH-5766).
-# s390x: RHCOS 10 KVM guests use a broken PHC refclock and cannot reach
-# clock.corp.redhat.com. LPARs already allow 192.168.0.0/16, so point chrony
-# at this lease's libvirt gateway (plus known VPN subnets as fallbacks).
-if [ "${ARCH}" = "ppc64le" ]; then
-  write_chrony_machineconfigs "c2VydmVyIGNsb2NrLmNvcnAucmVkaGF0LmNvbSBpYnVyc3QKZHJpZnRmaWxlIC92YXIvbGliL2Nocm9ueS9kcmlmdAptYWtlc3RlcCAxLjAgMwpydGNzeW5jCmxvZ2RpciAvdmFyL2xvZy9jaHJvbnkK"
-elif [ "${ARCH}" = "s390x" ]; then
-  s390x_gateway="192.168.$(leaseLookup subnet).1"
-  echo "Saving chrony config for s390x using LPAR gateway ${s390x_gateway}..."
-  write_chrony_machineconfigs "$(base64 -w0 <<EOF
-server ${s390x_gateway} iburst
-server 192.168.1.1 iburst
-server 192.168.2.1 iburst
-server 192.168.3.1 iburst
-server 192.168.126.1 iburst
-driftfile /var/lib/chrony/drift
-makestep 1.0 3
-rtcsync
-logdir /var/log/chrony
-EOF
-)"
 fi
