@@ -126,9 +126,9 @@ spec:
 EOF
 fi
 
-# Add the chrony config for ppc64le
+# Add the chrony config for ppc64le and s390x
 # setting it to clock.corp.redhat.com
-if [ ${ARCH} = "ppc64le" ]; then
+if [ "${ARCH}" = "ppc64le" ] || [ "${ARCH}" = "s390x" ]; then
   echo "Saving chrony worker yaml config..."
   cat >> ${SHARED_DIR}/99-chrony-worker.yaml << EOF
 apiVersion: machineconfiguration.openshift.io/v1
