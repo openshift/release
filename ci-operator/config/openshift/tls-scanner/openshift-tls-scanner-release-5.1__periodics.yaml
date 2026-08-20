@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: base-rhel9
   dev-scripts:
@@ -25,17 +25,18 @@ images:
     to: tls-scanner-tool
 promotion:
   to:
-  - name: "5.0"
+  - disabled: true
+    name: "5.1"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -50,35 +51,18 @@ resources:
       cpu: "4"
       memory: 4Gi
 tests:
-- as: unit
-  commands: make test
-  container:
-    from: src
-- as: default-tls
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.22"
-  optional: true
-  steps:
-    test:
-    - ref: tls-scanner-run
-    workflow: generic-claim
-- as: default-pqc-readiness
-  optional: true
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
-      PQC_CHECK: "true"
-    test:
-    - ref: tls-scanner-run
-    workflow: ipi-aws
-- as: tls13-adherence
-  optional: true
+- as: periodic-tls13-adherence
+  interval: 24h
+  reporter_config:
+    channel: '#forum-case'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :warning:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -89,8 +73,18 @@ tests:
     test:
     - ref: tls-scanner-run
     workflow: openshift-e2e-aws-ovn-tls-13
-- as: tls13-adherence-gcp
-  optional: true
+- as: periodic-tls13-adherence-gcp
+  interval: 24h
+  reporter_config:
+    channel: '#forum-case'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :warning:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -102,8 +96,18 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: openshift-e2e-gcp-ovn
-- as: tls13-adherence-azure
-  optional: true
+- as: periodic-tls13-adherence-azure
+  interval: 24h
+  reporter_config:
+    channel: '#forum-case'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :warning:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -115,8 +119,18 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: openshift-e2e-azure-ovn
-- as: tls13-adherence-metal
-  optional: true
+- as: periodic-tls13-adherence-metal
+  interval: 24h
+  reporter_config:
+    channel: '#forum-case'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :warning:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -134,17 +148,8 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: baremetalds-e2e
-- as: tls13-pqc-readiness
-  optional: true
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
-      PQC_CHECK: "true"
-    test:
-    - ref: tls-scanner-run
-    workflow: openshift-e2e-aws-ovn-tls-13
 zz_generated_metadata:
-  branch: release-5.0
+  branch: release-5.1
   org: openshift
   repo: tls-scanner
+  variant: periodics
