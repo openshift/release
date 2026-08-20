@@ -15,7 +15,13 @@ if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
 fi
 gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet
 
-# Read cluster info from SHARED_DIR
+# Read cluster info from SHARED_DIR (written by tf-provision)
+# If provision didn't complete, these files won't exist — nothing to clean up.
+if [[ ! -f "${SHARED_DIR}/region-project-id" ]]; then
+  echo "No region-project-id in SHARED_DIR — provision likely didn't complete. Nothing to clean up."
+  exit 0
+fi
+
 REGION_PROJECT=$(<"${SHARED_DIR}/region-project-id")
 REGION_CLUSTER_NAME=$(<"${SHARED_DIR}/region-cluster-name")
 MC_PROJECT=$(<"${SHARED_DIR}/mc-project-id")
