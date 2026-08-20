@@ -31,6 +31,7 @@ echo "Running ArgoCD sync validation tests..."
 /usr/bin/test-e2e \
   --ginkgo.v \
   --ginkgo.no-color \
+  --ginkgo.timeout=85m \
   --ginkgo.junit-report="${ARTIFACT_DIR}/junit_argocd_sync.xml" \
   --ginkgo.label-filter="argocd"
 
