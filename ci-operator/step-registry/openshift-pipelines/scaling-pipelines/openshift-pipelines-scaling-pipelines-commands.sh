@@ -65,11 +65,59 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     git checkout -b "pr-${PULL_NUMBER}" FETCH_HEAD
 fi
 
-# Collect load test results at the end
-trap './ci-scripts/collect-results.sh; trap EXIT' SIGINT EXIT
-
 # Setup Tekton cluster
 ./ci-scripts/setup-cluster.sh
 
-# Execute load test
-./ci-scripts/load-test.sh
+if [[ -n "${TEST_SCENARIOS:-}" ]]; then
+    # Multi-scenario mode: run multiple parameter combinations on the same cluster.
+    # Format: "total/concurrent/namespace/steps" (space-separated list)
+
+    cleanup_namespaces() {
+        for ns_idx in $(seq 1 "${TEST_NAMESPACE}"); do
+            ns_tag=$([ "$TEST_NAMESPACE" -eq 1 ] && echo "" || echo "$ns_idx")
+            oc delete --cascade=foreground --timeout=30m namespace "benchmark${ns_tag}" 2>/dev/null || true
+        done
+    }
+
+    overall_rc=0
+    for scenario in $TEST_SCENARIOS; do
+        IFS='/' read -r t c n s <<< "$scenario"
+        if [[ -z "$t" || -z "$c" || -z "$n" || -z "$s" ]]; then
+            echo "[ERROR] Malformed scenario '$scenario': expected total/concurrent/namespace/steps"
+            exit 1
+        fi
+        export TEST_TOTAL="$t"
+        export TEST_CONCURRENT="$c"
+        export TEST_NAMESPACE="$n"
+        export TEST_BIGBANG_MULTI_STEP__STEP_COUNT="$s"
+
+        echo "[INFO] Scenario: total=$TEST_TOTAL concurrent=$TEST_CONCURRENT ns=$TEST_NAMESPACE steps=$TEST_BIGBANG_MULTI_STEP__STEP_COUNT"
+
+        run_artifacts="${ARTIFACT_DIR:-artifacts}/run-${TEST_TOTAL}-${TEST_CONCURRENT}-${TEST_NAMESPACE}-${TEST_BIGBANG_MULTI_STEP__STEP_COUNT}"
+        mkdir -p "$run_artifacts"
+
+        rm -f tests/scaling-pipelines/benchmark-tekton.json
+        rm -f tests/scaling-pipelines/benchmark-stats.csv
+        rm -f tests/scaling-pipelines/cluster-benchmark-stats.csv
+        rm -f tests/scaling-pipelines/benchmark-output.json
+        rm -f tests/scaling-pipelines/pipelineruns-stats.csv
+        rm -f tests/scaling-pipelines/taskruns-stats.csv
+
+        scenario_rc=0
+        ./ci-scripts/load-test.sh || scenario_rc=$?
+        ARTIFACT_DIR="$run_artifacts" ./ci-scripts/collect-results.sh || true
+
+        cleanup_namespaces
+        sleep 60
+
+        if (( scenario_rc != 0 )); then
+            echo "[WARN] Scenario $scenario failed (rc=$scenario_rc), continuing..."
+            overall_rc=1
+        fi
+    done
+    exit "$overall_rc"
+else
+    # Single-scenario mode: existing behavior
+    trap './ci-scripts/collect-results.sh; trap EXIT' SIGINT EXIT
+    ./ci-scripts/load-test.sh
+fi
