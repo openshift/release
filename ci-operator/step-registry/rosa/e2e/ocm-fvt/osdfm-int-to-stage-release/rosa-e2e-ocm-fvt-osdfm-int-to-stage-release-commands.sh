@@ -45,15 +45,6 @@ export OSDFM_WEBHOOK_URL
 OSDFM_GITLAB_TOKEN=$(<"${CREDS_DIR}/osdfm_gitlab_token")
 OSDFM_WEBHOOK_URL=$(<"${CREDS_DIR}/osdfm_webhook_url")
 
-# Optional: older osdfm_release.sh still requires a deploy key env/file
-# before it clones. Prow mounts it from osdfm-qe-credentials (not
-# cs-qe-credentials). HTTPS auth below is what actually authenticates
-# git clone; the key is exported so older osdfm_release.sh does not exit early.
-if [[ -f "${CREDS_DIR}/osdfm_github_deploy_key" ]]; then
-  export OSDFM_GITHUB_DEPLOY_KEY
-  OSDFM_GITHUB_DEPLOY_KEY=$(<"${CREDS_DIR}/osdfm_github_deploy_key")
-fi
-
 # rosa-e2e jobs are public, so ci-operator does not auto-mount the private
 # git-cloner token. Rehearsal showed url.insteadOf with the token as the
 # HTTPS username never rewrote the remote (git still prompted for a
