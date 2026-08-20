@@ -1,6 +1,6 @@
 
 chain:
-  as: redhat-chaos-krkn-hub-tests
+  as: redhat-chaos-krkn-hub-cr-tests
   env:
   - name: ENABLE_ALERTS
     default: "True"
@@ -45,8 +45,12 @@ chain:
   - name: CD_V2_EXTRA_FLAGS
     default: ""
   steps:
-  - chain: redhat-chaos-krkn-hub-cr-tests
-  - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
-  
+  - ref: openshift-qe-cluster-density-v2
+  - ref: redhat-chaos-observer-start
+  - chain: redhat-chaos-krkn-hub-etcd-tests
+  - chain: redhat-chaos-krkn-hub-console-tests
+  - chain: redhat-chaos-krkn-hub-ovn-disruption
+  - chain: redhat-chaos-krkn-hub-prometheus-tests
+  - ref: redhat-chaos-pod-scenarios-kube-apiserver-disruption
   documentation: |-
     This workflow executes chaos scenarios to ensure OpenShift is resilient and performant.
