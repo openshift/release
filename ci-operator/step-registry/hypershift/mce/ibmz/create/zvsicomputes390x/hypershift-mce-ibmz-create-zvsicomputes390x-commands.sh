@@ -473,6 +473,19 @@ for i in $(seq 1 "$HUB_COMPUTE_COUNT"); do
   echo "   server ${MGMT_CLUSTER_NAME}-compute-${i} ${HUB_COMPUTE_RIPS[$index]}:${API_NODEPORT}" >> haproxy.cfg
 done
 
+# Agents receive the ignition URL as https://api.<domain>:<API_NODEPORT>/ignition from
+# assisted-service. They resolve api.* to BASTION_RIP via the IBM Cloud private DNS zone,
+# then connect to BASTION_RIP:API_NODEPORT. The :6443 frontend above only handles external
+# tooling — it does NOT cover the NodePort that agents actually dial. This frontend closes
+# that gap: it binds the exact NodePort on the bastion so agents can reach the HCP API.
+cat <<HAPROXY_CFG >> haproxy.cfg
+frontend hcp-api-nodeport
+    mode tcp
+    option tcplog
+    bind ${BASTION_RIP}:${API_NODEPORT}
+    default_backend hub-api-server-nodeport
+HAPROXY_CFG
+
 cat <<HAPROXY_CFG >> haproxy.cfg
 frontend hcp-http
     mode tcp
