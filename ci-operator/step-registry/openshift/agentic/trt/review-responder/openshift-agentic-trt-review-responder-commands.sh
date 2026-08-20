@@ -89,6 +89,12 @@ DISALLOWED_TOOLS=(
     "Bash(cat*gh-upstream-token*)"
     "Bash(cat*google-token*)"
     "Bash(git push*)"
+    "Read(/var/run/github-token/**)"
+    "Read(/var/run/claude-code-service-account/**)"
+    "Grep(/var/run/github-token/**)"
+    "Grep(/var/run/claude-code-service-account/**)"
+    "Glob(/var/run/github-token/**)"
+    "Glob(/var/run/claude-code-service-account/**)"
 )
 
 # --- Assemble system prompt: CI extras + skill + repo-specific config ---
@@ -183,7 +189,7 @@ echo "# Gate Process" >> "${GATE_PROMPT}"
 echo "" >> "${GATE_PROMPT}"
 sed -e "s|\${CLAUDE_SKILL_DIR}|${GATE_SKILL_DIR}|g" \
     -e 's/\$1/'"${PR_NUM}"'/g' \
-    -e 's/\$2/'"${UPSTREAM_REPO}"'/g' \
+    -e 's|\$2|'"${UPSTREAM_REPO}"'|g' \
     "${GATE_SKILL}" >> "${GATE_PROMPT}"
 
 # --- Poll: small-model gate, then worker ---
@@ -203,6 +209,9 @@ except json.JSONDecodeError:
     sys.exit(1)
 if not isinstance(obj, list):
     sys.exit(1)
+for entry in obj:
+    if not isinstance(entry, dict) or not all(k in entry for k in ("name", "state", "bucket")):
+        sys.exit(1)
 print(json.dumps(obj, separators=(",", ":")))
 ' "$1"
 }
@@ -210,6 +219,10 @@ print(json.dumps(obj, separators=(",", ":")))
 iteration=0
 idle_streak=0
 PREV_FAILING='[]'
+GATE_FAILURE_THRESHOLD="${GATE_FAILURE_THRESHOLD:-3}"
+PUSH_FAILURE_THRESHOLD="${PUSH_FAILURE_THRESHOLD:-3}"
+gate_failures=0
+push_failures=0
 
 while true; do
     iteration=$(( iteration + 1 ))
@@ -222,6 +235,7 @@ while true; do
 
         echo "Running gate (${GATE_MODEL})..."
         GATE_LOG="${WORKDIR}/artifacts/gate-${iteration}.log"
+        set +e
         timeout 120 claude \
             --model "${GATE_MODEL}" \
             --allowedTools "Bash" \
@@ -233,10 +247,25 @@ while true; do
 
 Our GitHub login is ${BOT_LOGIN}. Ignore comments from this login.
 Previous FAILING_CHECKS JSON array: ${PREV_FAILING}" \
-            --verbose 2>&1 | tee "${GATE_LOG}" || true
+            --verbose 2>&1 | tee "${GATE_LOG}"
+        gate_rc=${PIPESTATUS[0]}
+        set -e
+        echo "Gate exit status: ${gate_rc}"
         cat "${GATE_LOG}" >> "${WORKDIR}/artifacts/claude-output.log" 2>/dev/null || true
 
-        decision=$(grep -Eo 'WORK=(yes|no)' "${GATE_LOG}" | tail -1 || true)
+        if [[ "${gate_rc}" -ne 0 ]]; then
+            gate_failures=$(( gate_failures + 1 ))
+            echo "Gate failed (${gate_failures}/${GATE_FAILURE_THRESHOLD})"
+            if [[ "${gate_failures}" -ge "${GATE_FAILURE_THRESHOLD}" ]]; then
+                echo "ERROR: gate failed ${gate_failures} consecutive times; giving up"
+                exit 1
+            fi
+            has_work=false
+            continue
+        fi
+        gate_failures=0
+
+        decision=$(grep -Eo '^WORK=(yes|no)' "${GATE_LOG}" | tail -1 || true)
         if extracted=$(extract_failing_checks "${GATE_LOG}"); then
             PREV_FAILING="${extracted}"
         fi
@@ -269,8 +298,21 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
         BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "")
         if [[ -n "${BRANCH_NAME}" ]]; then
             echo "Pushing ${BRANCH_NAME}..."
-            git push fork "${BRANCH_NAME}" || git push origin "${BRANCH_NAME}" || \
-                echo "Warning: failed to push ${BRANCH_NAME}"
+            if git push fork "${BRANCH_NAME}"; then
+                push_failures=0
+            else
+                echo "ERROR: git push fork ${BRANCH_NAME} failed"
+                if git push origin "${BRANCH_NAME}"; then
+                    push_failures=0
+                else
+                    echo "ERROR: git push origin ${BRANCH_NAME} failed"
+                    push_failures=$(( push_failures + 1 ))
+                    if [[ "${push_failures}" -ge "${PUSH_FAILURE_THRESHOLD}" ]]; then
+                        echo "ERROR: push failed ${push_failures} consecutive times; giving up"
+                        exit 1
+                    fi
+                fi
+            fi
         fi
 
         if [[ "${EVAL_MODE:-}" == "true" ]]; then
