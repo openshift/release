@@ -56,13 +56,26 @@ tests:
       commands: |
         set -euo pipefail
         NS=koku-service-operator-system
+        scrub() {
+          sed -E \
+            -e 's#(https?|postgres(ql)?|mysql|mariadb|kafka|amqp|amqps|redis|rediss|mongodb|mongo|s3|ftp|ftps|grpc)://[^[:space:]"'\''<>\\]+#<redacted-url>#g' \
+            -e 's#[A-Za-z0-9._-]+\.(svc|cluster\.local|internal)[^[:space:]"'\'']*#<redacted-host>#g' \
+            -e 's#(Bearer[[:space:]]+)[^[:space:]]+#\1<redacted>#g' \
+            -e 's#eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}#<redacted-jwt>#g' \
+            -e 's#AKIA[0-9A-Z]{16}#<redacted-aws-key>#g' \
+            -e 's#((password|passwd|token|secret|api[_-]?key|access[_-]?key|private[_-]?key|credentials?|authorization)["'\'']?[[:space:]]*[=:][[:space:]]*)[^[:space:]"'\'',;}]+#\1<redacted>#Ig' \
+            -e 's#^([[:space:]]*value:[[:space:]]*).+#\1<redacted>#'
+        }
+        write_artifact() {
+          scrub > "$1" || true
+        }
         dump() {
           mkdir -p "${ARTIFACT_DIR}"
-          oc -n "${NS}" logs deploy/koku-service-operator-controller-manager > "${ARTIFACT_DIR}/operator.log" 2>/dev/null || true
-          oc -n "${NS}" get csv,deploy,po,event -o yaml > "${ARTIFACT_DIR}/olm-resources.yaml" 2>/dev/null || true
-          oc get csv -A -o yaml > "${ARTIFACT_DIR}/csv.yaml" 2>/dev/null || true
-          oc get cmsc -A -o yaml > "${ARTIFACT_DIR}/cmsc.yaml" 2>/dev/null || true
-          oc -n "${NS}" get events --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/events.txt" 2>/dev/null || true
+          oc -n "${NS}" logs deploy/koku-service-operator-controller-manager 2>/dev/null | write_artifact "${ARTIFACT_DIR}/operator.log" || true
+          oc -n "${NS}" get csv,deploy -o yaml 2>/dev/null | write_artifact "${ARTIFACT_DIR}/olm-resources.yaml" || true
+          oc -n "${NS}" get po,event 2>/dev/null | write_artifact "${ARTIFACT_DIR}/olm-resources.txt" || true
+          oc get csv -A -o yaml 2>/dev/null | write_artifact "${ARTIFACT_DIR}/csv.yaml" || true
+          oc -n "${NS}" get events --sort-by=.lastTimestamp 2>/dev/null | write_artifact "${ARTIFACT_DIR}/events.txt" || true
         }
         trap dump EXIT
         oc create namespace "${NS}" --dry-run=client -o yaml | oc apply -f -
