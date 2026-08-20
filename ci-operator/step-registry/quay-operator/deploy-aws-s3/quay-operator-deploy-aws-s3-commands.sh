@@ -25,12 +25,44 @@ function archive_pod_info() {
   oc get pods -n "${ns}" -o yaml > "${ARTIFACT_DIR}/pods_full.yaml" 2>&1 || true
   mkdir -p "${ARTIFACT_DIR}/pod_logs"
   while read -r pod; do
-    containers=$(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null || true)
+    [[ -z "${pod}" ]] && continue
+    containers=$(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.initContainers[*].name} {.spec.containers[*].name}' 2>/dev/null || true)
     for container in ${containers}; do
       oc logs "${pod}" -n "${ns}" -c "${container}" > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}.log" 2>&1 || true
       oc logs "${pod}" -n "${ns}" -c "${container}" --previous > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}_previous.log" 2>&1 || true
     done
   done < <(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n')
+}
+
+function print_quayregistry_conditions() {
+  local ns="${QUAY_NS}"
+  if command -v jq >/dev/null 2>&1; then
+    oc -n "${ns}" get quayregistry quay -o json 2>/dev/null \
+      | jq -r '.status.conditions[]? | "\(.type)=\(.status) reason=\(.reason // "") msg=\(.message // "")"' >&2 || true
+  else
+    oc -n "${ns}" get quayregistry quay -o yaml 2>/dev/null >&2 || true
+  fi
+}
+
+function print_failing_pod_logs() {
+  local ns="${QUAY_NS}"
+  local name ready status restarts age
+  while read -r name ready status restarts age; do
+    [[ -z "${name}" ]] && continue
+    case "${status}" in
+      CrashLoopBackOff|Error|ErrImagePull|ImagePullBackOff|CreateContainerConfigError|CreateContainerError|OOMKilled|Init:CrashLoopBackOff|Init:Error|Failed) ;;
+      *) continue ;;
+    esac
+    echo "===== ${name} status=${status} restarts=${restarts} =====" >&2
+    local containers
+    containers=$(oc get pod "${name}" -n "${ns}" -o jsonpath='{.spec.initContainers[*].name} {.spec.containers[*].name}' 2>/dev/null || true)
+    for container in ${containers}; do
+      echo "----- ${name}/${container} (tail 80) -----" >&2
+      oc logs "${name}" -n "${ns}" -c "${container}" --tail=80 2>&1 || true
+      echo "----- ${name}/${container} previous (tail 40) -----" >&2
+      oc logs "${name}" -n "${ns}" -c "${container}" --previous --tail=40 2>&1 || true
+    done
+  done < <(oc get pods -n "${ns}" --no-headers 2>/dev/null || true)
 }
 
 #Get the credentials and Email of new Quay User
@@ -307,7 +339,7 @@ spec:
   - kind: monitoring
     managed: false
   - kind: horizontalpodautoscaler
-    managed: true
+    managed: false
   - kind: quay
     managed: true
   - kind: mirror
@@ -335,16 +367,17 @@ for i in $(seq 1 90); do
   fi
   if (( i % 6 == 0 )); then
     echo "[$((i * 10))s] Quay not ready yet. Component status:" >&2
-    oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{range .status.conditions[*]}{.type}: {.status} ({.reason}) {.message}{"\n"}{end}' 2>/dev/null >&2 || true
+    print_quayregistry_conditions
   fi
   sleep 10
 done
 
 echo "Timed out waiting for Quay to become ready" >&2
 echo "Final QuayRegistry conditions:" >&2
-oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{range .status.conditions[*]}{.type}: {.status} ({.reason}) {.message}{"\n"}{end}' 2>/dev/null >&2 || true
+print_quayregistry_conditions
 echo "Pods in ${QUAY_NS} namespace:" >&2
 oc -n "${QUAY_NS}" get pods -o wide >&2 || true
+print_failing_pod_logs
 echo "Events in ${QUAY_NS} namespace:" >&2
 oc -n "${QUAY_NS}" get events --sort-by='.lastTimestamp' >&2 || true
 
