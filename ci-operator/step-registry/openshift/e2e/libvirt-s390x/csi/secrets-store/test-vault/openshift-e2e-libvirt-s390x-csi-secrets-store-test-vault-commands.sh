@@ -5,10 +5,14 @@
 #
 # Assumptions:
 #   - setup-fbc-operator step has already been run successfully
-#   - Vault credentials are mounted from vault at /var/run/vault/secrets-store-csi
+#   - Vault credentials are mounted at /etc/hypershift-agent-ibmz-credentials
 # ==============================================================================
 
 set -euo pipefail
+
+# Setup unprivileged tool installation path
+export PATH="/tmp/bin:${PATH}"
+mkdir -p /tmp/bin
 
 # --- Configuration ---
 VAULT_CREDS_DIR="/etc/hypershift-agent-ibmz-credentials"
@@ -19,7 +23,7 @@ VAULT_NAMESPACE="vault"
 
 # Repo
 REPO_URL="https://github.com/openshift/secrets-store-csi-driver"
-REPO_DIR="${SHARED_DIR}/secrets-store-csi-driver"
+REPO_DIR="/tmp/secrets-store-csi-driver"
 
 # Image replacement — old image in test yamls → new s390x image
 OLD_BUSYBOX_IMAGE="registry.k8s.io/e2e-test-images/busybox:1.29-4"
@@ -36,13 +40,6 @@ BUSYBOX_YAML_FILES=(
 
 # vault.bats patch
 BATS_FILE="test/bats/vault.bats"
-
-# Helm / Vault config
-VAULT_HELM_RELEASE="vault"
-VAULT_HELM_REPO="https://helm.releases.hashicorp.com"
-
-# Timeouts
-VAULT_READY_TIMEOUT=300   # seconds
 
 # --- Helper ---
 section() {
@@ -70,41 +67,64 @@ check_arch_and_deps() {
     echo
     echo "Checking and installing required tools..."
 
-    # --- dnf-installable ---
-    for pkg in git curl jq tar; do
-        if ! command -v "${pkg}" &>/dev/null; then
-            echo "Installing ${pkg} via dnf..."
-            sudo dnf install -y "${pkg}" || {
-                echo "ERROR: Failed to install ${pkg}."
-                exit 1
-            }
-        else
-            echo "  [OK] ${pkg}"
+    # Verify tools already present in cli image
+    for tool in oc curl tar git; do
+        if ! command -v "${tool}" &>/dev/null; then
+            echo "ERROR: Required tool '${tool}' not found in PATH."
+            exit 1
         fi
+        echo "  [OK] ${tool}"
     done
 
-    # --- bats: install from source ---
-    if ! command -v bats &>/dev/null; then
-        echo "Installing bats (Bash Automated Testing System)..."
-        BATS_TMP=$(mktemp -d)
-        git clone https://github.com/bats-core/bats-core.git "${BATS_TMP}/bats-core"
-        sudo bash "${BATS_TMP}/bats-core/install.sh" /usr/local
-        rm -rf "${BATS_TMP}"
-        echo "  [OK] bats $(bats --version)"
+    # Install jq to /tmp/bin if not present
+    if ! command -v jq &>/dev/null; then
+        echo "Installing jq (amd64 for build farm pod)..."
+        JQ_VERSION="1.7.1"
+        JQ_URL="https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64"
+        curl -fsSL "${JQ_URL}" -o /tmp/bin/jq || {
+            echo "ERROR: Failed to download jq from ${JQ_URL}."
+            exit 1
+        }
+        chmod +x /tmp/bin/jq
+        echo "  [OK] jq $(jq --version)"
     else
-        echo "  [OK] bats ($(bats --version))"
+        echo "  [OK] jq $(jq --version)"
     fi
 
-    # --- helm: download s390x binary ---
-    if ! command -v helm &>/dev/null; then
-        echo "Installing helm (s390x)..."
-        curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4
-        chmod 700 get_helm.sh
-        ./get_helm.sh
-        rm -rf ./get_helm.sh
-        echo "  [OK] helm ($(helm version --short))"
+    # Install bats to /tmp/bin if not present
+    if ! command -v bats &>/dev/null; then
+        echo "Installing bats (Bash Automated Testing System)..."
+        BATS_VERSION="1.11.0"
+        BATS_URL="https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz"
+        curl -fsSL "${BATS_URL}" -o /tmp/bats.tar.gz || {
+            echo "ERROR: Failed to download bats from ${BATS_URL}."
+            exit 1
+        }
+        tar -xzf /tmp/bats.tar.gz -C /tmp
+        bash /tmp/bats-core-${BATS_VERSION}/install.sh /tmp/bin
+        rm -rf /tmp/bats.tar.gz /tmp/bats-core-${BATS_VERSION}
+        echo "  [OK] bats $(bats --version)"
     else
-        echo "  [OK] helm ($(helm version --short))"
+        echo "  [OK] bats $(bats --version)"
+    fi
+
+    # Install helm to /tmp/bin if not present
+    if ! command -v helm &>/dev/null; then
+        echo "Installing helm (amd64 for build farm pod)..."
+        HELM_VERSION="3.16.4"
+        HELM_TARBALL="helm-v${HELM_VERSION}-linux-amd64.tar.gz"
+        HELM_URL="https://get.helm.sh/${HELM_TARBALL}"
+        curl -fsSL "${HELM_URL}" -o /tmp/helm.tar.gz || {
+            echo "ERROR: Failed to download helm from ${HELM_URL}."
+            exit 1
+        }
+        tar -xzf /tmp/helm.tar.gz -C /tmp
+        mv /tmp/linux-amd64/helm /tmp/bin/helm
+        chmod +x /tmp/bin/helm
+        rm -rf /tmp/helm.tar.gz /tmp/linux-amd64
+        echo "  [OK] helm $(helm version --short)"
+    else
+        echo "  [OK] helm $(helm version --short)"
     fi
 
     echo
@@ -156,6 +176,9 @@ clone_repo() {
     else
         echo "Cloning from ${REPO_URL}..."
         git clone "${REPO_URL}" "${REPO_DIR}"
+        cd "${REPO_DIR}"
+        echo "Checking out branch for release ${BRANCH}..."
+        git checkout "release-${BRANCH}" || git checkout main
     fi
 
     echo "Repository ready at: ${REPO_DIR}"
