@@ -8,6 +8,10 @@
 
 set -euo pipefail
 
+# Setup unprivileged tool installation path
+export PATH="/tmp/bin:${PATH}"
+mkdir -p /tmp/bin
+
 # --- Configuration ---
 # Check if TEST_GA_BUILD is set to true (case-insensitive)
 TEST_GA_BUILD="${TEST_GA_BUILD:-false}"
@@ -68,38 +72,47 @@ check_arch_and_deps() {
     echo
     echo "Checking required tools..."
 
-    # --- dnf-installable packages ---
-    for pkg in jq podman curl tar; do
-        if ! command -v "${pkg}" &>/dev/null; then
-            echo "Installing ${pkg} via dnf..."
-            sudo dnf install -y "${pkg}" || {
-                echo "ERROR: Failed to install ${pkg}."
-                exit 1
-            }
-        else
-            echo "  [OK] ${pkg}"
+    # Verify tools already present in cli image
+    for tool in oc podman curl tar; do
+        if ! command -v "${tool}" &>/dev/null; then
+            echo "ERROR: Required tool '${tool}' not found in PATH."
+            exit 1
         fi
+        echo "  [OK] ${tool}"
     done
 
-    # --- oras: download s390x binary from GitHub releases if not present ---
-    if ! command -v oras &>/dev/null; then
-        echo "Installing oras (s390x)..."
-        ORAS_VERSION="1.3.1"
-        ORAS_TMP=$(mktemp -d)
-        ORAS_TARBALL="oras_${ORAS_VERSION}_linux_s390x.tar.gz"
-        ORAS_URL="https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/${ORAS_TARBALL}"
-        echo "   Downloading: ${ORAS_URL}"
-        curl -fsSL "${ORAS_URL}" -o "${ORAS_TMP}/${ORAS_TARBALL}" || {
-            echo "ERROR: Failed to download oras from ${ORAS_URL}."
-            rm -rf "${ORAS_TMP}"
+    # Install jq to /tmp/bin if not present
+    if ! command -v jq &>/dev/null; then
+        echo "Installing jq (amd64 for build farm pod)..."
+        JQ_VERSION="1.7.1"
+        JQ_URL="https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64"
+        curl -fsSL "${JQ_URL}" -o /tmp/bin/jq || {
+            echo "ERROR: Failed to download jq from ${JQ_URL}."
             exit 1
         }
-        tar -xzf "${ORAS_TMP}/${ORAS_TARBALL}" -C "${ORAS_TMP}"
-        sudo install -m 0755 "${ORAS_TMP}/oras" /usr/local/bin/oras
-        rm -rf "${ORAS_TMP}"
-        echo "  [OK] oras $(oras version | head -n1)"
+        chmod +x /tmp/bin/jq
+        echo "  [OK] jq $(jq --version)"
     else
-        echo "  [OK] oras ($(oras version | head -n1))"
+        echo "  [OK] jq $(jq --version)"
+    fi
+
+    # Install oras to /tmp/bin if not present
+    if ! command -v oras &>/dev/null; then
+        echo "Installing oras (amd64 for build farm pod)..."
+        ORAS_VERSION="1.3.1"
+        ORAS_TARBALL="oras_${ORAS_VERSION}_linux_amd64.tar.gz"
+        ORAS_URL="https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/${ORAS_TARBALL}"
+        echo "   Downloading: ${ORAS_URL}"
+        curl -fsSL "${ORAS_URL}" -o /tmp/oras.tar.gz || {
+            echo "ERROR: Failed to download oras from ${ORAS_URL}."
+            exit 1
+        }
+        tar -xzf /tmp/oras.tar.gz -C /tmp/bin oras
+        chmod +x /tmp/bin/oras
+        rm -f /tmp/oras.tar.gz
+        echo "  [OK] oras version: $(oras version 2>/dev/null || echo 'unknown')"
+    else
+        echo "  [OK] oras version: $(oras version 2>/dev/null || echo 'unknown')"
     fi
 
     echo
@@ -282,6 +295,12 @@ generate_and_apply_idms() {
         jq -r '.[]' "${RELATED_IMAGES_FILE}" | sed 's/@sha256:[a-f0-9]*//'
     )
 
+    if [ -z "${IMAGE_LIST[*]}" ]; then
+        echo "ERROR: No related images found via oras discover."
+        echo "       Cannot generate IDMS. Exiting."
+        exit 1
+    fi
+
     if [ ${#IMAGE_LIST[@]} -eq 0 ]; then
         echo "WARNING: No images found in related-images.json."
     else
@@ -323,9 +342,9 @@ wait_for_catalog_source() {
         return 0
     fi
 
-    section "STEP 6: Waiting for CatalogSource '${FBC_CATALOG_NAME}' to become READY"
+section "STEP 6: Waiting for CatalogSource '${FBC_CATALOG_NAME}' to become READY"
 
-    local timeout=120
+    local timeout=600
     local elapsed=0
     local interval=10
 
@@ -361,6 +380,18 @@ wait_for_mcp_rollout() {
     section "STEP 7: Waiting for MachineConfigPool Rollout (triggered by IDMS)"
 
     echo "IDMS changes trigger a MachineConfig update which reboots nodes."
+    
+    echo "Waiting for MCP rollout to begin..."
+    for i in $(seq 1 60); do
+        MC=$(oc get mcp worker -o jsonpath='{.status.machineCount}' 2>/dev/null || echo "0")
+        UMC=$(oc get mcp worker -o jsonpath='{.status.updatedMachineCount}' 2>/dev/null || echo "0")
+        if [ "${MC}" != "${UMC}" ]; then
+            echo "MCP rollout started (${UMC}/${MC} updated)"
+            break
+        fi
+        sleep 10
+    done
+
     echo "Waiting for all MCPs to finish updating..."
 
     local timeout=900   # 15 min
@@ -514,36 +545,16 @@ EOF
 verify_pods() {
     section "STEP 11: Verifying Operator and Operand Pods"
 
-    local timeout=300
-    local elapsed=0
-    local interval=15
+    echo "Waiting for secrets-store-csi-driver-operator Deployment..."
+    oc rollout status deployment/secrets-store-csi-driver-operator \
+        -n "${OPERATOR_NAMESPACE}" --timeout=300s
 
-    echo "Waiting for secrets-store pods to be Running..."
+    echo "Waiting for secrets-store-csi-driver DaemonSet rollout..."
+    oc rollout status daemonset/secrets-store-csi-driver \
+        -n "${OPERATOR_NAMESPACE}" --timeout=300s
 
-    while [ ${elapsed} -lt ${timeout} ]; do
-        NOT_RUNNING=$(oc get pods -n "${OPERATOR_NAMESPACE}" \
-            --no-headers 2>/dev/null \
-            | grep -i secrets \
-            | grep -cv 'Running' || true)
-
-        RUNNING=$(oc get pods -n "${OPERATOR_NAMESPACE}" \
-            --no-headers 2>/dev/null \
-            | grep -i secrets \
-            | grep -c 'Running' || true)
-
-        if [ "${RUNNING}" -gt 0 ] && [ "${NOT_RUNNING}" -eq 0 ]; then
-            echo "  All secrets-store pods are Running:"
-            oc get pods -n "${OPERATOR_NAMESPACE}" | grep -i secrets
-            return 0
-        fi
-
-        echo "  Running: ${RUNNING}  Not yet Running: ${NOT_RUNNING} — waiting..."
-        sleep ${interval}
-        elapsed=$(( elapsed + interval ))
-    done
-
-    echo "WARNING: Not all pods reached Running state within ${timeout}s."
-    oc get pods -n "${OPERATOR_NAMESPACE}" | grep -i secrets || true
+    echo "All secrets-store pods are ready:"
+    oc get pods -n "${OPERATOR_NAMESPACE}" | grep -i secrets
 }
 
 # ==============================================================================
