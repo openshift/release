@@ -7,18 +7,25 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.24-linux
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 build_root:
   from_repository: true
 images:
   items:
   - dockerfile_path: Dockerfile
     from: base
-    to: insights-client
+    inputs:
+      stolostron_builder_go1.25-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+    to: search-collector
 promotion:
   to:
-  - name: "5.1"
-    namespace: stolostron
-  - name: "5.2"
+  - disabled: true
+    name: "5.2"
     namespace: stolostron
 resources:
   '*':
@@ -26,7 +33,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
+  container:
+    from: src
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-collector
+    env:
+      IMAGE_REPO: search-collector
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: test-on-kind-cluster
   steps:
     env:
       AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
@@ -46,42 +66,48 @@ tests:
         set +o pipefail
       dependencies:
       - env: COMPONENT_IMAGE_REF
-        name: insights-client
+        name: search-collector
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-kind
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: insights-client
-    env:
-      IMAGE_REPO: insights-client
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: git-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-5.1
-    workflow: ocm-ci-fastforward
-- as: lint
-  commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
-  container:
-    from: src
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow unit-test
   container:
     from: src
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-collector
+    env:
+      IMAGE_REPO: search-collector
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
-    go clean -cache -modcache
+    export DEPLOYED_IN_HUB=true
+    export SONAR_GO_TEST_ARGS="./... -coverpkg=./..."
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
@@ -91,7 +117,8 @@ tests:
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
-    go clean -cache -modcache
+    export DEPLOYED_IN_HUB=true
+    export SONAR_GO_TEST_ARGS="./... -coverpkg=./..."
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
@@ -100,6 +127,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-5.2
   org: stolostron
-  repo: insights-client
+  repo: search-collector
