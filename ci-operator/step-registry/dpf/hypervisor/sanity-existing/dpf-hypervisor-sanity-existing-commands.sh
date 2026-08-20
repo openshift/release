@@ -4,13 +4,13 @@ set -euo pipefail
 CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
 
 # Configuration
-REMOTE_HOST=$(cat /var/run/dpf-ci/remote-host)
+REMOTE_HOST=$(cat ${CLUSTER_PROFILE_DIR}/remote-host)
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
 # Prepare SSH key from Vault (add trailing newline if missing)
 echo "Configuring SSH private key..."
-cat /var/run/dpf-ci/private-key | base64 -d > /tmp/id_rsa
+cat ${CLUSTER_PROFILE_DIR}/private-key | base64 -d > /tmp/id_rsa
 echo "" >> /tmp/id_rsa
 chmod 600 /tmp/id_rsa
 

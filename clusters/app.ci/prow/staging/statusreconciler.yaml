@@ -24,14 +24,14 @@ spec:
         args:
         - --repo=https://github.com/Prucek/release-staging.git
         - --ref=main
-        - --root=/etc/jobs/git-synced
+        - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
         - --link=release-staging
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
-        - name: job-configs
-          mountPath: /etc/jobs
+        - name: git-sync
+          mountPath: /tmp/git-sync
       containers:
       - name: statusreconciler
         image: us-docker.pkg.dev/k8s-infra-prow/images/status-reconciler:v20260729-7f8580d8d
@@ -66,8 +66,14 @@ spec:
         - name: gcs-credentials
           mountPath: /etc/gcs-credentials
           readOnly: true
-        - name: job-configs
+        - name: combined-jobs
           mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: git-sync
+          mountPath: /etc/jobs/release-staging
+          readOnly: true
       - name: git-sync
         command:
         - /git-sync
@@ -75,13 +81,13 @@ spec:
         - --repo=https://github.com/Prucek/release-staging.git
         - --ref=main
         - --period=30s
-        - --root=/etc/jobs/git-synced
+        - --root=/tmp/git-sync
         - --max-failures=3
         - --link=release-staging
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
-        - name: job-configs
-          mountPath: /etc/jobs
+        - name: git-sync
+          mountPath: /tmp/git-sync
         resources:
           requests:
             memory: "1Gi"
@@ -99,6 +105,10 @@ spec:
       - name: gcs-credentials
         secret:
           secretName: gce-sa-credentials-gcs-private
+      - name: combined-jobs
+        emptyDir: {}
+      - name: git-sync
+        emptyDir: {}
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs

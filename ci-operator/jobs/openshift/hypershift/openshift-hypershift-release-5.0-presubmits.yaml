@@ -13,7 +13,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -99,7 +98,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -186,7 +184,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -276,7 +273,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
@@ -364,7 +360,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
@@ -443,6 +438,92 @@ presubmits:
     - ^release-5\.0$
     - ^release-5\.0-
     cluster: build06
+    context: ci/prow/e2e-aks-managed-hsm
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
+    labels:
+      ci-operator.openshift.io/cloud: hypershift-aks
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-hypershift-release-5.0-e2e-aks-managed-hsm
+    optional: true
+    rerun_command: /test e2e-aks-managed-hsm
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aks-managed-hsm
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aks-managed-hsm,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5\.0$
+    - ^release-5\.0-
+    cluster: build06
     context: ci/prow/e2e-aks-override
     decorate: true
     decoration_config:
@@ -450,7 +531,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
@@ -537,7 +617,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: aro-hcp-dev
       ci-operator.openshift.io/cloud-cluster-profile: aro-hcp-dev
@@ -626,7 +705,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       capability/build-tmpfs: build-tmpfs
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -715,7 +793,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       capability/build-tmpfs: build-tmpfs
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -802,7 +879,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -889,7 +965,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -969,6 +1044,92 @@ presubmits:
     - ^release-5\.0$
     - ^release-5\.0-
     cluster: build06
+    context: ci/prow/e2e-aws-major-version-upgrade
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
+    labels:
+      ci-operator.openshift.io/cloud: hypershift-aws
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-hypershift-release-5.0-e2e-aws-major-version-upgrade
+    optional: true
+    rerun_command: /test e2e-aws-major-version-upgrade
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-major-version-upgrade
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-major-version-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5\.0$
+    - ^release-5\.0-
+    cluster: build06
     context: ci/prow/e2e-aws-metrics
     decorate: true
     decoration_config:
@@ -976,7 +1137,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -1063,7 +1223,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -1150,7 +1309,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       capability/build-tmpfs: build-tmpfs
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -1238,7 +1396,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -1325,7 +1482,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -1412,7 +1568,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -1501,7 +1656,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       capability/build-tmpfs: build-tmpfs
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -1590,7 +1744,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
@@ -1676,7 +1829,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
@@ -1763,7 +1915,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
@@ -1850,7 +2001,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
@@ -1937,7 +2087,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -2024,7 +2173,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -2111,7 +2259,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -2198,7 +2345,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -2287,7 +2433,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -2373,7 +2518,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -2460,7 +2604,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2548,7 +2691,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
       timeout: 6h0m0s
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
@@ -2636,7 +2778,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -2723,7 +2864,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -2810,7 +2950,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -2897,7 +3036,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -2986,7 +3124,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -3072,7 +3209,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -3159,7 +3295,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -3248,7 +3383,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci-operator.openshift.io/cloud: hypershift-azure
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-azure
@@ -3336,7 +3470,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       capability/build-tmpfs: build-tmpfs
       ci-operator.openshift.io/cloud: hypershift-gcp
@@ -3423,7 +3556,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       capability/arm64: arm64
       ci.openshift.io/generator: prowgen
@@ -3438,6 +3570,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=[release:latest]
+        - --target=hypershift-operator-pr
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -3484,7 +3617,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       capability/build-tmpfs: build-tmpfs
       ci-operator.openshift.io/cloud: aws
@@ -3572,7 +3704,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3657,7 +3788,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3724,7 +3854,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
       timeout: 1h0m0s
     labels:
       ci.openshift.io/generator: prowgen
@@ -3792,7 +3921,6 @@ presubmits:
       - .ci-operator.yaml
       - Dockerfile
       - Dockerfile.control-plane
-      - Dockerfile.e2e
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"

@@ -7,11 +7,6 @@
 # The script exit 0 if fail to create catalogsource. this allows  the other test can be executed continuously
 set -u
 
-if [[ "${SKIP_QE_APP_REGISTRY:-false}" == "true" ]]; then
-  echo "====> SKIP_QE_APP_REGISTRY=true, skipping deploy qe catalogsource"
-  exit 0
-fi
-
 # Version comparison functions using sort -V
 function version_gt() {
   # Returns 0 (true) if $1 > $2
@@ -654,6 +649,11 @@ if [ $mirror -eq 0 ]; then
 fi
 #Create ICSP for mirror registry. The ICSP are used for the following ci-opertor steps too. Abort the job if ICSP can not be created
 create_settled_icsp  || exit 1
+
+if [[ "${SKIP_QE_APP_REGISTRY:-false}" == "true" ]]; then
+  echo "====> SKIP_QE_APP_REGISTRY=true, skipping QE catalogsource creation (mirror infrastructure is configured)"
+  exit 0
+fi
 
 #skip the mirror or catalogsource when OLM is not enabled.
 check_olm_capability || exit 0

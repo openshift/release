@@ -14,6 +14,11 @@ workflow:
     The workflow configures Modern TLS (TLS 1.3) on the hosted cluster and scans
     TLS endpoints in both the management control plane and the guest cluster.
 
+    When TLS_13_ENABLE_TLS_ADHERENCE is true, the workflow also sets
+    spec.configuration.apiServer.tlsAdherence on the HostedCluster (for example
+    StrictAllComponents). TechPreviewNoUpgrade must be enabled on the HyperShift
+    operator (hypershift install --tech-preview-no-upgrade) and guest cluster.
+
     The management cluster is hosted in the `osd-hypershift` AWS account and
     destroyed after the scan completes.
   steps:
@@ -21,6 +26,7 @@ workflow:
     pre:
     - ref: ipi-install-rbac
     - chain: hypershift-setup-root-management-cluster
+    - ref: hypershift-install
     - chain: hypershift-aws-create
     - ref: hypershift-modern-tls
     test:

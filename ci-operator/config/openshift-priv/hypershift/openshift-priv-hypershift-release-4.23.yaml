@@ -19,8 +19,16 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator-init:
+  hypershift-operator:
     name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-operator-423-latest:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: "4.23"
+  hypershift-tests:
+    name: hypershift-tests
     namespace: hypershift
     tag: latest
   manila-csi-driver-operator-test:
@@ -37,38 +45,30 @@ build_root:
 canonical_go_repository: github.com/openshift/hypershift
 images:
   items:
-  - additional_architectures:
-    - arm64
-    to: hypershift-operator
+  - to: hypershift-operator-pr
   - additional_architectures:
     - arm64
     dockerfile_path: Dockerfile.control-plane
     to: hypershift
-  - additional_architectures:
-    - arm64
-    dockerfile_path: Dockerfile.e2e
-    to: hypershift-tests
   - dockerfile_literal: |
       FROM base
       RUN dnf install -y python3-pip
     from: src
     to: custom-verify-src
-  - additional_architectures:
-    - arm64
-    dockerfile_literal: |
-      FROM hypershift-operator
-      RUN yum install -y jq && yum clean all
-    from: hypershift-operator
-    to: hypershift-cli
 promotion:
   to:
   - excluded_images:
+    - hypershift-operator-pr
     - custom-verify-src
-    - hypershift-cli
-    - hypershift-operator
-    - hypershift-tests
     name: "4.23"
     namespace: ocp-priv
+  - additional_images:
+      hypershift-operator: hypershift-operator-pr
+    disabled: true
+    excluded_images:
+    - '*'
+    namespace: hypershift
+    tag: "4.23"
 prowgen:
   private: true
 releases:
@@ -83,18 +83,38 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.23"
+      version: "4.22"
   latest:
     integration:
       include_built_images: true
       name: "4.23"
       namespace: ocp-priv
+  latest-418:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.18"
+  latest-419:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.19"
+  latest-420:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.20"
   latest-421:
     candidate:
       product: ocp
       stream: ci
-      version: "4.23"
+      version: "4.21"
   latest-422:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+  latest-423:
     candidate:
       product: ocp
       stream: ci
@@ -112,6 +132,26 @@ releases:
       product: ocp
       stream: nightly
       version: "4.23"
+  n1minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+  n2minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
+  n3minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.20"
+  n4minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -156,6 +196,11 @@ tests:
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
   steps:
     cluster_profile: hypershift-aks
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -194,6 +239,10 @@ tests:
     cluster_profile: hypershift-aks
     dependencies:
       OCP_IMAGE_LATEST: release:latest-422
+      OCP_IMAGE_N1: release:latest-421
+      OCP_IMAGE_N2: release:latest-420
+      OCP_IMAGE_N3: release:latest-419
+      OCP_IMAGE_N4: release:latest-418
       OCP_IMAGE_PREVIOUS: release:initial-422
     env:
       AUTH_THROUGH_CERTS: "true"
@@ -232,6 +281,11 @@ tests:
   pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor|test/envtest)/)|(\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
   steps:
     cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       NODEPOOL_N1_VERSION: "4.22"
@@ -326,6 +380,11 @@ tests:
   optional: true
   steps:
     cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
     env:
       CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -340,6 +399,11 @@ tests:
   optional: true
   steps:
     cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       NODEPOOL_N1_VERSION: "4.22"
@@ -357,7 +421,8 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
+      CI_HYPERSHIFT_OPERATOR: hypershift-operator-pr
+      HYPERSHIFT_RELEASE_LATEST: hypershift-operator-423-latest
     env:
       CI_TESTS_RUN: ^TestUpgradeHyperShiftOperator$
       INSTALL_FROM_LATEST: "true"
@@ -383,15 +448,30 @@ tests:
     cluster_profile: hypershift-aws
     dependencies:
       OCP_IMAGE_LATEST: release:latest-422
+      OCP_IMAGE_N1: release:latest-421
+      OCP_IMAGE_N2: release:latest-420
+      OCP_IMAGE_N3: release:latest-419
+      OCP_IMAGE_N4: release:latest-418
       OCP_IMAGE_PREVIOUS: release:initial-422
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       NODEPOOL_N1_VERSION: "4.21"
       NODEPOOL_N2_VERSION: "4.20"
       NODEPOOL_N3_VERSION: "4.19"
-      NODEPOOL_N4_VERSION: "4.18"
+      NODEPOOL_N4_VERSION: "4.19"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       RUN_KARPENTER_TESTS: "true"
+    workflow: hypershift-aws-e2e-nested
+- always_run: false
+  as: e2e-aws-major-version-upgrade
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest-423
+      OCP_IMAGE_PREVIOUS: release:latest-422
+    env:
+      CI_TESTS_RUN: TestNodePool/HostedCluster/TestNodePoolMajorVersionUpgrade
     workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-kubevirt-aws-ovn-reduced
