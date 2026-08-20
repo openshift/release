@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-enterprise-base-multi-openshift-4.19
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -160,6 +164,22 @@ tests:
   container:
     from: operator-sdk-mto
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)
+- as: periodic-jira-agent
+  cron: 0 9 * * *
+  steps:
+    env:
+      JIRA_AGENT_MAX_ISSUES: "1"
+    workflow: splat-jira-agent-multiarch-tuning-operator
+- as: periodic-review-agent
+  cron: '@yearly'
+  steps:
+    workflow: splat-review-agent-multiarch-tuning-operator
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: splat-review-agent-multiarch-tuning-operator-trigger
 zz_generated_metadata:
   branch: main
   org: openshift
