@@ -32,6 +32,9 @@ main() {
     if [[ -n "${SPOKE_LOCKDOWN_URI:-}" ]]; then
         echo "Using spoke lockdown: ${SPOKE_LOCKDOWN_URI}"
         extra_vars+=(-e "spoke_lockdown_uri=${SPOKE_LOCKDOWN_URI}")
+        # version is intentionally omitted in lockdown mode: mirror-spoke-operators.yml
+        # extracts spoke_ocp_version from the lockdown and overwrites the version fact,
+        # so passing it here would be redundant and could mask lockdown mismatches.
     else
         extra_vars+=(-e "version=${VERSION}")
     fi
