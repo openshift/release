@@ -1,20 +1,19 @@
 postsubmits:
-  stolostron/backplane-operator:
+  stolostron/backplane-must-gather:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    cluster: build11
+    - ^backplane-5\.2$
+    cluster: build01
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - build/Dockerfile.prow
-      - build/Dockerfile.test.prow
+      - Dockerfile
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stolostron-backplane-operator-main-images
+    name: branch-ci-stolostron-backplane-must-gather-backplane-5.2-images
     spec:
       containers:
       - args:
@@ -65,25 +64,24 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    cluster: build11
+    - ^backplane-5\.2$
+    cluster: build01
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - build/Dockerfile.prow
-      - build/Dockerfile.test.prow
+      - Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stolostron-backplane-operator-main-sonar-post-submit
+    name: branch-ci-stolostron-backplane-must-gather-backplane-5.2-publish
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/acm-sonarcloud-token
-        - --target=sonar-post-submit
+        - --target=publish
         command:
         - ci-operator
         env:
@@ -101,8 +99,8 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/acm-sonarcloud-token
-          name: acm-sonarcloud-token
+        - mountPath: /etc/boskos
+          name: boskos
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -118,9 +116,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: acm-sonarcloud-token
+      - name: boskos
         secret:
-          secretName: acm-sonarcloud-token
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
