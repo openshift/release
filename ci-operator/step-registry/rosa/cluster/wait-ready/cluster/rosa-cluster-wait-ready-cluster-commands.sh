@@ -193,7 +193,7 @@ while true; do
       loop_count=$((loop_count + 1))
       if (( loop_count % 5 == 0 )); then
         log "Checking install logs for fatal errors..."
-        install_log_output=$(rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
+        install_log_output=$(timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
         fatal_pattern=$(echo "${install_log_output}" | grep -E "ProvisionFailed|failed to create|InvalidSubnet|LimitExceeded|QuotaExceeded|InsufficientFreeAddresses|UnauthorizedAccess" || true)
         if [[ -n "${fatal_pattern}" ]]; then
           log "ERROR: Fatal error detected in install logs:"
@@ -210,13 +210,27 @@ while true; do
           installing_elapsed=$(( current_time - dyn_start_time ))
 
           if [[ "${infra_id_check}" == "null" ]] && (( installing_elapsed >= PROVISIONER_LAUNCH_TIMEOUT )); then
-            install_log_check=$(rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
+            install_log_check=$(timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
             if echo "${install_log_check}" | grep -q "waiting for installation to begin"; then
               log "FATAL: Hive provisioner never launched."
               log "  infra_id is null after $(( installing_elapsed / 60 )) minutes in 'installing' state."
               log "  Install logs still show: 'waiting for installation to begin'"
               log "  This indicates the OCM-to-Hive handoff failed."
               record_cluster "timers" "status" "provisioner_stall"
+              FAILED_INSTALL="yes"
+              break
+            fi
+          fi
+
+          # OCM state reconciliation detection: installer completed but OCM state stuck
+          if [[ "${infra_id_check}" != "null" ]] && (( installing_elapsed >= PROVISIONER_LAUNCH_TIMEOUT )); then
+            install_log_check=$(timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
+            if echo "${install_log_check}" | grep -Eiq 'install complete!|install completed successfully'; then
+              log "FATAL: OCM state reconciliation failure detected."
+              log "  infra_id is set (provisioner launched) but cluster is still in 'installing' state"
+              log "  after $(( installing_elapsed / 60 )) minutes, despite install logs showing completion."
+              log "  This indicates OCM failed to reconcile the cluster state from 'installing' to 'ready'."
+              record_cluster "timers" "status" "ocm_state_stall"
               FAILED_INSTALL="yes"
               break
             fi
@@ -244,7 +258,7 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
   status_desc=$(jq -r '.status.description // "N/A"' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || echo "N/A")
   log "Cluster status description: ${status_desc}"
   # Save install logs
-  rosa logs install -c ${CLUSTER_ID} > "${ARTIFACT_DIR}/.install.log" || true
+  timeout 60 rosa logs install -c ${CLUSTER_ID} > "${ARTIFACT_DIR}/.install.log" || true
   exit 1
 fi
 
