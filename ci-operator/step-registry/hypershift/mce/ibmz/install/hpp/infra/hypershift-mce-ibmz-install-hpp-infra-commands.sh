@@ -33,7 +33,7 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 140Gi
+            storage: 200Gi
       name: local
       path: "/var/hpvolumes"
   imagePullPolicy: IfNotPresent
