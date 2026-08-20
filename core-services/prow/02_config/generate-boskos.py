@@ -394,13 +394,22 @@ CONFIG = {
         'us-east1': 60,
     },
     'gcp-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 35,
+        'us-east1': 35,
+        'us-east4': 35,
+        'us-west1': 35,
     },
     'gcp-3-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 35,
+        'us-east1': 35,
+        'us-east4': 35,
+        'us-west1': 35,
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 35,
+        'us-east1': 35,
+        'us-east4': 35,
+        'us-west1': 35,
     },
     'gcp-arm64-quota-slice': {
         'us-central1': 30,
