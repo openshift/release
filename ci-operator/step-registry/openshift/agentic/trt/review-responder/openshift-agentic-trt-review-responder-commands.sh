@@ -88,13 +88,28 @@ DISALLOWED_TOOLS=(
     "Bash(cat*gh-fork-token*)"
     "Bash(cat*gh-upstream-token*)"
     "Bash(cat*google-token*)"
+    "Bash(head*claude-code-service-account*)"
+    "Bash(head*gh-fork-token*)"
+    "Bash(head*gh-upstream-token*)"
+    "Bash(head*google-token*)"
+    "Bash(sed*claude-code-service-account*)"
+    "Bash(sed*gh-fork-token*)"
+    "Bash(sed*gh-upstream-token*)"
+    "Bash(sed*google-token*)"
+    "Bash(od*claude-code-service-account*)"
+    "Bash(od*gh-fork-token*)"
+    "Bash(od*gh-upstream-token*)"
+    "Bash(od*google-token*)"
     "Bash(git push*)"
-    "Read(/var/run/github-token/**)"
-    "Read(/var/run/claude-code-service-account/**)"
-    "Grep(/var/run/github-token/**)"
-    "Grep(/var/run/claude-code-service-account/**)"
-    "Glob(/var/run/github-token/**)"
-    "Glob(/var/run/claude-code-service-account/**)"
+    "Bash(head*/var/run/github-token*)"
+    "Bash(sed*/var/run/github-token*)"
+    "Bash(od*/var/run/github-token*)"
+    "Read(//var/run/github-token/**)"
+    "Read(//var/run/claude-code-service-account/**)"
+    "Grep(//var/run/github-token/**)"
+    "Grep(//var/run/claude-code-service-account/**)"
+    "Glob(//var/run/github-token/**)"
+    "Glob(//var/run/claude-code-service-account/**)"
 )
 
 # --- Assemble system prompt: CI extras + skill + repo-specific config ---
@@ -264,7 +279,7 @@ Previous FAILING_CHECKS JSON array: ${PREV_FAILING}" \
     fi
     gate_failures=0
 
-    decision=$(grep -Eo '^WORK=(yes|no)' "${GATE_LOG}" | tail -1 || true)
+    decision=$(grep -Eo '^WORK=(yes|no)$' "${GATE_LOG}" | tail -1 || true)
     if extracted=$(extract_failing_checks "${GATE_LOG}"); then
         PREV_FAILING="${extracted}"
     fi
