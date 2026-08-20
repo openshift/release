@@ -1,0 +1,37 @@
+ref:
+  as: gcp-hcp-pre-destroy-cleanup
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  commands: gcp-hcp-pre-destroy-cleanup-commands.sh
+  env:
+  - name: GCP_REGION
+    default: "us-central1"
+    documentation: "GCP region for e2e infrastructure deployment"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 10m0s
+  best_effort: true
+  documentation: |-
+    Cleans up GCP resources created by ArgoCD-deployed applications that
+    block terraform destroy. Runs in the post phase before tf-deprovision.
+
+    Cleanup phases:
+    1. Stop ArgoCD (scale down, delete Applications/ApplicationSets)
+    2. Delete Gateway API resources (HTTPRoute, Gateway, etc.) to trigger
+       GKE NEG cleanup
+    3. Delete DNS records from regional zones (external-dns creates records
+       that block zone deletion)
+    4. Force-delete remaining NEGs via gcloud (block VPC network deletion)
+
+    Does NOT delete resources that terraform destroy handles (IAM, KCC
+    resources, Spanner databases, etc. — these cascade with project deletion).
+
+    Uses best_effort: true so cleanup failures don't block the job.
+
+    Depends on:
+    - hypershift-gcp-wif-auth (WIF credential in SHARED_DIR)
+    - gcp-hcp-tf-provision (cluster names/project IDs in SHARED_DIR)
