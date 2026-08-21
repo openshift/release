@@ -1,0 +1,65 @@
+ref:
+  as: openshift-agentic-agentic-docs-doc-creator
+  from: agentic-dev
+  commands: openshift-agentic-agentic-docs-doc-creator-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: hypershift-team-claude-prow
+      mount_path: /var/run/claude-code-service-account
+    - namespace: test-credentials
+      name: agentic-docs-gh-app
+      mount_path: /var/run/github-token
+  env:
+    - name: UPSTREAM_REPO
+      default: ""
+      documentation: |-
+        Upstream GitHub repo to create docs for (e.g., "openshift/machine-config-operator").
+        Required. Set via Gangway: MULTISTAGE_PARAM_OVERRIDE_UPSTREAM_REPO.
+    - name: MULTISTAGE_PARAM_OVERRIDE_UPSTREAM_REPO
+      default: ""
+      documentation: |-
+        Gangway API override for UPSTREAM_REPO. When triggering via
+        Gangway, pass as pod_spec_options.envs.
+    - name: SETUP_SCRIPT
+      default: "hack/agentic_setup.sh"
+    - name: CREATE_ARGS
+      default: ""
+      documentation: |-
+        Optional arguments to pass to the generate-docs command
+        (e.g. "--max-iterations 3"). The /workspace path is always
+        passed automatically as the first argument.
+        Set via Gangway: MULTISTAGE_PARAM_OVERRIDE_CREATE_ARGS.
+    - name: MULTISTAGE_PARAM_OVERRIDE_CREATE_ARGS
+      default: ""
+      documentation: |-
+        Gangway API override for CREATE_ARGS. When triggering via
+        Gangway, pass as pod_spec_options.envs.
+    - name: ALLOWED_TOOLS
+      default: "Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate TodoWrite ToolSearch"
+    - name: CLAUDE_CODE_USE_VERTEX
+      default: "1"
+    - name: CLOUD_ML_REGION
+      default: "global"
+    - name: ANTHROPIC_VERTEX_PROJECT_ID
+      default: "itpc-gcp-hybrid-pe-eng-claude"
+    - name: GOOGLE_APPLICATION_CREDENTIALS
+      default: "/var/run/claude-code-service-account/claude-prow"
+    - name: CLAUDE_MODEL
+      default: "claude-opus-4-6"
+  nested_podman: true
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 3h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Creates lean component documentation using the
+    agentic-docs:generate-docs command via Claude Code. This runs an
+    iterative generate + review loop: it generates docs with
+    component-docs, then repeatedly reviews and fixes them with
+    review-docs (verified by fresh independent agents) until they are
+    clean. Requires ai-docs/ to NOT already exist in the target
+    repository. Reads GitHub tokens from SHARED_DIR (written by
+    github-app-auth pre-step). Creates a PR with new documentation
+    against the upstream repo.
