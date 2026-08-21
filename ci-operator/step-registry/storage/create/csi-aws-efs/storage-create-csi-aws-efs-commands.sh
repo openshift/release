@@ -71,8 +71,12 @@ EOF
 
 echo "Created cluster CSI driver object"
 
-if [ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ] && [ "${ENABLE_LONG_CSI_CERTIFICATION_TESTS}" = "true" ]; then
-    cp /usr/share/aws-efs-csi-driver/ocp-manifest.yaml  ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+if [ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ]; then
+    if [ "${ENABLE_LONG_CSI_CERTIFICATION_TESTS}" = "true" ]; then
+        cp /usr/share/aws-efs-csi-driver/ocp-manifest-long.yaml ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+    else
+        cp /usr/share/aws-efs-csi-driver/ocp-manifest.yaml ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+    fi
     echo "Using OCP specific manifest ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}:"
     cat ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
 fi
