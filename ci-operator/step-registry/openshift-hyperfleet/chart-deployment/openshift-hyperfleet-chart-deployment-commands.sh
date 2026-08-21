@@ -11,8 +11,6 @@ log(){
 }
 
 
-helm plugin install https://github.com/aslafy-z/helm-git
-helm plugin list 
 
 GCP_CREDENTIALS_FILE="${HYPERFLEET_E2E_PATH}/hcm-hyperfleet-e2e.json"
 
