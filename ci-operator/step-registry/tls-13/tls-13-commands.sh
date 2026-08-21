@@ -143,7 +143,74 @@ apiserver_patch=$(jq -nc --arg mode "${TLS_13_TLS_ADHERENCE_POLICY}" --arg adher
 
 oc patch apiservers/cluster --type=merge -p "${apiserver_patch}"
 
-oc adm wait-for-stable-cluster
+# Waiting for stability immediately after the patch is not always enough. The
+# operators may not have started progressing yet, so the cluster still looks
+# stable from before the change, and a job that inspects endpoints right after
+# this step can observe the old profile still being served. The kubelet profile
+# also rides a MachineConfig rollout that reboots nodes, which on single-node
+# takes the API server down with it.
+#
+# Jobs that read back the effective profile opt in to the longer wait. This is
+# off by default so existing consumers keep their current timing.
+
+all_machine_config_pools_updated() {
+  oc get machineconfigpools -o json 2>/dev/null | jq -e '
+    .items as $pools
+    | ($pools | length) > 0
+    and all($pools[];
+      (.status.machineCount == .status.updatedMachineCount)
+      and ((.status.conditions // []) | any(.type == "Updated" and .status == "True"))
+      and ((.status.conditions // []) | any(.type == "Updating" and .status == "True") | not)
+    )' >/dev/null 2>&1
+}
+
+wait_for_machine_config_rollout() {
+  # Clusters without machine config pools, such as hosted control planes, have
+  # nothing to roll out here.
+  if ! oc get machineconfigpools -o json 2>/dev/null | jq -e '(.items | length) > 0' >/dev/null 2>&1; then
+    echo "No machine config pools found; skipping machine config rollout wait"
+    return 0
+  fi
+
+  local deadline=$(( $(date +%s) + 5400 ))
+  local settled=0
+
+  # Require several consecutive clean observations so a pool that has not begun
+  # updating yet is not mistaken for one that has finished, and tolerate the API
+  # being unreachable while a node reboots.
+  while (( $(date +%s) < deadline )); do
+    if all_machine_config_pools_updated; then
+      (( settled += 1 )) || true
+      if (( settled >= 6 )); then
+        echo "Machine config pools are updated"
+        return 0
+      fi
+    else
+      settled=0
+    fi
+    sleep 30
+  done
+
+  # Deliberately not fatal: wait-for-stable-cluster below is the real gate, and
+  # failing here would turn a slow rollout into a job failure.
+  echo "Warning: timed out waiting for machine config pools to finish updating; continuing"
+  oc get machineconfigpools || true
+  return 0
+}
+
+case "${TLS_13_WAIT_FOR_ROLLOUT:-}" in
+true)
+  wait_for_machine_config_rollout
+  oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=90m
+  ;;
+false|"")
+  oc adm wait-for-stable-cluster
+  ;;
+*)
+  echo "Invalid TLS_13_WAIT_FOR_ROLLOUT='${TLS_13_WAIT_FOR_ROLLOUT}' (expected literal \"true\" or \"false\")"
+  exit 1
+  ;;
+esac
 
 tls_profile=$(oc get apiserver/cluster -ojson | jq -r .spec.tlsSecurityProfile.type)
 if [[ "$tls_profile" != "Modern" ]]; then
