@@ -7,6 +7,7 @@
 #
 # Optional env:
 #   EVAL_MODEL        -- model for the skill under test (default: claude-sonnet-4-6)
+#   EVAL_EFFORT       -- agent reasoning effort passed to /eval-run as --effort
 #   EVAL_PARALLELISM  -- number of test cases to run concurrently (default: 1)
 #   EVAL_CASES        -- comma-separated list of case IDs to run (default: all)
 #   EVAL_DISCOVER     -- "true" or glob pattern to auto-discover eval configs
@@ -26,6 +27,10 @@ echo "Starting claude-agent-eval"
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_EVAL_MODEL:-}" ]]; then
     echo "Applying Gangway override: EVAL_MODEL=${MULTISTAGE_PARAM_OVERRIDE_EVAL_MODEL}"
     EVAL_MODEL="${MULTISTAGE_PARAM_OVERRIDE_EVAL_MODEL}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_EVAL_EFFORT:-}" ]]; then
+    echo "Applying Gangway override: EVAL_EFFORT=${MULTISTAGE_PARAM_OVERRIDE_EVAL_EFFORT}"
+    EVAL_EFFORT="${MULTISTAGE_PARAM_OVERRIDE_EVAL_EFFORT}"
 fi
 
 # Load GitHub token for gh CLI access (same secret as payload-agent)
@@ -498,6 +503,7 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
     fi
 
     EVAL_RUN_ARGS="--config ${config} --model ${EVAL_MODEL} --run-id ${RUN_ID} --parallelism ${EVAL_PARALLELISM}"
+    [[ -n "${EVAL_EFFORT:-}" ]] && EVAL_RUN_ARGS="${EVAL_RUN_ARGS} --effort ${EVAL_EFFORT}"
     [[ -n "${CASE_ARGS}" ]] && EVAL_RUN_ARGS="${EVAL_RUN_ARGS} ${CASE_ARGS}"
     [[ -n "${EVAL_BASELINE}" ]] && EVAL_RUN_ARGS="${EVAL_RUN_ARGS} --baseline ${EVAL_BASELINE}"
     [[ -n "${EVAL_EXTRA_ARGS}" ]] && EVAL_RUN_ARGS="${EVAL_RUN_ARGS} ${EVAL_EXTRA_ARGS}"
