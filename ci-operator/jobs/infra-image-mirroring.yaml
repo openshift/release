@@ -575,55 +575,6 @@ periodics:
   cron: '@hourly'
   decorate: true
   labels:
-    ci.openshift.io/area: node-observability-operator
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-node-observability-operator
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - curl -sL https://raw.githubusercontent.com/openshift/release/refs/heads/main/hack/periodic-mirroring.sh
-        | bash
-      command:
-      - bash
-      env:
-      - name: HOME
-        value: /tmp/user
-      - name: MAPPING_FILE_PREFIX
-        value: mapping_node_observability_operator
-      - name: dry_run
-        value: "false"
-      image: registry.redhat.io/openshift4/ose-cli-rhel9
-      imagePullPolicy: IfNotPresent
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /tmp/user/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-      - mountPath: /etc/qci-robot-credentials
-        name: qci-robot-credentials
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay-io-node-observability-optr
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-    - name: qci-robot-credentials
-      secret:
-        secretName: qci-robot-credentials
-- agent: kubernetes
-  cluster: core-ci
-  cron: '@hourly'
-  decorate: true
-  labels:
     ci.openshift.io/area: external-dns-operator
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-external-dns-operator
