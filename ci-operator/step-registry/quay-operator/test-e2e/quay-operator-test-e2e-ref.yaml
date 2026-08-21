@@ -1,0 +1,46 @@
+ref:
+  as: quay-operator-test-e2e
+  cli: latest
+  from: quay-playwright-runner
+  commands: quay-operator-test-e2e-commands.sh
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  timeout: 2h0m0s
+  grace_period: 15m0s
+  credentials:
+  - namespace: test-credentials
+    name: quay-qe-quay-secret
+    mount_path: /var/run/quay-qe-quay-secret
+  env:
+  - name: PLAYWRIGHT_GIT_REPO
+    default: "https://github.com/quay/quay.git"
+    documentation: |-
+      Git repository cloned when PLAYWRIGHT_GIT_BRANCH is set. Unused when
+      tests run from the quay-playwright-runner image sources.
+  - name: PLAYWRIGHT_GIT_BRANCH
+    default: ""
+    documentation: |-
+      Optional git branch or tag to clone for Playwright tests. When empty,
+      tests run from the quay-playwright-runner image (same git ref as the
+      ci-operator src / image build). Set this only to override the image.
+  - name: MULTISTAGE_PARAM_OVERRIDE_PLAYWRIGHT_GIT_BRANCH
+    default: ""
+    documentation: |-
+      Optional Gangway or rehearsal override for PLAYWRIGHT_GIT_BRANCH.
+      When set, tests are cloned from that ref instead of using the image.
+  - name: QUAY_OPERATOR_CHANNEL
+    default: "stable-3.16"
+    documentation: Installed Quay operator channel (informational in this step).
+  - name: PLAYWRIGHT_GREP_INVERT
+    default: "@auth:OIDC|@auth:LDAP|@webhook|Webhook Delivery Verification|tokens? (is|are) hidden|team and members links stay correct|session cookie honors configured SESSION_TIMEOUT|Help menu|creates notifications for each event type"
+    documentation: |-
+      Regex passed to `playwright test --grep-invert` to skip tests. Defaults
+      exclude unsupported auth backends (OIDC/LDAP), all webhook tests (out of
+      scope), and tests tracking known product bugs / UI-version gaps. See
+      E2E_FAILURE_REPORT.md for the rationale behind each quarantined entry.
+  documentation: |-
+    Execute Quay Playwright e2e smoke tests against a deployed Quay instance.
+    By default tests and browsers come from the quay-playwright-runner image.
+    Set PLAYWRIGHT_GIT_BRANCH to clone a different quay.git ref at runtime.
