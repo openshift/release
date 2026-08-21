@@ -302,3 +302,4 @@ if [[ "$HOSTED_CP" == "true" ]] && [[ "${INFRA_ID}" == "null" ]]; then
   INFRA_ID=$(cat $cluster_info_json | jq -r '.name')
 fi
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
+
