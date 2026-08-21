@@ -1,0 +1,54 @@
+ref:
+  as: kuadrant-s390x-install-coredns
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: kuadrant-s390x-install-coredns-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 20m0s
+  env:
+  - name: METALLB_NAMESPACE
+    default: "metallb-system"
+    documentation: |-
+      Namespace of the MetalLB IPAddressPool created by install-metallb.
+  - name: METALLB_POOL_NAME
+    default: "default-pool"
+    documentation: |-
+      Existing MetalLB IPAddressPool to allocate the CoreDNS LoadBalancer IP from.
+      Must match kuadrant-s390x-install-metallb (do not create a second overlapping
+      pool — MetalLB's admission webhook rejects CIDR overlaps).
+  - name: COREDNS_NAMESPACE
+    default: "kuadrant-coredns"
+    documentation: |-
+      Namespace for the kuadrant-coredns Deployment and LoadBalancer Service.
+  - name: COREDNS_ZONE
+    default: "k.example.com"
+    documentation: |-
+      Authoritative DNS zone served by kuadrant-coredns (Corefile + provider Secret
+      ZONES). Matches ocpz-m42lp36 / rhcl-mc1 LPAR reference clusters.
+  - name: COREDNS_IMAGE
+    default: "quay.io/kuadrant/coredns-kuadrant:latest"
+    documentation: |-
+      CoreDNS image with the Kuadrant plugin (same as m42lp36 / mc1).
+  - name: COREDNS_LB_HOST
+    default: "241"
+    documentation: |-
+      Host octet for the CoreDNS LoadBalancer IP when deriving from the libvirt
+      lease /24. Defaults to .241 so .240 remains available for Istio Gateway LBs
+      (verify-gateway / smoke). Must fall within METALLB_POOL_NAME.
+  - name: COREDNS_LOADBALANCER_IP
+    default: ""
+    documentation: |-
+      Optional explicit CoreDNS LoadBalancer IP. When empty, derives
+      192.168.<lease.subnet>.<COREDNS_LB_HOST> and pins it via metallb.io/loadBalancerIPs.
+      On success the IP is written to SHARED_DIR/kuadrant-coredns-ip for the
+      run-testsuite step.
+  documentation: |-
+    Deploys kuadrant-coredns with the Kuadrant plugin and pins its LoadBalancer
+    Service to .241 from the existing install-metallb default-pool (fails if the
+    EXTERNAL-IP is not assigned). Writes SHARED_DIR/kuadrant-coredns-ip for smoke
+    DNS resolution. Run after install-metallb and before install-operator.
