@@ -21,7 +21,10 @@ echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n p
 typeset -i expectedMinPolicies=4
 typeset -i pollDeadline=$((SECONDS + 600))
 until (( $(oc get policies -n policies -o name 2>/dev/null | wc -l) >= expectedMinPolicies )); do
-  ((SECONDS > pollDeadline)) && { : "Error: fewer than ${expectedMinPolicies} policies after 10 minutes"; exit 1; }
+  ((SECONDS > pollDeadline)) && {
+    printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
+    exit 1
+  }
   sleep 5
 done
 

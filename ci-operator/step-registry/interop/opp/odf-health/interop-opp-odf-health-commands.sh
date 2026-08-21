@@ -1,6 +1,5 @@
 #!/bin/bash
-set -euo pipefail
-shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
 # ODF Health Check (7-point gate)
@@ -489,9 +488,19 @@ function CheckOdfInstalled () {
     if ! oc get namespace "${ODF_NAMESPACE}" &>/dev/null; then
         return 1
     fi
-    typeset csvCount
-    csvCount="$(oc get csv -n "${ODF_NAMESPACE}" -o json 2>/dev/null | \
-        python3 -c "import sys,json; print(len([i for i in json.load(sys.stdin).get('items',[]) if 'odf' in i['metadata']['name'].lower() or 'ocs' in i['metadata']['name'].lower()]))" 2>/dev/null)" || csvCount="0"
+    typeset csvJson=""
+    if ! csvJson="$(oc get csv -n "${ODF_NAMESPACE}" -o json 2>/dev/null)"; then
+        printf '%s\n' "Error: failed to list CSVs in ${ODF_NAMESPACE}" >&2
+        return 2
+    fi
+    typeset csvCount=""
+    if ! csvCount="$(printf '%s' "${csvJson}" | python3 -c "
+import sys,json,re; d=json.load(sys.stdin)
+print(len([i for i in d.get('items',[]) if re.match(r'^(odf-|ocs-)operator',i['metadata']['name'])]))
+")"; then
+        printf '%s\n' "Error: failed to parse CSV JSON from ${ODF_NAMESPACE}" >&2
+        return 2
+    fi
     [[ "${csvCount}" -gt 0 ]]
 }
 
@@ -504,7 +513,13 @@ function Main () {
     : "Namespace: ${ODF_NAMESPACE}"
     : "Artifacts dir: ${ARTIFACT_DIR}"
 
-    if ! CheckOdfInstalled; then
+    typeset -i odfProbeResult=0
+    CheckOdfInstalled || odfProbeResult=$?
+    if (( odfProbeResult == 2 )); then
+        : "ODF Health Check: PROBE ERROR (cannot determine ODF state)"
+        exit 1
+    fi
+    if (( odfProbeResult == 1 )); then
         typeset skipMsg="ODF is not installed (no ODF/OCS CSV in ${ODF_NAMESPACE})"
         typeset -a checkNames=("odf-csv-phase" "storagecluster-ready" "cephcluster-health"
             "storageclasses-available" "pvc-provision-rbd" "pvc-provision-cephfs"
