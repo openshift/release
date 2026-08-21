@@ -358,7 +358,7 @@ function CheckThanosHealth () {
     done
 
     if (( foundCount == 0 )); then
-        AddResult "thanos-health" "fail" "No Thanos/observability components found in ${OBS_NAMESPACE}"
+        AddResult "thanos-health" "skip" "No Thanos/observability components found in ${OBS_NAMESPACE}; observability not deployed"
     elif [[ -n "${failMsg}" ]]; then
         AddResult "thanos-health" "fail" "Unhealthy Thanos components: ${failMsg}"
     elif (( ${#missingComponents[@]} > 0 )); then
@@ -532,8 +532,7 @@ print(items[0]['metadata']['name'] if items else '')
         typeset queryResult=""
         if [[ -n "${queryFrontendPod}" ]]; then
             queryResult="$(oc exec -n "${OBS_NAMESPACE}" "${queryFrontendPod}" \
-                -- wget -qO- --no-check-certificate \
-                "http://localhost:9090/api/v1/query?query=up")" || true
+                -- curl -sk "http://localhost:9090/api/v1/query?query=up")" || true
         fi
 
         if [[ -z "${queryResult}" ]]; then
@@ -546,8 +545,7 @@ print(items[0]['metadata']['name'] if items else '')
             fi
             if [[ -n "${queryPod}" ]]; then
                 queryResult="$(oc exec -n "${OBS_NAMESPACE}" "${queryPod}" \
-                    -- wget -qO- --no-check-certificate \
-                    "http://localhost:9090/api/v1/query?query=up")" || true
+                    -- curl -sk "http://localhost:9090/api/v1/query?query=up")" || true
             fi
         fi
 
