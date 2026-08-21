@@ -43,6 +43,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: cli
+  openstack-tests:
+    name: "4.22"
+    namespace: ocp
+    tag: openstack-tests
   shellcheck:
     name: shellcheck
     namespace: ci
@@ -897,6 +901,10 @@ tests:
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
+      TEST_ARGS: --disable-monitor=termination-message-policy
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
 - always_run: false
   as: e2e-openstack-dualstack-upi
@@ -909,16 +917,27 @@ tests:
       OPENSTACK_COMPUTE_FLAVOR: m1.xlarge
       OPENSTACK_TEST_SKIPS: The OpenStack platform creates Worker nodes in a server
         group\|The OpenStack platform creates Control plane nodes in a server group
+      TEST_ARGS: --disable-monitor=termination-message-policy
       TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for service
         endpoints using hostNetwork\| Services Secondary IP Family \[LinuxOnly\] should
         function for node-Service\| Services Secondary IP Family \[LinuxOnly\] should
         function for pod-Service
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-upi
 - always_run: false
   as: e2e-openstack-singlestackv6
   optional: true
   steps:
     cluster_profile: openstack-hwoffload
+    env:
+      TEST_ARGS: --disable-monitor=termination-message-policy
+    test:
+    - ref: openstack-test-e2e-images
+    - ref: mirror-images-qe-test-images
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-singlestackv6
 - always_run: false
   as: e2e-openstack-proxy
@@ -926,6 +945,11 @@ tests:
   pipeline_run_if_changed: openstack
   steps:
     cluster_profile: openstack-vh-mecha-central
+    env:
+      TEST_ARGS: --disable-monitor=termination-message-policy
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-proxy
 - always_run: false
   as: e2e-openstack-nfv-intel
@@ -939,6 +963,11 @@ tests:
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
+    env:
+      TEST_ARGS: --disable-monitor=termination-message-policy
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-external-lb
 - always_run: false
   as: e2e-openstack-ccpmso
@@ -1379,6 +1408,11 @@ tests:
   optional: true
   steps:
     cluster_profile: openstack-hwoffload
+    env:
+      TEST_ARGS: --disable-monitor=termination-message-policy
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-dualstack
 - always_run: false
   as: e2e-aws-overlay-mtu-ovn-1200
