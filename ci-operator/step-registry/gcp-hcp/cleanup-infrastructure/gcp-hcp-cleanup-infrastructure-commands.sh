@@ -4,6 +4,22 @@ set -euo pipefail
 LOG="${ARTIFACT_DIR}/cleanup.log"
 log() { echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') | $*" | tee -a "${LOG}"; }
 
+# Validate required dependencies
+if ! command -v jq &>/dev/null; then
+  echo "ERROR: jq not found in container" >&2
+  exit 1
+fi
+
+if ! command -v kubectl &>/dev/null; then
+  echo "ERROR: kubectl not found in container" >&2
+  exit 1
+fi
+
+if ! command -v gcloud &>/dev/null; then
+  echo "ERROR: gcloud not found in container" >&2
+  exit 1
+fi
+
 log "=== GCP HCP Infrastructure Cleanup ==="
 log "This script performs comprehensive cleanup modeled after the Tekton cleanup task:"
 log "1. Stop ArgoCD (prevents resource recreation)"
@@ -126,14 +142,18 @@ delete_gateway_resources() {
 
   # Remove finalizers from stuck Gateway resources
   log "  Removing finalizers from Gateway resources"
-  kc "${kubeconfig}" get gateway --all-namespaces -o json 2>/dev/null | \
-    jq -r '.items[] | select(.metadata.finalizers != null) | "\(.metadata.namespace) \(.metadata.name)"' 2>/dev/null | \
-    while read -r ns name; do
-      [[ -z "${ns}" || -z "${name}" ]] && continue
-      log "    Patching gateway ${ns}/${name}"
-      kc "${kubeconfig}" patch gateway "${name}" -n "${ns}" \
-        --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]' 2>/dev/null || true
-    done
+  local gateways_json
+  if gateways_json=$(kc "${kubeconfig}" get gateway --all-namespaces -o json 2>/dev/null); then
+    echo "${gateways_json}" | jq -r '.items[] | select(.metadata.finalizers != null) | "\(.metadata.namespace) \(.metadata.name)"' 2>/dev/null | \
+      while read -r ns name; do
+        [[ -z "${ns}" || -z "${name}" ]] && continue
+        log "    Patching gateway ${ns}/${name}"
+        kc "${kubeconfig}" patch gateway "${name}" -n "${ns}" \
+          --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]' 2>/dev/null || true
+      done
+  else
+    log "  WARNING: Could not get Gateway resources (may not exist or cluster unreachable)"
+  fi
 }
 
 # ========================================================================
@@ -234,10 +254,19 @@ delete_project() {
 
   log "--- [${label}] Force-deleting project: ${project} ---"
 
-  if gcloud projects delete "${project}" --quiet 2>&1 | tee -a "${LOG}"; then
+  local output
+  local exit_code
+  output=$(gcloud projects delete "${project}" --quiet 2>&1)
+  exit_code=$?
+  
+  echo "${output}" | tee -a "${LOG}"
+  
+  if [[ ${exit_code} -eq 0 ]]; then
     log "  Project ${project} deletion initiated"
+    return 0
   else
-    log "  WARNING: Failed to delete project ${project}"
+    log "  ERROR: Failed to delete project ${project} (exit code: ${exit_code})"
+    return 1
   fi
 }
 
@@ -263,17 +292,19 @@ clear_tfc_workspace() {
 
   local tfc_token
   tfc_token=$(<"/etc/terraform-cloud/token")
-  local tfc_org="hp-platform-engineering"
+  local tfc_org="${TFC_ORGANIZATION:-hp-platform-engineering}"
 
   log "  Workspace: ${workspace_name}"
 
   # Get workspace ID
   local workspace_id
   workspace_id=$(curl -sS \
+    --max-time 30 \
+    --connect-timeout 10 \
     --header "Authorization: Bearer ${tfc_token}" \
     --header "Content-Type: application/vnd.api+json" \
     "https://app.terraform.io/api/v2/organizations/${tfc_org}/workspaces/${workspace_name}" 2>/dev/null | \
-    jq -r '.data.id // empty' || echo "")
+    jq -r '.data.id // empty' 2>/dev/null || echo "")
 
   if [[ -z "${workspace_id}" ]]; then
     log "  WARNING: Could not find workspace ID, may already be deleted"
@@ -281,13 +312,22 @@ clear_tfc_workspace() {
   fi
 
   # Delete workspace (deletes state)
-  if curl -sS -X DELETE \
+  local delete_output
+  local delete_exit
+  delete_output=$(curl -sS -X DELETE \
+    --max-time 30 \
+    --connect-timeout 10 \
     --header "Authorization: Bearer ${tfc_token}" \
     --header "Content-Type: application/vnd.api+json" \
-    "https://app.terraform.io/api/v2/workspaces/${workspace_id}" 2>&1 | tee -a "${LOG}"; then
+    "https://app.terraform.io/api/v2/workspaces/${workspace_id}" 2>&1)
+  delete_exit=$?
+  
+  echo "${delete_output}" | tee -a "${LOG}"
+  
+  if [[ ${delete_exit} -eq 0 ]]; then
     log "  TFC workspace deleted: ${workspace_name}"
   else
-    log "  WARNING: Failed to delete TFC workspace (may already be deleted)"
+    log "  WARNING: Failed to delete TFC workspace (exit code: ${delete_exit}, may already be deleted)"
   fi
 }
 
@@ -342,6 +382,9 @@ if [[ "${REGION_CONNECTED}" == "true" ]]; then
 fi
 
 # Wait for GKE Gateway controller to process deletions
+# Note: 120s is a conservative estimate. GKE typically processes Gateway deletions
+# within 60s, but we add buffer time to reduce NEG orphan risk. This wait can be
+# tuned based on observed cleanup times.
 if [[ "${REGION_CONNECTED}" == "true" || "${MC_CONNECTED}" == "true" ]]; then
   log ""
   log "Waiting 120s for GKE to process Gateway/NEG deletions..."
