@@ -34,6 +34,10 @@ else
   export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 fi
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
+UNIVERSE_DOMAIN=$(python3 -c "import json; print(json.load(open('${GCP_SHARED_CREDENTIALS_FILE}')).get('universe_domain',''))" 2>/dev/null)
+if [[ -n "${UNIVERSE_DOMAIN}" ]]; then
+  export GOOGLE_CLOUD_UNIVERSE_DOMAIN="${UNIVERSE_DOMAIN}"
+fi
 PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
