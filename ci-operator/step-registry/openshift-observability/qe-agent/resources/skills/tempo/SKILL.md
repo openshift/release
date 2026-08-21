@@ -1,5 +1,5 @@
 ---
-name: tempo-qe-agent
+name: tempo
 description: Use this skill to analyze failing CI tests for the OpenShift Tempo Operator (TempoStack and TempoMonolithic), rerun the specific failing tests (chainsaw-based, junit_tempo_* prefix), diagnose whether the failure is a product bug or a test that needs fixing, apply fixes to test source files when needed, and export results to the artifact directory. Trigger whenever $SHARED_DIR/qe-agent-context.json is present with has_test_failures=true for Tempo Operator tests, or when an engineer asks to debug, rerun, or fix failing Tempo QE tests.
 ---
 
@@ -48,13 +48,34 @@ Before running any prerequisites setup or test reruns, confirm the cluster is st
 oc get machineconfigpools.machineconfiguration.openshift.io
 ```
 
-Each MachineConfigPool must have `UPDATED=True`, `UPDATING=False`, `DEGRADED=False`, and `READYMACHINECOUNT=MACHINECOUNT` before proceeding.
+Each MachineConfigPool must have `UPDATED=True`, `UPDATING=False`, and `DEGRADED=False` before proceeding.
 
 **If any pool is not ready**, wait and recheck every 60 seconds:
 
 ```bash
-# Wait until all MCPs are updated, not updating, and not degraded (20-minute timeout)
-deadline=$((SECONDS + 1200))
+# Wait until all MCPs are updated, not updating, and not degraded.
+# Split into two 10-minute phases to stay within the Bash tool's timeout limit.
+# Phase 1: wait up to 10 minutes
+deadline=$((SECONDS + 600))
+while oc get machineconfigpools.machineconfiguration.openshift.io \
+    -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Updated")].status}{" "}{.status.conditions[?(@.type=="Updating")].status}{" "}{.status.conditions[?(@.type=="Degraded")].status}{"\n"}{end}' \
+    | grep -qvE '^True False False$'; do
+  echo "MCPs not ready yet, waiting 60s..."
+  if (( SECONDS >= deadline )); then
+    echo "Phase 1 timeout — MCPs still not ready after 10 minutes. Continuing in phase 2."
+    oc get machineconfigpools.machineconfiguration.openshift.io
+    break
+  fi
+  sleep 60
+  oc get machineconfigpools.machineconfiguration.openshift.io
+done
+```
+
+If the first phase did not converge (the loop exited via the `break`), run a second Bash invocation to continue waiting:
+
+```bash
+# Phase 2: wait up to 10 more minutes (total 20 minutes across both phases)
+deadline=$((SECONDS + 600))
 while oc get machineconfigpools.machineconfiguration.openshift.io \
     -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Updated")].status}{" "}{.status.conditions[?(@.type=="Updating")].status}{" "}{.status.conditions[?(@.type=="Degraded")].status}{"\n"}{end}' \
     | grep -qvE '^True False False$'; do

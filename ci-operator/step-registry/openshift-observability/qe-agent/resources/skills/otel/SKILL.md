@@ -1,5 +1,5 @@
 ---
-name: otel-qe-agent
+name: otel
 description: Use this skill to analyze failing CI tests for the OpenShift OpenTelemetry Operator, rerun the specific failing tests (chainsaw-based, junit_otel_* prefix), diagnose whether the failure is a product bug or a test that needs fixing, apply fixes to test source files when needed, and export results to the artifact directory. Trigger whenever $SHARED_DIR/qe-agent-context.json is present with has_test_failures=true for OpenTelemetry Operator tests, or when an engineer asks to debug, rerun, or fix failing OTel QE tests.
 ---
 
@@ -50,11 +50,32 @@ Before running any prerequisites setup or test reruns, confirm the cluster is st
 oc get machineconfigpools.machineconfiguration.openshift.io
 ```
 
-Each MachineConfigPool must have `UPDATED=True`, `UPDATING=False`, `DEGRADED=False`, and `READYMACHINECOUNT=MACHINECOUNT` before proceeding. Wait in a 60s poll loop with a 20-minute hard timeout; if the deadline fires, print MCP status and abort:
+Each MachineConfigPool must have `UPDATED=True`, `UPDATING=False`, and `DEGRADED=False` before proceeding. Wait in a 60s poll loop with a 20-minute hard timeout; if the deadline fires, print MCP status and abort:
 
 ```bash
-# Wait until all MCPs are updated, not updating, and not degraded (20-minute timeout)
-deadline=$((SECONDS + 1200))
+# Wait until all MCPs are updated, not updating, and not degraded.
+# Split into two 10-minute phases to stay within the Bash tool's timeout limit.
+# Phase 1: wait up to 10 minutes
+deadline=$((SECONDS + 600))
+while oc get machineconfigpools.machineconfiguration.openshift.io \
+    -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Updated")].status}{" "}{.status.conditions[?(@.type=="Updating")].status}{" "}{.status.conditions[?(@.type=="Degraded")].status}{"\n"}{end}' \
+    | grep -qvE '^True False False$'; do
+  echo "MCPs not ready yet, waiting 60s..."
+  if (( SECONDS >= deadline )); then
+    echo "Phase 1 timeout — MCPs still not ready after 10 minutes. Continuing in phase 2."
+    oc get machineconfigpools.machineconfiguration.openshift.io
+    break
+  fi
+  sleep 60
+  oc get machineconfigpools.machineconfiguration.openshift.io
+done
+```
+
+If the first phase did not converge (the loop exited via the `break`), run a second Bash invocation to continue waiting:
+
+```bash
+# Phase 2: wait up to 10 more minutes (total 20 minutes across both phases)
+deadline=$((SECONDS + 600))
 while oc get machineconfigpools.machineconfiguration.openshift.io \
     -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Updated")].status}{" "}{.status.conditions[?(@.type=="Updating")].status}{" "}{.status.conditions[?(@.type=="Degraded")].status}{"\n"}{end}' \
     | grep -qvE '^True False False$'; do
@@ -80,7 +101,8 @@ Required adaptations:
 |---|---|
 | `cp -R /tmp/<name>` (image mount) | Replace with `git clone <repo> <dest>` — find the repo URL from `oc get csv -o yaml \| grep github.com` |
 | `kubectl create -f <url>` (CRDs) | Use `kubectl apply -f <url>` — `create` fails if the CRD exists from the prior run |
-| `oc patch csv ...` | Skip — the operator is already patched; verify with `oc get csv -n opentelemetry-operator-system` |
+| `oc patch csv ...` (initial setup patches) | Skip — the operator is already patched; verify with `oc get csv -n opentelemetry-operator-system` |
+| `oc patch csv ...` (later patches: `LABELS_FILTER`, instrumentation images, etc.) | **Evaluate per-test**: later CSV patches create operator state that subsequent tests may not expect. When rerunning a single test out of the original execution order, check whether that test assumes a clean CSV or one with specific patches applied. If the test asserts on a CSV field that a prior patch modified (e.g., `LABELS_FILTER=.*filter.out`), either (a) reset the CSV field before the rerun, or (b) rerun the test in its original suite order. Document which CSV state the test requires in the diagnosis. |
 | `$SKIP_TESTS` block | Skip entirely — `$SKIP_TESTS` is unset in the qe-agent pod |
 | chainsaw test invocation | Run `unset NAMESPACE` before every `chainsaw test` call — a set `NAMESPACE` causes tests to run in the wrong namespace |
 
@@ -139,15 +161,20 @@ Rerun only the specific failing tests, not the entire suite, to save time and ke
 
 Chainsaw reruns use `--skip-delete` so resources persist — clean up before each rerun or the next run collides with leftover state. `kubectl delete -f <test-folder>/` is insufficient because chainsaw also creates resources via script steps, operator reconciliation, and cluster-scoped objects.
 
+Chainsaw generates random namespace names (e.g., `chainsaw-advanced-griffon`) rather than using predictable `chainsaw-<test-name>` names. Use a namespace discovery approach instead of assuming a known name:
+
 ```bash
-kubectl delete namespace chainsaw-<test-name> --ignore-not-found=true
-kubectl wait --for=delete namespace/chainsaw-<test-name> --timeout=5m 2>/dev/null || true
+# Find and delete all chainsaw-created namespaces for this test
+for ns in $(kubectl get namespaces --no-headers -o custom-columns=':metadata.name' | grep '^chainsaw-'); do
+  kubectl delete namespace "$ns" --ignore-not-found=true
+done
+# Wait for all chainsaw namespaces to be fully deleted
+for ns in $(kubectl get namespaces --no-headers -o custom-columns=':metadata.name' | grep '^chainsaw-'); do
+  kubectl wait --for=delete namespace/"$ns" --timeout=5m 2>/dev/null || true
+done
 kubectl delete clusterrole,clusterrolebinding \
   -l app.kubernetes.io/managed-by=chainsaw \
-  -l chainsaw.kyverno.io/test-namespace=chainsaw-<test-name> \
   --ignore-not-found=true
-# Fallback label if the above selector matches nothing:
-# -l chainsaw.kyverno.io/test-name=<test-name>
 ```
 
 Read `chainsaw-test.yaml` before cleanup to identify any additional cluster-scoped resources the test creates via script steps.
@@ -181,11 +208,14 @@ TEST_DIR="<value resolved in Step 2>"
 OTEL_SELECTOR="<value captured during first rerun>"  # empty string if no --selector was used
 
 for i in 2 3 4; do
-  kubectl delete namespace chainsaw-<test-name> --ignore-not-found=true
-  kubectl wait --for=delete namespace/chainsaw-<test-name> --timeout=5m 2>/dev/null || true
+  for ns in $(kubectl get namespaces --no-headers -o custom-columns=':metadata.name' | grep '^chainsaw-'); do
+    kubectl delete namespace "$ns" --ignore-not-found=true
+  done
+  for ns in $(kubectl get namespaces --no-headers -o custom-columns=':metadata.name' | grep '^chainsaw-'); do
+    kubectl wait --for=delete namespace/"$ns" --timeout=5m 2>/dev/null || true
+  done
   kubectl delete clusterrole,clusterrolebinding \
     -l app.kubernetes.io/managed-by=chainsaw \
-    -l chainsaw.kyverno.io/test-namespace=chainsaw-<test-name> \
     --ignore-not-found=true
 
   unset NAMESPACE
@@ -233,6 +263,9 @@ oc describe pods -n <test-namespace> | grep -A10 -E 'Events:|Reason:|State:|Exit
 oc get events -n opentelemetry-operator-system --sort-by='.lastTimestamp' | tail -20
 oc get events -n <test-namespace> --sort-by='.lastTimestamp' | tail -30
 
+# SCC-related pod creation failures (DaemonSet hostNetwork/privileged tests)
+oc get events -n <test-namespace> --field-selector reason=FailedCreate --sort-by='.lastTimestamp'
+
 # CSV and subscription status
 oc get csv -n opentelemetry-operator-system -o jsonpath='{range .items[*]}{.metadata.name}: {.status.phase} — {.status.message}{"\n"}{end}'
 oc get subscription -n opentelemetry-operator-system -o jsonpath='{range .items[*]}{.metadata.name}: {.status.currentCSV} state={.status.state}{"\n"}{end}' 2>/dev/null || true
@@ -245,6 +278,7 @@ oc get subscription -n opentelemetry-operator-system -o jsonpath='{range .items[
 oc get crd | grep -E 'opentelemetry|observability'
 oc api-resources | grep opentelemetry
 ```
+
 
 ### Product Bug indicators
 Classify as `PRODUCT_BUG` when the evidence shows the operator or operand itself misbehaved:
@@ -262,6 +296,7 @@ Classify as `TEST_ISSUE` when the test itself is wrong or stale:
 - Race condition: the test asserts a resource state before the operator has had time to act — look for very short `timeout` values in chainsaw steps or missing `wait` blocks
 - Missing prerequisite in the test setup (CRD that must be installed before the test runs but isn't part of the test's `setup` steps)
 - Assertion checks a field or value that changed in the operator API (e.g., a renamed status condition)
+- Missing SCC setup for DaemonSet tests that use `hostNetwork: true` or privileged containers — compare with working DaemonSet tests (e.g., `smoke-collector-daemonset`) that include an SCC binding step
 
 ### Cluster Instability indicators
 
