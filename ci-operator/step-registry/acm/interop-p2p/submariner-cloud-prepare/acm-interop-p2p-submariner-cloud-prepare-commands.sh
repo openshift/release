@@ -40,27 +40,32 @@ typeset -a spokeNamesArr=()
 
 # ── Cleanup — remove AWS credentials on EXIT ──────────────────────────────────
 Cleanup() {
-    typeset _wasTracing=false
-    [[ $- == *x* ]] && _wasTracing=true
-    set +x
-    if [[ -n "${awsTmpCreds}" && -f "${awsTmpCreds}" ]]; then
-        rm -f "${awsTmpCreds}"
-    fi
-    rm -f "${HOME}/.aws/credentials" "${HOME}/.aws/config"
-    [[ "${_wasTracing}" == "true" ]] && set -x
+    ( set +x
+        [[ -n "${awsTmpCreds}" && -f "${awsTmpCreds}" ]] && rm -f "${awsTmpCreds}" || true
+        rm -f "${HOME}/.aws/credentials" "${HOME}/.aws/config" || true
+    true )
 }
 trap Cleanup EXIT
 
 # ── InstallSubctl — install subctl to /tmp/bin/ ───────────────────────────────
+# Downloads directly from GitHub releases and extracts with tar -xJf.
+# Requires xz, which is pre-installed in the cli-with-git step image.
 InstallSubctl() {
     mkdir -p /tmp/bin
-    if [[ -x "${subctlBin}" ]]; then
-        return 0
-    fi
-    curl -Ls https://get.submariner.io | bash
-    cp "${HOME}/.local/bin/subctl" "${subctlBin}"
-    chmod +x "${subctlBin}"
-    true
+    [[ -x "${subctlBin}" ]] && return 0
+
+    typeset version="${SUBMARINER_SUBCTL_VERSION}"
+    typeset tarUrl="https://github.com/submariner-io/subctl/releases/download/subctl-${version}/subctl-${version}-linux-amd64.tar.xz"
+    typeset tmpTar; tmpTar="$(mktemp /tmp/subctl-XXXXXX.tar.xz)"
+    typeset tmpDir; tmpDir="$(mktemp -d /tmp/subctl-dir-XXXXXX)"
+
+    curl -fsSL "${tarUrl}" -o "${tmpTar}"
+    tar -xJf "${tmpTar}" -C "${tmpDir}"
+    typeset extracted; extracted="$(find "${tmpDir}" -maxdepth 2 -name 'subctl' -type f | head -1)"
+    [[ -n "${extracted}" ]]
+    cp "${extracted}" "${subctlBin}"
+    rm -rf "${tmpDir}" "${tmpTar}"
+    [[ -x "${subctlBin}" ]]
 }
 
 # ── SetAwsCredentials — write ~/.aws/credentials from cluster profile ────────

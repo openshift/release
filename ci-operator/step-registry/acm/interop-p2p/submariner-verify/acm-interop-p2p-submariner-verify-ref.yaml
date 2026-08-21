@@ -1,6 +1,6 @@
 ref:
   as: acm-interop-p2p-submariner-verify
-  from: cli
+  from: cli-with-git
   commands: acm-interop-p2p-submariner-verify-commands.sh
   resources:
     requests:
@@ -9,10 +9,29 @@ ref:
   timeout: 45m0s
   grace_period: 10m0s
   env:
+    - name: SUBMARINER_SUBCTL_VERSION
+      default: "release-0.24"
+      documentation: |-
+        subctl release tag to download from GitHub releases.
+        Format: release-<major>.<minor> (e.g. release-0.24).
+        Must match the Submariner operator version deployed by broker-join.
     - name: ACM_SPOKE_CLUSTER_COUNT
       default: "2"
       documentation: |-
         Number of ACM spoke clusters to verify Submariner connectivity for.
+    - name: SUBMARINER_RUN_SUBCTL_VERIFY
+      default: "false"
+      documentation: |-
+        When "true", download subctl and run 'subctl verify' for full
+        connectivity and service-discovery tests between each spoke pair.
+        Set to "false" (default) to skip subctl verify and avoid the ~300s
+        polling timeouts it introduces.
+    - name: SUBMARINER_VERIFY_HUB_SPOKE
+      default: "false"
+      documentation: |-
+        When "true", also verify Submariner connectivity between the hub and
+        each spoke (hub-spoke jobs). Enables OVN route injection and CCLM sync
+        probing on the hub cluster in addition to spoke pairs.
     - name: SUBMARINER_VERIFY_DEBUG_MODE
       default: "false"
       documentation: |-
@@ -56,6 +75,8 @@ ref:
 
     Env vars consumed:
       ACM_SPOKE_CLUSTER_COUNT            - number of spoke clusters (default: 2)
+      SUBMARINER_RUN_SUBCTL_VERIFY       - run subctl verify tests (default: false)
+      SUBMARINER_VERIFY_HUB_SPOKE        - enable hub↔spoke verification (default: false)
       SUBMARINER_VERIFY_DEBUG_MODE       - swallow failures for debugging (default: false)
       SUBMARINER_VERIFY_CCLM_SYNC        - probe virt-sync-controller TCP path (default: true)
       SUBMARINER_CCLM_CNV_NAMESPACE      - CNV namespace (default: openshift-cnv)

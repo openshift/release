@@ -1,0 +1,165 @@
+ref:
+  as: p2p-mtv-spoke-to-hub-migration
+  from: cli
+  commands: p2p-mtv-spoke-to-hub-migration-commands.sh
+  timeout: 6h0m0s
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Execute the SPOKE→HUB direction of MTV cross-cluster live migration (CCLM).
+
+    This is a directional wrapper for p2p-mtv-execute-hub-spoke-migration: the migration
+    direction is hardcoded to spoke→hub regardless of any P2P_MIGRATION_DIRECTION value
+    in the job environment. This allows it to be placed AFTER spoke upgrade steps in a chain,
+    independently of a prior hub→spoke migration step.
+
+    Typical use in the upgrade+migration workflow:
+      1. p2p-mtv-execute-hub-spoke-migration (direction=hub-to-spoke via CI config env)
+      2. acm-interop-p2p-spoke-upgrade-prehealthcheck
+      3. acm-interop-p2p-spoke-upgrade
+      4. acm-interop-p2p-spoke-upgrade-healthcheck
+      5. p2p-mtv-spoke-to-hub-migration  ← this step
+
+    The spoke VMs (prefix MTV_HS_SPOKE_VM_PREFIX) that were migrated to the spoke in the
+    prior hub→spoke pass are now migrated back to the hub cluster (post-upgrade verification).
+
+    Full CCLM preflights run before migration:
+      - MTV spoke and hub providers Ready.
+      - StorageMap and NetworkMap for spoke→hub direction Ready.
+      - DecentralizedLiveMigration featureGate on both hub and spoke (patched via HCO).
+      - virt-synchronization-controller Available on both hub and spoke.
+      - MTV ForkliftController FEATURE_OCP_LIVE_MIGRATION=true verified.
+      - Submariner no-Globalnet on both.
+      - Provider inventory refresh.
+      - All source spoke VMs Running.
+      - TCP probe to hub virt-synchronization-controller :8443.
+
+    Requires:
+      - p2p-mtv-additional-config, p2p-mtv-register-providers, p2p-mtv-create-hub-spoke-maps.
+      - p2p-create-hub-spoke-test-vms (spoke VMs must exist and be Running on the spoke).
+      - acm-interop-p2p-spoke-upgrade (spoke must be upgraded before running reverse migration).
+      - CNV/ODF on both hub and spoke; Submariner no-Globalnet.
+
+    Hub kubeconfig is KUBECONFIG from ci-operator (also used for hub KubeVirt operations).
+
+    Writes:
+      ${ARTIFACT_DIR}/hub-spoke-spoke-to-hub-migration-status.txt
+      ${ARTIFACT_DIR}/junit_hub_spoke_cclm_migration.xml (Prow/Firewatch JUnit)
+      ${ARTIFACT_DIR}/hub-spoke-migration-diagnostics/spoke-to-hub/ on failure
+  env:
+  - name: P2P_HS_VM_COUNT
+    default: "2"
+    documentation: Number of VMs to migrate (must match p2p-create-hub-spoke-test-vms).
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV Plan and Migration CRs live on the hub.
+  - name: MTV_HS_PLAN_TYPE
+    default: "live"
+    documentation: Plan spec.type — live for CCLM, cold for powered-off migration.
+  - name: MTV_HS_HUB_PROVIDER
+    default: "host"
+    documentation: MTV Provider CR name for the hub cluster (auto-created by MTV at install time).
+  - name: MTV_HS_SPOKE_PROVIDER
+    default: "spoke-1"
+    documentation: MTV Provider CR name for the spoke (registered by p2p-mtv-register-providers).
+  - name: MTV_HS_HUB_TO_SPOKE_NETWORK_MAP
+    default: "hub-to-spoke-network-map"
+    documentation: NetworkMap CR name for hub→spoke direction (must match p2p-mtv-create-hub-spoke-maps).
+  - name: MTV_HS_HUB_TO_SPOKE_STORAGE_MAP
+    default: "hub-to-spoke-storage-map"
+    documentation: StorageMap CR name for hub→spoke direction (must match p2p-mtv-create-hub-spoke-maps).
+  - name: MTV_HS_HUB_TO_SPOKE_PLAN
+    default: "cclm-hub-to-spoke-plan"
+    documentation: Plan metadata.name for hub→spoke migration (not run by this step; kept for consistency).
+  - name: MTV_HS_HUB_TO_SPOKE_MIGRATION
+    default: "cclm-hub-to-spoke-run-1"
+    documentation: Migration metadata.name for hub→spoke migration (not run by this step; kept for consistency).
+  - name: MTV_HS_HUB_VM_PREFIX
+    default: "hub-vm"
+    documentation: VM name prefix on the hub (must match p2p-create-hub-spoke-test-vms P2P_HS_HUB_VM_PREFIX).
+  - name: MTV_HS_HUB_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Namespace of hub VMs.
+  - name: MTV_HS_HUB_TO_SPOKE_TARGET_NAMESPACE
+    default: ""
+    documentation: Destination namespace on spoke for hub→spoke direction. Not used by this step.
+  - name: MTV_HS_SPOKE_TO_HUB_NETWORK_MAP
+    default: "spoke-to-hub-network-map"
+    documentation: NetworkMap CR name for spoke→hub direction (must match p2p-mtv-create-hub-spoke-maps).
+  - name: MTV_HS_SPOKE_TO_HUB_STORAGE_MAP
+    default: "spoke-to-hub-storage-map"
+    documentation: StorageMap CR name for spoke→hub direction.
+  - name: MTV_HS_SPOKE_TO_HUB_PLAN
+    default: "cclm-spoke-to-hub-post-upgrade-plan"
+    documentation: |-
+      Plan metadata.name for spoke→hub migration. Uses a different default than the bidirectional
+      step (cclm-spoke-to-hub-plan) to avoid name collision when both steps run in the same job.
+  - name: MTV_HS_SPOKE_TO_HUB_MIGRATION
+    default: "cclm-spoke-to-hub-post-upgrade-run-1"
+    documentation: Migration metadata.name for spoke→hub migration post-upgrade.
+  - name: MTV_HS_SPOKE_VM_PREFIX
+    default: "spoke-vm"
+    documentation: VM name prefix on the spoke (must match p2p-create-hub-spoke-test-vms P2P_HS_SPOKE_VM_PREFIX).
+  - name: MTV_HS_SPOKE_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Namespace of spoke VMs (source namespace for spoke→hub migration).
+  - name: MTV_HS_SPOKE_TO_HUB_TARGET_NAMESPACE
+    default: ""
+    documentation: Destination namespace on hub for spoke→hub migration. Empty uses MTV_HS_SPOKE_VM_NAMESPACE.
+  - name: MTV_HS_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based SHARED_DIR kubeconfig index for the spoke cluster.
+  - name: MTV_HS_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional explicit kubeconfig path for the spoke cluster.
+  - name: MTV_HS_PLAN_READY_TIMEOUT
+    default: "15m"
+    documentation: Timeout for Provider/Map/Plan Ready waits.
+  - name: MTV_HS_MIGRATION_TIMEOUT
+    default: "2h"
+    documentation: Max duration to wait for Migration Succeeded.
+  - name: MTV_HS_MIGRATION_POLL_INTERVAL_SECONDS
+    default: "30"
+    documentation: Sleep between Migration status polls.
+  - name: MTV_HS_CNV_NAMESPACE
+    default: "openshift-cnv"
+    documentation: OpenShift Virtualization namespace on both hub and spoke.
+  - name: MTV_HS_KUBEVIRT_NAME
+    default: "kubevirt-kubevirt-hyperconverged"
+    documentation: KubeVirt CR name on both hub and spoke.
+  - name: MTV_HS_HCO_NAME
+    default: "kubevirt-hyperconverged"
+    documentation: HyperConverged CR name patched when ensuring DecentralizedLiveMigration gate.
+  - name: MTV_HS_ENSURE_DECENTRALIZED_LIVE_MIGRATION
+    default: "true"
+    documentation: Patch HCO featureGates on hub and spoke when DecentralizedLiveMigration is missing.
+  - name: MTV_HS_FORKLIFT_CONTROLLER_NAME
+    default: "forklift-controller"
+    documentation: ForkliftController deployment name on the hub.
+  - name: MTV_HS_PROVIDER_INVENTORY_REFRESH_WAIT
+    default: "5m"
+    documentation: Timeout for provider Ready after inventory refresh.
+  - name: MTV_HS_SYNC_CONTROLLER_WAIT
+    default: "10m"
+    documentation: Timeout for virt-synchronization-controller Available on hub and spoke.
+  - name: MTV_HS_CCLM_SYNC_PROBE
+    default: "true"
+    documentation: TCP-probe hub sync-controller from source virt-launcher before migration.
+  - name: MTV_HS_CCLM_SYNC_PORT
+    default: "8443"
+    documentation: KubeVirt cross-cluster sync controller TCP port.
+  - name: MTV_HS_CCLM_SYNC_PROBE_TIMEOUT
+    default: "10"
+    documentation: Seconds to wait per pre-migration CCLM sync TCP probe attempt.
+  - name: MTV_HS_CCLM_SYNC_PROBE_RETRIES
+    default: "5"
+    documentation: Max attempts for the pre-migration CCLM sync port TCP probe.
+  - name: MTV_HS_SYNC_STUCK_MINUTES
+    default: "20"
+    documentation: Fail migration wait if Synchronization stays Running with VMIM stuck longer than this.
+  - name: P2P_CCLM_DEBUG_MODE
+    default: "false"
+    documentation: When true, log failures and exit 0 so downstream debug steps can run.

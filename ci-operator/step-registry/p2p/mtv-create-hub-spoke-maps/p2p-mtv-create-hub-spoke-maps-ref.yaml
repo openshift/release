@@ -1,0 +1,85 @@
+ref:
+  as: p2p-mtv-create-hub-spoke-maps
+  from: cli
+  commands: p2p-mtv-create-hub-spoke-maps-commands.sh
+  timeout: 30m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Create MTV NetworkMap and StorageMap for bi-directional hub↔spoke migration on the ACM hub.
+
+    The hub cluster is represented by the MTV "host" provider (MTV_HS_HUB_PROVIDER, default "host"),
+    automatically created by MTV at install time — no separate registration needed. The spoke is
+    the OpenShift provider registered by p2p-mtv-register-providers.
+
+    Hub→Spoke: creates MTV_HS_HUB_TO_SPOKE_NETWORK_MAP (pod→pod) and MTV_HS_HUB_TO_SPOKE_STORAGE_MAP
+    (hub ODF StorageClass → spoke ODF StorageClass) between the hub "host" provider and the spoke
+    provider.
+
+    Spoke→Hub: creates MTV_HS_SPOKE_TO_HUB_NETWORK_MAP (pod→pod) and MTV_HS_SPOKE_TO_HUB_STORAGE_MAP
+    (spoke ODF StorageClass → hub ODF StorageClass) between the spoke provider and the hub "host"
+    provider.
+
+    Both providers are waited for Ready (with optional inventory refresh) before maps are applied.
+    All four maps are waited for Ready before the step exits.
+
+    Requires: p2p-mtv-additional-config (ForkliftController with CCLM gate), p2p-mtv-register-providers
+    (spoke provider registered and Ready), p2p-install-odf-hub and p2p-install-odf-spokes (ODF
+    Available on both hub and spoke). Hub kubeconfig is KUBECONFIG from ci-operator.
+
+    Writes ${ARTIFACT_DIR}/mtv-hub-spoke-maps-status.txt.
+  env:
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV operator and map CRs live.
+  - name: MTV_HS_HUB_PROVIDER
+    default: "host"
+    documentation: |-
+      MTV Provider CR name for the hub cluster. MTV automatically creates a "host" provider
+      representing the local hub cluster at install time. Verify with:
+        oc get providers -n openshift-mtv
+  - name: MTV_HS_SPOKE_PROVIDER
+    default: "spoke-1"
+    documentation: MTV Provider CR name for the spoke cluster (registered by p2p-mtv-register-providers).
+  - name: MTV_HS_HUB_TO_SPOKE_NETWORK_MAP
+    default: "hub-to-spoke-network-map"
+    documentation: NetworkMap metadata.name for the hub→spoke direction.
+  - name: MTV_HS_HUB_TO_SPOKE_STORAGE_MAP
+    default: "hub-to-spoke-storage-map"
+    documentation: StorageMap metadata.name for the hub→spoke direction.
+  - name: MTV_HS_HUB_STORAGE_NAME
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: |-
+      ODF StorageClass name on the hub cluster (spec.map[].source.name for hub→spoke StorageMap).
+      Must match the StorageClass used for hub VMs in p2p-create-hub-spoke-test-vms.
+  - name: MTV_HS_SPOKE_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: |-
+      ODF StorageClass name on the spoke cluster (destination storageClass for hub→spoke StorageMap).
+  - name: MTV_HS_SPOKE_TO_HUB_NETWORK_MAP
+    default: "spoke-to-hub-network-map"
+    documentation: NetworkMap metadata.name for the spoke→hub direction.
+  - name: MTV_HS_SPOKE_TO_HUB_STORAGE_MAP
+    default: "spoke-to-hub-storage-map"
+    documentation: StorageMap metadata.name for the spoke→hub direction.
+  - name: MTV_HS_SPOKE_STORAGE_NAME
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: |-
+      ODF StorageClass name on the spoke cluster (spec.map[].source.name for spoke→hub StorageMap).
+      Must match the StorageClass used for spoke VMs in p2p-create-hub-spoke-test-vms.
+  - name: MTV_HS_HUB_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: |-
+      ODF StorageClass name on the hub cluster (destination storageClass for spoke→hub StorageMap).
+  - name: MTV_HS_PROVIDER_READY_TIMEOUT
+    default: "15m"
+    documentation: Timeout for oc wait provider/<name> --for=condition=Ready before map creation.
+  - name: MTV_HS_MAP_READY_TIMEOUT
+    default: "15m"
+    documentation: Timeout for NetworkMap/StorageMap Ready waits.
+  - name: MTV_HS_SKIP_INVENTORY_REFRESH
+    default: "false"
+    documentation: Set to "true" to skip forklift.konveyor.io/inventory-refresh annotation on providers.
