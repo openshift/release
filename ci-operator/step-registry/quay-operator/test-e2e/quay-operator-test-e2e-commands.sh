@@ -33,12 +33,14 @@ export QUAY_USERNAME
 export QUAY_PASSWORD
 export CI=true
 
-# Mailpit HTTP API base URL for email-dependent specs (utils/mailpit.ts). Written
-# by the quay-operator-deploy-mailpit step. Left unset when mailing is disabled.
+# Mailpit HTTP API base URL for email-dependent specs. utils/mailpit.ts reads
+# process.env.MAILPIT_API_URL (NOT MAILPIT_API), so the var name must match or the
+# suite falls back to http://localhost:8025 and reports "Mailpit NOT available".
+# Written by the quay-operator-deploy-mailpit step. Left unset when mailing is off.
 if [[ -s "${SHARED_DIR}/mailpit_api" ]]; then
-  MAILPIT_API=$(cat "${SHARED_DIR}/mailpit_api")
-  export MAILPIT_API
-  echo "MAILPIT_API=${MAILPIT_API}"
+  MAILPIT_API_URL=$(cat "${SHARED_DIR}/mailpit_api")
+  export MAILPIT_API_URL
+  echo "MAILPIT_API_URL=${MAILPIT_API_URL}"
 else
   echo "No mailpit_api in SHARED_DIR; email-dependent specs may skip or fail"
 fi

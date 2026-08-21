@@ -97,9 +97,10 @@ if [[ -z "${MAILPIT_HOST}" ]]; then
   exit 1
 fi
 
-# utils/mailpit.ts calls `${MAILPIT_API}/messages`; Mailpit serves that under
-# /api/v1, so the base URL includes the /api/v1 segment.
-MAILPIT_API="https://${MAILPIT_HOST}/api/v1"
-echo "${MAILPIT_API}" > "${SHARED_DIR}/mailpit_api"
+# utils/mailpit.ts reads MAILPIT_API_URL and calls `${MAILPIT_API_URL}/messages`;
+# Mailpit serves that under /api/v1, so the base URL includes the /api/v1 segment.
+# The test step exports this file's contents as MAILPIT_API_URL.
+MAILPIT_API_URL="https://${MAILPIT_HOST}/api/v1"
+echo "${MAILPIT_API_URL}" > "${SHARED_DIR}/mailpit_api"
 cp "${SHARED_DIR}/mailpit_api" "${ARTIFACT_DIR}/mailpit_api" || true
-echo "Mailpit API: ${MAILPIT_API}"
+echo "Mailpit API: ${MAILPIT_API_URL}"
