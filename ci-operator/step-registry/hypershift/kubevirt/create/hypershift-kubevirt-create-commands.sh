@@ -161,9 +161,17 @@ count_configured_localnet_lsps_for_nad() {
   local multi_ns="$1"
   local nad_name="$2"
   local subnet="$3"
+  local -a target_nodes=()
   local count=0 node ovn_pod lsp_name
 
-  for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+  if [[ $# -ge 4 && -n "${4:-}" ]]; then
+    read -ra target_nodes <<< "${4}"
+  else
+    read -ra target_nodes <<< "$(oc get nodes -o jsonpath='{.items[*].metadata.name}')"
+  fi
+
+  for node in "${target_nodes[@]}"; do
+    [[ -z "${node}" ]] && continue
     ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
       --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
     [[ -z "${ovn_pod}" ]] && continue
@@ -175,6 +183,41 @@ count_configured_localnet_lsps_for_nad() {
     done < <(find_localnet_lsps_for_nad "${multi_ns}" "${ovn_pod}" "${nad_name}" "${subnet}")
   done
   echo "${count}"
+}
+
+localnet_multi_should_disable_ipv6_boot() {
+  [[ "${LOCALNET_MULTI_DISABLE_IPV6_BOOT:-true}" == "true" ]] \
+    && [[ "${IP_STACK}" == "v4v6" || "${IP_STACK}" == "v6v4" ]]
+}
+
+# restrict_localnet_lsp_to_ipv4 removes IPv6 addresses from a localnet LSP so initrd
+# Ignition uses IPv4 DNS/route to the ingress VIP instead of timing out on IPv6 ::4.
+restrict_localnet_lsp_to_ipv4() {
+  local ovn_pod="$1"
+  local lsp_name="$2"
+  local addrs ipv4_addr
+
+  if ! localnet_multi_should_disable_ipv6_boot; then
+    return 0
+  fi
+
+  addrs=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl get Logical_Switch_Port "${lsp_name}" dynamic_addresses 2>/dev/null || true)
+  addrs=${addrs//\"/}
+  [[ -z "${addrs}" || "${addrs}" == "[]" ]] && return 0
+
+  ipv4_addr=$(echo "${addrs}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+  if [[ -z "${ipv4_addr}" ]]; then
+    return 0
+  fi
+  if [[ "${addrs}" == *":"* ]]; then
+    oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl lsp-set-addresses "${lsp_name}" "${ipv4_addr}" 2>/dev/null || true
+    oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl clear Logical_Switch_Port "${lsp_name}" dhcpv6_options 2>/dev/null || true
+    echo "  Restricted ${lsp_name} to IPv4 ${ipv4_addr} (disabled IPv6 for initrd bootstrap)"
+  fi
+  return 0
 }
 
 configure_localnet_multi_dhcp_on_nodes() {
@@ -206,9 +249,11 @@ configure_localnet_multi_dhcp_on_nodes() {
       while IFS= read -r lsp_name; do
         [[ -z "${lsp_name}" ]] && continue
         if lsp_has_dhcp_configured "${ovn_pod}" "${lsp_name}"; then
+          restrict_localnet_lsp_to_ipv4 "${ovn_pod}" "${lsp_name}"
           continue
         fi
         if configure_localnet_multi_dhcp_on_lsp "${ovn_pod}" "${lsp_name}" "${subnet}" "${i}"; then
+          restrict_localnet_lsp_to_ipv4 "${ovn_pod}" "${lsp_name}"
           echo "  Configured DHCP for ${nad_name} (LSP=${lsp_name}, node=${node})"
         else
           echo "  WARNING: Failed to configure DHCP for ${nad_name} (LSP=${lsp_name}, node=${node})"
@@ -218,9 +263,33 @@ configure_localnet_multi_dhcp_on_nodes() {
     done
   done
 
-  PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${multi_ns}" "localnet-1" "${SUBNETS[0]}")
+  if [[ $# -ge 3 && -n "${3:-}" ]]; then
+    PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${multi_ns}" "localnet-1" "${SUBNETS[0]}" "${3}")
+  else
+    PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${multi_ns}" "localnet-1" "${SUBNETS[0]}")
+  fi
   echo "localnet-multi DHCP: ${PRIMARY_CONFIGURED}/${HYPERSHIFT_NODE_COUNT} primary LSPs configured, ${pending} pending on targeted nodes"
   [[ ${pending} -eq 0 ]]
+}
+
+renew_localnet_multi_dhcp_for_running_vmis_if_ready() {
+  local multi_ns="$1"
+  local network_count="$2"
+  local vmi phase vmi_ip renewed=0 marker
+
+  for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    phase=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+    [[ "${phase}" == "Running" ]] || continue
+    marker="${SHARED_DIR}/localnet_multi_renewed_${vmi}"
+    [[ -f "${marker}" ]] && continue
+    vmi_ip=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || true)
+    [[ -n "${vmi_ip}" ]] || continue
+    if renew_localnet_multi_dhcp_on_vmi "${multi_ns}" "${network_count}" "${vmi}"; then
+      touch "${marker}"
+      renewed=$((renewed + 1))
+    fi
+  done
+  [[ ${renewed} -gt 0 ]]
 }
 
 wait_for_localnet_multi_vmis_running() {
@@ -765,7 +834,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   fi
 
   echo "Configuring early OVN DHCP for multi (${NETWORK_COUNT})-localnet interfaces..."
-  DHCP_CONFIGURE_READY=false
+  prepare_localnet_multi_dhcp_renewal_secret "${MULTI_NAMESPACE}" || true
   for attempt in $(seq 1 120); do
     if [[ -n "${LAUNCHER_NODES// }" ]]; then
       configure_localnet_multi_dhcp_on_nodes "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" "${LAUNCHER_NODES}" || true
@@ -773,14 +842,21 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
       configure_localnet_multi_dhcp_on_nodes "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
     fi
 
-    PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${MULTI_NAMESPACE}" "localnet-1" "${SUBNETS[0]}")
+    if [[ -n "${LAUNCHER_NODES// }" ]]; then
+      PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${MULTI_NAMESPACE}" "localnet-1" "${SUBNETS[0]}" "${LAUNCHER_NODES}")
+    else
+      PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${MULTI_NAMESPACE}" "localnet-1" "${SUBNETS[0]}")
+    fi
+
     if [[ ${PRIMARY_CONFIGURED} -ge ${HYPERSHIFT_NODE_COUNT} ]]; then
       echo "Early OVN DHCP configuration complete for multi (${NETWORK_COUNT})-localnet interfaces"
-      DHCP_CONFIGURE_READY=true
       break
     fi
 
-    echo "Attempt ${attempt}/120: ${PRIMARY_CONFIGURED}/${HYPERSHIFT_NODE_COUNT} primary LSPs configured"
+    # Best-effort: renew DHCP and disable IPv6 on enp*s0 as soon as SSH is reachable.
+    renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
+
+    echo "Attempt ${attempt}/120: ${PRIMARY_CONFIGURED}/${HYPERSHIFT_NODE_COUNT} primary LSPs configured on worker node(s)"
     if [[ ${attempt} -eq 120 ]]; then
       echo "ERROR: Failed to configure DHCP on all worker localnet LSPs after 10 minutes"
       exit 1
@@ -790,7 +866,25 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
 fi
 
 echo "Waiting for cluster to become available"
-oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
+if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
+  MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
+  for attempt in $(seq 1 360); do
+    renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
+    if oc get hostedcluster "${CLUSTER_NAME}" -n "${CLUSTER_NAMESPACE_PREFIX}" \
+      -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null | grep -q True; then
+      echo "HostedCluster became Available (attempt ${attempt})"
+      break
+    fi
+    if [[ ${attempt} -eq 360 ]]; then
+      echo "ERROR: HostedCluster did not become Available within 30 minutes"
+      exit 1
+    fi
+    sleep 5
+  done
+else
+  oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
+fi
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
