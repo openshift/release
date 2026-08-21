@@ -13,9 +13,22 @@ resources:
       memory: 200Mi
 tests:
 - as: terraform-validate
-  commands: ./ci/terraform-validate.sh
-  container:
-    from: src
+  steps:
+    test:
+    - as: validate
+      commands: |
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(cat /etc/github-private/oauth)"; }; f'
+        ./ci/terraform-validate.sh
+      credentials:
+      - mount_path: /etc/github-private
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        namespace: ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift-online
