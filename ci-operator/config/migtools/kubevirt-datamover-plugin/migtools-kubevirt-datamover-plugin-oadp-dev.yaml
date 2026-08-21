@@ -1,3 +1,8 @@
+base_images:
+  test-oadp-operator:
+    name: oadp-operator-e2e-tests
+    namespace: konveyor
+    tag: oadp-dev
 build_root:
   image_stream_tag:
     name: builder
@@ -13,6 +18,12 @@ promotion:
   to:
   - namespace: konveyor
     tag: oadp-dev
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -20,6 +31,90 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-test-aws
+  run_if_changed: (\.go|\.ya?ml|\.sh)$|^go\.(mod|sum)$|^Makefile$|^Dockerfile$|^\.dockerignore$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      OO_BUNDLE: quay-proxy.ci.openshift.org/openshift/ci:konveyor_oadp-operator-bundle_oadp-dev
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_INSTALL_TIMEOUT_MINUTES: "25"
+      OO_MIRROR_TO_CLUSTER_REGISTRY: "true"
+      OO_PSA_ENFORCE_PRIVILEGED: "true"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: oadp-operator-sdk-bundle-image
+    test:
+    - as: set-related-image
+      cli: latest
+      commands: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        SUBS=$(oc get subscription -n "${OO_INSTALL_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}')
+        if [ -z "${SUBS}" ]; then
+          echo "No Subscription found in namespace ${OO_INSTALL_NAMESPACE}" >&2
+          exit 1
+        fi
+        if [ "$(echo "${SUBS}" | wc -w)" -gt 1 ]; then
+          echo "Multiple Subscriptions found in ${OO_INSTALL_NAMESPACE}: ${SUBS}" >&2
+          exit 1
+        fi
+        SUB="${SUBS}"
+        echo "Discovered Subscription: ${SUB}"
+        # Subscription.spec.config.env is OLM's supported override mechanism:
+        # it wins over same-named CSV env vars and survives reconciliation,
+        # unlike patching the Deployment directly (OLM reconciles that from
+        # the CSV and would revert it). Built with printf, not jq -- the cli
+        # image doesn't ship it, and the patch shape is fixed/simple enough not to need it.
+        # NOTE: --type merge below REPLACES the whole spec.config.env array
+        # rather than merging by key. Safe today only because operator-sdk's
+        # freshly created Subscription in this ephemeral, single-purpose
+        # namespace has no pre-existing config.env entries to lose; this
+        # would need a read-modify-write if that ever stops being true.
+        PATCH=$(printf '{"spec":{"config":{"env":[{"name":"RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN","value":"%s"}]}}}' "${KDM_PLUGIN_IMAGE}")
+        oc patch subscription "${SUB}" -n "${OO_INSTALL_NAMESPACE}" --type merge -p "${PATCH}"
+        echo "Waiting for Deployment to observe RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN=${KDM_PLUGIN_IMAGE}"
+        for _ in $(seq 1 60); do
+          CURRENT=$(oc get deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" -o jsonpath="{.spec.template.spec.containers[?(@.name==\"manager\")].env[?(@.name==\"RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN\")].value}" 2>/dev/null || true)
+          [ "${CURRENT}" = "${KDM_PLUGIN_IMAGE}" ] && break
+          sleep 5
+        done
+        if [ "${CURRENT}" != "${KDM_PLUGIN_IMAGE}" ]; then
+          echo "Timed out waiting for Deployment spec to reflect the Subscription.spec.config.env override" >&2
+          oc get subscription "${SUB}" -n "${OO_INSTALL_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/subscription-${SUB}.yaml" || true
+          oc get csv -n "${OO_INSTALL_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/csvs.yaml" || true
+          oc get deployment -n "${OO_INSTALL_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/deployments.yaml" || true
+          exit 1
+        fi
+        oc rollout status deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" --timeout=180s
+      dependencies:
+      - env: KDM_PLUGIN_IMAGE
+        name: kubevirt-datamover-plugin
+      env:
+      - name: OO_INSTALL_NAMESPACE
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: e2e
+      cli: latest
+      commands: make TEST_VIRT_KDM=true test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
 zz_generated_metadata:
   branch: oadp-dev
   org: migtools
