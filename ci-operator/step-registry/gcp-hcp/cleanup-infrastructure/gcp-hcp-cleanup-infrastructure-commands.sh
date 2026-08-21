@@ -228,6 +228,11 @@ delete_dns_records() {
 
   while IFS= read -r zone; do
     [[ -z "${zone}" ]] && continue
+    # Skip GKE Cloud DNS Scope zones (internal cluster DNS) — deleted with the cluster
+    if [[ "${zone}" == gke-* ]]; then
+      log "  Skipping GKE internal zone: ${zone}"
+      continue
+    fi
     log "  Zone: ${zone}"
 
     local records
@@ -313,23 +318,115 @@ clear_tfc_workspace() {
     return 0
   fi
 
-  # Delete workspace (deletes state)
-  local delete_output
-  local delete_exit
-  delete_output=$(curl -sS -X DELETE \
+  # Use terraform CLI to clear state, then safe-delete the workspace.
+  # The GCP projects are already deleted, so the state is stale.
+  # Install terraform, point it at the TFC workspace via cloud backend,
+  # and run 'terraform state rm' at the module level for speed (~3s for 400+ resources).
+
+  # Install terraform (same version as .tool-versions)
+  local tf_version="1.15.8"
+  log "  Installing terraform ${tf_version}..."
+  if ! curl -fsSL --max-time 120 \
+    "https://releases.hashicorp.com/terraform/${tf_version}/terraform_${tf_version}_linux_amd64.zip" \
+    -o /tmp/terraform.zip; then
+    log "  WARNING: Failed to download terraform, skipping TFC cleanup"
+    return 0
+  fi
+  if command -v unzip &>/dev/null; then
+    unzip -o -q /tmp/terraform.zip -d /tmp
+  else
+    python3 -c "import zipfile; zipfile.ZipFile('/tmp/terraform.zip').extractall('/tmp')"
+  fi
+  chmod +x /tmp/terraform
+
+  # Create minimal terraform config with cloud backend
+  local tf_dir="/tmp/tfc-cleanup"
+  mkdir -p "${tf_dir}"
+  cat > "${tf_dir}/main.tf" <<TFEOF
+terraform {
+  cloud {
+    organization = "${tfc_org}"
+    workspaces {
+      name = "${workspace_name}"
+    }
+  }
+}
+TFEOF
+
+  # Configure TFC auth
+  (umask 077 && cat > "$HOME/.terraformrc" <<TFRC
+credentials "app.terraform.io" {
+  token = "${tfc_token}"
+}
+TFRC
+  )
+
+  export TF_INPUT=false
+  export TF_IN_AUTOMATION=true
+
+  log "  Initializing terraform against workspace ${workspace_name}..."
+  if ! /tmp/terraform -chdir="${tf_dir}" init -no-color 2>&1 | tee -a "${LOG}"; then
+    log "  WARNING: terraform init failed, skipping TFC cleanup"
+    return 0
+  fi
+
+  # Force-unlock if the workspace is locked from a previous run
+  local lock_id
+  lock_id=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>&1 | \
+    grep -oP 'lock ID: "\K[^"]+' || echo "")
+  if [[ -n "${lock_id}" ]]; then
+    log "  Workspace locked (${lock_id}), force-unlocking..."
+    /tmp/terraform -chdir="${tf_dir}" force-unlock -force "${lock_id}" -no-color 2>&1 | tee -a "${LOG}" || true
+  fi
+
+  # Remove all resources from state at the module level — fast bulk operation.
+  # E2E state has 3 top-level modules: customer_project, management_cluster, region.
+  # Removing at module level clears all child resources in one API call (~3 seconds).
+  log "  Clearing all resources from state (module-level rm)..."
+  local resource_count
+  resource_count=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>/dev/null | wc -l | tr -d ' ')
+  resource_count=${resource_count:-0}
+
+  if [[ ${resource_count} -eq 0 ]]; then
+    log "  State is already empty"
+  else
+    log "  Removing ${resource_count} resources across top-level modules..."
+    /tmp/terraform -chdir="${tf_dir}" state rm \
+      module.customer_project \
+      module.management_cluster \
+      module.region \
+      -no-color 2>&1 | tail -5 | tee -a "${LOG}" || true
+
+    # Check if any resources remain (e.g. top-level data sources)
+    local remaining
+    remaining=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>/dev/null | wc -l | tr -d ' ')
+    remaining=${remaining:-0}
+    if [[ ${remaining} -gt 0 ]]; then
+      log "  ${remaining} resource(s) remain, removing individually..."
+      /tmp/terraform -chdir="${tf_dir}" state list -no-color 2>/dev/null | \
+        while IFS= read -r addr; do
+          [[ -z "${addr}" ]] && continue
+          /tmp/terraform -chdir="${tf_dir}" state rm "${addr}" -no-color 2>/dev/null || true
+        done
+    fi
+  fi
+
+  # Safe-delete the workspace (should succeed with 0 resources)
+  log "  Deleting workspace..."
+  local http_code
+  http_code=$(curl -sS -o /dev/null -w "%{http_code}" \
     --max-time 30 \
     --connect-timeout 10 \
     --header "Authorization: Bearer ${tfc_token}" \
     --header "Content-Type: application/vnd.api+json" \
-    "https://app.terraform.io/api/v2/workspaces/${workspace_id}" 2>&1)
-  delete_exit=$?
-  
-  echo "${delete_output}" | tee -a "${LOG}"
-  
-  if [[ ${delete_exit} -eq 0 ]]; then
+    --request POST \
+    "https://app.terraform.io/api/v2/workspaces/${workspace_id}/actions/safe-delete" 2>/dev/null || echo "000")
+
+  if [[ "${http_code}" == "204" || "${http_code}" == "200" ]]; then
     log "  TFC workspace deleted: ${workspace_name}"
   else
-    log "  WARNING: Failed to delete TFC workspace (exit code: ${delete_exit}, may already be deleted)"
+    log "  WARNING: Could not delete TFC workspace (HTTP ${http_code}). Manual cleanup may be needed."
+    log "  Workspace: https://app.terraform.io/app/${tfc_org}/workspaces/${workspace_name}"
   fi
 }
 
