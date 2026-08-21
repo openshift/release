@@ -180,14 +180,16 @@ tekton_file_version_compare() {
 # Remove Tekton files whose embedded version is <= max_version (X.Y format).
 # Must be called with cwd inside the target git working tree, on the branch
 # already checked out. Stages removals with `git rm`. All log output goes to
-# stderr; only the count of removed files is written to stdout, so callers
-# can safely capture the result via command substitution.
+# stderr; only the result is written to stdout as "<removed> <failed>", so
+# callers can safely capture it via command substitution and must treat a
+# non-zero <failed> count as an error rather than silently proceeding.
 cleanup_stale_tekton_files() {
   local product_prefix=$1
   local branch_prefix=$2
   local max_version=$3  # e.g. "5.0" - files at or below this are removed
 
   local removed=0
+  local failed=0
 
   for old_file in .tekton/*-"${product_prefix}"-*-*.yaml; do
     [[ -f "$old_file" ]] || continue
@@ -216,12 +218,13 @@ cleanup_stale_tekton_files() {
       if git rm -q "$old_file" >/dev/null 2>&1; then
         removed=$((removed + 1))
       else
-        echo "WARNING: Could not remove ${old_file}" >&2
+        echo "ERROR: Could not remove ${old_file}" >&2
+        failed=$((failed + 1))
       fi
     fi
   done
 
-  echo "$removed"
+  echo "$removed $failed"
 }
 
 # Transform Tekton files from source version to destination version
@@ -358,8 +361,17 @@ transform_tekton_files() {
     # earlier release cycles that rode along via fast-forward (e.g. an
     # acm-50- template that was never cleaned up on this branch).
     local removed_stale=0
+    local failed_cleanup=0
     if [[ -n "${last_release_version:-}" ]]; then
-      removed_stale=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${last_release_version}")
+      local cleanup_result
+      cleanup_result=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${last_release_version}")
+      removed_stale="${cleanup_result%% *}"
+      failed_cleanup="${cleanup_result##* }"
+    fi
+
+    if [[ "${failed_cleanup}" -gt 0 ]]; then
+      echo "ERROR: Failed to remove ${failed_cleanup} stale Tekton file(s) <= ${last_release_version}, aborting"
+      exit 1
     fi
 
     if [[ "$files_found" == "false" ]] && [[ "${removed_stale}" -eq 0 ]]; then
@@ -912,10 +924,19 @@ create_tekton_files() {
     # the versions above; now that those new versions have been created on
     # ${default_branch}, the old template is stale and should not persist.
     local removed_stale=0
+    local failed_cleanup=0
     if [[ -n "${LAST_RELEASE_VERSION:-}" ]]; then
       log "INFO Cleaning up Tekton files <= LAST_RELEASE_VERSION (${LAST_RELEASE_VERSION})"
-      removed_stale=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${LAST_RELEASE_VERSION}")
+      local cleanup_result
+      cleanup_result=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${LAST_RELEASE_VERSION}")
+      removed_stale="${cleanup_result%% *}"
+      failed_cleanup="${cleanup_result##* }"
       log "INFO Removed ${removed_stale} stale Tekton file(s)"
+
+      if [[ "${failed_cleanup}" -gt 0 ]]; then
+        log "ERROR Failed to remove ${failed_cleanup} stale Tekton file(s) <= LAST_RELEASE_VERSION, aborting"
+        exit 1
+      fi
     fi
 
     # Check if PR exists for branch (even if no new files)
