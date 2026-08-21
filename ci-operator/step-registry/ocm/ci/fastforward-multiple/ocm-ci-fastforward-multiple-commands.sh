@@ -118,6 +118,112 @@ extract_version_from_branch() {
   return 1
 }
 
+# Compare two X.Y version strings numerically by major then minor.
+# Echoes -1, 0, or 1 (a <, ==, > b).
+compare_versions() {
+  local a_major="${1%%.*}"
+  local a_minor="${1##*.}"
+  local b_major="${2%%.*}"
+  local b_minor="${2##*.}"
+
+  if [[ $a_major -lt $b_major ]]; then
+    echo "-1"
+  elif [[ $a_major -gt $b_major ]]; then
+    echo "1"
+  elif [[ $a_minor -lt $b_minor ]]; then
+    echo "-1"
+  elif [[ $a_minor -gt $b_minor ]]; then
+    echo "1"
+  else
+    echo "0"
+  fi
+}
+
+# Compare a Tekton file's embedded version against a target X.Y version.
+# Prefers the semantic version embedded in the file content (e.g. a
+# "release-5.0" / "backplane-5.0" branch reference), since compact filename
+# versions (e.g. "50", "217") don't sort correctly once a minor version
+# reaches double digits (mirrors get_highest_tekton_version's approach).
+# Falls back to comparing the compact filename version numerically if no
+# semantic version can be extracted from the file content.
+# Echoes -1, 0, or 1 (file version <, ==, > target).
+tekton_file_version_compare() {
+  local file=$1
+  local branch_prefix=$2
+  local file_ver_compact=$3  # e.g. "50" or "5-0"
+  local target_version=$4    # e.g. "5.0"
+
+  local semantic_version
+  semantic_version=$(grep -oE "${branch_prefix}-[0-9]+\.[0-9]+" "$file" 2>/dev/null | head -1 | cut -d'-' -f2)
+
+  if [[ -n "$semantic_version" ]]; then
+    compare_versions "$semantic_version" "$target_version"
+    return
+  fi
+
+  # Fallback: compare compact filename version numerically
+  local target_compact="${target_version//./}"
+  local file_num="${file_ver_compact//-/}"
+  local target_num="${target_compact//-/}"
+  file_num=$((10#${file_num}))
+  target_num=$((10#${target_num}))
+
+  if [[ $file_num -lt $target_num ]]; then
+    echo "-1"
+  elif [[ $file_num -gt $target_num ]]; then
+    echo "1"
+  else
+    echo "0"
+  fi
+}
+
+# Remove Tekton files whose embedded version is <= max_version (X.Y format).
+# Must be called with cwd inside the target git working tree, on the branch
+# already checked out. Stages removals with `git rm`. All log output goes to
+# stderr; only the count of removed files is written to stdout, so callers
+# can safely capture the result via command substitution.
+cleanup_stale_tekton_files() {
+  local product_prefix=$1
+  local branch_prefix=$2
+  local max_version=$3  # e.g. "5.0" - files at or below this are removed
+
+  local removed=0
+
+  for old_file in .tekton/*-"${product_prefix}"-*-*.yaml; do
+    [[ -f "$old_file" ]] || continue
+
+    local old_filename
+    old_filename=$(basename "$old_file")
+
+    local old_ver_compact=""
+    if [[ "${product_prefix}" == "globalhub" ]]; then
+      if [[ "$old_filename" =~ ${product_prefix}-([0-9]+-[0-9]+)- ]]; then
+        old_ver_compact="${BASH_REMATCH[1]}"
+      fi
+    else
+      if [[ "$old_filename" =~ ${product_prefix}-([0-9]+)- ]]; then
+        old_ver_compact="${BASH_REMATCH[1]}"
+      fi
+    fi
+
+    [[ -n "$old_ver_compact" ]] || continue
+
+    local cmp
+    cmp=$(tekton_file_version_compare "$old_file" "${branch_prefix}" "${old_ver_compact}" "${max_version}")
+
+    if [[ "$cmp" == "-1" || "$cmp" == "0" ]]; then
+      echo "INFO: Removing stale Tekton file: ${old_filename} (<= ${max_version})" >&2
+      if git rm -q "$old_file" >/dev/null 2>&1; then
+        removed=$((removed + 1))
+      else
+        echo "WARNING: Could not remove ${old_file}" >&2
+      fi
+    fi
+  done
+
+  echo "$removed"
+}
+
 # Transform Tekton files from source version to destination version
 # After fast-forward, renames and updates Tekton files for new branch
 transform_tekton_files() {
@@ -246,18 +352,38 @@ transform_tekton_files() {
       files_transformed=$((files_transformed + 1))
     done
 
-    if [[ "$files_found" == "false" ]]; then
-      echo "INFO: No ${source_pattern}*.yaml files found to transform"
+    # Remove any remaining Tekton files older than or equal to
+    # LAST_RELEASE_VERSION. The exact source_version files (if any) were
+    # already renamed above via `git mv`; this sweeps up stragglers from
+    # earlier release cycles that rode along via fast-forward (e.g. an
+    # acm-50- template that was never cleaned up on this branch).
+    local removed_stale=0
+    if [[ -n "${last_release_version:-}" ]]; then
+      removed_stale=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${last_release_version}")
+    fi
+
+    if [[ "$files_found" == "false" ]] && [[ "${removed_stale}" -eq 0 ]]; then
+      echo "INFO: No ${source_pattern}*.yaml files found to transform, nothing stale to clean up"
       exit 0
     fi
 
     echo "INFO: Transformed ${files_transformed} files"
+    if [[ "${removed_stale}" -gt 0 ]]; then
+      echo "INFO: Removed ${removed_stale} stale Tekton file(s) <= ${last_release_version}"
+    fi
 
     # Commit transformation
     git config user.email "${GITHUB_USER}@users.noreply.github.com"
     git config user.name "${GITHUB_USER}"
 
-    git commit -m "Transform Tekton files from ${source_version} to ${dest_version}
+    local commit_message="Transform Tekton files from ${source_version} to ${dest_version}"
+    if [[ "${removed_stale}" -gt 0 ]]; then
+      commit_message="${commit_message}
+
+Remove ${removed_stale} stale Tekton file(s) <= ${last_release_version}"
+    fi
+
+    git commit -m "${commit_message}
 
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 
@@ -781,6 +907,17 @@ create_tekton_files() {
       fi
     done
 
+    # Remove Tekton files for versions <= LAST_RELEASE_VERSION.
+    # LAST_RELEASE_VERSION was only kept around as a template for creating
+    # the versions above; now that those new versions have been created on
+    # ${default_branch}, the old template is stale and should not persist.
+    local removed_stale=0
+    if [[ -n "${LAST_RELEASE_VERSION:-}" ]]; then
+      log "INFO Cleaning up Tekton files <= LAST_RELEASE_VERSION (${LAST_RELEASE_VERSION})"
+      removed_stale=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${LAST_RELEASE_VERSION}")
+      log "INFO Removed ${removed_stale} stale Tekton file(s)"
+    fi
+
     # Check if PR exists for branch (even if no new files)
     local pr_title
     pr_title="Add Tekton files for ${product_prefix} versions: ${dest_versions}"
@@ -789,6 +926,11 @@ create_tekton_files() {
 $(for v in ${dest_versions}; do echo "- ${product_prefix}-${v//./}"; done)
 
 Generated from existing ${product_prefix}-${highest_version} templates."
+    if [[ "${removed_stale}" -gt 0 ]]; then
+      pr_body="${pr_body}
+
+Also removes ${removed_stale} stale Tekton file(s) for version <= ${LAST_RELEASE_VERSION}, which are no longer needed now that the versions above exist."
+    fi
 
     local pr_exists=false
     if command -v gh >/dev/null 2>&1; then
@@ -801,8 +943,8 @@ Generated from existing ${product_prefix}-${highest_version} templates."
       fi
     fi
 
-    if [[ "$files_created" == "false" ]]; then
-      log "INFO No new files to create"
+    if [[ "$files_created" == "false" ]] && [[ "${removed_stale}" -eq 0 ]]; then
+      log "INFO No new files to create and nothing stale to clean up"
 
       # Create PR if branch existed on remote (has commits) but no PR
       if [[ "$pr_exists" == "false" ]] && [[ "$branch_existed_on_remote" == "true" ]] && command -v gh >/dev/null 2>&1; then
@@ -843,8 +985,15 @@ Generated from existing ${product_prefix}-${highest_version} templates."
     git config user.name "OpenShift CI Robot"
     git config user.email "noreply@openshift.io"
 
-    log "INFO Committing: Add Tekton files for versions: ${dest_versions}"
-    git commit -s -m "Add Tekton files for versions: ${dest_versions}" 2>&1
+    local commit_message="Add Tekton files for versions: ${dest_versions}"
+    if [[ "${removed_stale}" -gt 0 ]]; then
+      commit_message="${commit_message}
+
+Remove ${removed_stale} stale Tekton file(s) for version <= ${LAST_RELEASE_VERSION}"
+    fi
+
+    log "INFO Committing: ${commit_message}"
+    git commit -s -m "${commit_message}" 2>&1
 
     # Push branch (use -u for new branch, --force-with-lease if we reset existing branch)
     log "INFO Pushing ${pr_branch} to origin"
