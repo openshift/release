@@ -76,13 +76,18 @@ declare -a MIRRORED_IMAGES=(
 )
 
 function run-oc-image-mirror() {
-  if ! oc image mirror -f /tmp/mirror --keep-manifest-list --registry-config ${DS_WORKING_DIR}/pull_secret.json; then
+	local env_prefix=()
+	if [[ "${DISABLE_HTTP2_IMAGE_MIRRORING:-}" == "1" ]]; then
+		env_prefix=(env DISABLE_HTTP2=1)
+	fi
+
+  if ! "\${env_prefix[@]}" oc image mirror -f /tmp/mirror --keep-manifest-list --registry-config ${DS_WORKING_DIR}/pull_secret.json; then
     echo "oc image mirror failed. Contents of /tmp/mirror:"
     cat /tmp/mirror || true
     return 1
   fi
   for image_pair in "\${MIRRORED_IMAGES[@]}"; do
-    oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" \$image_pair || return 1
+    "\${env_prefix[@]}" oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" \$image_pair || return 1
   done
 }
 
