@@ -7,15 +7,12 @@ ref:
       cpu: 500m
       memory: 512Mi
   credentials:
-  - namespace: test-credentials
-    name: gcp-hcp-ci-workload-identity
-    mount_path: /secrets/gcp-hcp-ci
-  - namespace: test-credentials
-    name: terraform-cloud-token
-    mount_path: /etc/terraform-cloud
+  - mount_path: /etc/terraform-cloud
+    name: tfcloud-ci-secret
+    namespace: ci
   env:
-  - name: GOOGLE_APPLICATION_CREDENTIALS
-    default: /secrets/gcp-hcp-ci/credential.json
+  - name: GCP_REGION
+    default: us-central1
   timeout: 30m0s
   documentation: |-
     Performs comprehensive infrastructure cleanup for GCP HCP e2e environments.
@@ -29,5 +26,8 @@ ref:
     4. Deletes DNS records from regional zones
     5. Force-deletes GCP projects (cascades to all resources)
     6. Clears Terraform Cloud workspace state
+    
+    WIF credential is read from SHARED_DIR/wif-cred.json (written by hypershift-gcp-wif-auth).
+    TFC token is mounted from the tfcloud-ci-secret credential.
     
     This approach is more reliable than terraform destroy for ephemeral e2e environments.
