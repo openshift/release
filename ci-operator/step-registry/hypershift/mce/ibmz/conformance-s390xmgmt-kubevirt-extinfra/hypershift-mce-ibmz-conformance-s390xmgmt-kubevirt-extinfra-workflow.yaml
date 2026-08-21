@@ -1,0 +1,44 @@
+workflow:
+  as: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra
+  documentation: |-
+    Phase 1 workflow that provisions two ephemeral OpenShift clusters on libvirt:
+    a management cluster and an external infrastructure (infra) cluster. This is the
+    foundation for HyperShift KubeVirt on external infrastructure testing.
+    MCE + virt operator are installed on the mgmt cluster; virt operator alone on infra.
+  steps:
+    allow_best_effort_post_steps: true
+    leases:
+    - resource_type: libvirt-s390x-vpn-hcp-quota-slice
+      env: LEASED_RESOURCE_INFRA    # second OZ host for infra cluster
+    env:
+      CONTROL_COUNT: "3"
+      COMPUTE_COUNT: "0"
+      CNV_SUBSCRIPTION_SOURCE: 'redhat-operators'
+      DOMAIN_MEMORY: "65536"   # 64 GiB; applies to both mgmt SNO and infra cluster VMs
+      DOMAIN_VCPUS: "16"       # 12 vCPUs; applies to both mgmt SNO and infra cluster VMs
+      VOLUME_CAPACITY: "500G"  # 200 GB root disk for both mgmt SNO and infra cluster VMs
+    pre:
+    # ── Management cluster (SNO: 3 control, 0 compute) ───────────────────
+    - chain: hypershift-mce-ibmz-create-s390xmgmt-oz
+
+    # ── Infra cluster (compact: 3 control, 0 compute) ────────────────────
+    - chain: hypershift-mce-ibmz-create-s390xinfra-oz
+
+    # ── Operator installs ─────────────────────────────────────────────────
+    # MCE, virt, HPP, MetalLB on mgmt cluster (default $KUBECONFIG → mgmt)
+    - chain: hypershift-mce-ibmz-install-operators-mgmt
+    # virt, HPP, MetalLB on infra cluster ($SHARED_DIR/infra-kubeconfig)
+    - chain: hypershift-mce-ibmz-install-operators-infra
+    
+    # ── HCP virt external infra cluster creation ─────────────────────────────────────────────────
+    - ref: hypershift-mce-ibmz-create-hcpvirt-extinfra
+
+    test:
+    - ref: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-extinfra-test-print
+    - chain: hypershift-conformance
+
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+    - ref: upi-libvirt-infra-cleanup-post

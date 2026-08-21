@@ -109,6 +109,10 @@ IMG="${_REPO}:${MCE_VERSION}-latest"
 if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
   IMG="${_REPO}:latest-${MCE_VERSION}"
 fi
+if [[ -n "${MCE_CATALOG_IMAGE}" ]]; then
+  echo "Overriding MCE catalog image with MCE_CATALOG_IMAGE=${MCE_CATALOG_IMAGE}"
+  IMG="${MCE_CATALOG_IMAGE}"
+fi
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -203,7 +207,23 @@ metadata:
   name: multiclusterengine-sample
 spec: {}
 EOF
-sleep 5
+echo "Waiting for klusterlet clusterrole to be created by MCE operator"
+for ((i=1; i<=60; i++)); do
+  if oc get clusterrole klusterlet &>/dev/null; then
+    echo "klusterlet clusterrole found after $((i * 10))s"
+    break
+  fi
+  if [[ ${i} -eq 60 ]]; then
+    echo "ERROR: klusterlet clusterrole not found after 600s"
+    exit 1
+  fi
+  echo "Waiting for klusterlet clusterrole... ($i/60)"
+  sleep 10
+done
+
+echo "Patching klusterlet clusterrole to add networkpolicies permissions"
+oc patch clusterrole klusterlet --type=json \
+  -p='[{"op":"add","path":"/rules/-","value":{"apiGroups":["networking.k8s.io"],"resources":["networkpolicies"],"verbs":["create","get","list","update","watch","patch","delete"]}}]'
 
 oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hypershift-preview","enabled": true}]}}}'
 echo "wait for mce to Available"
@@ -326,6 +346,8 @@ fi
 HYPERSHIFT_NAME=hcp
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
+  echo "DEBUG: sleeping 15m before hcp CLI download to allow live debugging"
+  sleep 900
   downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
   cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
   chmod +x /tmp/${HYPERSHIFT_NAME}
