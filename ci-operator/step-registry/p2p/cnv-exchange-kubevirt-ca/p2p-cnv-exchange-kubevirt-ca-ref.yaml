@@ -1,0 +1,40 @@
+ref:
+  as: p2p-cnv-exchange-kubevirt-ca
+  from: cli
+  commands: p2p-cnv-exchange-kubevirt-ca-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: CNV_EXCHANGE_KUBEVIRT_CA__SPOKE_COUNT
+    default: "2"
+    documentation: |-
+      Number of spoke clusters to process. Must match the number of
+      managed-cluster-kubeconfig-N files written to SHARED_DIR.
+  - name: CNV_EXCHANGE_KUBEVIRT_CA__CNV_NS
+    default: "openshift-cnv"
+    documentation: |-
+      Namespace where the kubevirt-ca ConfigMap lives on each spoke.
+  documentation: |-
+    Exchange KubeVirt CA bundles between all spoke clusters so virt-handler on
+    each spoke trusts the virt-synchronization-controller TLS certificate on
+    every other spoke.
+
+    KubeVirt watches the kubevirt-ca ConfigMap (key: ca-bundle) in the CNV
+    namespace via extensionsKubeVirtCAConfigMapInformer for its TLS root-of-trust
+    pool. CCLM (spec.sendTo) uses mTLS: the source virt-handler must trust the
+    destination sync-controller cert, and vice versa. Since each cluster generates
+    an independent KubeVirt CA, cross-cluster trust must be established before
+    migration. MTV 2.12.x does not inject the peer CA — this step provides that
+    exchange.
+
+    For each spoke, the step reads the ca-bundle from its kubevirt-ca ConfigMap,
+    deduplicates all CAs by SHA-256 fingerprint across all spokes, and patches
+    each ConfigMap with the combined bundle. The informer picks up the change
+    dynamically (no virt-handler restart required).
+
+    Idempotent: re-running the step produces the same combined bundle.
+
+    Requires: p2p-acm-cnv-install-policy (CNV installed on all spokes) and
+    managed-cluster-kubeconfig-N files in SHARED_DIR.

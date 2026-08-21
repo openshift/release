@@ -33,15 +33,26 @@ typeset -a spokeKubeconfigsArr=()
 typeset -a spokeNamesArr=()
 
 # ── InstallSubctl — install subctl to /tmp/bin/ ───────────────────────────────
+# Downloads directly from GitHub releases and extracts with tar -xJf.
+# Requires xz, which is pre-installed in the cli-with-git step image
+# (defined in the CI config via dockerfile_literal).
 InstallSubctl() {
     mkdir -p /tmp/bin
-    if [[ -x "${subctlBin}" ]]; then
-        return 0
-    fi
-    curl -Ls https://get.submariner.io | bash
-    cp "${HOME}/.local/bin/subctl" "${subctlBin}"
+    [[ -x "${subctlBin}" ]] && return 0
+
+    typeset version="${SUBMARINER_SUBCTL_VERSION:-release-0.24}"
+    typeset tarUrl="https://github.com/submariner-io/subctl/releases/download/subctl-${version}/subctl-${version}-linux-amd64.tar.xz"
+    typeset tmpTar; tmpTar="$(mktemp /tmp/subctl-XXXXXX.tar.xz)"
+    typeset tmpDir; tmpDir="$(mktemp -d /tmp/subctl-dir-XXXXXX)"
+
+    curl -fsSL "${tarUrl}" -o "${tmpTar}"
+    tar -xJf "${tmpTar}" -C "${tmpDir}"
+    typeset extracted; extracted="$(find "${tmpDir}" -maxdepth 2 -name 'subctl' -type f | head -1)"
+    [[ -n "${extracted}" ]]
+    cp "${extracted}" "${subctlBin}"
     chmod +x "${subctlBin}"
-    true
+    rm -rf "${tmpDir}" "${tmpTar}"
+    [[ -x "${subctlBin}" ]]
 }
 
 # ── LoadSpokeConfig — populate spoke arrays from SHARED_DIR ───────────────────
@@ -297,17 +308,19 @@ ProbeCclmSyncPort() {
         --dry-run=client -o yaml --save-config | KUBECONFIG="${srcKubeconfig}" oc apply -f - 1>/dev/null
 
     # bash ships in ubi9-minimal; no extra package install needed.
+    # Capture exit code explicitly; cleanup must run even on failure.
+    typeset -i probeRc=0
     KUBECONFIG="${srcKubeconfig}" oc run "${probePod}" \
         -n "${probeNs}" \
         --rm -i --restart=Never \
         --image=registry.redhat.io/ubi9/ubi-minimal:latest \
         --command -- \
         timeout "${SUBMARINER_CCLM_SYNC_PROBE_TIMEOUT}" bash -c "echo >/dev/tcp/${destIp}/${SUBMARINER_CCLM_SYNC_PORT}" \
-        1>/dev/null
+        1>/dev/null || probeRc=$?
 
     KUBECONFIG="${srcKubeconfig}" oc delete namespace "${probeNs}" \
         --ignore-not-found --wait=false 1>/dev/null &
-    true
+    return "${probeRc}"
 }
 
 # ── VerifyCclmSyncPath — bidirectional sync-controller TCP reachability ───────
@@ -333,13 +346,14 @@ VerifyCclmSyncPath() {
         false
     }
 
+    typeset -i cclmRc=0
     : "CCLM sync probe ${srcName} -> ${tgtName} (${tgtSyncIp}:${SUBMARINER_CCLM_SYNC_PORT})"
-    ProbeCclmSyncPort "${kcSource}" "${tgtSyncIp}" "${srcName}-to-${tgtName}"
+    ProbeCclmSyncPort "${kcSource}" "${tgtSyncIp}" "${srcName}-to-${tgtName}" || cclmRc=$?
 
     : "CCLM sync probe ${tgtName} -> ${srcName} (${srcSyncIp}:${SUBMARINER_CCLM_SYNC_PORT})"
-    ProbeCclmSyncPort "${kcTarget}" "${srcSyncIp}" "${tgtName}-to-${srcName}"
+    ProbeCclmSyncPort "${kcTarget}" "${srcSyncIp}" "${tgtName}-to-${srcName}" || { (( cclmRc == 0 )) && cclmRc=$?; }
 
-    true
+    return "${cclmRc}"
 }
 
 # ── VerifyConnectivity — run subctl verify between two spokes ─────────────────
@@ -387,12 +401,17 @@ VerifyConnectivity() {
 
     KUBECONFIG="${kc1Renamed}:${kc2Renamed}" oc config view --flatten -o json > "${mergedKc}"
 
-    KUBECONFIG="${mergedKc}" "${subctlBin}" verify \
+    # Bound subctl verify to 35m so it exits before the 45m step timeout.
+    # Without this, each failing TCP test takes ~7m and the process is killed
+    # externally before the failure handler runs.
+    # Use || rc=$? instead of relying on set -e: bash does not reliably
+    # trigger set -e on function return codes inside for-loop bodies.
+    typeset -i rc=0
+    KUBECONFIG="${mergedKc}" timeout --kill-after=30s 35m "${subctlBin}" verify \
         --context   "${ctx1}" \
         --tocontext "${ctx2}" \
         --only connectivity,service-discovery \
-        --verbose
-    typeset -i rc=$?
+        --verbose || rc=$?
 
     rm -f "${kc1Renamed}" "${kc2Renamed}" "${mergedKc}"
     return "${rc}"
@@ -436,12 +455,12 @@ typeset -i submarinerStepRc=0
                 "${spokeKubeconfigsArr[i]}" \
                 "${spokeKubeconfigsArr[j]}" \
                 "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}"
+                "${spokeNamesArr[j]}" || exit $?
             VerifyCclmSyncPath \
                 "${spokeKubeconfigsArr[i]}" \
                 "${spokeKubeconfigsArr[j]}" \
                 "${spokeNamesArr[i]}" \
-                "${spokeNamesArr[j]}"
+                "${spokeNamesArr[j]}" || exit $?
         done
     done
 
