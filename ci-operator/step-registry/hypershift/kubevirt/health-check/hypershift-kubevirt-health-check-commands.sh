@@ -77,12 +77,21 @@ dump_vm_debug_logs() {
 }
 
 echo "Waiting for nested cluster's node count to reach the desired replicas count in the NodePool"
-WAIT_TIMEOUT=$(($(date +%s) + 1800)) # 30 minutes
+if [[ -n "${HYPERSHIFT_KUBEVIRT_NODE_JOIN_TIMEOUT:-}" ]]; then
+  NODE_JOIN_TIMEOUT_SECONDS="${HYPERSHIFT_KUBEVIRT_NODE_JOIN_TIMEOUT}"
+elif [[ "${ATTACH_DEFAULT_NETWORK:-}" == "localnet-multi" ]]; then
+  # localnet-multi workers bootstrap slower (OVN DHCP, guest routing, MCD pull).
+  NODE_JOIN_TIMEOUT_SECONDS=3600
+else
+  NODE_JOIN_TIMEOUT_SECONDS=1800
+fi
+echo "Node join timeout: ${NODE_JOIN_TIMEOUT_SECONDS}s (ATTACH_DEFAULT_NETWORK=${ATTACH_DEFAULT_NETWORK:-})"
+WAIT_TIMEOUT=$(($(date +%s) + NODE_JOIN_TIMEOUT_SECONDS))
 until \
   [[ $(oc get nodepool "${CLUSTER_NAME}" -n "${CLUSTER_NAMESPACE_PREFIX}" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "") \
     == $(oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" get nodes --no-headers 2>/dev/null | wc -l) ]]; do
       if [[ $(date +%s) -ge ${WAIT_TIMEOUT} ]]; then
-        echo "Timed out waiting for node count to match NodePool replicas after 30 minutes"
+        echo "Timed out waiting for node count to match NodePool replicas after $((NODE_JOIN_TIMEOUT_SECONDS / 60)) minutes"
         dump_vm_debug_logs
         exit 1
       fi
