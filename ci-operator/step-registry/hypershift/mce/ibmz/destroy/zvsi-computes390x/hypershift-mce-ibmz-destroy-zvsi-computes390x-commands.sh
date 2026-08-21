@@ -18,6 +18,12 @@ httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 
 
+# mgmt_cluster_name is written by create-s390xmgmt; if that step failed, the file won't exist.
+# Nothing was provisioned so there is nothing to destroy — exit cleanly.
+if [[ ! -f "$SHARED_DIR/mgmt_cluster_name" ]]; then
+    echo "WARN: $SHARED_DIR/mgmt_cluster_name not found — create-s390xmgmt did not complete, no zVSIs to destroy."
+    exit 0
+fi
 MGMT_CLUSTER_NAME=$(cat "$SHARED_DIR/mgmt_cluster_name")
 export MGMT_CLUSTER_NAME
 
@@ -79,20 +85,34 @@ fi
 
 
 # Deleting the zVSIs and Floating IPs
+# Note: if create step failed early, instances may not exist — treat not-found as already-gone (success).
 for ((i = 1; i <= $HYPERSHIFT_NODE_COUNT ; i++)); do
     echo "Triggering the $infra_name-compute-$i instance deletion in the $VPC_NAME VPC."
-    vsi_status=$(ibmcloud is instance-delete $infra_name-compute-$i --output JSON -f | jq -r '.[]|.result')
-    vsi_delete_status+=("$vsi_status")
-    echo "Triggering the $infra_name-compute-$i-ip Floating IP in the $infra_name-rg resource group."
-    fip_status=$(ibmcloud is ipd $infra_name-compute-$i-ip --output JSON -f | jq -r '.[]|.result')
-    fip_delete_status+=("$fip_status")
+    raw=$(ibmcloud is instance-delete $infra_name-compute-$i --output JSON -f 2>&1)
+    vsi_status=$(echo "$raw" | jq -r '.[]|.result' 2>/dev/null || echo "not_found")
+    if [[ "$vsi_status" == "not_found" ]]; then
+        echo "Instance $infra_name-compute-$i not found (already deleted or never created) — skipping."
+        vsi_delete_status+=("true")
+    else
+        vsi_delete_status+=("$vsi_status")
+    fi
+
+    echo "Triggering the $infra_name-compute-$i-ip Floating IP deletion in the $infra_name-rg resource group."
+    raw=$(ibmcloud is ipd $infra_name-compute-$i-ip --output JSON -f 2>&1)
+    fip_status=$(echo "$raw" | jq -r '.[]|.result' 2>/dev/null || echo "not_found")
+    if [[ "$fip_status" == "not_found" ]]; then
+        echo "Floating IP $infra_name-compute-$i-ip not found (already deleted or never created) — skipping."
+        fip_delete_status+=("true")
+    else
+        fip_delete_status+=("$fip_status")
+    fi
 done
 
 for status in "${vsi_delete_status[@]}"; do
     if [ "$status" = 'false' ]; then
         echo "$infra_name-compute instances are not deleted successfully in the $infra_name-vpc VPC."
         exit 1
-    else 
+    else
         echo "Successfully deleted the $infra_name-compute instances in the $infra_name-vpc VPC."
     fi
 done
@@ -101,18 +121,21 @@ for status in "${fip_delete_status[@]}"; do
     if [ "$status" = 'false' ]; then
         echo "$infra_name-compute-ip floating IPs are not deleted successfully in the $infra_name-rg resource group."
         exit 1
-    else 
+    else
         echo "Successfully deleted the $infra_name-compute-ip floating IPs in the $infra_name-rg resource group."
     fi
 done
 
 # Deleting the bastion VSI
 echo "Triggering the $infra_name-bastion instance deletion in the $infra_name-vpc VPC."
-bvsi_delete_status=$(ibmcloud is instance-delete $infra_name-bastion --output JSON -f | jq -r '.[]|.result')
-if [ "$bvsi_delete_status" = 'false' ]; then
+raw=$(ibmcloud is instance-delete $infra_name-bastion --output JSON -f 2>&1)
+bvsi_delete_status=$(echo "$raw" | jq -r '.[]|.result' 2>/dev/null || echo "not_found")
+if [[ "$bvsi_delete_status" == "not_found" ]]; then
+    echo "Bastion $infra_name-bastion not found (already deleted or never created) — skipping."
+elif [ "$bvsi_delete_status" = 'false' ]; then
     echo "Deletion of $infra_name-bastion instance is not successful."
     exit 1
-else 
+else
     echo "Successfully deleted the $infra_name-bastion instance in the $infra_name-vpc VPC."
 fi
 
