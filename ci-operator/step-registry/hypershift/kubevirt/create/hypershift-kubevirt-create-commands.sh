@@ -154,6 +154,7 @@ configure_localnet_multi_dhcp_on_lsp() {
     ovn-nbctl lsp-set-dhcpv4-options "${lsp_name}" "${dhcp_uuid}" 2>/dev/null
   oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
     ovn-nbctl clear Logical_Switch_Port "${lsp_name}" port_security 2>/dev/null
+  localnet_multi_clear_lsp_dhcpv6 "${ovn_pod}" "${lsp_name}"
   return 0
 }
 
@@ -190,6 +191,23 @@ localnet_multi_should_disable_ipv6_boot() {
     && [[ "${IP_STACK}" == "v4v6" || "${IP_STACK}" == "v6v4" ]]
 }
 
+localnet_multi_log_check() {
+  local vmi="$1"
+  shift
+  echo "LOCALNET_MULTI_CHECK: vmi=${vmi} $* gateway=${LOCALNET_MULTI_PRIMARY_GATEWAY}"
+}
+
+localnet_multi_clear_lsp_dhcpv6() {
+  local ovn_pod="$1"
+  local lsp_name="$2"
+
+  if ! localnet_multi_should_disable_ipv6_boot; then
+    return 0
+  fi
+  oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl clear Logical_Switch_Port "${lsp_name}" dhcpv6_options 2>/dev/null || true
+}
+
 # restrict_localnet_lsp_to_ipv4 removes IPv6 addresses from a localnet LSP so initrd
 # Ignition uses IPv4 DNS/route to the ingress VIP instead of timing out on IPv6 ::4.
 restrict_localnet_lsp_to_ipv4() {
@@ -201,10 +219,14 @@ restrict_localnet_lsp_to_ipv4() {
     return 0
   fi
 
+  localnet_multi_clear_lsp_dhcpv6 "${ovn_pod}" "${lsp_name}"
+
   addrs=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
     ovn-nbctl get Logical_Switch_Port "${lsp_name}" dynamic_addresses 2>/dev/null || true)
   addrs=${addrs//\"/}
-  [[ -z "${addrs}" || "${addrs}" == "[]" ]] && return 0
+  if [[ -z "${addrs}" || "${addrs}" == "[]" ]]; then
+    return 0
+  fi
 
   ipv4_addr=$(echo "${addrs}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
   if [[ -z "${ipv4_addr}" ]]; then
@@ -213,9 +235,186 @@ restrict_localnet_lsp_to_ipv4() {
   if [[ "${addrs}" == *":"* ]]; then
     oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
       ovn-nbctl lsp-set-addresses "${lsp_name}" "${ipv4_addr}" 2>/dev/null || true
-    oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
-      ovn-nbctl clear Logical_Switch_Port "${lsp_name}" dhcpv6_options 2>/dev/null || true
+    localnet_multi_clear_lsp_dhcpv6 "${ovn_pod}" "${lsp_name}"
     echo "  Restricted ${lsp_name} to IPv4 ${ipv4_addr} (disabled IPv6 for initrd bootstrap)"
+  fi
+  return 0
+}
+
+get_localnet_multi_launcher_nodes() {
+  local multi_ns="$1"
+  oc get pods -n "${multi_ns}" -l kubevirt.io=virt-launcher \
+    -o jsonpath='{range .items[*]}{.spec.nodeName}{" "}{end}' 2>/dev/null \
+    | tr ' ' '\n' | sort -u | tr '\n' ' '
+}
+
+localnet_multi_launcher_nodes_have_ovn() {
+  local -a target_nodes=()
+  local node ovn_pod missing=0
+
+  read -ra target_nodes <<< "$1"
+  for node in "${target_nodes[@]}"; do
+    [[ -z "${node}" ]] && continue
+    ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    if [[ -z "${ovn_pod}" ]]; then
+      echo "WARNING: No ovnkube-node pod on virt-launcher node ${node}"
+      missing=$((missing + 1))
+    fi
+  done
+  [[ ${missing} -eq 0 ]]
+}
+
+resolve_virtctl_cmd() {
+  if command -v virtctl >/dev/null 2>&1; then
+    echo "virtctl"
+    return 0
+  fi
+  if [[ -x /usr/bin/virtctl ]]; then
+    echo "/usr/bin/virtctl"
+    return 0
+  fi
+  echo "WARNING: virtctl not found; guest-exec renewal unavailable" >&2
+  return 1
+}
+
+vmi_guest_agent_ready() {
+  local multi_ns="$1"
+  local vmi="$2"
+  local ga_status
+
+  ga_status=$(oc get vmi -n "${multi_ns}" "${vmi}" \
+    -o jsonpath='{.status.conditions[?(@.type=="GuestAgentConnected")].status}' 2>/dev/null || true)
+  [[ "${ga_status}" == "True" ]]
+}
+
+wait_for_vmi_guest_agent() {
+  local multi_ns="$1"
+  local vmi="$2"
+  local attempt
+
+  for attempt in $(seq 1 30); do
+    if vmi_guest_agent_ready "${multi_ns}" "${vmi}"; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+localnet_multi_guest_renew_script() {
+  local network_count="$1"
+  local idx renew_devices inner_script
+
+  renew_devices=""
+  for idx in $(seq 1 "${network_count}"); do
+    renew_devices="${renew_devices} enp${idx}s0"
+  done
+  inner_script="for dev in${renew_devices}; do "
+  inner_script+="sudo nmcli device set \\\$dev ipv6.method disabled 2>/dev/null || true; "
+  inner_script+="sudo nmcli device reapply \\\$dev 2>/dev/null || "
+  inner_script="{ sudo nmcli device disconnect \\\$dev 2>/dev/null; sudo nmcli device connect \\\$dev 2>/dev/null; }; "
+  inner_script+="done; echo 'Default IPv4 route:'; ip route show default 2>/dev/null || echo '(none)'; "
+  inner_script+="echo 'IPv6 global addresses:'; ip -6 addr show scope global 2>/dev/null || true"
+  echo "${inner_script}"
+}
+
+localnet_multi_guest_exec_output() {
+  local multi_ns="$1"
+  local vmi="$2"
+  local inner_script="$3"
+  local virtctl_cmd output
+
+  virtctl_cmd=$(resolve_virtctl_cmd) || return 1
+  output=$("${virtctl_cmd}" guest-exec "${vmi}" -n "${multi_ns}" --username core --return stdout -- \
+    sh -c "${inner_script}" 2>&1) || true
+  echo "${output}"
+}
+
+localnet_multi_output_has_default_route() {
+  local output="$1"
+  echo "${output}" | grep -q "via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"
+}
+
+localnet_multi_output_has_ipv6_on_localnet() {
+  local output="$1"
+  echo "${output}" | grep -E 'inet6 (fd|2[0-9a-f]{3}:)' >/dev/null 2>&1
+}
+
+verify_localnet_multi_vmi_default_route() {
+  local multi_ns="$1"
+  local vmi="$2"
+  local output inner_script
+
+  [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]] || return 0
+
+  if ! wait_for_vmi_guest_agent "${multi_ns}" "${vmi}"; then
+    localnet_multi_log_check "${vmi}" "default_route=MISSING guest_agent=unavailable"
+    return 1
+  fi
+
+  inner_script="ip route show default 2>/dev/null || echo '(none)'; ip -6 addr show scope global 2>/dev/null || true"
+  output=$(localnet_multi_guest_exec_output "${multi_ns}" "${vmi}" "${inner_script}") || return 1
+
+  if localnet_multi_output_has_default_route "${output}"; then
+    if localnet_multi_output_has_ipv6_on_localnet "${output}"; then
+      localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=present"
+    else
+      localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=disabled"
+    fi
+    return 0
+  fi
+
+  localnet_multi_log_check "${vmi}" "default_route=MISSING"
+  return 1
+}
+
+renew_localnet_multi_dhcp_via_guest_exec() {
+  local multi_ns="$1"
+  local network_count="$2"
+  local vmi="$3"
+  local inner_script output
+
+  if ! wait_for_vmi_guest_agent "${multi_ns}" "${vmi}"; then
+    echo "WARNING: Guest agent not ready on VMI ${vmi}, skipping guest-exec renewal"
+    return 1
+  fi
+
+  inner_script=$(localnet_multi_guest_renew_script "${network_count}")
+  echo "Forcing DHCP renewal on VMI ${vmi} via guest-exec..."
+  output=$(localnet_multi_guest_exec_output "${multi_ns}" "${vmi}" "${inner_script}") || return 1
+
+  echo "--- guest-exec renewal output for ${vmi} ---"
+  echo "${output}" | tail -30
+
+  if localnet_multi_output_has_default_route "${output}"; then
+    if localnet_multi_output_has_ipv6_on_localnet "${output}"; then
+      localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=present"
+    else
+      localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=disabled"
+    fi
+    return 0
+  fi
+
+  localnet_multi_log_check "${vmi}" "default_route=MISSING"
+  return 1
+}
+
+verify_localnet_multi_worker_routes() {
+  local multi_ns="$1"
+  local vmi failures=0
+
+  [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]] || return 0
+
+  for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    if ! verify_localnet_multi_vmi_default_route "${multi_ns}" "${vmi}"; then
+      failures=$((failures + 1))
+    fi
+  done
+
+  if [[ ${failures} -gt 0 ]]; then
+    echo "ERROR: ${failures} worker VMI(s) lack default route via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"
+    return 1
   fi
   return 0
 }
@@ -229,7 +428,8 @@ configure_localnet_multi_dhcp_on_nodes() {
   if [[ $# -ge 3 && -n "${3:-}" ]]; then
     read -ra target_nodes <<< "${3}"
   else
-    read -ra target_nodes <<< "$(oc get nodes -o jsonpath='{.items[*].metadata.name}')"
+    echo "ERROR: configure_localnet_multi_dhcp_on_nodes requires virt-launcher node list" >&2
+    return 1
   fi
 
   pending=0
@@ -266,7 +466,7 @@ configure_localnet_multi_dhcp_on_nodes() {
   if [[ $# -ge 3 && -n "${3:-}" ]]; then
     PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${multi_ns}" "localnet-1" "${SUBNETS[0]}" "${3}")
   else
-    PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${multi_ns}" "localnet-1" "${SUBNETS[0]}")
+    PRIMARY_CONFIGURED=0
   fi
   echo "localnet-multi DHCP: ${PRIMARY_CONFIGURED}/${HYPERSHIFT_NODE_COUNT} primary LSPs configured, ${pending} pending on targeted nodes"
   [[ ${pending} -eq 0 ]]
@@ -328,7 +528,7 @@ prepare_localnet_multi_dhcp_renewal_secret() {
   return 0
 }
 
-renew_localnet_multi_dhcp_on_vmi() {
+renew_localnet_multi_dhcp_on_vmi_via_ssh() {
   local multi_ns="$1"
   local network_count="$2"
   local vmi="$3"
@@ -341,7 +541,7 @@ renew_localnet_multi_dhcp_on_vmi() {
     return 1
   fi
 
-  echo "Forcing DHCP renewal on VMI ${vmi} (${vmi_ip}) via pod on ${vmi_node}..."
+  echo "Forcing DHCP renewal on VMI ${vmi} (${vmi_ip}) via SSH pod on ${vmi_node}..."
   renew_pod="dhcp-renew-${vmi##*-}"
   renew_devices=""
   for idx in $(seq "${network_count}" -1 1); do
@@ -407,12 +607,26 @@ RENEW_EOF
   echo "--- DHCP renewal output for ${vmi} ---"
   oc logs "${renew_pod}" -n "${multi_ns}" 2>&1 | tail -20
   if ! oc logs "${renew_pod}" -n "${multi_ns}" 2>&1 | grep -q "via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"; then
-    echo "WARNING: VMI ${vmi} may still lack default route via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"
+    echo "WARNING: VMI ${vmi} may still lack default route via ${LOCALNET_MULTI_PRIMARY_GATEWAY} after SSH renewal"
+    localnet_multi_log_check "${vmi}" "default_route=MISSING renewal=ssh"
     oc delete pod "${renew_pod}" -n "${multi_ns}" --ignore-not-found 2>/dev/null || true
     return 1
   fi
+  localnet_multi_log_check "${vmi}" "default_route=OK renewal=ssh"
   oc delete pod "${renew_pod}" -n "${multi_ns}" --ignore-not-found 2>/dev/null || true
   return 0
+}
+
+renew_localnet_multi_dhcp_on_vmi() {
+  local multi_ns="$1"
+  local network_count="$2"
+  local vmi="$3"
+
+  if renew_localnet_multi_dhcp_via_guest_exec "${multi_ns}" "${network_count}" "${vmi}"; then
+    return 0
+  fi
+  echo "WARNING: guest-exec renewal failed for ${vmi}, falling back to SSH renewal pod"
+  renew_localnet_multi_dhcp_on_vmi_via_ssh "${multi_ns}" "${network_count}" "${vmi}"
 }
 
 renew_localnet_multi_dhcp_for_running_vmis() {
@@ -453,6 +667,9 @@ ensure_localnet_multi_worker_networking() {
   fi
   if ! renew_localnet_multi_dhcp_for_running_vmis "${multi_ns}" "${network_count}"; then
     echo "WARNING: DHCP renewal failed on one or more worker VMIs"
+    return 1
+  fi
+  if ! verify_localnet_multi_worker_routes "${multi_ns}"; then
     return 1
   fi
   return 0
@@ -818,8 +1035,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   echo "Waiting for virt-launcher pods so we can configure OVN DHCP before VM first boot..."
   LAUNCHER_NODES=""
   for attempt in $(seq 1 120); do
-    LAUNCHER_NODES=$(oc get pods -n "${MULTI_NAMESPACE}" -l kubevirt.io=virt-launcher \
-      -o jsonpath='{range .items[*]}{.spec.nodeName}{" "}{end}' 2>/dev/null | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    LAUNCHER_NODES=$(get_localnet_multi_launcher_nodes "${MULTI_NAMESPACE}")
     LAUNCHER_COUNT=$(echo "${LAUNCHER_NODES}" | wc -w)
     if [[ ${LAUNCHER_COUNT} -ge ${HYPERSHIFT_NODE_COUNT} ]]; then
       echo "Found virt-launcher pods on ${LAUNCHER_COUNT} node(s) (attempt ${attempt})"
@@ -830,35 +1046,37 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   done
 
   if [[ -z "${LAUNCHER_NODES// }" ]]; then
-    echo "WARNING: No virt-launcher pods found after 10 minutes, configuring DHCP on all nodes"
+    echo "ERROR: No virt-launcher pods found after 10 minutes; cannot configure localnet-multi OVN DHCP" >&2
+    exit 1
   fi
 
-  echo "Configuring early OVN DHCP for multi (${NETWORK_COUNT})-localnet interfaces..."
+  echo "Configuring early OVN DHCP for multi (${NETWORK_COUNT})-localnet interfaces on nodes:${LAUNCHER_NODES}"
   prepare_localnet_multi_dhcp_renewal_secret "${MULTI_NAMESPACE}" || true
   for attempt in $(seq 1 120); do
-    if [[ -n "${LAUNCHER_NODES// }" ]]; then
-      configure_localnet_multi_dhcp_on_nodes "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" "${LAUNCHER_NODES}" || true
-    else
-      configure_localnet_multi_dhcp_on_nodes "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
+    LAUNCHER_NODES=$(get_localnet_multi_launcher_nodes "${MULTI_NAMESPACE}")
+    if [[ -z "${LAUNCHER_NODES// }" ]]; then
+      echo "WARNING: virt-launcher pods disappeared during early DHCP setup (attempt ${attempt})"
+      sleep 5
+      continue
     fi
 
-    if [[ -n "${LAUNCHER_NODES// }" ]]; then
-      PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${MULTI_NAMESPACE}" "localnet-1" "${SUBNETS[0]}" "${LAUNCHER_NODES}")
-    else
-      PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${MULTI_NAMESPACE}" "localnet-1" "${SUBNETS[0]}")
-    fi
+    configure_localnet_multi_dhcp_on_nodes "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" "${LAUNCHER_NODES}" || true
 
-    if [[ ${PRIMARY_CONFIGURED} -ge ${HYPERSHIFT_NODE_COUNT} ]]; then
+    PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${MULTI_NAMESPACE}" "localnet-1" "${SUBNETS[0]}" "${LAUNCHER_NODES}")
+
+    if [[ ${PRIMARY_CONFIGURED} -ge ${HYPERSHIFT_NODE_COUNT} ]] \
+      && localnet_multi_launcher_nodes_have_ovn "${LAUNCHER_NODES}"; then
       echo "Early OVN DHCP configuration complete for multi (${NETWORK_COUNT})-localnet interfaces"
+      renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
       break
     fi
 
-    # Best-effort: renew DHCP and disable IPv6 on enp*s0 as soon as SSH is reachable.
+    # Best-effort: renew DHCP and disable IPv6 on enp*s0 as soon as guest agent is ready.
     renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
 
-    echo "Attempt ${attempt}/120: ${PRIMARY_CONFIGURED}/${HYPERSHIFT_NODE_COUNT} primary LSPs configured on worker node(s)"
+    echo "Attempt ${attempt}/120: ${PRIMARY_CONFIGURED}/${HYPERSHIFT_NODE_COUNT} primary LSPs configured on virt-launcher node(s)"
     if [[ ${attempt} -eq 120 ]]; then
-      echo "ERROR: Failed to configure DHCP on all worker localnet LSPs after 10 minutes"
+      echo "ERROR: Failed to configure DHCP on all worker localnet LSPs after 10 minutes" >&2
       exit 1
     fi
     sleep 5
@@ -891,8 +1109,10 @@ $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${C
 if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   # After HC is Available and VMIs are Running, configure OVN DHCP on each worker node
   # and renew leases so enp1s0 gets the default gateway (no pod network fallback).
-  ensure_localnet_multi_worker_networking "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || \
-    echo "WARNING: post-Available localnet-multi worker networking setup encountered errors"
+  ensure_localnet_multi_worker_networking "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || {
+    echo "ERROR: post-Available localnet-multi worker networking verification failed" >&2
+    exit 1
+  }
 fi
 
 # OVN-Kubernetes assigns IPs to localnet ports via IPAM but does not create
