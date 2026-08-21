@@ -25,11 +25,11 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL:-}" ]]; then
     CLAUDE_MODEL="${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL}"
 fi
 
-# --- Load JIRA credentials for read-only lookups ---
+# --- Load JIRA credentials (read + write) ---
 # Mounted from the openshift-qse-bot-managers test-credentials secret. The
-# ai-helpers skill reads JIRA_USERNAME/JIRA_API_TOKEN to look up existing bugs
-# (e.g. searching OCPBUGS). JIRA access is read-only: the skill must not perform
-# any JIRA writes.
+# ai-helpers skill uses JIRA_USERNAME/JIRA_API_TOKEN both to look up existing
+# bugs and to write as the openshift-qse-bot-managers service account (append
+# triage links, comment, file new bugs).
 # Disable tracing so the token is never echoed into the CI logs.
 set +x
 if [[ -f "${JIRA_EMAIL_PATH:-}" && -f "${JIRA_PAT_PATH:-}" ]]; then
@@ -37,7 +37,7 @@ if [[ -f "${JIRA_EMAIL_PATH:-}" && -f "${JIRA_PAT_PATH:-}" ]]; then
     JIRA_USERNAME="$(cat "${JIRA_EMAIL_PATH}")"
     JIRA_API_TOKEN="$(cat "${JIRA_PAT_PATH}")"
     JIRA_URL="${JIRA_URL:-https://redhat.atlassian.net}"
-    echo "JIRA credentials loaded for read-only lookups."
+    echo "JIRA credentials loaded (read + write)."
 else
     echo "Warning: JIRA credentials not found (JIRA_EMAIL_PATH/JIRA_PAT_PATH); JIRA lookups will be skipped."
 fi
@@ -184,9 +184,9 @@ SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer on Component
 
 **CRITICAL**: You have many ci skills at your disposal. You MUST load the relevant skills using the Skill tool BEFORE you begin any work. Do NOT improvise or guess. This applies equally to subagents: instruct every subagent to review its available skills and load the appropriate ones before beginning its investigation.
 
-**WRITE SCOPE — READ CAREFULLY**: A DPCR Sippy bearer token is available in the environment variable \$DPCR_TOKEN. You ARE authorized to create and update Component Readiness triage records with it (via the ci:triage-regression skill — pass it as --token \"\$DPCR_TOKEN\"), and to run the authenticated reevaluate symptom probe in dry-run (detection) mode; use \$DPCR_TOKEN directly rather than running 'oc login'. You may link triage records ONLY to JIRA bugs that ALREADY EXIST. JIRA access is READ-ONLY: do NOT file new JIRA issues, comment on or transition issues, or set release blockers — recommend these in the report instead. Do NOT create or modify Sippy labels or symptoms (their creation requires human confirmation) — propose them in the report. Do NOT post anything to Slack or anywhere else. Capture every action you are not authorized to perform as a recommended action in your report."
+**WRITE SCOPE — READ CAREFULLY**: You have write credentials for both Sippy and JIRA. Sippy: a DPCR bearer token is in the environment variable \$DPCR_TOKEN — you ARE authorized to create and update Component Readiness triage records (via the ci:triage-regression skill — pass it as --token \"\$DPCR_TOKEN\") and to run the authenticated reevaluate symptom probe in dry-run (detection) mode; use \$DPCR_TOKEN directly rather than running 'oc login'. JIRA: you act as the openshift-qse-bot-managers service account (\$JIRA_USERNAME / \$JIRA_API_TOKEN) and ARE authorized to file new bugs (/jira:create bug against the OWNING component, label component-regression), comment on existing issues, and run ci:add-jira-triage-link after each triage. Every JIRA issue or comment you create MUST end with the AI-attribution footer as its own visually marked block (an ADF rule followed by a note panel containing 'AI-generated content: filed by AI as part of Component Readiness triage duty. Please verify before acting on it.'); after add-jira-triage-link runs, verify that footer is still the final block. You are NOT authorized to: transition, resolve, or close JIRA issues; set release blockers; or create/modify Sippy labels or symptoms — capture each of those as a recommendation in the report. Do NOT post anything to Slack or anywhere else."
 
-PROMPT="Load and follow the ci:bulk-triage-regressions skill for view '${TRIAGE_VIEW}' covering ${COMPONENTS_CLAUSE}. Execute Phases 1-5 fully. You ARE authorized to create or extend Sippy triage records (use \$DPCR_TOKEN) for buckets whose root cause maps to a JIRA bug that already exists. For buckets that need a NEW JIRA bug, a release blocker, or a new Sippy symptom/label, record a recommendation in the report instead of performing the action (JIRA is read-only; symptom and blocker creation need human confirmation).
+PROMPT="Load and follow the ci:bulk-triage-regressions skill for view '${TRIAGE_VIEW}' covering ${COMPONENTS_CLAUSE}. Execute Phases 1-5 fully. You ARE authorized to create or extend Sippy triage records (use \$DPCR_TOKEN), to file new JIRA bugs against the owning component for buckets with no existing bug, to comment on existing bugs, and to append the Component Readiness triage link to each bug (ci:add-jira-triage-link) — every JIRA issue or comment you create must carry the AI-attribution footer. Record a recommendation in the report instead of performing the action for: release blockers, new Sippy symptoms/labels, and any JIRA transition/resolve/close (these need human confirmation).
 
 Write the complete duty report as GitHub-flavored markdown to ${WORKDIR}/${REPORT_FILE}. The report must contain: the untriaged-regression inventory table, the bucket list with member regression IDs and evidence (error signatures, failure stage, representative run links, suspect PRs), the recommended disposition per bucket (extend triage <id> / link to <JIRA> / file new bug against <component> with a draft summary), deliberately-untriaged leftovers with reasons, and cross-cutting observations. Every claim must cite artifact paths or run URLs."
 
