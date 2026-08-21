@@ -1,0 +1,95 @@
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: rosa-hyperfleet-base
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_rosa-hyperfleet-base_latest
+  source:
+    dockerfile: |
+      # CI build-root image for rosa-hyperfleet-internal PR checks.
+      # Mirrors rosa-hyperfleet-internal/ci/Containerfile for use as a supplemental CI image.
+      # These ARGs are the single source of truth for tool versions.
+
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ocp_ubi_10
+
+      ARG TERRAFORM_VERSION
+      ARG TERRAGRUNT_VERSION
+
+      # System packages
+      RUN dnf install -y \
+              git \
+              make \
+              unzip \
+              gnupg2 \
+          && dnf clean all
+
+      # Terraform (GPG-verified)
+      RUN arch=$(uname -m) && \
+          case "${arch}" in \
+              x86_64)  arch="amd64" ;; \
+              aarch64) arch="arm64" ;; \
+          esac && \
+          TF_PACKAGE="terraform_${TERRAFORM_VERSION}_linux_${arch}.zip" && \
+          TF_BASE_URL="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}" && \
+          curl -fsSLO "${TF_BASE_URL}/${TF_PACKAGE}" && \
+          curl -fsSLO "${TF_BASE_URL}/terraform_${TERRAFORM_VERSION}_SHA256SUMS" && \
+          curl -fsSLO "${TF_BASE_URL}/terraform_${TERRAFORM_VERSION}_SHA256SUMS.sig" && \
+          ( gpg --batch --keyserver keyserver.ubuntu.com --recv-keys \
+              C874011F0AB405110D02105534365D9472D7468F || \
+            gpg --batch --keyserver keys.openpgp.org --recv-keys \
+              C874011F0AB405110D02105534365D9472D7468F || \
+            gpg --batch --keyserver pgp.mit.edu --recv-keys \
+              C874011F0AB405110D02105534365D9472D7468F ) && \
+          gpg --batch --verify "terraform_${TERRAFORM_VERSION}_SHA256SUMS.sig" \
+              "terraform_${TERRAFORM_VERSION}_SHA256SUMS" && \
+          grep "${TF_PACKAGE}" "terraform_${TERRAFORM_VERSION}_SHA256SUMS" | sha256sum -c - && \
+          unzip -qo "${TF_PACKAGE}" -d /usr/local/bin && \
+          chmod +x /usr/local/bin/terraform && \
+          rm -f "${TF_PACKAGE}" "terraform_${TERRAFORM_VERSION}_SHA256SUMS" \
+              "terraform_${TERRAFORM_VERSION}_SHA256SUMS.sig"
+
+      # Terragrunt (checksum-verified)
+      RUN arch=$(uname -m) && \
+          case "${arch}" in \
+              x86_64)  arch="amd64" ;; \
+              aarch64) arch="arm64" ;; \
+          esac && \
+          TG_BASE_URL="https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}" && \
+          TG_BIN="terragrunt_linux_${arch}" && \
+          curl -fsSL "${TG_BASE_URL}/${TG_BIN}" -o "/tmp/${TG_BIN}" && \
+          curl -fsSL "${TG_BASE_URL}/SHA256SUMS" -o /tmp/tg_sha256sums && \
+          grep "${TG_BIN}$" /tmp/tg_sha256sums | (cd /tmp && sha256sum -c -) && \
+          install -m 0755 "/tmp/${TG_BIN}" /usr/local/bin/terragrunt && \
+          rm -f "/tmp/${TG_BIN}" /tmp/tg_sha256sums
+
+      # Pre-create cache directories writable by any UID (OpenShift runs as random UID)
+      RUN mkdir -p /tmp/.terraform.d && \
+          chmod -R 777 /tmp/.terraform.d
+
+      USER 1001
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      buildArgs:
+      - name: TERRAFORM_VERSION
+        value: "1.14.3"
+      - name: TERRAGRUNT_VERSION
+        value: "1.1.1"
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+  - type: ConfigChange
+  - imageChange:
+      from:
+        kind: ImageStreamTag
+        name: "ubi:10"
+        namespace: ocp
+    type: ImageChange
