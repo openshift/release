@@ -16,6 +16,32 @@ build_root:
   from_repository: true
 images:
   items:
+  - dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/go-toolset
+      USER 0
+      RUN dnf install -y git make jq openssl python3 && \
+          dnf install -y 'dnf-command(config-manager)' && \
+          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo && \
+          dnf install -y gh && \
+          dnf clean all
+      RUN dnf module reset -y nodejs && \
+          dnf module enable -y nodejs:20 && \
+          dnf install -y nodejs npm && \
+          npm install -g @anthropic-ai/claude-code && \
+          dnf clean all
+      RUN go install golang.org/x/tools/cmd/goimports@v0.33.0 && \
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.1.6/install.sh | sh -s -- -b /usr/local/bin v2.1.6
+      WORKDIR /app
+      RUN git clone --depth 1 https://github.com/openshift-eng/oape-ai-e2e.git /tmp/oape && \
+          cp -r /tmp/oape/scripts /app/scripts && \
+          cp -r /tmp/oape/plugins /plugins && \
+          mkdir -p /config && cp -r /tmp/oape/deploy/config/* /config/ && \
+          rm -rf /tmp/oape
+      RUN git config --global user.name "openshift-app-platform-shift-bot" && \
+          git config --global user.email "267347085+openshift-app-platform-shift-bot@users.noreply.github.com"
+      RUN chmod -R g=u /opt/app-root/src /config
+      USER 1001
+    to: review-handler-agent
   - dockerfile_path: Dockerfile.openshift
     from: base-rhel9
     to: must-gather-operator
@@ -34,7 +60,9 @@ operator:
     with: stable:must-gather
 promotion:
   to:
-  - name: "5.1"
+  - excluded_images:
+    - review-handler-agent
+    name: "5.1"
     namespace: ocp
 releases:
   initial:
@@ -368,6 +396,12 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
+- always_run: false
+  as: oape-review-handler
+  optional: true
+  steps:
+    test:
+    - ref: oape-review-handler
 zz_generated_metadata:
   branch: master
   org: openshift
