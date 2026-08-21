@@ -1,0 +1,47 @@
+base_images:
+  rebasebot:
+    name: rebasebot
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 200Mi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rebasebot
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: rebasebot
+      commands: |
+        rebasebot --source https://github.com/cri-o/cri-o:release-1.36 \
+                  --dest openshift/cri-o:main \
+                  --rebase openshift/cri-o:rebase-bot-main \
+                  --github-app-id 4009104 \
+                  --github-app-key /secrets/rebasebot/rebasebot \
+                  --github-cloner-id 4009104 \
+                  --github-cloner-key /secrets/rebasebot/rebasebot \
+                  --git-username openshift-node-bot \
+                  --git-email openshift-node-bot@redhat.com
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: node-team-rebasebot
+        namespace: test-credentials
+      from_image:
+        name: rebasebot
+        namespace: ci
+        tag: latest
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 400m
+          memory: 1Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: cri-o
+  variant: periodics

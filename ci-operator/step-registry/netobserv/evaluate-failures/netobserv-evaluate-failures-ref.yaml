@@ -1,0 +1,20 @@
+ref:
+  # Use src instead of e2etests: e2etests is only built/imported by some NetObserv
+  # repos (e.g. operator). Jobs like netobserv-web-console build e2e-integration-tests
+  # instead, so from: e2etests causes ImagePullBackOff (manifest unknown). This step
+  # only needs a shell to read SHARED_DIR, so src is always available.
+  from: src
+  as: netobserv-evaluate-failures
+  commands: netobserv-evaluate-failures-commands.sh
+  resources:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  documentation: |-
+    Evaluates aggregated step failures recorded in ${SHARED_DIR}/netobserv-step-failures.
+    Exits non-zero if any preceding test steps recorded a failure, ensuring the overall
+    job correctly reports failure status even when individual steps exited 0 to allow
+    subsequent steps to run.

@@ -1,0 +1,295 @@
+base_images:
+  cincinnati-operand:
+    name: cincinnati-build-root
+    namespace: cincinnati-ci
+    tag: deploy
+  fips-check-payload:
+    name: check-payload
+    namespace: ci
+    tag: latest
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
+  published-cincinnati-graph-data:
+    name: cincinnati-graph-data
+    namespace: cincinnati-ci-public
+    tag: stable
+  tls-scanner-tool:
+    name: "5.0"
+    namespace: ocp
+    tag: tls-scanner-tool
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+images:
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: ubi
+    to: cincinnati-operator
+  - dockerfile_path: dev/Dockerfile
+    from: ubi
+    to: local-cincinnati-graph-data
+operator:
+  bundles:
+  - as: cincinnati-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/cincinnati/cincinnati:latest
+    with: pipeline:cincinnati-operand
+  - pullspec: controller:latest
+    with: pipeline:cincinnati-operator
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: go fmt ./... && git diff --exit-code
+  container:
+    from: src
+  run_if_changed: \.go$
+- as: verify-generate
+  commands: make verify-generate
+  container:
+    from: src
+- as: verify-crypto
+  commands: make verify-crypto
+  container:
+    from: src
+  run_if_changed: \.go$
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: install-bundle
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace install-osus-here
+        operator-sdk run bundle -n install-osus-here "$OO_BUNDLE" --security-context-config restricted
+        oc wait --for condition=Available -n install-osus-here deployment updateservice-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: cincinnati-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1000Mi
+    workflow: generic-claim
+- always_run: false
+  as: install-bundle-tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCAN_NAMESPACE: install-osus-here
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace install-osus-here
+        operator-sdk run bundle -n install-osus-here "$OO_BUNDLE" --security-context-config restricted
+        oc wait --for condition=Available -n install-osus-here deployment updateservice-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: cincinnati-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1000Mi
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- as: scorecard
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
+    test:
+    - as: scorecard-test
+      cli: latest
+      commands: make scorecard-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: operator-e2e-old-ocp-published-graph-data
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make func-test \
+        OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERAND
+        name: pipeline:cincinnati-operand
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:published-cincinnati-graph-data
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: fips-image-scan-operator
+  steps:
+    dependencies:
+      SCAN_IMAGE: cincinnati-operator
+    test:
+    - ref: fips-check-image-scan
+- as: fips-image-scan-operator-production
+  cron: '@weekly'
+  reporter_config:
+    channel: '#team-cincinnati-alert'
+    job_states_to_report:
+    - failure
+    report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>.
+  steps:
+    test:
+    - as: check-payload
+      commands: |
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        set -x
+        SCAN_IMAGE="registry.redhat.io/openshift-update-service/openshift-update-service-rhel8-operator:latest"
+
+        export REGISTRY_AUTH_FILE=/var/secrets/ci-pull-credentials/.dockerconfigjson
+        mkdir -p /tmp/oci-images
+        skopeo copy --remove-signatures docker://"$SCAN_IMAGE" oci:/tmp/oci-images:image:latest
+        umoci raw unpack --rootless --image /tmp/oci-images:image:latest /tmp/unpacked-image
+        /check-payload scan local --path=/tmp/unpacked-image --output-file="$ARTIFACT_DIR"/check-payload-report.txt
+      credentials:
+      - mount_path: /var/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: fips-check-payload
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+- as: operator-e2e-new-ocp-published-graph-data
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  steps:
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make func-test \
+        OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERAND
+        name: pipeline:cincinnati-operand
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:published-cincinnati-graph-data
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: operator-e2e-new-ocp-published-graph-data-fips
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+    test:
+    - ref: fips-check-fips-or-die
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make func-test \
+        OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERAND
+        name: pipeline:cincinnati-operand
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:published-cincinnati-graph-data
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: operator-e2e-hypershift-local-graph-data
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make func-test \
+        OPENSHIFT_BUILD_NAMESPACE= \
+      dependencies:
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERAND
+        name: pipeline:cincinnati-operand
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:local-cincinnati-graph-data
+      env:
+      - default: local
+        documentation: Let the test suite know it has a locally-built graph-data image,
+          so it can enable custom testing.
+        name: GRAPH_DATA
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cincinnati-operator

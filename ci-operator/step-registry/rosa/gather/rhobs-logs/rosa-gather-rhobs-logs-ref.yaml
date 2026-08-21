@@ -1,0 +1,40 @@
+ref:
+  as: rosa-gather-rhobs-logs
+  best_effort: true
+  from_image:
+    namespace: ci
+    name: rosa-aws-cli
+    tag: latest
+  commands: rosa-gather-rhobs-logs-commands.sh
+  grace_period: 30s
+  timeout: 10m0s
+  credentials:
+  - namespace: ci
+    name: rhobs-oidc-staging
+    mount_path: /usr/local/rhobs-oidc
+  env:
+  - name: OCM_LOGIN_ENV
+    default: staging
+    documentation: OCM environment to login to
+  - name: RHOBS_HIVE_OCM_URL
+    default: staging
+    documentation: OCM environment where the MC is registered for RHOBS lookups
+  - name: RHOBS_LOG_SINCE
+    default: "3h"
+    documentation: How far back to collect logs (e.g. 3h, 1h, 30m)
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  documentation: |-
+    Collect logs from RHOBS Loki for HCP cluster diagnostics. Gathers:
+    - HCP guest cluster logs (etcd, kube-apiserver) from the MC sub-namespace
+    - HyperShift operator logs (reconciliation, scheduling)
+    - MCO logs (ClusterImagePolicy/MachineConfig rollout)
+    - ACM and cert-manager logs
+    - RMO (Route Monitor Operator) logs
+    - AVO (AWS VPCE Operator) logs
+    - CS provisioning logs (via RHOBS OIDC, queries the global cell)
+    - CS telemetry lifecycle events (IT/UT/UCT tags)
+    All logs are collected (not just errors) for full diagnostic visibility.
+    Runs as a best-effort post step.

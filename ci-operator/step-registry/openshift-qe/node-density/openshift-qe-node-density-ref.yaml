@@ -1,0 +1,72 @@
+ref:
+  as: openshift-qe-node-density
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-node-density-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: ND_EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Extra flags for node-density workload
+      Add args for e2e-benchmarking kube-burner-ocp cmd.
+  - name: KB_FLAGS
+    default: ""
+    documentation: |-
+      Additional flags for the kube-burner command. Reused across other kube-burner based workloads
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: PODS_PER_NODE
+    default: "245"
+    documentation: |-
+      Define the maximum number of pods to deploy on each labeled node.
+  - name: POD_READY_THRESHOLD
+    default: "180000ms"
+    documentation: |-
+      Define the maximum number of pods to deploy on each labeled node.
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local-indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: NODE_DENSITY_GC
+    default: "true"
+    documentation: |-
+      Garbage collection
+  - name: PPROF
+    default: "true"
+    documentation: |-
+      Enable or disable pprof collection
+  - name: ADDITIONAL_PARAMS
+    default: '{}'
+    documentation: |-
+      JSON value to upload additonal metadata to the fingerprint
+  documentation: >-
+    This step runs the perfscale node-density workload in the deployed cluster
+  timeout: 4h

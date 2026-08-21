@@ -1,0 +1,24 @@
+ref:
+  as: cucushift-installer-check-aws-rootvolume
+  from_image:
+    namespace: ocp
+    name: "4.21"
+    tag: upi-installer
+  grace_period: 10m
+  commands: cucushift-installer-check-aws-rootvolume-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: ENABLE_AWS_EDGE_ZONE
+    default: "no"
+    documentation: |-
+      Set to "yes" to enable edge zone support and check edge node root volumes.
+      When enabled, the script will look for edge compute pool in install-config.yaml
+      and verify edge node root volume configurations.
+  documentation: >-
+    Validate AWS root volume configuration post-installation:
+    - Ensure gp3 throughput configuration is applied on worker and control plane nodes
+    - Report mismatched or missing throughput settings for root volumes
+    - When ENABLE_AWS_EDGE_ZONE=yes, also validates edge node root volumes
