@@ -78,13 +78,17 @@ EOF
     true
 }
 
-trap '{ ( GenerateJunit ); }' EXIT
+trap '{ typeset -i rc=$?; ( GenerateJunit ); exit ${rc}; }' EXIT
 
 function DiscoverQuay () {
     QUAY_NS=$(oc get quayregistry --all-namespaces -o jsonpath='{.items[0].metadata.namespace}')
     QUAY_REGISTRY=$(oc get quayregistry -n "${QUAY_NS}" -o jsonpath='{.items[0].metadata.name}')
     QUAY_HOST=$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpath='{.status.registryEndpoint}')
     QUAY_HOST="${QUAY_HOST#https://}"
+    if [[ -z "${QUAY_HOST}" ]]; then
+        echo "ERROR: Quay registry route not ready (empty host)" >&2
+        return 1
+    fi
     export QUAY_NS QUAY_REGISTRY QUAY_HOST
     true
 }
@@ -138,7 +142,7 @@ function GetQuayAuth () {
 
 function PreflightCheck () {
     if ! curl -sk --connect-timeout 15 "https://${QUAY_HOST}/api/v1/discovery" | grep -qi "quay"; then
-        echo "ERROR: Quay route not reachable at ${QUAY_HOST}" >&2
+        echo "ERROR: Quay registry endpoint not reachable" >&2
         return 1
     fi
     true
@@ -186,6 +190,12 @@ function RunPushPull () {
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
     typeset authFile="/tmp/quay-auth.json"
+
+    if [[ -z "${QUAY_TOKEN}" && -z "${QUAY_PASSWORD}" ]]; then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "No valid Quay authentication token or password available" "${elapsed}"
+        return 1
+    fi
 
     typeset registryAuth
     if [[ -n "${QUAY_TOKEN}" ]]; then
@@ -336,7 +346,7 @@ print(json.dumps(payload))
         -H "Content-Type: application/json" \
         -d "${regPayload}" || true
 
-    echo "INFO: Registered Quay at ${QUAY_HOST} as ACS image integration"
+    echo "INFO: Registered Quay registry endpoint as ACS image integration"
     true
 }
 
@@ -425,10 +435,14 @@ function Main () {
     PreflightCheck || { echo "FATAL: Quay not reachable; skipping all tests" >&2; exit 1; }
     CreateTestOrg
 
-    typeset -i status=0
-    RunPushPull || status=1
+    typeset -i status=0 pushPassed=0
+    RunPushPull && pushPassed=1 || status=1
     RunOdfStorageCheck || status=1
-    RunAcsScan || status=1
+    if (( pushPassed )); then
+        RunAcsScan || status=1
+    else
+        RecordResult "[sig-interop][Jira:INTEROP][Feature:Quay] ACS scan of pushed Quay image" "skipped" "Skipped: push-pull test failed; no image available to scan"
+    fi
 
     rm -f /tmp/quay-auth.json
 
