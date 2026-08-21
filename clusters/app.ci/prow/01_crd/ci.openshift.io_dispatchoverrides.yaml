@@ -1,0 +1,336 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: dispatchoverrides.ci.openshift.io
+spec:
+  group: ci.openshift.io
+  names:
+    kind: DispatchOverride
+    listKind: DispatchOverrideList
+    plural: dispatchoverrides
+    shortNames:
+    - doverride
+    singular: dispatchoverride
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.kind
+      name: Kind
+      type: string
+    - jsonPath: .spec.cluster
+      name: Cluster
+      type: string
+    - jsonPath: .status.state
+      name: State
+      type: string
+    - jsonPath: .spec.expiresAt
+      name: Expires
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: DispatchOverride is a durable, temporary overlay on dispatcher
+          baseline policy.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DispatchOverrideSpec is the desired temporary scheduling
+              policy.
+            properties:
+              approvals:
+                items:
+                  description: DispatchApproval records one Slack user approval.
+                  properties:
+                    at:
+                      format: date-time
+                      type: string
+                    userID:
+                      minLength: 1
+                      type: string
+                  required:
+                  - at
+                  - userID
+                  type: object
+                maxItems: 2
+                type: array
+                x-kubernetes-list-map-keys:
+                - userID
+                x-kubernetes-list-type: map
+              capacity:
+                format: int32
+                maximum: 100
+                minimum: 1
+                type: integer
+              cluster:
+                minLength: 1
+                type: string
+              createdBy:
+                minLength: 1
+                type: string
+              expiresAt:
+                format: date-time
+                type: string
+              fallbackConfirmed:
+                type: boolean
+              fallbackProtected:
+                type: boolean
+              id:
+                minLength: 1
+                type: string
+              idempotencyKey:
+                minLength: 1
+                type: string
+              incidentURL:
+                type: string
+              kind:
+                description: OverrideKind describes the runtime scheduling control
+                  applied by an override.
+                enum:
+                - Capacity
+                - Drain
+                type: string
+              planID:
+                minLength: 1
+                type: string
+              policyInputDigest:
+                minLength: 1
+                type: string
+              reason:
+                minLength: 1
+                type: string
+              requiredApprovals:
+                format: int32
+                maximum: 2
+                minimum: 1
+                type: integer
+              revokedAt:
+                format: date-time
+                type: string
+              revokedBy:
+                type: string
+              scope:
+                description: DispatchOverrideScope narrows an override to jobs requiring
+                  one capability.
+                properties:
+                  capability:
+                    minLength: 1
+                    type: string
+                type: object
+              slackThreadTS:
+                type: string
+              sourceChannelID:
+                minLength: 1
+                type: string
+              sourceGeneration:
+                format: int64
+                minimum: 1
+                type: integer
+              startsAt:
+                format: date-time
+                type: string
+            required:
+            - cluster
+            - createdBy
+            - expiresAt
+            - fallbackProtected
+            - id
+            - idempotencyKey
+            - kind
+            - planID
+            - policyInputDigest
+            - reason
+            - requiredApprovals
+            - sourceChannelID
+            - sourceGeneration
+            - startsAt
+            type: object
+            x-kubernetes-validations:
+            - message: capacity is required only for Capacity overrides
+              rule: 'self.kind == ''Capacity'' ? has(self.capacity) : !has(self.capacity)'
+            - message: immutable override identity and policy fields cannot change
+              rule: self.id == oldSelf.id && self.planID == oldSelf.planID && self.sourceGeneration
+                == oldSelf.sourceGeneration && self.policyInputDigest == oldSelf.policyInputDigest
+                && self.kind == oldSelf.kind && self.cluster == oldSelf.cluster &&
+                self.startsAt == oldSelf.startsAt && self.expiresAt == oldSelf.expiresAt
+                && self.createdBy == oldSelf.createdBy && self.sourceChannelID ==
+                oldSelf.sourceChannelID && self.reason == oldSelf.reason && self.requiredApprovals
+                == oldSelf.requiredApprovals && self.fallbackProtected == oldSelf.fallbackProtected
+                && self.idempotencyKey == oldSelf.idempotencyKey
+            - message: override scope is immutable
+              rule: has(self.scope) == has(oldSelf.scope) && (!has(self.scope) ||
+                self.scope == oldSelf.scope)
+            - message: override capacity is immutable
+              rule: has(self.capacity) == has(oldSelf.capacity) && (!has(self.capacity)
+                || self.capacity == oldSelf.capacity)
+            - message: incident URL is immutable
+              rule: has(self.incidentURL) == has(oldSelf.incidentURL) && (!has(self.incidentURL)
+                || self.incidentURL == oldSelf.incidentURL)
+            - message: approvals may only be appended
+              rule: '!has(oldSelf.approvals) || (has(self.approvals) && oldSelf.approvals.all(a,
+                self.approvals.exists(b, b.userID == a.userID && b.at == a.at)))'
+            - message: fallback confirmation cannot be withdrawn
+              rule: '!has(oldSelf.fallbackConfirmed) || !oldSelf.fallbackConfirmed
+                || (has(self.fallbackConfirmed) && self.fallbackConfirmed)'
+            - message: revokedAt and a non-empty revokedBy must be set together
+              rule: has(self.revokedAt) == has(self.revokedBy) && (!has(self.revokedBy)
+                || size(self.revokedBy) > 0)
+            - message: revocation cannot be removed or changed
+              rule: '!has(oldSelf.revokedAt) || (has(self.revokedAt) && self.revokedAt
+                == oldSelf.revokedAt && has(oldSelf.revokedBy) && has(self.revokedBy)
+                && self.revokedBy == oldSelf.revokedBy)'
+            - message: Slack thread binding cannot be changed
+              rule: '!has(oldSelf.slackThreadTS) || (has(self.slackThreadTS) && self.slackThreadTS
+                == oldSelf.slackThreadTS)'
+            - message: drain overrides require two approvals
+              rule: self.kind != 'Drain' || self.requiredApprovals == 2
+            - message: an unprotected drain requires explicit fallback confirmation
+              rule: self.kind != 'Drain' || self.fallbackProtected || (has(self.fallbackConfirmed)
+                && self.fallbackConfirmed)
+          status:
+            description: DispatchOverrideStatus is the observed override and publication
+              state.
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              fallbackProtected:
+                type: boolean
+              history:
+                items:
+                  description: DispatchAuditEvent records a durable state transition
+                    for an override.
+                  properties:
+                    actor:
+                      type: string
+                    at:
+                      format: date-time
+                      type: string
+                    generation:
+                      format: int64
+                      type: integer
+                    message:
+                      type: string
+                    state:
+                      description: OverrideState describes the lifecycle state of
+                        a DispatchOverride.
+                      enum:
+                      - Pending
+                      - Active
+                      - Expired
+                      - Revoked
+                      - Rejected
+                      - Failed
+                      type: string
+                  required:
+                  - at
+                  - state
+                  type: object
+                maxItems: 50
+                type: array
+              message:
+                type: string
+              observedGeneration:
+                format: int64
+                type: integer
+              policyGeneration:
+                format: int64
+                type: integer
+              snapshotChecksum:
+                type: string
+              state:
+                description: OverrideState describes the lifecycle state of a DispatchOverride.
+                enum:
+                - Pending
+                - Active
+                - Expired
+                - Revoked
+                - Rejected
+                - Failed
+                type: string
+            type: object
+        required:
+        - metadata
+        - spec
+        type: object
+        x-kubernetes-validations:
+        - message: metadata.name must equal spec.id
+          rule: self.metadata.name == self.spec.id
+    served: true
+    storage: true
+    subresources:
+      status: {}
