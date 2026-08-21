@@ -1,146 +1,129 @@
 # Jira Agent Onboarding Guide
 
-This guide walks you through setting up the **jira-agent** periodic Prow job for your OpenShift team. The jira-agent automatically picks up Jira issues, solves them using Claude Code, runs code review, addresses findings, creates PRs, and sends Slack notifications.
+This guide walks you through onboarding your OpenShift team to the **jira-agent**. The jira-agent automatically picks up Jira issues, solves them using Claude Code, runs code review, addresses findings, creates PRs, and sends Slack notifications.
+
+There is **one central jira-agent job** that serves every team — you do **not** create a per-team Prow job. Onboarding is a single `case` arm in the team-config step; the central job discovers the right repo for each issue from its Jira component.
 
 ## How It Works
 
-The jira-agent runs as a periodic Prow job that:
+A single central periodic Prow job —
+`periodic-ci-openshift-release-main-jira-agent-periodic-jira-agent`, defined in
+`ci-operator/config/openshift/release/openshift-release-main__jira-agent.yaml` —
+runs the generic `jira-agent` workflow with `JIRA_AGENT_TEAM: all`. It:
 
-1. **Setup** — Verifies Claude Code CLI and Vertex AI credentials
-2. **Process** — For each Jira issue matching your JQL query:
+1. **Team config (aggregate)** — Builds an independently limited Jira query for each team and per-component maps (repo, review profile, Slack emoji, assignee) from the team table.
+2. **Setup** — Verifies Claude Code CLI and Vertex AI credentials.
+3. **Process** — Runs each team's query up to that team's `JIRA_AGENT_MAX_ISSUES`, deduplicates the results, and for each selected issue:
+   - Discovers the upstream repo from the issue's Jira **component** (falling back to its **project** key), then clones/forks/syncs that repo.
    - Phase 1: Runs `/openshift-developer:jira-solve` to analyze and fix the issue
    - Phase 2: Runs pre-commit code review
    - Phase 3: Addresses review findings
-   - Phase 4: Creates a PR to your upstream repo
+   - Phase 4: Creates a PR to the upstream repo
    - Labels the Jira issue, transitions status, sets assignee, sends Slack notification
-3. **Report** — Generates an HTML report with token usage, cost breakdown, and phase output
+4. **Report** — Generates an HTML report with token usage, cost breakdown, and phase output
 
-Your team creates a **thin workflow YAML** that sets team-specific env vars and references the generic step registry components. No bash scripting required.
+The same job is what **chai/Gangway** triggers for a single ticket: it passes an
+issue-key override (`MULTISTAGE_PARAM_OVERRIDE_JIRA_AGENT_ISSUE_KEY`), and the repo
+is still discovered from that issue's component. Because the job uses one uniform
+setup for every repo, it authenticates with a **classic PAT** and auto-forks into
+the `jira-solve-bot` org, and installs a **superset tool setup** (gopls + pre-commit)
+once before processing.
+
+Onboarding a team is a single `case` arm in the team table (the team-config step) —
+no per-team periodic, no per-team GitHub App, and no wrapper workflow are required.
 
 ## Prerequisites
 
-Before starting, you need:
+Because the central job uses one uniform auth mode (a shared PAT that auto-forks into
+`jira-solve-bot`), onboarding a team needs very little:
 
-- [ ] **A GitHub App** installed on both your fork org and upstream repo (for push and PR creation)
-- [ ] **A fork organization** on GitHub where the agent pushes branches (see below)
-- [ ] **Vault secret** synced to OpenShift CI with your credentials (see [Credentials Setup](#credentials-setup))
-- [ ] **Vertex AI access** via a Google Cloud service account (for Claude Code)
-- [ ] **Jira labels** on issues you want the agent to process (e.g., `issue-for-agent`)
-- [ ] **(Optional)** Slack incoming webhook for PR notifications
+- [ ] **Your upstream repo** (e.g., `openshift/my-repo`) — the `jira-solve-bot` bot account must be able to fork it and open PRs against it.
+- [ ] **The Jira component name** your issues use (e.g., `My Component`) — this is how the job routes an issue to your repo. If your issues live in a dedicated Jira project instead, note the **project key** (e.g., `WINC`).
+- [ ] **Jira labels** on issues you want the agent to process (e.g., `issue-for-agent`).
+- [ ] **(Optional)** Slack incoming webhook for PR notifications, and a per-team emoji.
 
-### Fork / Upstream Model
+The shared credentials (GitHub PAT, Vertex AI service account, Jira API token, Slack
+webhook) are already synced to CI for the central job — see [Credentials Setup](#credentials-setup).
+You do **not** need to create a per-team GitHub App or fork organization.
 
-The jira-agent pushes branches to a **fork** and creates PRs against the **upstream** repo.
-This is the same fork-based workflow developers use — it avoids needing write access to the upstream repo.
+### Repo Routing (component → repo)
 
-**Example:** For the HyperShift team:
-- **Upstream** (`JIRA_AGENT_UPSTREAM_REPO`): `openshift/hypershift` — where PRs are created against
-- **Fork** (`JIRA_AGENT_FORK_REPO`): `hypershift-community/hypershift` — where the agent pushes branches
+The central job discovers which repo an issue belongs to from the issue itself:
 
-For teams working on repos within the `openshift/` GitHub org, you'll typically create a fork organization
-(e.g., `my-team-bots/my-repo`) and install the GitHub App on both. The agent only needs push access to the
-fork; PR creation to the upstream repo is handled by the GitHub App's permissions.
+1. **Component** — `JIRA_AGENT_COMPONENTS` in your `case` arm maps your Jira component name(s) to your `JIRA_AGENT_UPSTREAM_REPO`.
+2. **Project (fallback)** — `JIRA_AGENT_PROJECTS` maps a whole Jira project key to your repo, for teams whose issues are routed by project and may not carry a component (e.g., `WINC`).
 
-## Step 1: Create Your Workflow YAML
+The agent pushes branches to a **fork** in `jira-solve-bot` and opens PRs against your
+upstream repo — the same fork-based workflow developers use, so no write access to the
+upstream repo is needed.
 
-Create a workflow file in `openshift/release` at:
-```
-ci-operator/step-registry/<your-team>/jira-agent/<your-team>-jira-agent-workflow.yaml
-```
+> **Advanced / targeted runs:** the team table also supports a per-team GitHub App
+> (`JIRA_AGENT_AUTH_MODE=app` with `JIRA_AGENT_FORK_REPO` and installation-id keys). The
+> central all-teams job ignores those and always uses the uniform PAT + `jira-solve-bot`
+> fork; per-team auth only takes effect for a targeted single-team run
+> (`JIRA_AGENT_TEAM=<your-team>`, e.g. triggered ad hoc via Gangway).
 
-Here's a template — replace the values with your team's configuration:
+## Step 1: Add Your Team to the Team Table
 
-```yaml
-workflow:
-  as: <your-team>-jira-agent
-  steps:
-    pre:
-      - ref: jira-agent-setup
-      - ref: jira-agent-github-app-auth
-      - ref: jira-agent-slack-pr-notify
-      - ref: jira-agent-claude-helpers
-      - ref: jira-agent-jira-helpers
-      - ref: jira-agent-git-helpers
-    test:
-      - ref: jira-agent-process
-    post:
-      - ref: jira-agent-report
-    env:
-      # Required: your fork and upstream repos
-      JIRA_AGENT_FORK_REPO: "<your-org>/<your-repo>"
-      JIRA_AGENT_UPSTREAM_REPO: "openshift/<your-repo>"
+All team configuration lives in one place — the team table (`configure_team`) in:
 
-      # Required: JQL query to find issues for the agent
-      JIRA_AGENT_JQL: 'project = OCPBUGS AND resolution = Unresolved AND status in (New, "To Do") AND labels = issue-for-agent AND labels != agent-processed'
-
-      # Optional: transition issues to a status after processing
-      JIRA_AGENT_TARGET_STATUS: '{"OCPBUGS":"ASSIGNED"}'
-
-      # Optional: set assignee on processed issues
-      JIRA_AGENT_ASSIGNEE: "my-team-automation"
-
-      # Optional: credential key names in your Vault secret
-      JIRA_AGENT_UPSTREAM_INSTALLATION_ID_KEY: "upstream-installation-id"
-      JIRA_AGENT_FORK_INSTALLATION_ID_KEY: "fork-installation-id"
-
-      # Optional: project-specific tool/plugin setup (runs before processing)
-      JIRA_AGENT_TOOL_SETUP_SCRIPT: "GOFLAGS='' go install golang.org/x/tools/gopls@latest"
-
-      # Optional: code review configuration
-      JIRA_AGENT_REVIEW_LANGUAGE: "go"
-      JIRA_AGENT_REVIEW_PROFILE: ""
-
-      # Optional: Slack notification emoji
-      JIRA_AGENT_SLACK_EMOJI: ":robot:"
-
-  documentation: |-
-    <Your-Team>-specific wrapper for the generic Jira Agent workflow.
-    Credentials: Uses <your-secret-name> (configured in generic step refs).
+```text
+ci-operator/step-registry/jira-agent/team-config/jira-agent-team-config-commands.sh
 ```
 
-## Step 2: Create the Periodic Job Config
+Add a `case` arm keyed by your team id, and add your team id to the `TEAMS` list at the
+top of the file so the central all-teams job includes you. Set only the variables your
+team needs; anything you omit falls back to the documented default (see the
+[Environment Variable Reference](#environment-variable-reference)).
 
-Create a CI config file in `openshift/release` at:
-```
-ci-operator/config/openshift/<your-repo>/openshift-<your-repo>-main__periodics.yaml
-```
+For the central all-teams job, the fields that matter are your **repo**, the
+**component(s)/project(s)** that route issues to it, and your **JQL**. Auth, fork org,
+and tool setup are uniform across the job, so you don't set them here.
 
-Example:
-
-```yaml
-base_images:
-  cli:
-    name: "4.18"
-    namespace: ocp
-    tag: cli
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.23
-tests:
-- as: periodic-jira-agent
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: hypershift
-    product: ocp
-    timeout: 2h0m0s
-    version: "4.18"
-  cron: 0 */4 * * 1-5
-  steps:
-    workflow: <your-team>-jira-agent
-zz_generated_metadata:
-  branch: main
-  org: openshift
-  repo: <your-repo>
-  variant: periodics
+```bash
+  my-team)
+    export JIRA_AGENT_UPSTREAM_REPO="openshift/my-repo"
+    # How the job routes an issue to your repo:
+    export JIRA_AGENT_COMPONENTS="My Component"          # newline-separated for multiple
+    # export JIRA_AGENT_PROJECTS="MYPROJ"                # only if routed by project key
+    export JIRA_AGENT_JQL='project = OCPBUGS AND resolution = Unresolved AND status in (New, "To Do") AND component = "My Component" AND labels = issue-for-agent AND labels != agent-processed'
+    export JIRA_AGENT_MAX_ISSUES="1"                     # limit for this team per scheduled run
+    # Optional:
+    export JIRA_AGENT_TARGET_STATUS='{"OCPBUGS":"ASSIGNED"}'   # per-project target status
+    export JIRA_AGENT_ASSIGNEE="my-team-automation"            # Jira display name to assign
+    export JIRA_AGENT_REVIEW_PROFILE="my-profile"             # code-review plugin profile
+    export JIRA_AGENT_SLACK_EMOJI=":robot:"                    # notification emoji
+    ;;
 ```
 
-After creating these files, run:
+Notes:
+
+- **Independent limits** — each team's JQL runs separately with that team's
+  `JIRA_AGENT_MAX_ISSUES`. A value of `1` means the central periodic can select one issue for
+  this team in addition to the independently selected issues from other teams.
+- **JQL isolation** — put every condition your team needs (e.g., an extra
+  `labels = ready-to-solve`) inside your own `JIRA_AGENT_JQL`. Teams do not share label
+  requirements.
+- **Multiple components** — set `JIRA_AGENT_COMPONENTS` to a newline-separated list.
+- **Project routing** — set `JIRA_AGENT_PROJECTS` when issues may not carry your component
+  (the job falls back to the issue key's project prefix, e.g. `WINC-9` → `WINC`).
+- **Extra tools** — the central job installs a uniform superset (gopls + pre-commit). If your
+  repo needs additional tooling, extend the superset in `build_aggregate` (in the same file);
+  a per-team `JIRA_AGENT_TOOL_SETUP_SCRIPT` only applies to targeted single-team runs.
+- **Non-`main` default branch** — set `export JIRA_AGENT_DEFAULT_BRANCH="master"` (see the `windows` arm).
+
+## Step 2: Regenerate and You're Done
+
+There is **no per-team Prow job to create** — the central job already runs for all teams.
+After editing the team table, regenerate metadata:
+
 ```bash
 make update
 ```
+
+This refreshes the step-registry metadata. Your team is now included in the central
+job's per-team query plan and component→repo map. To try it before merging, rehearse
+the central job (see [Rehearsal Testing](#rehearsal-testing)).
 
 ## Credentials Setup
 
@@ -154,7 +137,7 @@ The jira-agent reads credentials from `/var/run/claude-code-service-account/`. Y
 | `<upstream-installation-id-key>` | Installation ID for upstream repo (default key: `o-h-installation-id`) |
 | `jira-email` | Jira account email for API access |
 | `jira-pat` | Jira API token (personal access token) |
-| `slack-webhook-url` | **(Optional)** Slack incoming webhook URL |
+| `<slack-webhook-key>` | **(Optional)** Slack incoming webhook URL (default key: `slack-webhook-url`; override per team with `JIRA_AGENT_SLACK_WEBHOOK_KEY`) |
 | `gh-to-slack-ids` | **(Optional)** JSON mapping of GitHub usernames to Slack user IDs |
 
 ### GitHub App Setup
@@ -167,7 +150,7 @@ The jira-agent reads credentials from `/var/run/claude-code-service-account/`. Y
 
 ### Vault Secret
 
-Store your credentials in Vault under a collection accessible by OpenShift CI. The generic step registry refs declare the secret mount; your workflow overrides the secret name.
+Store your credentials in Vault under a collection accessible by OpenShift CI. The generic step registry refs declare the secret mount.
 
 See [OpenShift CI Secret Management](https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/) for details on syncing secrets to CI.
 
@@ -187,11 +170,24 @@ Find Slack member IDs by viewing a user's profile in Slack and clicking "Copy me
 
 ## Environment Variable Reference
 
+These are the `JIRA_AGENT_*` variables you set in your team's `case` arm. Required variables must be
+set for every team; optional variables fall back to the listed default.
+
+> In the **central all-teams job**, auth and setup are uniform: `JIRA_AGENT_AUTH_MODE`,
+> `JIRA_AGENT_FORK_ORG`, `JIRA_AGENT_FORK_REPO`, the `*_INSTALLATION_ID_KEY` keys, and
+> `JIRA_AGENT_TOOL_SETUP_SCRIPT` are set by aggregate mode, so per-team values for those are
+> used only for a targeted single-team run (`JIRA_AGENT_TEAM=<your-team>`).
+
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `JIRA_AGENT_FORK_REPO` | Yes | — | Fork repo slug (e.g., `my-org/my-repo`) |
 | `JIRA_AGENT_UPSTREAM_REPO` | Yes | — | Upstream repo slug (e.g., `openshift/my-repo`) |
+| `JIRA_AGENT_COMPONENTS` | Yes* | — | Newline-separated Jira component name(s) that route issues to your repo in the central job (*at least one of `JIRA_AGENT_COMPONENTS`/`JIRA_AGENT_PROJECTS`) |
+| `JIRA_AGENT_PROJECTS` | Yes* | — | Newline-separated Jira project key(s) that route issues to your repo when they may not carry your component (fallback by issue key prefix) |
 | `JIRA_AGENT_JQL` | Yes* | — | JQL query for finding issues (*not required if `JIRA_AGENT_ISSUE_KEY` is set) |
+| `JIRA_AGENT_FORK_REPO` | App mode | — | Fork repo slug (e.g., `my-org/my-repo`); required in App auth mode |
+| `JIRA_AGENT_AUTH_MODE` | No | `app` | `app` (GitHub App) or `pat` (classic token + auto-fork) |
+| `JIRA_AGENT_FORK_ORG` | PAT mode | — | Fork org the upstream repo is auto-forked into; required in PAT auth mode |
+| `JIRA_AGENT_DEFAULT_BRANCH` | No | `main` | Upstream default branch (set `master` where applicable) |
 | `JIRA_AGENT_ISSUE_KEY` | No | — | Process a specific issue instead of running JQL |
 | `JIRA_AGENT_TARGET_STATUS` | No | `""` | JSON map of project prefix to target status |
 | `JIRA_AGENT_ASSIGNEE` | No | `""` | Display name to search when setting assignee |
@@ -201,7 +197,8 @@ Find Slack member IDs by viewing a user's profile in Slack and clicking "Copy me
 | `JIRA_AGENT_REVIEW_LANGUAGE` | No | `go` | Language for the code-review plugin |
 | `JIRA_AGENT_REVIEW_PROFILE` | No | `""` | Profile for the code-review plugin |
 | `JIRA_AGENT_SLACK_EMOJI` | No | `:robot:` | Slack message emoji prefix |
-| `JIRA_AGENT_MAX_ISSUES` | No | `1` | Maximum issues to process per run |
+| `JIRA_AGENT_SLACK_WEBHOOK_KEY` | No | `slack-webhook-url` | Key name in the secret for the Slack webhook URL (point a team at its own channel) |
+| `JIRA_AGENT_MAX_ISSUES` | No | `1` | Maximum issues selected by this team's JQL per scheduled run |
 | `CLAUDE_MODEL` | No | `claude-opus-4-6` | Claude model to use |
 | `JIRA_BASE_URL` | No | `https://redhat.atlassian.net` | Jira instance base URL |
 
@@ -253,16 +250,21 @@ Make sure your Jira issues are accessible to the service account. If issues have
 
 ### Rehearsal Testing
 
-To test your job in a PR to `openshift/release`, trigger a rehearsal with the full job name:
+To test the central job in a PR to `openshift/release`, trigger a rehearsal with its full name:
 
 ```
-/pj-rehearse periodic-ci-openshift-<your-repo>-main-periodic-jira-agent
+/pj-rehearse periodic-ci-openshift-release-main-jira-agent-periodic-jira-agent
 ```
 
-Never run bare `/pj-rehearse` — always specify the full job name.
+This runs the all-teams job (including your new arm). Never run bare `/pj-rehearse` — always specify the full job name.
 
-## Example: HyperShift Configuration
+## Examples
 
-For a working example, see the HyperShift jira-agent workflow:
-- Workflow YAML: `ci-operator/step-registry/hypershift/jira-agent/hypershift-jira-agent-workflow.yaml`
-- Periodic config: `ci-operator/config/openshift/hypershift/openshift-hypershift-main__periodics.yaml`
+For working examples, see the existing arms in `configure_team`:
+- Team table: `ci-operator/step-registry/jira-agent/team-config/jira-agent-team-config-commands.sh`
+  - `hypershift` — component routing plus an extra `ready-to-solve` label and a review profile/emoji
+  - `installer` — simple single-component routing
+  - `windows` — component **and** project (`WINC`) routing, with a `master` default branch
+  - `mco` — component **and** project (`MCO`) routing
+  - `ingress` — component **and** project (`NE`) routing, with a `master` default branch
+- Central job config: `ci-operator/config/openshift/release/openshift-release-main__jira-agent.yaml`
