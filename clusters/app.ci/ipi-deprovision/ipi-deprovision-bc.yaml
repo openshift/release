@@ -41,13 +41,16 @@ spec:
 
       ARG JQ_VERSION=1.6
 
-      RUN echo -e "[google-cloud-sdk]\nname=Google Cloud SDK\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64\nenabled=1" > /etc/yum.repos.d/google-cloud-sdk.repo
+      RUN echo -e "[google-cloud-sdk]\nname=Google Cloud SDK\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg" > /etc/yum.repos.d/google-cloud-sdk.repo
 
       COPY ./oc /usr/bin/oc
       COPY ./openshift-install /usr/bin/openshift-install
       COPY ./hypershift /usr/bin/hypershift
 
-      RUN dnf install --nogpg -y google-cloud-sdk unzip jq less && \
+      RUN rpm --import https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg && \
+            rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
+            echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azure-cli.repo && \
+            dnf install -y google-cloud-sdk azure-cli unzip jq less && \
             dnf clean all && \
             curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
             unzip awscliv2.zip && ./aws/install
