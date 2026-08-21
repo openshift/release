@@ -104,12 +104,9 @@ DISALLOWED_TOOLS=(
     "Bash(head*/var/run/github-token*)"
     "Bash(sed*/var/run/github-token*)"
     "Bash(od*/var/run/github-token*)"
+    # Read(path) covers all file-reading tools (Grep/Glob path denials are ignored).
     "Read(//var/run/github-token/**)"
     "Read(//var/run/claude-code-service-account/**)"
-    "Grep(//var/run/github-token/**)"
-    "Grep(//var/run/claude-code-service-account/**)"
-    "Glob(//var/run/github-token/**)"
-    "Glob(//var/run/claude-code-service-account/**)"
 )
 
 # --- Assemble system prompt: CI extras + skill + repo-specific config ---
