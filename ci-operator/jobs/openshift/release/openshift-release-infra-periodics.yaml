@@ -1086,6 +1086,144 @@ periodics:
   decorate: true
   labels:
     config-type: modern
+    job-architecture: amd64
+    job-env: aro-hcp
+    job-type: launch
+  name: release-openshift-origin-installer-launch-aro-hcp
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters (EA Subscription),ARO HCP
+                  E2E Hosted Clusters 2 (EA Subscription),ARO HCP E2E Hosted Clusters - Dev
+                  - 02,ARO HCP E2E Hosted Clusters - Dev - 03
+                ARO_HCP_CLOUD: dev
+                ARO_HCP_DEPLOY_ENV: ci01
+                ARO_HCP_SUITE_PARALLELISM: "60"
+                LOCATION_WEIGHTS: westus3=1,canadacentral=1,centralus=1
+                VAULT_SECRET_PROFILE: dev
+              test:
+              - ref: clusterbot-aro-hcp-auth
+              - ref: openshift-cluster-bot-rbac
+              - ref: clusterbot-wait
+              workflow: aro-hcp-local-e2e
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
     job-architecture: arm64
     job-env: azure
     job-type: launch
