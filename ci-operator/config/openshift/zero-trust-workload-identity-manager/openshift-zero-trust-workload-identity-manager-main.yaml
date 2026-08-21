@@ -3,6 +3,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.39.2
+  hypershift-cli:
+    name: hypershift-cli
+    namespace: ci
+    tag: latest
   operator-sdk:
     name: "4.19"
     namespace: origin
@@ -33,6 +37,11 @@ releases:
     integration:
       name: "4.22"
       namespace: ocp
+  multi-latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -147,6 +156,171 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: e2e-federation-sds
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+    post:
+    - as: destroy-cluster-b
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        if [[ ! -f "${SHARED_DIR}/cluster_b_info.txt" ]]; then
+          echo "No Cluster B info found, skipping"; exit 0
+        fi
+        source "${SHARED_DIR}/cluster_b_info.txt"
+        if [[ -z "${CLUSTER_B_NAME:-}" ]]; then
+          echo "No Cluster B to destroy"; exit 0
+        fi
+        export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+        echo "Destroying Cluster B: ${CLUSTER_B_NAME}"
+        /usr/bin/hypershift destroy cluster aws \
+          --name "${CLUSTER_B_NAME}" \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" \
+          --destroy-cloud-resources || true
+        echo "Cluster B destruction initiated"
+      from: hypershift-cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 30m0s
+    test:
+    - as: create-cluster-b
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        echo "=== Creating Cluster B (second HyperShift guest) ==="
+        export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+
+        HASH_B="$(echo -n "${PROW_JOB_ID}-cluster-b" | sha256sum)"
+        CLUSTER_B_NAME="${HASH_B:0:20}"
+        INFRA_B_ID="${HASH_B:20:5}"
+        echo "Cluster B name: ${CLUSTER_B_NAME}, infra-id: ${INFRA_B_ID}"
+        echo "CLUSTER_B_NAME=${CLUSTER_B_NAME}" > "${SHARED_DIR}/cluster_b_info.txt"
+        echo "INFRA_B_ID=${INFRA_B_ID}" >> "${SHARED_DIR}/cluster_b_info.txt"
+
+        RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}"
+        BASE_DOMAIN=""
+        if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+          BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
+        fi
+        if [[ -z "${BASE_DOMAIN}" ]]; then
+          echo "ERROR: Cannot determine base domain"; exit 1
+        fi
+
+        if [[ -f "${SHARED_DIR}/pull-secret-build-farm.json" ]] && command -v jq &>/dev/null; then
+          jq -s '.[0] * .[1]' "${SHARED_DIR}/pull-secret-build-farm.json" /etc/ci-pull-credentials/.dockerconfigjson > /tmp/pull-secret-b.json
+        elif [[ -f "${SHARED_DIR}/pull-secret-build-farm.json" ]]; then
+          cp "${SHARED_DIR}/pull-secret-build-farm.json" /tmp/pull-secret-b.json
+        else
+          cp /etc/ci-pull-credentials/.dockerconfigjson /tmp/pull-secret-b.json
+        fi
+
+        EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+        echo "Creating Cluster B..."
+        /usr/bin/hypershift create cluster aws \
+          --name "${CLUSTER_B_NAME}" \
+          --infra-id "${INFRA_B_ID}" \
+          --node-pool-replicas 2 \
+          --base-domain "${BASE_DOMAIN}" \
+          --release-image "${RELEASE_IMAGE}" \
+          --control-plane-availability-policy "SingleReplica" \
+          --infra-availability-policy "SingleReplica" \
+          --instance-type "m5.xlarge" \
+          --region "us-east-1" \
+          --pull-secret /tmp/pull-secret-b.json \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" \
+          --node-selector "hypershift.openshift.io/control-plane=true" \
+          --olm-catalog-placement "management" \
+          --additional-tags "expirationDate=${EXPIRATION_DATE}" \
+          --annotations "prow.k8s.io/job=${JOB_NAME}" \
+          --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
+          --annotations hypershift.openshift.io/cleanup-cloud-resources="false"
+
+        echo "Waiting for Cluster B to become available..."
+        oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_B_NAME}
+
+        echo "Extracting Cluster B kubeconfig..."
+        for i in $(seq 1 60); do
+          KUBECONFIG_B_NAME=$(oc get hc/${CLUSTER_B_NAME} -n clusters -o jsonpath='{ .status.kubeconfig.name }') && [[ -n "${KUBECONFIG_B_NAME}" ]] && break
+          sleep 10
+        done
+        /usr/bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_B_NAME} > "${SHARED_DIR}/nested_kubeconfig_b"
+
+        echo "Waiting for Cluster B clusteroperators..."
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_b"
+        timeout 20m bash -c 'until oc wait clusterversion/version --for="condition=Available=True" 2>/dev/null; do sleep 30; done'
+        echo "=== Cluster B is ready ==="
+        oc get clusterversion
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: RELEASE_IMAGE_LATEST
+        name: release:multi-latest
+      from: hypershift-cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 45m0s
+    - as: install-ztwim
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        mkdir -p "${HOME}/.docker"
+        cp "${SHARED_DIR}/pull-secret-build-farm.json" "${HOME}/.docker/config.json"
+
+        install_ztwim_on_cluster() {
+          local cluster_name="$1"
+          local kubeconfig_path="$2"
+          echo "=== Installing ZTWIM on ${cluster_name} ==="
+          export KUBECONFIG="${kubeconfig_path}"
+          oc whoami || { echo "ERROR: Cannot reach ${cluster_name}"; return 1; }
+          oc create namespace zero-trust-workload-identity-manager
+          operator-sdk run bundle --timeout=10m \
+            --security-context-config=restricted \
+            --install-mode=AllNamespaces \
+            -n zero-trust-workload-identity-manager \
+            "${OO_BUNDLE}" --verbose
+          oc wait --for=condition=Available -n zero-trust-workload-identity-manager \
+            deployment/zero-trust-workload-identity-manager-controller-manager --timeout=180s
+          echo "=== ZTWIM installed successfully on ${cluster_name} ==="
+        }
+
+        install_ztwim_on_cluster "cluster-a" "${SHARED_DIR}/nested_kubeconfig"
+        install_ztwim_on_cluster "cluster-b" "${SHARED_DIR}/nested_kubeconfig_b"
+      dependencies:
+      - env: OO_BUNDLE
+        name: zero-trust-workload-identity-manager-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 25m0s
+    - as: test-federation
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        export KUBECONFIG_CLUSTER_B="${SHARED_DIR}/nested_kubeconfig_b"
+        make test-e2e-federation
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 35m0s
+    workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: operator-e2e-coverage
   cluster_claim:
