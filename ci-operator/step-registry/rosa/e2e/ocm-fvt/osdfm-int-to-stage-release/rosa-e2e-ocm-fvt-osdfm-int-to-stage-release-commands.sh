@@ -7,9 +7,7 @@ CREDS_DIR=/usr/local/osdfm-qe-credentials
 GITHUB_CREDS_DIR=/usr/local/github-credentials
 ROSA_BACKEND_TESTS_REF=${ROSA_BACKEND_TESTS_REF:-master}
 
-# This is a post step, which ci-operator always runs regardless of whether
-# the preceding test step passed or failed. Only proceed with the stage
-# promotion if the OSDFM integration test explicitly reported success.
+# Post steps always run; only promote if the OSDFM integration test recorded success.
 if [[ ! -f "${SHARED_DIR}/ocm-fvt-exit-code" ]]; then
   echo "WARNING: ${SHARED_DIR}/ocm-fvt-exit-code not found; cannot confirm the OSDFM integration test succeeded. Skipping stage promotion." >&2
   exit 0
@@ -45,13 +43,8 @@ export OSDFM_WEBHOOK_URL
 OSDFM_GITLAB_TOKEN=$(<"${CREDS_DIR}/osdfm_gitlab_token")
 OSDFM_WEBHOOK_URL=$(<"${CREDS_DIR}/osdfm_webhook_url")
 
-# rosa-e2e jobs are public, so ci-operator does not auto-mount the private
-# git-cloner token. Rehearsal showed url.insteadOf with the token as the
-# HTTPS username never rewrote the remote (git still prompted for a
-# username). Use the same credential.helper pattern as hive/mco, and a
-# writable HOME so --global config is picked up by this clone and by
-# osdfm_release.sh's later osd-fleet-manager clone. mktemp -d (mode 0700)
-# avoids a predictable /tmp path for .gitconfig, which contains the token.
+# rosa-e2e is public, so mount the git-cloner token and put git config in a
+# private HOME. credential.helper then authenticates this clone and osdfm_release.sh.
 export HOME
 HOME=$(mktemp -d)
 trap 'rm -rf "${HOME}"' EXIT
@@ -63,7 +56,7 @@ if [[ -z "${GITHUB_TOKEN}" ]]; then
   exit 1
 fi
 git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN}; }; f"
-# --add is required: two insteadOf on the same url.* key otherwise overwrite each other.
+# --add: a second insteadOf on the same key otherwise overwrites the first.
 git config --global url."https://github.com/".insteadOf "git@github.com:"
 git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
 
