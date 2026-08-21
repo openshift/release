@@ -169,7 +169,7 @@ FAILURE_COUNT=0
 CONFIGS_RUN=0
 JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-eval.xml"
 STEP_START=${SECONDS}
-STEP_TIMEOUT=10200  # 2h50m — leave margin within the 3h step limit
+STEP_TIMEOUT=13800  # 3h50m — leave margin within the 4h step limit
 
 write_junit() {
     cat > "${JUNIT_FILE}" <<JEOF
@@ -514,7 +514,7 @@ for config in "${CONFIGS_TO_RUN[@]}"; do
     EVAL_START=$(date +%s)
     THIS_EXIT=0
     STREAM_LOG="${ARTIFACT_DIR}/claude-eval-${config_name}.log"
-    timeout 7200 claude \
+    timeout 12600 claude \
         --model "${CLAUDE_MODEL}" \
         --plugin-dir "${EVAL_HARNESS_DIR}" \
         --allowedTools "${ALLOWED_TOOLS}" \
