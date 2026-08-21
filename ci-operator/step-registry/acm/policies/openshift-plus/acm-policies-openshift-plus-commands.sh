@@ -35,7 +35,7 @@ typeset -a quayNamespacesArr=(quay openshift-quay quay-enterprise)
 typeset quayFound=false
 for ns in "${quayNamespacesArr[@]}"; do
   if (($(oc get quayregistry -n "${ns}" -o name 2>/dev/null | wc -l))); then
-    : "Found Quay Operator deployment in namespace ${ns}, waiting for ready condition"
+    echo "Found Quay Operator deployment in namespace ${ns}, waiting for ready condition"
     oc wait quayregistry --all -n "${ns}" \
       --for condition=Available=True \
       --timeout=10m || true
@@ -43,7 +43,7 @@ for ns in "${quayNamespacesArr[@]}"; do
     break
   fi
 done
-[[ "${quayFound}" == "false" ]] && : "Warning: no QuayRegistry found in namespaces: ${quayNamespacesArr[*]}"
+[[ "${quayFound}" == "false" ]] && echo "Warning: no QuayRegistry found in namespaces: ${quayNamespacesArr[*]}" >&2
 
 typeset -a secondaryPoliciesArr=(
   policy-acs
@@ -78,12 +78,12 @@ if [[ "${IGNORE_SECONDARY_POLICIES}" == "true" ]]; then
         --for jsonpath='{.status.compliant}'=Compliant \
         --timeout=40m
     } || {
-      : "Critical policies failed to become compliant:"
+      echo "ERROR: Critical policies failed to become compliant:" >&2
       oc get policies -n policies | grep -Ev "$(IFS='|'; echo "${secondaryPoliciesArr[*]}")" || true
       exit 1
     }
   else
-    : "All policies are secondary (ignored), no critical policies to wait for"
+    echo "All policies are secondary (ignored), no critical policies to wait for"
   fi
 else
   {
@@ -91,7 +91,7 @@ else
       --for jsonpath='{.status.compliant}'=Compliant \
       --timeout=40m
   } || {
-    : "Policies failed to become compliant:"
+    echo "ERROR: Policies failed to become compliant:" >&2
     oc get policies -n policies
     exit 1
   }
