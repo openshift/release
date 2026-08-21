@@ -1,6 +1,6 @@
 ref:
   as: acm-interop-p2p-submariner-cloud-prepare
-  from: cli
+  from: cli-with-git
   commands: acm-interop-p2p-submariner-cloud-prepare-commands.sh
   resources:
     requests:
@@ -9,6 +9,12 @@ ref:
   timeout: 45m0s
   grace_period: 10m0s
   env:
+    - name: SUBMARINER_SUBCTL_VERSION
+      default: "release-0.24"
+      documentation: |-
+        subctl release tag to download from GitHub releases.
+        Format: release-<major>.<minor> (e.g. release-0.24).
+        Must match the Submariner operator version deployed by broker-join.
     - name: ACM_SPOKE_CLUSTER_COUNT
       default: "2"
       documentation: |-
@@ -22,13 +28,6 @@ ref:
       documentation: |-
         When "true", cloud-prepare failures are logged but do not fail the job.
         Used for iterative debugging of gateway node provisioning.
-    - name: SUBMARINER_VERIFY_HUB_SPOKE
-      default: "false"
-      documentation: |-
-        When "true", the hub cluster is also cloud-prepared for Submariner (AWS
-        security groups + gateway node). Required for hub↔spoke CCLM jobs where
-        the hub must participate in the Submariner mesh. Set to "false" (default)
-        for spoke↔spoke CCLM jobs where hub cloud-prepare adds unnecessary overhead.
   documentation: |-
     Step 1 of 3 in the Submariner installation chain.
 

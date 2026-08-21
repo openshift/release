@@ -1,6 +1,6 @@
 ref:
   as: acm-interop-p2p-submariner-broker-join
-  from: cli
+  from: cli-with-git
   commands: acm-interop-p2p-submariner-broker-join-commands.sh
   resources:
     requests:
@@ -9,6 +9,12 @@ ref:
   timeout: 1h0m0s
   grace_period: 10m0s
   env:
+    - name: SUBMARINER_SUBCTL_VERSION
+      default: "release-0.24"
+      documentation: |-
+        subctl release tag to download from GitHub releases.
+        Format: release-<major>.<minor> (e.g. release-0.24).
+        Must match the Submariner operator version deployed by broker-join.
     - name: ACM_SPOKE_CLUSTER_COUNT
       default: "2"
       documentation: |-
@@ -34,14 +40,6 @@ ref:
       documentation: |-
         When "true", broker-join failures are logged but do not fail the job.
         Used for iterative debugging of broker deployment and cluster join.
-    - name: SUBMARINER_VERIFY_HUB_SPOKE
-      default: "false"
-      documentation: |-
-        When "true", the hub cluster is joined to the Submariner broker as a full
-        participant (in addition to the spokes). Required for hub↔spoke CCLM jobs
-        where the hub must route pod IPs to spoke clusters via Submariner. Set to
-        "false" (default) for spoke↔spoke CCLM jobs where the hub is not a
-        migration participant and hub enrollment adds unnecessary overhead.
   documentation: |-
     Step 2 of 3 in the Submariner installation chain.
 
@@ -57,12 +55,8 @@ ref:
       - submariner-lighthouse-agent Deployment rollout
       - submariner-lighthouse-coredns Deployment rollout
     Asserts submariner-globalnet is absent and remote subnets are not 242.x.
-    Waits for OpenShift CoreDNS (dns-default) or kube-system coredns
+    Finally waits for OpenShift CoreDNS (dns-default) or kube-system coredns
     to include the Lighthouse clusterset.local stub zone on each spoke.
-    Note: AllowCclmSyncIngress NetworkPolicy (cross-cluster pod CIDRs → openshift-cnv
-    port 8443) is applied in the verify step AFTER tunnels are confirmed connected,
-    not here — IPsec tunnels are not yet established at this stage so the gateway
-    CRs carry no CIDR data and the policy would be silently skipped.
 
     Submariner broker is deployed WITHOUT Globalnet. Spokes must use
     non-overlapping pod CIDRs (acm-interop-p2p-cluster-install ResolveSpokeCidr)
@@ -78,6 +72,5 @@ ref:
       SUBMARINER_UNINSTALL_WAIT_SECS   - wait after Globalnet uninstall (default: 30)
       SUBMARINER_COREDNS_SETTLE_SECS   - CoreDNS propagation settle time (default: 35)
       SUBMARINER_BROKER_JOIN_DEBUG_MODE - when true, failures do not fail the job (default: false)
-      SUBMARINER_VERIFY_HUB_SPOKE      - when true, hub is joined + waited as Submariner participant (default: false)
       KUBECONFIG                       - hub cluster kubeconfig
       SHARED_DIR                       - shared artifact directory

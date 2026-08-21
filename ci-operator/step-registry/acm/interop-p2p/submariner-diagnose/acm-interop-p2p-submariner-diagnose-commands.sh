@@ -23,7 +23,7 @@
 # This step always exits 0 — diagnostic failures must not block cluster teardown.
 #
 
-set -uo pipefail; shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 
 eval "$(
     typeset -a _fURL=()
@@ -42,15 +42,24 @@ typeset -a spokeKubeconfigsArr=()
 typeset -a spokeNamesArr=()
 
 # ── InstallSubctl — install subctl to /tmp/bin/ ───────────────────────────────
+# Downloads directly from GitHub releases and extracts with tar -xJf.
+# Requires xz, which is pre-installed in the cli-with-git step image.
 InstallSubctl() {
     mkdir -p /tmp/bin
-    if [[ -x "${subctlBin}" ]]; then
-        return 0
-    fi
-    : "Installing subctl from get.submariner.io"
-    curl -Ls https://get.submariner.io | bash
-    cp "${HOME}/.local/bin/subctl" "${subctlBin}"
-    chmod +x "${subctlBin}"
+    [[ -x "${subctlBin}" ]] && return 0
+
+    typeset version="${SUBMARINER_SUBCTL_VERSION:-release-0.24}"
+    typeset tarUrl="https://github.com/submariner-io/subctl/releases/download/subctl-${version}/subctl-${version}-linux-amd64.tar.xz"
+    typeset tmpTar; tmpTar="$(mktemp /tmp/subctl-XXXXXX.tar.xz)"
+    typeset tmpDir; tmpDir="$(mktemp -d /tmp/subctl-dir-XXXXXX)"
+
+    curl -fsSL "${tarUrl}" -o "${tmpTar}"
+    tar -xJf "${tmpTar}" -C "${tmpDir}"
+    typeset extracted; extracted="$(find "${tmpDir}" -maxdepth 2 -name 'subctl' -type f | head -1)"
+    [[ -n "${extracted}" ]]
+    cp "${extracted}" "${subctlBin}"
+    rm -rf "${tmpDir}" "${tmpTar}"
+    [[ -x "${subctlBin}" ]]
 }
 
 # ── LoadSpokeConfig — populate spoke arrays from SHARED_DIR ──────────────────
@@ -363,5 +372,6 @@ fi
 : "=== Submariner diagnostics complete. Artifacts saved to ${diagDir} ==="
 ls -lh "${diagDir}" || true
 
-# Always exit 0 — this is a post-step; failures must not block cluster teardown
-exit 0
+# Always succeeds — this is a post-step; failures must not block cluster teardown.
+# Every command above uses || true; set -e will not fire.
+true

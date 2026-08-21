@@ -402,6 +402,62 @@ PreflightVmStorageMapped() {
 
 # ----------------------------- Plan / Migration functions ---------------------
 
+# CleanupDestinationStaleResources — remove VM/DV/PVC left on the destination
+# cluster after a previous migration leg, preventing MTV PrepareTarget from
+# failing with "Target VM already exists" / "MAC address conflicts" on re-runs.
+# For the spoke→hub direction, stale spoke-vm-N objects from a prior run land
+# in the hub destination namespace and must be cleared before Plan creation.
+# Skips per-VM cleanup when the destination VMI is already Running (idempotent).
+CleanupDestinationStaleResources() {
+    typeset dstKc="${1:?}"
+    typeset vmPrefix="${2:?}"
+    typeset vmNs="${3:?}"
+    typeset -i count="${4:?}"
+    typeset -i i
+
+    for ((i = 1; i <= count; i++)); do
+        typeset vmName="${vmPrefix}-${i}"
+        typeset dvName="${vmName}-rootdisk"
+
+        typeset vmiPhase
+        vmiPhase="$(oc --kubeconfig="${dstKc}" get "virtualmachineinstance/${vmName}" \
+            -n "${vmNs}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+        [[ "${vmiPhase}" == "Running" ]] && continue
+
+        oc --kubeconfig="${dstKc}" patch "virtualmachine/${vmName}" -n "${vmNs}" \
+            --type merge -p '{"metadata":{"finalizers":null}}' 1>/dev/null 2>/dev/null || true
+        oc --kubeconfig="${dstKc}" patch "virtualmachineinstance/${vmName}" -n "${vmNs}" \
+            --type merge -p '{"metadata":{"finalizers":null}}' 1>/dev/null 2>/dev/null || true
+
+        oc --kubeconfig="${dstKc}" delete "virtualmachine/${vmName}" -n "${vmNs}" \
+            --ignore-not-found --wait=false 1>/dev/null || true
+        oc --kubeconfig="${dstKc}" delete "virtualmachineinstance/${vmName}" -n "${vmNs}" \
+            --ignore-not-found --wait=false 1>/dev/null || true
+        oc --kubeconfig="${dstKc}" delete "datavolume/${dvName}" -n "${vmNs}" \
+            --ignore-not-found --wait=false 1>/dev/null || true
+
+        typeset pvcName
+        while read -r pvcName; do
+            [[ -n "${pvcName}" ]] || continue
+            oc --kubeconfig="${dstKc}" patch "persistentvolumeclaim/${pvcName}" -n "${vmNs}" \
+                --type merge -p '{"metadata":{"finalizers":null}}' 1>/dev/null || true
+            oc --kubeconfig="${dstKc}" delete "persistentvolumeclaim/${pvcName}" -n "${vmNs}" \
+                --ignore-not-found --wait=false 1>/dev/null || true
+        done < <(oc --kubeconfig="${dstKc}" get pvc -n "${vmNs}" -o json 2>/dev/null \
+            | jq -r --arg dv "${dvName}" \
+                '.items[].metadata.name | select(test("^(" + $dv + "|prime-))"))' \
+            || true)
+
+        oc --kubeconfig="${dstKc}" wait --for=delete "virtualmachineinstance/${vmName}" \
+            -n "${vmNs}" --timeout=2m 1>/dev/null 2>/dev/null || true
+        oc --kubeconfig="${dstKc}" wait --for=delete "virtualmachine/${vmName}" \
+            -n "${vmNs}" --timeout=2m 1>/dev/null 2>/dev/null || true
+        oc --kubeconfig="${dstKc}" wait --for=delete "datavolume/${dvName}" \
+            -n "${vmNs}" --timeout=3m 1>/dev/null 2>/dev/null || true
+    done
+    true
+}
+
 # BuildVmsJson — build the Plan spec.vms JSON array from VM prefix and count.
 BuildVmsJson() {
     typeset vmPrefix="${1:?}"
@@ -796,6 +852,13 @@ RunOneMigrationDirection() {
         PreflightVmStorageMapped "${srcKc}" "${vmPrefix}" "${vmNs}" "${storMapName}"
 
     vmsJson="$(BuildVmsJson "${vmPrefix}" "${vmNs}" "${vmCount}")"
+
+    # For the spoke→hub return leg, remove any stale VM/DV/PVC on the destination
+    # (hub) left by a previous run — MTV PrepareTarget rejects duplicate VMs.
+    if [[ "${direction}" == "spoke-to-hub" ]]; then
+        JStep "[${direction}] Pre-migration: Cleanup stale destination resources" \
+            CleanupDestinationStaleResources "${dstKc}" "${vmPrefix}" "${targetNs}" "${vmCount}"
+    fi
 
     JStep "[${direction}] Migration: Apply Plan (${vmCount} VMs)" \
         ApplyPlan "${planName}" "${srcProvider}" "${dstProvider}" \

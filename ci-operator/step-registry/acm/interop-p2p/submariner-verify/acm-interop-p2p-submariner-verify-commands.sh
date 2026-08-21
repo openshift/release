@@ -52,15 +52,22 @@ typeset -a spokeNamesArr=()
 
 # ── InstallSubctl — install subctl to /tmp/bin/ (only when opt-in) ───────────
 InstallSubctl() {
-    [[ "${runSubctlVerify}" == "true" ]] || return 0
+    [[  "${runSubctlVerify}" == "true" ]] || return 0
     mkdir -p /tmp/bin
-    if [[ -x "${subctlBin}" ]]; then
-        return 0
-    fi
-    curl -Ls https://get.submariner.io | bash
-    cp "${HOME}/.local/bin/subctl" "${subctlBin}"
-    chmod +x "${subctlBin}"
-    true
+    [[ -x "${subctlBin}" ]] && return 0
+
+    typeset version="${SUBMARINER_SUBCTL_VERSION}"
+    typeset tarUrl="https://github.com/submariner-io/subctl/releases/download/subctl-${version}/subctl-${version}-linux-amd64.tar.xz"
+    typeset tmpTar; tmpTar="$(mktemp /tmp/subctl-XXXXXX.tar.xz)"
+    typeset tmpDir; tmpDir="$(mktemp -d /tmp/subctl-dir-XXXXXX)"
+
+    curl -fsSL "${tarUrl}" -o "${tmpTar}"
+    tar -xJf "${tmpTar}" -C "${tmpDir}"
+    typeset extracted; extracted="$(find "${tmpDir}" -maxdepth 2 -name 'subctl' -type f | head -1)"
+    [[ -n "${extracted}" ]]
+    cp "${extracted}" "${subctlBin}"
+    rm -rf "${tmpDir}" "${tmpTar}"
+    [[ -x "${subctlBin}" ]]
 }
 
 # ── LoadSpokeConfig — populate spoke arrays from SHARED_DIR ───────────────────
@@ -93,15 +100,19 @@ EnsureNonGatewayOvnRoutes() {
 
     : "EnsureNonGatewayOvnRoutes: injecting missing OVN routes on non-gateway nodes of '${clusterName}'"
 
-    typeset -i ngrCount=0 ngrWait=0
-    until (( ngrCount > 0 || ngrWait >= 120 )); do
-        ngrCount=$(KUBECONFIG="${kubeconfig}" oc get nongatewayroutes.submariner.io \
-            -n submariner-operator --no-headers 2>/dev/null | wc -l || true)
-        (( ngrCount > 0 )) && break
-        sleep 10
-        (( ngrWait += 10 ))
-        : "  Waiting for NonGatewayRoute CRs on '${clusterName}' (${ngrWait}/120 s)"
-    done
+    typeset -i ngrCount
+    ngrCount=$(
+        typeset -i count=0 wMax=120
+        SECONDS=0
+        until (( count > 0 || SECONDS >= wMax )); do
+            count=$(KUBECONFIG="${kubeconfig}" oc get nongatewayroutes.submariner.io \
+                -n submariner-operator --no-headers 2>/dev/null | wc -l || true)
+            (( count > 0 )) && break
+            sleep 10
+            : "  Waiting for NonGatewayRoute CRs on '${clusterName}' (${SECONDS}/${wMax}s)"
+        done
+        printf '%d\n' "${count}"
+    )
 
     if (( ngrCount == 0 )); then
         : "  No NonGatewayRoute CRs on '${clusterName}' after 120 s — skipping"
