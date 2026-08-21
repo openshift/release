@@ -123,7 +123,7 @@ fi
 
 cmd="oc adm release -a '${new_pull_secret}' mirror ${args[*]} | tee '${mirror_output}'"
 
-MAX_ATTEMPTS=5
+MAX_ATTEMPTS=10
 ATTEMPTS=0
 SUCCESS=false
 while [ "${SUCCESS}" = false ] && (( ATTEMPTS++ < MAX_ATTEMPTS )); do
