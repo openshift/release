@@ -10,10 +10,33 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_JIRA_AGENT_ISSUE_KEY:-}" ]]; then
   export JIRA_AGENT_ISSUE_KEY="${MULTISTAGE_PARAM_OVERRIDE_JIRA_AGENT_ISSUE_KEY}"
 fi
 
+# ── Team configuration ──────────────────────────────────────────────────────
+# The jira-agent-team-config pre step resolves the team named by JIRA_AGENT_TEAM
+# into JIRA_AGENT_* variables and writes them to SHARED_DIR. Source them here so
+# the rest of the pipeline runs with that team's configuration. The per-team
+# table (the single source of truth) lives in that step's commands file:
+# ci-operator/step-registry/jira-agent/team-config/jira-agent-team-config-commands.sh
+if [ -f "${SHARED_DIR}/jira-agent-team-env.sh" ]; then
+  echo "Sourcing resolved team configuration from SHARED_DIR"
+  source "${SHARED_DIR}/jira-agent-team-env.sh"
+fi
+
 export JIRA_AGENT_AUTH_MODE="${JIRA_AGENT_AUTH_MODE:-app}"
 export JIRA_AGENT_FORK_ORG="${JIRA_AGENT_FORK_ORG:-}"
 export JIRA_AGENT_PAT_KEY="${JIRA_AGENT_PAT_KEY:-gh-pat}"
 export JIRA_AGENT_COMPONENT_REPO_MAP="${JIRA_AGENT_COMPONENT_REPO_MAP:-}"
+# Additional per-issue routing maps used in the single all-teams job (aggregate
+# mode). Default to empty so git-helpers can reference them safely under `set -u`
+# in single-team/passthrough runs, where they are not set.
+export JIRA_AGENT_PROJECT_REPO_MAP="${JIRA_AGENT_PROJECT_REPO_MAP:-}"
+export JIRA_AGENT_REPO_BRANCH_MAP="${JIRA_AGENT_REPO_BRANCH_MAP:-}"
+export JIRA_AGENT_COMPONENT_PROFILE_MAP="${JIRA_AGENT_COMPONENT_PROFILE_MAP:-}"
+export JIRA_AGENT_COMPONENT_EMOJI_MAP="${JIRA_AGENT_COMPONENT_EMOJI_MAP:-}"
+export JIRA_AGENT_COMPONENT_ASSIGNEE_MAP="${JIRA_AGENT_COMPONENT_ASSIGNEE_MAP:-}"
+export JIRA_AGENT_TEAM_QUERIES="${JIRA_AGENT_TEAM_QUERIES:-}"
+# Default to empty so the FORK_ORG derivation below is safe under `set -u` when a
+# team sets FORK_ORG (PAT mode) but not FORK_REPO; it is derived before it is used.
+export JIRA_AGENT_FORK_REPO="${JIRA_AGENT_FORK_REPO:-}"
 
 # When a component-repo map is set, UPSTREAM_REPO is resolved per-issue from the Jira component.
 # Otherwise it must be set statically.
@@ -48,8 +71,8 @@ else
   exit 1
 fi
 
-if [ -z "${JIRA_AGENT_ISSUE_KEY:-}" ] && [ -z "${JIRA_AGENT_JQL:-}" ]; then
-  echo "ERROR: JIRA_AGENT_JQL must be set when JIRA_AGENT_ISSUE_KEY is not provided"
+if [ -z "${JIRA_AGENT_ISSUE_KEY:-}" ] && [ -z "${JIRA_AGENT_JQL:-}" ] && [ -z "$JIRA_AGENT_TEAM_QUERIES" ]; then
+  echo "ERROR: JIRA_AGENT_JQL or JIRA_AGENT_TEAM_QUERIES must be set when JIRA_AGENT_ISSUE_KEY is not provided"
   exit 1
 fi
 
@@ -59,8 +82,9 @@ export FORK_INSTALL_ID_KEY="${JIRA_AGENT_FORK_INSTALLATION_ID_KEY:-installation-
 export REVIEW_LANGUAGE="${JIRA_AGENT_REVIEW_LANGUAGE:-go}"
 export REVIEW_PROFILE="${JIRA_AGENT_REVIEW_PROFILE:-}"
 export SLACK_EMOJI="${JIRA_AGENT_SLACK_EMOJI:-:robot:}"
+export SLACK_WEBHOOK_KEY="${JIRA_AGENT_SLACK_WEBHOOK_KEY:-slack-webhook-url}"
 export JIRA_BASE_URL="${JIRA_BASE_URL:-https://redhat.atlassian.net}"
-export MAX_ISSUES=${JIRA_AGENT_MAX_ISSUES:-1}
+export MAX_ISSUES="${JIRA_AGENT_MAX_ISSUES:-1}"
 export STATE_FILE="${SHARED_DIR}/processed-issues.txt"
 export REPORT_STEP="${JIRA_AGENT_REPORT_STEP:-jira-agent-report}"
 export SUBAGENT_PROMPT="SUBAGENTS: Launch ALL subagents in parallel (single message with multiple Task tool calls) for maximum speed. Each subagent should be given subagent_type: \"general-purpose\". Do NOT set the model parameter — let subagents inherit the parent model, as these analysis tasks require a capable model."
@@ -69,7 +93,11 @@ export SECURITY_PROMPT="SECURITY: Do NOT run commands that reveal git credential
 export BASH_DEFAULT_TIMEOUT_MS=1200000
 export BASH_MAX_TIMEOUT_MS=1200000
 
-echo "Configuration: AUTH_MODE=$JIRA_AGENT_AUTH_MODE MAX_ISSUES=$MAX_ISSUES"
+if [ -n "$JIRA_AGENT_TEAM_QUERIES" ]; then
+  echo "Configuration: AUTH_MODE=$JIRA_AGENT_AUTH_MODE TEAM_QUERIES=$(jq 'length' <<<"$JIRA_AGENT_TEAM_QUERIES")"
+else
+  echo "Configuration: AUTH_MODE=$JIRA_AGENT_AUTH_MODE MAX_ISSUES=$MAX_ISSUES"
+fi
 
 # ── Source libraries ───────────────────────────────────────────────────────────
 
@@ -95,6 +123,8 @@ claude plugin install prow-agent@ai-helpers
 
 # ── Credentials ───────────────────────────────────────────────────────────────
 
+# In registry mode, git credentials depend on the resolved team's auth mode,
+# which is already known (resolved up front), so credentials load normally here.
 load_credentials
 load_jira_credentials
 load_slack_credentials
@@ -122,7 +152,6 @@ if [ "$DYNAMIC_REPO" = false ]; then
 fi
 
 # ── Query Jira ─────────────────────────────────────────────────────────────────
-
 query_jira_issues
 
 # ── Process each issue ─────────────────────────────────────────────────────────
@@ -130,20 +159,26 @@ query_jira_issues
 PROCESSED_COUNT=0
 FAILED_COUNT=0
 TOTAL=0
-
+ISSUE_LINES=()
 while IFS= read -r line; do
-  if [ $TOTAL -ge "$MAX_ISSUES" ]; then
-    echo "Reached maximum issues limit ($MAX_ISSUES). Stopping."
-    break
-  fi
+  [ -n "$line" ] && ISSUE_LINES+=("$line")
+done <<< "$ISSUES"
+ISSUE_COUNT=${#ISSUE_LINES[@]}
 
+for line in "${ISSUE_LINES[@]}"; do
   issue_key=$(echo "$line" | awk '{print $1}')
   issue_summary=$(echo "$line" | cut -d' ' -f2-)
 
   # In dynamic mode, resolve the upstream repo from the issue's Jira component
   # and set up a fresh clone/fork/sync for each issue
   if [ "$DYNAMIC_REPO" = true ]; then
-    resolve_upstream_repo "$issue_key"
+    if ! resolve_upstream_repo "$issue_key"; then
+      echo "Skipping ${issue_key}: could not resolve an upstream repo for it."
+      record_issue_result "$issue_key" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "" "FAILED"
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+      TOTAL=$((TOTAL + 1))
+      continue
+    fi
     setup_repo
     validate_jira_plugin
   fi
@@ -156,11 +191,11 @@ while IFS= read -r line; do
   TOTAL=$((TOTAL + 1))
 
   # Rate-limit between issues to avoid GitHub API abuse detection
-  if [ $TOTAL -lt "$MAX_ISSUES" ]; then
+  if [ $TOTAL -lt "$ISSUE_COUNT" ]; then
     echo "Waiting 60 seconds before next issue..."
     sleep 60
   fi
-done <<< "$ISSUES"
+done
 
 # Generate conversation transcript HTML from stream-json files in /tmp
 echo "Generating conversation transcript..."

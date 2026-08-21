@@ -15,7 +15,7 @@ cat > "${SHARED_DIR}/jira-helpers.sh" << 'HEREDOC_EOF'
 #   load_github_slack_map    - Load GitHub-to-Slack user ID mapping
 #   transition_issue         - Transition a Jira issue to a target status
 #   set_assignee             - Set assignee on a Jira issue
-#   query_jira_issues        - Query Jira for issues matching JQL
+#   query_jira_issues        - Query Jira by issue key, team query plan, or JQL
 #   postprocess_jira_issue   - Label, transition, and assign after processing
 
 JIRA_CREDS_DIR="/var/run/claude-code-service-account"
@@ -84,7 +84,16 @@ load_jira_credentials() {
 # Load Slack webhook URL for notifications.
 # Sets: SLACK_WEBHOOK_URL (exported)
 load_slack_credentials() {
-  local webhook_file="${JIRA_CREDS_DIR}/slack-webhook-url"
+  local webhook_key="${SLACK_WEBHOOK_KEY:-slack-webhook-url}"
+  # The key names a single file in the mounted credentials dir. Reject path
+  # separators and bare '.'/'..' so a misconfigured or overridden key cannot
+  # traverse outside JIRA_CREDS_DIR to read a non-credential file.
+  if [[ ! "$webhook_key" =~ ^[A-Za-z0-9._-]+$ || "$webhook_key" == "." || "$webhook_key" == ".." ]]; then
+    echo "Warning: ignoring invalid SLACK_WEBHOOK_KEY (must be a single credential key name); Slack notifications will be skipped"
+    export SLACK_WEBHOOK_URL=""
+    return 0
+  fi
+  local webhook_file="${JIRA_CREDS_DIR}/${webhook_key}"
   [[ $- == *x* ]] && local _was_tracing=true || local _was_tracing=false
   set +x
   if [ -f "$webhook_file" ]; then
@@ -166,21 +175,16 @@ set_assignee() {
     -d "{\"accountId\":\"${account_id}\"}"
 }
 
-# Query Jira for issues matching JQL or a specific issue key.
-# Sets: ISSUES (multi-line "KEY SUMMARY" pairs)
-# Requires: JIRA_AGENT_ISSUE_KEY or JIRA_AGENT_JQL, MAX_ISSUES, JIRA_BASE_URL, JIRA_AUTH
-query_jira_issues() {
-  local jql search_payload search_body total_results
+# Run one Jira search and set QUERY_ISSUES to "KEY SUMMARY" lines.
+# Usage: query_jira <label> <jql> <max_results>
+query_jira() {
+  local label=$1
+  local jql=$2
+  local max_results=$3
+  local search_payload search_body result_count
 
-  echo "Querying Jira for issues..."
-  if [ -n "${JIRA_AGENT_ISSUE_KEY:-}" ]; then
-    echo "Using override: JIRA_AGENT_ISSUE_KEY=$JIRA_AGENT_ISSUE_KEY"
-    jql="key = ${JIRA_AGENT_ISSUE_KEY}"
-  else
-    jql="$JIRA_AGENT_JQL"
-  fi
-
-  search_payload=$(jq -n --arg jql "$jql" --argjson max "$MAX_ISSUES" \
+  echo "Querying Jira for ${label} (limit ${max_results})..."
+  search_payload=$(jq -n --arg jql "$jql" --argjson max "$max_results" \
     '{jql: $jql, fields: ["key", "summary"], maxResults: $max}')
 
   if ! curl_with_retry "${JIRA_BASE_URL}/rest/api/3/search/jql" \
@@ -188,15 +192,53 @@ query_jira_issues() {
     -H "Authorization: Basic $JIRA_AUTH" \
     -H "Content-Type: application/json" \
     -d "$search_payload"; then
-    echo "ERROR: Jira search failed (HTTP $CURL_HTTP_CODE)"
+    echo "ERROR: Jira search failed for ${label} (HTTP $CURL_HTTP_CODE)"
     echo "Response: $CURL_BODY"
-    exit 1
+    return 1
   fi
   search_body="$CURL_BODY"
 
-  total_results=$(echo "$search_body" | jq -r '.total // 0')
-  echo "Jira search returned $total_results result(s)"
-  ISSUES=$(echo "$search_body" | jq -r '.issues[]? | "\(.key) \(.fields.summary)"')
+  result_count=$(echo "$search_body" | jq -r '.issues | length')
+  echo "Jira search for ${label} selected $result_count issue(s)"
+  QUERY_ISSUES=$(echo "$search_body" | jq -r '.issues[]? | "\(.key) \(.fields.summary)"')
+}
+
+# Query Jira for a specific issue, each team's independently limited JQL, or a
+# single JQL. Sets ISSUES to deduplicated "KEY SUMMARY" lines.
+# Sets: ISSUES (multi-line "KEY SUMMARY" pairs)
+# Requires: JIRA_AGENT_ISSUE_KEY, JIRA_AGENT_TEAM_QUERIES, or JIRA_AGENT_JQL
+query_jira_issues() {
+  local team_query team jql max_issues
+
+  ISSUES=""
+  if [ -n "${JIRA_AGENT_ISSUE_KEY:-}" ]; then
+    echo "Using override: JIRA_AGENT_ISSUE_KEY=$JIRA_AGENT_ISSUE_KEY"
+    if ! query_jira "issue ${JIRA_AGENT_ISSUE_KEY}" "key = ${JIRA_AGENT_ISSUE_KEY}" 1; then
+      exit 1
+    fi
+    ISSUES="$QUERY_ISSUES"
+  elif [ -n "${JIRA_AGENT_TEAM_QUERIES:-}" ]; then
+    while IFS= read -r team_query; do
+      team=$(jq -r '.team' <<<"$team_query")
+      jql=$(jq -r '.jql' <<<"$team_query")
+      max_issues=$(jq -r '.maxIssues' <<<"$team_query")
+      if ! query_jira "team ${team}" "$jql" "$max_issues"; then
+        exit 1
+      fi
+      if [ -n "$QUERY_ISSUES" ]; then
+        ISSUES+="${ISSUES:+$'\n'}${QUERY_ISSUES}"
+      fi
+    done < <(jq -c '.[]' <<<"$JIRA_AGENT_TEAM_QUERIES")
+
+    if [ -n "$ISSUES" ]; then
+      ISSUES=$(awk 'NF && !seen[$1]++' <<<"$ISSUES")
+    fi
+  else
+    if ! query_jira "configured JQL" "$JIRA_AGENT_JQL" "$MAX_ISSUES"; then
+      exit 1
+    fi
+    ISSUES="$QUERY_ISSUES"
+  fi
 
   if [ -z "$ISSUES" ]; then
     echo "No issues found matching criteria"

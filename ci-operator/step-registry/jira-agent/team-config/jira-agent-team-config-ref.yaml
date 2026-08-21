@@ -1,0 +1,29 @@
+ref:
+  as: jira-agent-team-config
+  from: claude-ai-helpers
+  commands: jira-agent-team-config-commands.sh
+  env:
+  - name: JIRA_AGENT_TEAM
+    default: ""
+    documentation: |-
+      Team id selecting a team's configuration from the per-team table in this
+      step's commands file. When set, this step resolves that team's
+      JIRA_AGENT_* variables (JQL, repos, auth, etc.) and writes them to
+      SHARED_DIR for the process step to source, so a per-team wrapper workflow
+      is not required. Leave empty to provide the JIRA_AGENT_* variables directly
+      (e.g. manual Gangway single-issue runs).
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Resolves per-team jira-agent configuration.
+
+    This step is the single source of truth for team settings: given
+    JIRA_AGENT_TEAM, it selects that team's JIRA_AGENT_* variables from the case
+    table in its commands file and writes them to
+    ${SHARED_DIR}/jira-agent-team-env.sh, which the process step sources.
+
+    Onboarding a team means adding a case arm here plus a thin periodic that sets
+    JIRA_AGENT_TEAM. See ONBOARDING.md in the parent directory for the full field
+    reference.
