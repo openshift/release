@@ -11,8 +11,10 @@ workflow:
 
     After install, quay-tests-libvirt-s390x-make-masters-workers converts two control-plane
     nodes into dual-role master+worker (schedulable) because the leases pool currently
-    provides only two dedicated compute nodes. Quay operator/catalog/deploy/test steps
-    remain on the job test: chain.
+    provides only two dedicated compute nodes. quay-tests-libvirt-s390x-provision-nfs-csi
+    clones ibmcloud-openshift-provisioning from vault credentials and runs
+    bash/csi-provisioner.sh when no default StorageClass exists. Quay
+    operator/catalog/deploy/test steps remain on the job test: chain.
   steps:
     allow_best_effort_post_steps: true
     pre:
@@ -22,6 +24,7 @@ workflow:
     - ref: ipi-conf-etcd-on-ramfs
     - chain: upi-install-libvirt
     - ref: quay-tests-libvirt-s390x-make-masters-workers
+    - ref: quay-tests-libvirt-s390x-provision-nfs-csi
     post:
     - ref: ipi-conf-debug-kdump-gather-logs
     - chain: gather
