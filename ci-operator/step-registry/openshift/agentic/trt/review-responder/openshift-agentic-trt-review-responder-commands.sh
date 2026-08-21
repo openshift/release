@@ -276,17 +276,6 @@ print(json.dumps(obj, separators=(",", ":")))
 ' "$1"
 }
 
-failing_checks_changed() {
-    python3 -c '
-import json, sys
-prev = json.loads(sys.argv[1])
-cur = json.loads(sys.argv[2])
-def names(obj):
-    return sorted(str(x.get("name", "")) for x in obj if isinstance(x, dict))
-sys.exit(0 if names(prev) != names(cur) else 1)
-' "$1" "$2"
-}
-
 push_current_branch() {
     local branch_name
     branch_name=$(git branch --show-current 2>/dev/null || echo "")
@@ -366,50 +355,20 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
 
     comment_decision=$(grep -Eo '^COMMENT_WORK=(yes|no)$' "${GATE_LOG}" | tail -1 || true)
     ci_decision=$(grep -Eo '^CI_WORK=(yes|no)$' "${GATE_LOG}" | tail -1 || true)
-    work_decision=$(grep -Eo '^WORK=(yes|no)$' "${GATE_LOG}" | tail -1 || true)
     extracted='[]'
     if got_checks=$(extract_failing_checks "${GATE_LOG}"); then
         extracted="${got_checks}"
     fi
 
-    if [[ "${comment_decision}" == "COMMENT_WORK=yes" ]]; then
-        has_review=true
-    elif [[ "${comment_decision}" == "COMMENT_WORK=no" ]]; then
-        has_review=false
-    elif [[ "${work_decision}" == "WORK=yes" ]]; then
-        has_review=true
-    elif [[ "${work_decision}" == "WORK=no" ]]; then
-        has_review=false
-    else
-        echo "Gate did not return COMMENT_WORK= or WORK= (got comment='${comment_decision}' work='${work_decision}'); treating as review work."
-        has_review=true
-    fi
-
-    if [[ "${ci_decision}" == "CI_WORK=yes" ]]; then
-        has_ci=true
-    elif [[ "${ci_decision}" == "CI_WORK=no" ]]; then
-        has_ci=false
-    else
-        # Older gate: FAILING_CHECKS is the current set, not a delta.
-        has_ci=false
-        if [[ "${has_review}" == "true" && "${extracted}" != "[]" ]]; then
-            if [[ -z "${PREV_HEAD}" ]] || \
-               { [[ -n "${current_head}" && "${current_head}" != "${PREV_HEAD}" ]]; } || \
-               failing_checks_changed "${PREV_FAILING}" "${extracted}"; then
-                has_ci=true
-            fi
-        fi
-        # Old WORK=yes could be CI-only; still run CI via the delta above.
-        # If WORK=no, do not treat lingering failures as new.
-        if [[ "${work_decision}" == "WORK=no" ]]; then
-            has_ci=false
-        fi
-    fi
+    has_review=false
+    [[ "${comment_decision}" == "COMMENT_WORK=yes" ]] && has_review=true
+    has_ci=false
+    [[ "${ci_decision}" == "CI_WORK=yes" ]] && has_ci=true
 
     PREV_FAILING="${extracted}"
     PREV_HEAD="${current_head}"
 
-    echo "Gate decision: comment=${comment_decision:-<none>} ci=${ci_decision:-<none>} work=${work_decision:-<none>} (has_review=${has_review} has_ci=${has_ci})"
+    echo "Gate decision: comment=${comment_decision:-<none>} ci=${ci_decision:-<none>} (has_review=${has_review} has_ci=${has_ci})"
 
     if [[ "${has_review}" != "true" && "${has_ci}" != "true" ]]; then
         idle_streak=$(( idle_streak + 1 ))
