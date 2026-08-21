@@ -135,46 +135,36 @@ Must state:
 
 ## Adding a new skill
 
-1. Create `skills/<TEAM_NAME>.md` following this structure
-2. Add your team identifier to the `OWNERS` file in `skills/`
-3. Validate the skill before submitting (see [Skill validation](#skill-validation))
+1. Create `resources/skills/<name>/SKILL.md` following this structure (e.g., `resources/skills/my-operator/SKILL.md`)
+2. Add your team identifier to the `OWNERS` file in `resources/`
+3. Run `make lint` from the `resources/` directory to validate the skill (see [Skill validation](#skill-validation))
 4. Open a PR to `openshift/release`
-5. Set `AGENT_SKILL: <TEAM_NAME>` in your CI config
+5. Set `AGENT_SKILL: <name>` in your CI config (e.g., `AGENT_SKILL: my-operator`)
 
-Skill names must match `^[A-Za-z0-9_-]+$`. The step rejects any value with other characters.
+Skill directory names must match `^[A-Za-z0-9_-]+$`. The step rejects any value with other characters.
 
 ---
 
 ## Skill validation
 
-Before submitting a new or modified skill, run these tools to catch security and quality issues early:
+Before submitting a new or modified skill, run [skillsaw](https://github.com/stbenjam/skillsaw) lint locally. Skillsaw checks skill files for security issues (embedded secrets), content quality (weak language, contradictions, attention dead zones), and structure (frontmatter, instruction budget limits).
 
-### Skillsaw
+### Prerequisites
 
-[Skillsaw](https://github.com/stbenjam/skillsaw) is a linter for AI agent instruction files. It checks for:
-- **Security** — embedded secrets, API keys, tokens, or passwords in skill content
-- **Content quality** — weak/vague language, contradictions, tautological instructions, attention dead zones (critical instructions buried in the middle of long files)
-- **Structure** — valid frontmatter, instruction budget limits, placeholder text, broken internal references
+- Docker or Podman
 
-```bash
-pip install skillsaw
-skillsaw lint skills/
-```
+### Running skillsaw lint
 
-Fix violations before submitting:
+From the `resources/` directory:
 
 ```bash
-skillsaw fix skills/          # Apply deterministic fixes
-skillsaw fix --llm skills/    # Apply LLM-powered content improvements
+cd ci-operator/step-registry/openshift-observability/qe-agent/resources
+make lint
 ```
 
-### Agent Eval Harness
+The Makefile, `.skillsaw.yaml`, and `.claude-plugin/plugin.json` live in the `resources/` directory alongside the skills. Skillsaw discovers skills via the plugin manifest and lints all `skills/<name>/SKILL.md` files.
 
-[Agent Eval Harness](https://github.com/opendatahub-io/agent-eval-harness) is an evaluation framework for testing AI agent skill effectiveness. Use it to measure how well your skill performs against known test failure scenarios — verifying that the agent produces correct diagnoses, useful fixes, and structured output before the skill is deployed to CI.
-
-```bash
-pip install agent-eval-harness
-```
+The step script fetches skills by directory name (e.g., `AGENT_SKILL: tempo` loads `resources/skills/tempo/SKILL.md`).
 
 ---
 
