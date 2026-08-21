@@ -42,11 +42,20 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
+      ENABLE_BUILD_SUPPORT: "true"
       MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-22@sha256:2a17e0af09b8d6242c8fb758da9a7a38829bdda5232a7b9f02f119c842dc2e9f
+      QUAY_BUILDER_IMAGE: registry.redhat.io/quay/quay-builder-rhel8:v3.18.0
       QUAY_EXTRA_CONFIG: |
         FEATURE_PROGRAMMATIC_BOOTSTRAP: false
         FEATURE_USER_METADATA: true
         FEATURE_IMMUTABLE_TAGS: true
+        FEATURE_SPARSE_INDEX: true
+        FEATURE_MAILING: true
+        MAIL_SERVER: mailpit.quay-enterprise.svc.cluster.local
+        MAIL_PORT: 1025
+        MAIL_USE_TLS: false
+        MAIL_USE_AUTH: false
+        MAIL_DEFAULT_SENDER: quay@quayqe.local
         DEFAULT_UI: react
         SUPER_USERS:
           - admin
@@ -58,6 +67,9 @@ tests:
     - ref: quay-operator-deprovision
     test:
     - ref: quay-operator-enable-catalogsource
+    - ref: quay-operator-provisioning-tls
+    - ref: quay-operator-provisioning-builder
+    - ref: quay-operator-deploy-mailpit
     - ref: quay-operator-deploy-aws-s3
     - ref: quay-operator-test-e2e
     workflow: ipi-aws

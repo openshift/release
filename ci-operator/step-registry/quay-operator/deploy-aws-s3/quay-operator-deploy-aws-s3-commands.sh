@@ -322,7 +322,34 @@ if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	' config.yaml
 fi
 
-oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
+# Build support requires unmanaged TLS plus a virtual builder. When enabled, the
+# quay-operator-provisioning-{tls,builder} steps have already written the
+# cert/key, build-cluster CA, and builder config to SHARED_DIR. Fold the builder
+# config into the bundle (after the extra-config merge, so it is not stripped) and
+# hand the operator the unmanaged cert material. Do not echo config_builder.yaml:
+# it carries the Quay password and builder SA token. (This script runs without
+# set -x, so the append below is not traced.)
+TLS_MANAGED="true"
+if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
+  echo "Build support enabled: configuring unmanaged TLS + virtual builder" >&2
+  for f in config_builder.yaml ssl.cert ssl.key build_cluster.crt; do
+    if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
+      echo "ERROR: ENABLE_BUILD_SUPPORT=true but ${SHARED_DIR}/${f} is missing." >&2
+      echo "       Ensure quay-operator-provisioning-tls and -builder ran first." >&2
+      exit 1
+    fi
+  done
+  TLS_MANAGED="false"
+  cat "${SHARED_DIR}/config_builder.yaml" >> config.yaml
+
+  oc create secret generic -n quay-enterprise config-bundle-secret \
+    --from-file config.yaml=./config.yaml \
+    --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
+    --from-file ssl.key="${SHARED_DIR}/ssl.key" \
+    --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt"
+else
+  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
+fi
 
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
@@ -347,7 +374,7 @@ spec:
   - kind: clair
     managed: true
   - kind: tls
-    managed: true
+    managed: ${TLS_MANAGED}
   - kind: route
     managed: true
 EOF

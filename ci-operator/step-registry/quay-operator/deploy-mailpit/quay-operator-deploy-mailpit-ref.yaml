@@ -1,0 +1,28 @@
+ref:
+  as: quay-operator-deploy-mailpit
+  cli: latest
+  from_image:
+    name: quay-test-omr
+    namespace: ci
+    tag: latest
+  commands: quay-operator-deploy-mailpit-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  grace_period: 10m0s
+  documentation: |-
+    Deploy a Mailpit SMTP sink into the Quay namespace so Quay's FEATURE_MAILING
+    has a mail server to send to, and the Playwright e2e suite has an HTTP API to
+    read delivered mail from (utils/mailpit.ts). Creates a Deployment, a Service
+    exposing SMTP (1025) and HTTP (8025), and an edge-terminated Route to the HTTP
+    API. Writes the API base URL to ${SHARED_DIR}/mailpit_api for the test step.
+  env:
+  - name: QUAYNAMESPACE
+    default: "quay-enterprise"
+    documentation: Namespace where Quay (and Mailpit) are deployed.
+  - name: MAILPIT_IMAGE
+    default: "docker.io/axllent/mailpit:latest"
+    documentation: |-
+      Mailpit container image. Override to a pinned/mirrored tag for reproducible
+      runs and to avoid registry rate limits.

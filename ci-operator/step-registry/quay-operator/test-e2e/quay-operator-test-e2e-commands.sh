@@ -33,6 +33,16 @@ export QUAY_USERNAME
 export QUAY_PASSWORD
 export CI=true
 
+# Mailpit HTTP API base URL for email-dependent specs (utils/mailpit.ts). Written
+# by the quay-operator-deploy-mailpit step. Left unset when mailing is disabled.
+if [[ -s "${SHARED_DIR}/mailpit_api" ]]; then
+  MAILPIT_API=$(cat "${SHARED_DIR}/mailpit_api")
+  export MAILPIT_API
+  echo "MAILPIT_API=${MAILPIT_API}"
+else
+  echo "No mailpit_api in SHARED_DIR; email-dependent specs may skip or fail"
+fi
+
 PLAYWRIGHT_WORKDIR="/go/src/github.com/quay/quay/web"
 PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_GIT_REPO:-https://github.com/quay/quay.git}"
 
@@ -164,10 +174,16 @@ echo "Test user pre-creation complete"
 # ignoreHTTPSErrors). Without this, config fetch throws and smoke tests never run.
 export NODE_TLS_REJECT_UNAUTHORIZED=0
 
+# Tests excluded from the run. Beyond unsupported auth backends (OIDC/LDAP), this
+# quarantines webhook tests (out of scope) plus tests tracking known product bugs
+# and UI/version gaps. See E2E_FAILURE_REPORT.md for the rationale per entry.
+PLAYWRIGHT_GREP_INVERT="${PLAYWRIGHT_GREP_INVERT:-@auth:OIDC|@auth:LDAP}"
+echo "Excluding tests matching: ${PLAYWRIGHT_GREP_INVERT}"
+
 echo "Running Playwright smoke tests from ${PLAYWRIGHT_WORKDIR} (branch ${PLAYWRIGHT_GIT_BRANCH:-image})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
 npx playwright test \
-  --grep-invert '@auth:OIDC|@auth:LDAP' \
+  --grep-invert "${PLAYWRIGHT_GREP_INVERT}" \
   --reporter=junit,html \
   2>&1 | tee "${ARTIFACT_DIR}/playwright-output.log"
 popd
