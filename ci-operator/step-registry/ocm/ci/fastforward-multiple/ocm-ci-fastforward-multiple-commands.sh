@@ -154,27 +154,41 @@ tekton_file_version_compare() {
   local target_version=$4    # e.g. "5.0"
 
   local semantic_version
-  semantic_version=$(grep -oE "${branch_prefix}-[0-9]+\.[0-9]+" "$file" 2>/dev/null | head -1 | cut -d'-' -f2)
+  # `|| true` guards against `grep` finding no match (exit 1) so the
+  # fallback below always runs, regardless of any future `set -e` change.
+  semantic_version=$(grep -oE "${branch_prefix}-[0-9]+\.[0-9]+" "$file" 2>/dev/null | head -1 | cut -d'-' -f2 || true)
 
   if [[ -n "$semantic_version" ]]; then
     compare_versions "$semantic_version" "$target_version"
     return
   fi
 
-  # Fallback: compare compact filename version numerically
-  local target_compact="${target_version//./}"
-  local file_num="${file_ver_compact//-/}"
-  local target_num="${target_compact//-/}"
-  file_num=$((10#${file_num}))
-  target_num=$((10#${target_num}))
-
-  if [[ $file_num -lt $target_num ]]; then
-    echo "-1"
-  elif [[ $file_num -gt $target_num ]]; then
-    echo "1"
+  # Fallback: parse the compact filename version into major.minor and
+  # compare with compare_versions, instead of comparing the compact
+  # representations as plain integers. A plain-integer comparison
+  # misorders versions once a minor version reaches double digits, e.g.
+  # compact "217" (2.17) vs "50" (5.0) would read as 217 > 50 and treat
+  # 2.17 as newer than 5.0.
+  local file_major file_minor
+  if [[ "$file_ver_compact" == *-* ]]; then
+    # globalhub-style compact version, already major-minor delimited (e.g. "5-0")
+    file_major="${file_ver_compact%%-*}"
+    file_minor="${file_ver_compact##*-}"
   else
-    echo "0"
+    # acm/mce-style compact version: 3+ digits is MAJOR + 2-digit MINOR
+    # (e.g. "217" -> 2.17), otherwise MAJOR + 1-digit MINOR (e.g. "50" -> 5.0)
+    # (mirrors the same convention used in create_tekton_files).
+    local compact_num=$((10#${file_ver_compact}))
+    if [[ ${#file_ver_compact} -ge 3 ]]; then
+      file_major=$((compact_num / 100))
+      file_minor=$((compact_num % 100))
+    else
+      file_major=$((compact_num / 10))
+      file_minor=$((compact_num % 10))
+    fi
   fi
+
+  compare_versions "${file_major}.${file_minor}" "${target_version}"
 }
 
 # Remove Tekton files whose embedded version is <= max_version (X.Y format).
@@ -681,62 +695,18 @@ create_tekton_files() {
 
     cd "$repo" || exit 1
 
-    # First check if files already exist on DEFAULT branch
-    log "INFO Checking if files already exist on ${default_branch}"
-    local all_versions_exist=true
-    for dest_version in ${dest_versions}; do
-      local dest_ver_compact
-      if [[ "${product}" == "globalhub" ]]; then
-        dest_ver_compact="${dest_version//./-}"
-      else
-        dest_ver_compact="${dest_version//./}"
-      fi
-
-      if ! compgen -G ".tekton/*-${product_prefix}-${dest_ver_compact}-*.yaml" >/dev/null; then
-        all_versions_exist=false
-        log "INFO ${product_prefix}-${dest_ver_compact} files missing on ${default_branch}"
-        break
-      else
-        log "INFO ${product_prefix}-${dest_ver_compact} files already exist on ${default_branch}"
-      fi
-    done
-
-    if [[ "$all_versions_exist" == "true" ]]; then
-      log "INFO All requested versions already exist on ${default_branch}, nothing to do"
-
-      # Clean up stale PR branch if exists
-      local pr_branch="add-tekton-files-${dest_versions// /-}"
-      if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
-        log "INFO Stale PR branch ${pr_branch} found, cleaning up"
-
-        # Close PR if exists
-        if command -v gh >/dev/null 2>&1; then
-          export GH_TOKEN="${token}"
-          local pr_num
-          pr_num=$(gh pr list --repo "${owner}/${repo}" --head "${pr_branch}" --json number --jq '.[0].number' 2>/dev/null || echo "")
-
-          if [[ -n "${pr_num}" ]]; then
-            log "INFO Closing obsolete PR #${pr_num}"
-            if gh pr close "${pr_num}" --repo "${owner}/${repo}" \
-              --comment "Closing - all Tekton files already merged to ${default_branch}" 2>&1; then
-              log "INFO Closed PR #${pr_num}"
-            else
-              log "WARNING Failed to close PR #${pr_num}"
-            fi
-          fi
-        fi
-
-        # Delete branch
-        log "INFO Deleting stale branch ${pr_branch}"
-        if git push origin --delete "${pr_branch}" 2>&1; then
-          log "INFO Deleted branch ${pr_branch}"
-        else
-          log "WARNING Failed to delete branch ${pr_branch}"
-        fi
-      fi
-
-      exit 0
-    fi
+    # NOTE: We intentionally do not short-circuit here even when every
+    # requested version already exists on ${default_branch}. An earlier
+    # version of this function returned immediately in that case (after
+    # only tidying up an obsolete PR branch), which skipped the stale
+    # Tekton file cleanup below entirely - so files <= LAST_RELEASE_VERSION
+    # could persist indefinitely as long as no new destination version
+    # needed to be created. The per-version loop further down already
+    # no-ops correctly (via `continue`) for any version that already
+    # exists, and the "no new files" handling after cleanup already closes
+    # obsolete PRs/branches based on an actual diff against
+    # ${default_branch}, so falling through here is both simpler and
+    # strictly more correct than special-casing "all versions exist".
 
     # Create branch for PR
     local pr_branch="add-tekton-files-${dest_versions// /-}"
@@ -954,22 +924,29 @@ Also removes ${removed_stale} stale Tekton file(s) for version <= ${LAST_RELEASE
     fi
 
     local pr_exists=false
+    local pr_num=""
     if command -v gh >/dev/null 2>&1; then
       export GH_TOKEN="${token}"
 
       log "INFO Checking if PR already exists for ${pr_branch}"
-      if gh pr list --head "${pr_branch}" --json number --jq '.[0].number' 2>&1 | grep -q '^[0-9]'; then
+      pr_num=$(gh pr list --head "${pr_branch}" --json number --jq '.[0].number' 2>/dev/null || echo "")
+      if [[ -n "${pr_num}" ]]; then
         pr_exists=true
-        log "INFO PR already exists for ${pr_branch}"
+        log "INFO PR already exists for ${pr_branch} (#${pr_num})"
       fi
     fi
 
     if [[ "$files_created" == "false" ]] && [[ "${removed_stale}" -eq 0 ]]; then
       log "INFO No new files to create and nothing stale to clean up"
 
-      # Create PR if branch existed on remote (has commits) but no PR
-      if [[ "$pr_exists" == "false" ]] && [[ "$branch_existed_on_remote" == "true" ]] && command -v gh >/dev/null 2>&1; then
-        # Check if branch differs from default branch
+      if [[ "$branch_existed_on_remote" == "true" ]] && command -v gh >/dev/null 2>&1; then
+        # Check if branch differs from default branch. This covers both:
+        # - a pre-existing PR branch that turned out to need no changes
+        #   (e.g. all requested versions already existed on default_branch
+        #   and there was nothing stale to remove), which should be closed
+        #   and deleted rather than left open indefinitely
+        # - a pre-existing PR branch with real, uncommitted-here changes
+        #   from a previous run, which should get its PR (re)created
         log "INFO Checking if ${pr_branch} differs from ${default_branch}"
         if ! git fetch origin "${default_branch}" 2>&1; then
           log "WARNING Could not fetch ${default_branch}"
@@ -978,6 +955,17 @@ Also removes ${removed_stale} stale Tekton file(s) for version <= ${LAST_RELEASE
 
         if git diff --quiet "origin/${default_branch}" HEAD; then
           log "INFO Branch ${pr_branch} is identical to ${default_branch}, no PR needed"
+
+          if [[ -n "${pr_num}" ]]; then
+            log "INFO Closing obsolete PR #${pr_num}"
+            if gh pr close "${pr_num}" --repo "${owner}/${repo}" \
+              --comment "Closing - all Tekton files already merged to ${default_branch}" 2>&1; then
+              log "INFO Closed PR #${pr_num}"
+            else
+              log "WARNING Failed to close PR #${pr_num}"
+            fi
+          fi
+
           log "INFO Deleting orphaned branch ${pr_branch}"
           if git push origin --delete "${pr_branch}" 2>&1; then
             log "INFO Successfully deleted ${pr_branch}"
@@ -987,14 +975,16 @@ Also removes ${removed_stale} stale Tekton file(s) for version <= ${LAST_RELEASE
           exit 0
         fi
 
-        log "INFO Creating PR for existing branch with changes"
+        if [[ "$pr_exists" == "false" ]]; then
+          log "INFO Creating PR for existing branch with changes"
 
-        if ! gh pr create \
-          --title "${pr_title}" \
-          --body "${pr_body}" \
-          --base "${default_branch}" \
-          --head "${pr_branch}" 2>&1; then
-          log "WARNING PR creation failed"
+          if ! gh pr create \
+            --title "${pr_title}" \
+            --body "${pr_body}" \
+            --base "${default_branch}" \
+            --head "${pr_branch}" 2>&1; then
+            log "WARNING PR creation failed"
+          fi
         fi
       fi
 
