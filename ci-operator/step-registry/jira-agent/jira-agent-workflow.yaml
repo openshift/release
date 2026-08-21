@@ -2,6 +2,7 @@ workflow:
   as: jira-agent
   steps:
     pre:
+      - ref: jira-agent-team-config
       - ref: jira-agent-setup
       - ref: jira-agent-github-app-auth
       - ref: jira-agent-slack-pr-notify
@@ -16,6 +17,7 @@ workflow:
     Generic Jira Agent workflow for automated issue processing.
 
     Pre steps write shell libraries to SHARED_DIR:
+    - team-config: Resolves JIRA_AGENT_TEAM into that team's JIRA_AGENT_* settings
     - setup: Verifies Claude Code CLI and Vertex AI credentials
     - github-app-auth: GitHub App token generation helpers
     - slack-pr-notify: Slack notification helpers
@@ -24,13 +26,21 @@ workflow:
     - git-helpers: Token management, fork sync, branch operations
 
     Test step (process): Sources the libraries and runs a four-phase pipeline
-    (solve, review, fix, PR) for each Jira issue matching the JQL query.
+    (solve, review, fix, PR) for each Jira issue selected by the configured
+    single-team query or all-teams query plan.
 
     Post step (report): Generates HTML report with token usage and cost breakdown.
 
-    Required env vars (set in your team's wrapper workflow):
-    - JIRA_AGENT_FORK_REPO: Fork repo (org/repo) for pushing branches
-    - JIRA_AGENT_UPSTREAM_REPO: Upstream repo (org/repo) for creating PRs
-    - JIRA_AGENT_JQL: JQL query for finding issues to process
+    Team selection (JIRA_AGENT_TEAM):
+    - "all": aggregate mode. The team-config step builds one independently
+      limited query per team plus component/project->repo maps; the process step
+      deduplicates the selected issues and resolves each issue's repo. This is
+      what the central all-teams job and chai/Gangway (via an issue-key override)
+      use.
+    - "<team>": single-team mode for a targeted run of one team's configuration.
+    - unset: the process step must receive JIRA_AGENT_* directly.
+
+    The per-team table (the single source of truth) lives in the team-config
+    step. No per-team wrapper workflow or periodic is required.
 
     See ONBOARDING.md in this directory for full setup instructions.
