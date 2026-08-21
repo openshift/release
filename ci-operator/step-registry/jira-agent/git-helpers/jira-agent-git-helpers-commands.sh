@@ -267,6 +267,8 @@ resolve_upstream_repo() {
 # Call once per issue when JIRA_AGENT_COMPONENT_REPO_MAP is set (repo changes per issue).
 # Requires: JIRA_AGENT_FORK_REPO, JIRA_AGENT_UPSTREAM_REPO
 setup_repo() {
+  # The previous issue leaves the shell inside this directory.
+  cd /tmp
   rm -rf /tmp/project-repo
 
   ensure_fork_exists
