@@ -1,0 +1,36 @@
+ref:
+  as: gcp-hcp-cleanup-infrastructure
+  from_image:
+    namespace: ci
+    name: gcp-hcp-e2e-tests
+    tag: latest
+  commands: gcp-hcp-cleanup-infrastructure-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  credentials:
+  - namespace: test-credentials
+    name: gcp-hcp-ci-workload-identity
+    mount_path: /secrets/gcp-hcp-ci
+  - namespace: test-credentials
+    name: terraform-cloud-token
+    mount_path: /etc/terraform-cloud
+  env:
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: /secrets/gcp-hcp-ci/credential.json
+  timeout: 30m0s
+  documentation: |-
+    Performs comprehensive infrastructure cleanup for GCP HCP e2e environments.
+    
+    This step force-deletes GCP projects instead of relying on terraform destroy,
+    which can fail due to orphaned NEGs or other resources. The cleanup process:
+    
+    1. Stops ArgoCD to prevent resource recreation
+    2. Deletes Gateway API resources (triggers NEG cleanup)
+    3. Force-deletes any remaining NEGs
+    4. Deletes DNS records from regional zones
+    5. Force-deletes GCP projects (cascades to all resources)
+    6. Clears Terraform Cloud workspace state
+    
+    This approach is more reliable than terraform destroy for ephemeral e2e environments.

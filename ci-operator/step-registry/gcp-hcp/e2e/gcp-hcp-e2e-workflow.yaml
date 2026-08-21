@@ -8,8 +8,7 @@ workflow:
     test:
     - ref: gcp-hcp-verify-argocd-sync
     post:
-    - ref: gcp-hcp-pre-destroy-cleanup
-    - ref: gcp-hcp-tf-deprovision
+    - ref: gcp-hcp-cleanup-infrastructure
   documentation: |-
     E2E workflow for gcp-hcp-infra. Provisions full platform infrastructure
     (region + management cluster) using Terraform Cloud ephemeral workspaces,
@@ -18,4 +17,4 @@ workflow:
     Phase breakdown:
     - Pre: Authenticate via WIF, provision infrastructure with terraform apply, generate kubeconfigs
     - Test: Validate ArgoCD application sync on region and management clusters using Ginkgo v2 tests
-    - Post: Clean up ArgoCD-managed GCP resources (NEGs, DNS, Gateways), then terraform destroy
+    - Post: Force-delete GCP projects and clear TFC workspace state (more reliable than terraform destroy)
