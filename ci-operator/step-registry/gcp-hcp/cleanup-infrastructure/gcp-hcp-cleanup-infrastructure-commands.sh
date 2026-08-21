@@ -379,10 +379,11 @@ TFRC
     /tmp/terraform -chdir="${tf_dir}" force-unlock -force "${lock_id}" -no-color 2>&1 | tee -a "${LOG}" || true
   fi
 
-  # Remove all resources from state at the module level — fast bulk operation.
-  # E2E state has 3 top-level modules: customer_project, management_cluster, region.
-  # Removing at module level clears all child resources in one API call (~3 seconds).
-  log "  Clearing all resources from state (module-level rm)..."
+  # Remove all resources from state in one bulk operation.
+  # E2E state has 3 top-level modules plus data sources. Removing at
+  # module level clears child resources, then we remove any remaining
+  # top-level resources (data sources).
+  log "  Clearing all resources from state..."
   local resource_count
   resource_count=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>/dev/null | wc -l | tr -d ' ')
   resource_count=${resource_count:-0}
@@ -390,25 +391,17 @@ TFRC
   if [[ ${resource_count} -eq 0 ]]; then
     log "  State is already empty"
   else
-    log "  Removing ${resource_count} resources across top-level modules..."
+    log "  Removing ${resource_count} resources..."
+    # Bulk remove: modules + data sources in one call (~3 seconds)
     /tmp/terraform -chdir="${tf_dir}" state rm \
       module.customer_project \
       module.management_cluster \
       module.region \
+      data.terraform_remote_state.commons \
+      data.terraform_remote_state.global \
+      data.terraform_remote_state.platform_ci \
+      data.terraform_remote_state.service \
       -no-color 2>&1 | tail -5 | tee -a "${LOG}" || true
-
-    # Check if any resources remain (e.g. top-level data sources)
-    local remaining
-    remaining=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>/dev/null | wc -l | tr -d ' ')
-    remaining=${remaining:-0}
-    if [[ ${remaining} -gt 0 ]]; then
-      log "  ${remaining} resource(s) remain, removing individually..."
-      /tmp/terraform -chdir="${tf_dir}" state list -no-color 2>/dev/null | \
-        while IFS= read -r addr; do
-          [[ -z "${addr}" ]] && continue
-          /tmp/terraform -chdir="${tf_dir}" state rm "${addr}" -no-color 2>/dev/null || true
-        done
-    fi
   fi
 
   # Safe-delete the workspace (should succeed with 0 resources)
