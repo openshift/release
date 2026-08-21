@@ -840,23 +840,31 @@ function verify_trustee_connectivity() {
     return 1
   fi
 
-  # Get expected resource value from KbsConfig
+  # Get expected resource value from Secrets
   local expected_value=""
-  local configmap_name
-  configmap_name=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].spec.kbsConfigMapName}' 2>/dev/null || echo "")
+  expected_value=$(oc get secret/kbsres1 -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.data.key1}' 2>/dev/null || echo "")
 
-  if [[ -n "${configmap_name}" ]]; then
-    expected_value=$(oc get configmap "${configmap_name}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.data.kbsres1}' 2>/dev/null || echo "")
-  else
-    echo ">>> WARN: Could not determine the KbsConfig ConfigMap" >&2
-  fi
-
+  # TODO: Trustee <= 1.12 has the resources specified in either kbsconfig or
+  # kbsconfig configmap. This code is kept for backward compatibility and
+  # should be removed once older versions get supported.
   if [[ -z "${expected_value}" ]]; then
-    echo ">>> WARN: Could not determine expected resource value from KbsConfig ConfigMap. Falling back to check the KbsConfig resource data directly" >&2
-    expected_value=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].spec.resourceData.default.kbsres1.key1}' 2>/dev/null || echo "")
+    echo "WARN: Could not determine expected resource value from kbsres1 secret. Falling back to get from KbsConfig ConfigMap"
+    local configmap_name
+    configmap_name=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].spec.kbsConfigMapName}' 2>/dev/null || echo "")
+
+    if [[ -n "${configmap_name}" ]]; then
+      expected_value=$(oc get configmap "${configmap_name}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.data.kbsres1}' 2>/dev/null || echo "")
+    else
+      echo ">>> WARN: Could not determine the KbsConfig ConfigMap" >&2
+    fi
+
     if [[ -z "${expected_value}" ]]; then
-      echo ">>> ERROR: Failed to determine the expected resource value. Cannot proceed with kbs-client connectivity test" >&2
-      return 1
+      echo ">>> WARN: Could not determine expected resource value from KbsConfig ConfigMap. Falling back to check the KbsConfig resource data directly" >&2
+      expected_value=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].spec.resourceData.default.kbsres1.key1}' 2>/dev/null || echo "")
+      if [[ -z "${expected_value}" ]]; then
+        echo ">>> ERROR: Failed to determine the expected resource value. Cannot proceed with kbs-client connectivity test" >&2
+        return 1
+      fi
     fi
   fi
 
