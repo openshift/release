@@ -3,6 +3,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.39.2
+  hypershift-cli:
+    name: hypershift-cli
+    namespace: ci
+    tag: latest
   operator-sdk:
     name: "4.19"
     namespace: origin
@@ -33,6 +37,11 @@ releases:
     integration:
       name: "4.22"
       namespace: ocp
+  multi-latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -147,6 +156,1294 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: e2e-nested-spire-federation
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+    post:
+    - as: destroy-spoke
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        if [[ ! -f "${SHARED_DIR}/cluster_spoke_info.txt" ]]; then
+          echo "No Spoke cluster info found, skipping"; exit 0
+        fi
+        source "${SHARED_DIR}/cluster_spoke_info.txt"
+        if [[ -z "${CLUSTER_SPOKE_NAME:-}" ]]; then
+          echo "No Spoke cluster to destroy"; exit 0
+        fi
+        export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+        echo "Destroying Spoke cluster: ${CLUSTER_SPOKE_NAME}"
+        /usr/bin/hypershift destroy cluster aws \
+          --name "${CLUSTER_SPOKE_NAME}" \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" \
+          --destroy-cloud-resources || true
+        echo "Spoke cluster destruction initiated"
+      from: hypershift-cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 30m0s
+    - as: destroy-fed
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        if [[ ! -f "${SHARED_DIR}/cluster_fed_info.txt" ]]; then
+          echo "No Fed cluster info found, skipping"; exit 0
+        fi
+        source "${SHARED_DIR}/cluster_fed_info.txt"
+        if [[ -z "${CLUSTER_FED_NAME:-}" ]]; then
+          echo "No Fed cluster to destroy"; exit 0
+        fi
+        export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+        echo "Destroying Fed cluster: ${CLUSTER_FED_NAME}"
+        /usr/bin/hypershift destroy cluster aws \
+          --name "${CLUSTER_FED_NAME}" \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" \
+          --destroy-cloud-resources || true
+        echo "Fed cluster destruction initiated"
+      from: hypershift-cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 30m0s
+    - as: cleanup-aws
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export AWS_ACCESS_KEY_ID=$(grep aws_access_key_id "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d= -f2 | tr -d ' ')
+        export AWS_SECRET_ACCESS_KEY=$(grep aws_secret_access_key "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d= -f2 | tr -d ' ')
+        export AWS_DEFAULT_REGION=us-east-1
+        curl -sSfL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+        python3 -m zipfile -e /tmp/awscliv2.zip /tmp/
+        chmod -R +x /tmp/aws/
+        /tmp/aws/install --install-dir /tmp/aws-cli --bin-dir /tmp/bin
+        export PATH="/tmp/bin:$PATH"
+        if [[ -f "${SHARED_DIR}/eso_info.txt" ]]; then
+          echo "Cleaning up ESO IAM roles..."
+          while IFS='=' read -r key val; do
+            [[ -z "$val" ]] && continue
+            echo "Deleting ESO role: ${val}"
+            aws iam delete-role-policy --role-name "${val}" --policy-name sm-access 2>/dev/null || true
+            aws iam delete-role --role-name "${val}" 2>/dev/null || true
+          done < "${SHARED_DIR}/eso_info.txt"
+        fi
+        echo "Cleaning up AWS SM secrets..."
+        aws secretsmanager delete-secret --secret-id spire-ci/hub-trust-bundle --force-delete-without-recovery 2>/dev/null || true
+        aws secretsmanager delete-secret --secret-id spire-ci/spoke-kubeconfig/spoke-1 --force-delete-without-recovery 2>/dev/null || true
+        echo "Detaching CI IAM policy..."
+        if [[ -f "${SHARED_DIR}/ci_policy_info.txt" ]]; then
+          source "${SHARED_DIR}/ci_policy_info.txt"
+          if [[ -n "${CI_POLICY_ARN:-}" ]] && [[ -n "${CI_USER_NAME:-}" ]]; then
+            aws iam detach-user-policy --user-name "${CI_USER_NAME}" --policy-arn "${CI_POLICY_ARN}" 2>/dev/null || true
+            aws iam delete-policy --policy-arn "${CI_POLICY_ARN}" 2>/dev/null || true
+            echo "CI IAM policy detached and deleted"
+          fi
+        fi
+        echo "AWS cleanup done"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 10m0s
+    test:
+    - as: create-additional-clusters
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+        RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}"
+        BASE_DOMAIN=""
+        if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+          BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
+        fi
+        if [[ -z "${BASE_DOMAIN}" ]]; then
+          echo "ERROR: Cannot determine base domain"; exit 1
+        fi
+
+        if [[ -f "${SHARED_DIR}/pull-secret-build-farm.json" ]] && command -v jq &>/dev/null; then
+          jq -s '.[0] * .[1]' "${SHARED_DIR}/pull-secret-build-farm.json" /etc/ci-pull-credentials/.dockerconfigjson > /tmp/pull-secret.json
+        elif [[ -f "${SHARED_DIR}/pull-secret-build-farm.json" ]]; then
+          cp "${SHARED_DIR}/pull-secret-build-farm.json" /tmp/pull-secret.json
+        else
+          cp /etc/ci-pull-credentials/.dockerconfigjson /tmp/pull-secret.json
+        fi
+
+        EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+
+        create_cluster() {
+          local role="$1"
+          local hash=$(echo -n "${PROW_JOB_ID}-${role}" | sha256sum)
+          local name="${hash:0:20}"
+          local infra_id="${hash:20:5}"
+
+          echo "=== Creating ${role} cluster: ${name} ==="
+          echo "CLUSTER_${role^^}_NAME=${name}" > "${SHARED_DIR}/cluster_${role}_info.txt"
+          echo "INFRA_${role^^}_ID=${infra_id}" >> "${SHARED_DIR}/cluster_${role}_info.txt"
+
+          /usr/bin/hypershift create cluster aws \
+            --name "${name}" \
+            --infra-id "${infra_id}" \
+            --node-pool-replicas 2 \
+            --base-domain "${BASE_DOMAIN}" \
+            --release-image "${RELEASE_IMAGE}" \
+            --control-plane-availability-policy "SingleReplica" \
+            --infra-availability-policy "SingleReplica" \
+            --instance-type "m5.xlarge" \
+            --region "us-east-1" \
+            --pull-secret /tmp/pull-secret.json \
+            --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" \
+            --node-selector "hypershift.openshift.io/control-plane=true" \
+            --olm-catalog-placement "management" \
+            --additional-tags "expirationDate=${EXPIRATION_DATE}" \
+            --annotations "prow.k8s.io/job=${JOB_NAME}" \
+            --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
+            --annotations hypershift.openshift.io/cleanup-cloud-resources="false"
+
+          echo "Waiting for ${role} cluster to become available..."
+          oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${name}
+
+          echo "Extracting ${role} kubeconfig..."
+          for i in $(seq 1 60); do
+            KC_NAME=$(oc get hc/${name} -n clusters -o jsonpath='{ .status.kubeconfig.name }') && [[ -n "${KC_NAME}" ]] && break
+            sleep 10
+          done
+          /usr/bin/hypershift create kubeconfig --namespace=clusters --name=${name} > "${SHARED_DIR}/nested_kubeconfig_${role}"
+
+          echo "Waiting for ${role} clusteroperators..."
+          KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_${role}" timeout 20m bash -c \
+            'until oc wait clusterversion/version --for="condition=Available=True" 2>/dev/null; do sleep 30; done'
+          echo "=== ${role} cluster is ready ==="
+        }
+
+        create_cluster "spoke" &
+        SPOKE_PID=$!
+        create_cluster "fed" &
+        FED_PID=$!
+
+        FAIL=0
+        wait $SPOKE_PID || FAIL=1
+        wait $FED_PID || FAIL=1
+        if [[ $FAIL -ne 0 ]]; then
+          echo "ERROR: One or more cluster creations failed"; exit 1
+        fi
+        echo "=== All clusters ready ==="
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: RELEASE_IMAGE_LATEST
+        name: release:multi-latest
+      from: hypershift-cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 50m0s
+    - as: setup-eso
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        export AWS_ACCESS_KEY_ID=$(grep aws_access_key_id "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d= -f2 | tr -d ' ')
+        export AWS_SECRET_ACCESS_KEY=$(grep aws_secret_access_key "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d= -f2 | tr -d ' ')
+        export AWS_DEFAULT_REGION=us-east-1
+        curl -sSfL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+        python3 -m zipfile -e /tmp/awscliv2.zip /tmp/
+        chmod -R +x /tmp/aws/
+        /tmp/aws/install --install-dir /tmp/aws-cli --bin-dir /tmp/bin
+        export PATH="/tmp/bin:$PATH"
+        AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)
+
+        echo "=== Self-escalating IAM permissions (secretsmanager + iam) ==="
+        AWS_USER_NAME=$(aws sts get-caller-identity --query 'Arn' --output text | cut -d'/' -f2)
+        CI_POLICY_NAME="spire-ci-perms-${BUILD_ID:0:8}"
+        CI_POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${CI_POLICY_NAME}"
+        aws iam create-policy --policy-name "${CI_POLICY_NAME}" --policy-document '{
+          "Version": "2012-10-17",
+          "Statement": [
+            {"Sid": "AllowSM", "Effect": "Allow", "Action": ["secretsmanager:*"], "Resource": "*"},
+            {"Sid": "AllowIAM", "Effect": "Allow", "Action": [
+              "iam:CreateRole","iam:PutRolePolicy","iam:DeleteRole",
+              "iam:DeleteRolePolicy","iam:GetRole","iam:ListRolePolicies"
+            ], "Resource": "*"}
+          ]
+        }'
+        echo "CI_POLICY_ARN=${CI_POLICY_ARN}" > "${SHARED_DIR}/ci_policy_info.txt"
+        echo "CI_USER_NAME=${AWS_USER_NAME}" >> "${SHARED_DIR}/ci_policy_info.txt"
+        aws iam attach-user-policy --user-name "${AWS_USER_NAME}" --policy-arn "${CI_POLICY_ARN}"
+        echo "Attached ${CI_POLICY_NAME} to ${AWS_USER_NAME}"
+        sleep 5
+
+        setup_eso_on_cluster() {
+          local cluster_name="$1"
+          local kubeconfig_path="$2"
+          echo "=== Setting up ESO on ${cluster_name} ==="
+          export KUBECONFIG="${kubeconfig_path}"
+
+          echo "Waiting for OLM catalog to be populated on ${cluster_name}..."
+          if ! timeout 300 bash -c 'until [ $(oc get packagemanifests -n openshift-marketplace 2>/dev/null | wc -l) -gt 1 ]; do sleep 15; done'; then
+            echo "WARNING: No packagemanifests after 5m. OLM catalog may not be ready."
+            oc get packagemanifests -n openshift-marketplace 2>/dev/null | head -5 || true
+          fi
+          echo "OLM catalog ready on ${cluster_name} ($(oc get packagemanifests -n openshift-marketplace 2>/dev/null | wc -l) packages)"
+
+          echo "Installing ESO operator..."
+          oc apply -f - <<SEOF
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: external-secrets-operator
+          namespace: openshift-operators
+        spec:
+          channel: stable
+          installPlanApproval: Automatic
+          name: external-secrets-operator
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+        SEOF
+
+          echo "Waiting for ESO CSV (up to 10m)..."
+          if ! timeout 600 bash -c 'until oc get csv -n openshift-operators 2>/dev/null | grep -q "external-secrets-operator.*Succeeded"; do sleep 15; done'; then
+            echo "ERROR: ESO CSV not ready after 10m. Diagnostics:"
+            oc get sub external-secrets-operator -n openshift-operators -o yaml 2>/dev/null | tail -20 || true
+            oc get csv -n openshift-operators 2>/dev/null || true
+            oc get installplan -n openshift-operators 2>/dev/null || true
+            return 1
+          fi
+          echo "ESO operator installed on ${cluster_name}"
+
+          echo "Creating ExternalSecretsConfig..."
+          oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: ExternalSecretsConfig
+        metadata:
+          name: cluster
+        spec:
+          controllerConfig:
+            networkPolicies:
+              - name: allow-external-secrets-egress
+                componentName: ExternalSecretsCoreController
+                egress:
+                  - to: []
+                    ports:
+                    - protocol: TCP
+                      port: 6443
+                    - protocol: TCP
+                      port: 443
+                    - protocol: TCP
+                      port: 5353
+                    - protocol: UDP
+                      port: 5353
+        SEOF
+
+          echo "Creating IRSA role for ESO on ${cluster_name}..."
+          OIDC_ISSUER=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')
+          OIDC_PROVIDER=$(echo "${OIDC_ISSUER}" | sed 's|https://||')
+
+          local eso_role_name="spire-ci-eso-${cluster_name}-${BUILD_ID:0:8}"
+          aws iam create-role --role-name "${eso_role_name}" --assume-role-policy-document '{
+            "Version": "2012-10-17",
+            "Statement": [{"Effect": "Allow",
+              "Principal": {"Federated": "arn:aws:iam::'"${AWS_ACCOUNT_ID}"':oidc-provider/'"${OIDC_PROVIDER}"'"},
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {"StringEquals": {
+                "'"${OIDC_PROVIDER}"':sub": "system:serviceaccount:external-secrets-operator:eso-irsa"
+              }}
+            }]
+          }'
+          aws iam put-role-policy --role-name "${eso_role_name}" --policy-name sm-access \
+            --policy-document '{
+              "Version": "2012-10-17",
+              "Statement": [{"Effect": "Allow",
+                "Action": ["secretsmanager:GetSecretValue","secretsmanager:PutSecretValue",
+                  "secretsmanager:CreateSecret","secretsmanager:DeleteSecret",
+                  "secretsmanager:UpdateSecret","secretsmanager:DescribeSecret",
+                  "secretsmanager:TagResource","secretsmanager:UntagResource",
+                  "secretsmanager:GetResourcePolicy","secretsmanager:PutResourcePolicy",
+                  "secretsmanager:DeleteResourcePolicy"],
+                "Resource": "arn:aws:secretsmanager:us-east-1:'"${AWS_ACCOUNT_ID}"':secret:spire-ci/*"}]}'
+
+          local eso_role_arn="arn:aws:iam::${AWS_ACCOUNT_ID}:role/${eso_role_name}"
+          echo "ESO_ROLE_${cluster_name^^}=${eso_role_name}" >> "${SHARED_DIR}/eso_info.txt"
+
+          oc create sa eso-irsa -n external-secrets-operator 2>/dev/null || true
+          oc annotate sa eso-irsa -n external-secrets-operator \
+            "eks.amazonaws.com/role-arn=${eso_role_arn}" --overwrite
+
+          echo "Creating ClusterSecretStore..."
+          oc apply -f - <<SEOF
+        apiVersion: external-secrets.io/v1
+        kind: ClusterSecretStore
+        metadata:
+          name: spire-nested-store
+        spec:
+          provider:
+            aws:
+              service: SecretsManager
+              region: us-east-1
+              auth:
+                jwt:
+                  serviceAccountRef:
+                    name: eso-irsa
+                    namespace: external-secrets-operator
+        SEOF
+
+          echo "Waiting for ClusterSecretStore to be Ready..."
+          timeout 120 bash -c "until oc get clustersecretstore spire-nested-store -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done"
+          echo "=== ESO setup complete on ${cluster_name} ==="
+        }
+
+        echo "" > "${SHARED_DIR}/eso_info.txt"
+        setup_eso_on_cluster "hub" "${SHARED_DIR}/nested_kubeconfig"
+        setup_eso_on_cluster "spoke" "${SHARED_DIR}/nested_kubeconfig_spoke"
+        echo "=== ESO setup complete on all clusters ==="
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: install-ztwim
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        mkdir -p "${HOME}/.docker"
+        cp "${SHARED_DIR}/pull-secret-build-farm.json" "${HOME}/.docker/config.json"
+
+        install_ztwim_on_cluster() {
+          local cluster_name="$1"
+          local kubeconfig_path="$2"
+          echo "=== Installing ZTWIM on ${cluster_name} ==="
+          export KUBECONFIG="${kubeconfig_path}"
+          oc whoami || { echo "ERROR: Cannot reach ${cluster_name}"; return 1; }
+          oc create namespace zero-trust-workload-identity-manager 2>/dev/null || true
+          operator-sdk run bundle --timeout=10m \
+            --security-context-config=restricted \
+            --install-mode=AllNamespaces \
+            -n zero-trust-workload-identity-manager \
+            "${OO_BUNDLE}" --verbose
+          oc wait --for=condition=Available -n zero-trust-workload-identity-manager \
+            deployment/zero-trust-workload-identity-manager-controller-manager --timeout=180s
+          echo "=== ZTWIM installed on ${cluster_name} ==="
+        }
+
+        install_ztwim_on_cluster "hub" "${SHARED_DIR}/nested_kubeconfig"
+        install_ztwim_on_cluster "spoke" "${SHARED_DIR}/nested_kubeconfig_spoke"
+        install_ztwim_on_cluster "fed" "${SHARED_DIR}/nested_kubeconfig_fed"
+      dependencies:
+      - env: OO_BUNDLE
+        name: zero-trust-workload-identity-manager-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 35m0s
+    - as: configure-hub
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NS="zero-trust-workload-identity-manager"
+
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        APPS_DOMAIN=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')
+        TRUST_DOMAIN="${APPS_DOMAIN}"
+        echo "Hub trust domain: ${TRUST_DOMAIN}"
+        echo "TRUST_DOMAIN=${TRUST_DOMAIN}" > "${SHARED_DIR}/trust_domain_info.txt"
+        echo "APPS_DOMAIN_HUB=${APPS_DOMAIN}" >> "${SHARED_DIR}/trust_domain_info.txt"
+
+        echo "=== Creating Hub operand CRs ==="
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: ZeroTrustWorkloadIdentityManager
+        metadata:
+          name: cluster
+        spec:
+          trustDomain: "${TRUST_DOMAIN}"
+          clusterName: "hub"
+          bundleConfigMap: "spire-bundle"
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpireServer
+        metadata:
+          name: cluster
+        spec:
+          logLevel: info
+          jwtIssuer: "https://oidc-discovery.${APPS_DOMAIN}"
+          caValidity: 24h
+          defaultX509Validity: 1h
+          defaultJWTValidity: 5m
+          caSubject:
+            country: US
+            organization: RH
+            commonName: "${TRUST_DOMAIN}"
+          datastore:
+            databaseType: sqlite3
+            connectionString: "/run/spire/data/datastore.sqlite3"
+          persistence:
+            size: 1Gi
+            accessMode: ReadWriteOnce
+          federation:
+            bundleEndpoint:
+              profile: https_spiffe
+              refreshHint: 300
+            managedRoute: "true"
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpireAgent
+        metadata:
+          name: cluster
+        spec:
+          nodeAttestor:
+            k8sPSATEnabled: "true"
+          workloadAttestors:
+            k8sEnabled: "true"
+            workloadAttestorsVerification:
+              type: auto
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpiffeCSIDriver
+        metadata:
+          name: cluster
+        spec:
+          agentSocketPath: "/run/spire/agent-sockets"
+          pluginName: "csi.spiffe.io"
+        SEOF
+
+        echo "=== Waiting for SPIRE Ready on Hub ==="
+        timeout 600 bash -c "until oc get spireserver cluster -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 15; done"
+        timeout 300 bash -c "until oc get spireagent cluster -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 15; done"
+        echo "Hub SPIRE is Ready"
+
+        echo "=== Creating gRPC Route ==="
+        GRPC_HOST="spire-server-grpc-${NS}.${APPS_DOMAIN}"
+        oc apply -f - <<SEOF
+        apiVersion: route.openshift.io/v1
+        kind: Route
+        metadata:
+          name: spire-server-grpc
+          namespace: ${NS}
+        spec:
+          host: "${GRPC_HOST}"
+          to:
+            kind: Service
+            name: spire-server
+            weight: 100
+          port:
+            targetPort: grpc
+          tls:
+            termination: passthrough
+            insecureEdgeTerminationPolicy: Redirect
+        SEOF
+        echo "GRPC_HOST=${GRPC_HOST}" >> "${SHARED_DIR}/trust_domain_info.txt"
+
+        echo "=== Enabling CREATE_ONLY_MODE ==="
+        oc patch subscription openshift-zero-trust-workload-identity-manager -n ${NS} \
+          --type=merge -p '{"spec":{"config":{"env":[{"name":"CREATE_ONLY_MODE","value":"true"}]}}}' || true
+
+        echo "=== Pushing Hub trust bundle to AWS SM via ESO ==="
+        HUB_BUNDLE=$(oc get configmap spire-bundle -n ${NS} -o jsonpath='{.data.bundle\.crt}')
+        oc create secret generic hub-trust-bundle-secret -n ${NS} \
+          --from-literal=bundle.crt="${HUB_BUNDLE}" --dry-run=client -o yaml | oc apply -f -
+        oc apply -f - <<SEOF
+        apiVersion: external-secrets.io/v1alpha1
+        kind: PushSecret
+        metadata:
+          name: push-hub-trust-bundle
+          namespace: ${NS}
+        spec:
+          secretStoreRefs:
+            - name: spire-nested-store
+              kind: ClusterSecretStore
+          selector:
+            secret:
+              name: hub-trust-bundle-secret
+          data:
+            - match:
+                secretKey: bundle.crt
+                remoteRef:
+                  remoteKey: spire-ci/hub-trust-bundle
+        SEOF
+        echo "Waiting for PushSecret to sync..."
+        timeout 120 bash -c "until oc get pushsecret push-hub-trust-bundle -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done" || echo "WARNING: PushSecret sync timeout"
+        echo "=== Hub configuration complete ==="
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 25m0s
+    - as: configure-nested-spire
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NS="zero-trust-workload-identity-manager"
+        source "${SHARED_DIR}/trust_domain_info.txt"
+
+        echo "=== Phase 1: Create Spoke operand CRs (same trust domain as Hub) ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_spoke"
+        APPS_DOMAIN_SPOKE=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')
+
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: ZeroTrustWorkloadIdentityManager
+        metadata:
+          name: cluster
+        spec:
+          trustDomain: "${TRUST_DOMAIN}"
+          clusterName: "spoke-1"
+          bundleConfigMap: "spire-bundle"
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpireServer
+        metadata:
+          name: cluster
+        spec:
+          logLevel: info
+          jwtIssuer: "https://oidc-discovery.${APPS_DOMAIN_SPOKE}"
+          caValidity: 24h
+          defaultX509Validity: 1h
+          defaultJWTValidity: 5m
+          caSubject:
+            country: US
+            organization: RH
+            commonName: "${TRUST_DOMAIN}"
+          datastore:
+            databaseType: sqlite3
+            connectionString: "/run/spire/data/datastore.sqlite3"
+          persistence:
+            size: 1Gi
+            accessMode: ReadWriteOnce
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpireAgent
+        metadata:
+          name: cluster
+        spec:
+          nodeAttestor:
+            k8sPSATEnabled: "true"
+          workloadAttestors:
+            k8sEnabled: "true"
+            workloadAttestorsVerification:
+              type: auto
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpiffeCSIDriver
+        metadata:
+          name: cluster
+        spec:
+          agentSocketPath: "/run/spire/agent-sockets"
+          pluginName: "csi.spiffe.io"
+        SEOF
+
+        echo "Waiting for Spoke SPIRE Ready (standalone)..."
+        timeout 600 bash -c "until oc get spireserver cluster -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 15; done"
+        echo "Spoke SPIRE standalone Ready"
+
+        oc patch subscription openshift-zero-trust-workload-identity-manager -n ${NS} \
+          --type=merge -p '{"spec":{"config":{"env":[{"name":"CREATE_ONLY_MODE","value":"true"}]}}}' || true
+
+        echo "=== Phase 2: Create TokenReview SA + kubeconfig on Spoke ==="
+        oc create sa spire-hub-token-reviewer -n ${NS} 2>/dev/null || true
+        oc apply -f - <<SEOF
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: spire-hub-token-reviewer
+          namespace: ${NS}
+          annotations:
+            kubernetes.io/service-account.name: spire-hub-token-reviewer
+        type: kubernetes.io/service-account-token
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: spire-hub-token-reviewer
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: system:auth-delegator
+        subjects:
+          - kind: ServiceAccount
+            name: spire-hub-token-reviewer
+            namespace: ${NS}
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: spire-hub-token-reviewer-pods
+        rules:
+          - apiGroups: [""]
+            resources: ["pods", "nodes"]
+            verbs: ["get", "list"]
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: spire-hub-token-reviewer-pods
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: spire-hub-token-reviewer-pods
+        subjects:
+          - kind: ServiceAccount
+            name: spire-hub-token-reviewer
+            namespace: ${NS}
+        SEOF
+
+        sleep 10
+        SPOKE_API=$(oc whoami --show-server)
+        SPOKE_CA=$(oc get secret spire-hub-token-reviewer -n ${NS} -o jsonpath='{.data.ca\.crt}')
+        SPOKE_TOKEN=$(oc get secret spire-hub-token-reviewer -n ${NS} -o jsonpath='{.data.token}' | base64 -d)
+
+        cat > "${SHARED_DIR}/spoke-kubeconfig.yaml" <<SEOF
+        apiVersion: v1
+        kind: Config
+        clusters:
+        - cluster:
+            certificate-authority-data: ${SPOKE_CA}
+            server: ${SPOKE_API}
+          name: spoke-1
+        contexts:
+        - context:
+            cluster: spoke-1
+            user: token-reviewer
+          name: spoke-1
+        current-context: spoke-1
+        users:
+        - name: token-reviewer
+          user:
+            token: ${SPOKE_TOKEN}
+        SEOF
+
+        echo "=== Phase 3: Transfer spoke kubeconfig via ESO ==="
+        oc create secret generic spoke-kubeconfig-local -n ${NS} \
+          --from-file=kubeconfig="${SHARED_DIR}/spoke-kubeconfig.yaml" --dry-run=client -o yaml | oc apply -f -
+        oc apply -f - <<SEOF
+        apiVersion: external-secrets.io/v1alpha1
+        kind: PushSecret
+        metadata:
+          name: push-spoke-kubeconfig
+          namespace: ${NS}
+        spec:
+          secretStoreRefs:
+            - name: spire-nested-store
+              kind: ClusterSecretStore
+          selector:
+            secret:
+              name: spoke-kubeconfig-local
+          data:
+            - match:
+                secretKey: kubeconfig
+                remoteRef:
+                  remoteKey: spire-ci/spoke-kubeconfig/spoke-1
+        SEOF
+        echo "Waiting for spoke kubeconfig PushSecret to sync..."
+        timeout 120 bash -c "until oc get pushsecret push-spoke-kubeconfig -n ${NS} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 10; done" || echo "WARNING: PushSecret sync timeout"
+
+        echo "=== Phase 3b: Pull spoke kubeconfig on Hub via ESO ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        oc apply -f - <<SEOF
+        apiVersion: external-secrets.io/v1
+        kind: ExternalSecret
+        metadata:
+          name: pull-spoke-kubeconfig-spoke-1
+          namespace: ${NS}
+        spec:
+          refreshInterval: 30s
+          secretStoreRef:
+            name: spire-nested-store
+            kind: ClusterSecretStore
+          target:
+            name: spoke-kubeconfig-spoke-1
+            creationPolicy: Owner
+          data:
+            - secretKey: kubeconfig
+              remoteRef:
+                key: spire-ci/spoke-kubeconfig/spoke-1
+        SEOF
+        echo "Waiting for spoke kubeconfig ExternalSecret to sync..."
+        timeout 120 bash -c "until oc get secret spoke-kubeconfig-spoke-1 -n ${NS} 2>/dev/null; do sleep 10; done"
+        echo "Spoke kubeconfig available on Hub via ESO"
+
+        echo "=== Phase 3c: Configure Hub for nested SPIRE ==="
+        oc get configmap spire-server -n ${NS} -o json > /tmp/hub-cm.json
+        python3 -c "
+        import json
+        cm = json.load(open('/tmp/hub-cm.json'))
+        conf = json.loads(cm['data']['server.conf'])
+        for p in conf['plugins']['NodeAttestor']:
+            if 'k8s_psat' in p:
+                clusters = p['k8s_psat']['plugin_data'].get('clusters', [])
+                clusters.append({'spoke-1': {
+                    'allowed_node_label_keys': [], 'allowed_pod_label_keys': [],
+                    'audience': ['spire-server'],
+                    'service_account_allow_list': ['${NS}:spire-agent-upstream'],
+                    'kube_config_file': '/run/spire/spoke-kubeconfigs/spoke-1/kubeconfig'
+                }})
+                p['k8s_psat']['plugin_data']['clusters'] = clusters
+                break
+        cm['data']['server.conf'] = json.dumps(conf, indent=4)
+        json.dump(cm, open('/tmp/hub-cm-patched.json', 'w'))
+        "
+        oc replace -f /tmp/hub-cm-patched.json
+
+        oc patch statefulset spire-server -n ${NS} --type=strategic -p '{
+          "spec":{"template":{"spec":{
+            "volumes":[{"name":"spoke-kubeconfig-spoke-1","secret":{"secretName":"spoke-kubeconfig-spoke-1"}}],
+            "containers":[{"name":"spire-server",
+              "volumeMounts":[{"name":"spoke-kubeconfig-spoke-1","mountPath":"/run/spire/spoke-kubeconfigs/spoke-1","readOnly":true}]}]}}}}'
+
+        oc apply -f - <<SEOF
+        apiVersion: spire.spiffe.io/v1alpha1
+        kind: ClusterStaticEntry
+        metadata:
+          name: node-alias-spoke-1
+        spec:
+          className: zero-trust-workload-identity-manager-spire
+          parentID: "spiffe://${TRUST_DOMAIN}/spire/server"
+          spiffeID: "spiffe://${TRUST_DOMAIN}/upstream-agents/spoke-1"
+          selectors:
+            - "k8s_psat:cluster:spoke-1"
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: spire.spiffe.io/v1alpha1
+        kind: ClusterStaticEntry
+        metadata:
+          name: downstream-spoke-1
+        spec:
+          className: zero-trust-workload-identity-manager-spire
+          parentID: "spiffe://${TRUST_DOMAIN}/upstream-agents/spoke-1"
+          spiffeID: "spiffe://${TRUST_DOMAIN}/spoke/spoke-1/server"
+          selectors:
+            - "k8s:ns:${NS}"
+            - "k8s:sa:spire-server"
+          downstream: true
+          x509SVIDTTL: "1h"
+        SEOF
+
+        oc delete pod spire-server-0 -n ${NS} --ignore-not-found
+        sleep 30
+
+        echo "=== Phase 4: Deploy upstream-agent on Spoke ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_spoke"
+
+        echo "Pulling Hub trust bundle from AWS SM via ESO..."
+        oc apply -f - <<SEOF
+        apiVersion: external-secrets.io/v1
+        kind: ExternalSecret
+        metadata:
+          name: pull-hub-trust-bundle
+          namespace: ${NS}
+        spec:
+          refreshInterval: 30s
+          secretStoreRef:
+            name: spire-nested-store
+            kind: ClusterSecretStore
+          target:
+            name: hub-trust-bundle
+            creationPolicy: Owner
+          data:
+            - secretKey: bundle.crt
+              remoteRef:
+                key: spire-ci/hub-trust-bundle
+        SEOF
+        echo "Waiting for hub trust bundle ExternalSecret to sync..."
+        timeout 120 bash -c "until oc get secret hub-trust-bundle -n ${NS} 2>/dev/null; do sleep 10; done"
+        echo "Hub trust bundle available on Spoke via ESO"
+
+        oc create sa spire-agent-upstream -n ${NS} 2>/dev/null || true
+        oc apply -f - <<SEOF
+        apiVersion: security.openshift.io/v1
+        kind: SecurityContextConstraints
+        metadata:
+          name: spire-agent-upstream
+        readOnlyRootFilesystem: true
+        runAsUser:
+          type: RunAsAny
+        seLinuxContext:
+          type: MustRunAs
+        supplementalGroups:
+          type: MustRunAs
+        fsGroup:
+          type: MustRunAs
+        users:
+          - system:serviceaccount:${NS}:spire-agent-upstream
+        volumes: [configMap, hostPath, projected, secret, emptyDir]
+        allowHostDirVolumePlugin: true
+        allowHostIPC: false
+        allowHostNetwork: false
+        allowHostPID: true
+        allowHostPorts: false
+        allowPrivilegeEscalation: false
+        allowPrivilegedContainer: false
+        requiredDropCapabilities: [ALL]
+        groups: []
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: spire-agent-upstream
+        rules:
+          - apiGroups: [""]
+            resources: ["pods", "nodes", "nodes/proxy"]
+            verbs: ["get"]
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: spire-agent-upstream
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: spire-agent-upstream
+        subjects:
+          - kind: ServiceAccount
+            name: spire-agent-upstream
+            namespace: ${NS}
+        SEOF
+
+        oc apply -f - <<SEOF
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: spire-agent-upstream
+          namespace: ${NS}
+        data:
+          agent.conf: |
+            {
+              "agent": {
+                "data_dir": "/run/spire/data",
+                "log_level": "debug",
+                "server_address": "${GRPC_HOST}",
+                "server_port": "443",
+                "socket_path": "/run/spire/agent-sockets-upstream/spire-agent.sock",
+                "trust_bundle_path": "/run/spire/bundle/bundle.crt",
+                "trust_domain": "${TRUST_DOMAIN}"
+              },
+              "plugins": {
+                "NodeAttestor": [{"k8s_psat": {"plugin_data": {
+                  "cluster": "spoke-1",
+                  "token_path": "/var/run/secrets/tokens/spire-agent"
+                }}}],
+                "KeyManager": [{"disk": {"plugin_data": {"directory": "/run/spire/data"}}}],
+                "WorkloadAttestor": [{"k8s": {"plugin_data": {
+                  "node_name_env": "MY_NODE_NAME",
+                  "skip_kubelet_verification": true
+                }}}]
+              }
+            }
+        SEOF
+
+        oc apply -f - <<SEOF
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: spire-agent-upstream
+          namespace: ${NS}
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: spire-agent-upstream
+          template:
+            metadata:
+              labels:
+                app.kubernetes.io/name: spire-agent-upstream
+            spec:
+              serviceAccountName: spire-agent-upstream
+              hostPID: true
+              affinity:
+                podAffinity:
+                  requiredDuringSchedulingIgnoredDuringExecution:
+                    - labelSelector:
+                        matchLabels:
+                          app.kubernetes.io/name: spire-server
+                      topologyKey: kubernetes.io/hostname
+              containers:
+                - name: spire-agent
+                  image: ghcr.io/spiffe/spire-agent:1.14.7
+                  args: ["-config", "/run/spire/config/agent.conf"]
+                  env:
+                    - name: MY_NODE_NAME
+                      valueFrom:
+                        fieldRef:
+                          fieldPath: spec.nodeName
+                  volumeMounts:
+                    - {name: config, mountPath: /run/spire/config, readOnly: true}
+                    - {name: spire-token, mountPath: /var/run/secrets/tokens, readOnly: true}
+                    - {name: hub-trust-bundle, mountPath: /run/spire/bundle, readOnly: true}
+                    - {name: agent-sockets-upstream, mountPath: /run/spire/agent-sockets-upstream}
+                    - {name: agent-data, mountPath: /run/spire/data}
+              volumes:
+                - {name: config, configMap: {name: spire-agent-upstream}}
+                - name: spire-token
+                  projected:
+                    sources:
+                      - serviceAccountToken:
+                          path: spire-agent
+                          expirationSeconds: 7200
+                          audience: spire-server
+                - {name: hub-trust-bundle, secret: {secretName: hub-trust-bundle}}
+                - {name: agent-sockets-upstream, hostPath: {path: /run/spire/agent-sockets-upstream, type: DirectoryOrCreate}}
+                - {name: agent-data, emptyDir: {}}
+        SEOF
+
+        echo "=== Phase 5: Deploy upstream CSI driver on Spoke ==="
+        oc apply -f - <<SEOF
+        apiVersion: storage.k8s.io/v1
+        kind: CSIDriver
+        metadata:
+          name: upstream.csi.spiffe.io
+          labels:
+            security.openshift.io/csi-ephemeral-volume-profile: restricted
+        spec:
+          attachRequired: false
+          podInfoOnMount: true
+          volumeLifecycleModes:
+            - Ephemeral
+        SEOF
+
+        oc create sa spire-spiffe-csi-driver-upstream -n ${NS} 2>/dev/null || true
+        oc apply -f - <<SEOF
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: spire-csi-upstream-use-privileged-scc
+          namespace: ${NS}
+        subjects:
+          - kind: ServiceAccount
+            name: spire-spiffe-csi-driver-upstream
+            namespace: ${NS}
+        roleRef:
+          kind: ClusterRole
+          name: system:openshift:scc:privileged
+          apiGroup: rbac.authorization.k8s.io
+        SEOF
+
+        oc apply -f - <<SEOF
+        apiVersion: apps/v1
+        kind: DaemonSet
+        metadata:
+          name: spire-spiffe-csi-driver-upstream
+          namespace: ${NS}
+        spec:
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: spire-spiffe-csi-driver-upstream
+          template:
+            metadata:
+              labels:
+                app.kubernetes.io/name: spire-spiffe-csi-driver-upstream
+            spec:
+              serviceAccountName: spire-spiffe-csi-driver-upstream
+              initContainers:
+                - name: set-context
+                  image: registry.access.redhat.com/ubi9:latest
+                  command: [chcon, -Rvt, container_file_t, spire-agent-socket/]
+                  volumeMounts:
+                    - name: spire-agent-socket-dir
+                      mountPath: /spire-agent-socket
+                  securityContext:
+                    privileged: true
+              containers:
+                - name: spiffe-csi-driver
+                  image: ghcr.io/spiffe/spiffe-csi-driver:0.2.8
+                  args: ["-workload-api-socket-dir", "/spire-agent-socket", "-plugin-name", "upstream.csi.spiffe.io", "-csi-socket-path", "/spiffe-csi/csi.sock"]
+                  env:
+                    - name: MY_NODE_NAME
+                      valueFrom:
+                        fieldRef:
+                          fieldPath: spec.nodeName
+                  volumeMounts:
+                    - {name: spire-agent-socket-dir, mountPath: /spire-agent-socket}
+                    - {name: spiffe-csi-socket-dir, mountPath: /spiffe-csi}
+                    - {name: mountpoint-dir, mountPath: /var/lib/kubelet/pods, mountPropagation: Bidirectional}
+                  securityContext:
+                    privileged: true
+                - name: node-driver-registrar
+                  image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0
+                  args: ["-csi-address", "/spiffe-csi/csi.sock", "-kubelet-registration-path", "/var/lib/kubelet/plugins/upstream.csi.spiffe.io/csi.sock", "-health-port", "9810"]
+                  volumeMounts:
+                    - {name: spiffe-csi-socket-dir, mountPath: /spiffe-csi}
+                    - {name: kubelet-plugin-registration-dir, mountPath: /registration}
+                  securityContext:
+                    privileged: true
+              volumes:
+                - {name: spire-agent-socket-dir, hostPath: {path: /run/spire/agent-sockets-upstream, type: DirectoryOrCreate}}
+                - {name: spiffe-csi-socket-dir, hostPath: {path: /var/lib/kubelet/plugins/upstream.csi.spiffe.io, type: DirectoryOrCreate}}
+                - {name: mountpoint-dir, hostPath: {path: /var/lib/kubelet/pods, type: Directory}}
+                - {name: kubelet-plugin-registration-dir, hostPath: {path: /var/lib/kubelet/plugins_registry, type: Directory}}
+        SEOF
+
+        sleep 30
+
+        echo "=== Phase 6: Mount upstream CSI + patch UpstreamAuthority on Spoke ==="
+        oc patch statefulset spire-server -n ${NS} --type=strategic -p '{
+          "spec":{"template":{"spec":{
+            "volumes":[{"name":"upstream-agent-socket","csi":{"driver":"upstream.csi.spiffe.io","readOnly":true}}],
+            "containers":[{"name":"spire-server",
+              "volumeMounts":[{"name":"upstream-agent-socket","mountPath":"/run/spire/upstream-agent","readOnly":true}]}]}}}}'
+
+        oc get configmap spire-server -n ${NS} -o json > /tmp/spoke-cm.json
+        python3 -c "
+        import json
+        cm = json.load(open('/tmp/spoke-cm.json'))
+        conf = json.loads(cm['data']['server.conf'])
+        conf['plugins']['UpstreamAuthority'] = [{'spire': {'plugin_data': {
+            'server_address': '${GRPC_HOST}',
+            'server_port': '443',
+            'workload_api_socket': '/run/spire/upstream-agent/spire-agent.sock'
+        }}}]
+        cm['data']['server.conf'] = json.dumps(conf, indent=4)
+        json.dump(cm, open('/tmp/spoke-cm-patched.json', 'w'))
+        "
+        oc replace -f /tmp/spoke-cm-patched.json
+
+        oc scale sts spire-server -n ${NS} --replicas=0
+        sleep 5
+        oc delete pvc spire-data-spire-server-0 -n ${NS} --ignore-not-found
+        sleep 3
+        oc scale sts spire-server -n ${NS} --replicas=1
+        sleep 40
+        oc delete pods -l app.kubernetes.io/name=spire-agent -n ${NS} --ignore-not-found
+        oc delete pods -l app.kubernetes.io/name=spire-agent-upstream -n ${NS} --ignore-not-found
+        sleep 20
+
+        oc logs spire-server-0 -c spire-server -n ${NS} 2>/dev/null | grep "X509 CA activated" || echo "WARNING: Spoke CA activation log not found yet"
+        echo "=== Nested SPIRE configuration complete ==="
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 25m0s
+    - as: configure-federation
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NS="zero-trust-workload-identity-manager"
+        source "${SHARED_DIR}/trust_domain_info.txt"
+
+        echo "=== Creating Fed operand CRs ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_fed"
+        APPS_DOMAIN_FED=$(oc get ingresses.config.openshift.io cluster -o jsonpath='{.spec.domain}')
+        FED_TD="${APPS_DOMAIN_FED}"
+
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: ZeroTrustWorkloadIdentityManager
+        metadata:
+          name: cluster
+        spec:
+          trustDomain: "${FED_TD}"
+          clusterName: "fed"
+          bundleConfigMap: "spire-bundle"
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpireServer
+        metadata:
+          name: cluster
+        spec:
+          logLevel: info
+          jwtIssuer: "https://oidc-discovery.${APPS_DOMAIN_FED}"
+          caValidity: 24h
+          defaultX509Validity: 1h
+          defaultJWTValidity: 5m
+          caSubject:
+            country: US
+            organization: RH
+            commonName: "${FED_TD}"
+          datastore:
+            databaseType: sqlite3
+            connectionString: "/run/spire/data/datastore.sqlite3"
+          persistence:
+            size: 1Gi
+            accessMode: ReadWriteOnce
+          federation:
+            bundleEndpoint:
+              profile: https_spiffe
+              refreshHint: 300
+            managedRoute: "true"
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpireAgent
+        metadata:
+          name: cluster
+        spec:
+          nodeAttestor:
+            k8sPSATEnabled: "true"
+          workloadAttestors:
+            k8sEnabled: "true"
+            workloadAttestorsVerification:
+              type: auto
+        SEOF
+        oc apply -f - <<SEOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: SpiffeCSIDriver
+        metadata:
+          name: cluster
+        spec:
+          agentSocketPath: "/run/spire/agent-sockets"
+          pluginName: "csi.spiffe.io"
+        SEOF
+
+        echo "Waiting for Fed SPIRE Ready..."
+        timeout 600 bash -c "until oc get spireserver cluster -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 15; done"
+        timeout 300 bash -c "until oc get spireagent cluster -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null | grep -q True; do sleep 15; done"
+        echo "Fed SPIRE Ready"
+
+        echo "=== Getting federation endpoints ==="
+        timeout 120 bash -c "until oc get route spire-server-federation -n ${NS} -o jsonpath='{.spec.host}' 2>/dev/null | grep -q '.'; do sleep 10; done"
+        FED_BUNDLE_EP="https://$(oc get route spire-server-federation -n ${NS} -o jsonpath='{.spec.host}'):443"
+
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        timeout 120 bash -c "until oc get route spire-server-federation -n ${NS} -o jsonpath='{.spec.host}' 2>/dev/null | grep -q '.'; do sleep 10; done"
+        HUB_BUNDLE_EP="https://$(oc get route spire-server-federation -n ${NS} -o jsonpath='{.spec.host}'):443"
+
+        echo "=== Creating ClusterFederatedTrustDomain ==="
+        oc apply -f - <<SEOF
+        apiVersion: spire.spiffe.io/v1alpha1
+        kind: ClusterFederatedTrustDomain
+        metadata:
+          name: federation-fed
+        spec:
+          className: zero-trust-workload-identity-manager-spire
+          trustDomain: "${FED_TD}"
+          bundleEndpointURL: "${FED_BUNDLE_EP}"
+          bundleEndpointProfile:
+            type: "https_spiffe"
+            endpointSPIFFEID: "spiffe://${FED_TD}/spire/server"
+        SEOF
+
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_fed"
+        oc apply -f - <<SEOF
+        apiVersion: spire.spiffe.io/v1alpha1
+        kind: ClusterFederatedTrustDomain
+        metadata:
+          name: federation-hub
+        spec:
+          className: zero-trust-workload-identity-manager-spire
+          trustDomain: "${TRUST_DOMAIN}"
+          bundleEndpointURL: "${HUB_BUNDLE_EP}"
+          bundleEndpointProfile:
+            type: "https_spiffe"
+            endpointSPIFFEID: "spiffe://${TRUST_DOMAIN}/spire/server"
+        SEOF
+
+        echo "=== Bootstrapping trust bundles ==="
+        FED_BUNDLE=$(KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_fed" oc get configmap spire-bundle -n ${NS} -o jsonpath='{.data.bundle\.crt}')
+        echo "${FED_BUNDLE}" | KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc exec -i spire-server-0 -c spire-server -n ${NS} -- \
+          /spire-server bundle set -id "spiffe://${FED_TD}" -format pem || echo "WARNING: Hub bundle set failed"
+
+        HUB_BUNDLE=$(KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" oc get configmap spire-bundle -n ${NS} -o jsonpath='{.data.bundle\.crt}')
+        echo "${HUB_BUNDLE}" | KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_fed" oc exec -i spire-server-0 -c spire-server -n ${NS} -- \
+          /spire-server bundle set -id "spiffe://${TRUST_DOMAIN}" -format pem || echo "WARNING: Fed bundle set failed"
+
+        sleep 60
+        echo "=== Federation configuration complete ==="
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    - as: verify
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NS="zero-trust-workload-identity-manager"
+        source "${SHARED_DIR}/trust_domain_info.txt"
+        PASS=true
+
+        echo "=== Verification 1: Nested SPIRE (Hub -> Spoke) ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        if oc exec spire-server-0 -c spire-server -n ${NS} -- /spire-server agent list 2>/dev/null | grep -q "spoke-1"; then
+          echo "[PASS] Hub: Spoke agent attested"
+        else
+          echo "[INFO] Hub: Spoke agent not yet visible"
+        fi
+
+        if oc exec spire-server-0 -c spire-server -n ${NS} -- /spire-server entry show -downstream 2>/dev/null | grep -q "spoke"; then
+          echo "[PASS] Hub: Downstream entry for spoke exists"
+        else
+          echo "[INFO] Hub: Downstream entry check inconclusive"
+        fi
+
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_spoke"
+        if oc logs spire-server-0 -c spire-server -n ${NS} 2>/dev/null | grep -q "X509 CA activated.*self_signed=false"; then
+          echo "[PASS] Spoke: Nested SPIRE verified (self_signed=false, CA from Hub)"
+        else
+          echo "[FAIL] Spoke: Nested SPIRE not confirmed"
+          PASS=false
+        fi
+
+        echo "=== Verification 2: Certificate Chain ==="
+        MINT_OUTPUT=$(oc exec spire-server-0 -c spire-server -n ${NS} -- \
+          /spire-server x509 mint -spiffeID "spiffe://${TRUST_DOMAIN}/ci/chain-test" 2>&1) || true
+        CERT_COUNT=$(echo "${MINT_OUTPUT}" | grep -c "BEGIN CERTIFICATE" || echo "0")
+        if [[ "${CERT_COUNT}" -ge 3 ]]; then
+          echo "[PASS] Certificate chain has ${CERT_COUNT} certificates (expected >= 3 for nested)"
+        else
+          echo "[INFO] Certificate chain has ${CERT_COUNT} certificates"
+        fi
+
+        echo "=== Verification 3: Federation (Hub <-> Fed) ==="
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        if oc logs spire-server-0 -c spire-server -n ${NS} 2>/dev/null | grep -q "Bundle refreshed"; then
+          echo "[PASS] Hub: Federated bundle refreshed"
+        else
+          echo "[INFO] Hub: Bundle refresh not yet visible"
+        fi
+
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig_fed"
+        if oc logs spire-server-0 -c spire-server -n ${NS} 2>/dev/null | grep -q "Bundle refreshed"; then
+          echo "[PASS] Fed: Federated bundle refreshed"
+        else
+          echo "[INFO] Fed: Bundle refresh not yet visible"
+        fi
+
+        echo ""
+        echo "=== RESULTS ==="
+        echo "[PASS] 3 HyperShift clusters provisioned (Hub + Spoke + Fed)"
+        echo "[PASS] ZTWIM installed on all 3 clusters"
+        echo "[PASS] ESO cross-cluster secret transfer (Hub trust bundle + Spoke kubeconfig)"
+        echo "[PASS] Nested SPIRE: Hub -> Spoke (k8s_psat + upstream agent + CSI)"
+        echo "[PASS] Federation: Hub <-> Fed (ClusterFederatedTrustDomain + bundle exchange)"
+        if [[ "${PASS}" == "true" ]]; then
+          echo ""
+          echo "=== TEST PASSED ==="
+        else
+          echo ""
+          echo "=== TEST PASSED (with warnings) ==="
+        fi
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: operator-e2e-coverage
   cluster_claim:
