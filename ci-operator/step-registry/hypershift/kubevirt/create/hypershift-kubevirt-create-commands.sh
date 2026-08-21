@@ -533,7 +533,9 @@ EOF
     fi
 
     # Parse subnets from comma-separated LOCALNET_MULTI_SUBNETS into an array.
-    # Format: "192.168.111.0/24,192.168.224.0/24,..." — first subnet gets default gateway.
+    # Format: "192.168.111.128/25,192.168.224.0/24,..." — first subnet gets default gateway.
+    # On baremetal dev-scripts the primary subnet must not overlap management VIPs on br-ex
+    # (ingress .4, api .5, node .20-.25, MetalLB/HC API .30-.32); default uses .128/25.
     IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
     if [[ ${#SUBNETS[@]} -lt ${NETWORK_COUNT} ]]; then
       echo "ERROR: LOCALNET_MULTI_SUBNETS has ${#SUBNETS[@]} entries but LOCALNET_MULTI_NETWORK_COUNT=${NETWORK_COUNT}"
@@ -593,6 +595,10 @@ EOF
         PHYSNET_NAME="physnet${i}"
       fi
       SUBNET="${SUBNETS[$((i-1))]}"
+      EXCLUDE_SUBNETS_JSON=""
+      if [[ ${i} -eq 1 && -n "${LOCALNET_MULTI_EXCLUDE_SUBNETS:-}" ]]; then
+        EXCLUDE_SUBNETS_JSON=",\"excludeSubnets\": \"${LOCALNET_MULTI_EXCLUDE_SUBNETS}\""
+      fi
       oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
@@ -606,10 +612,14 @@ spec:
       "type": "ovn-k8s-cni-overlay",
       "topology": "localnet",
       "netAttachDefName": "${ns}/${NAD_NAME}",
-      "subnets": "${SUBNET}"
+      "subnets": "${SUBNET}"${EXCLUDE_SUBNETS_JSON}
   }'
 EOF
-      echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:br-ex, subnet ${SUBNET})"
+      if [[ -n "${EXCLUDE_SUBNETS_JSON}" ]]; then
+        echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:br-ex, subnet ${SUBNET}, exclude ${LOCALNET_MULTI_EXCLUDE_SUBNETS})"
+      else
+        echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:br-ex, subnet ${SUBNET})"
+      fi
     done
 
     EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false"

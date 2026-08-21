@@ -76,14 +76,25 @@ ref:
       default: "2"
       documentation: "Number of localnet networks for the multi-localnet architecture. First network gets the default gateway."
     - name: LOCALNET_MULTI_SUBNETS
-      default: "192.168.111.0/24,192.168.224.0/24"
-      documentation: "Comma-separated list of subnets for multi-localnet networks. Must have at least LOCALNET_MULTI_NETWORK_COUNT entries. First subnet gets default gateway and DNS."
+      default: "192.168.111.128/25,192.168.224.0/24"
+      documentation: |-
+        Comma-separated list of subnets for multi-localnet networks. Must have at least
+        LOCALNET_MULTI_NETWORK_COUNT entries. First subnet gets default gateway and DNS.
+        On baremetal dev-scripts clusters the primary subnet must avoid 192.168.111.4
+        (ingress VIP), .5 (api VIP), node br-ex (.20-.25), and MetalLB/HC API (.30-.32).
+        Default 192.168.111.128/25 keeps worker IPAM in the upper half of the /24 on br-ex.
     - name: LOCALNET_MULTI_PRIMARY_GATEWAY
       default: "192.168.111.1"
       documentation: "Gateway IP for the primary localnet in the multi-localnet architecture (also used as DNS server)."
     - name: LOCALNET_MULTI_PRIMARY_DNS
       default: "192.168.111.1"
       documentation: "DNS server IP for the primary localnet in the multi-localnet architecture."
+    - name: LOCALNET_MULTI_EXCLUDE_SUBNETS
+      default: ""
+      documentation: |-
+        Optional comma-separated CIDRs excluded from OVN IPAM on the primary localnet NAD
+        (in addition to choosing a non-overlapping primary subnet). Use when the primary
+        subnet must be a full /24 but must not assign dev-scripts VIP addresses.
   commands: hypershift-kubevirt-create-commands.sh
   resources:
     requests:
