@@ -1,0 +1,29 @@
+ref:
+  as: bsod-detector-self-test
+  from: bsod-detector
+  commands: bsod-detector-self-test-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 256Mi
+  env:
+  - name: BSOD_MODE
+    default: "self-test"
+  - name: BUGCHECK_CODE
+    default: "0x19"
+  - name: BUGCHECK_PARAMS
+    default: "0x3 0x0 0x0 0x0"
+  - name: VMI_NAME
+    default: ""
+  - name: NAMESPACE
+    default: ""
+  documentation: |-
+    Triggers a BSOD on a Windows VM via the CrashMe KeBugCheckEx driver,
+    captures screenshots of the BSOD screen via the KubeVirt screenshot API,
+    collects post-mortem evidence (minidumps, event logs, bug-check code),
+    and validates the expected code was captured.
+
+    Requires:
+    - A running Windows Server 2025 VM with OpenSSH (key in SHARED_DIR/ssh-privatekey)
+    - VM IP in SHARED_DIR/*_windows_instance.txt or VMI_NAME set
+    - RBAC for virtualmachineinstances/vnc/screenshot (kubevirt.io:admin)

@@ -1,0 +1,28 @@
+ref:
+  as: bsod-detector-post-mortem
+  from: bsod-detector
+  commands: bsod-detector-post-mortem-commands.sh
+  resources:
+    requests:
+      cpu: 200m
+      memory: 128Mi
+  env:
+  - name: BSOD_MODE
+    default: "post-mortem"
+  - name: VMI_NAME
+    default: ""
+  - name: NAMESPACE
+    default: ""
+  best_effort: true
+  timeout: 10m
+  documentation: |-
+    Post-mortem BSOD evidence collector. Runs as a post step (always, even
+    on failure). SSHes into a Windows VM and checks for BSOD evidence.
+    If a crash is detected, uploads dumps, event logs, and a JSON report
+    to artifacts. Does not fail the job if no crash occurred or the VM
+    is unreachable.
+
+    Requires:
+    - A Windows VM that may or may not have experienced a BSOD
+    - SSH key in SHARED_DIR/ssh-privatekey
+    - VM IP in SHARED_DIR/*_windows_instance.txt or VMI_NAME set
