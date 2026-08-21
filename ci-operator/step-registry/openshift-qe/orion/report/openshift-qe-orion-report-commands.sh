@@ -74,6 +74,11 @@ orion --report "$json_file_list" | tee "${ARTIFACT_DIR}/orion-report-summary.txt
 report_exit=$?
 set -e
 
+if [[ "${JOB_NAME}" == *rehearse* ]]; then
+  echo "Rehearse job detected. Exit status $report_exit ignored."
+  exit 0
+fi
+
 if [ "$report_exit" -eq 2 ]; then
   echo "Orion report detected regressions."
   exit 1
