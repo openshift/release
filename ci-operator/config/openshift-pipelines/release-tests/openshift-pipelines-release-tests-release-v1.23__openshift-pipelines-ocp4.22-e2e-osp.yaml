@@ -1,13 +1,13 @@
 base_images:
   cli:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: cli
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.21
+    tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
   - context_dir: .
@@ -18,7 +18,7 @@ releases:
     release:
       architecture: amd64
       channel: stable
-      version: "4.21"
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -28,7 +28,7 @@ resources:
       memory: 200Mi
 tests:
 - as: openshift-pipelines-e2e-osp
-  cron: 0 23 31 2 *
+  cron: 0 4 * * *
   reporter_config:
     channel: '#tektoncd-pipeline-ci'
     job_states_to_report:
@@ -43,12 +43,16 @@ tests:
     cluster_profile: aws-osp-qe
     env:
       BASE_DOMAIN: psi.ospqa.com
+      CATALOG_INDEX_IMAGE: quay.io/openshift-pipeline/pipelines-index-4.22:next
+      CATALOG_SOURCE_NAME: custom-operators
     test:
+    - ref: openshift-pipelines-catalog-source
     - ref: openshift-pipelines-install
     - ref: openshift-pipelines-tests
     workflow: ipi-aws
+  timeout: 3h0m0s
 zz_generated_metadata:
-  branch: release-v1.21
+  branch: release-v1.23
   org: openshift-pipelines
   repo: release-tests
-  variant: openshift-pipelines-ocp4.21-e2e-osp
+  variant: openshift-pipelines-ocp4.22-e2e-osp
