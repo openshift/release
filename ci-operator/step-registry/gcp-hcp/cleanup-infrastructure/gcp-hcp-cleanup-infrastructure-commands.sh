@@ -5,18 +5,20 @@ LOG="${ARTIFACT_DIR}/cleanup.log"
 log() { echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') | $*" | tee -a "${LOG}"; }
 
 # Validate required dependencies
-if ! command -v jq &>/dev/null; then
-  echo "ERROR: jq not found in container" >&2
-  exit 1
-fi
+for cmd in jq gcloud curl; do
+  if ! command -v "${cmd}" &>/dev/null; then
+    echo "ERROR: ${cmd} not found in container" >&2
+    exit 1
+  fi
+done
 
-if ! command -v kubectl &>/dev/null; then
-  echo "ERROR: kubectl not found in container" >&2
-  exit 1
-fi
-
-if ! command -v gcloud &>/dev/null; then
-  echo "ERROR: gcloud not found in container" >&2
+# Use oc as kubectl — upi-installer image has oc but not kubectl
+if command -v kubectl &>/dev/null; then
+  KUBECTL=kubectl
+elif command -v oc &>/dev/null; then
+  KUBECTL=oc
+else
+  echo "ERROR: neither kubectl nor oc found in container" >&2
   exit 1
 fi
 
@@ -89,11 +91,11 @@ users:
 EOF
 }
 
-# Helper: kubectl wrapper
+# Helper: kubectl/oc wrapper
 kc() {
   local kubeconfig=$1
   shift
-  kubectl --kubeconfig="${kubeconfig}" "$@"
+  "${KUBECTL}" --kubeconfig="${kubeconfig}" "$@"
 }
 
 # ========================================================================
