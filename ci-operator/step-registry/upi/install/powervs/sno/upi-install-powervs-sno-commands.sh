@@ -6,6 +6,9 @@ CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
 POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
 BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
 CREDENTIALS_PATH="/etc/sno-power-credentials"
+ls -lrt /etc/sno-power-credentials
+# Read secrets into variables
+IBMCLOUD_API_KEY=$(cat /etc/sno-power-credentials/POWERVS_SNO_ibmcloud-api-key)
 
 setup_env() {
   set +x
@@ -21,7 +24,8 @@ setup_env() {
 
   # IBM cloud login
   ibmcloud config --check-version=false
-  echo | ibmcloud login --apikey @"${CREDENTIALS_PATH}/.powercreds" --no-region
+  ibmcloud login --apikey "${IBMCLOUD_API_KEY}" --no-region
+  # ibmcloud login --apikey @"${CREDENTIALS_PATH}/.powercreds" --no-region
 
   # Installing required ibmcloud plugins
   echo "$(date) Installing required ibmcloud plugins"
@@ -34,7 +38,7 @@ setup_env() {
 
   # Setting IBMCLOUD_TRACE to true to enable debug logs for pi and cis operations
   export IBMCLOUD_TRACE=true
-  set -x
+  #set -x
 }
 
 create_sno_node() {
@@ -756,7 +760,7 @@ IBMCLOUD_API_KEY=$(cat ${CREDENTIALS_PATH}/.powercreds)
 POWERVS_SERVICE_INSTANCE_ID=$(echo ${POWERVS_INSTANCE_CRN} | cut -f8 -d":")
 POWERVS_REGION=$(echo ${POWERVS_INSTANCE_CRN} | cut -f6 -d":")
 POWERVS_ZONE=$(echo ${POWERVS_REGION} | sed 's/-*[0-9].*//')
-POWERVS_RESOURCE_GROUP=""
+POWERVS_RESOURCE_GROUP="${POWERVS_SNO_RESOURCE_GROUP:-}"
 cat > /tmp/powervs-config.json << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
