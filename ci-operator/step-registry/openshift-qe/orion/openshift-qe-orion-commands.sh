@@ -201,13 +201,42 @@ elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${P
     # Indicates a ci test triggered in PR against a pull request
     pull_number="(${PULL_NUMBER} OR 0)"
     job_type="(periodic OR pull)"
-elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-    # Indicates a rehearse job triggered from a PR
-    pull_number="(${PULL_NUMBER} OR 0)"
-    job_type="(rehearse OR pull OR periodic)"
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
-    # Indicates a rehearsal in PR against openshift/release repo
-    job_type="(periodic OR rehearse)"
+    # Indicates a rehearsal in PR against openshift/release repo.
+    # Compare only this PR's rehearsal runs against the periodic baseline, excluding
+    # historical rehearsal data from other PRs that would otherwise mask regressions.
+    # Achieved by injecting pullNumber into the downloaded config (if absent) and
+    # using a jobtype that matches both periodic and rehearse via ES text-field OR.
+    if [[ -n "${PULL_NUMBER:-}" ]]; then
+        pull_number="(${PULL_NUMBER} OR 0)"
+        job_type="periodic rehearse"
+        # Inject pullNumber into the Orion config metadata so the query filters on it.
+        # The match query on the text field uses OR between terms, so the ES filter
+        # becomes: jobType IN (periodic, rehearse) AND pullNumber IN (PR_NUMBER, 0).
+        # That includes the periodic baseline (pullNumber=0) and only this PR's
+        # rehearsal runs (pullNumber=PR_NUMBER), not rehearsals from other PRs.
+        if [[ -f "${ORION_CONFIG}" ]]; then
+            python3 - "${ORION_CONFIG}" << 'PYEOF'
+import sys, re
+path = sys.argv[1]
+content = open(path).read()
+if 'pullNumber' not in content:
+    # Match the full jobType line (including its value) so we insert after it,
+    # not in the middle of it.
+    m = re.search(r'([ \t]*)jobType:[^\n]*', content)
+    if m:
+        indent = m.group(1)
+        content = content.replace(
+            m.group(0),
+            m.group(0) + '\n' + indent + 'pullNumber: "{{ pull_number | default(0) }}"',
+            1
+        )
+        open(path, 'w').write(content)
+PYEOF
+        fi
+    else
+        job_type="(periodic OR rehearse)"
+    fi
 fi
 
 set +e
@@ -216,6 +245,7 @@ export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_
 if [[ -n $pull_number ]]; then
     export pull_number=${pull_number}
 fi
+echo "Orion query parameters: jobtype=${job_type} pull_number=${pull_number:-0}"
 orion --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
 orion_exit_status=$?
 set -e
