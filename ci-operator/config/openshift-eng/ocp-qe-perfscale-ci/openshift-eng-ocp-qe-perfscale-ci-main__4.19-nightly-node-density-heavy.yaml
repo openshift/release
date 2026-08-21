@@ -1,6 +1,6 @@
 base_images:
   upi-installer:
-    name: "4.20"
+    name: "4.19"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -13,13 +13,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.19"
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -27,7 +27,7 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: aws-3nodes-ocpbugs-98252
+  as: aws-3nodes-ocpbugs-98252-payload
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -36,13 +36,15 @@ tests:
       BURST: "100"
       CLUSTER_NETWORK_CIDR: 10.128.0.0/14
       CLUSTER_NETWORK_HOST_PREFIX: "21"
-      COMPUTE_NODE_TYPE: m5.4xlarge
+      COMPUTE_NODE_TYPE: m6a.4xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
-      ITERATIONS_PER_NAMESPACE: "420"
-      MAX_PODS: "500"
+      # Update this image before triggering the test (payload or nightly release).
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-rsh3xbb/release:latest
+      ITERATIONS_PER_NAMESPACE: "400"
+      MAX_PODS: "2500"
       NDH_EXTRA_FLAGS: --pod-ready-threshold=300s
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      PODS_PER_NODE: "420"
+      PODS_PER_NODE: "400"
       PPROF: "false"
       PROFILE_TYPE: both
       QPS: "50"
@@ -65,4 +67,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-eng
   repo: ocp-qe-perfscale-ci
-  variant: 4.20-nightly-node-density-heavy
+  variant: 4.19-nightly-node-density-heavy
