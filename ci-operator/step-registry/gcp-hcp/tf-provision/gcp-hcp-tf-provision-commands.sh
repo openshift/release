@@ -197,8 +197,13 @@ NON_TRANSIENT_ERRORS="quota.*exceeded|forbidden|invalid.*configuration|unauthori
 import_orphaned_firestore() {
   local output="$1"
 
-  # Check for the Firestore 409 pattern
-  if ! echo "${output}" | grep -q "google_firestore_database.*Database already exists"; then
+  # Check for the Firestore 409 pattern.
+  # TFC remote output splits the error across multiple lines with │ prefixes,
+  # so we check for both strings independently rather than on a single line.
+  if ! echo "${output}" | grep -q "Database already exists"; then
+    return 1
+  fi
+  if ! echo "${output}" | grep -q "google_firestore_database"; then
     return 1
   fi
 
