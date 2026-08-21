@@ -1,0 +1,69 @@
+base_images:
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: aws-3nodes-ocpbugs-98252-payload
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BURST: "100"
+      CLUSTER_NETWORK_CIDR: 10.128.0.0/14
+      CLUSTER_NETWORK_HOST_PREFIX: "21"
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-rsh3xbb/release:latest
+      ITERATIONS_PER_NAMESPACE: "400"
+      MAX_PODS: "2500"
+      NDH_EXTRA_FLAGS: --pod-ready-threshold=300s
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      PODS_PER_NODE: "400"
+      PPROF: "false"
+      PROFILE_TYPE: both
+      QPS: "50"
+      SET_ENV_BY_PLATFORM: custom
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf-custom-cidr
+    - chain: ipi-install
+    - ref: openshift-qe-set-max-pods
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - ref: openshift-qe-ovn-libovsdb-check
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: 4.18-nightly-node-density-heavy

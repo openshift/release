@@ -1,0 +1,42 @@
+base_images:
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-anp-cpu-spike-regression
+  cron: 0 8 1,15 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SET_ENV_BY_PLATFORM: custom
+      USER_TAGS: |
+        TicketId OCPBUGS-105851
+    test:
+    - ref: openshift-qe-anp-cpu-spike-regression
+    workflow: openshift-qe-installer-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: 4.18-nightly-anp-regression
