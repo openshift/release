@@ -21,24 +21,24 @@ extract_version() {
 }
 OC_VERSION=$(ssh "${SSHOPTS[@]}" "root@${IP}" "oc version")
 OC_BRANCH=$(extract_version "${OC_VERSION}" "Server Version:")
-METALLB_SRC_DIR="/go/src/github.com/openshift/metallb"
+#METALLB_SRC_DIR="/go/src/github.com/openshift/metallb"
 FRRK8S_SRC_DIR="/go/src/github.com/openshift/frr"
 METALLB_OPERATOR_SRC_DIR="/go/src/github.com/openshift/metallb-operator"
-METALLB_REPO=${METALLB_REPO:-"https://github.com/openshift/metallb.git"}
+METALLB_REPO="${METALLB_REPO:-"https://github.com/ajaggapa/metallb-openshift.git"}"
 FRRK8S_REPO=${FRRK8S_REPO:-"https://github.com/openshift/frr.git"}
 
-METALLB_BRANCH="${OC_BRANCH}"
+#METALLB_BRANCH="${OC_BRANCH}"
 FRRK8S_BRANCH="${OC_BRANCH}"
 DONT_DEPLOY_OPERATOR=${DONT_DEPLOY_OPERATOR:-}
 DEPLOY_FRRK8S_FROM_CNO=${DEPLOY_FRRK8S_FROM_CNO:-""}
 
-if [ -d "${METALLB_SRC_DIR}" ]; then
-  echo "### Copying metallb directory"
-  scp "${SSHOPTS[@]}" -r "${METALLB_SRC_DIR}" "root@${IP}:/root/dev-scripts/"
-else
-  echo "### Cloning metallb"
-  ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/ && rm -rf metallb/ && git clone ${METALLB_REPO} && cd metallb/ && git checkout ${METALLB_BRANCH}"
-fi
+#if [ -d "${METALLB_SRC_DIR}" ]; then
+#  echo "### Copying metallb directory"
+#  scp "${SSHOPTS[@]}" -r "${METALLB_SRC_DIR}" "root@${IP}:/root/dev-scripts/"
+#else
+echo "### Cloning metallb"
+ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/ && rm -rf metallb/ && git clone ${METALLB_REPO} && mv metallb-openshift metallb && cd metallb/ && git checkout testrelease"
+#fi
 
 if [ -d "${FRRK8S_SRC_DIR}" ]; then
   echo "### Copying frr directory"
