@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
 # ACM Observability + ODF Interop Validation (6-point gate)
@@ -256,26 +256,32 @@ else:
     if [[ -n "${secretJson}" ]]; then
         endpointCheck="$(printf '%s' "${secretJson}" | python3 -c "
 import sys,json,base64,re
+sys.tracebacklimit=0
 d=json.load(sys.stdin)
 target_key=sys.argv[1] if len(sys.argv)>1 else 'thanos.yaml'
 raw=d.get('data',{}).get(target_key,'')
 if not raw:
     print('no-endpoint')
     sys.exit(0)
-decoded=base64.b64decode(raw).decode('utf-8','replace')
+try:
+    content=base64.b64decode(raw).decode('utf-8','replace')
+except Exception:
+    print('no-endpoint')
+    sys.exit(0)
+endpoint=''
 try:
     import yaml
-    cfg=yaml.safe_load(decoded)
+    cfg=yaml.safe_load(content)
     endpoint=cfg.get('config',{}).get('endpoint','') if isinstance(cfg,dict) else ''
 except Exception:
-    import re as re2
-    m=re2.search(r'endpoint:\s*(.+)',decoded)
+    m=re.search(r'endpoint:\s*(.+)',content)
     endpoint=m.group(1).strip() if m else ''
+del content
 if not endpoint:
     print('no-endpoint')
     sys.exit(0)
-odf=re.compile(r'(openshift-storage|noobaa|ceph|rgw|rook|ocs|mcg)',re.IGNORECASE)
-print('odf-backed' if odf.search(endpoint) else 'external')
+odf_pat=re.compile(r'(openshift-storage|noobaa|ceph|rgw|rook|ocs|mcg)',re.IGNORECASE)
+print('odf-backed' if odf_pat.search(endpoint) else 'external')
 " "${secretKey}")"
     fi
 
@@ -351,26 +357,12 @@ function CheckThanosHealth () {
         fi
     done
 
-    typeset -a s3CriticalNames=("thanos-receive" "thanos-compact" "thanos-store")
-    typeset -a missingCritical=()
-    typeset mc=""
-    for mc in "${missingComponents[@]}"; do
-        typeset cc=""
-        for cc in "${s3CriticalNames[@]}"; do
-            if [[ "${mc}" == "${cc}" ]]; then
-                missingCritical+=("${mc}")
-            fi
-        done
-    done
-
     if (( foundCount == 0 )); then
         AddResult "thanos-health" "fail" "No Thanos/observability components found in ${OBS_NAMESPACE}"
     elif [[ -n "${failMsg}" ]]; then
         AddResult "thanos-health" "fail" "Unhealthy Thanos components: ${failMsg}"
-    elif (( ${#missingCritical[@]} > 0 )); then
-        AddResult "thanos-health" "fail" "Missing S3-critical components: ${missingCritical[*]}"
     elif (( ${#missingComponents[@]} > 0 )); then
-        AddResult "thanos-health" "pass" "Running (optional missing: ${missingComponents[*]})"
+        AddResult "thanos-health" "fail" "Missing components: ${missingComponents[*]}"
     else
         AddResult "thanos-health" "pass"
     fi
@@ -385,38 +377,41 @@ function CheckObcBound () {
     : "=== Check 5: Observability ObjectBucketClaim ==="
 
     typeset obcList=""
-    obcList="$(oc get obc -n "${OBS_NAMESPACE}" -o json)" || true
+    obcList="$(oc get obc -n "${OBS_NAMESPACE}" -o json 2>/dev/null)" || true
 
-    typeset obcItemCount=""
-    if [[ -n "${obcList}" ]]; then
-        obcItemCount="$(echo "${obcList}" | python3 -c "
+    typeset obcItemCount=0
+    obcItemCount="$(printf '%s' "${obcList}" | python3 -c "
 import sys,json
-d=json.load(sys.stdin)
-print(len(d.get('items',[])))
+try:
+    d=json.load(sys.stdin)
+    print(len(d.get('items',[])))
+except Exception:
+    print(0)
 ")"
-    fi
 
-    if [[ "${obcItemCount:-0}" -eq 0 ]]; then
+    if [[ "${obcItemCount}" -eq 0 ]]; then
         typeset odfObcJson=""
-        odfObcJson="$(oc get obc -n "${ODF_NAMESPACE}" -o json)" || true
-        if [[ -n "${odfObcJson}" ]]; then
-            obcList="$(printf '%s' "${odfObcJson}" | python3 -c "
+        odfObcJson="$(oc get obc -n "${ODF_NAMESPACE}" -o json 2>/dev/null)" || true
+        obcList="$(printf '%s' "${odfObcJson}" | python3 -c "
 import sys,json
-d=json.load(sys.stdin)
-obs=[i for i in d.get('items',[]) if 'obs' in i['metadata'].get('name','').lower() or 'thanos' in i['metadata'].get('name','').lower()]
-print(json.dumps({'items':obs}))
+try:
+    d=json.load(sys.stdin)
+    obs=[i for i in d.get('items',[]) if 'obs' in i['metadata'].get('name','').lower() or 'thanos' in i['metadata'].get('name','').lower()]
+    print(json.dumps({'items':obs}))
+except Exception:
+    print(json.dumps({'items':[]}))
 ")"
-        fi
-        if [[ -n "${obcList}" ]]; then
-            obcItemCount="$(echo "${obcList}" | python3 -c "
+        obcItemCount="$(printf '%s' "${obcList}" | python3 -c "
 import sys,json
-d=json.load(sys.stdin)
-print(len(d.get('items',[])))
+try:
+    d=json.load(sys.stdin)
+    print(len(d.get('items',[])))
+except Exception:
+    print(0)
 ")"
-        fi
     fi
 
-    if [[ "${obcItemCount:-0}" -eq 0 ]]; then
+    if [[ "${obcItemCount}" -eq 0 ]]; then
         AddResult "obc-bound" "skip" "No ObjectBucketClaim found for observability"
         return
     fi
@@ -565,7 +560,6 @@ print(items[0]['metadata']['name'] if items else '')
         return
     fi
 
-    set +x
     typeset token=""
     token="$(oc whoami -t)" || true
 
@@ -575,7 +569,6 @@ print(items[0]['metadata']['name'] if items else '')
         -H "Authorization: Bearer ${token}" \
         "https://${queryRoute}/api/v1/query?query=up" \
         --max-time 30)" || true
-    set -x
 
     httpCode="$(echo "${responseBody}" | tail -1)"
     responseBody="$(echo "${responseBody}" | sed '$d')"
