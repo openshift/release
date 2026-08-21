@@ -847,12 +847,17 @@ function verify_trustee_connectivity() {
 
   if [[ -n "${configmap_name}" ]]; then
     expected_value=$(oc get configmap "${configmap_name}" -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.data.kbsres1}' 2>/dev/null || echo "")
+  else
+    echo ">>> WARN: Could not determine the KbsConfig ConfigMap" >&2
   fi
 
   if [[ -z "${expected_value}" ]]; then
-    echo ">>> WARN: Could not determine expected resource value from KbsConfig ConfigMap" >&2
-    # Fallback: check the KbsConfig resource data directly
-    expected_value=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].spec.resourceData.default.kbsres1.key1}' 2>/dev/null || echo "key1")
+    echo ">>> WARN: Could not determine expected resource value from KbsConfig ConfigMap. Falling back to check the KbsConfig resource data directly" >&2
+    expected_value=$(oc get kbsconfig -n "${TRUSTEE_NAMESPACE}" -o jsonpath='{.items[0].spec.resourceData.default.kbsres1.key1}' 2>/dev/null || echo "")
+    if [[ -z "${expected_value}" ]]; then
+      echo ">>> ERROR: Failed to determine the expected resource value. Cannot proceed with kbs-client connectivity test" >&2
+      return 1
+    fi
   fi
 
   # Test KBS connectivity using RCA protocol
@@ -878,7 +883,7 @@ function verify_trustee_connectivity() {
     echo ">>> Retrieved resource value: ${resource_value}"
 
     # Validate the retrieved value matches what was configured
-    if [[ -n "${expected_value}" ]] && [[ "${resource_value}" != "${expected_value}" ]]; then
+    if [[ "${resource_value}" != "${expected_value}" ]]; then
       echo ">>> ERROR: Resource value mismatch!"
       echo ">>>   Expected: ${expected_value}"
       echo ">>>   Retrieved: ${resource_value}"
