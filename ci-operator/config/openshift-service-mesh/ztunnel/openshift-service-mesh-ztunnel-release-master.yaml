@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: maistra-builder
     namespace: ci
-    tag: "3.3"
+    tag: main
   use_build_cache: true
 releases:
   latest:
@@ -65,9 +65,9 @@ tests:
       -r istio \
       -f /creds-github/token \
       "-c bin/update_ztunnel.sh ${PULL_BASE_SHA}" \
-      '-t [release-1.28] Automator: Update ztunnel' \
-      -m bump-ztunnel-1.28 \
-      -b release-1.28
+      '-t [master] Automator: Update ztunnel' \
+      -m bump-ztunnel-master \
+      -b master
   container:
     from: src
   postsubmit: true
@@ -82,19 +82,19 @@ tests:
   - mount_path: /creds-github
     name: ossm-github-simple-job
   timeout: 8h0m0s
-- as: sync-upstream-ztunnel-1.28
+- as: sync-upstream-ztunnel-master
   commands: |
     git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
     cd test-infra
     export GITHUB_TOKEN_PATH=/creds-github/token
-    export MERGE_BRANCH=release-1.28
+    export MERGE_BRANCH=master
     ./tools/automator-main.sh \
     --org=openshift-service-mesh \
     --repo=ztunnel \
-    --branch=release-1.28 \
+    --branch=release-master \
     --token-path=/creds-github/token \
     '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
-    --modifier=merge_upstream_ztunnel_1.28 \
+    --modifier=merge_upstream_ztunnel_master \
     --cmd=./ossm/merge_upstream.sh
   container:
     from: src
@@ -103,6 +103,6 @@ tests:
   - mount_path: /creds-github
     name: ossm-github-simple-job
 zz_generated_metadata:
-  branch: release-1.28
+  branch: release-master
   org: openshift-service-mesh
   repo: ztunnel
