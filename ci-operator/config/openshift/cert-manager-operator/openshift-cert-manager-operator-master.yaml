@@ -473,82 +473,58 @@ tests:
     test:
     - as: deploy-operand
       cli: latest
-      commands: |-
-        set -o errexit
-        set -o nounset
-        set -o pipefail
-
-        echo "Waiting for default cert-manager operand deployments..."
-        oc wait --for=create namespace/cert-manager --timeout=5m
-        oc wait --for=create -n cert-manager deployment/cert-manager --timeout=5m
-        oc wait --for=create -n cert-manager deployment/cert-manager-webhook --timeout=5m
-        oc wait --for=create -n cert-manager deployment/cert-manager-cainjector --timeout=5m
-        oc wait --for=condition=Available -n cert-manager deployment/cert-manager --timeout=5m
-        oc wait --for=condition=Available -n cert-manager deployment/cert-manager-webhook --timeout=5m
-        oc wait --for=condition=Available -n cert-manager deployment/cert-manager-cainjector --timeout=5m
-
-        echo "Enabling TrustManager feature gate via subscription..."
-        # operator-sdk run bundle creates a versioned Subscription name
-        # (e.g. cert-manager-operator-v1-20-0-sub), not a fixed cert-manager-operator.
-        # Match e2e getCertManagerOperatorSubscription: list and patch the one present.
-        SUB=$(oc -n cert-manager-operator get subscriptions.operators.coreos.com -o jsonpath='{.items[0].metadata.name}')
-        if [[ -z "${SUB}" ]]; then
-          echo "No Subscription found in cert-manager-operator namespace"
-          oc -n cert-manager-operator get subscriptions.operators.coreos.com -o yaml || true
-          exit 1
-        fi
-        echo "Patching Subscription ${SUB} (preserve existing env, match e2e patchSubscriptionWithEnvVars)"
-        PATCH=$(oc -n cert-manager-operator get "subscription/${SUB}" -o json | python3 -c 'import json,sys; sub=json.load(sys.stdin); cfg=(sub.get("spec") or {}).get("config") or {}; env=[e for e in (cfg.get("env") or []) if e.get("name")!="UNSUPPORTED_ADDON_FEATURES"]; env.append({"name":"UNSUPPORTED_ADDON_FEATURES","value":"TrustManager=true"}); print(json.dumps({"spec":{"config":{"env":env}}}))')
-        oc -n cert-manager-operator patch "subscription/${SUB}" --type=merge -p "${PATCH}"
-
-        echo "Waiting for TrustManager feature gate on operator deployment env and rollout..."
-        FOUND=false
-        for _ in $(seq 1 60); do
-          ENV_VAL=$(oc -n cert-manager-operator get deploy/cert-manager-operator-controller-manager \
-            -o jsonpath='{range .spec.template.spec.containers[0].env[?(@.name=="UNSUPPORTED_ADDON_FEATURES")]}{.value}{end}' 2>/dev/null || true)
-          if [[ "${ENV_VAL}" == "TrustManager=true" ]]; then
-            echo "Found UNSUPPORTED_ADDON_FEATURES=${ENV_VAL} on operator deployment"
-            FOUND=true
-            break
-          fi
-          sleep 5
-        done
-        if [[ "${FOUND}" != "true" ]]; then
-          echo "Timed out waiting for UNSUPPORTED_ADDON_FEATURES=TrustManager=true on operator deployment"
-          oc -n cert-manager-operator get deploy/cert-manager-operator-controller-manager -o yaml || true
-          exit 1
-        fi
-        oc -n cert-manager-operator rollout status deployment/cert-manager-operator-controller-manager --timeout=5m
-
-        echo "Creating TrustManager CR (minimal, match e2e newTrustManagerCR)..."
-        oc apply -f - <<EOF
-        apiVersion: operator.openshift.io/v1alpha1
-        kind: TrustManager
-        metadata:
-          name: cluster
-        spec:
-          trustManagerConfig: {}
-        EOF
-
-        echo "Waiting for TrustManager Ready and trust-manager deployment..."
-        FOUND=false
-        for _ in $(seq 1 60); do
-          READY=$(oc get trustmanagers.operator.openshift.io cluster \
-            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
-          if [[ "${READY}" == "True" ]]; then
-            echo "TrustManager CR is Ready"
-            FOUND=true
-            break
-          fi
-          sleep 5
-        done
-        if [[ "${FOUND}" != "true" ]]; then
-          echo "Timed out waiting for TrustManager Ready=True"
-          oc get trustmanagers.operator.openshift.io cluster -o yaml || true
-          exit 1
-        fi
-        oc wait --for=create -n cert-manager deployment/trust-manager --timeout=5m
-        oc wait --for=condition=Available -n cert-manager deployment/trust-manager --timeout=5m
+      commands: make deploy-trust-manager --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: tls-pqc-readiness
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: cert-manager-operator,cert-manager
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+    test:
+    - as: deploy-operand
+      cli: latest
+      commands: make deploy-trust-manager --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: tls-pqc-readiness-periodic
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: cert-manager-operator,cert-manager
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+    test:
+    - as: deploy-operand
+      cli: latest
+      commands: make deploy-trust-manager --warn-undefined-variables
       from: src
       resources:
         requests:
