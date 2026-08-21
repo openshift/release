@@ -78,7 +78,7 @@ EOF
     true
 }
 
-trap '{ typeset -i rc=$?; ( GenerateJunit ); exit ${rc}; }' EXIT
+trap '{ ( GenerateJunit; true ); }' EXIT
 
 function DiscoverQuay () {
     QUAY_NS=$(oc get quayregistry --all-namespaces -o jsonpath='{.items[0].metadata.namespace}')
@@ -98,21 +98,24 @@ function GetQuayAuth () {
     QUAY_PASSWORD=""
     QUAY_TOKEN=""
 
-    if oc get secret quayadmin -n "${QUAY_NS}" &>/dev/null; then
+    set +x
+    if oc get secret quayadmin -n "${QUAY_NS}" 2>/dev/null; then
         QUAY_TOKEN=$(oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d 2>/dev/null) || QUAY_TOKEN=""
         QUAY_PASSWORD=$(oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null) || QUAY_PASSWORD=""
         QUAY_USER="quayadmin"
         if [[ -n "${QUAY_TOKEN}" || -n "${QUAY_PASSWORD}" ]]; then
+            set -x
             echo "INFO: Quay credentials obtained from quayadmin secret"
             export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
             return 0
         fi
     fi
 
-    if oc get secret quaydevel -n "${QUAY_NS}" &>/dev/null; then
+    if oc get secret quaydevel -n "${QUAY_NS}" 2>/dev/null; then
         QUAY_PASSWORD=$(oc get secret quaydevel -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null) || QUAY_PASSWORD=""
         QUAY_USER="quaydevel"
         if [[ -n "${QUAY_PASSWORD}" ]]; then
+            set -x
             echo "INFO: Quay credentials obtained from quaydevel secret"
             export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
             return 0
@@ -130,10 +133,12 @@ function GetQuayAuth () {
     if [[ -n "${QUAY_TOKEN}" ]]; then
         QUAY_USER="quayadmin"
         QUAY_PASSWORD="${initPassword}"
+        set -x
         echo "INFO: Quay admin user initialized via /api/v1/user/initialize"
         export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
         return 0
     fi
+    set -x
 
     echo "ERROR: Could not obtain Quay credentials from any source" >&2
     export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
@@ -157,6 +162,7 @@ function CreateTestOrg () {
 
         if [[ -n "${csrf}" ]]; then
             typeset signinResult
+            set +x
             signinResult=$(curl -sk -X POST "https://${QUAY_HOST}/api/v1/signin" \
                 -H "Content-Type: application/json" \
                 -H "X-CSRF-Token: ${csrf}" \
@@ -164,6 +170,7 @@ function CreateTestOrg () {
                 -d "{\"username\":\"${QUAY_USER}\",\"password\":\"${QUAY_PASSWORD}\"}" 2>/dev/null) || signinResult=""
             QUAY_TOKEN=$(echo "${signinResult}" | \
                 python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null) || QUAY_TOKEN=""
+            set -x
         fi
         rm -f "${cookieFile}"
         export QUAY_TOKEN
@@ -198,6 +205,7 @@ function RunPushPull () {
     fi
 
     typeset registryAuth
+    set +x
     if [[ -n "${QUAY_TOKEN}" ]]; then
         registryAuth=$(echo -n "\$oauthtoken:${QUAY_TOKEN}" | base64)
     else
@@ -207,6 +215,7 @@ function RunPushPull () {
     cat > "${authFile}" <<EOF
 {"auths":{"${QUAY_HOST}":{"auth":"${registryAuth}"}}}
 EOF
+    set -x
 
     if ! skopeo copy --dest-tls-verify=false \
         --dest-authfile="${authFile}" \
@@ -294,6 +303,7 @@ print(' '.join(unbound))
 ################################################################################
 function RegisterQuayInAcs () {
     typeset acsHost="${1}" acsPassword="${2}"
+    set +x
 
     typeset existing
     existing=$(curl -sk -u "admin:${acsPassword}" \
@@ -345,6 +355,7 @@ print(json.dumps(payload))
         -u "admin:${acsPassword}" \
         -H "Content-Type: application/json" \
         -d "${regPayload}" || true
+    set -x
 
     echo "INFO: Registered Quay registry endpoint as ACS image integration"
     true
@@ -352,6 +363,7 @@ print(json.dumps(payload))
 
 function RequestAcsScan () {
     typeset acsHost="${1}" acsPassword="${2}" imageName="${3}"
+    set +x
 
     typeset scanPayload=''
     scanPayload=$(python3 -c "
@@ -364,6 +376,7 @@ print(json.dumps(payload))
         -u "admin:${acsPassword}" \
         -H "Content-Type: application/json" \
         -d "${scanPayload}" || true
+    set -x
 
     echo "INFO: Requested ACS scan of ${imageName}"
     true
@@ -382,7 +395,9 @@ function RunAcsScan () {
         return 1
     fi
 
-    acsPassword=$(oc get secret -n stackrox central-htpasswd -o jsonpath='{.data.password}' 2>/dev/null | base64 -d) || acsPassword=""
+    set +x
+    acsPassword=$(oc get secret -n stackrox central-htpasswd -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null) || acsPassword=""
+    set -x
     if [[ -z "${acsPassword}" ]]; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "ACS admin password not found" "${elapsed}"
@@ -391,15 +406,19 @@ function RunAcsScan () {
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
 
+    set +x
     RegisterQuayInAcs "${acsHost}" "${acsPassword}"
     RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}"
+    set -x
 
     typeset -i attempts=0 maxAttempts=40
 
     while (( attempts < maxAttempts )); do
         typeset scanResult
+        set +x
         scanResult=$(curl -sk -u "admin:${acsPassword}" \
             "https://${acsHost}/v1/images?query=Image:${pushTarget}" 2>/dev/null) || scanResult=""
+        set -x
 
         if echo "${scanResult}" | python3 -c "
 import sys, json
@@ -413,7 +432,9 @@ sys.exit(0 if len(images) > 0 else 1)
         fi
 
         if (( attempts % 4 == 3 )); then
+            set +x
             RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}"
+            set -x
         fi
 
         attempts=$((attempts + 1))
