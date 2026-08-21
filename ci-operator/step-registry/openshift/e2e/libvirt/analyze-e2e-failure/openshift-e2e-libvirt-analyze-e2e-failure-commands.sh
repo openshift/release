@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== Libvirt VPN E2E Failure Analyzer ==="
+echo "=== Libvirt E2E Failure Analyzer ==="
 
 JOB_NAME="${JOB_NAME:-unknown}"
 BUILD_ID="${BUILD_ID:-unknown}"
