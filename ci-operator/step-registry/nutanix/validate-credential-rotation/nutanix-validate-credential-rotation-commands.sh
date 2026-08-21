@@ -22,25 +22,27 @@ source /tmp/nutanix-creds/secrets.sh
 
 # Validate and set up new credentials
 # shellcheck disable=SC2154
-if [[ -z "${NEW_NUTANIX_USERNAME:-}" ]] || [[ -z "${NEW_NUTANIX_PASSWORD:-}" ]]; then
-  echo "WARNING: NEW_NUTANIX_USERNAME or NEW_NUTANIX_PASSWORD not provided"
+# Check if user provided any credentials
+if [[ -n "${NEW_NUTANIX_USERNAME:-}" ]] || [[ -n "${NEW_NUTANIX_PASSWORD:-}" ]]; then
+  # User provided at least one credential - require BOTH to be non-empty
+  if [[ -z "${NEW_NUTANIX_USERNAME:-}" ]] || [[ -z "${NEW_NUTANIX_PASSWORD:-}" ]]; then
+    echo "ERROR: Incomplete credential replacement detected"
+    echo "When providing new credentials, both NEW_NUTANIX_USERNAME and NEW_NUTANIX_PASSWORD must be set"
+    echo "Provided: NEW_NUTANIX_USERNAME='${NEW_NUTANIX_USERNAME:-<empty>}'"
+    echo "Provided: NEW_NUTANIX_PASSWORD='${NEW_NUTANIX_PASSWORD:+<set>}${NEW_NUTANIX_PASSWORD:-<empty>}'"
+    exit 1
+  fi
+  echo "Running in ACTUAL ROTATION mode with provided credentials"
+  SIMULATED_ROTATION=false
+else
+  # Neither credential provided - use simulated mode
+  echo "WARNING: NEW_NUTANIX_USERNAME and NEW_NUTANIX_PASSWORD not provided"
   echo "Running in SIMULATED mode: using existing credentials to test the rotation mechanism"
   echo "For actual credential rotation validation, provide both NEW_NUTANIX_USERNAME and NEW_NUTANIX_PASSWORD"
   NEW_NUTANIX_USERNAME="${prism_central_username}"
   NEW_NUTANIX_PASSWORD="${prism_central_password}"
   SIMULATED_ROTATION=true
-else
-  # Validate both credentials are non-empty
-  if [[ -z "${NEW_NUTANIX_USERNAME}" ]] || [[ -z "${NEW_NUTANIX_PASSWORD}" ]]; then
-    echo "ERROR: Both NEW_NUTANIX_USERNAME and NEW_NUTANIX_PASSWORD must be non-empty"
-    exit 1
-  fi
-  echo "Running in ACTUAL ROTATION mode with provided credentials"
-  SIMULATED_ROTATION=false
 fi
-
-# Re-enable tracing
-set -x
 
 echo "=== Step 1: Backup existing credentials ==="
 oc get secret nutanix-credentials -n openshift-machine-api -o yaml > "${TEMP_DIR}/backup-machine-api-secret.yaml" 2>/dev/null || true
@@ -59,7 +61,6 @@ echo "Cluster version: ${CLUSTER_VERSION}"
 set +x
 RELEASE_IMAGE=$(oc get clusterversion version -o jsonpath='{.status.desired.image}')
 echo "Release image: <redacted>"
-set -x
 
 # Extract credential requests (disable tracing for registry operations)
 dir=$(mktemp -d)
@@ -79,7 +80,6 @@ oc adm release extract \
   --install-config=${SHARED_DIR}/install-config.yaml \
   "${RELEASE_IMAGE}" > /dev/null 2>&1
 rm -f pull-secret
-set -x
 
 popd > /dev/null
 
@@ -100,8 +100,6 @@ credentials:
       password: ${NEW_NUTANIX_PASSWORD}
     prismElements: null
 EOF
-
-set -x
 
 ADDITIONAL_CCOCTL_ARGS=""
 if [[ "${FEATURE_SET:-}" == "TechPreviewNoUpgrade" ]]; then
@@ -349,12 +347,10 @@ if [[ "${VALIDATE_OLD_CREDS_REMOVAL:-true}" == "true" ]] && [[ "${SIMULATED_ROTA
   MACHINE_API_USER=$(oc get secret nutanix-credentials -n openshift-machine-api -o jsonpath='{.data.credentials}' 2>/dev/null | base64 -d | jq -r '.[0].data.prismCentral.username')
   CCM_USER=$(oc get secret nutanix-credentials -n openshift-cloud-controller-manager -o jsonpath='{.data.credentials}' 2>/dev/null | base64 -d | jq -r '.[0].data.prismCentral.username')
   CSI_USER=$(oc get secret ntnx-secret -n openshift-cluster-csi-drivers -o jsonpath='{.data.key}' 2>/dev/null | base64 -d | cut -d':' -f3)
-  set -x
 
   echo "Active credentials verified (usernames match expected values)"
 
   # Verify all are using new credentials
-  set +x
   if [[ "${MACHINE_API_USER}" == "${NEW_NUTANIX_USERNAME}" ]] && \
      [[ "${CCM_USER}" == "${NEW_NUTANIX_USERNAME}" ]] && \
      [[ "${CSI_USER}" == "${NEW_NUTANIX_USERNAME}" ]]; then
@@ -364,7 +360,6 @@ if [[ "${VALIDATE_OLD_CREDS_REMOVAL:-true}" == "true" ]] && [[ "${SIMULATED_ROTA
     echo "✗ ERROR: Not all namespaces updated to new credentials"
     exit 1
   fi
-  set -x
 fi
 
 echo "=== Credential Rotation Validation Complete ==="
