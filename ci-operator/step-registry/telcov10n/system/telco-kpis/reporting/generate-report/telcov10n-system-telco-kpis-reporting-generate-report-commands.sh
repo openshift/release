@@ -99,6 +99,17 @@ main() {
         fi
     fi
 
+    # Always forward git_repo_token so the playbook can derive kpi_targets_token
+    # for fetching live KPI thresholds from GitLab — required even in development_mode
+    # where the report-repo block above is skipped.
+    if [ -f /var/reports-repo/git_repo_token ]; then
+        set +x
+        echo "git_repo_token: \"$(_yaml_quote "$(cat /var/reports-repo/git_repo_token)")\"" >> "${SENSITIVE_VARS_FILE}"
+        $_was_tracing && set -x
+    else
+        echo "WARNING: /var/reports-repo/git_repo_token not found — KPI targets will use hardcoded fallback"
+    fi
+
     if [ -n "${DEBUG_FLAG}" ] && [ "$(wc -l < "${SENSITIVE_VARS_FILE}")" -gt 1 ]; then
         echo "WARNING: -vvv is active with sensitive credentials in vars file; ensure tasks use no_log: true"
     fi

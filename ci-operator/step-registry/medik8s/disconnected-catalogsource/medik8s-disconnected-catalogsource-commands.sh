@@ -227,12 +227,19 @@ create_mirror_sets_disconnected() {
         exit 1
     fi
 
-    # Apply ITMS for test workload image (ubi-minimal). The test suite uses
-    # registry.access.redhat.com/ubi9/ubi-minimal as a lightweight workload pod
-    # for eviction verification. On disconnected clusters this registry is
-    # unreachable, so we mirror it (via additionalImages above) and create an
-    # ITMS to redirect pulls to the bastion mirror.
-    # Pattern from kueue-operator/disconnected/install (lines 140-155).
+    # Apply oc-mirror generated ITMS for tag-based image pulls (additionalImages).
+    # oc-mirror knows the exact mirror path it pushed tags to; our custom ITMS
+    # below may use a different path convention.
+    local ocmirror_itms="${TMP_DIR}/working-dir/cluster-resources/itms-oc-mirror.yaml"
+    if [[ -f "$ocmirror_itms" ]]; then
+        log "Applying oc-mirror generated ITMS (tag-based mirror mappings)..."
+        oc apply -f "$ocmirror_itms"
+    else
+        log "WARNING: oc-mirror ITMS not found at ${ocmirror_itms}, relying on custom ITMS only"
+    fi
+
+    # Apply ITMS for workload image (ubi-minimal used for eviction verification).
+    # SBR init Job ITMS is handled separately by medik8s-sbr-nfs-bastion step.
     log "Applying ITMS for test workload image..."
     oc apply -f - <<ITMS_EOF
 apiVersion: config.openshift.io/v1

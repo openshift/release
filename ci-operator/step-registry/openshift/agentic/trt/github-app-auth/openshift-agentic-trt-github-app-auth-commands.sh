@@ -14,7 +14,7 @@ PRIVATE_KEY="${CRED_DIR}/private-key"
 [[ -f "${APP_ID_FILE}" ]] || { echo "ERROR: ${APP_ID_FILE} not found."; exit 1; }
 [[ -f "${PRIVATE_KEY}" ]] || { echo "ERROR: ${PRIVATE_KEY} not found."; exit 1; }
 
-APP_ID=$(cat "${APP_ID_FILE}")
+APP_ID=$(tr -d '[:space:]' < "${APP_ID_FILE}")
 
 generate_jwt() {
     local exp_seconds=${1:-600}
@@ -43,11 +43,20 @@ generate_token() {
 }
 
 # Resolve app slug (used by review-responder for bot identity)
-APP_SLUG=$(curl -sf --connect-timeout 10 --max-time 15 \
-    -H "Authorization: Bearer $(generate_jwt 120)" \
-    -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/app" \
-    | python3 -c "import sys,json; print(json.load(sys.stdin).get('slug',''))")
+app_json=""
+for attempt in 1 2 3 4; do
+    app_json=$(curl -sf --connect-timeout 10 --max-time 15 \
+        -H "Authorization: Bearer $(generate_jwt 120)" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app") && break
+    echo "GET https://api.github.com/app failed (attempt ${attempt}/4), retrying..."
+    sleep $((attempt * 5))
+done
+[[ -n "${app_json}" ]] || {
+    echo "ERROR: GET https://api.github.com/app failed after 4 attempts."
+    exit 1
+}
+APP_SLUG=$(echo "${app_json}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('slug',''))")
 [[ -n "${APP_SLUG}" ]] || { echo "ERROR: Failed to resolve app slug from /app endpoint."; exit 1; }
 echo "${APP_SLUG}[bot]" > "${SHARED_DIR}/gh-app-bot-login"
 echo "App slug: ${APP_SLUG} (bot login: ${APP_SLUG}[bot])"

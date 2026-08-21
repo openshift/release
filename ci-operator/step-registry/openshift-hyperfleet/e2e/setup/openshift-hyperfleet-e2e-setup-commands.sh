@@ -96,9 +96,9 @@ done
 log "SUCCESS: All pods are Running and deployment is healthy"
 
 
-API_EXTERNAL_IP=$(kubectl get svc hyperfleet-api -n $NAMESPACE_NAME -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-if [[ -z "${API_EXTERNAL_IP}" ]]; then
-  log "ERROR: Failed to resolve Hyperfleet API external IP. Is the LoadBalancer ready?"
+GATEWAY_EXTERNAL_IP=$(kubectl get svc hyperfleet-gateway -n $NAMESPACE_NAME -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+if [[ -z "${GATEWAY_EXTERNAL_IP}" ]]; then
+  log "ERROR: Failed to resolve Hyperfleet Gateway external IP. Is the LoadBalancer ready?"
   exit 1
 fi
 
@@ -108,7 +108,7 @@ if [[ -z "${MAESTRO_EXTERNAL_IP}" ]]; then
   exit 1
 fi
 
-export HYPERFLEET_API_URL=http://${API_EXTERNAL_IP}:8000
+export HYPERFLEET_API_URL=http://${GATEWAY_EXTERNAL_IP}:8000
 echo "${HYPERFLEET_API_URL}" > "${SHARED_DIR}/hyperfleet_api_url"
 
 export MAESTRO_URL=http://${MAESTRO_EXTERNAL_IP}:8000

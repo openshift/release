@@ -225,6 +225,53 @@ function mapTestsForComponentReadiness() {
     fi
 }
 
+# Run a command until it succeeds or the maximum number of retries is reached.
+#
+# Arguments:
+# - $1: a banner describing what we are waiting for
+# - $2: the maximum number of retries before giving up
+# - $3: the delay to wait before each retry
+# - $@: the command to run
+function wait_for() {
+  local what="$1"; shift
+  local retries="$1"; shift
+  local delay="$1"; shift
+
+  echo "[INFO] Waiting for ${what}." >&2
+
+  time (
+    { set +x; } 2>/dev/null
+    while true; do
+      if "$@"; then
+        break
+      fi
+
+      # Give up after too many tries
+      if [[ "${retries}" -le 0 ]]; then
+        echo "[ERROR] Timeout waiting for ${what}." >&2
+        exit 1
+      fi
+
+      retries=$((retries - 1))
+      sleep "${delay}"
+    done
+  )
+}
+
+function download_virtctl() {
+    echo "[INFO] Downloading virtctl to ${BIN_FOLDER} .." >&2
+    curl -k -fsS "${virtctl_url}" | tar -C "${BIN_FOLDER}" \
+      --transform='flags=r;s/virtctl-linux-.*/virtctl/' -xzf -
+
+    chmod +x "${BIN_FOLDER}/virtctl"
+    echo "[INFO] virtctl installed: $("${BIN_FOLDER}/virtctl" version --client 2>/dev/null | head -1 || echo unknown)" >&2
+}
+
+# shellcheck disable=SC2329
+function virtctl_download_ready() {
+  curl -k -fsS -o /dev/null --connect-timeout 15 --max-time 120 "$1" 2>/dev/null
+}
+
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
 
@@ -259,6 +306,38 @@ curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
 
 oc whoami --show-console
 HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
+readonly HCO_CR="${HCO_CR:-kubevirt-hyperconverged}"
+
+ARCH=$(uname -m)
+case ${ARCH} in
+  aarch64) ARCH_LABEL='ARM 64' ;;
+  s390x)   ARCH_LABEL='IBM Z' ;;
+  *)       ARCH_LABEL=${ARCH} ;;
+esac
+
+virtctl_url=$(oc get consoleclidownload "virtctl-clidownloads-${HCO_CR}" \
+  -o=jsonpath="{.spec.links[?(@.text==\"Download virtctl for Linux for ${ARCH_LABEL}\")].href}")
+
+if [[ -z "${virtctl_url}" ]]; then
+  echo "[ERROR] No ConsoleCLIDownload href for arch '${ARCH_LABEL}' (uname -m=${ARCH})." >&2
+  oc get consoleclidownload "virtctl-clidownloads-${HCO_CR}" \
+    -o jsonpath='{range .spec.links[*]}{.text}{"\t"}{.href}{"\n"}{end}' >&2 || true
+  exit 1
+fi
+
+_retries="${VIRTCTL_DOWNLOAD_WAIT_RETRIES:-40}"
+_delay="${VIRTCTL_DOWNLOAD_WAIT_DELAY:-15}"
+if ! wait_for \
+  'virtctl download URL to respond' \
+  "${_retries}" \
+  "${_delay}" \
+  virtctl_download_ready \
+  "${virtctl_url}"; then
+  echo "[ERROR] virtctl tarball not reachable: ${virtctl_url}" >&2
+  exit 1
+fi
+
+download_virtctl
 
 oc get sc # Before
 setDefaultStorageClass 'ocs-storagecluster-ceph-rbd-virtualization'
