@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eux -o pipefail
+set -euo pipefail
 shopt -s inherit_errexit
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
@@ -8,10 +8,8 @@ fi
 
 echo "[smoke] Reading connection details from SHARED_DIR..."
 
-set +x
 CENTRAL_URL="$(cat "${SHARED_DIR}/CENTRAL_URL")"
 ROX_ADMIN_PASSWORD="$(cat "${SHARED_DIR}/ROX_ADMIN_PASSWORD")"
-set -x
 
 echo "[smoke] Connection details loaded from SHARED_DIR"
 
@@ -51,7 +49,6 @@ grep -q 'DEFAULT_CLUSTER_NAME = "local-cluster"' \
     /tmp/stackrox/qa-tests-backend/src/main/groovy/services/ClusterService.groovy \
     || { echo "[smoke] FATAL: DEFAULT_CLUSTER_NAME patch failed"; exit 1; }
 
-set +x
 export API_HOSTNAME="${CENTRAL_URL}"
 export API_PORT="443"
 export ROX_USERNAME="admin"
@@ -72,7 +69,6 @@ if [[ -f /tmp/vault/stackrox-stackrox-e2e-tests/GOOGLE_ARTIFACT_REGISTRY_SERVICE
     GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2="$(cat /tmp/vault/stackrox-stackrox-e2e-tests/GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2)"
     export GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2
 fi
-set -x
 
 cd /tmp/stackrox/qa-tests-backend
 
@@ -103,13 +99,4 @@ if [[ -d build/reports/tests/testSMOKE ]]; then
 fi
 
 echo "[smoke] Test run finished with exit code: ${testExit}"
-if [[ "${testExit}" -ne 0 ]] && [[ -d build/test-results/testSMOKE ]]; then
-    typeset total=""
-    total="$(find build/test-results/testSMOKE -name '*.xml' -exec grep -l 'testcase' {} \; | wc -l)"
-    if [[ "${total}" -gt 0 ]]; then
-        echo "[smoke] Tests executed and results captured; treating as informational (exit 0)."
-        echo "[smoke] Review JUnit XML in ARTIFACT_DIR for individual test failures."
-        exit 0
-    fi
-fi
 exit "${testExit}"
