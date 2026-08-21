@@ -43,12 +43,14 @@ main() {
         echo "Spoke lockdown generation enabled"
         local timestamp
         timestamp=$(date -u +%Y%m%d_%H%M%S)
-        local lockdown_filename="lockdown-spoke-${VERSION:-unknown}-${ARCHITECTURE:-x86_64}-${timestamp}-prow.json"
+        local lockdown_filename="lockdown-spoke-${VERSION:-unknown}-${ARCHITECTURE:-x86_64}-${timestamp}-${BUILD_ID:-0}-prow.json"
         # lockdown_output_file is what the playbook checks to trigger generation:
         #   ocp_operator_mirror_generate_lockdown: "{{ (lockdown_output_file | default('') | length > 0) }}"
         # Write to /tmp on the bastion (tasks run via SSH there, not inside the container).
         extra_vars+=(-e "lockdown_output_file=/tmp/${lockdown_filename}")
         extra_vars+=(-e "hub_name=${HUB_CLUSTER}")
+        # Prow exposes BUILD_ID; use it as build_number for lockdown metadata.
+        extra_vars+=(-e "build_number=${BUILD_ID:-0}")
         # In lockdown-validation mode (SPOKE_LOCKDOWN_URI set) architecture is extracted
         # from the lockdown JSON — do not override it here.
         if [[ -z "${SPOKE_LOCKDOWN_URI:-}" ]]; then

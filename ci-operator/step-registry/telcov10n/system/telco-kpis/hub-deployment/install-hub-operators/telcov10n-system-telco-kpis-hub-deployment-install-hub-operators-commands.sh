@@ -50,7 +50,7 @@ main() {
         echo "Hub lockdown generation enabled"
         local timestamp
         timestamp=$(date -u +%Y%m%d_%H%M%S)
-        local lockdown_filename="lockdown-hub-temp-${timestamp}-prow.json"
+        local lockdown_filename="lockdown-hub-temp-${timestamp}-${BUILD_ID:-0}-prow.json"
         # hub_lockdown_output_file must be a path valid on the bastion (tasks run via SSH
         # there). /tmp avoids any container-path or ARTIFACT_DIR availability issues.
         extra_vars+=(-e "generate_hub_lockdown=true")
