@@ -1,0 +1,32 @@
+ref:
+  as: quay-operator-provisioning-builder
+  cli: latest
+  from_image:
+    name: quay-test-omr
+    namespace: ci
+    tag: latest
+  commands: quay-operator-provisioning-builder-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  grace_period: 15m0s
+  documentation: |-
+    Deploy a virtual builder for Quay build support. Creates the virtual-builders
+    namespace, the quay-builder service account and token, and writes
+    config_builder.yaml (FEATURE_BUILD_SUPPORT + BUILDMAN/executor config) to
+    ${SHARED_DIR} for the deploy step. Unmanaged TLS is a prerequisite.
+  credentials:
+  - namespace: test-credentials
+    name: quay-qe-quaybuilder-secret
+    mount_path: /var/run/quay-qe-quaybuilder-secret
+  env:
+  - name: QUAYREGISTRY
+    documentation: The quay registry name
+    default: "quay"
+  - name: QUAYNAMESPACE
+    documentation: The Quay installed namespace
+    default: "quay-enterprise"
+  - name: QUAY_BUILDER_IMAGE
+    documentation: The builder image for Quay Virtual Build
+    default: "brew.registry.redhat.io/rh-osbs/quay-quay-builder-rhel8:v3.9.0-19"
