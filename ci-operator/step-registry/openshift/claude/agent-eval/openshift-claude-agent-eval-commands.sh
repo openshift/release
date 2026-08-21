@@ -109,8 +109,11 @@ fi
 echo ""
 echo "=== Installing plugins ==="
 EVAL_HARNESS_DIR="/tmp/agent-eval-harness"
-git clone --depth 1 https://github.com/opendatahub-io/agent-eval-harness.git "${EVAL_HARNESS_DIR}"
-echo "agent-eval-harness cloned."
+# EVAL_HARNESS_REPO / EVAL_HARNESS_REF let a PR rehearse the eval against a
+# not-yet-merged branch of the harness. They default to the released main.
+EVAL_HARNESS_REPO="${EVAL_HARNESS_REPO:-https://github.com/opendatahub-io/agent-eval-harness.git}"
+git clone --depth 1 ${EVAL_HARNESS_REF:+--branch "${EVAL_HARNESS_REF}"} "${EVAL_HARNESS_REPO}" "${EVAL_HARNESS_DIR}"
+echo "agent-eval-harness cloned from ${EVAL_HARNESS_REPO} (ref: ${EVAL_HARNESS_REF:-default})."
 
 # -----------------------------------------------------------------------
 # Run optional setup script (e.g. extract snapshots, populate fixtures)
