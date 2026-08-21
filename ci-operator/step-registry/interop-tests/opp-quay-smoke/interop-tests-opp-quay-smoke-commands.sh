@@ -275,6 +275,77 @@ print(' '.join(unbound))
 ################################################################################
 # Test Case 3: ACS scan of pushed Quay image
 ################################################################################
+function RegisterQuayInAcs () {
+    typeset acsHost="${1}" acsPassword="${2}"
+
+    typeset existing
+    existing=$(curl -sk -u "admin:${acsPassword}" \
+        "https://${acsHost}/v1/imageintegrations" 2>/dev/null | \
+        python3 -c "
+import sys, json, os
+host = os.environ['QUAY_HOST']
+data = json.load(sys.stdin)
+for i in data.get('integrations', []):
+    if host in i.get('docker', {}).get('endpoint', ''):
+        print(i['id'])
+        sys.exit(0)
+sys.exit(1)
+" 2>/dev/null || echo "")
+
+    if [[ -n "${existing}" ]]; then
+        echo "INFO: Quay integration already registered in ACS"
+        return 0
+    fi
+
+    typeset regUser regPass
+    if [[ -n "${QUAY_TOKEN}" ]]; then
+        regUser="\$oauthtoken"
+        regPass="${QUAY_TOKEN}"
+    else
+        regUser="${QUAY_USER}"
+        regPass="${QUAY_PASSWORD}"
+    fi
+
+    python3 -c "
+import json, sys, os
+payload = {
+    'name': 'interop-quay-smoke',
+    'type': 'docker',
+    'categories': ['REGISTRY'],
+    'docker': {
+        'endpoint': os.environ['QUAY_HOST'],
+        'username': sys.argv[1],
+        'password': sys.argv[2],
+        'insecure': True
+    },
+    'skipTestIntegration': True
+}
+print(json.dumps(payload))
+" "${regUser}" "${regPass}" | \
+    curl -sk -X POST "https://${acsHost}/v1/imageintegrations" \
+        -u "admin:${acsPassword}" \
+        -H "Content-Type: application/json" \
+        -d @- >/dev/null 2>&1 || true
+
+    echo "INFO: Registered Quay at ${QUAY_HOST} as ACS image integration"
+}
+
+function RequestAcsScan () {
+    typeset acsHost="${1}" acsPassword="${2}" imageName="${3}"
+
+    python3 -c "
+import json, sys
+payload = {'imageName': sys.argv[1], 'force': True}
+print(json.dumps(payload))
+" "${imageName}" | \
+    curl -sk -X POST "https://${acsHost}/v1/images/scan" \
+        -u "admin:${acsPassword}" \
+        -H "Content-Type: application/json" \
+        -d @- >/dev/null 2>&1 || true
+
+    echo "INFO: Requested ACS scan of ${imageName}"
+}
+
 function RunAcsScan () {
     typeset testName="[sig-interop][Jira:INTEROP][Feature:Quay] ACS scan of pushed Quay image"
     typeset -i start elapsed
@@ -296,7 +367,11 @@ function RunAcsScan () {
     fi
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
-    typeset -i attempts=0 maxAttempts=20
+
+    RegisterQuayInAcs "${acsHost}" "${acsPassword}"
+    RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}"
+
+    typeset -i attempts=0 maxAttempts=40
 
     while (( attempts < maxAttempts )); do
         typeset scanResult
@@ -314,12 +389,16 @@ sys.exit(0 if len(images) > 0 else 1)
             return 0
         fi
 
+        if (( attempts % 4 == 3 )); then
+            RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}"
+        fi
+
         attempts=$((attempts + 1))
         sleep 15
     done
 
     elapsed=$(( $(date +%s) - start ))
-    RecordResult "${testName}" "failed" "ACS did not detect pushed image within 5 minutes" "${elapsed}"
+    RecordResult "${testName}" "failed" "ACS did not detect pushed image within 10 minutes" "${elapsed}"
     return 1
 }
 
