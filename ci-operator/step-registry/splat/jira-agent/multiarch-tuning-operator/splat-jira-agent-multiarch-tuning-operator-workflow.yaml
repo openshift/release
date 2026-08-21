@@ -1,0 +1,34 @@
+workflow:
+  as: splat-jira-agent-multiarch-tuning-operator
+  steps:
+    pre:
+      - ref: jira-agent-setup
+      - ref: jira-agent-github-app-auth
+      - ref: jira-agent-slack-pr-notify
+      - ref: jira-agent-claude-helpers
+      - ref: jira-agent-jira-helpers
+      - ref: jira-agent-git-helpers
+    test:
+      - ref: jira-agent-process
+    post:
+      - ref: jira-agent-report
+    env:
+      JIRA_AGENT_DEFAULT_BRANCH: "main"
+      JIRA_AGENT_AUTH_MODE: "pat"
+      JIRA_AGENT_FORK_ORG: "jira-solve-bot"
+      JIRA_AGENT_UPSTREAM_REPO: "openshift/multiarch-tuning-operator"
+      JIRA_AGENT_JQL: '(project = MULTIARCH OR (project = OCPBUGS AND component = "Multiarch Tuning Operator")) AND resolution = Unresolved AND status in (New, "To Do") AND labels = issue-for-agent AND labels != agent-processed'
+      JIRA_AGENT_TARGET_STATUS: '{"MULTIARCH":"ASSIGNED","OCPBUGS":"ASSIGNED"}'
+      JIRA_AGENT_TOOL_SETUP_SCRIPT: "GOFLAGS='' go install golang.org/x/tools/gopls@v0.21.0"
+      JIRA_AGENT_REVIEW_LANGUAGE: "go"
+      JIRA_AGENT_SLACK_EMOJI: ":robot:"
+  documentation: |-
+    SPLAT Multiarch Tuning Operator wrapper for the generic Jira Agent workflow.
+    Uses PAT auth mode — auto-forks openshift/multiarch-tuning-operator
+    into jira-solve-bot and creates PRs against the upstream repo.
+
+    Queries both the dedicated MULTIARCH project and the OCPBUGS "Multiarch
+    Tuning Operator" component, since bugs against this repo are filed under
+    either.
+
+    Credentials: Uses hypershift-team-claude-prow (shared secret with gh-pat).
