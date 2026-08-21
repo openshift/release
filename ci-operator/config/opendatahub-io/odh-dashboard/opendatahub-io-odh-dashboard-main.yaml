@@ -41,11 +41,23 @@ images:
   - context_dir: .
     dockerfile_path: ./dashboard-operator/Dockerfile
     to: odh-dashboard-operator-image
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/nodejs-22:latest
+      USER root
+      RUN dnf install -y git && dnf clean all
+      WORKDIR /opt/app-root/src
+      COPY --chown=1001:0 . .
+      USER 1001
+    to: nodejs-22-src
 promotion:
   to:
-  - namespace: opendatahub-io
+  - excluded_images:
+    - nodejs-22-src
+    namespace: opendatahub-io
     tag: latest
-  - namespace: opendatahub-io
+  - excluded_images:
+    - nodejs-22-src
+    namespace: opendatahub-io
     tag: main
 releases:
   latest:
@@ -58,7 +70,47 @@ resources:
     requests:
       cpu: 200m
       memory: 400Mi
+  lint:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+  nodejs-22-src:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+  type-check:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+  unit-tests:
+    requests:
+      cpu: "2"
+      memory: 8Gi
 tests:
+- as: lint
+  commands: |
+    npm install -g npm@11.8.0
+    npm ci
+    npm run install:modules
+    NODE_OPTIONS="--max-old-space-size=8192" npm run lint
+  container:
+    from: nodejs-22-src
+- as: type-check
+  commands: |
+    npm install -g npm@11.8.0
+    npm ci
+    npm run install:modules
+    npm run type-check
+  container:
+    from: nodejs-22-src
+- as: unit-tests
+  commands: |
+    npm install -g npm@11.8.0
+    npm ci
+    npm run install:modules
+    npm run test-unit
+  container:
+    from: nodejs-22-src
 - as: odh-dashboard-image-mirror
   postsubmit: true
   steps:
