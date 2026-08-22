@@ -1,0 +1,26 @@
+ref:
+  as: hypershift-agent-ovn-ipecho-provision
+  from: dev-scripts
+  commands: hypershift-agent-ovn-ipecho-provision-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: IPECHO_PORT
+    default: "9095"
+    documentation: "TCP port on which the ipecho HTTP server listens."
+  timeout: 10m0s
+  grace_period: 5m0s
+  documentation: |-
+    Provisions a Python3 ipecho HTTP server on the dev-scripts provisioning host
+    (192.168.111.1) as a systemd service. The ipecho server returns the caller's
+    source IP address, which is used by OVN-Kubernetes EgressIP tests.
+
+    The server runs on the ostestbm libvirt bridge (192.168.111.0/24), on the
+    same L2 segment as the guest cluster worker VMs, so EgressIP SNAT traffic
+    reaches it without any routing or NAT in the way.
+
+    Outputs saved to ${SHARED_DIR}:
+    - ipecho_host_ip: Bridge IP of the provisioning host (192.168.111.1)
+    - ipecho_url: Full URL (http://192.168.111.1:<port>)
