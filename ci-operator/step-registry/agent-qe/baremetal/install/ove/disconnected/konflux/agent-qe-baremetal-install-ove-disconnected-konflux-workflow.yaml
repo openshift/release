@@ -1,14 +1,22 @@
 workflow:
   as: agent-qe-baremetal-install-ove-disconnected-konflux
   steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
     pre:
       - chain: agent-qe-baremetal-install-ove-disconnected-konflux
     post:
+      - ref: agent-qe-baremetal-install-ove-disconnected-collect-validation-results
+        best_effort: true
+      - chain: gather
+        optional_on_success: true
       - ref: agent-qe-baremetal-install-ove-disconnected-konflux-delete-iso
+        best_effort: true
       - chain: baremetal-lab-agent-post
+        best_effort: true
     env:
       DISCONNECTED: "true"
   documentation: |-
-    The agent-qe-baremetal-install-ove-disconnected workflow provides pre- and post- steps that provision and
-    deprovision an ABI OVE cluster with a default configuration on a Baremetal lab,
-    allowing job authors to inject their own end-to-end test logic.
+    The agent-qe-baremetal-install-ove-disconnected-konflux workflow provisions and
+    deprovisions an ABI OVE cluster on a Baremetal lab, installs LSO/ODF, mirrors
+    validation images for disconnected testing, and collects test artifacts.
