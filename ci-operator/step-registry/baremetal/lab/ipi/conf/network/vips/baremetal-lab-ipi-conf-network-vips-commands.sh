@@ -18,6 +18,8 @@ fi
 cat > "${SHARED_DIR}/vips_patch_install_config.yaml" <<EOF
 platform:
   baremetal:
+    loadBalancer:
+      type: UserManaged
     apiVIPs:
     $([ "${ipv4_enabled:-false}" == "true" ] && echo "- $(yq ".api_vip" "${SHARED_DIR}/vips.yaml")")
     $([ "${ipv6_enabled:-false}" == "true" ] && echo "- $(yq ".api_vip_v6" "${SHARED_DIR}/vips.yaml")")
