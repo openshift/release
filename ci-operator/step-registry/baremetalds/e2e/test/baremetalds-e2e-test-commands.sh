@@ -76,13 +76,13 @@ declare -a MIRRORED_IMAGES=(
 )
 
 function run-oc-image-mirror() {
-  if ! oc image mirror -f /tmp/mirror --keep-manifest-list --registry-config ${DS_WORKING_DIR}/pull_secret.json; then
+  if ! oc image mirror -f /tmp/mirror --keep-manifest-list --registry-config ${DS_WORKING_DIR}/pull_secret.json ${TEST_OC_IMAGE_MIRROR_FLAGS}; then
     echo "oc image mirror failed. Contents of /tmp/mirror:"
     cat /tmp/mirror || true
     return 1
   fi
   for image_pair in "\${MIRRORED_IMAGES[@]}"; do
-    oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" \$image_pair || return 1
+    oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" \$image_pair ${TEST_OC_IMAGE_MIRROR_FLAGS} || return 1
   done
 }
 
