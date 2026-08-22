@@ -1,0 +1,65 @@
+ref:
+  as: openshift-qe-network-vm-localnet-perf
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: NETPERF_FILENAME
+    default: "./k8s-netperf"
+    documentation: |-
+      Path to the k8s-netperf binary used by run.sh
+  - name: VM
+    default: "true"
+    documentation: |-
+      Run netperf on VMs
+  - name: POD
+    default: "false"
+    documentation: |-
+      Run netperf on pods
+  - name: LOCALNET_PORT
+    default: "ens7f0"
+    documentation: |-
+      Physical NIC used as the OVS bridge underlay port
+  - name: LOCALNET_BRIDGE
+    default: "br-ens7f0"
+    documentation: |-
+      OVS bridge name for the localnet underlay
+  - name: LOCALNET
+    default: "physnet-ens7f0"
+    documentation: |-
+      OVN localnet name used by NNCP bridge-mappings and run.sh
+  - name: LOCALNET_CONFIG
+    default: "localnetNetwork_new.json"
+    documentation: |-
+      Localnet network config file consumed by network-perf-v2
+  - name: USE_VIRTCTL
+    default: "true"
+    documentation: |-
+      Use virtctl to connect to the VM instead of ssh
+  - name: ALL_SCENARIOS
+    default: "false"
+    documentation: |-
+      Run all netperf scenarios when true
+  - name: CLEAN_UP
+    default: "true"
+    documentation: |-
+      Clean up the test namespace before and after the test
+  commands: openshift-qe-network-vm-localnet-perf-commands.sh
+  timeout: 4h
+  grace_period: 15m
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    Creates an OVS/OVN localnet NNCP underlay and runs perfscale network-perf VM localnet workload

@@ -1,0 +1,61 @@
+ref:
+  as: openshift-qe-network-vm-bridge-perf
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: NETPERF_FILENAME
+    default: "./k8s-netperf"
+    documentation: |-
+      Path to the k8s-netperf binary used by run.sh
+  - name: VM
+    default: "true"
+    documentation: |-
+      Run netperf on VMs
+  - name: POD
+    default: "false"
+    documentation: |-
+      Run netperf on pods
+  - name: BRIDGE
+    default: "br0"
+    documentation: |-
+      Linux bridge name created by NNCP and used by the workload
+  - name: BRIDGE_PORT
+    default: "eno2"
+    documentation: |-
+      Physical NIC used as a port on the linux bridge in the NNCP
+  - name: BRIDGE_CONFIG
+    default: "bridgeNetwork_test.json"
+    documentation: |-
+      Bridge network config file consumed by network-perf-v2
+  - name: USE_VIRTCTL
+    default: "true"
+    documentation: |-
+      Use virtctl to connect to the VM instead of ssh
+  - name: ALL_SCENARIOS
+    default: "false"
+    documentation: |-
+      Run all netperf scenarios when true
+  - name: CLEAN_UP
+    default: "true"
+    documentation: |-
+      Clean up the test namespace before and after the test
+  commands: openshift-qe-network-vm-bridge-perf-commands.sh
+  timeout: 4h
+  grace_period: 15m
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    Creates an NNCP linux bridge and runs perfscale network-perf VM bridge workload
