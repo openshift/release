@@ -101,6 +101,34 @@ fi
 # Mailpit serves that under /api/v1, so the base URL includes the /api/v1 segment.
 # The test step exports this file's contents as MAILPIT_API_URL.
 MAILPIT_API_URL="https://${MAILPIT_HOST}/api/v1"
+
+# Guard: prove the Route actually answers GET ${MAILPIT_API_URL}/messages before we
+# hand it off. This is the exact request the Playwright suite's mailpit.isAvailable()
+# makes; if it fails, mailing-based email verification silently degrades to
+# "Mailpit NOT available" and every test user hits 403 needsEmailVerification in
+# global setup. Fail loudly here instead. -k mirrors the test pod, which reaches the
+# edge Route's untrusted ingress cert with NODE_TLS_REJECT_UNAUTHORIZED=0. The Route
+# can take a few seconds to program after the host is assigned, so retry briefly.
+MAILPIT_REACHABLE=false
+for _ in $(seq 1 24); do
+  code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "${MAILPIT_API_URL}/messages" || true)
+  if [[ "${code}" == "200" ]]; then
+    MAILPIT_REACHABLE=true
+    break
+  fi
+  sleep 5
+done
+if [[ "${MAILPIT_REACHABLE}" != "true" ]]; then
+  echo "ERROR: Mailpit API not reachable at ${MAILPIT_API_URL}/messages (last HTTP code: ${code:-none})." >&2
+  echo "       The test suite would report 'Mailpit NOT available' and all users would fail" >&2
+  echo "       email verification. Route/service diagnostics:" >&2
+  oc get route mailpit -n "${QUAY_NS}" -o yaml >&2 || true
+  oc get svc mailpit -n "${QUAY_NS}" -o wide >&2 || true
+  oc get pods -n "${QUAY_NS}" -l app=mailpit -o wide >&2 || true
+  exit 1
+fi
+echo "Mailpit API reachable (HTTP 200) at ${MAILPIT_API_URL}/messages"
+
 echo "${MAILPIT_API_URL}" > "${SHARED_DIR}/mailpit_api"
 cp "${SHARED_DIR}/mailpit_api" "${ARTIFACT_DIR}/mailpit_api" || true
 echo "Mailpit API: ${MAILPIT_API_URL}"
