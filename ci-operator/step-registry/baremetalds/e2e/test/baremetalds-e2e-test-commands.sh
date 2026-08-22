@@ -497,35 +497,40 @@ for _ in {1..11}; do
 done
 
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
-echo "$(date) - waiting for non-samples imagesteams to import..."
-count=0
-while :
-do
+# On disconnected clusters without a mirror registry (ISO no-registry mode), imagestreams cannot import so skip the wait.
+if [[ "${DS_AGENT_E2E_TEST_BOOT_MODE:-}" == "ISO_NO_REGISTRY" ]]; then
+  echo "$(date) - skipping imagestream import wait (ISO no-registry mode: no mirror registry available)"
+else
+  echo "$(date) - waiting for non-samples imagesteams to import..."
+  count=0
+  while :
+  do
 
-  # The local image registry isn't working in 4.6 and isn't needed for the
-  # subset of tests we use for this version
-  if ! is_openshift_version_gte "4.7" ; then
-    echo "Skipping imagesteams wait"
-    break
-  fi
+    # The local image registry isn't working in 4.6 and isn't needed for the
+    # subset of tests we use for this version
+    if ! is_openshift_version_gte "4.7" ; then
+      echo "Skipping imagesteams wait"
+      break
+    fi
 
-  non_imported_imagestreams=$(oc -n openshift get imagestreams -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
-  if [ -z "${non_imported_imagestreams}" ]
-  then
-    break
-  fi
-  echo "The following image streams are yet to be imported (attempt #${count}):"
-  echo "${non_imported_imagestreams}"
+    non_imported_imagestreams=$(oc -n openshift get imagestreams -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
+    if [ -z "${non_imported_imagestreams}" ]
+    then
+      break
+    fi
+    echo "The following image streams are yet to be imported (attempt #${count}):"
+    echo "${non_imported_imagestreams}"
 
-  count=$((count+1))
-  if (( count > 30 )); then
-    echo "Failed while waiting on imagestream import"
-    exit 1
-  fi
+    count=$((count+1))
+    if (( count > 30 )); then
+      echo "Failed while waiting on imagestream import"
+      exit 1
+    fi
 
-  sleep 60
-done
-echo "$(date) - all imagestreams are imported."
+    sleep 60
+  done
+  echo "$(date) - all imagestreams are imported."
+fi
 
 # In some cases the cluster events are processed slowly by the kube-apiservers,
 # producing a late revision updates that could be missed by the previous co check.
