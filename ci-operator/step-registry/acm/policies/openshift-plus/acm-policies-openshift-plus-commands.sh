@@ -18,9 +18,15 @@ if [[ -n "${QUAY_OPERATOR_CHANNEL}" ]]; then
 fi
 echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
 
+# openshift-plus generates ~25 policies; require 4+ before oc wait to avoid
+# racing the GitOps Subscription propagation (stolostron/policy-collection#174)
+typeset -i expectedMinPolicies=4
 typeset -i pollDeadline=$((SECONDS + 600))
-until (($(oc get policies -n policies -o name 2>/dev/null | wc -l))); do
-  ((SECONDS > pollDeadline)) && { : "Error: no policies appeared after 10 minutes"; exit 1; }
+until (( $(oc get policies -n policies -o name 2>/dev/null | wc -l) >= expectedMinPolicies )); do
+  ((SECONDS > pollDeadline)) && {
+    printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
+    exit 1
+  }
   sleep 5
 done
 
@@ -41,8 +47,23 @@ done
 
 typeset -a secondaryPoliciesArr=(
   policy-acs
+  policy-acs-monitor-certs
+  policy-acs-operator-central
+  policy-acs-sync-resources
+  policy-advanced-managed-cluster-security
   policy-advanced-managed-cluster-status
+  policy-compliance-operator-install
+  policy-config-quay
   policy-hub-quay-bridge
+  policy-install-quay
+  policy-observability-operator
+  policy-observability-storage
+  policy-observability-storage-status
+  policy-odf
+  policy-odf-cluster
+  policy-odf-noobaa
+  policy-odf-status
+  policy-quay-bridge
   policy-quay-status
 )
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eux -o pipefail
+set -euo pipefail
 shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
@@ -84,9 +84,20 @@ function CheckCentralRoute () {
 
 WaitFor "Central route" CheckCentralRoute
 
-set +x
-centralUrl="$(oc get route central -n "${centralNs}" -o jsonpath='{.spec.host}')"
-set -x
+typeset -i routeElapsed=0
+centralUrl=""
+while [[ -z "${centralUrl}" ]]; do
+    centralUrl="$(oc get route central -n "${centralNs}" -o jsonpath='{.spec.host}' 2>/dev/null)" || true
+    if [[ -n "${centralUrl}" ]]; then
+        break
+    fi
+    if (( routeElapsed >= 30 )); then
+        echo "[readiness] FATAL: Central route host empty after 30s"
+        exit 1
+    fi
+    sleep 5
+    (( routeElapsed += 5 )) || true
+done
 echo "[readiness] Central route discovered"
 
 # ---------------------------------------------------------------------------
@@ -94,10 +105,8 @@ echo "[readiness] Central route discovered"
 # ---------------------------------------------------------------------------
 typeset roxAdminPassword=""
 echo "[readiness] Extracting roxAdminPassword..."
-set +x
 roxAdminPassword="$(oc get secret -n "${centralNs}" central-htpasswd \
     -o jsonpath='{.data.password}' | base64 -d)"
-set -x
 
 if [[ -z "${roxAdminPassword}" ]]; then
     echo "[readiness] FATAL: could not extract roxAdminPassword"
@@ -109,12 +118,10 @@ echo "[readiness] roxAdminPassword extracted successfully"
 # Check 2: Central API health (authenticated v1/metadata)
 # ---------------------------------------------------------------------------
 function CheckCentralApi () {
-    set +x
     typeset httpCode=""
     httpCode="$(curl -sk -o /dev/null -w '%{http_code}' \
         -u "admin:${roxAdminPassword}" \
-        "https://${centralUrl}/v1/metadata" --max-time 10)" || { set -x; return 1; }
-    set -x
+        "https://${centralUrl}/v1/metadata" --max-time 10)" || return 1
     [[ "${httpCode}" == "200" ]]
 }
 
@@ -124,12 +131,10 @@ WaitFor "Central API health (v1/metadata)" CheckCentralApi
 # Check 3: At least 1 secured cluster connected
 # ---------------------------------------------------------------------------
 function CheckClustersConnected () {
-    set +x
     typeset clusterCount=""
     clusterCount="$(curl -sk -u "admin:${roxAdminPassword}" \
         "https://${centralUrl}/v1/clusters" --max-time 10 \
-        | JsonLength clusters)" || { set -x; return 1; }
-    set -x
+        | JsonLength clusters)" || return 1
     [[ "${clusterCount}" -ge 1 ]]
 }
 
@@ -184,12 +189,10 @@ WaitFor "sensor pods Running in ${scNs}" CheckSensorPods
 # Check 5: Default policies loaded (count > 80)
 # ---------------------------------------------------------------------------
 function CheckPoliciesLoaded () {
-    set +x
     typeset policyCount=""
     policyCount="$(curl -sk -u "admin:${roxAdminPassword}" \
         "https://${centralUrl}/v1/policies?query=" --max-time 10 \
-        | JsonLength policies)" || { set -x; return 1; }
-    set -x
+        | JsonLength policies)" || return 1
     echo "[readiness]   policy count: ${policyCount}"
     [[ "${policyCount}" -gt 80 ]]
 }
@@ -198,10 +201,8 @@ WaitFor "default policies loaded (>80)" CheckPoliciesLoaded
 
 echo "[readiness] Writing connection details to SHARED_DIR..."
 
-set +x
 echo "${roxAdminPassword}" > "${SHARED_DIR}/ROX_ADMIN_PASSWORD"
 echo "${centralUrl}"       > "${SHARED_DIR}/CENTRAL_URL"
-set -x
 
 echo "${centralNs}"  > "${SHARED_DIR}/CENTRAL_NS"
 echo "${scNs}"       > "${SHARED_DIR}/SC_NS"
