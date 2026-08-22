@@ -1,0 +1,40 @@
+ref:
+  as: sandboxed-containers-operator-tests-e2e-poc
+  from_image:
+    namespace: openshift
+    name: release
+    tag: rhel-9-release-golang-1.26-openshift-4.23
+  cli: latest
+  commands: sandboxed-containers-operator-tests-e2e-poc-commands.sh
+  timeout: 2h30m0s
+  env:
+  - name: TEST_E2E_POC_ENABLE
+    default: ""
+    documentation: |-
+      Set to "false" to skip the e2e-poc test step.
+      Any other value or unset means the step runs.
+  - name: TEST_E2E_POC_REPO
+    default: "https://github.com/tbuskey/sandboxed-containers-operator"
+    documentation: |-
+      Git repository URL to clone for e2e-poc tests.
+  - name: TEST_E2E_POC_BRANCH
+    default: "kata-e2e-poc"
+    documentation: |-
+      Git branch to checkout after cloning TEST_E2E_POC_REPO.
+  - name: TEST_E2E_POC_FULL_ENABLE
+    default: ""
+    documentation: |-
+      Set to "true" to run the full test pass after smoke.
+      Any other value or unset means only smoke tests run.
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+  documentation: |-
+    Runs sandboxed-containers-operator e2e-poc golang Ginkgo tests.
+    Clones TEST_E2E_POC_REPO/BRANCH, then runs smoke tests via go test.
+    If TEST_E2E_POC_FULL_ENABLE is "true", also runs the full test pass.
+    Uses from_image with Go 1.26 toolchain for compilation.
+    Assumes the operator and Kata runtime are already installed by the pre chain.

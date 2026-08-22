@@ -46,4 +46,17 @@ On workflow change or periodic update please use the
 [create-prowjob](../../../step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh)
 command to refresh the default templates using the pre-defined defaults
 by running: ``sandboxed-containers-operator-create-prowjob-commands.sh update_templates``.
-Avoid modifying the templates directly, always use the ``update_template``!
+Avoid modifying the templates directly, always use the ``update_templates``!
+
+## OWNERS
+
+The `OWNERS` file in this directory is **auto-generated** by a tool in [openshift/ci-tools](https://github.com/openshift/ci-tools) that runs as a Prow periodic job. It:
+
+1. Fetches the root `OWNERS` file from [openshift/sandboxed-containers-operator](https://github.com/openshift/sandboxed-containers-operator).
+2. Expands any `OWNERS_ALIASES`.
+3. Filters out logins that are not members of the `openshift` GitHub organization.
+4. Writes the result here.
+
+**Do not edit `OWNERS` directly** — changes will be overwritten on the next sync. To add or remove reviewers/approvers, update the `OWNERS` file in the upstream [sandboxed-containers-operator](https://github.com/openshift/sandboxed-containers-operator) repository.
+
+Note: the step-registry OWNERS (`ci-operator/step-registry/sandboxed-containers-operator/OWNERS`) is maintained separately and may contain additional users (e.g. CI infrastructure contributors) who are not in the upstream repo's OWNERS.
