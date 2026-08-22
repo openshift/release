@@ -1,0 +1,70 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+build_root:
+  from_repository: true
+releases:
+  initial:
+    integration:
+      name: "5.1"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: periodic-tls-scanner-aws-ebs
+  cron: 0 6 1,15 * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-aws-csi
+- as: periodic-tls-scanner-gcp-pd
+  cron: 0 6 1,15 * *
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-gcp-csi
+- as: periodic-tls-scanner-azure
+  cron: 0 6 1,15 * *
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-azure-csi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: csi-operator
+  variant: periodics
