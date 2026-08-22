@@ -2,50 +2,111 @@
 
 set -o errexit
 set -o pipefail
+set -o nounset
+
+# --- FIX SSH HOME ---
+export HOME="${HOME:-/tmp}"
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
 
 cd /tmp
 
 # --- SETUP AND VARIABLES ---
-SECRET_DIR="/tmp/vault/ibmz-ci-creds"
+SECRET_DIR="/tmp/vault/ibmz-ci-creds/ssh-creds-dt"
 PRIVATE_KEY_FILE="${SECRET_DIR}/IPI_SSH_KEY"
-IP_JUMPHOST=128.168.131.205
+IP_JUMPHOST="128.168.131.115"
+SSH_USER="${SSH_USER:-root}"
 CLUSTER_VARS_PATH="/root/ocp-cluster-ibmcloud/ibmcloud-openshift-provisioning/cluster-vars"
-SSH_KEY_PATH="/tmp/id_rsa"
+SSH_KEY_PATH="/tmp/id_ed25519"
 
-# --- VERIFY KEY ---
-# Check if the private key file exists
+# Required environment variables
+: "${CLUSTER_VERSION:?CLUSTER_VERSION must be set}"
+: "${CLUSTER_NAME:?CLUSTER_NAME must be set}"
+: "${PULL_SECRET_FILE:?PULL_SECRET_FILE must be set}"
+
+# --- VERIFY KEY SOURCE ---
 if [[ ! -f "$PRIVATE_KEY_FILE" ]]; then
     echo "Error: Private key file not found at $PRIVATE_KEY_FILE" >&2
     exit 1
 fi
 
+if [[ ! -r "$PRIVATE_KEY_FILE" ]]; then
+    echo "Error: Private key file is not readable: $PRIVATE_KEY_FILE" >&2
+    exit 1
+fi
+
 # --- PREPARE SSH KEY ---
+echo "Preparing SSH key..."
+
 cp -f "$PRIVATE_KEY_FILE" "$SSH_KEY_PATH"
-chmod 400 "$SSH_KEY_PATH"
+chmod 600 "$SSH_KEY_PATH"
+
+# ensure key file exists and is non-empty
+if [[ ! -s "$SSH_KEY_PATH" ]]; then
+    echo "Error: SSH key was not created at $SSH_KEY_PATH" >&2
+    exit 1
+fi
+
+# --- VERIFY KEY TYPE ---
+echo "Verifying SSH key..."
+if command -v ssh-keygen >/dev/null 2>&1; then
+    ssh-keygen -lf "$SSH_KEY_PATH" || {
+        echo "Invalid SSH key format in $SSH_KEY_PATH" >&2
+        exit 1
+    }
+else
+    echo "ssh-keygen not available, skipping verification"
+fi
+
+# --- DEBUG INFO ---
+echo "SSH key file info:"
+ls -l "$SSH_KEY_PATH" || true
 
 # --- SSH CONFIGURATION ---
-# StrictHostKeyChecking=no and UserKnownHostsFile=/dev/null are used
-# to avoid interactive prompts in the CI environment.
-SSH_ARGS=" -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
+SSH_ARGS=(
+  -i "$SSH_KEY_PATH"
+  -o IdentitiesOnly=yes
+  -o IdentityAgent=none           # NEW: Disable SSH agent
+  -o PubkeyAcceptedKeyTypes=+ssh-ed25519  # NEW: Explicitly allow ED25519
+  -o BatchMode=yes
+  -o StrictHostKeyChecking=no
+  -o UserKnownHostsFile=/dev/null
+  -o ConnectTimeout=10
+  -o LogLevel=ERROR
+)
 
 # --- REMOTE COMMAND ---
-# Note: The variables CLUSTER_VERSION, CLUSTER_NAME, and PULL_SECRET_FILE
-# must be set in the environment for this to work.
 SSH_CMD=$(cat <<EOF
 set -e
-# Append values directly to cluster-vars
-{
-  echo "CLUSTER_VERSION='${CLUSTER_VERSION}'"
-  echo "CLUSTER_NAME='${CLUSTER_NAME}'"
-  echo "PULL_SECRET_FILE='${PULL_SECRET_FILE}'"
-} >> "$CLUSTER_VARS_PATH"
+mkdir -p "$(dirname "${CLUSTER_VARS_PATH}")"
+
+cat > "${CLUSTER_VARS_PATH}" <<EOV
+CLUSTER_VERSION='${CLUSTER_VERSION}'
+CLUSTER_NAME='${CLUSTER_NAME}'
+PULL_SECRET_FILE='${PULL_SECRET_FILE}'
+EOV
 
 cd /root/ocp-cluster-ibmcloud/ibmcloud-openshift-provisioning
 ./create-cluster.sh
 EOF
 )
 
+# --- VERIFY SSH CLIENT ---
+if ! command -v ssh >/dev/null 2>&1; then
+    echo "Error: ssh client is not installed" >&2
+    exit 1
+fi
+
 # --- EXECUTE SSH COMMAND ---
-ssh $SSH_ARGS root@$IP_JUMPHOST "$SSH_CMD"
+echo "Connecting to ${SSH_USER}@${IP_JUMPHOST} and starting cluster creation..."
+
+if ! ssh "${SSH_ARGS[@]}" "${SSH_USER}@${IP_JUMPHOST}" "$SSH_CMD"; then
+    echo "SSH failed, retrying with verbose output for debugging..." >&2
+
+    ssh -vvv "${SSH_ARGS[@]}" "${SSH_USER}@${IP_JUMPHOST}" "$SSH_CMD" || {
+        echo "SSH failed after verbose attempt" >&2
+        exit 1
+    }
+fi
 
 echo "Cluster creation initiated successfully."
