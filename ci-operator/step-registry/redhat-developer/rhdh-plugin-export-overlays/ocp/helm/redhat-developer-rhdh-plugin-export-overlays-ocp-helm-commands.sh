@@ -10,15 +10,16 @@ set -euo pipefail
 #
 # Job flows:
 #
-#   Scenario                                | JOB_TYPE  | JOB_NAME         | Mode     | GIT_PR_NUMBER | Code tested | OCI images | Tests
-#   ----------------------------------------|-----------|------------------|----------|---------------|-------------|------------|------
-#   Overlay PR (pr-check)                   | presubmit | pull-ci-*        | pr-check | PR number     | PR branch   | PR-built   | changed workspace
-#   Overlay PR (nightly)                    | presubmit | pull-ci-*nightly | nightly  | not exported  | PR branch   | released   | all workspaces
-#   Rehearse pr-check                       | presubmit | rehearse-*       | pr-check | empty         | main        | —          | skips (no changes)
-#   Rehearse pr-check + REHEARSE_PR_NUMBER  | presubmit | rehearse-*       | pr-check | REHEARSE_PR   | PR branch   | PR-built   | changed workspace
-#   Rehearse nightly                        | presubmit | rehearse-*night  | nightly  | not exported  | main        | released   | all workspaces
-#   Rehearse nightly  + REHEARSE_PR_NUMBER  | presubmit | rehearse-*night  | nightly  | not exported  | PR branch   | released   | all workspaces
-#   Periodic cron                           | periodic  | periodic-*       | nightly  | not exported  | main        | released   | all workspaces
+#   Scenario                                | JOB_TYPE  | JOB_NAME            | Mode       | GIT_PR_NUMBER | Code tested | OCI images | Tests
+#   ----------------------------------------|-----------|---------------------|------------|---------------|-------------|------------|------
+#   Overlay PR (pr-check)                   | presubmit | pull-ci-*           | pr-check   | PR number     | PR branch   | PR-built   | changed workspace
+#   Overlay PR (nightly-pr)                 | presubmit | pull-ci-*nightly-pr | nightly-pr | not exported  | PR branch   | released   | changed workspace
+#   Overlay PR (nightly)                    | presubmit | pull-ci-*nightly    | nightly    | not exported  | PR branch   | released   | all workspaces
+#   Rehearse pr-check                       | presubmit | rehearse-*          | pr-check   | empty         | main        | —          | skips (no changes)
+#   Rehearse pr-check + REHEARSE_PR_NUMBER  | presubmit | rehearse-*          | pr-check   | REHEARSE_PR   | PR branch   | PR-built   | changed workspace
+#   Rehearse nightly                        | presubmit | rehearse-*night     | nightly    | not exported  | main        | released   | all workspaces
+#   Rehearse nightly  + REHEARSE_PR_NUMBER  | presubmit | rehearse-*night     | nightly    | not exported  | PR branch   | released   | all workspaces
+#   Periodic cron                           | periodic  | periodic-*          | nightly    | not exported  | main        | released   | all workspaces
 #
 # =============================================================================
 
@@ -27,7 +28,7 @@ set -euo pipefail
 GITHUB_ORG_NAME="redhat-developer"
 GITHUB_REPOSITORY_NAME="rhdh-plugin-export-overlays"
 OVERLAY_BRANCH=""
-REHEARSE_PR_NUMBER=""  # Set overlay repo PR number for rehearse testing
+REHEARSE_PR_NUMBER="3109"  # Set overlay repo PR number for rehearse testing
 CATALOG_INDEX_IMAGE=""
 PLAYWRIGHT_VERSION=""
 
@@ -78,7 +79,9 @@ done
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 
 # Determine job mode
-if [[ "$JOB_TYPE" == "periodic" ]] || [[ "$JOB_NAME" == *nightly* ]]; then
+if [[ "$JOB_NAME" == *-nightly-pr ]]; then
+    JOB_MODE="nightly-pr"
+elif [[ "$JOB_TYPE" == "periodic" ]] || [[ "$JOB_NAME" == *nightly* ]]; then
     JOB_MODE="nightly"
 else
     JOB_MODE="pr-check"
@@ -264,7 +267,11 @@ if [[ "$JOB_MODE" == "nightly" ]]; then
     exit $TEST_EXIT_CODE
 fi
 
-# ── PR check ─────────────────────────────────────────────────────────────────
+if [[ "$JOB_MODE" == "nightly-pr" ]]; then
+    export E2E_NIGHTLY_MODE="true"
+fi
+
+# ── PR check / nightly-pr ───────────────────────────────────────────────
 
 PR_CHANGESET=$(git diff --name-only "$RELEASE_BRANCH_NAME")
 echo "Changeset: ${PR_CHANGESET}"
@@ -280,19 +287,25 @@ echo "Changed workspaces: ${CHANGED_WORKSPACES:-none} (count: ${WORKSPACE_COUNT}
 if [ "$WORKSPACE_COUNT" -eq 0 ]; then
     echo "No workspace changes detected. Skipping tests."
     exit 0
-elif [ "$WORKSPACE_COUNT" -gt 1 ]; then
+elif [ "$WORKSPACE_COUNT" -gt 1 ] && [[ "$JOB_MODE" == "pr-check" ]]; then
     echo "ERROR: Multiple workspaces changed: ${CHANGED_WORKSPACES}"
     exit 1
 fi
 
-if [[ ! -f "workspaces/${CHANGED_WORKSPACES}/e2e-tests/package.json" ]]; then
-    echo "Workspace '${CHANGED_WORKSPACES}' has no e2e-tests. Skipping."
+# Filter to workspaces with e2e-tests, build -w flags
+RUN_E2E_ARGS=()
+for ws in $CHANGED_WORKSPACES; do
+    [[ -f "workspaces/${ws}/e2e-tests/package.json" ]] && RUN_E2E_ARGS+=("-w" "$ws")
+done
+
+if [ ${#RUN_E2E_ARGS[@]} -eq 0 ]; then
+    echo "No changed workspaces have e2e-tests. Skipping."
     exit 0
 fi
 
-echo "Running tests for workspace: ${CHANGED_WORKSPACES}"
-bash ./run-e2e.sh -w "${CHANGED_WORKSPACES}" || TEST_EXIT_CODE=$?
+echo "Running tests for: ${RUN_E2E_ARGS[*]}"
+bash ./run-e2e.sh "${RUN_E2E_ARGS[@]}" || TEST_EXIT_CODE=$?
 collect_artifacts
-post_github_comment "E2E Tests - \`${CHANGED_WORKSPACES}\`" || echo "WARNING: Failed to post GitHub comment"
+post_github_comment "E2E Tests (${RUN_E2E_ARGS[*]})" || echo "WARNING: Failed to post GitHub comment"
 
 exit $TEST_EXIT_CODE
