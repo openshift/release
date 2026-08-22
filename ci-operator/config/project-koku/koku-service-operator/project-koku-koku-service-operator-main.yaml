@@ -1,8 +1,32 @@
+base_images:
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.26-openshift-4.23
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: koku-service-operator
+operator:
+  bundles:
+  - as: koku-service-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  substitutions:
+  - pullspec: quay.io/project-koku/koku-service-operator:v0.0.1
+    with: pipeline:koku-service-operator
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -15,6 +39,47 @@ tests:
   commands: GOFLAGS=-mod=mod go build -o /dev/null ./cmd/main.go
   container:
     from: src
+- always_run: false
+  as: e2e-olm
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  optional: true
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NS=koku-service-operator-system
+        oc create namespace "${NS}" --dry-run=client -o yaml | oc apply -f -
+        operator-sdk run bundle "${OO_BUNDLE}" \
+          --namespace "${NS}" \
+          --install-mode AllNamespaces \
+          --timeout 10m \
+          --security-context-config restricted
+        oc wait csv/koku-service-operator.v0.0.1 -n "${NS}" \
+          --for=jsonpath='{.status.phase}'=Succeeded --timeout=10m
+        oc wait deployment/koku-service-operator-controller-manager -n "${NS}" \
+          --for=condition=Available --timeout=5m
+        cat > "${ARTIFACT_DIR}/junit_olm-install.xml" <<'EOF'
+        <testsuite name="olm-install" tests="1" failures="0">
+          <testcase classname="olm" name="csv-succeeded-controller-available"/>
+        </testsuite>
+        EOF
+      dependencies:
+      - env: OO_BUNDLE
+        name: koku-service-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: project-koku
