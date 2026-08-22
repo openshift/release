@@ -48,9 +48,19 @@ main() {
 
     if [[ "${GENERATE_HUB_LOCKDOWN:-false}" == "true" ]]; then
         echo "Hub lockdown generation enabled"
+        local timestamp
+        timestamp=$(date -u +%Y%m%d_%H%M%S)
+        local lockdown_filename="lockdown-hub-temp-${timestamp}-${BUILD_ID:-0}-prow.json"
+        # hub_lockdown_output_file must be a path valid on the bastion (tasks run via SSH
+        # there). /tmp avoids any container-path or ARTIFACT_DIR availability issues.
         extra_vars+=(-e "generate_hub_lockdown=true")
         extra_vars+=(-e "hub_cluster=${HUB_CLUSTER}")
-        extra_vars+=(-e "architecture=${ARCHITECTURE:-x86_64}")
+        extra_vars+=(-e "hub_lockdown_output_file=/tmp/${lockdown_filename}")
+        # In lockdown-validation mode (HUB_LOCKDOWN_URI set) architecture is extracted
+        # from the lockdown JSON — do not override it here.
+        if [[ -z "${HUB_LOCKDOWN_URI:-}" ]]; then
+            extra_vars+=(-e "architecture=${ARCHITECTURE:-x86_64}")
+        fi
     fi
 
     ansible-playbook ./playbooks/telco-kpis/deploy-ocp-operators.yml \
