@@ -30,15 +30,20 @@ else
 fi
 
 # Get the kubeconfig of the management cluster who manages the hosted cluster
-echo "Get the kubeconfig of the manangement cluster ..."
+echo "Get the kubeconfig of the management cluster ..."
 HOSTED_CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-MC_NAME=$(ocm get /api/clusters_mgmt/v1/clusters/${HOSTED_CLUSTER_ID}/provision_shard | jq -r .management_cluster)
-MC_CLUSTER_ID=$(ocm get /api/clusters_mgmt/v1/clusters --parameter search="name is '${MC_NAME}'" | jq -r .items[0].id)
-echo "${MC_NAME}" > "${SHARED_DIR}/mc-cluster-name"
-if [[ -z "$MC_CLUSTER_ID" ]]; then
-  echo "Failed to get the cluster id of the manangement cluster!"
+MC_NAME=$(ocm get "/api/clusters_mgmt/v1/clusters/${HOSTED_CLUSTER_ID}/provision_shard" | jq -r .management_cluster)
+if [[ -z "$MC_NAME" || "$MC_NAME" == "null" ]]; then
+  echo "Failed to get the name of the management cluster!"
   exit 1
 fi
+MC_CLUSTER_ID=$(ocm get /api/clusters_mgmt/v1/clusters --parameter search="name is '${MC_NAME}'" | jq -r .items[0].id)
+echo "${MC_NAME}" > "${SHARED_DIR}/mc-cluster-name"
+if [[ -z "$MC_CLUSTER_ID" || "$MC_CLUSTER_ID" == "null" ]]; then
+  echo "Failed to get the cluster id of the management cluster!"
+  exit 1
+fi
+echo "${MC_CLUSTER_ID}" > "${SHARED_DIR}/mc-cluster-id"
 
 MC_KUBECONFIG_FILE="${SHARED_DIR}/hs-mc.kubeconfig"
 ocm get "/api/clusters_mgmt/v1/clusters/${MC_CLUSTER_ID}/credentials" | jq -r .kubeconfig > "${MC_KUBECONFIG_FILE}"
