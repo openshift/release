@@ -25,12 +25,17 @@ aws s3 cp --recursive \
 	s3://"${HIVE_LOGS_BUCKET}"/"${CLUSTER_NAME}"-uhc-staging-"${CLUSTER_ID}" \
 	"${ARTIFACT_DIR}"/
 
-# save csv list of operator images
-oc get csv -A -o json | jq -r '
+# save csv list of operator images (best-effort — cluster may not be accessible on stalled installs)
+if oc get csv -A -o json 2>/dev/null | jq -r '
 	.items[] |
 	select(.spec.install.spec.deployments != null) |
 	"\(.metadata.name): " + (
 		.spec.install.spec.deployments[] |
 		.spec.template.spec.containers[] |
 		.name
-	)' | sort | uniq > "${ARTIFACT_DIR}"/operator-shas.txt
+	)' | sort | uniq > "${ARTIFACT_DIR}"/operator-shas.txt 2>/dev/null; then
+  echo "INFO: Successfully gathered operator CSV data"
+else
+  echo "WARN: Failed to gather operator CSV data (cluster may not be accessible)"
+  rm -f "${ARTIFACT_DIR}"/operator-shas.txt
+fi
