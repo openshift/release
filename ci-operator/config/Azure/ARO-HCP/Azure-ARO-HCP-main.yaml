@@ -254,6 +254,15 @@ tests:
     test:
     - ref: aro-hcp-api-validation
 - always_run: true
+  as: component-health
+  commands: |
+    cd /go/src/github.com/Azure/ARO-HCP
+    go build -mod=mod -o /tmp/hcpctl ./tooling/hcpctl/
+    /tmp/hcpctl ci component-health --base-ref=${PULL_BASE_SHA}
+  container:
+    from: src
+  optional: true
+- always_run: true
   as: integration
   capabilities:
   - nested-podman
