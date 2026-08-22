@@ -1,6 +1,5 @@
 #!/bin/bash
-set -euo pipefail
-shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
 # ODF Health Check (7-point gate)
@@ -105,7 +104,7 @@ function CheckOdfCsv () {
     typeset csvPhase=""
     if ! csvPhase="$(oc get csv -n "${ODF_NAMESPACE}" -o json | python3 -c "
 import sys,json,re; d=json.load(sys.stdin)
-m=[i for i in d.get('items',[]) if re.match(r'^(odf-|ocs-)operator',i['metadata']['name'])]
+m=[i for i in d.get('items',[]) if re.match(r'^(odf-operator|ocs-operator)',i['metadata']['name'])]
 print((m[0].get('status',{}).get('phase','NotFound')) if m else 'NotFound')
 ")"; then
         AddResult "odf-csv-phase" "fail" "Failed to query ODF CSVs in ${ODF_NAMESPACE}"
@@ -485,6 +484,32 @@ print(d['items'][0].get('status',{}).get('ceph',{}).get('health','unknown') if d
 # Main
 # ---------------------------------------------------------------------------
 
+function CheckOdfInstalled () {
+    if ! oc get namespace "${ODF_NAMESPACE}" &>/dev/null; then
+        return 1
+    fi
+    typeset csvJson=""
+    typeset -i ocExit=0
+    csvJson="$(oc get csv -n "${ODF_NAMESPACE}" -o json 2>/dev/null)" || ocExit=$?
+    if (( ocExit != 0 )); then
+        printf '%s\n' "Error: oc get csv failed (exit ${ocExit}) in ${ODF_NAMESPACE}" >&2
+        return 2
+    fi
+    if [[ -z "${csvJson}" ]]; then
+        printf '%s\n' "Error: oc get csv returned empty output in ${ODF_NAMESPACE}" >&2
+        return 2
+    fi
+    typeset csvCount=""
+    if ! csvCount="$(printf '%s' "${csvJson}" | python3 -c "
+import sys,json,re; d=json.load(sys.stdin)
+print(len([i for i in d.get('items',[]) if re.match(r'^(odf-operator|ocs-operator)',i['metadata']['name'])]))
+")"; then
+        printf '%s\n' "Error: failed to parse CSV JSON from ${ODF_NAMESPACE}" >&2
+        return 2
+    fi
+    [[ "${csvCount}" -gt 0 ]]
+}
+
 function Main () {
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -493,6 +518,26 @@ function Main () {
     : "ODF Health Check (7-point gate) starting"
     : "Namespace: ${ODF_NAMESPACE}"
     : "Artifacts dir: ${ARTIFACT_DIR}"
+
+    typeset -i odfProbeResult=0
+    CheckOdfInstalled || odfProbeResult=$?
+    if (( odfProbeResult == 2 )); then
+        : "ODF Health Check: PROBE ERROR (cannot determine ODF state)"
+        exit 1
+    fi
+    if (( odfProbeResult == 1 )); then
+        typeset skipMsg="ODF is not installed (no ODF/OCS CSV in ${ODF_NAMESPACE})"
+        typeset -a checkNames=("odf-csv-phase" "storagecluster-ready" "cephcluster-health"
+            "storageclasses-available" "pvc-provision-rbd" "pvc-provision-cephfs"
+            "noobaa-s3-functional" "ceph-health-detail")
+        typeset name=""
+        for name in "${checkNames[@]}"; do
+            AddResult "${name}" "skip" "${skipMsg}"
+        done
+        WriteJunit
+        : "ODF Health Check: ALL SKIPPED (ODF not installed)"
+        exit 0
+    fi
 
     CheckOdfCsv          || true
     CheckStorageCluster  || true
