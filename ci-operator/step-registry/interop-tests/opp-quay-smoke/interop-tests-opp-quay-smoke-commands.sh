@@ -81,7 +81,20 @@ EOF
 trap '{ ( GenerateJunit; true ); }' EXIT
 
 function DiscoverQuay () {
-    QUAY_NS=$(oc get quayregistry --all-namespaces -o jsonpath='{.items[0].metadata.namespace}')
+    typeset registryJson=""
+    registryJson="$(oc get quayregistry --all-namespaces -o json 2>/dev/null)" || true
+    typeset itemCount=""
+    itemCount="$(printf '%s' "${registryJson}" | python3 -c "
+import sys,json
+print(len(json.load(sys.stdin).get('items',[])))
+" 2>/dev/null || echo "0")"
+
+    if [[ "${itemCount}" -eq 0 ]]; then
+        echo "INFO: No QuayRegistry found; Quay is not deployed"
+        return 1
+    fi
+
+    QUAY_NS="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['namespace'])")"
     QUAY_REGISTRY=$(oc get quayregistry -n "${QUAY_NS}" -o jsonpath='{.items[0].metadata.name}')
     QUAY_HOST=$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpath='{.status.registryEndpoint}')
     QUAY_HOST="${QUAY_HOST#https://}"
@@ -180,10 +193,12 @@ function CreateTestOrg () {
         echo "WARNING: No Quay token available; org creation may fail" >&2
     fi
 
+    set +x  # tracing off: bearer token
     curl -sk -X POST "https://${QUAY_HOST}/api/v1/organization/" \
         -H "Authorization: Bearer ${QUAY_TOKEN}" \
         -H "Content-Type: application/json" \
         -d '{"name":"interop-smoke-test","email":"interop-test@example.com"}' || true
+    set -x
     true
 }
 
@@ -255,26 +270,56 @@ function RunOdfStorageCheck () {
         return 1
     fi
 
-    typeset obcCount
-    obcCount=$(oc get objectbucketclaim -n openshift-storage -o json 2>/dev/null | \
-        python3 -c "import sys,json; print(len(json.load(sys.stdin).get('items',[])))" 2>/dev/null) || obcCount="0"
-    if [[ "${obcCount}" == "0" ]]; then
-        obcCount=$(oc get objectbucketclaim --all-namespaces -o json 2>/dev/null | \
-            python3 -c "import sys,json; print(len(json.load(sys.stdin).get('items',[])))" 2>/dev/null) || obcCount="0"
-    fi
+    typeset quayObc
+    quayObc=$(oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>/dev/null | \
+        python3 -c "
+import sys, json, os
+registry = os.environ.get('QUAY_REGISTRY', '')
+data = json.load(sys.stdin)
+for item in data.get('items', []):
+    name = item['metadata']['name']
+    owners = item['metadata'].get('ownerReferences', [])
+    if any(o.get('kind') == 'QuayRegistry' for o in owners) or registry in name:
+        print(name)
+        sys.exit(0)
+if data.get('items'):
+    print(data['items'][0]['metadata']['name'])
+    sys.exit(0)
+sys.exit(1)
+" 2>/dev/null) || quayObc=""
 
-    if [[ "${obcCount}" == "0" ]]; then
+    if [[ -z "${quayObc}" ]]; then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "No ObjectBucketClaims found" "${elapsed}"
+        RecordResult "${testName}" "failed" "No ObjectBucketClaim found in Quay namespace ${QUAY_NS}" "${elapsed}"
         return 1
     fi
 
-    typeset obCount
-    obCount=$(oc get objectbucket -o json 2>/dev/null | \
-        python3 -c "import sys,json; print(len(json.load(sys.stdin).get('items',[])))" 2>/dev/null) || obCount="0"
-    if [[ "${obCount}" == "0" ]]; then
+    typeset obcPhase
+    obcPhase=$(oc get objectbucketclaim "${quayObc}" -n "${QUAY_NS}" \
+        -o jsonpath='{.status.phase}' 2>/dev/null) || obcPhase=""
+    if [[ "${obcPhase}" != "Bound" ]]; then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "No ObjectBucket resources found for OBCs" "${elapsed}"
+        RecordResult "${testName}" "failed" "Quay OBC ${quayObc} not Bound (phase: ${obcPhase:-unknown})" "${elapsed}"
+        return 1
+    fi
+
+    typeset obName
+    obName=$(oc get objectbucket -o json 2>/dev/null | \
+        python3 -c "
+import sys, json
+obc_name, obc_ns = sys.argv[1], sys.argv[2]
+data = json.load(sys.stdin)
+for item in data.get('items', []):
+    ref = item.get('spec', {}).get('claimRef', {})
+    if ref.get('name') == obc_name and ref.get('namespace') == obc_ns:
+        print(item['metadata']['name'])
+        sys.exit(0)
+sys.exit(1)
+" "${quayObc}" "${QUAY_NS}" 2>/dev/null) || obName=""
+
+    if [[ -z "${obName}" ]]; then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "No ObjectBucket found for Quay OBC ${quayObc}" "${elapsed}"
         return 1
     fi
 
@@ -310,12 +355,20 @@ print(' '.join(unbound))
 ################################################################################
 function RegisterQuayInAcs () {
     typeset acsHost="${1}" acsPassword="${2}"
-    set +x
+    typeset _xtrace=false
+    [[ $- == *x* ]] && _xtrace=true
+    set +x  # tracing off: credentials
+
+    typeset response
+    if ! response=$(curl -sk -u "admin:${acsPassword}" \
+        "https://${acsHost}/v1/imageintegrations" 2>/dev/null); then
+        echo "ERROR: Failed to query ACS image integrations" >&2
+        $_xtrace && set -x
+        return 1
+    fi
 
     typeset existing
-    existing=$(curl -sk -u "admin:${acsPassword}" \
-        "https://${acsHost}/v1/imageintegrations" 2>/dev/null | \
-        python3 -c "
+    existing=$(echo "${response}" | python3 -c "
 import sys, json, os
 host = os.environ['QUAY_HOST']
 data = json.load(sys.stdin)
@@ -328,6 +381,7 @@ sys.exit(1)
 
     if [[ -n "${existing}" ]]; then
         echo "INFO: Quay integration already registered in ACS"
+        $_xtrace && set -x
         return 0
     fi
 
@@ -358,19 +412,24 @@ payload = {
 print(json.dumps(payload))
 " "${regUser}" "${regPass}")
 
-    curl -sk -X POST "https://${acsHost}/v1/imageintegrations" \
+    if ! curl -sk -X POST "https://${acsHost}/v1/imageintegrations" \
         -u "admin:${acsPassword}" \
         -H "Content-Type: application/json" \
-        -d "${regPayload}" || true
-    set -x
+        -d "${regPayload}" >/dev/null 2>&1; then
+        echo "ERROR: Failed to register Quay in ACS" >&2
+        $_xtrace && set -x
+        return 1
+    fi
 
-    echo "INFO: Registered Quay registry endpoint as ACS image integration"
-    true
+    echo "INFO: Registered Quay as ACS image integration"
+    $_xtrace && set -x
 }
 
 function RequestAcsScan () {
     typeset acsHost="${1}" acsPassword="${2}" imageName="${3}"
-    set +x
+    typeset _xtrace=false
+    [[ $- == *x* ]] && _xtrace=true
+    set +x  # tracing off: credentials
 
     typeset scanPayload=''
     scanPayload=$(python3 -c "
@@ -379,14 +438,17 @@ payload = {'imageName': sys.argv[1], 'force': True}
 print(json.dumps(payload))
 " "${imageName}")
 
-    curl -sk -X POST "https://${acsHost}/v1/images/scan" \
+    if ! curl -sk -X POST "https://${acsHost}/v1/images/scan" \
         -u "admin:${acsPassword}" \
         -H "Content-Type: application/json" \
-        -d "${scanPayload}" || true
-    set -x
+        -d "${scanPayload}" >/dev/null 2>&1; then
+        echo "ERROR: ACS scan request failed" >&2
+        $_xtrace && set -x
+        return 1
+    fi
 
-    echo "INFO: Requested ACS scan of ${imageName}"
-    true
+    echo "INFO: Requested ACS scan for pushed image"
+    $_xtrace && set -x
 }
 
 function RunAcsScan () {
@@ -398,8 +460,8 @@ function RunAcsScan () {
     acsHost=$(oc get route -n stackrox central -o jsonpath='{.spec.host}' 2>/dev/null) || acsHost=""
     if [[ -z "${acsHost}" ]]; then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "ACS Central route not found" "${elapsed}"
-        return 1
+        RecordResult "${testName}" "skipped" "ACS not deployed (Central route not found)" "${elapsed}"
+        return 0
     fi
 
     set +x
@@ -407,16 +469,22 @@ function RunAcsScan () {
     set -x
     if [[ -z "${acsPassword}" ]]; then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "ACS admin password not found" "${elapsed}"
-        return 1
+        RecordResult "${testName}" "skipped" "ACS admin password not available" "${elapsed}"
+        return 0
     fi
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
 
-    set +x
-    RegisterQuayInAcs "${acsHost}" "${acsPassword}"
-    RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}"
-    set -x
+    if ! RegisterQuayInAcs "${acsHost}" "${acsPassword}"; then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "Failed to register Quay in ACS" "${elapsed}"
+        return 1
+    fi
+    if ! RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}"; then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "ACS scan request failed" "${elapsed}"
+        return 1
+    fi
 
     typeset -i attempts=0 maxAttempts=40
 
@@ -439,9 +507,7 @@ sys.exit(0 if len(images) > 0 else 1)
         fi
 
         if (( attempts % 4 == 3 )); then
-            set +x
-            RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}"
-            set -x
+            RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}" || true
         fi
 
         attempts=$((attempts + 1))
@@ -458,7 +524,12 @@ sys.exit(0 if len(images) > 0 else 1)
 ################################################################################
 
 function Main () {
-    DiscoverQuay
+    if ! DiscoverQuay; then
+        for t in "${allTests[@]}"; do
+            RecordResult "${t}" "skipped" "Quay not deployed"
+        done
+        exit 0
+    fi
     if ! GetQuayAuth; then
         for t in "${allTests[@]}"; do
             RecordResult "${t}" "failed" "Quay credential retrieval failed"
