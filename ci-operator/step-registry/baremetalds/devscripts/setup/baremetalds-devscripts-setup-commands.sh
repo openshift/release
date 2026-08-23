@@ -187,7 +187,7 @@ fi
 # We always want to collect an installer log bundle for bootstrap,
 # even on success
 cat - <<EOF >> "${SHARED_DIR}/dev-scripts-additional-config"
-export OPENSHIFT_INSTALL_GATHER_BOOTSTRAP=true
+export OPENSHIFT_INSTALL_GATHER_BOOTSTRAP=${OPENSHIFT_INSTALL_GATHER_BOOTSTRAP:-true}
 export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}
 EOF
 
