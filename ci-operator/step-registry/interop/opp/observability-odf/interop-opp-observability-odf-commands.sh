@@ -532,8 +532,7 @@ print(items[0]['metadata']['name'] if items else '')
         typeset queryResult=""
         if [[ -n "${queryFrontendPod}" ]]; then
             queryResult="$(oc exec -n "${OBS_NAMESPACE}" "${queryFrontendPod}" \
-                -- curl -sk
-                "http://localhost:9090/api/v1/query?query=up")" || true
+                -- curl -sk "http://localhost:9090/api/v1/query?query=up")" || true
         fi
 
         if [[ -z "${queryResult}" ]]; then
@@ -546,8 +545,7 @@ print(items[0]['metadata']['name'] if items else '')
             fi
             if [[ -n "${queryPod}" ]]; then
                 queryResult="$(oc exec -n "${OBS_NAMESPACE}" "${queryPod}" \
-                    -- curl -sk
-                    "http://localhost:9090/api/v1/query?query=up")" || true
+                    -- curl -sk "http://localhost:9090/api/v1/query?query=up")" || true
             fi
         fi
 
