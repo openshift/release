@@ -8,12 +8,22 @@ images:
   - dockerfile_literal: |
       FROM src
       RUN dnf module enable -y nodejs:22 && \
-          dnf install -y nodejs npm \
+          dnf install -y nodejs npm skopeo \
           alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
           libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
           libxkbcommon libXfixes libXcursor libXext libXi libXtst \
           libwayland-client && \
           dnf clean all
+      # Registry CLIs used by the @container-tagged e2e tests to push/pull real
+      # images. The suite deliberately avoids podman/docker (OCP CI pods block
+      # user namespaces) and drives skopeo/crane/oras/regctl directly; without
+      # them every @container test auto-skips (utils/container.ts).
+      RUN curl -fsSL "https://github.com/google/go-containerregistry/releases/download/v0.20.2/go-containerregistry_Linux_x86_64.tar.gz" \
+            | tar -xzf - -C /usr/local/bin crane && \
+          curl -fsSL "https://github.com/oras-project/oras/releases/download/v1.2.0/oras_1.2.0_linux_amd64.tar.gz" \
+            | tar -xzf - -C /usr/local/bin oras && \
+          curl -fsSL -o /usr/local/bin/regctl "https://github.com/regclient/regclient/releases/download/v0.7.1/regctl-linux-amd64" && \
+          chmod +x /usr/local/bin/crane /usr/local/bin/oras /usr/local/bin/regctl
       WORKDIR /go/src/github.com/quay/quay/web
       RUN npm ci
       ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
@@ -44,12 +54,15 @@ tests:
       COMPUTE_NODE_TYPE: m5.4xlarge
       ENABLE_BUILD_SUPPORT: "true"
       MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-22@sha256:2a17e0af09b8d6242c8fb758da9a7a38829bdda5232a7b9f02f119c842dc2e9f
-      QUAY_BUILDER_IMAGE: registry.redhat.io/quay/quay-builder-rhel8:v3.18.0
+      QUAY_BUILDER_IMAGE: registry.redhat.io/quay/quay-builder-rhel9@sha256:9ced74943d3147fb6eac6df05c50a47553d550586be736068c47767c6f68c777
       QUAY_EXTRA_CONFIG: |
         FEATURE_PROGRAMMATIC_BOOTSTRAP: false
         FEATURE_USER_METADATA: true
         FEATURE_IMMUTABLE_TAGS: true
         FEATURE_SPARSE_INDEX: true
+        FEATURE_QUOTA_NOTIFICATIONS: true
+        FEATURE_EDIT_QUOTA: true
+        FEATURE_CHANGE_TAG_EXPIRATION: true
         FEATURE_MAILING: true
         MAIL_SERVER: mailpit.quay-enterprise.svc.cluster.local
         MAIL_PORT: 1025
