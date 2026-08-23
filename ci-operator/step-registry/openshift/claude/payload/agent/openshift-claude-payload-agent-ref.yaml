@@ -8,6 +8,9 @@ ref:
     name: sa-claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
   - namespace: test-credentials
+    name: sa-codex-openshift-ci
+    mount_path: /var/run/codex-openai-api-key
+  - namespace: test-credentials
     name: trt-alert-slack-webhook-url
     mount_path: /var/run/slack-webhook
   - namespace: test-credentials
@@ -35,6 +38,12 @@ ref:
     default: "claude-opus-4-6"
   - name: CODEX_MODEL
     default: "gpt-5.6-sol"
+  - name: OPENAI_API_KEY_PATH
+    default: "/var/run/codex-openai-api-key/token"
+    documentation: |-
+      Path to the OpenAI API key mounted from the
+      sa-codex-openshift-ci secret. The key is exported as
+      OPENAI_API_KEY only when the Codex harness is selected.
   - name: AGENT_HARNESS
     default: "claude-code"
     documentation: |-
@@ -44,10 +53,9 @@ ref:
     default: ""
     documentation: |-
       Gangway API override for AGENT_HARNESS. Supported values are
-      claude-code and codex. Codex requires CODEX_API_KEY,
-      CODEX_ACCESS_TOKEN, OPENAI_API_KEY, or an existing
-      $CODEX_HOME/auth.json in the execution environment. When triggering
-      via Gangway, this can be combined with model and effort overrides:
+      claude-code and codex. Codex uses the API key mounted from the
+      sa-codex-openshift-ci secret. When triggering via Gangway, this can
+      be combined with model and effort overrides:
       "pod_spec_options": {
         "envs": {
           "MULTISTAGE_PARAM_OVERRIDE_AGENT_HARNESS": "codex",

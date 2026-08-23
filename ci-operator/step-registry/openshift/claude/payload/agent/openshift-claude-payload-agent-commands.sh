@@ -43,6 +43,7 @@ fetch_with_backoff() {
 
 CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 export CLAUDE_CONFIG_DIR
+OPENAI_API_KEY_PATH="${OPENAI_API_KEY_PATH:-/var/run/codex-openai-api-key/token}"
 
 AGENT_HARNESS="${AGENT_HARNESS:-claude-code}"
 AGENT_EFFORT="${AGENT_EFFORT:-}"
@@ -53,6 +54,13 @@ fi
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_AGENT_EFFORT:-}" ]]; then
     echo "Applying Gangway override: AGENT_EFFORT=${MULTISTAGE_PARAM_OVERRIDE_AGENT_EFFORT}"
     AGENT_EFFORT="${MULTISTAGE_PARAM_OVERRIDE_AGENT_EFFORT}"
+fi
+
+if [[ "${AGENT_HARNESS}" == "codex" && -z "${OPENAI_API_KEY:-}" && -r "${OPENAI_API_KEY_PATH}" ]]; then
+    set +x
+    OPENAI_API_KEY=$(<"${OPENAI_API_KEY_PATH}")
+    export OPENAI_API_KEY
+    echo "OpenAI API key loaded."
 fi
 
 case "${AGENT_HARNESS}" in
@@ -86,8 +94,8 @@ case "${AGENT_HARNESS}" in
             echo "ERROR: AGENT_HARNESS=codex requires the codex binary in the payload agent image."
             exit 1
         fi
-        if [[ -z "${CODEX_API_KEY:-}" && -z "${CODEX_ACCESS_TOKEN:-}" && -z "${OPENAI_API_KEY:-}" && ! -f "${CODEX_AUTH_FILE}" ]]; then
-            echo "ERROR: AGENT_HARNESS=codex requires CODEX_API_KEY, CODEX_ACCESS_TOKEN, OPENAI_API_KEY, or ${CODEX_AUTH_FILE}."
+        if [[ -z "${OPENAI_API_KEY:-}" && ! -f "${CODEX_AUTH_FILE}" ]]; then
+            echo "ERROR: AGENT_HARNESS=codex requires OPENAI_API_KEY or ${CODEX_AUTH_FILE}."
             exit 1
         fi
         ;;
@@ -470,7 +478,6 @@ EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 # Keep the established artifact name for downstream consumers; it contains telemetry
 # from whichever harness is selected.
 OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
-ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
 agentic_ci() {
     local agentic_args=()
@@ -487,8 +494,7 @@ agentic_ci() {
     case "${AGENT_HARNESS}" in
         claude-code)
             harness_args=(
-                --permission-mode default
-                --allowedTools "${ALLOWED_TOOLS}"
+                --permission-mode auto
                 --verbose
             )
             if [[ -n "${AGENT_EFFORT}" ]]; then
@@ -497,9 +503,9 @@ agentic_ci() {
             harness_args+=("$@")
             ;;
         codex)
-            # Codex runs are ephemeral, so follow-up invocations start fresh and
-            # inspect artifacts already written to WORKDIR. Translate the one
-            # system-prompt option and discard Claude-only continuation/turn flags.
+            local codex_resume=false
+            # Translate Claude-specific prompt and continuation options to their
+            # Codex equivalents. Codex has no max-turns option.
             while [[ $# -gt 0 ]]; do
                 case "$1" in
                     --append-system-prompt)
@@ -507,6 +513,7 @@ agentic_ci() {
                         shift 2
                         ;;
                     --continue)
+                        codex_resume=true
                         shift
                         ;;
                     --max-turns)
@@ -520,6 +527,10 @@ agentic_ci() {
             done
             if [[ -n "${AGENT_EFFORT}" ]]; then
                 harness_args+=(-c "model_reasoning_effort=${AGENT_EFFORT}")
+            fi
+            # agentic-ci's Codex harness defaults to --approve-for-me.
+            if ${codex_resume}; then
+                harness_args+=(resume --last)
             fi
             ;;
     esac
