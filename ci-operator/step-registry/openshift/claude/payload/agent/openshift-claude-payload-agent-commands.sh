@@ -45,14 +45,42 @@ CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 export CLAUDE_CONFIG_DIR
 
 AGENT_HARNESS="${AGENT_HARNESS:-claude-code}"
+AGENT_EFFORT="${AGENT_EFFORT:-}"
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_AGENT_HARNESS:-}" ]]; then
+    echo "Applying Gangway override: AGENT_HARNESS=${MULTISTAGE_PARAM_OVERRIDE_AGENT_HARNESS}"
+    AGENT_HARNESS="${MULTISTAGE_PARAM_OVERRIDE_AGENT_HARNESS}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_AGENT_EFFORT:-}" ]]; then
+    echo "Applying Gangway override: AGENT_EFFORT=${MULTISTAGE_PARAM_OVERRIDE_AGENT_EFFORT}"
+    AGENT_EFFORT="${MULTISTAGE_PARAM_OVERRIDE_AGENT_EFFORT}"
+fi
+
 case "${AGENT_HARNESS}" in
     claude-code)
         AGENT_DISPLAY_NAME="Claude"
         AGENT_MODEL="${CLAUDE_MODEL}"
+        if [[ -n "${AGENT_EFFORT}" ]]; then
+            case "${AGENT_EFFORT}" in
+                low|medium|high|xhigh|max) ;;
+                *)
+                    echo "ERROR: Unsupported Claude effort ${AGENT_EFFORT}. Expected low, medium, high, xhigh, or max."
+                    exit 1
+                    ;;
+            esac
+        fi
         ;;
     codex)
         AGENT_DISPLAY_NAME="Codex"
         AGENT_MODEL="${CODEX_MODEL:-gpt-5.6-sol}"
+        if [[ -n "${AGENT_EFFORT}" ]]; then
+            case "${AGENT_EFFORT}" in
+                minimal|low|medium|high|xhigh) ;;
+                *)
+                    echo "ERROR: Unsupported Codex effort ${AGENT_EFFORT}. Expected minimal, low, medium, high, or xhigh."
+                    exit 1
+                    ;;
+            esac
+        fi
         CODEX_AUTH_FILE="${CODEX_HOME:-${HOME}/.codex}/auth.json"
         if ! command -v codex >/dev/null 2>&1; then
             echo "ERROR: AGENT_HARNESS=codex requires the codex binary in the payload agent image."
@@ -69,7 +97,12 @@ case "${AGENT_HARNESS}" in
         ;;
 esac
 
-# --- Gangway override ---
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL:-}" ]]; then
+    echo "Applying Gangway override: AGENT_MODEL=${MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL}"
+    AGENT_MODEL="${MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL}"
+fi
+
+# --- Payload selection ---
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG:-}" ]]; then
     echo "Applying Gangway override: PAYLOAD_TAG=${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG}"
     PAYLOAD_TAG="${MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_TAG}"
@@ -95,6 +128,7 @@ fi
 echo "Starting payload agent for payload: ${PAYLOAD_TAG}"
 echo "Harness: ${AGENT_HARNESS}"
 echo "Model: ${AGENT_MODEL}"
+echo "Effort: ${AGENT_EFFORT:-harness default}"
 
 # Load secrets with xtrace disabled to prevent leaking credentials in logs
 set +x
@@ -335,7 +369,7 @@ while true; do
                 SLACK_TEXT=":green-check: *Payload Accepted for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
 
 All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}
-_Harness: ${AGENT_HARNESS} | Model: ${AGENT_MODEL}_"
+_Harness: ${AGENT_HARNESS} | Model: ${AGENT_MODEL} | Effort: ${AGENT_EFFORT:-default}_"
 
                 set +x
                 jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
@@ -456,8 +490,11 @@ agentic_ci() {
                 --permission-mode default
                 --allowedTools "${ALLOWED_TOOLS}"
                 --verbose
-                "$@"
             )
+            if [[ -n "${AGENT_EFFORT}" ]]; then
+                harness_args+=(--effort "${AGENT_EFFORT}")
+            fi
+            harness_args+=("$@")
             ;;
         codex)
             # Codex runs are ephemeral, so follow-up invocations start fresh and
@@ -481,6 +518,9 @@ agentic_ci() {
                         ;;
                 esac
             done
+            if [[ -n "${AGENT_EFFORT}" ]]; then
+                harness_args+=(-c "model_reasoning_effort=${AGENT_EFFORT}")
+            fi
             ;;
     esac
     local cmd=(
@@ -696,7 +736,7 @@ if [[ -n "${SLACK_WEBHOOK}" ]]; then
 ${SUMMARY:-No summary available.}
 
 <${PROW_JOB_URL}|:point_right: View Full Analysis Report>
-_Harness: ${AGENT_HARNESS} | Model: ${AGENT_MODEL}_"
+_Harness: ${AGENT_HARNESS} | Model: ${AGENT_MODEL} | Effort: ${AGENT_EFFORT:-default}_"
 
     set +x
     jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
