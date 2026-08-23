@@ -82,7 +82,7 @@ function WriteJunit () {
     : "JUnit XML written to ${junitFile}"
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329
 function CollectExitArtifacts () {
     : "Collecting ODF diagnostics..."
     oc get csv -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/odf-csvs.yaml" || true
