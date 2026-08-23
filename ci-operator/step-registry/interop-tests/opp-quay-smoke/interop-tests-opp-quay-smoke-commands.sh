@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eux -o pipefail
+set -eu -o pipefail
 shopt -s inherit_errexit
 
 ARTIFACT_DIR="${ARTIFACT_DIR:=/tmp/artifacts}"
@@ -207,9 +207,9 @@ function RunPushPull () {
     typeset registryAuth
     set +x
     if [[ -n "${QUAY_TOKEN}" ]]; then
-        registryAuth=$(echo -n "\$oauthtoken:${QUAY_TOKEN}" | base64)
+        registryAuth=$(echo -n "\$oauthtoken:${QUAY_TOKEN}" | base64 -w0)
     else
-        registryAuth=$(echo -n "${QUAY_USER}:${QUAY_PASSWORD}" | base64)
+        registryAuth=$(echo -n "${QUAY_USER}:${QUAY_PASSWORD}" | base64 -w0)
     fi
 
     cat > "${authFile}" <<EOF
@@ -278,14 +278,21 @@ function RunOdfStorageCheck () {
         return 1
     fi
 
+    typeset pvcJson
+    if ! pvcJson=$(oc get pvc -n "${QUAY_NS}" -o json 2>&1); then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "Failed to list PVCs: ${pvcJson}" "${elapsed}"
+        return 1
+    fi
+
     typeset unboundPvcs
-    unboundPvcs=$(oc get pvc -n "${QUAY_NS}" -o json 2>/dev/null | python3 -c "
+    unboundPvcs=$(printf '%s' "${pvcJson}" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 items = [i for i in data.get('items', []) if 'quay' in i['metadata'].get('name','').lower()]
-unbound = [i['metadata']['name'] for i in items if i['status'].get('phase') != 'Bound']
+unbound = [i['metadata']['name'] for i in items if i.get('status', {}).get('phase') != 'Bound']
 print(' '.join(unbound))
-" 2>/dev/null) || unboundPvcs=""
+") || { elapsed=$(( $(date +%s) - start )); RecordResult "${testName}" "failed" "PVC filter script error"; return 1; }
 
     if [[ -n "${unboundPvcs}" ]]; then
         elapsed=$(( $(date +%s) - start ))
@@ -452,7 +459,12 @@ sys.exit(0 if len(images) > 0 else 1)
 
 function Main () {
     DiscoverQuay
-    GetQuayAuth
+    if ! GetQuayAuth; then
+        for t in "${allTests[@]}"; do
+            RecordResult "${t}" "failed" "Quay credential retrieval failed"
+        done
+        exit 1
+    fi
     PreflightCheck || { echo "FATAL: Quay not reachable; skipping all tests" >&2; exit 1; }
     CreateTestOrg
 
