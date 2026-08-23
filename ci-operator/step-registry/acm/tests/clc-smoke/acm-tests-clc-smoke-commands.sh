@@ -16,6 +16,7 @@ if [[ -f "${awsCredFile}" ]]; then
     typeset awsAccKeyID=
     typeset awsAccKeyToken=
 
+    # tracing off: AWS credentials
     set +x
     awsAccKeyID="$(sed -nE 's/^\s*aws_access_key_id\s*=\s*//p;T;q' "${awsCredFile}")"
     awsAccKeyToken="$(sed -nE 's/^\s*aws_secret_access_key\s*=\s*//p;T;q' "${awsCredFile}")"
@@ -42,6 +43,7 @@ if [[ -f "${awsCredFile}" ]]; then
     unset awsAccKeyID awsAccKeyToken
 fi
 
+# tracing off: kubeadmin password
 set +x
 export CYPRESS_OPTIONS_HUB_PASSWORD=
 CYPRESS_OPTIONS_HUB_PASSWORD="$(cat "${SHARED_DIR}/kubeadmin-password")"

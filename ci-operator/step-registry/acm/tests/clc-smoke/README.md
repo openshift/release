@@ -13,7 +13,7 @@ Smoke-scoped variant of [acm-tests-clc-create](../clc-create/README.md) with a r
 
 The full `acm-tests-clc-create` step already creates only 1 AWS managed cluster (~50 min actual runtime) but carries a 28800s (8h) timeout and suppresses failures with `|| :`. This step:
 - Reduces the timeout to 5400s (90 min), giving ~80% headroom over the observed average.
-- Propagates failures so downstream steps (`acm-fetch-managed-clusters`, `acm-opp-app`) fail fast instead of running against a missing cluster.
+- Runs with `best_effort: true` so independent downstream validations (ODF health, Quay smoke, observability) continue regardless of CLC outcome. The script still exits with the CLC status code for JUnit reporting and failure visibility.
 
 > **IMPORTANT**
 > You must use the [acm-tests-clc-destroy-ref](../clc-destroy/README.md) as a post step when using this step. If you do not and succeed in running this step then you will leave clusters running on the ACM QE team's cloud.
