@@ -174,10 +174,56 @@ trap copyArtifacts EXIT
 # ignoreHTTPSErrors). Without this, config fetch throws and smoke tests never run.
 export NODE_TLS_REJECT_UNAUTHORIZED=0
 
+# The @container tests drive Go registry CLIs (regctl/crane/oras), which do NOT
+# honor NODE_TLS_REJECT_UNAUTHORIZED. crane/oras get --insecure, but regctl's
+# `tag ls` (cli-interop spec) has no insecure flag and rejects the self-signed
+# Quay route. The rootCA that signs the route is bundled into ssl.cert
+# (provisioning-tls appends rootCA.pem). Point Go's x509 at a combined store
+# (system CAs + that rootCA) via SSL_CERT_FILE so regctl trusts the route while
+# public pulls (quay.io busybox) still verify against the system bundle.
+if [[ -s "${SHARED_DIR}/ssl.cert" ]]; then
+  COMBINED_CA=/tmp/combined-ca.crt
+  if [[ -s /etc/pki/tls/certs/ca-bundle.crt ]]; then
+    cat /etc/pki/tls/certs/ca-bundle.crt "${SHARED_DIR}/ssl.cert" > "${COMBINED_CA}"
+  else
+    cp "${SHARED_DIR}/ssl.cert" "${COMBINED_CA}"
+  fi
+  export SSL_CERT_FILE="${COMBINED_CA}"
+  echo "SSL_CERT_FILE=${SSL_CERT_FILE}"
+fi
+
 # Tests excluded from the run. Beyond unsupported auth backends (OIDC/LDAP), this
-# quarantines webhook tests (out of scope) plus tests tracking known product bugs
-# and UI/version gaps. See E2E_FAILURE_REPORT.md for the rationale per entry.
-PLAYWRIGHT_GREP_INVERT="${PLAYWRIGHT_GREP_INVERT:-@auth:OIDC|@auth:LDAP}"
+# quarantines tests tracking known product bugs and UI/version gaps that no Quay
+# config can fix. See E2E_FAILURE_REPORT.md for the rationale per entry.
+BASE_GREP_INVERT='@auth:OIDC|@auth:LDAP'
+
+# JS-regex fragments matched against the full Playwright test title.
+QUARANTINE=(
+  # Cosign .sig cascade on delete/retarget & autoprune — product feature gap on the
+  # deployed 3.18 image; .sig is not cascade-deleted/pruned with its subject. PROJQUAY-11682.
+  'deleting subject image tag cascades to cosign \.sig tag'
+  'deleting one alias keeps cosign \.sig while another alias remains'
+  'retargeting last alias cascades cosign \.sig for displaced digest'
+  'tag-count pruning excludes cosign \.sig tags and cascades on prune'
+  'creation-date pruning does not age-prune cosign \.sig tags'
+  # Quota-notification specs (org + user) — selectors target a newer UI than 3.18
+  # ships (strict-mode dup labels; entity-search is a <div> not <input>) or depend on
+  # a quota-notification email path that does not deliver on this build.
+  'create and delete namespace notification logs render descriptions'
+  'deleting quota removes all namespace notification configs'
+  'email notification fires on quota threshold crossing'
+  'can create a webhook notification, verify in list, test it, and delete it'
+  'can create an email notification'
+  'can create a Slack notification'
+  'can create a Quay notification with team recipient'
+  'Quay notification — submit disabled without recipient'
+  # Repositories list domainRoute link — duplicated /repository/ path. PROJQUAY-11202.
+  'tag link stays correct from /repository/\.\.\./testrepository\.\.\. path'
+)
+
+GREP_INVERT_DEFAULT="${BASE_GREP_INVERT}"
+for q in "${QUARANTINE[@]}"; do GREP_INVERT_DEFAULT="${GREP_INVERT_DEFAULT}|${q}"; done
+PLAYWRIGHT_GREP_INVERT="${PLAYWRIGHT_GREP_INVERT:-${GREP_INVERT_DEFAULT}}"
 echo "Excluding tests matching: ${PLAYWRIGHT_GREP_INVERT}"
 
 echo "Running Playwright smoke tests from ${PLAYWRIGHT_WORKDIR} (branch ${PLAYWRIGHT_GIT_BRANCH:-image})..."

@@ -46,8 +46,8 @@ function print_quayregistry_conditions() {
 
 function print_failing_pod_logs() {
   local ns="${QUAY_NS}"
-  local name ready status restarts age
-  while read -r name ready status restarts age; do
+  local name status restarts
+  while read -r name _ status restarts _; do
     [[ -z "${name}" ]] && continue
     case "${status}" in
       CrashLoopBackOff|Error|ErrImagePull|ImagePullBackOff|CreateContainerConfigError|CreateContainerError|OOMKilled|Init:CrashLoopBackOff|Init:Error|Failed) ;;
