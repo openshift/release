@@ -57,9 +57,17 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_AGENT_EFFORT:-}" ]]; then
 fi
 
 if [[ "${AGENT_HARNESS}" == "codex" && -z "${OPENAI_API_KEY:-}" && -r "${OPENAI_API_KEY_PATH}" ]]; then
-    set +x
+    # Keep xtrace disabled only while reading the secret so it cannot reach logs.
+    RESTORE_XTRACE=false
+    if [[ $- == *x* ]]; then
+        RESTORE_XTRACE=true
+        set +x
+    fi
     OPENAI_API_KEY=$(<"${OPENAI_API_KEY_PATH}")
     export OPENAI_API_KEY
+    if ${RESTORE_XTRACE}; then
+        set -x
+    fi
     echo "OpenAI API key loaded."
 fi
 
@@ -440,7 +448,7 @@ copy_reports() {
         find "${WORKDIR}" -name "payload-results-*.yaml" -exec cp {} "${ARTIFACT_DIR}/" \; || true
     fi
 
-    # Archive Claude sessions for continuation. Codex runs are ephemeral.
+    # Archive Claude session logs for the continue-session artifact.
     CLAUDE_HOME="/home/claude/.claude"
     if [[ "${AGENT_HARNESS}" == "claude-code" && -d "${CLAUDE_HOME}/projects" ]]; then
         echo "Archiving Claude session logs..."
