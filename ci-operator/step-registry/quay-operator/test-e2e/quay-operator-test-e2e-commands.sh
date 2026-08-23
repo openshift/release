@@ -123,6 +123,30 @@ else
   fi
 fi
 
+# Capture virtual-builder diagnostics from the TARGET cluster. Playwright build
+# specs only see the API build object (which stays "build-scheduled" with no
+# error), so the real cause lives in the build manager + the ephemeral builder
+# pod in the virtual-builders namespace. This step has `cli: latest` and the
+# target-cluster KUBECONFIG, so gather that state into ARTIFACT_DIR every run.
+# All commands are best-effort (|| true) so they never fail the step.
+function gatherBuilderDiagnostics {
+  local ns="${QUAYNAMESPACE:-quay-enterprise}"
+  local bns="virtual-builders"
+  local out="${ARTIFACT_DIR}/builder-diagnostics"
+  command -v oc >/dev/null 2>&1 || return 0
+  oc whoami >/dev/null 2>&1 || return 0
+  echo "Gathering virtual-builder diagnostics into ${out}..."
+  mkdir -p "${out}"
+  oc get pods -n "${bns}" -o wide                       > "${out}/virtual-builders-pods.txt"     2>&1 || true
+  oc get events -n "${bns}" --sort-by=.lastTimestamp    > "${out}/virtual-builders-events.txt"   2>&1 || true
+  oc describe pods -n "${bns}"                           > "${out}/virtual-builders-describe.txt" 2>&1 || true
+  oc get all -n "${bns}" -o wide                         > "${out}/virtual-builders-all.txt"      2>&1 || true
+  # Build manager runs inside the quay-app pods; keep only buildman/executor lines.
+  oc logs -n "${ns}" -l quay-component=quay-app -c quay-app --tail=5000 2>/dev/null \
+    | grep -iE 'buildman|build manager|executor|ephemeral|register|build token|kubernetes|traceback|error' \
+    > "${out}/quay-app-buildman.log" 2>&1 || true
+}
+
 function copyArtifacts {
   echo "Copying test artifacts..."
   local src="${PLAYWRIGHT_WORKDIR:-.}"
@@ -134,6 +158,7 @@ function copyArtifacts {
     fi
   done
   cp -r "${src}"/playwright-report/* "${ARTIFACT_DIR}/" 2>/dev/null || true
+  gatherBuilderDiagnostics || true
 }
 trap copyArtifacts EXIT
 

@@ -49,8 +49,12 @@ FEATURE_BUILD_SUPPORT: true
 BUILDMAN_HOSTNAME: ${quay_builder_route}:443
 BUILD_MANAGER:
 - ephemeral
-- ALLOWED_WORKER_COUNT: 20 
+- ALLOWED_WORKER_COUNT: 20
   ORCHESTRATOR_PREFIX: buildman/production/
+  # Per RH Quay docs: if unset/too low the ephemeral worker can fail to register
+  # ("Invalid build token: Signature has expired") and the build never leaves the
+  # build-scheduled phase. Docs recommend >= 240; use the reference value 3600.
+  JOB_REGISTRATION_TIMEOUT: 3600
   ORCHESTRATOR:
     REDIS_HOST: ${QUAYREGISTRY}-quay-redis
     REDIS_PASSWORD: ""
