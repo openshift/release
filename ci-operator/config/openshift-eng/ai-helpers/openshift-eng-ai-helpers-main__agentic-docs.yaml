@@ -1,0 +1,68 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM claude-ai-helpers AS ai-helpers
+      FROM nested-podman AS podman
+      FROM ai-helpers
+      USER root
+      RUN dnf install -y podman fuse-overlayfs shadow-utils openssl && dnf clean all
+      COPY --from=podman /entrypoint.sh /entrypoint.sh
+      RUN setcap cap_setuid+ep /usr/bin/newuidmap && \
+          setcap cap_setgid+ep /usr/bin/newgidmap && \
+          touch /etc/subgid /etc/subuid && \
+          chmod -R g=u /etc/subuid /etc/subgid /etc/passwd /etc/group && \
+          chmod +rx /entrypoint.sh
+      RUN mkdir -p /workspace/hack && \
+          printf '#!/bin/bash\necho "No additional setup needed."' > /workspace/hack/agentic_setup.sh && \
+          chmod +x /workspace/hack/agentic_setup.sh && \
+          chgrp -R 0 /workspace && chmod -R g=u /workspace
+      ENV BUILDAH_ISOLATION=chroot
+      USER claude
+      WORKDIR /workspace
+      ENTRYPOINT ["/entrypoint.sh"]
+      CMD ["bash"]
+    from: claude-ai-helpers
+    inputs:
+      claude-ai-helpers:
+        as:
+        - claude-ai-helpers
+      nested-podman:
+        as:
+        - nested-podman
+    to: agentic-dev
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: periodic-doc-creator
+  capabilities:
+  - nested-podman
+  cron: '@yearly'
+  steps:
+    env:
+      ALLOWED_TOOLS: Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill
+        TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate TodoWrite ToolSearch
+      SETUP_SCRIPT: hack/agentic_setup.sh
+      UPSTREAM_REPO: jatinsu/machine-config-operator
+    workflow: openshift-agentic-agentic-docs-doc-creator
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ai-helpers
+  variant: agentic-docs
