@@ -305,26 +305,24 @@ function RegisterQuayInAcs () {
     typeset acsHost="${1}" acsPassword="${2}"
     set +x
 
-    typeset staleIds
-    staleIds=$(curl -sk -u "admin:${acsPassword}" \
+    typeset existing
+    existing=$(curl -sk -u "admin:${acsPassword}" \
         "https://${acsHost}/v1/imageintegrations" 2>/dev/null | \
         python3 -c "
 import sys, json, os
 host = os.environ['QUAY_HOST']
 data = json.load(sys.stdin)
-ids = []
 for i in data.get('integrations', []):
-    endpoint = i.get('docker', {}).get('endpoint', '') or i.get('quay', {}).get('endpoint', '')
-    if host in endpoint or i.get('name', '') == 'interop-quay-smoke':
-        ids.append(i['id'])
-print(' '.join(ids))
-" 2>/dev/null) || staleIds=""
+    if host in i.get('docker', {}).get('endpoint', ''):
+        print(i['id'])
+        sys.exit(0)
+sys.exit(1)
+" 2>/dev/null) || existing=""
 
-    typeset integrationId
-    for integrationId in ${staleIds}; do
-        curl -sk -X DELETE "https://${acsHost}/v1/imageintegrations/${integrationId}" \
-            -u "admin:${acsPassword}" 2>/dev/null || true
-    done
+    if [[ -n "${existing}" ]]; then
+        echo "INFO: Quay integration already registered in ACS"
+        return 0
+    fi
 
     typeset regUser regPass
     if [[ -n "${QUAY_TOKEN}" ]]; then
