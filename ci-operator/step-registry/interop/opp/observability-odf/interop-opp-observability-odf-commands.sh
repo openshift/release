@@ -312,6 +312,7 @@ function CheckThanosHealth () {
 
     typeset failMsg=""
     typeset -i foundCount=0
+    typeset -i discoveryErrors=0
     typeset -a missingComponents=()
 
     typeset -a componentNames=("thanos-receive"     "thanos-compact"     "thanos-store"       "thanos-query"       "alertmanager"       "rbac-query-proxy")
@@ -323,13 +324,19 @@ function CheckThanosHealth () {
         typeset labelSelector="${componentLabels[$idx]}"
 
         typeset podList=""
-        podList="$(oc get pods -n "${OBS_NAMESPACE}" -l "${labelSelector}" \
-            --no-headers)" || true
+        if ! podList="$(oc get pods -n "${OBS_NAMESPACE}" -l "${labelSelector}" \
+            --no-headers 2>&1)"; then
+            (( ++discoveryErrors ))
+            podList=""
+        fi
 
         if [[ -z "${podList}" ]]; then
             typeset allPods=""
-            allPods="$(oc get pods -n "${OBS_NAMESPACE}" \
-                --no-headers)" || true
+            if ! allPods="$(oc get pods -n "${OBS_NAMESPACE}" \
+                --no-headers 2>&1)"; then
+                (( ++discoveryErrors ))
+                allPods=""
+            fi
             podList="$(printf '%s' "${allPods}" | awk -v pat="^${component}" '$0 ~ pat')"
         fi
 
@@ -357,7 +364,9 @@ function CheckThanosHealth () {
         fi
     done
 
-    if (( foundCount == 0 )); then
+    if (( foundCount == 0 && discoveryErrors > 0 )); then
+        AddResult "thanos-health" "fail" "Pod discovery failed (${discoveryErrors} API errors) in ${OBS_NAMESPACE}"
+    elif (( foundCount == 0 )); then
         AddResult "thanos-health" "skip" "No Thanos/observability components found in ${OBS_NAMESPACE}; observability not deployed"
     elif [[ -n "${failMsg}" ]]; then
         AddResult "thanos-health" "fail" "Unhealthy Thanos components: ${failMsg}"
@@ -532,7 +541,8 @@ print(items[0]['metadata']['name'] if items else '')
         typeset queryResult=""
         if [[ -n "${queryFrontendPod}" ]]; then
             queryResult="$(oc exec -n "${OBS_NAMESPACE}" "${queryFrontendPod}" \
-                -- curl -sk "http://localhost:9090/api/v1/query?query=up")" || true
+                -- curl -sk --connect-timeout 10 --max-time 30 \
+                "http://localhost:9090/api/v1/query?query=up")" || true
         fi
 
         if [[ -z "${queryResult}" ]]; then
@@ -545,7 +555,8 @@ print(items[0]['metadata']['name'] if items else '')
             fi
             if [[ -n "${queryPod}" ]]; then
                 queryResult="$(oc exec -n "${OBS_NAMESPACE}" "${queryPod}" \
-                    -- curl -sk "http://localhost:9090/api/v1/query?query=up")" || true
+                    -- curl -sk --connect-timeout 10 --max-time 30 \
+                    "http://localhost:9090/api/v1/query?query=up")" || true
             fi
         fi
 
