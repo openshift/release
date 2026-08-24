@@ -1,3 +1,8 @@
+base_images:
+  upi-installer:
+    name: "4.23"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -38,6 +43,241 @@ tests:
       SCAN_IMAGE: bgp-cloud-connector
     test:
     - ref: fips-check-image-scan
+- always_run: false
+  as: e2e-aws-route-server-probe
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: route-server-probe
+      commands: |
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        # Does a CI account have the VPC Route Server API at all? The
+        # operator discovers route servers and endpoints, it never
+        # creates them, so before we can run an end-to-end test here
+        # something has to stand the estate up, and this asks whether
+        # this account in this region is allowed to. Create one route
+        # server, one endpoint, one propagation, list them, tear it all
+        # down again.
+        #
+        # Endpoints bill hourly and belong to the VPC rather than the
+        # cluster, so the deprovision step will not reclaim them. The
+        # trap below is what stops a failed run leaving them running.
+
+        export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
+        if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+          export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        fi
+
+        infra="$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')"
+        region="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.aws.region}')"
+        export AWS_REGION="${region}"
+        export AWS_DEFAULT_REGION="${region}"
+
+        echo "cluster:  ${infra}"
+        echo "region:   ${region}"
+        echo "identity: $(aws sts get-caller-identity --query Arn --output text)"
+        echo "aws cli:  $(aws --version 2>&1)"
+
+        # Ask first, because an API the region does not offer and an API
+        # this account may not call are different answers and a failed
+        # create cannot tell them apart. Keep the error text: the
+        # distinction we are here for is in it.
+        if ! describe_out="$(aws ec2 describe-route-servers 2>&1)"; then
+          echo "FAIL describe-route-servers"
+          echo "${describe_out}"
+          exit 1
+        fi
+        echo "OK   describe-route-servers"
+
+        vpc="$(aws ec2 describe-vpcs \
+          --filters "Name=tag:kubernetes.io/cluster/${infra},Values=owned" \
+          --query 'Vpcs[0].VpcId' --output text)"
+        if [[ "${vpc}" == "None" || -z "${vpc}" ]]; then
+          echo "no VPC tagged kubernetes.io/cluster/${infra}=owned"
+          exit 1
+        fi
+
+        subnet="$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${vpc}" \
+          --query 'Subnets[0].SubnetId' --output text)"
+        route_table="$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=${vpc}" \
+          --query 'RouteTables[0].RouteTableId' --output text)"
+
+        if [[ "${subnet}" == "None" || "${route_table}" == "None" ]]; then
+          echo "vpc ${vpc} has no usable subnet (${subnet}) or route table (${route_table})"
+          exit 1
+        fi
+
+        echo "vpc:      ${vpc}"
+        echo "subnet:   ${subnet}"
+        echo "table:    ${route_table}"
+
+        # A failed describe is a failed poll, never an empty answer,
+        # or expired credentials read as "it has gone" and the delete
+        # that follows hits a resource still standing.
+        wait_until() {
+          local what="$1" attempts="$2"; shift 2
+          local i
+          for (( i = 1; i <= attempts; i++ )); do
+            if "$@"; then
+              return 0
+            fi
+            sleep 10
+          done
+          echo "timed out waiting for ${what}"
+          return 1
+        }
+
+        # There is no aws ec2 wait for any of this: the route server
+        # waiters do not exist, so every wait here polls describe.
+        route_server_available() {
+          local state
+          state="$(aws ec2 describe-route-servers --route-server-ids "${1}" \
+            --query 'RouteServers[0].State' --output text 2>/dev/null)" || return 1
+          [[ "${state}" == "available" ]]
+        }
+
+        # Deleting an endpoint that is still pending is rejected as
+        # IncorrectState, so the teardown needs it to have settled
+        # first, and an endpoint that comes up is a stronger answer
+        # than one that was merely accepted.
+        endpoint_available() {
+          local state
+          state="$(aws ec2 describe-route-server-endpoints \
+            --route-server-endpoint-ids "${1}" \
+            --query 'RouteServerEndpoints[0].State' --output text 2>/dev/null)" || return 1
+          [[ "${state}" == "available" ]]
+        }
+
+        endpoint_gone() {
+          local n
+          n="$(aws ec2 describe-route-server-endpoints \
+            --query "length(RouteServerEndpoints[?RouteServerEndpointId=='${1}' && State!='deleted'])" \
+            --output text 2>/dev/null)" || return 1
+          [[ "${n}" == "0" ]]
+        }
+
+        # disable-route-server-propagation returns while the propagation
+        # is still deleting, and disassociating before it has gone is
+        # rejected: "Route Server has non-deleted propagation to Route
+        # Table". So the association cannot go until this has.
+        propagations_cleared() {
+          local out
+          if out="$(aws ec2 get-route-server-propagations --route-server-id "${1}" \
+            --query "length(RouteServerPropagations[?State!='deleted'])" \
+            --output text 2>&1)"; then
+            [[ "${out}" == "0" ]]
+            return
+          fi
+          [[ "${out}" == *NotAssociated* || "${out}" == *NotFound* ]]
+        }
+
+        # AWS reports "no associations" as an error rather than as an
+        # empty list, so the state we are waiting for is the state that
+        # makes the call fail.
+        association_gone() {
+          local out
+          if out="$(aws ec2 get-route-server-associations --route-server-id "${1}" \
+            --query 'length(RouteServerAssociations)' --output text 2>&1)"; then
+            [[ "${out}" == "0" ]]
+            return
+          fi
+          [[ "${out}" == *NotAssociated* ]]
+        }
+
+        route_server=""
+        endpoint=""
+        propagated=false
+        associated=false
+
+        cleaned_up=false
+
+        cleanup() {
+          local rc=$?
+          if [[ "${cleaned_up}" == true ]]; then
+            return
+          fi
+          cleaned_up=true
+          set +o errexit
+          echo "--- teardown ---"
+          if [[ -n "${endpoint}" ]]; then
+            aws ec2 delete-route-server-endpoint --route-server-endpoint-id "${endpoint}"
+            wait_until "endpoint ${endpoint} to go" 60 endpoint_gone "${endpoint}"
+          fi
+          if [[ "${propagated}" == true ]]; then
+            aws ec2 disable-route-server-propagation \
+              --route-server-id "${route_server}" --route-table-id "${route_table}"
+            wait_until "propagation to clear" 30 \
+              propagations_cleared "${route_server}"
+          fi
+          if [[ "${associated}" == true ]]; then
+            aws ec2 disassociate-route-server \
+              --route-server-id "${route_server}" --vpc-id "${vpc}"
+            wait_until "association to clear" 30 association_gone "${route_server}"
+          fi
+          if [[ -n "${route_server}" ]]; then
+            aws ec2 delete-route-server --route-server-id "${route_server}"
+          fi
+          echo "--- teardown done ---"
+          exit "${rc}"
+        }
+        trap cleanup EXIT INT TERM
+
+        # 65000 is the hacks scripts' default for the Amazon side and
+        # has to differ from the localASN a CUDNBgpConfig would carry.
+        # Nothing peers here, so it only has to be well formed.
+        echo "creating route server..."
+        route_server="$(aws ec2 create-route-server \
+          --amazon-side-asn 65000 \
+          --tag-specifications "ResourceType=route-server,Tags=[{Key=Name,Value=${infra}-rs-probe}]" \
+          --query 'RouteServer.RouteServerId' --output text)"
+        echo "OK   create-route-server ${route_server}"
+        wait_until "route server to become available" 60 \
+          route_server_available "${route_server}"
+
+        aws ec2 associate-route-server --route-server-id "${route_server}" --vpc-id "${vpc}"
+        associated=true
+        echo "OK   associate-route-server ${vpc}"
+
+        endpoint="$(aws ec2 create-route-server-endpoint \
+          --route-server-id "${route_server}" \
+          --subnet-id "${subnet}" \
+          --tag-specifications "ResourceType=route-server-endpoint,Tags=[{Key=Name,Value=${infra}-rs-probe-ep}]" \
+          --query 'RouteServerEndpoint.RouteServerEndpointId' --output text)"
+        echo "OK   create-route-server-endpoint ${endpoint}"
+        wait_until "endpoint to become available" 60 \
+          endpoint_available "${endpoint}"
+
+        # Propagation is the one that hides: without it every peer
+        # reaches available and every session establishes while nothing
+        # in the VPC can reach a pod. If the CI account is short one
+        # permission this is the likeliest one, so probe it explicitly.
+        aws ec2 enable-route-server-propagation \
+          --route-server-id "${route_server}" --route-table-id "${route_table}"
+        propagated=true
+        echo "OK   enable-route-server-propagation ${route_table}"
+
+        echo "--- what we can see ---"
+        aws ec2 describe-route-servers --route-server-ids "${route_server}" --output table
+        aws ec2 describe-route-server-endpoints \
+          --query "RouteServerEndpoints[?RouteServerId=='${route_server}']" --output table
+        aws ec2 get-route-server-associations --route-server-id "${route_server}" --output table
+        aws ec2 get-route-server-propagations --route-server-id "${route_server}" --output table
+        aws ec2 describe-route-server-peers \
+          --query "RouteServerPeers[?RouteServerId=='${route_server}']" --output table
+
+        echo "create, associate, endpoint, propagate and list all succeeded"
+      from: upi-installer
+      grace_period: 30m
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
