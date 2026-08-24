@@ -1,0 +1,41 @@
+workflow:
+  as: sandboxed-containers-operator-e2e-azure-sts
+  steps:
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      ENABLE_MUST_GATHER: "true"
+      FORCE_SUCCESS_EXIT: "no"
+      IDENTITY_MODE: "sts"
+      LOKI_ENABLED: "false"
+      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
+      MUST_GATHER_TIMEOUT: "35m"
+      SLEEP_DURATION: 3h
+      SPOT_INSTANCES: "false"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_PARALLEL: 1
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-azure-oidc-creds-provision
+    - ref: ipi-conf-azure-provisioned-resourcegroup
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    - chain: sandboxed-containers-operator-pre
+    - ref: sandboxed-containers-operator-azure-sts-pre-install
+    post:
+    - ref: cucushift-installer-wait
+      timeout: 12h10m0s
+      best_effort: true
+      optional_on_success: true
+    - ref: sandboxed-containers-operator-gather-must-gather
+    - ref: sandboxed-containers-operator-post
+    - chain: ipi-azure-post-manual-oidc-workload-identity
+    test:
+    - ref: openshift-extended-test
+  documentation: |-
+    This workflow runs openshift-extended-test on an Azure cluster with
+    workload identity (STS/federated credentials) and sandboxed containers deployed.
+    It creates the cluster using ccoctl with managed identities for all operators,
+    then creates an additional managed identity for the OSC operator with federated
+    credentials.
