@@ -75,9 +75,15 @@ configure_host_pull_secret() {
 
 install_oc_mirror() {
     log "Installing oc-mirror..."
+    CGWURL="https://mirror.openshift.com/pub/cgw"
+    ARCH=$(uname -m)
+    case ${ARCH} in
+        x86_64) ARCH="amd64" ;;
+        aarch64) ARCH="arm64" ;;
+    esac
     curl -sSLf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 120 \
         -o /tmp/oc-mirror.tar.gz \
-        "https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz"
+        "${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
     tar -xzf /tmp/oc-mirror.tar.gz -C /tmp && chmod +x /tmp/oc-mirror
     rm -f /tmp/oc-mirror.tar.gz
     log "oc-mirror installed"
