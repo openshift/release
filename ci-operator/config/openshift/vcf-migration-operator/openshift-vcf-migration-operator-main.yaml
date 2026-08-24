@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   upi-installer:
     name: "5.0"
     namespace: ocp
@@ -96,6 +100,22 @@ tests:
       PERSISTENT_MONITORING: "false"
       SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
     workflow: vcf-migration-e2e
+- as: periodic-jira-agent
+  cron: 0 9 * * *
+  steps:
+    env:
+      JIRA_AGENT_MAX_ISSUES: "1"
+    workflow: splat-jira-agent-vcf-migration
+- as: periodic-review-agent
+  cron: '@yearly'
+  steps:
+    workflow: splat-review-agent-vcf-migration
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: splat-review-agent-vcf-migration-trigger
 zz_generated_metadata:
   branch: main
   org: openshift
