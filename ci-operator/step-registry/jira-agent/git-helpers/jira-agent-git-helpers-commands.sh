@@ -134,14 +134,38 @@ ensure_fork_exists() {
   echo "Fork repo set to: ${JIRA_AGENT_FORK_REPO}"
 }
 
-# Resolve the upstream repo for an issue from its Jira component.
-# Uses JIRA_AGENT_COMPONENT_REPO_MAP (JSON object) to map component names to repos.
-# Falls back to JIRA_AGENT_UPSTREAM_REPO if no map is configured or component not found.
-# Sets: JIRA_AGENT_UPSTREAM_REPO (exported), JIRA_AGENT_FORK_REPO (exported), FORK_ORG (exported)
+# Resolve the per-issue routing for an issue from its Jira component/project.
+# In the single all-teams job the repo (and its review profile, Slack emoji and
+# Jira assignee) differs per issue, so this is called once per issue.
+#
+# Repo resolution:
+#   1. JIRA_AGENT_COMPONENT_REPO_MAP[component]  (primary — all of the issue's
+#      Jira components are checked; routes when they agree on one repo, skips if
+#      they map to different repos)
+#   2. JIRA_AGENT_PROJECT_REPO_MAP[project]      (fallback — issue key prefix,
+#      e.g. WINC-9 -> WINC, for teams routed by project without a component)
+# Returns 0 without changes when no component map is configured (static mode).
+# Returns non-zero when a map is configured but the issue cannot be routed (HTTP
+# error, ambiguous components, or no matching component/project); the caller must
+# skip that issue rather than process it against another issue's repo.
+#
+# Per-issue fields (only when the corresponding map is set; keyed by component,
+# defaults applied when routed by project or the component has no entry):
+#   REVIEW_PROFILE       <- JIRA_AGENT_COMPONENT_PROFILE_MAP  (default "")
+#   SLACK_EMOJI          <- JIRA_AGENT_COMPONENT_EMOJI_MAP    (default ":robot:")
+#   JIRA_AGENT_ASSIGNEE  <- JIRA_AGENT_COMPONENT_ASSIGNEE_MAP (default "")
+#   DEFAULT_BRANCH       <- JIRA_AGENT_REPO_BRANCH_MAP        (default "main")
+#
+# Sets: JIRA_AGENT_UPSTREAM_REPO, JIRA_AGENT_FORK_REPO, FORK_ORG (all exported)
 # Requires: JIRA_AUTH, JIRA_BASE_URL, JIRA_AGENT_FORK_ORG (in PAT mode)
 resolve_upstream_repo() {
   local issue_key="$1"
   local component_map="${JIRA_AGENT_COMPONENT_REPO_MAP:-}"
+  local project_map="${JIRA_AGENT_PROJECT_REPO_MAP:-}"
+  local branch_map="${JIRA_AGENT_REPO_BRANCH_MAP:-}"
+  local profile_map="${JIRA_AGENT_COMPONENT_PROFILE_MAP:-}"
+  local emoji_map="${JIRA_AGENT_COMPONENT_EMOJI_MAP:-}"
+  local assignee_map="${JIRA_AGENT_COMPONENT_ASSIGNEE_MAP:-}"
 
   if [ -z "$component_map" ]; then
     echo "No component-repo map configured, using JIRA_AGENT_UPSTREAM_REPO=${JIRA_AGENT_UPSTREAM_REPO}"
@@ -149,7 +173,7 @@ resolve_upstream_repo() {
   fi
 
   echo "Resolving upstream repo for ${issue_key} from Jira component..."
-  local issue_response http_code component resolved_repo
+  local issue_response http_code component resolved_repo project_key c mapped ambiguous
   issue_response=$(curl -s -w "\n%{http_code}" \
     "${JIRA_BASE_URL}/rest/api/3/issue/${issue_key}?fields=components" \
     -H "Authorization: Basic $JIRA_AUTH" \
@@ -157,26 +181,79 @@ resolve_upstream_repo() {
   http_code=$(echo "$issue_response" | tail -1)
 
   if [ "$http_code" != "200" ]; then
-    echo "Warning: Failed to fetch issue components (HTTP ${http_code}), using default JIRA_AGENT_UPSTREAM_REPO"
-    return 0
+    echo "Warning: Failed to fetch issue components for ${issue_key} (HTTP ${http_code}); skipping issue"
+    return 1
   fi
 
-  component=$(echo "$issue_response" | sed '$d' | jq -r '.fields.components[0].name // empty')
-  if [ -z "$component" ]; then
-    echo "Warning: Issue ${issue_key} has no components, using default JIRA_AGENT_UPSTREAM_REPO"
-    return 0
+  # 1) Component-based routing (primary). Examine ALL of the issue's components,
+  # not just the first: a Jira issue can carry multiple components and the union
+  # JQL matches on any one of them. Route when the mapped components agree on a
+  # single repo; skip if they map to different repos (ambiguous) rather than
+  # guess (which could bypass a team's label gate).
+  resolved_repo=""
+  component=""
+  ambiguous=false
+  while IFS= read -r c; do
+    [ -z "$c" ] && continue
+    mapped=$(echo "$component_map" | jq -r --arg c "$c" '.[$c] // empty')
+    [ -z "$mapped" ] && continue
+    if [ -z "$resolved_repo" ]; then
+      resolved_repo="$mapped"
+      component="$c"
+    elif [ "$mapped" != "$resolved_repo" ]; then
+      ambiguous=true
+    fi
+  done < <(echo "$issue_response" | sed '$d' | jq -r '.fields.components[]?.name // empty')
+
+  if [ "$ambiguous" = true ]; then
+    echo "Warning: ${issue_key} components map to multiple repos; skipping (ambiguous routing)"
+    return 1
+  fi
+  if [ -n "$component" ]; then
+    echo "Routing component: ${component} -> ${resolved_repo}"
+  else
+    echo "Issue ${issue_key} has no mapped component; will try project-based routing"
   fi
 
-  echo "Issue component: ${component}"
-  resolved_repo=$(echo "$component_map" | jq -r --arg c "$component" '.[$c] // empty')
+  # 2) Project-based routing (fallback) keyed by the issue key prefix, for issues
+  # that don't carry a mapped component (e.g. WINC-9 -> WINC).
+  project_key="${issue_key%%-*}"
+  if [ -z "$resolved_repo" ] && [ -n "$project_map" ]; then
+    resolved_repo=$(echo "$project_map" | jq -r --arg p "$project_key" '.[$p] // empty')
+    [ -n "$resolved_repo" ] && echo "Resolved via project '${project_key}': ${resolved_repo}"
+  fi
 
   if [ -z "$resolved_repo" ]; then
-    echo "Warning: Component '${component}' not found in JIRA_AGENT_COMPONENT_REPO_MAP, using default JIRA_AGENT_UPSTREAM_REPO"
-    return 0
+    echo "Warning: No repo mapping for ${issue_key} (components or project '${project_key}'); skipping"
+    return 1
   fi
 
   export JIRA_AGENT_UPSTREAM_REPO="$resolved_repo"
   echo "Resolved upstream repo: ${JIRA_AGENT_UPSTREAM_REPO}"
+
+  # Check out the repo's default branch (some repos use master, not main).
+  # Re-exported every issue so it never bleeds across repos in the loop.
+  if [ -n "$branch_map" ]; then
+    DEFAULT_BRANCH=$(echo "$branch_map" | jq -r --arg r "$resolved_repo" '.[$r] // "main"')
+    export DEFAULT_BRANCH
+    echo "Default branch: ${DEFAULT_BRANCH}"
+  fi
+
+  # Per-issue review profile / Slack emoji / Jira assignee, keyed by component.
+  # Re-exported every issue (even to the default) so values never bleed across
+  # issues in the single all-teams loop.
+  if [ -n "$profile_map" ]; then
+    REVIEW_PROFILE=$(echo "$profile_map" | jq -r --arg c "${component:-}" '.[$c] // empty')
+    export REVIEW_PROFILE
+  fi
+  if [ -n "$emoji_map" ]; then
+    SLACK_EMOJI=$(echo "$emoji_map" | jq -r --arg c "${component:-}" '.[$c] // ":robot:"')
+    export SLACK_EMOJI
+  fi
+  if [ -n "$assignee_map" ]; then
+    JIRA_AGENT_ASSIGNEE=$(echo "$assignee_map" | jq -r --arg c "${component:-}" '.[$c] // empty')
+    export JIRA_AGENT_ASSIGNEE
+  fi
 
   # In PAT mode, also update the fork repo
   if [ "${JIRA_AGENT_AUTH_MODE:-app}" = "pat" ] && [ -n "${JIRA_AGENT_FORK_ORG:-}" ]; then
@@ -190,6 +267,8 @@ resolve_upstream_repo() {
 # Call once per issue when JIRA_AGENT_COMPONENT_REPO_MAP is set (repo changes per issue).
 # Requires: JIRA_AGENT_FORK_REPO, JIRA_AGENT_UPSTREAM_REPO
 setup_repo() {
+  # The previous issue leaves the shell inside this directory.
+  cd /tmp
   rm -rf /tmp/project-repo
 
   ensure_fork_exists

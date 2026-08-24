@@ -105,6 +105,12 @@ ref:
     default: ":robot:"
     documentation: |-
       Slack emoji used in notification messages.
+  - name: JIRA_AGENT_SLACK_WEBHOOK_KEY
+    default: "slack-webhook-url"
+    documentation: |-
+      Key name in the mounted credentials secret holding the Slack incoming
+      webhook URL. Override per team to post to that team's own channel
+      (the destination channel is bound to the webhook, not set in the payload).
   - name: JIRA_AGENT_ISSUE_KEY
     default: ""
     documentation: |-
@@ -122,7 +128,9 @@ ref:
   - name: JIRA_AGENT_MAX_ISSUES
     default: "1"
     documentation: |-
-      Maximum number of Jira issues to process per run.
+      Maximum issues selected by the configured JQL. In all-teams mode, each
+      team arm defines its own value and the central job does not set a global
+      limit.
   - name: CLAUDE_MODEL
     default: "claude-opus-4-6"
     documentation: |-
@@ -148,8 +156,8 @@ ref:
     default: "jira-agent-report"
     documentation: |-
       CI step name for the report step, used to generate correct artifact
-      cross-links in the transcript HTML. Override when a team-specific
-      workflow uses a different step name (e.g., "hypershift-jira-agent-report").
+      cross-links in the transcript HTML. Override only if a workflow runs the
+      report logic under a custom ref name instead of "jira-agent-report".
   resources:
     requests:
       cpu: "4"
