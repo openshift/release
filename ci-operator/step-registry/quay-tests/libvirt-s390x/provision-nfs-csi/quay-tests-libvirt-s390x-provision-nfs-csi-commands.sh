@@ -30,9 +30,19 @@ if [[ -n "${default_sc}" ]]; then
   exit 0
 fi
 
+echo "=== Credential mount (${CREDENTIALS_DIR}) ==="
+if [[ -d "${CREDENTIALS_DIR}" ]]; then
+  find "${CREDENTIALS_DIR}" -type f | sort || true
+else
+  echo "ERROR: credentials mount ${CREDENTIALS_DIR} does not exist (secret not mounted?)"
+  exit 1
+fi
+
 if [[ ! -f "${GIT_URL_FILE}" ]]; then
   echo "ERROR: Git repo URL file not found: ${GIT_URL_FILE}"
-  echo "Expected vault secret ${CREDENTIALS_DIR} to contain csi-provisioner-git-url"
+  echo "The env default is a pod file path, not a Vault path."
+  echo "Add Vault field key/csi-provisioner-git-url to hypershift-agent-ibmz-credentials"
+  echo "and ensure ci-secret-bootstrap syncs it to build12:test-credentials."
   exit 1
 fi
 
