@@ -47,6 +47,7 @@ OPENAI_API_KEY_PATH="${OPENAI_API_KEY_PATH:-/var/run/codex-openai-api-key/token}
 
 AGENT_HARNESS="${AGENT_HARNESS:-claude-code}"
 AGENT_EFFORT="${AGENT_EFFORT:-}"
+ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_AGENT_HARNESS:-}" ]]; then
     echo "Applying Gangway override: AGENT_HARNESS=${MULTISTAGE_PARAM_OVERRIDE_AGENT_HARNESS}"
     AGENT_HARNESS="${MULTISTAGE_PARAM_OVERRIDE_AGENT_HARNESS}"
@@ -90,9 +91,9 @@ case "${AGENT_HARNESS}" in
         AGENT_MODEL="${CODEX_MODEL:-gpt-5.6-sol}"
         if [[ -n "${AGENT_EFFORT}" ]]; then
             case "${AGENT_EFFORT}" in
-                minimal|low|medium|high|xhigh) ;;
+                minimal|low|medium|high|xhigh|max) ;;
                 *)
-                    echo "ERROR: Unsupported Codex effort ${AGENT_EFFORT}. Expected minimal, low, medium, high, or xhigh."
+                    echo "ERROR: Unsupported Codex effort ${AGENT_EFFORT}. Expected minimal, low, medium, high, xhigh, or max."
                     exit 1
                     ;;
             esac
@@ -501,10 +502,20 @@ agentic_ci() {
     local harness_args=()
     case "${AGENT_HARNESS}" in
         claude-code)
-            harness_args=(
-                --permission-mode auto
-                --verbose
-            )
+            # Opus 4.6 does not support auto mode. Retain the established
+            # explicit allow-list behavior for that model.
+            if [[ "${AGENT_MODEL}" == "claude-opus-4-6" ]]; then
+                harness_args=(
+                    --permission-mode default
+                    --allowedTools "${ALLOWED_TOOLS}"
+                    --verbose
+                )
+            else
+                harness_args=(
+                    --permission-mode auto
+                    --verbose
+                )
+            fi
             if [[ -n "${AGENT_EFFORT}" ]]; then
                 harness_args+=(--effort "${AGENT_EFFORT}")
             fi
