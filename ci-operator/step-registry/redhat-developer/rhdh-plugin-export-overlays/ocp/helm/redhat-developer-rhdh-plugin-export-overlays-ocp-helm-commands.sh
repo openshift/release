@@ -10,16 +10,16 @@ set -euo pipefail
 #
 # Job flows:
 #
-#   Scenario                                | JOB_TYPE  | JOB_NAME            | Mode       | GIT_PR_NUMBER | Code tested | OCI images | Tests
-#   ----------------------------------------|-----------|---------------------|------------|---------------|-------------|------------|------
-#   Overlay PR (pr-check)                   | presubmit | pull-ci-*           | pr-check   | PR number     | PR branch   | PR-built   | changed workspace
-#   Overlay PR (nightly-pr)                 | presubmit | pull-ci-*nightly-pr | nightly-pr | not exported  | PR branch   | released   | changed workspace
-#   Overlay PR (nightly)                    | presubmit | pull-ci-*nightly    | nightly    | not exported  | PR branch   | released   | all workspaces
-#   Rehearse pr-check                       | presubmit | rehearse-*          | pr-check   | empty         | main        | —          | skips (no changes)
-#   Rehearse pr-check + REHEARSE_PR_NUMBER  | presubmit | rehearse-*          | pr-check   | REHEARSE_PR   | PR branch   | PR-built   | changed workspace
-#   Rehearse nightly                        | presubmit | rehearse-*night     | nightly    | not exported  | main        | released   | all workspaces
-#   Rehearse nightly  + REHEARSE_PR_NUMBER  | presubmit | rehearse-*night     | nightly    | not exported  | PR branch   | released   | all workspaces
-#   Periodic cron                           | periodic  | periodic-*          | nightly    | not exported  | main        | released   | all workspaces
+#   Scenario                               | JOB_TYPE  | JOB_NAME                   | Mode              | GIT_PR_NUMBER | Code tested | OCI images | Tests
+#   ---------------------------------------|-----------|----------------------------|-------------------|---------------|-------------|------------|------
+#   Overlay PR (pr-check)                  | presubmit | pull-ci-*                  | pr-check          | PR number     | PR branch   | PR-built   | changed workspace
+#   Overlay PR (nightly-pr-scoped)         | presubmit | pull-ci-*nightly-pr-scoped | nightly-pr-scoped | not exported  | PR branch   | released   | changed workspace
+#   Overlay PR (nightly)                   | presubmit | pull-ci-*nightly           | nightly           | not exported  | PR branch   | released   | all workspaces
+#   Rehearse pr-check                      | presubmit | rehearse-*                 | pr-check          | empty         | main        | —          | skips (no changes)
+#   Rehearse pr-check + REHEARSE_PR_NUMBER | presubmit | rehearse-*                 | pr-check          | REHEARSE_PR   | PR branch   | PR-built   | changed workspace
+#   Rehearse nightly                       | presubmit | rehearse-*night            | nightly           | not exported  | main        | released   | all workspaces
+#   Rehearse nightly  + REHEARSE_PR_NUMBER | presubmit | rehearse-*night            | nightly           | not exported  | PR branch   | released   | all workspaces
+#   Periodic cron                          | periodic  | periodic-*                 | nightly           | not exported  | main        | released   | all workspaces
 #
 # =============================================================================
 
@@ -79,8 +79,8 @@ done
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 
 # Determine job mode
-if [[ "$JOB_NAME" == *-nightly-pr ]]; then
-    JOB_MODE="nightly-pr"
+if [[ "$JOB_NAME" == *-nightly-pr-scoped ]]; then
+    JOB_MODE="nightly-pr-scoped"
 elif [[ "$JOB_TYPE" == "periodic" ]] || [[ "$JOB_NAME" == *nightly* ]]; then
     JOB_MODE="nightly"
 else
@@ -267,11 +267,11 @@ if [[ "$JOB_MODE" == "nightly" ]]; then
     exit $TEST_EXIT_CODE
 fi
 
-if [[ "$JOB_MODE" == "nightly-pr" ]]; then
+if [[ "$JOB_MODE" == "nightly-pr-scoped" ]]; then
     export E2E_NIGHTLY_MODE="true"
 fi
 
-# ── PR check / nightly-pr ───────────────────────────────────────────────
+# ── PR check / nightly-pr-scoped ─────────────────────────────────────────
 
 PR_CHANGESET=$(git diff --name-only "$RELEASE_BRANCH_NAME")
 echo "Changeset: ${PR_CHANGESET}"
