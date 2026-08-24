@@ -1,0 +1,31 @@
+ref:
+  as: openshift-qe-anp-cpu-spike-regression
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-anp-cpu-spike-regression-commands.sh
+  timeout: 1h0m0s
+  grace_period: 5m0s
+  env:
+  - name: MONITOR_DURATION
+    default: "1200"
+    documentation: |-
+      Monitoring duration in seconds. Default is 1200 (20 minutes), covering
+      4 complete CronJob trigger cycles at */5 schedule.
+  - name: ANP_COUNT
+    default: "70"
+    documentation: |-
+      Number of namespaces and ANPs to create. Each namespace gets one ANP
+      and two CronJobs.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    Regression test for OCPBUGS-62895 / 85366 / 98616 / 105851 — ANP/BANP
+    status reconciliation causing kube-apiserver CPU spikes. Creates ANP_COUNT
+    namespaces, one BANP, ANP_COUNT ANPs, and 2*ANP_COUNT CronJobs running every
+    5 minutes to generate pod churn. Monitors ovnkube-controller for redundant
+    "Patched status" calls. Pass criterion: zero patch calls during MONITOR_DURATION.
