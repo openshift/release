@@ -40,7 +40,7 @@ WAITED=0
 
 while [[ ${WAITED} -lt ${MAX_WAIT} ]]; do
   for STEP_NAME in ${TEST_STEPS}; do
-    FINISHED_JSON=$(curl -sL "${ARTIFACTS_BASE}/${STEP_NAME}/finished.json" 2>/dev/null || true)
+    FINISHED_JSON=$(curl -sL --connect-timeout 10 --max-time 20 "${ARTIFACTS_BASE}/${STEP_NAME}/finished.json" 2>/dev/null || true)
     if echo "${FINISHED_JSON}" | jq -e '.passed == false' &>/dev/null; then
       echo "Detected failure in ${STEP_NAME}/finished.json (waited ${WAITED}s)"
       FAILURE_DETECTED=true
@@ -52,7 +52,7 @@ while [[ ${WAITED} -lt ${MAX_WAIT} ]]; do
   all_passed=true
   saw_any=false
   for STEP_NAME in ${TEST_STEPS}; do
-    FINISHED_JSON=$(curl -sL "${ARTIFACTS_BASE}/${STEP_NAME}/finished.json" 2>/dev/null || true)
+    FINISHED_JSON=$(curl -sL --connect-timeout 10 --max-time 20 "${ARTIFACTS_BASE}/${STEP_NAME}/finished.json" 2>/dev/null || true)
     if echo "${FINISHED_JSON}" | jq -e '.passed == true' &>/dev/null; then
       saw_any=true
       continue
@@ -84,7 +84,6 @@ if ! command -v claude &>/dev/null; then
 fi
 
 echo "Claude Code CLI: $(claude --version 2>/dev/null || echo 'unknown')"
-echo "Prow job URL: ${PROW_JOB_URL}"
 echo "Failed step: ${FAILED_STEP}"
 
 SYSTEM_PROMPT="IMPORTANT CI CONTEXT:
@@ -118,8 +117,8 @@ timeout 1200 claude -p "/ci:prow-job-analysis ${PROW_JOB_URL} --fast" \
   --model "${CLAUDE_MODEL}" \
   --verbose \
   --output-format stream-json \
-  2> "${ARTIFACT_DIR}/claude-failure-analysis.log" \
-  | tee "${ARTIFACT_DIR}/claude-failure-analysis.json"
+  > "${ARTIFACT_DIR}/claude-failure-analysis.json" \
+  2> "${ARTIFACT_DIR}/claude-failure-analysis.log"
 CLAUDE_EXIT=$?
 set -e
 
