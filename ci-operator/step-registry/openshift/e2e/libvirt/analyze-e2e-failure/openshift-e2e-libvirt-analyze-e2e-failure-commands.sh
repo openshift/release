@@ -101,8 +101,6 @@ LIBVIRT CONTEXT:
 - Z uses cluster profile libvirt-s390x-vpn. Power uses libvirt-ppc64le-s2s.
 - Install steps: upi-conf-libvirt, upi-install-libvirt. Test step: openshift-e2e-libvirt-test.
 - ARCH is ${ARCH:-unknown}.
-- Power (ppc64le) injects chrony to clock.corp.redhat.com. Z (s390x) RHCOS 10 KVM guests may have a broken PHC refclock; LPAR NTP is the libvirt gateway 192.168.<subnet>.1.
-- Serial jobs (TEST_TYPE=conformance-serial) include oc adm upgrade recommend, which fails when NodeClockNotSynchronising fires.
 - Prefer evidence from junit, install logs, node journals, and MachineConfigs over speculation."
 
 echo ""
