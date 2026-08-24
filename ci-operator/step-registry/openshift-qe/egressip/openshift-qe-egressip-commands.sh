@@ -14,7 +14,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    set -o pipefail
    podman ps -q --filter ancestor=quay.io/cloud-bulldozer/nginxecho | xargs -r podman stop
    podman ps -aq --filter ancestor=quay.io/cloud-bulldozer/nginxecho | xargs -r podman rm
-   for port in {9002..9020}; do
+   for port in {9002..9061}; do
       podman run --network=host -d -e LISTEN_PORT=\$port quay.io/cloud-bulldozer/nginxecho:latest
    done
 "
@@ -46,11 +46,20 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
 fi
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=egressip
+
+current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
+
+if [[ -n "${ITERATIONS}" ]]; then
+  export ITERATIONS
+else
+  ITERATIONS=$(awk "BEGIN {printf \"%d\", int($ITERATION_MULTIPLIER * $current_worker_count)}")
+  export ITERATIONS
+fi
 
 EXTRA_FLAGS="--gc-metrics=false --pod-ready-threshold=$POD_READY_THRESHOLD --addresses-per-iteration=$ADDRESSES_PER_ITERATION --profile-type=${PROFILE_TYPE}"
 
@@ -62,6 +71,11 @@ fi
 
 export EXTRA_FLAGS
 
+# Pre-load egressip test image on all worker nodes sequentially
+for node in $(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}'); do
+  echo "Pre-loading image on node ${node}..."
+  oc debug "node/${node}" -n default -- chroot /host crictl pull quay.io/cloud-bulldozer/eipvalidator:latest
+done
 
 # Run workload immediately
 ./run.sh

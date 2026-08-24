@@ -8,23 +8,23 @@ base_images:
     namespace: ci
     tag: latest
   cli:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: cli
   tests-private:
     name: tests-private
     namespace: ci
     tag: latest
   upi-installer:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
     tag: upi-installer
 binary_build_commands: make go-mod-tidy;make all
 build_root:
   image_stream_tag:
-    name: builder-priv
-    namespace: ocp-private
-    tag: rhel-9-golang-1.25-openshift-4.23
+    name: builder
+    namespace: ocp-priv
+    tag: rhel-9-golang-1.26-openshift-5.0
 canonical_go_repository: github.com/openshift/openshift-tests-private
 images:
   items:
@@ -57,20 +57,23 @@ promotion:
   - excluded_images:
     - tests-private-ui
     - tests-private-pr
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "5.1"
+    namespace: ocp-priv
+prowgen:
+  expose: true
+  private: true
 releases:
   arm64-latest:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.1"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.1"
 resources:
   '*':
     limits:
@@ -231,33 +234,6 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
-- as: debug-winc-vsphere-ipi
-  optional: true
-  run_if_changed: test/extended/winc/
-  steps:
-    cluster_profile: vsphere-connected-2
-    env:
-      FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
-- as: debug-winc-nutanix-ipi
-  optional: true
-  run_if_changed: test/extended/winc/
-  steps:
-    cluster_profile: nutanix-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      OVERRIDE_RHCOS_IMAGE: https://rhcos.mirror.openshift.com/art/storage/prod/streams/rhel-9.6/builds/9.6.20260323-1/x86_64/rhcos-9.6.20260323-1-nutanix.x86_64.qcow2
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~Disruptive&;~Serial&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "1551"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-nutanix-ipi-ovn-winc
 - as: debug-winc-aws-upi
   optional: true
   run_if_changed: test/extended/winc/

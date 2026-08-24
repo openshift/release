@@ -1,16 +1,24 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   operator-sdk:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: windows-machine-config-operator-test
+  tls-scanner-tool:
+    name: "5.1"
+    namespace: ocp
+    tag: tls-scanner-tool
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -19,13 +27,14 @@ images:
   items:
   - dockerfile_path: build/Dockerfile.ci
     to: windows-machine-config-operator-test
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 operator:
   bundles:
   - as: wmco-bundle
     context_dir: .
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
+    skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   substitutions:
   - pullspec: REPLACE_IMAGE
     with: pipeline:windows-machine-config-operator-test
@@ -33,17 +42,17 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -69,14 +78,14 @@ tests:
   commands: make lint
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 - as: unit
   commands: make unit
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 - as: security
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     env:
       PROJECT_NAME: windows-machine-config-operator
@@ -93,8 +102,49 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
+  as: aws-e2e-ote
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: wmco-setup-and-test
+      cli: latest
+      commands: |
+        export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-aws-ovn-hybrid
+- always_run: false
   as: aws-e2e-operator-windows-server-2025
   cron: 0 2 * * 1
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -106,6 +156,13 @@ tests:
     workflow: ipi-aws-ovn-hybrid
 - as: aws-e2e-olmv1-install
   cron: 0 9 * * 1
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: openshift-org-aws
@@ -124,6 +181,7 @@ tests:
     - ref: windows-conf-operator-olmv1
 - always_run: false
   as: vsphere-disconnected-e2e-operator
+  optional: true
   skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: vsphere-dis-2
@@ -140,18 +198,6 @@ tests:
 - always_run: false
   as: azure-e2e-operator
   skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
-  steps:
-    cluster_profile: openshift-org-azure
-    env:
-      COMPUTE_NODE_REPLICAS: "1"
-      CONTROL_PLANE_REPLICAS: "1"
-      WINDOWS_SERVER_VERSION: "2019"
-    test:
-    - ref: windows-e2e-operator-test
-    workflow: ipi-azure-ovn-hybrid
-- always_run: false
-  as: azure-e2e-operator-2025
-  cron: 0 2 * * 1
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -176,6 +222,13 @@ tests:
 - always_run: false
   as: gcp-e2e-operator-2025
   cron: 0 2 * * 1
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -196,6 +249,13 @@ tests:
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - as: vsphere-e2e-operator-fips
   cron: 0 9 * * 1
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
   steps:
     cluster_profile: vsphere-connected-2
     env:
@@ -207,6 +267,13 @@ tests:
 - always_run: false
   as: vsphere-e2e-operator-2025
   cron: 0 2 * * 1
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -216,6 +283,13 @@ tests:
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - as: vsphere-e2e-ccm-install
   cron: 38 14 * * 2
+  reporter_config:
+    channel: '#forum-ocp-winc'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: <!subteam^S025TMX0LF3> Job {{.Spec.Job}} ended with {{.Status.State}}.
+      <{{.Status.URL}}|View logs>. Please investigate.
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -343,8 +417,8 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: community-4.21
-      SOURCE_BRANCH: release-4.21
+      DESTINATION_BRANCH: community-5.0
+      SOURCE_BRANCH: release-5.0
     workflow: windows-ci-fastforward
 - always_run: false
   as: nutanix-e2e-operator
@@ -355,6 +429,36 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-nutanix-ovn-hybrid
+- always_run: false
+  as: tls-scanner
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_REPLICAS: "1"
+      SCAN_NAMESPACE: openshift-windows-machine-config-operator
+    test:
+    - ref: openshift-windows-install-wmco
+    - ref: tls-scanner-run
+    workflow: ipi-aws-ovn-hybrid
+- as: periodic-jira-agent
+  cron: 0 9 * * *
+  steps:
+    env:
+      JIRA_AGENT_MAX_ISSUES: "1"
+    workflow: windows-jira-agent
+- as: periodic-review-agent
+  cron: '@yearly'
+  steps:
+    workflow: windows-review-agent
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: windows-review-agent-trigger
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -57,8 +57,8 @@ function annotate() {
 	local conf="${base}/core-services/release-controller/_releases/release-$3"
 
 	if [[ -n "${private}" ]]; then
-        conf="${base}/core-services/release-controller/_releases/priv/release-$3"
-    fi
+		conf="${base}/core-services/release-controller/_releases/priv/release-$3"
+	fi
 
 	if [[ -s "${conf}" ]]; then
 		echo "${conf}"
@@ -81,8 +81,14 @@ function annotate() {
 
 for release in ${releases[@]}; do
 	annotate "origin" "${release}" "okd-${release}.json"
+	annotate "origin" "scos-${release}" "okd-scos-${release}.json"
 	annotate "origin" "scos-${release}" "okd-scos-${release}-ci.json"
 	annotate "origin" "scos-${release}-art" "okd-scos-${release}-art.json"
+
+	annotate "origin-arm64" "${release}-arm64" "okd-${release}-arm64.json"
+	annotate "origin-arm64" "scos-${release}-arm64" "okd-scos-${release}-arm64.json"
+	annotate "origin-arm64" "scos-${release}-arm64" "okd-scos-${release}-ci-arm64.json"
+	annotate "origin-arm64" "scos-${release}-art-arm64" "okd-scos-${release}-art-arm64.json"
 
 	annotate "ocp" "${release}" "ocp-${release}-ci.json"
 	annotate "ocp" "${release}-art-latest" "ocp-${release}.json"
@@ -105,6 +111,19 @@ done
 annotate "origin" "release" "okd-4.y-stable.json"
 annotate "origin" "release-scos" "okd-scos-4.y-stable.json"
 annotate "origin" "release-scos-next" "okd-scos-4.y-next.json"
+
+# OKD 4.y-stable release streams (arm64)
+annotate "origin-arm64" "release-arm64" "okd-4.y-stable-arm64.json"
+annotate "origin-arm64" "release-scos-arm64" "okd-scos-4.y-stable-arm64.json"
+annotate "origin-arm64" "release-scos-next-arm64" "okd-scos-4.y-next-arm64.json"
+
+# OKD 5.y-stable release streams
+annotate "origin" "release-5-scos" "okd-scos-5.y-stable.json"
+annotate "origin" "release-5-scos-next" "okd-scos-5.y-next.json"
+
+# OKD 5.y-stable release streams (arm64)
+annotate "origin-arm64" "release-5-scos-arm64" "okd-scos-5.y-stable-arm64.json"
+annotate "origin-arm64" "release-5-scos-next-arm64" "okd-scos-5.y-next-arm64.json"
 
 # 4.y-stable release streams
 annotate "ocp" "release" "ocp-4.y-stable.json"

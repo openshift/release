@@ -5,11 +5,16 @@ presubmits:
     branches:
     - ^oadp-1\.4$
     - ^oadp-1\.4-
-    cluster: build11
+    cluster: build06
     context: ci/prow/4.18-ci-index
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     hidden: true
     labels:
       ci-operator.openshift.io/variant: "4.18"
@@ -54,9 +59,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -72,11 +74,16 @@ presubmits:
     branches:
     - ^oadp-1\.4$
     - ^oadp-1\.4-
-    cluster: build09
+    cluster: build12
     context: ci/prow/4.18-e2e-test-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -149,9 +156,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -167,11 +171,16 @@ presubmits:
     branches:
     - ^oadp-1\.4$
     - ^oadp-1\.4-
-    cluster: build09
-    context: ci/prow/4.18-e2e-test-hcp-aws
+    cluster: build12
+    context: ci/prow/4.18-e2e-test-cli-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -180,9 +189,10 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.18"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-oadp-operator-oadp-1.4-4.18-e2e-test-hcp-aws
+    name: pull-ci-openshift-priv-oadp-operator-oadp-1.4-4.18-e2e-test-cli-aws
+    optional: true
     path_alias: github.com/openshift/oadp-operator
-    rerun_command: /test 4.18-e2e-test-hcp-aws
+    rerun_command: /test 4.18-e2e-test-cli-aws
     run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
     spec:
       containers:
@@ -193,7 +203,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-test-hcp-aws
+        - --target=e2e-test-cli-aws
         - --variant=4.18
         command:
         - ci-operator
@@ -244,9 +254,6 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -256,17 +263,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.18-e2e-test-hcp-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.18-e2e-test-cli-aws,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^oadp-1\.4$
     - ^oadp-1\.4-
-    cluster: build11
+    cluster: build06
     context: ci/prow/4.18-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     hidden: true
     labels:
       ci-operator.openshift.io/variant: "4.18"
@@ -311,9 +323,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -329,19 +338,23 @@ presubmits:
     branches:
     - ^oadp-1\.4$
     - ^oadp-1\.4-
-    cluster: build09
-    context: ci/prow/images
+    cluster: build06
+    context: ci/prow/ci-bundle-oadp-operator-bundle
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     hidden: true
     labels:
-      capability/arm64: arm64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-oadp-operator-oadp-1.4-images
+    name: pull-ci-openshift-priv-oadp-operator-oadp-1.4-ci-bundle-oadp-operator-bundle
     path_alias: github.com/openshift/oadp-operator
-    rerun_command: /test images
+    rerun_command: /test ci-bundle-oadp-operator-bundle
     spec:
       containers:
       - args:
@@ -349,7 +362,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --target=oadp-operator-bundle
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -376,9 +389,75 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: manifest-tool-local-pusher
         secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-bundle-oadp-operator-bundle,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^oadp-1\.4$
+    - ^oadp-1\.4-
+    cluster: build12
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
+    hidden: true
+    labels:
+      capability/arm64: arm64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-oadp-operator-oadp-1.4-images
+    path_alias: github.com/openshift/oadp-operator
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=oadp-operator-bundle
+        - --target=test-oadp-operator
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -394,11 +473,16 @@ presubmits:
     branches:
     - ^oadp-1\.4$
     - ^oadp-1\.4-
-    cluster: build11
+    cluster: build06
     context: ci/prow/unit-test
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -458,9 +542,6 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

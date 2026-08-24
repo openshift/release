@@ -1,4 +1,32 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -49,9 +77,11 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - as: e2e-gcp-ovn-rhcos10-fips-techpreview-serial
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
       OS_IMAGE_STREAM: rhel-10
@@ -62,6 +92,7 @@ tests:
     - chain: ipi-gcp-pre
     - ref: fips-check
     workflow: openshift-e2e-gcp-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-no-capabilities
   interval: 168h
   steps:
@@ -101,6 +132,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-techpreview-serial
   interval: 168h
   shard_count: 3
@@ -112,6 +144,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-rhcos10-techpreview-serial
   interval: 12h
   shard_count: 3
@@ -125,6 +158,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-upgrade
   interval: 168h
   steps:
@@ -190,6 +224,7 @@ tests:
     workflow: openshift-e2e-azure-serial
 - as: e2e-azure-ovn-techpreview-serial
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -198,8 +233,10 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial
+  timeout: 5h0m0s
 - as: e2e-azure-ovn-rhcos10-techpreview-serial
   interval: 12h
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -209,6 +246,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial
+  timeout: 5h0m0s
 - as: e2e-azure-ovn-upgrade
   interval: 168h
   steps:
@@ -317,25 +355,31 @@ tests:
     workflow: openshift-e2e-gcp-mount-ns-hiding
 - as: e2e-gcp-ovn-techpreview-serial
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-rhcos10-techpreview-serial
   interval: 12h
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-usernamespace
   cron: '@daily'
   steps:

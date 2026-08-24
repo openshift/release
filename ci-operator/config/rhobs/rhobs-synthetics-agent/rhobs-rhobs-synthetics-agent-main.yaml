@@ -3,7 +3,7 @@ build_root:
 images:
   items:
   - dockerfile_path: Dockerfile
-    to: unused
+    to: rhobs-synthetics-agent
 resources:
   '*':
     limits:
@@ -33,6 +33,18 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: rhobs-synthetics-agent-codecov-token
+- as: e2e
+  commands: make test-e2e
+  container:
+    from: src
+- as: e2e-cluster
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    env:
+      COMPONENT: agent
+    workflow: rosa-synthetics-e2e
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)

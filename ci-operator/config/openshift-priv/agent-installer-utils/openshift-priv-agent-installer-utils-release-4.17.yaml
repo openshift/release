@@ -12,18 +12,20 @@ images:
     to: agent-installer-utils
 promotion:
   to:
-  - name: 4.17-priv
-    namespace: ocp-private
+  - name: "4.17"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.17-priv
-      namespace: ocp-private
+      name: "4.17"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
-      namespace: ocp-private
+      name: "4.17"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -33,10 +35,11 @@ resources:
       memory: 200Mi
 test_binary_build_commands: dnf install -y nmstate-devel
 tests:
-- as: e2e-agent-bad-dns
+- always_run: false
+  as: e2e-agent-bad-dns
   capabilities:
   - intranet
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  pipeline_skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -44,10 +47,11 @@ tests:
         AGENT_E2E_TEST_SCENARIO=SNO_IPV4
         AGENT_TEST_CASES=bad_dns
     workflow: agent-e2e-generic
-- as: e2e-agent-compact-ipv4
+- always_run: false
+  as: e2e-agent-compact-ipv4
   capabilities:
   - intranet
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  pipeline_skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4

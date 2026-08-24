@@ -25,18 +25,20 @@ images:
     to: aws-cluster-api-controllers
 promotion:
   to:
-  - name: 4.18-priv
-    namespace: ocp-private
+  - name: "4.18"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.18-priv
-      namespace: ocp-private
+      name: "4.18"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.18-priv
-      namespace: ocp-private
+      name: "4.18"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -65,8 +67,9 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
@@ -78,8 +81,9 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
-- as: e2e-aws-serial
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-serial
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
@@ -95,8 +99,9 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: e2e-hypershift
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-hypershift
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
@@ -106,11 +111,6 @@ tests:
   container:
     from: commitchecker
   optional: true
-- as: security
-  steps:
-    env:
-      PROJECT_NAME: cluster-api-provider-aws
-    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-priv

@@ -19,7 +19,7 @@ Make a softlink to each folder.
 ```
 $ cd build-clusters/vsphere
 $ ln -s ../common common
-$ ln -s ../common_except_app.ci common_except_app.ci
+$ ln -s ../build-shared build-shared
 ```
 
 Create a pull request with the changes above.
@@ -31,11 +31,11 @@ See [OpenShift documentation](https://docs.openshift.com/container-platform/4.11
 
 Create the namespaces:
 
-> oc apply -f clusters/build-clusters/common/00_namespaces.yaml
+> oc apply -f clusters/build-clusters/build-shared/bootstrap/00_namespaces.yaml
 
 Create the SA for the `appyconfig` job:
 
-> oc apply -f clusters/build-clusters/common/prow/admin_config-updater_rbac.yaml
+> oc apply -f clusters/build-clusters/build-shared/prow/admin_config-updater_rbac.yaml
 
 Note that this will promote `system:serviceaccount:ci:config-updater` to `cluster-admin`.
 

@@ -6,21 +6,62 @@ EXTRA_ARGS=""
 HCP_CLI="bin/hypershift"
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
 
-if [[ $HO_MULTI == "true" ]]; then
-  OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
-  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-  mkdir /tmp/hs-cli
-  oc image extract quay.io/acm-d/rhtap-hypershift-operator:latest --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
-  chmod +x /tmp/hs-cli/hypershift
-  HCP_CLI="/tmp/hs-cli/hypershift"
-elif [[ $INSTALL_FROM_LATEST == "true" ]]; then
-  # We should use the hypershift cli from the HYPERSHIFT_RELEASE_LATEST
-  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-  mkdir /tmp/hs-cli
-  oc image extract $HYPERSHIFT_RELEASE_LATEST --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
-  chmod +x /tmp/hs-cli/hypershift
-  HCP_CLI="/tmp/hs-cli/hypershift"
+extract_hcp_cli() {
+  local image=$1
+  local cli_dir
+  cli_dir="$(mktemp -d "${TMPDIR:-/tmp}/hs-cli.XXXXXX")"
+  oc image extract "${image}" --path "/usr/bin/hypershift:${cli_dir}" \
+    --registry-config=/etc/ci-pull-credentials/.dockerconfigjson \
+    --filter-by-os="linux/amd64" --confirm
+  chmod +x "${cli_dir}/hypershift"
+  HCP_CLI="${cli_dir}/hypershift"
+}
+
+# Gangway does not strip the MULTISTAGE_PARAM_OVERRIDE_ prefix, so the HO release
+# controller passes the image via the prefixed variable and we copy it here.
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE="${MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
 fi
+
+OVERRIDE_COUNT=0
+if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+if [[ "${HO_MULTI}" == "true" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+if [[ "${INSTALL_FROM_LATEST}" == "true" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+
+if [[ ${OVERRIDE_COUNT} -gt 1 ]]; then
+  echo "WARNING: Multiple image override flags are set. Precedence (highest to lowest):"
+  echo "  1. OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE"
+  echo "  2. HO_MULTI"
+  echo "  3. INSTALL_FROM_LATEST"
+fi
+
+if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  echo "WARNING: Overriding OPERATOR_IMAGE"
+  echo "  Default: ${HYPERSHIFT_RELEASE_LATEST}"
+  echo "  Override: ${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
+  OPERATOR_IMAGE="${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
+  extract_hcp_cli "${OPERATOR_IMAGE}"
+elif [[ "${HO_MULTI}" == "true" ]]; then
+  # extract_hcp_cli uses --filter-by-os=linux/amd64 because the step container is always amd64
+  echo "WARNING: Using ACM downstream multi-arch operator image (CI pipeline builds amd64 only)"
+  echo "  Default: ${HYPERSHIFT_RELEASE_LATEST}"
+  echo "  Override: quay.io/acm-d/rhtap-hypershift-operator:latest"
+  OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
+  extract_hcp_cli "${OPERATOR_IMAGE}"
+elif [[ "${INSTALL_FROM_LATEST}" == "true" ]]; then
+  # We should use the hypershift cli from the HYPERSHIFT_RELEASE_LATEST
+  echo "WARNING: Extracting hcp CLI from dependency image instead of step container"
+  echo "  Image: ${OPERATOR_IMAGE}"
+  extract_hcp_cli "${OPERATOR_IMAGE}"
+fi
+
+INSTALL_HELP=$("${HCP_CLI}" install --help 2>&1 || true)
 
 if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --tech-preview-no-upgrade"
@@ -57,10 +98,16 @@ if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
 fi
 
 OCP_VERSION="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep -oP '(?<=^  Version:  ).*$' | grep -oE '^[0-9]+\.[0-9]+')"
-EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=registry.ci.openshift.org/ocp/${OCP_VERSION}:cluster-api-provider-kubevirt"
+if echo "${INSTALL_HELP}" | grep -q -- '--additional-operator-env-vars'; then
+  EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=quay-proxy.ci.openshift.org/openshift/ci:ocp_${OCP_VERSION}_cluster-api-provider-kubevirt"
+fi
 
 case "${CLOUD_PROVIDER}" in
   AWS)
+    if echo "${INSTALL_HELP}" | grep -q -- '--scale-from-zero-provider'; then
+      EXTRA_ARGS="${EXTRA_ARGS} --scale-from-zero-provider aws --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials"
+    fi
+
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
     --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
     --oidc-storage-provider-s3-bucket-name=hypershift-ci-oidc \
@@ -73,8 +120,6 @@ case "${CLOUD_PROVIDER}" in
     --external-dns-provider=aws \
     --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
     --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
-    --scale-from-zero-provider aws \
-    --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials \
     --wait-until-available \
     ${EXTRA_ARGS}
     ;;
@@ -97,7 +142,11 @@ case "${CLOUD_PROVIDER}" in
 
     if [ "${AZURE_SELF_MANAGED}" == "true" ]; then
       AZURE_MANAGED_SERVICE_ARGS=""
-      # Keep external DNS enabled - domain filter is set via HYPERSHIFT_EXTERNAL_DNS_DOMAIN env var
+      if [[ "${AZURE_EXTERNAL_DNS_DOMAIN}" != *"aks-e2e"* ]] && [ -f "/etc/hypershift-ci-jobs-self-managed-azure-e2e/dns-creds.json" ]; then
+        AZURE_EXTERNAL_DNS_ARGS="--external-dns-provider=azure \
+          --external-dns-credentials=/etc/hypershift-ci-jobs-self-managed-azure-e2e/dns-creds.json \
+          --external-dns-domain-filter=${AZURE_EXTERNAL_DNS_DOMAIN}"
+      fi
 
       # Enable Azure private platform support (Private Link Services) if credentials and resource group are provided.
       # Values can come from env vars or from SHARED_DIR files written by the
@@ -143,7 +192,6 @@ case "${CLOUD_PROVIDER}" in
   # Install HyperShift operator
   # The --pull-secret flag creates the pull-secret in the hypershift namespace
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-  --enable-conversion-webhook=false \
   --external-dns-provider=google \
   --external-dns-domain-filter="${HYPERSHIFT_CI_DNS_DOMAIN}" \
   --external-dns-google-project="${HYPERSHIFT_CI_PROJECT}" \

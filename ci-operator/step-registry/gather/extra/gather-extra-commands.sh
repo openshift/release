@@ -1,4 +1,22 @@
 #!/bin/bash
+function retry() {
+  local max_retries="${1}"; shift
+  local delay="${1}"; shift
+  local count=0
+  until "${@}"; do
+    local exit_code=$?
+    count=$((count + 1))
+    if [[ "${count}" -lt "${max_retries}" ]]; then
+      echo "Command failed (attempt ${count}/${max_retries}), retrying in ${delay}s: ${*}" >&2
+      sleep "${delay}"
+    else
+      echo "Command failed after ${max_retries} attempts: ${*}" >&2
+      return "${exit_code}"
+    fi
+  done
+  return 0
+}
+
 function queue() {
   local TARGET="${1}"
   shift
@@ -36,13 +54,13 @@ fi
 echo "Gathering artifacts ..."
 mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds ${ARTIFACT_DIR}/inspect
 
-oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
-oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
-oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api
+oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes || true
+oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers || true
+oc --insecure-skip-tls-verify --request-timeout=5s get pods -l openshift.io/component=api --all-namespaces --template '{{ range .items }}-n {{ .metadata.namespace }} {{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/pods-api || true
 
 oc --insecure-skip-tls-verify --request-timeout=5s adm inspect clusteroperators --dest-dir ${ARTIFACT_DIR}/inspect || true
 
-PLATFORM=$(oc get infrastructure cluster -o jsonpath="{.status.platform}")
+PLATFORM=$(retry 3 5 oc --request-timeout=5s get infrastructure cluster -o jsonpath="{.status.platform}") || true
 CAPI_PLATFORM=$(echo "$PLATFORM" | tr '[:upper:]' '[:lower:]')
 
 if [[ "${CAPI_PLATFORM}" == "baremetal" ]]; then
@@ -138,6 +156,7 @@ queue ${ARTIFACT_DIR}/releaseinfo.json oc --insecure-skip-tls-verify --request-t
 queue ${ARTIFACT_DIR}/clusterrolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterrolebindings --all-namespaces -o json
 queue ${ARTIFACT_DIR}/networkpolicies.json oc --insecure-skip-tls-verify --request-timeout=5s get networkpolicies --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/networkpolicies oc --insecure-skip-tls-verify --request-timeout=5s get networkpolicies --all-namespaces
+queue ${ARTIFACT_DIR}/pacemakercluster-cluster.json oc --insecure-skip-tls-verify --request-timeout=5s get pacemakerclusters cluster -ojson
 
 FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
@@ -147,6 +166,10 @@ while IFS= read -r i; do
   queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/audit.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --path=audit/audit.log
+  mcd=$( oc --insecure-skip-tls-verify --request-timeout=20s -n openshift-machine-config-operator get pod --field-selector=spec.nodeName=${i} -l k8s-app=machine-config-daemon -o name 2>/dev/null | head -1 )
+  if [[ -n "${mcd}" ]]; then
+    queue ${ARTIFACT_DIR}/nodes/$i/lsmod oc --insecure-skip-tls-verify -n openshift-machine-config-operator exec ${mcd} -c machine-config-daemon -- chroot /rootfs lsmod
+  fi
 done < /tmp/nodes
 
 echo "INFO: gathering the audit logs for each master"
@@ -156,7 +179,7 @@ for path in "${paths[@]}" ; do
   mkdir -p "$output_dir"
 
   # Skip downloading of .terminating and .lock files.
-  oc adm node-logs --role=master --path="$path" | \
+  oc --request-timeout=30s adm node-logs --role=master --path="$path" | \
     grep -v ".terminating" | \
     grep -v ".lock" | \
   tee "${output_dir}.audit_logs_listing"
@@ -181,7 +204,7 @@ if oc adm must-gather --help 2>&1 | grep -q -- '--volume-percentage'; then
    VOLUME_PERCENTAGE_FLAG="--volume-percentage=100"
 fi
 
-oc get node -oname | xargs oc adm must-gather $VOLUME_PERCENTAGE_FLAG -- /usr/bin/gather_multus_logs
+oc --request-timeout=10s get node -oname | xargs oc adm must-gather $VOLUME_PERCENTAGE_FLAG -- /usr/bin/gather_multus_logs || echo "WARNING: gather_multus_logs failed, continuing"
 popd || return
 
 # If the tcpdump-service or conntrackdump-service step was used, grab the files.
@@ -191,7 +214,7 @@ for capture_type in tcpdump conntrackdump; do
   mkdir -p "$output_dir"
 
   # Skip downloading of .terminating and .lock files.
-  oc adm node-logs -l kubernetes.io/os=linux --path="/${capture_type}" | \
+  oc --request-timeout=30s adm node-logs -l kubernetes.io/os=linux --path="/${capture_type}" | \
   grep -v ".terminating" | \
   grep -v ".lock" | \
   tee "${output_dir}.${capture_type}_listing"
@@ -213,12 +236,12 @@ echo "INFO: Fetching debug info from etcd pods if present"
 output_dir="${ARTIFACT_DIR}/etcd-debug"
 mkdir -p "$output_dir"
 TARGET_FILES="cpu.prof"
-for pqn in $(oc get pods -n openshift-etcd -l app=etcd --no-headers -o=name); do
+for pqn in $(oc --request-timeout=10s get pods -n openshift-etcd -l app=etcd --no-headers -o=name 2>/dev/null || true); do
 	echo ${pqn}
 	pod_name=$(echo ${pqn} | cut -d '/' -f 2)
 	for file_name in $TARGET_FILES; do
 		DEST_FILE="${output_dir}/${pod_name}_${file_name}"
-		oc cp openshift-etcd/${pod_name}:/var/lib/etcd/debug/${file_name} ${DEST_FILE}
+		oc cp openshift-etcd/${pod_name}:/var/lib/etcd/debug/${file_name} ${DEST_FILE} || true
 	done
 done
 echo "INFO: done attempting to fetch etcd debug info"
@@ -238,7 +261,7 @@ function gather_network() {
   local podlist="/tmp/${namespace}-pods"
 
   # Snapshot iptables/nftables rules on each node
-  oc --insecure-skip-tls-verify --request-timeout=20s get -n "${namespace}" -l "${selector}" pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > ${podlist}
+  oc --insecure-skip-tls-verify --request-timeout=20s get -n "${namespace}" -l "${selector}" pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > ${podlist} || true
   while IFS= read -r i; do
     queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i iptables-save -c
     if [[ ${netfilter} == "nftables" ]]; then
@@ -253,8 +276,8 @@ function gather_network() {
 
 # Gather network details both from SDN and OVN. One of them should succeed.
 gather_network openshift-sdn app=sdn sdn iptables
-sample_node=$(oc get no -o jsonpath='{.items[0].metadata.name}')
-sample_node_zone=$(oc get node "${sample_node}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/zone-name}')
+sample_node=$(retry 3 5 oc --request-timeout=10s get no -o jsonpath='{.items[0].metadata.name}') || true
+sample_node_zone=$(retry 3 5 oc --request-timeout=10s get node "${sample_node}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/zone-name}') || true
 if [ "${sample_node}" = "${sample_node_zone}" ]; then
   echo "INFO: INTERCONNECT MODE"
   ovnkube_container=ovnkube-controller
@@ -282,7 +305,7 @@ while IFS= read -r i; do
   FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs ${options} --request-timeout=20s -p $i
 done < /tmp/containers
 
-prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found -o name )"
+prometheus="$( retry 3 5 oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found -o name )" || true
 if [[ -n "${prometheus}" ]]; then
 	echo "${prometheus}" | while read prompod; do
 	  prompod=${prompod#"pod/"}
@@ -763,12 +786,12 @@ else
       source "${SHARED_DIR}/unset-proxy.sh"
     fi
     # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
-    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
+    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >${ARTIFACT_DIR}/jq && chmod ug+x ${ARTIFACT_DIR}/jq
     if test -f "${SHARED_DIR}/proxy-conf.sh"; then
         # shellcheck disable=SC1090
         source "${SHARED_DIR}/proxy-conf.sh"
     fi
-    <${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
+    <${ARTIFACT_DIR}/clusteroperators.json ${ARTIFACT_DIR}/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
 fi
 
 # This is an experimental wiring of autogenerated failure detection.

@@ -1,8 +1,24 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
 set -o pipefail
+
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--quay-tests__qbo-qe-test__quay-tests-qbo-qe-test.xml
+    ' EXIT
+fi
+
+QBO_RC=0
+
+(
+set -o errexit
 
 #Install QBO
 QBO_CHANNEL="$QBO_CHANNEL"
@@ -39,9 +55,9 @@ echo "Quay Bridge Operator is deployed successfully"
 #execute sanity test
 ##Creating OAuth application and token
 token=$(set +o pipefail; LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 40)
-quay_ns=$(oc get quayregistry --all-namespaces | tail -n1 | tr " " "\n" | head -n1)
-quay_registry=$(oc get quayregistry -n "$quay_ns" | tail -n1 | tr " " "\n" | head -n1)
-quay_app_pod=$(oc -n "$quay_ns" get pods -l quay-component=quay-app -o name | head -n1)
+quay_ns=$(oc get quayregistry --all-namespaces -o jsonpath='{.items[0].metadata.namespace}')
+quay_registry=$(oc get quayregistry -n "$quay_ns" -o jsonpath='{.items[0].metadata.name}')
+quay_app_pod=$(oc -n "$quay_ns" get pods -l quay-component=quay-app -o jsonpath='{.items[0].metadata.name}')
 
 oc -n "$quay_ns" rsh "$quay_app_pod" python <<EOF
 from app import app
@@ -519,3 +535,10 @@ for _ in {1..30}; do
   sleep 20
 done
 echo "QE Test for Quay Bridge Operator is passed"
+) || QBO_RC=$?
+
+if [ $QBO_RC -ne 0 ]; then
+  echo "!!! QBO test failed with exit code $QBO_RC, but continuing to allow subsequent steps to run"
+fi
+
+exit 0

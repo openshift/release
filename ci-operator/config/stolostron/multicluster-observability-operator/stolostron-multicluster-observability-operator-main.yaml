@@ -7,30 +7,30 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 images:
   items:
-  - dockerfile_path: operators/multiclusterobservability/Dockerfile
+  - dockerfile_path: operators/multiclusterobservability/Containerfile.operator
     from: base
     to: multicluster-observability-operator
-  - dockerfile_path: proxy/Dockerfile
+  - dockerfile_path: proxy/Containerfile.operator
     from: base
     to: rbac-query-proxy
-  - dockerfile_path: operators/endpointmetrics/Dockerfile
+  - dockerfile_path: operators/endpointmetrics/Containerfile.operator
     from: base
     to: endpoint-monitoring-operator
   - dockerfile_path: tests/Dockerfile
     from: base
     to: observability-e2e-test
-  - dockerfile_path: collectors/metrics/Dockerfile
+  - dockerfile_path: collectors/metrics/Containerfile.operator
     from: base
     to: metrics-collector
-  - dockerfile_path: loaders/dashboards/Dockerfile
+  - dockerfile_path: loaders/dashboards/Containerfile.operator
     from: base
     to: grafana-dashboard-loader
 promotion:
   to:
-  - name: "2.17"
+  - name: "5.1"
     namespace: stolostron
 resources:
   '*':
@@ -137,14 +137,15 @@ tests:
     dependencies:
       COMPONENT_IMAGE_REF: multicluster-observability-operator
     env:
-      ACM_RELEASE_VERSION: release-2.16
+      ACM_RELEASE_VERSION: release-2.17
       CLUSTERPOOL_GROUP_NAME: Core-Services
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
-      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-421
-      CLUSTERPOOL_LIFETIME: 1h
+      CLUSTERPOOL_HUB_FILTER: sno-4xlarge-422
+      CLUSTERPOOL_LIFETIME: 2h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: "422"
       CLUSTERPOOL_MANAGED_COUNT: "1"
-      CLUSTERPOOL_MANAGED_FILTER: sno-421
+      CLUSTERPOOL_MANAGED_FILTER: sno-422
       COMPONENT_NAME: multicluster-observability-operator
       DEPLOY_HUB_ADDITIONAL_YAML: |
         LS0tCmFwaVZlcnNpb246IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8vdjEKa2luZDogQ2x1c3Rl
@@ -239,7 +240,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.17
+      DESTINATION_BRANCH: release-5.1
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

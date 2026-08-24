@@ -1,0 +1,27 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
+prowgen:
+  expose: true
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 100Mi
+tests:
+- as: fast-forward
+  interval: 2h
+  steps:
+    env:
+      DESTINATION_VERSIONS: 5.1 5.2
+      LAST_RELEASE_VERSION: "5.0"
+      REPO_MAP_PATH: product/component-registry.yaml
+      SKIP_VERSIONS_PATH: product/fastforward-skip.yaml
+    workflow: ocm-ci-fastforward-multiple
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: acm-config

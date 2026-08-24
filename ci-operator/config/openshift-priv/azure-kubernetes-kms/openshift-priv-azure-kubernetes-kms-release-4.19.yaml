@@ -1,4 +1,8 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -12,8 +16,10 @@ images:
     to: azure-kms-encryption-provider
 promotion:
   to:
-  - name: 4.19-priv
-    namespace: ocp-private
+  - name: "4.19"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     candidate:
@@ -24,8 +30,8 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
-      namespace: ocp-private
+      name: "4.19"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -38,10 +44,13 @@ tests:
   commands: make unit-test
   container:
     from: src
-- as: e2e-hypershift
+- always_run: false
+  as: e2e-hypershift
   steps:
-    cluster_profile: hypershift-aws
-    workflow: hypershift-aws-e2e-external
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+    workflow: hypershift-azure-aks-e2e
 - as: verify-deps
   steps:
     env:

@@ -8,7 +8,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 canonical_go_repository: github.com/stolostron/ocm
 images:
   items:
@@ -32,16 +32,18 @@ promotion:
   - disabled: true
     name: "2.17"
     namespace: stolostron
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -102,7 +104,7 @@ tests:
         echo "PLACEMENT_IMAGE=$PLACEMENT_IMAGE"
         echo "ADDON_MANAGER_IMAGE=$ADDON_MANAGER_IMAGE"
         set -o pipefail
-        make test-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        SKIP_IMAGE_BUILD=true make test-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
         set +o pipefail
       dependencies:
       - env: OPERATOR_IMAGE_NAME

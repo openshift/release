@@ -1,30 +1,30 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   cluster-api-provider-agent:
-    name: ocm-2.17
+    name: backplane-5.0
     namespace: edge-infrastructure
     tag: cluster-api-provider-agent
   dev-scripts:
@@ -35,12 +35,12 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  postgresql-15-c9s:
+  postgresql-16-c9s:
     name: postgresql
     namespace: ci
-    tag: postgresql-15-c9s
+    tag: postgresql-16-c9s
   upi-installer:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: upi-installer
   vsphere-ci-python:
@@ -109,24 +109,24 @@ operator:
     with: assisted-installer-controller
   - pullspec: quay.io/edge-infrastructure/assisted-image-service:latest
     with: assisted-image-service
-  - pullspec: quay.io/sclorg/postgresql-15-c9s:latest
-    with: postgresql-15-c9s
+  - pullspec: quay.io/sclorg/postgresql-16-c9s:latest
+    with: postgresql-16-c9s
 promotion:
   to:
-  - name: ocm-2.17
+  - name: backplane-5.0
     namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -355,10 +355,12 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: e2e-ai-operator-ztp
+- always_run: false
+  as: e2e-ai-operator-ztp
   capabilities:
   - intranet
-  run_if_changed: ^(cmd/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  optional: true
+  pipeline_run_if_changed: ^(cmd/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -367,7 +369,8 @@ tests:
     env:
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-periodic
+- always_run: false
+  as: e2e-ai-operator-ztp-periodic
   capabilities:
   - intranet
   cron: 0 21 * * 2,4,6
@@ -383,6 +386,7 @@ tests:
   as: e2e-ai-operator-ztp-3masters
   capabilities:
   - intranet
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -409,7 +413,8 @@ tests:
         SPOKE_WORKER_AGENTS=0
       NUM_EXTRA_WORKERS: "4"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-4masters-periodic
+- always_run: false
+  as: e2e-ai-operator-ztp-4masters-periodic
   capabilities:
   - intranet
   cron: 15 21 * * 2,4,6
@@ -441,7 +446,8 @@ tests:
         SPOKE_WORKER_AGENTS=0
       NUM_EXTRA_WORKERS: "5"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-3masters-periodic
+- always_run: false
+  as: e2e-ai-operator-ztp-3masters-periodic
   capabilities:
   - intranet
   cron: 30 21 * * 2,4,6
@@ -456,10 +462,11 @@ tests:
       CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-disconnected
+- always_run: false
+  as: e2e-ai-operator-ztp-disconnected
   capabilities:
   - intranet
-  run_if_changed: ^(deploy/operator/.*)$
+  pipeline_run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -470,7 +477,8 @@ tests:
       DISCONNECTED: "true"
       IP_STACK: v6
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-disconnected-periodic
+- always_run: false
+  as: e2e-ai-operator-ztp-disconnected-periodic
   capabilities:
   - intranet
   cron: 0 22 * * 2,4,6
@@ -533,7 +541,8 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-sno-day2-workers-periodic
+- always_run: false
+  as: e2e-ai-operator-ztp-sno-day2-workers-periodic
   capabilities:
   - intranet
   cron: 30 22 * * 2,4,6
@@ -549,7 +558,8 @@ tests:
       CLUSTERTYPE: assisted_large_el9
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-node-labels-periodic
+- always_run: false
+  as: e2e-ai-operator-ztp-node-labels-periodic
   capabilities:
   - intranet
   cron: 0 23 * * 1,4
@@ -608,7 +618,8 @@ tests:
         DAY2_LATE_BINDING=True
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
+- always_run: false
+  as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
   capabilities:
   - intranet
   cron: 0 23 * * 2,4,6
@@ -659,10 +670,11 @@ tests:
         DAY2_MASTERS=True
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-capi
+- always_run: false
+  as: e2e-ai-operator-ztp-capi
   capabilities:
   - intranet
-  run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+  pipeline_run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -674,7 +686,8 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-ofcir-baremetal-operator-capi
-- as: e2e-ai-operator-ztp-capi-periodic
+- always_run: false
+  as: e2e-ai-operator-ztp-capi-periodic
   capabilities:
   - intranet
   cron: 30 23 * * 2,4,6
@@ -690,10 +703,12 @@ tests:
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal-operator-capi
-- as: e2e-ai-operator-disconnected-capi
+- always_run: false
+  as: e2e-ai-operator-disconnected-capi
   capabilities:
   - intranet
-  run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+  optional: true
+  pipeline_run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -708,7 +723,8 @@ tests:
       DISCONNECTED: "true"
       IP_STACK: v6
     workflow: assisted-ofcir-baremetal-operator-capi
-- as: e2e-ai-operator-disconnected-capi-periodic
+- always_run: false
+  as: e2e-ai-operator-disconnected-capi-periodic
   capabilities:
   - intranet
   cron: 0 0 * * 3,5,0
@@ -757,7 +773,8 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-ofcir-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-remove-node-periodic
+- always_run: false
+  as: e2e-ai-operator-ztp-remove-node-periodic
   capabilities:
   - intranet
   cron: 30 0 * * 3,5,0
@@ -796,7 +813,7 @@ tests:
       NUM_EXTRA_WORKERS: "5"
     workflow: assisted-ofcir-baremetal-operator-ztp
 - always_run: false
-  as: e2e-metal-assisted-tpmv2-4-22
+  as: e2e-metal-assisted-tpmv2-5-0
   capabilities:
   - intranet
   optional: true
@@ -806,10 +823,10 @@ tests:
       ASSISTED_CONFIG: |
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tpmv2
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-tang-4-22
+  as: e2e-metal-assisted-tang-5-0
   capabilities:
   - intranet
   optional: true
@@ -819,10 +836,10 @@ tests:
       ASSISTED_CONFIG: |
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tang
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-ipv6-4-22
+  as: e2e-metal-assisted-ipv6-5-0
   capabilities:
   - intranet
   optional: true
@@ -832,10 +849,10 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-ipv4v6-4-22
+  as: e2e-metal-assisted-ipv4v6-5-0
   capabilities:
   - intranet
   optional: true
@@ -845,21 +862,22 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=yes
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-none-4-22
+- always_run: false
+  as: e2e-metal-assisted-none-5-0
   capabilities:
   - intranet
-  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
+  pipeline_run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-sno-4-22
+  as: e2e-metal-assisted-sno-5-0
   capabilities:
   - intranet
   optional: true
@@ -868,10 +886,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-static-ip-suite-4-22
+  as: e2e-metal-assisted-static-ip-suite-5-0
   capabilities:
   - intranet
   optional: true
@@ -880,10 +898,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-bond-4-22
+  as: e2e-metal-assisted-bond-5-0
   capabilities:
   - intranet
   optional: true
@@ -892,10 +910,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         IS_BONDED=true
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-ha-kube-api-ipv6-4-22
+  as: e2e-metal-assisted-ha-kube-api-ipv6-5-0
   capabilities:
   - intranet
   optional: true
@@ -908,10 +926,10 @@ tests:
         IPv6=true
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-ha-kube-api-ipv4-4-22
+  as: e2e-metal-assisted-ha-kube-api-ipv4-5-0
   capabilities:
   - intranet
   optional: true
@@ -924,20 +942,21 @@ tests:
         IPv6=false
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-4-22
+- always_run: false
+  as: e2e-metal-assisted-5-0
   capabilities:
   - intranet
-  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  pipeline_run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-onprem-4-22
+  as: e2e-metal-assisted-onprem-5-0
   capabilities:
   - intranet
   optional: true
@@ -946,12 +965,13 @@ tests:
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-4-16
   capabilities:
   - intranet
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -962,16 +982,18 @@ tests:
   as: e2e-metal-assisted-4-17
   capabilities:
   - intranet
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.17
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-lvm-4-22
+- always_run: false
+  as: e2e-metal-assisted-lvm-4-22
   capabilities:
   - intranet
-  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  pipeline_run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -985,7 +1007,7 @@ tests:
         OPENSHIFT_VERSION=4.22
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-osc-sno-4-22
+  as: e2e-metal-assisted-osc-sno-5-0
   capabilities:
   - intranet
   optional: true
@@ -998,12 +1020,13 @@ tests:
         NUM_WORKERS=0
         MASTER_MEMORY=18432
         MASTER_CPU=10
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-osc-4-22
+- always_run: false
+  as: e2e-metal-assisted-osc-5-0
   capabilities:
   - intranet
-  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/osc/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  pipeline_run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/osc/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1015,10 +1038,10 @@ tests:
         MASTER_CPU=5
         WORKER_MEMORY=10240
         WORKER_CPU=3
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-day2-4-22
+  as: e2e-metal-assisted-day2-5-0
   capabilities:
   - intranet
   optional: true
@@ -1027,10 +1050,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-day2-sno-4-22
+  as: e2e-metal-assisted-day2-sno-5-0
   capabilities:
   - intranet
   optional: true
@@ -1041,10 +1064,10 @@ tests:
         NUM_MASTERS=1
         NUM_WORKERS=0
         TEST_FUNC=test_deploy_day2_nodes_cloud
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-kube-api-late-binding-sno-4-22
+  as: e2e-metal-assisted-kube-api-late-binding-sno-5-0
   capabilities:
   - intranet
   optional: true
@@ -1057,7 +1080,7 @@ tests:
         WORKER_DISK=40000000000
         WORKER_CPU=3
         WORKER_MEMORY=10240
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
       CLUSTERTYPE: assisted_large_el9
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
@@ -1067,7 +1090,7 @@ tests:
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-kube-api-late-unbinding-sno-4-22
+  as: e2e-metal-assisted-kube-api-late-unbinding-sno-5-0
   capabilities:
   - intranet
   optional: true
@@ -1078,7 +1101,7 @@ tests:
         WORKER_DISK=40000000000
         WORKER_CPU=3
         WORKER_MEMORY=10240
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export HOLD_INSTALLATION=true
@@ -1086,7 +1109,7 @@ tests:
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-upgrade-agent-4-22
+  as: e2e-metal-assisted-upgrade-agent-5-0
   capabilities:
   - intranet
   optional: true
@@ -1096,11 +1119,11 @@ tests:
       ASSISTED_CONFIG: |
         TEST=./src/tests/test_upgrade_agent.py
         TEST_FUNC=test_upgrade_agent
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
       TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-day2-arm-workers-4-22
+  as: e2e-metal-assisted-day2-arm-workers-5-0
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1111,21 +1134,22 @@ tests:
         CONTROLLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-controller-ds-main:latest
         INSTALLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-ds-main:latest
         DAY2_CPU_ARCHITECTURE=arm64
-        OPENSHIFT_VERSION=4.22-multi
+        OPENSHIFT_VERSION=5.0-multi
     workflow: assisted-ofcir-baremetal-heterogeneous
-- as: e2e-vsphere-assisted-4-22
-  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
+- always_run: false
+  as: e2e-vsphere-assisted-5-0
+  pipeline_run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: vsphere-elastic
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - always_run: false
-  as: e2e-vsphere-assisted-umn-4-22
+  as: e2e-vsphere-assisted-umn-5-0
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -1134,67 +1158,69 @@ tests:
         NUM_WORKERS=0
         USER_MANAGED_NETWORKING=true
         MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - always_run: false
-  as: e2e-oci-assisted-4-22
+  as: e2e-oci-assisted-5-0
   optional: true
   steps:
     cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-oci
 - always_run: false
-  as: e2e-oci-assisted-bm-iscsi-4-22
+  as: e2e-oci-assisted-bm-iscsi-5-0
   optional: true
   steps:
     cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
         OCI_COMPUTE_SHAPE="BM.Standard2.52"
         OCI_CONTROL_PLANE_SHAPE="BM.Standard2.52"
     workflow: assisted-oci
 - always_run: false
-  as: e2e-oci-assisted-bm-4cp-4-22
+  as: e2e-oci-assisted-bm-4cp-5-0
   optional: true
   steps:
     cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
         OCI_COMPUTE_SHAPE="BM.Standard2.52"
         OCI_CONTROL_PLANE_SHAPE="BM.Standard2.52"
         NUM_MASTERS=4
         NUM_WORKERS=0
     workflow: assisted-oci
-- as: e2e-metal-assisted-external-4-22
+- always_run: false
+  as: e2e-metal-assisted-external-5-0
   capabilities:
   - intranet
-  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/external/.*|internal/provider/registry/.*)$
+  pipeline_run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/external/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-5-control-planes-4-22
+  as: e2e-metal-assisted-5-control-planes-5-0
   capabilities:
   - intranet
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=5
         NUM_WORKERS=0
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-4-control-planes-4-22
+  as: e2e-metal-assisted-4-control-planes-5-0
   capabilities:
   - intranet
   optional: true
@@ -1204,10 +1230,10 @@ tests:
       ASSISTED_CONFIG: |
         NUM_MASTERS=4
         NUM_WORKERS=1
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-4-masters-none-4-22
+  as: e2e-metal-assisted-4-masters-none-5-0
   capabilities:
   - intranet
   optional: true
@@ -1217,10 +1243,10 @@ tests:
       ASSISTED_CONFIG: |
         PLATFORM=none
         NUM_MASTERS=4
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-umlb-4-22
+  as: e2e-metal-assisted-umlb-5-0
   capabilities:
   - intranet
   optional: true
@@ -1229,10 +1255,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         LOAD_BALANCER_TYPE=user-managed
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-kube-api-umlb-4-22
+  as: e2e-metal-assisted-kube-api-umlb-5-0
   capabilities:
   - intranet
   optional: true
@@ -1246,10 +1272,10 @@ tests:
         LOAD_BALANCER_TYPE=user-managed
         IPv4=true
         IPv6=false
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-vsphere-assisted-umlb-4-22
+  as: e2e-vsphere-assisted-umlb-5-0
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -1257,20 +1283,21 @@ tests:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
         LOAD_BALANCER_TYPE=user-managed
       PLATFORM: vsphere
     workflow: assisted-vsphere-external-lb
-- as: e2e-metal-assisted-virtualization-4-21
+- always_run: false
+  as: e2e-metal-assisted-virtualization-4-22
   capabilities:
   - intranet
-  run_if_changed: ^(internal/operators/.*\.go)$
+  pipeline_run_if_changed: ^(internal/operators/.*\.go)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OLM_BUNDLES=virtualization
-        OPENSHIFT_VERSION=4.21
+        OPENSHIFT_VERSION=4.22
         MASTER_MEMORY=18700
         MASTER_CPU=10
         MASTER_DISK_COUNT=2
@@ -1280,7 +1307,7 @@ tests:
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-dual-primary-v6-compact-4-22
+  as: e2e-metal-assisted-dual-primary-v6-compact-5-0
   capabilities:
   - intranet
   optional: true
@@ -1291,12 +1318,12 @@ tests:
         IPv4=true
         IPv6=true
         PRIMARY_STACK="ipv6"
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
         NUM_WORKERS=0
         NUM_MASTERS=3
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-dual-stack-primary-ipv6-4-22
+  as: e2e-metal-assisted-dual-stack-primary-ipv6-5-0
   capabilities:
   - intranet
   optional: true
@@ -1307,13 +1334,14 @@ tests:
         IPv4=true
         IPv6=true
         PRIMARY_STACK="ipv6"
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-dual-primary-v6-compact-4-22-periodic
+  as: e2e-metal-assisted-dual-primary-v6-compact-5-0-periodic
   capabilities:
   - intranet
   cron: 0 1 * * 3,5,0
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1321,20 +1349,21 @@ tests:
         IPv4=true
         IPv6=true
         PRIMARY_STACK="ipv6"
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
         NUM_WORKERS=0
         NUM_MASTERS=3
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-openshift-ai-4-20
+- always_run: false
+  as: e2e-metal-assisted-openshift-ai-4-21
   capabilities:
   - intranet
-  run_if_changed: ^(internal/operators/.*\.go)$
+  pipeline_run_if_changed: ^(internal/operators/.*\.go)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OLM_BUNDLES=openshift-ai
-        OPENSHIFT_VERSION=4.20
+        OPENSHIFT_VERSION=4.21
         NUM_WORKERS=3
         WORKER_MEMORY=65536
         WORKER_CPU=20
@@ -1346,31 +1375,32 @@ tests:
       REQUIRED_MEMORY_GIB: "400"
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-vlan-4-22
+  as: e2e-metal-assisted-vlan-5-0
   capabilities:
   - intranet
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
         STATIC_IPS_VLAN=true
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-tna-4-22
+  as: e2e-metal-assisted-tna-5-0
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
         TNA_CLUSTERS_SUPPORT=true
         NUM_MASTERS=2
         NUM_ARBITERS=1
         NUM_WORKERS=0
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-kube-api-tna-4-22
+  as: e2e-metal-assisted-kube-api-tna-5-0
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -1379,7 +1409,7 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
         ENABLE_KUBE_API=true
-        OPENSHIFT_VERSION=4.22
+        OPENSHIFT_VERSION=5.0
         TNA_CLUSTERS_SUPPORT=true
         NUM_MASTERS=2
         NUM_ARBITERS=1

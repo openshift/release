@@ -3,18 +3,29 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+env_file="${SHARED_DIR}/aro-hcp-slot.env"
+if [[ -f "${env_file}" ]]; then
+    # shellcheck disable=SC1090
+    source "${env_file}"
+fi
+
+export LOCATION="${SELECTED_LOCATION:-${LOCATION:-}}"
+: "${LOCATION:?LOCATION must be provided by SELECTED_LOCATION or the legacy runtime slot export file}"
+
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
-export CUSTOMER_SUBSCRIPTION; CUSTOMER_SUBSCRIPTION=$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")
-export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscription-id")
+INFRA_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-${ARO_HCP_DEPLOY_ENV}-subscription-id")
+export INFRA_SUBSCRIPTION_ID
+export DEPLOY_ENV="${ARO_HCP_DEPLOY_ENV}"
+export AZURE_TOKEN_CREDENTIALS=prod
+
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
-az account set --subscription "${SUBSCRIPTION_ID}"
+az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 oc version
 kubelogin --version
-export DEPLOY_ENV="prow"
 
 BACKEND_DIGEST=$(echo ${BACKEND_IMAGE} | cut -d'@' -f2)
 BACKEND_REPOSITORY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
@@ -36,22 +47,42 @@ SESSIONGATE_REPOSITORY=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f1 | cut -d '/' 
 SESSIONGATE_SOURCE_REGISTRY=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
 echo "source registry set to ${SESSIONGATE_SOURCE_REGISTRY} and repo ${SESSIONGATE_REPOSITORY} for SessionGate Image"
 
+HCP_RECOVERY_DIGEST=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f2)
+HCP_RECOVERY_REPOSITORY=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+HCP_RECOVERY_SOURCE_REGISTRY=$(echo ${HCP_RECOVERY_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+echo "source registry set to ${HCP_RECOVERY_SOURCE_REGISTRY} and repo ${HCP_RECOVERY_REPOSITORY} for HCP Recovery Image"
+
+FLEET_DIGEST=$(echo ${FLEET_IMAGE} | cut -d'@' -f2)
+FLEET_REPOSITORY=$(echo ${FLEET_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+FLEET_SOURCE_REGISTRY=$(echo ${FLEET_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+echo "source registry set to ${FLEET_SOURCE_REGISTRY} and repo ${FLEET_REPOSITORY} for Fleet Image"
+
+MGMT_AGENT_DIGEST=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f2)
+MGMT_AGENT_REPOSITORY=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+MGMT_AGENT_SOURCE_REGISTRY=$(echo ${MGMT_AGENT_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+echo "source registry set to ${MGMT_AGENT_SOURCE_REGISTRY} and repo ${MGMT_AGENT_REPOSITORY} for Mgmt Agent Image"
+
+KUBE_APPLIER_DIGEST=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f2)
+KUBE_APPLIER_REPOSITORY=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+KUBE_APPLIER_SOURCE_REGISTRY=$(echo ${KUBE_APPLIER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+echo "source registry set to ${KUBE_APPLIER_SOURCE_REGISTRY} and repo ${KUBE_APPLIER_REPOSITORY} for Kube Applier Image"
+
+EXPORTER_DIGEST=$(echo ${EXPORTER_IMAGE} | cut -d'@' -f2)
+EXPORTER_REPOSITORY=$(echo ${EXPORTER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+EXPORTER_SOURCE_REGISTRY=$(echo ${EXPORTER_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+echo "source registry set to ${EXPORTER_SOURCE_REGISTRY} and repo ${EXPORTER_REPOSITORY} for Exporter Image"
+
 # Set up registries that require oc login - append backend and frontend registries
 if [[ -n "${USE_OC_LOGIN_REGISTRIES}" ]]; then
-    USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY}"
+    USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY} ${EXPORTER_SOURCE_REGISTRY}"
 else
-    USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY}"
+    USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY} ${HCP_RECOVERY_SOURCE_REGISTRY} ${FLEET_SOURCE_REGISTRY} ${MGMT_AGENT_SOURCE_REGISTRY} ${KUBE_APPLIER_SOURCE_REGISTRY} ${EXPORTER_SOURCE_REGISTRY}"
 fi
 echo "USE_OC_LOGIN_REGISTRIES set to: ${USE_OC_LOGIN_REGISTRIES}"
 
-export OVERRIDE_CONFIG_FILE=${OVERRIDE_CONFIG_FILE:-/tmp/rp-override-config-$(date +%s).yaml}
-export AZURE_TOKEN_CREDENTIALS=prod
+OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override.yaml"
 
-MSI_MOCK_CLIENT_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".clientId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
-MSI_MOCK_PRINCIPAL_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".principalId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
-MSI_MOCK_CERT_NAME=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".certName" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
-echo "MSI mock SP override: ${LEASED_MSI_MOCK_SP} -> clientId=${MSI_MOCK_CLIENT_ID}"
-
+# Image overrides
 yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${BACKEND_SOURCE_REGISTRY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPOSITORY}\" |
@@ -65,12 +96,101 @@ yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.registry = \"${SESSIONGATE_SOURCE_REGISTRY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.repository = \"${SESSIONGATE_REPOSITORY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.digest = \"${SESSIONGATE_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.miMockClientId = \"${MSI_MOCK_CLIENT_ID}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.miMockPrincipalId = \"${MSI_MOCK_PRINCIPAL_ID}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.miMockCertName = \"${MSI_MOCK_CERT_NAME}\"
-" > ${OVERRIDE_CONFIG_FILE}
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.registry = \"${HCP_RECOVERY_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.repository = \"${HCP_RECOVERY_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.hcpRecovery.image.digest = \"${HCP_RECOVERY_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.registry = \"${FLEET_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.repository = \"${FLEET_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.fleet.image.digest = \"${FLEET_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.registry = \"${MGMT_AGENT_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.repository = \"${MGMT_AGENT_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmtAgent.image.digest = \"${MGMT_AGENT_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.registry = \"${KUBE_APPLIER_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.repository = \"${KUBE_APPLIER_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.kubeApplier.image.digest = \"${KUBE_APPLIER_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.registry = \"${EXPORTER_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.repository = \"${EXPORTER_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.customExporter.image.digest = \"${EXPORTER_DIGEST}\"
+" > "${OVERRIDE_CONFIG_FILE}"
+
+# MSI mock SP overrides (if provided)
+if [[ -n "${LEASED_MSI_MOCK_SP:-}" ]]; then
+  MSI_MOCK_CLIENT_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".clientId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
+  MSI_MOCK_PRINCIPAL_ID=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".principalId" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
+  MSI_MOCK_CERT_NAME=$(yq ".miMockPool.\"${LEASED_MSI_MOCK_SP}\".certName" dev-infrastructure/openshift-ci/msi-mock-pool.yaml)
+  if [[ -z "${MSI_MOCK_CLIENT_ID}" || "${MSI_MOCK_CLIENT_ID}" == "null" || \
+        -z "${MSI_MOCK_PRINCIPAL_ID}" || "${MSI_MOCK_PRINCIPAL_ID}" == "null" || \
+        -z "${MSI_MOCK_CERT_NAME}" || "${MSI_MOCK_CERT_NAME}" == "null" ]]; then
+    echo "ERROR: LEASED_MSI_MOCK_SP='${LEASED_MSI_MOCK_SP}' not found in dev-infrastructure/openshift-ci/msi-mock-pool.yaml"
+    exit 1
+  fi
+  echo "MSI mock SP override: ${LEASED_MSI_MOCK_SP} -> clientId=${MSI_MOCK_CLIENT_ID}"
+  yq -i "
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.miMockClientId = \"${MSI_MOCK_CLIENT_ID}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.miMockPrincipalId = \"${MSI_MOCK_PRINCIPAL_ID}\" |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.miMockCertName = \"${MSI_MOCK_CERT_NAME}\"
+  " "${OVERRIDE_CONFIG_FILE}"
+else
+  echo "No MSI mock SP lease provided, skipping mock SP overrides"
+fi
+
+# ARM helper SP overrides (if provided). The first lease is used by Backend and
+# the second by Clusters Service.
+# armHelperFPAPrincipalId deliberately remains unchanged: it identifies the mock
+# first-party principal, not either ARM helper authenticating a client.
+if [[ -n "${LEASED_ARM_HELPER_SP:-}" ]]; then
+  read -r -a ARM_HELPER_LEASES <<< "${LEASED_ARM_HELPER_SP}"
+  if [[ "${#ARM_HELPER_LEASES[@]}" -ne 2 ]]; then
+    echo "ERROR: LEASED_ARM_HELPER_SP must contain exactly two whitespace-separated resource names"
+    exit 1
+  fi
+  if [[ "${ARM_HELPER_LEASES[0]}" == "${ARM_HELPER_LEASES[1]}" ]]; then
+    echo "ERROR: LEASED_ARM_HELPER_SP must contain two distinct resource names"
+    exit 1
+  fi
+
+  ARM_HELPER_CLIENT_IDS=()
+  ARM_HELPER_CERT_NAMES=()
+  for lease in "${ARM_HELPER_LEASES[@]}"; do
+    client_id=$(yq ".armHelperPool.\"${lease}\".clientId" dev-infrastructure/openshift-ci/arm-helper-pool.yaml)
+    principal_id=$(yq ".armHelperPool.\"${lease}\".principalId" dev-infrastructure/openshift-ci/arm-helper-pool.yaml)
+    cert_name=$(yq ".armHelperPool.\"${lease}\".certName" dev-infrastructure/openshift-ci/arm-helper-pool.yaml)
+    if [[ -z "${client_id}" || "${client_id}" == "null" || \
+          -z "${principal_id}" || "${principal_id}" == "null" || \
+          -z "${cert_name}" || "${cert_name}" == "null" ]]; then
+      echo "ERROR: ARM helper lease '${lease}' not found or incomplete in dev-infrastructure/openshift-ci/arm-helper-pool.yaml"
+      exit 1
+    fi
+    ARM_HELPER_CLIENT_IDS+=("${client_id}")
+    ARM_HELPER_CERT_NAMES+=("${cert_name}")
+  done
+
+  echo "ARM helper SP leases: backend=${ARM_HELPER_LEASES[0]}, clustersService=${ARM_HELPER_LEASES[1]}"
+  export _YQ_ARM_HELPER_CID="${ARM_HELPER_CLIENT_IDS[0]}"
+  export _YQ_ARM_HELPER_CERT="${ARM_HELPER_CERT_NAMES[0]}"
+  export _YQ_CS_ARM_HELPER_CID="${ARM_HELPER_CLIENT_IDS[1]}"
+  export _YQ_CS_ARM_HELPER_CERT="${ARM_HELPER_CERT_NAMES[1]}"
+  yq -i "
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.armHelperClientId = strenv(_YQ_ARM_HELPER_CID) |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.armHelperCertName = strenv(_YQ_ARM_HELPER_CERT) |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.clustersServiceArmHelperClientId = strenv(_YQ_CS_ARM_HELPER_CID) |
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.clustersServiceArmHelperCertName = strenv(_YQ_CS_ARM_HELPER_CERT)
+  " "${OVERRIDE_CONFIG_FILE}"
+  unset _YQ_ARM_HELPER_CID _YQ_ARM_HELPER_CERT _YQ_CS_ARM_HELPER_CID _YQ_CS_ARM_HELPER_CERT
+else
+  echo "No ARM helper SP leases provided, skipping ARM helper overrides"
+fi
+
+# Healthcheck workflows provision without leases and don't need E2E-sized clusters.
+# Override minCount to 1 so healthcheck clusters stay small.
+if [[ -z "${LEASED_MSI_CONTAINERS:-}" ]]; then
+  yq -i "
+    .clouds.dev.environments.${DEPLOY_ENV}.defaults.mgmt.aks.userAgentPool.minCount = 1
+  " "${OVERRIDE_CONFIG_FILE}"
+fi
+
 echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
-cat ${OVERRIDE_CONFIG_FILE}
+cat "${OVERRIDE_CONFIG_FILE}"
 
 CONFIG_PROV="${SHARED_DIR}/config-prov.yaml"
 
@@ -89,9 +209,16 @@ finalize() {
 trap finalize EXIT
 
 unset GOFLAGS
+
+EXTRA_ARGS="--region ${LOCATION}"
+if [[ "${ARO_HCP_PROVISION_ABORT_IF_EXISTS:-true}" == "true" ]]; then
+  EXTRA_ARGS+=" --abort-if-regional-exist"
+fi
+
 make -o tooling/templatize/templatize entrypoint/Region \
-  DEPLOY_ENV=prow \
-  EXTRA_ARGS="--region ${LOCATION} --abort-if-regional-exist" \
+  DEPLOY_ENV="${DEPLOY_ENV}" \
+  OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}" \
+  EXTRA_ARGS="${EXTRA_ARGS}" \
   TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz \
   ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml \
   CONFIG_OUTPUT=${CONFIG_PROV}

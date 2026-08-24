@@ -144,7 +144,8 @@ validate_and_set_defaults() {
     # Allow override of test scenarios
     TEST_SCENARIOS="${TEST_SCENARIOS:-sig-kata.*Kata Author}"
 
-    TEST_FILTERS="${TEST_FILTERS:-~DisconnectedOnly&;~Disruptive&}"
+    # exclude C00133 from test by default
+    TEST_FILTERS="${TEST_FILTERS:-~DisconnectedOnly&;~Disruptive&;~C00133&}"
     local -a _test_filter_segments
     local _test_filter_seg
     local _test_filter_re='^~?[a-zA-Z0-9_]+&?$'

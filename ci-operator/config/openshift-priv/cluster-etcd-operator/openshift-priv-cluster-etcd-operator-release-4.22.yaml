@@ -37,19 +37,20 @@ images:
     to: cluster-etcd-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.22-priv
-    namespace: ocp-private
+  - name: "4.22"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -79,11 +80,13 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
-- as: e2e-agnostic-ovn
+- always_run: false
+  as: e2e-agnostic-ovn
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-agnostic-ovn-upgrade
+- always_run: false
+  as: e2e-agnostic-ovn-upgrade
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp
@@ -111,7 +114,8 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-disruption-ovn
-- as: e2e-operator
+- always_run: false
+  as: e2e-operator
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -162,7 +166,8 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
-- as: e2e-metal-ipi-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
   steps:
@@ -180,7 +185,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-ofcir-baremetal
-- as: e2e-aws-ovn-single-node
+- always_run: false
+  as: e2e-aws-ovn-single-node
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
@@ -201,7 +207,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-perfscale-e2e-configmap-scale
-- as: e2e-aws-ovn-serial
+- always_run: false
+  as: e2e-aws-ovn-serial
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
@@ -274,7 +281,8 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-aws
-- as: e2e-gcp-operator-disruptive
+- always_run: false
+  as: e2e-gcp-operator-disruptive
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -283,7 +291,8 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-gcp
-- as: e2e-gcp-operator
+- always_run: false
+  as: e2e-gcp-operator
   steps:
     cluster_profile: openshift-org-gcp
     env:

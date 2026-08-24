@@ -46,7 +46,7 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-image-mirror
   postsubmit: true
-  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^\.[^/]+\.(yaml|yml)$|^(component-params-env|semgrep)\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: opendatahub-operator
@@ -55,7 +55,7 @@ tests:
       RELEASE_VERSION: stable-2.x
     workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-e2e
-  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^\.[^/]+\.(yaml|yml)$|^(component-params-env|semgrep)\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -65,6 +65,10 @@ tests:
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
       OO_INSTALL_NAMESPACE: openshift-operators
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: opendatahub-io-ci-rhoai-quay-pull-secret
+    - ref: optional-operators-operator-sdk
     test:
     - as: e2e
       cli: latest

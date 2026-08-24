@@ -18,8 +18,13 @@ fi
 echo "Is multiarch image: ${MULTI_ARCH_IMAGE}"
 
 echo "Set KUBECONFIG to management cluster"
-export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
-cp "$KUBECONFIG" "${SHARED_DIR}/mgmt_kubeconfig" # idp-htpasswd step needs
+if [[ $HOSTED_MANAGEMENT_CLUSTER == "hosted-mgmt2" ]]; then
+	MGMT_KUBECONFIG=/var/run/hypershift-workload-credentials-hosted-mgmt2/kubeconfig
+else
+	MGMT_KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
+fi
+export KUBECONFIG=$MGMT_KUBECONFIG
+cp "$MGMT_KUBECONFIG" "${SHARED_DIR}/mgmt_kubeconfig" # idp-htpasswd step needs
 
 # Copy token file if kubeconfig references one
 CURRENT_CONTEXT=$(oc config current-context)
@@ -93,8 +98,33 @@ if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
   COMPUTE_NODE_TYPE="m5.xlarge"
 fi
 
+if [[ -n "${IMAGE_CONTENT_SOURCES}" ]]; then
+  echo "${IMAGE_CONTENT_SOURCES}" > /tmp/image-content-sources.yaml
+  echo "Wrote image content sources to /tmp/image-content-sources.yaml"
+fi
+
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+
+ARGS=( --name "${CLUSTER_NAME}" \
+  --infra-id "${INFRA_ID}" \
+  --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
+  --base-domain "${DOMAIN}" \
+  --release-image "${RELEASE_IMAGE}" \
+  --control-plane-availability-policy "${HYPERSHIFT_CP_AVAILABILITY_POLICY}" \
+  --infra-availability-policy "${HYPERSHIFT_INFRA_AVAILABILITY_POLICY}" \
+  --annotations "prow.k8s.io/job=${JOB_NAME}" \
+  --annotations "prow.k8s.io/build-id=${BUILD_ID}"
+)
+
+if [[ -f /tmp/image-content-sources.yaml ]]; then
+  ARGS+=( --image-content-sources /tmp/image-content-sources.yaml )
+fi
+
+if [[ "${FIPS}" == "true" ]]; then
+  ARGS+=( --fips )
+fi
+
 case "${PLATFORM}" in
   "aws")
     DEFAULT_NODE_SELECTOR="hypershift.openshift.io/control-plane=true"
@@ -104,23 +134,15 @@ case "${PLATFORM}" in
       NODE_SELECTOR="${DEFAULT_NODE_SELECTOR}"
     fi
 
-    ARGS=( --name "${CLUSTER_NAME}" \
-      --infra-id "${INFRA_ID}" \
-      --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
+    ARGS+=( \
       --instance-type "${COMPUTE_NODE_TYPE}" \
-      --base-domain "${DOMAIN}" \
       --region "${HYPERSHIFT_AWS_REGION}" \
-      --control-plane-availability-policy "${HYPERSHIFT_CP_AVAILABILITY_POLICY}" \
-      --infra-availability-policy "${HYPERSHIFT_INFRA_AVAILABILITY_POLICY}" \
       --pull-secret /tmp/pull-secret.json \
       --aws-creds "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
-      --release-image "${RELEASE_IMAGE}" \
       --node-selector "${NODE_SELECTOR}" \
       --olm-catalog-placement "${OLM_CATALOG_PLACEMENT}" \
       --additional-tags "expirationDate=${EXPIRATION_DATE}" \
-      --annotations "prow.k8s.io/job=${JOB_NAME}" \
       --annotations "cluster-profile=${CLUSTER_PROFILE_NAME}" \
-      --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
       --annotations "resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m" \
       --annotations hypershift.openshift.io/cleanup-cloud-resources="false" \
       --additional-tags "prow.k8s.io/job=${JOB_NAME}" \
@@ -144,9 +166,6 @@ case "${PLATFORM}" in
       ARGS+=( --feature-set "${GUEST_FEATURE_SET}")
     fi
 
-    echo "Creating cluster with the following arguments:"
-    echo "${ARGS[@]}"
-    /usr/bin/hypershift create cluster aws "${ARGS[@]}"
     ;;
   "powervs")
     if [[ -z "${POWERVS_GUID}" ]]; then
@@ -183,36 +202,32 @@ case "${PLATFORM}" in
       POWERVS_SYS_TYPE=$(jq -r '.sysType' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
 
-    bin/hypershift create cluster powervs \
-      --name ${CLUSTER_NAME} \
-      --infra-id ${INFRA_ID} \
-      --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
-      --base-domain ${DOMAIN} \
-      --region ${POWERVS_REGION} \
-      --zone ${POWERVS_ZONE} \
-      --resource-group ${POWERVS_RESOURCE_GROUP} \
-      --pull-secret=/etc/registry-pull-credentials/.dockerconfigjson \
-      --release-image ${RELEASE_IMAGE} \
+    ARGS+=( \
+      --region "${POWERVS_REGION}" \
+      --zone "${POWERVS_ZONE}" \
+      --resource-group "${POWERVS_RESOURCE_GROUP}" \
+      --pull-secret /etc/registry-pull-credentials/.dockerconfigjson \
       --olm-catalog-placement guest \
-      --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
-      --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
-      --vpc-region ${POWERVS_VPC_REGION} \
-      --proc-type ${POWERVS_PROC_TYPE} \
-      --sys-type ${POWERVS_SYS_TYPE} \
-      --processors ${POWERVS_PROCESSORS} \
-      --cloud-instance-id ${POWERVS_GUID} \
-      --vpc ${POWERVS_VPC} \
-      --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
-      --transit-gateway-location ${TRANSIT_GATEWAY_LOCATION} \
-      --annotations "prow.k8s.io/job=${JOB_NAME}" \
-      --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
+      --vpc-region "${POWERVS_VPC_REGION}" \
+      --proc-type "${POWERVS_PROC_TYPE}" \
+      --sys-type "${POWERVS_SYS_TYPE}" \
+      --processors "${POWERVS_PROCESSORS}" \
+      --cloud-instance-id "${POWERVS_GUID}" \
+      --vpc "${POWERVS_VPC}" \
+      --transit-gateway "${POWERVS_TRANSIT_GATEWAY}" \
+      --transit-gateway-location "${TRANSIT_GATEWAY_LOCATION}" \
       --debug
+    )
     ;;
   *)
     echo "Unsupported platform: ${PLATFORM}"
     exit 1
     ;;
 esac
+
+echo "Creating cluster with the following arguments:"
+echo "${ARGS[@]}"
+/usr/bin/hypershift create cluster "${PLATFORM}" "${ARGS[@]}"
 
 echo "Wait to check if release image is valid"
 n=0
@@ -248,7 +263,7 @@ while [[ -z "${KUBECONFIG_NAME}" ]]; do
   KUBECONFIG_NAME=$(oc get hc/${CLUSTER_NAME} -n clusters -o jsonpath='{ .status.kubeconfig.name }')
 done
 
-bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} > ${SHARED_DIR}/nested_kubeconfig || {
+/usr/bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} > ${SHARED_DIR}/nested_kubeconfig || {
   echo "Failed to create kubeconfig"
 }
 
@@ -275,7 +290,6 @@ if [[ ! -f ${SHARED_DIR}/kubeadmin-password ]]; then
 fi
 
 echo "Waiting for clusteroperators to be ready"
-ln -s ${SHARED_DIR}/nested_kubeconfig ${SHARED_DIR}/kubeconfig
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 
 until \
@@ -284,6 +298,34 @@ until \
     oc get clusterversion 2>/dev/null || true
     sleep 5s
 done
+
+# Wait for NodePool(s) to become ready on the management cluster
+# HyperShift creates NodePools with AZ suffixes (e.g. cluster-name-us-east-1a),
+# so we discover them dynamically via spec.clusterName instead of assuming the name.
+if [[ "${HYPERSHIFT_NODE_COUNT}" -gt 0 ]]; then
+  echo "Waiting for NodePool(s) to become ready (HYPERSHIFT_NODE_COUNT=${HYPERSHIFT_NODE_COUNT})"
+  export KUBECONFIG=$MGMT_KUBECONFIG
+  NODEPOOLS=$(oc get nodepool -n clusters \
+    -o jsonpath='{range .items[?(@.spec.clusterName=="'"${CLUSTER_NAME}"'")]}{.metadata.name}{"\n"}{end}')
+  if [[ -z "${NODEPOOLS}" ]]; then
+    echo "ERROR: No NodePools found for cluster ${CLUSTER_NAME}"
+    oc get nodepool -n clusters -o custom-columns=NAME:.metadata.name,CLUSTER:.spec.clusterName 2>/dev/null || true
+    exit 1
+  fi
+  for np in ${NODEPOOLS}; do
+    echo "Waiting for NodePool ${np} to become ready"
+    oc wait --timeout=30m "nodepool/${np}" -n clusters --for=condition=Ready || {
+      echo "NodePool ${np} did not become ready"
+      mkdir -p "${ARTIFACT_DIR}/hypershift-snapshot"
+      for failed_np in ${NODEPOOLS}; do
+        oc get "nodepool/${failed_np}" -n clusters -o yaml > "${ARTIFACT_DIR}/hypershift-snapshot/nodepool_${failed_np}.yaml" 2>/dev/null || true
+      done
+      exit 1
+    }
+    echo "NodePool ${np} is ready"
+  done
+  export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+fi
 
 if [[ -n "${GUEST_FEATURE_SET}" ]]; then
   echo "checking if cluster has expected featureset"
@@ -305,9 +347,15 @@ if [[ -n "${GUEST_FEATURE_SET}" ]]; then
   fi
 fi
 
+# Create the kubeconfig symlink only AFTER all readiness checks (clusteroperators,
+# NodePools, feature set) have passed.  The EphemeralCluster controller watches for
+# this file to set the ClusterReady condition; placing it earlier causes tests to
+# start before the cluster is actually ready, leading to DNS resolution failures.
+ln -s ${SHARED_DIR}/nested_kubeconfig ${SHARED_DIR}/kubeconfig
+
 # Data for cluster bot.
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x # Always disable tracing due to below lines printing cluster urls, in case this script happens to enable tracing again in future
 echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 $WAS_TRACING && set -x
-KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "created-at=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
+oc --kubeconfig=$MGMT_KUBECONFIG annotate -n clusters hostedcluster ${CLUSTER_NAME} "created-at=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"

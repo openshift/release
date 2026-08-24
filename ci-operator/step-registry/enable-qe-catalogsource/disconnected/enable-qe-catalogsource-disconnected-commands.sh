@@ -425,7 +425,27 @@ function create_catalog_sources()
     # details: https://issues.redhat.com/browse/OCPBUGS-31427
     if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
         echo "the index image as the initContainer cache image)"
-        cat <<EOF | oc create -f -
+        # oc-mirror rebuilds the catalog image with updated image references for C2S/SC2S,
+        # causing extractContent's cache integrity check to fail. Use the legacy catalog
+        # format for C2S/SC2S so opm serves the catalog without cache validation.
+        if [ $mirror -eq 1 ]; then
+            cat <<EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: $CATALOGSOURCE_NAME
+  namespace: openshift-marketplace
+spec:
+  displayName: Production Operators
+  image: ${mirror_index_image}
+  publisher: OpenShift QE
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+        else
+            cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -445,6 +465,7 @@ spec:
     registryPoll:
       interval: 15m
 EOF
+        fi
     else
         echo "the index image as the server image"
         cat <<EOF | oc create -f -
@@ -628,6 +649,11 @@ if [ $mirror -eq 0 ]; then
 fi
 #Create ICSP for mirror registry. The ICSP are used for the following ci-opertor steps too. Abort the job if ICSP can not be created
 create_settled_icsp  || exit 1
+
+if [[ "${SKIP_QE_APP_REGISTRY:-false}" == "true" ]]; then
+  echo "====> SKIP_QE_APP_REGISTRY=true, skipping QE catalogsource creation (mirror infrastructure is configured)"
+  exit 0
+fi
 
 #skip the mirror or catalogsource when OLM is not enabled.
 check_olm_capability || exit 0

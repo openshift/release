@@ -86,7 +86,7 @@ function getCIR(){
 
     # ofcir may be unavailable in the cluster(or the ingress machinery), retry
     # we can retry several times, preventing CIR leaking should be done by OFCIR with pool size
-    if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 15 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
+    if ! curl --retry-all-errors --max-time 65 --retry-delay 60 --retry 3 --retry-max-time 370 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
         BODY=$(cat "$CIRFILE")
         set +x
         echo "<==== OFCIR ERROR RESPONSE BODY ====="
@@ -123,15 +123,16 @@ function getCIR(){
 }
 
 CIRTYPE=host_el9
-#CLUSTERTYPE can be one of "virt", "virt-arm64", "baremetal" or "baremetal-moc"
+#CLUSTERTYPE can be one of "virt", "virt-arm64" or "baremetal"
 [ "$CLUSTERTYPE" == "baremetal" ] && CIRTYPE=cluster_el9
-[ "$CLUSTERTYPE" == "baremetal-moc" ] && CIRTYPE=cluster_moc
 [ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host_arm
 [ "$CLUSTERTYPE" == "lab-small" ] && CIRTYPE=host_lab_small
 [ "$CLUSTERTYPE" == "host_384gb_el9" ] && CIRTYPE=host_384gb_el9
 [ "$CLUSTERTYPE" == "assisted_large_el9" ] && CIRTYPE=assisted_large_el9
 [ "$CLUSTERTYPE" == "assisted_medium_el9" ] && CIRTYPE=assisted_medium_el9
 [ "$CLUSTERTYPE" == "assisted_small_el9" ] && CIRTYPE=assisted_small_el9
+[ "$CLUSTERTYPE" == "osac" ] && CIRTYPE=osac
+[ "$CLUSTERTYPE" == "osac-aws" ] && CIRTYPE=osac-aws
 
 getCIR && exit_with_success
 exit_with_failure "Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"

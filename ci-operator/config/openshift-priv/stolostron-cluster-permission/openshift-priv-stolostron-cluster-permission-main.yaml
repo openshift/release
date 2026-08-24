@@ -7,18 +7,15 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 canonical_go_repository: github.com/stolostron/cluster-permission
 images:
   items:
   - dockerfile_path: Dockerfile
     from: base
     to: cluster-permission
-promotion:
-  to:
-  - disabled: true
-    name: "2.17"
-    namespace: stolostron
+prowgen:
+  private: true
 resources:
   '*':
     requests:
@@ -46,11 +43,6 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cluster-permission
-    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: openshift-priv

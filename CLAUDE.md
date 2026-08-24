@@ -37,6 +37,15 @@ Search the step-registry (4,400+ reusable CI components) to find existing steps,
 
 **Always use `/step-finder` before creating new step-registry components to avoid duplication.**
 
+### `/test-repo-files` - Repo File URL Validation
+Validate that `core-services/release-controller/_repos/ocp-*.repo` files have correct mirror2 and CDN URLs after editing:
+
+```bash
+/test-repo-files 4.22              # Test all 4.22 repo files
+/test-repo-files ocp-4.22-rhel9    # Test a specific repo file
+/test-repo-files                   # Test all modified repo files vs main
+```
+
 See `.claude/SLASH_COMMANDS.md` for detailed documentation.
 
 ## Common Development Commands
@@ -125,6 +134,17 @@ Periodic tests can be separated from main configuration into dedicated `__period
 - Contains only periodic tests with `interval:` or `cron:` scheduling
 - `zz_generated_metadata` contains data extracted from the `__periodics.yaml` configuration during `make update`
 - Generated jobs go to separate `-periodics.yaml` files in `ci-operator/jobs/`
+
+### OpenShift Release Periodic Jobs (Nightly & CI)
+The main OpenShift periodic jobs that test nightly and CI payload streams are defined in `ci-operator/config/openshift/release/`. These are the top-level e2e and upgrade jobs that gate release payloads, distinct from per-component periodic jobs.
+
+Files follow the naming convention `openshift-release-main__<stream>-<version>.yaml`:
+- **Nightly stream**: `openshift-release-main__nightly-<version>.yaml` — e2e tests against nightly payloads
+- **CI stream**: `openshift-release-main__ci-<version>.yaml` — e2e tests against CI payloads
+- **Upgrade jobs**: `openshift-release-main__nightly-<version>-upgrade-from-stable-<prev>.yaml` — upgrade tests from prior stable releases
+- **Other variants**: OKD SCOS (`__okd-scos-<version>.yaml`), CNV (`__cnv-nightly-<version>.yaml`)
+
+The release controller configurations that define acceptance gates for these streams live in `core-services/release-controller/_releases/` (e.g., `release-ocp-5.0.json` for nightly, `release-ocp-5.0-ci.json` for CI).
 
 ## Key Workflows
 

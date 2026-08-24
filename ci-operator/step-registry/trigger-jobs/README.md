@@ -291,6 +291,41 @@ This Step will do the following:
  6. Continue processing until all Jobs have been processed.
  7. Print all Jobs that failed to trigger.
 
+## Tips and Tricks
+- Use the `trigger-jobs-trig-time-eval` Step as a switch to disable the whole `.jobList` temporarily.
+  Add `"0"` as the last `.trigCond.trigCodPars.mathExpr[]` element. Remove it to re-enable OR set it to `"1"` if this is the only element.
+  <details><summary>Jobs that already use the `trigger-jobs-trig-time-eval` Step.</summary>
+  
+  ```json
+  {
+    "trigCond": [
+      {
+        "trigCondFlgs": 1,
+        "trigCondStep": "trigger-jobs-trig-time-eval",
+        "trigCondPars": {"datePars": ["..."], "mathExpr": ["...", "0"]}
+      }
+    ],
+    "jobList": [...]
+  }
+  ```
+  </details>
+  <details><summary>Jobs that do not use the `trigger-jobs-trig-time-eval` Step.</summary>
+  
+  ```json
+  {
+    "trigCond": [
+      {
+        "trigCondFlgs": 1,
+        "trigCondStep": "trigger-jobs-trig-time-eval",
+        "trigCondPars": {"datePars": ["+%d"], "mathExpr": ["0"]}
+      },
+      ... # Actual Trigger Condition.
+    ],
+    "jobList": [...]
+  }
+  ```
+  </details>
+
 ## Possible RFEs
  1. Remove ALL legacy code AFTER all job definitions have migrated to the new list format.
  2. Remove dependency on Cluster Profile and use a dedicated secret collection.

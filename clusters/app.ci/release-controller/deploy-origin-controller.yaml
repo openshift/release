@@ -11,7 +11,7 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: release-controller
+  name: release-controller-okd
   namespace: ci
 spec:
   host: origin-release.apps.ci.l2s4.p1.openshiftapps.com
@@ -20,7 +20,7 @@ spec:
     termination: edge
   to:
     kind: Service
-    name: release-controller-api
+    name: release-controller-api-okd
 ---
 #---------------------------------------------------------------------------------
 # origin_resources.py added the following resource
@@ -29,14 +29,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: release-controller
+  name: release-controller-okd
   namespace: ci
 spec:
   ports:
   - port: 80
     targetPort: 8080
   selector:
-    app: release-controller
+    app: release-controller-okd
 ---
 #---------------------------------------------------------------------------------
 # origin_resources.py added the following resource
@@ -45,14 +45,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: release-controller-api
+  name: release-controller-api-okd
   namespace: ci
 spec:
   ports:
   - port: 80
     targetPort: 8080
   selector:
-    app: release-controller-api
+    app: release-controller-api-okd
 ---
 #---------------------------------------------------------------------------------
 # origin_resources.py added the following resource
@@ -66,17 +66,17 @@ metadata:
     keel.sh/policy: force
     keel.sh/pollSchedule: '@every 5m'
     keel.sh/trigger: poll
-  name: release-controller
+  name: release-controller-okd
   namespace: ci
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: release-controller
+      app: release-controller-okd
   template:
     metadata:
       labels:
-        app: release-controller
+        app: release-controller-okd
     spec:
       containers:
       - args:
@@ -139,9 +139,6 @@ spec:
         - mountPath: /etc/jira
           name: jira
           readOnly: true
-        - mountPath: /etc/plugins
-          name: plugins
-          readOnly: true
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
@@ -171,7 +168,7 @@ spec:
         volumeMounts:
         - mountPath: /tmp/git-sync
           name: release
-      serviceAccountName: release-controller
+      serviceAccountName: release-controller-okd
       volumes:
       - configMap:
           defaultMode: 420
@@ -187,10 +184,6 @@ spec:
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
-      - configMap:
-          defaultMode: 420
-          name: plugins
-        name: plugins
       - name: release-controller-kubeconfigs
         secret:
           defaultMode: 420
@@ -203,7 +196,7 @@ spec:
         secret:
           defaultMode: 420
           items:
-          - key: .git-credentials
+          - key: git_url_with_credentials
             path: .git-credentials
           secretName: release-controller-oc-git-credentials
       - name: pull-secret
@@ -223,17 +216,17 @@ metadata:
     keel.sh/policy: force
     keel.sh/pollSchedule: '@every 5m'
     keel.sh/trigger: poll
-  name: release-controller-api
+  name: release-controller-api-okd
   namespace: ci
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: release-controller-api
+      app: release-controller-api-okd
   template:
     metadata:
       labels:
-        app: release-controller-api
+        app: release-controller-api-okd
     spec:
       containers:
       - command:
@@ -245,9 +238,15 @@ spec:
         - --release-architecture=amd64
         - --enable-jira
         - --jira-endpoint=https://redhat.atlassian.net
-        - --jira-username=brawilli@redhat.com
-        - --jira-password-file=/etc/jira/password
+        - --jira-username=openshift-release-controller-jira-bot@redhat.com
+        - --jira-password-file=/etc/jira/bot-password
+        - --release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml
         - -v=4
+        env:
+        - name: HOME
+          value: /tmp/home
+        - name: XDG_RUNTIME_DIR
+          value: /tmp/home/run
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest
         imagePullPolicy: Always
         livenessProbe:
@@ -268,6 +267,9 @@ spec:
         - mountPath: /etc/jira
           name: jira
           readOnly: true
+        - mountPath: /etc/qualifiers-config
+          name: qualifiers-config
+          readOnly: true
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
@@ -280,12 +282,37 @@ spec:
           subPath: .git-credentials
         - mountPath: /tmp/pull-secret
           name: pull-secret
-      serviceAccountName: release-controller
+      initContainers:
+      - command:
+        - /bin/bash
+        - -c
+        - "#!/bin/bash\n            set -euo pipefail\n            trap 'kill $(jobs -p); exit 0' TERM\n\n            SECONDS=0\n\n            # ensure we are logged in to our registry\n            mkdir -p ${XDG_RUNTIME_DIR}/containers\n            cp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true\n\n            # global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods\n            git config --global credential.helper store\n            git config --global user.name test\n            git config --global user.email test@test.com\n            oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json\n\n            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I -w '%{http_code}' https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted)\n            if [[ \"$RC_SERVICE_AVAILABLE\" -ne 200 ]]\n            then\n                FROM=\"\"\n                TO=\"\"\n            else\n                FROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-stable\"][0] // empty')\n                TO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-dev-preview\"][0] // empty')\n            fi\n\n            if [[ -n \"$FROM\" && -n \"$TO\" ]]\n            then\n                echo \"Pre-populating the git cache...\"\n                oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64\n            else\n                echo \"Unable to Pre-populate the git cache!\"\n            fi\n\n            DURATION=$SECONDS\n            echo \"Took: $(($DURATION / 60))m $(($DURATION % 60))s\"\n                        "
+        env:
+        - name: HOME
+          value: /tmp/home
+        - name: XDG_RUNTIME_DIR
+          value: /tmp/home/run
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
+        name: oc-prepare
+        volumeMounts:
+        - mountPath: /tmp/home
+          name: home
+        - mountPath: /tmp/git
+          name: oc-cache
+        - mountPath: /tmp/home/.git-credentials
+          name: git-credentials
+          subPath: .git-credentials
+        - mountPath: /tmp/pull-secret
+          name: pull-secret
+      serviceAccountName: release-controller-okd
       volumes:
       - name: jira
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
+      - configMap:
+          name: release-controller-release-qualifiers
+        name: qualifiers-config
       - name: release-controller-kubeconfigs
         secret:
           defaultMode: 420
@@ -298,10 +325,66 @@ spec:
         secret:
           defaultMode: 420
           items:
-          - key: .git-credentials
+          - key: git_url_with_credentials
             path: .git-credentials
           secretName: release-controller-oc-git-credentials
       - name: pull-secret
         secret:
           defaultMode: 420
           secretName: release-controller-oc-pull-secret
+---
+#---------------------------------------------------------------------------------
+# origin_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
+  name: release-controller
+  namespace: ci
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: release-controller
+  template:
+    metadata:
+      labels:
+        app: release-controller
+    spec:
+      containers:
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
+        name: controller
+---
+#---------------------------------------------------------------------------------
+# origin_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
+  name: release-controller-api
+  namespace: ci
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: release-controller-api
+  template:
+    metadata:
+      labels:
+        app: release-controller-api
+    spec:
+      containers:
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest
+        name: controller

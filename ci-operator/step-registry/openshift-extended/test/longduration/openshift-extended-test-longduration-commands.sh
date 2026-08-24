@@ -225,7 +225,7 @@ ibmcloud)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
-nutanix|nutanix-qe|nutanix-qe-dis)
+nutanix|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
 *)
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -265,22 +265,47 @@ if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     ocpVersion=$(oc get clusterversion -o json | jq -r '.items[0].status.desired.version')
 fi
 
-#if OVERWRITE_OC_MIRROR then overwrite the oc-mirror from the payload
-if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
-    echo "OCP Version: ${ocpVersion}"
-    if [[ "$ocpVersion" == *arm* ]] || [[ "${OCP_ARCH:-}" != "amd64" ]]; then
-        echo "[WARN]OCP_ARCH is not amd64, or OCP is not for amd64, currently do not support to overwrite the oc-mirror from the OCP release image"
-    fi
+#if OVERRIDE_OC_MIRROR then download oc-mirror from CGW (Content Gateway)
+if [[ "${OVERRIDE_OC_MIRROR:-}" == "true" ]]; then
+    echo "OCP Version: ${ocpVersion:-}"
     if [[ -n "${ocpVersion:-}" ]]; then
         tmpDir=$(mktemp -d)
-        cd ${tmpDir}
-        echo "Extracting oc-mirror from ${ocpVersion}, OCP_ARCH: ${OCP_ARCH}"
+        cd "${tmpDir}"
+        echo "Downloading oc-mirror from CGW for OCP version ${ocpVersion}, OCP_ARCH: ${OCP_ARCH:-}"
         set -x
-        filter="linux/amd64"      
-        tag=$(oc adm release info "${ocpVersion}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os="${filter}" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
-        which oc
-        uname -m
-        oc image extract "${tag}" --path=/usr/bin/oc-mirror:. -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os="${filter}" --confirm
+
+        # Detect architecture for oc-mirror download
+        ARCH=$(uname -m)
+        case ${ARCH} in
+            x86_64) ARCH="amd64" ;;
+            aarch64) ARCH="arm64" ;;
+            *)
+                echo "ERROR: Unsupported architecture: ${ARCH}"
+                echo "oc-mirror downloads are only available for amd64 (x86_64) and arm64 (aarch64)"
+                exit 1
+                ;;
+        esac
+
+        # oc-mirror is now distributed via CGW which only publishes "latest"
+        oc_mirror_version="latest"
+
+        # Download oc-mirror from CGW (Content Gateway)
+        CGWURL="https://mirror.openshift.com/pub/cgw"
+        echo "Downloading oc-mirror from ${CGWURL}/oc-mirror/${oc_mirror_version}/"
+        curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+            "${CGWURL}/oc-mirror/${oc_mirror_version}/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
+
+        # Verify the integrity of the downloaded tarball
+        echo "Verifying oc-mirror.tar.gz integrity..."
+        curl -fL --retry 5 --connect-timeout 30 -o sha256sum.txt \
+            "${CGWURL}/oc-mirror/${oc_mirror_version}/sha256sum.txt"
+        grep "oc-mirror-rhel9-linux-${ARCH}.tar.gz" sha256sum.txt | sed "s/oc-mirror-rhel9-linux-${ARCH}.tar.gz/oc-mirror.tar.gz/" | sha256sum -c - || {
+            echo "ERROR: oc-mirror.tar.gz checksum verification failed"
+            exit 1
+        }
+        echo "Checksum verification passed"
+
+        tar -xzf oc-mirror.tar.gz
         ls -la ./oc-mirror
         md5sum ./oc-mirror
         chmod +x ./oc-mirror

@@ -259,6 +259,34 @@ fi
 versionList=$(eval $version_cmd)
 echo -e "Available cluster versions:\n${versionList}"
 
+# Resolve version from offset when OPENSHIFT_VERSION is not explicitly set
+if [[ -z "$OPENSHIFT_VERSION" && -n "${VERSION_OFFSET_FROM_LATEST:-}" ]]; then
+  readarray -t y_streams < <(echo "$versionList" | cut -d'.' -f1,2 | sort -Vu)
+  total=${#y_streams[@]}
+  offset=${VERSION_OFFSET_FROM_LATEST}
+  source_index=$((total - offset - 1))
+  if (( source_index < 0 )); then
+    log "ERROR: Not enough Y-streams for offset ${offset}. Have ${total}: ${y_streams[*]}"
+    exit 1
+  fi
+  OPENSHIFT_VERSION=${y_streams[$source_index]}
+  log "Resolved version from offset ${offset}: ${OPENSHIFT_VERSION} (available Y-streams: ${y_streams[*]})"
+fi
+
+# If account-roles-create fell back to a different version, use it. This overrides
+# release:latest resolution so the cluster version matches the account roles.
+if [[ -f "${SHARED_DIR}/openshift_version" ]]; then
+  FALLBACK_VERSION=$(cat "${SHARED_DIR}/openshift_version")
+  REQUESTED_MAJOR_MINOR=$(echo "${OPENSHIFT_VERSION}" | cut -d'.' -f1,2)
+  FALLBACK_MAJOR_MINOR=$(echo "${FALLBACK_VERSION}" | cut -d'.' -f1,2)
+  if [[ "${REQUESTED_MAJOR_MINOR}" =~ ^[0-9]+\.[0-9]+$ && "${REQUESTED_MAJOR_MINOR}" != "${FALLBACK_MAJOR_MINOR}" ]]; then
+    log "ERROR: Requested version ${OPENSHIFT_VERSION} but account-roles fell back to ${FALLBACK_VERSION}. Version ${OPENSHIFT_VERSION} may not be available for this cluster type."
+    exit 1
+  fi
+  OPENSHIFT_VERSION="${FALLBACK_VERSION}"
+  log "Using version ${OPENSHIFT_VERSION} from account-roles-create step"
+fi
+
 # If OPENSHIFT_VERSION is set to "release:latest", look at the environment variable
 # supplied by CI for the payload to use. This only really works for nightlies. ROSA
 # SRE has a job that polls the release controller and syncs new nightlies every 15 minutes,
@@ -333,9 +361,11 @@ fi
 TAG_Author=${TAG_Author:-"periodic"}
 TAG_Pull_Number=${PULL_NUMBER:-"periodic"}
 TAG_Job_Type=$JOB_TYPE
+TAG_Job_Name=$(echo "${JOB_SPEC}" | jq -r '.job // empty' || true)
+TAG_Job_Name=${TAG_Job_Name:-"unknown"}
 TAG_CI="prow"
 TAG_Cluster_Type=$([ "$HOSTED_CP" == "true" ] && echo -n "rosa-hcp" || echo -n "rosa")
-TAGS="usage-user:${TAG_Author},usage-pull-request:${TAG_Pull_Number},usage-cluster-type:${TAG_Cluster_Type},usage-ci-type:${TAG_CI},usage-job-type:${TAG_Job_Type}"
+TAGS="usage-user:${TAG_Author},usage-pull-request:${TAG_Pull_Number},usage-cluster-type:${TAG_Cluster_Type},usage-ci-type:${TAG_CI},usage-job-type:${TAG_Job_Type},usage-job-name:${TAG_Job_Name}"
 if [[ ! -z "$CLUSTER_TAGS" ]]; then
   TAGS="${TAGS},${CLUSTER_TAGS}"
 fi
@@ -471,19 +501,33 @@ HYPERSHIFT_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
   HYPERSHIFT_SWITCH="--hosted-cp"
   if [[ ! -z "${CLUSTER_SECTOR}" ]]; then
-    psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
-    if [[ -z "$psList" ]]; then
-      echo "no ready provision shard found, trying to find maintenance status provision shard"
-      # try to find maintenance mode SC, currently osdfm api doesn't support status in ('ready', 'maintenance') query.
-      psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('maintenance')" | jq -r '.items[].provision_shard_reference.id')
+    MAX_SHARD_RETRIES=5
+    SHARD_RETRY_DELAY=30
+    psList=""
+    for attempt in $(seq 1 ${MAX_SHARD_RETRIES}); do
+      psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
       if [[ -z "$psList" ]]; then
-        echo "No available provision shard!"
-        exit 1
+        echo "no ready provision shard found, trying to find maintenance status provision shard"
+        # try to find maintenance mode SC, currently osdfm api doesn't support status in ('ready', 'maintenance') query.
+        psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('maintenance')" | jq -r '.items[].provision_shard_reference.id')
       fi
+      if [[ -n "$psList" ]]; then
+        break
+      fi
+      if [[ $attempt -lt ${MAX_SHARD_RETRIES} ]]; then
+        echo "Attempt ${attempt}/${MAX_SHARD_RETRIES}: no provision shard found for sector '${CLUSTER_SECTOR}' in '${CLOUD_PROVIDER_REGION}', retrying in ${SHARD_RETRY_DELAY}s..."
+        sleep ${SHARD_RETRY_DELAY}
+      fi
+    done
+    if [[ -z "$psList" ]]; then
+      echo "No available provision shard after ${MAX_SHARD_RETRIES} attempts!"
+      echo "Sector: ${CLUSTER_SECTOR}, Region: ${CLOUD_PROVIDER_REGION}"
+      echo "Debug: querying OSDFM API directly..."
+      ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}'" || true
+      exit 1
     fi
 
     PROVISION_SHARD_ID=""
-    # ensure the SC is not for ibm usage so that it could support the latest version of the hosted cluster
     for ps in $psList ; do
       topology=$(ocm get /api/clusters_mgmt/v1/provision_shards/${ps} | jq -r '.hypershift_config.topology')
       if [[ "$topology" == "dedicated" ]] || [[ "$topology" == "dedicated-v2" ]] ; then

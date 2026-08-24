@@ -118,13 +118,51 @@ if [ "${CONTROL_PLANE_REPLICAS}" -lt 3 ]; then
   exit 1
 fi
 
-Z_VERSION=1000
+MAJOR_VERSION=1000
+Z_VERSION=0
+OCP_VERSION=100000
 
 if [ ! -z "${VERSION}" ]; then
+  MAJOR_VERSION=$(echo "${VERSION}" | cut -d'.' -f1)
   Z_VERSION=$(echo "${VERSION}" | cut -d'.' -f2)
-  echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
+  OCP_VERSION=$((MAJOR_VERSION * 100 + Z_VERSION))
+  echo "$(date -u --rfc-3339=seconds) - determined version is ${MAJOR_VERSION}.${Z_VERSION}"
 else
-  echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
+  echo "$(date -u --rfc-3339=seconds) - unable to determine version stream, assuming this is master"
+fi
+
+# Derive zone names dynamically from the failure domains provisioned by the VCM check step.
+# The number of zones in each pool's zones list is capped to match the replica count for
+# that pool type: control-plane gets CONTROL_PLANE_REPLICAS zones, compute gets
+# COMPUTE_NODE_REPLICAS zones.  This ensures each node lands in a distinct failure domain
+# without over- or under-specifying zones relative to the replica count.
+# Zones are sliced from the head of the failureDomains list (the order written by check-vcm).
+CP_ZONES_BLOCK=""
+W_ZONES_BLOCK=""
+if [[ -f "${SHARED_DIR}/platform.json" ]]; then
+  fd_count=$(jq '.failureDomains | length' "${SHARED_DIR}/platform.json")
+  if [[ "${fd_count}" -gt 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - found ${fd_count} failure domain(s) in platform.json, generating per-pool zones blocks"
+
+    # Control-plane: take the first min(CONTROL_PLANE_REPLICAS, fd_count) failure domains
+    cp_zone_count=$(( CONTROL_PLANE_REPLICAS < fd_count ? CONTROL_PLANE_REPLICAS : fd_count ))
+    CP_ZONES_YAML=$(jq -r --argjson n "${cp_zone_count}" \
+      '.failureDomains[:$n][].name | "      - \(.)"' "${SHARED_DIR}/platform.json")
+    CP_ZONES_BLOCK="
+      zones:
+${CP_ZONES_YAML}"
+
+    # Compute: take the first min(COMPUTE_NODE_REPLICAS, fd_count) failure domains
+    w_zone_count=$(( COMPUTE_NODE_REPLICAS < fd_count ? COMPUTE_NODE_REPLICAS : fd_count ))
+    W_ZONES_YAML=$(jq -r --argjson n "${w_zone_count}" \
+      '.failureDomains[:$n][].name | "      - \(.)"' "${SHARED_DIR}/platform.json")
+    W_ZONES_BLOCK="
+      zones:
+${W_ZONES_YAML}"
+
+    echo "$(date -u --rfc-3339=seconds) - control-plane zones (${cp_zone_count}): ${CP_ZONES_YAML//$'\n'/ }"
+    echo "$(date -u --rfc-3339=seconds) - compute zones (${w_zone_count}): ${W_ZONES_YAML//$'\n'/ }"
+  fi
 fi
 
 # Creating platform config for 4.12+
@@ -134,12 +172,12 @@ CP_PLATFORM="platform:
     vsphere:
       cpus: $(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG})
       coresPerSocket: $(jq -r '.spec.controlplane.coresPerSocket' ${SPEC_CONFIG})
-      memoryMB: $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})"
+      memoryMB: $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})${CP_ZONES_BLOCK}"
 W_PLATFORM="platform:
     vsphere:
       cpus: $(jq -r '.spec.compute.cpus' ${SPEC_CONFIG})
       coresPerSocket: $(jq -r '.spec.compute.coresPerSocket' ${SPEC_CONFIG})
-      memoryMB: $(jq -r '.spec.compute.memoryMB' ${SPEC_CONFIG})"
+      memoryMB: $(jq -r '.spec.compute.memoryMB' ${SPEC_CONFIG})${W_ZONES_BLOCK}"
 
 # Add additional disks
 if [ -n "${ADDITIONAL_DISK}" ]; then
@@ -176,18 +214,18 @@ if [ -n "${ADDITIONAL_DISK}" ]; then
   fi
 fi
 
-if [ ${Z_VERSION} -gt 9 ]; then
+if [ ${OCP_VERSION} -gt 409 ]; then
   echo "$(date -u --rfc-3339=seconds) - 4.x installation is later than 4.9, will install with resource pool"
   RESOURCE_POOL_DEF="resourcePool: ${vsphere_cluster}/Resources/ipi-ci-clusters"
 fi
-if [ ${Z_VERSION} -lt 11 ]; then
+if [ ${OCP_VERSION} -lt 411 ]; then
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: ${CONTROL_PLANE_REPLICAS}
   platform:
     vsphere:
       osDisk:
-        diskSizeGB: 120
+        diskSizeGB: 120${CP_ZONES_BLOCK}
 compute:
 - name: worker
   replicas: ${COMPUTE_NODE_REPLICAS}
@@ -197,7 +235,7 @@ compute:
       coresPerSocket: 1
       memoryMB: 16384
       osDisk:
-        diskSizeGB: 120"
+        diskSizeGB: 120${W_ZONES_BLOCK}"
 else
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
@@ -219,13 +257,13 @@ if [[ "${SIZE_VARIANT}" == "compact" ]]; then
       cpus: 8
       memoryMB: 32768
       osDisk:
-        diskSizeGB: 120
+        diskSizeGB: 120${CP_ZONES_BLOCK}
 compute:
 - name: worker
   replicas: 0"
 fi
 
-if [ "${Z_VERSION}" -lt 13 ]; then
+if [ "${OCP_VERSION}" -lt 413 ]; then
   cluster_name=$(echo "${vsphere_cluster}" | rev | cut -d '/' -f 1 | rev)
   datastore_name=$(echo "${vsphere_datastore}" | rev | cut -d '/' -f 1 | rev)
   cat >>"${CONFIG}" <<EOF
@@ -272,7 +310,7 @@ networking:
   - cidr: "${machine_cidr}"
 EOF
 
-if [ ${Z_VERSION} -gt 9 ]; then
+if [ ${OCP_VERSION} -gt 409 ]; then
   PULL_THROUGH_CACHE_DISABLE="/var/run/vault/vsphere-ibmcloud-config/pull-through-cache-disable"
   CACHE_FORCE_DISABLE="false"
   if [ -f "${PULL_THROUGH_CACHE_DISABLE}" ]; then
@@ -298,7 +336,7 @@ if [ ${Z_VERSION} -gt 9 ]; then
       fi
       if [ -f ${PULL_THROUGH_CACHE_CONFIG} ]; then
         echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration found. updating install-config"
-        if [ "${Z_VERSION}" -lt 14 ]; then
+        if [ "${OCP_VERSION}" -lt 414 ]; then
           echo "$(date -u --rfc-3339=seconds) - detected OCP version < 4.14.  converting imageDigestSources to imageContentSources for backwards compatability."
           cat ${PULL_THROUGH_CACHE_CONFIG} | sed 's/imageDigestSources/imageContentSources/g' >>${CONFIG}
         else

@@ -91,6 +91,12 @@ spec:
   - mirrors:
     - ${mirror}/rhel9/postgresql-13
     source: registry.redhat.io/rhel9/postgresql-13
+  - mirrors:
+    - ${mirror}/rhel9/postgresql-15
+    source: registry.redhat.io/rhel9/postgresql-15
+  - mirrors:
+    - ${mirror}/rhel9/postgresql-16
+    source: registry.redhat.io/rhel9/postgresql-16
 END
 }
 
@@ -195,6 +201,9 @@ spec:
   - mirrors:
     - ${LOCAL_REGISTRY_DNS_NAME}:${LOCAL_REGISTRY_PORT}/localimages/local-release-image
     source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+  - mirrors:
+    - ${LOCAL_REGISTRY_DNS_NAME}:${LOCAL_REGISTRY_PORT}/localimages/local-release-image
+    source: quay.io/openshift-release-dev/ocp-release
 END
 }
 

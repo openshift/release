@@ -7,6 +7,11 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/gce.json"
+UNIVERSE_DOMAIN=$(jq -r ".universe_domain // empty" "${GOOGLE_CLOUD_KEYFILE_JSON}" 2>/dev/null)
+if [[ -n "${UNIVERSE_DOMAIN}" ]]; then
+  export GOOGLE_CLOUD_UNIVERSE_DOMAIN="${UNIVERSE_DOMAIN}"
+  gcloud config set universe_domain "${UNIVERSE_DOMAIN}"
+fi
 gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
 
 if test ! -f "${SHARED_DIR}/metadata.json"

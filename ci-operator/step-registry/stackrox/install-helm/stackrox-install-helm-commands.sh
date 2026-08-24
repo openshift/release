@@ -207,6 +207,9 @@ function install_central_with_helm() {
       # https://github.com/stackrox/stackrox/blob/62c5f12ba8c3acc0c3d92a71c79221edf25a765f/image/templates/helm/shared/templates/02-scanner-v4-07-matcher-deployment.yaml#L80C9-L80C103
       # `{{ define "srox._envVars" }}` -> `{{- include "srox.envVars" (list . "deployment" "scanner-v4-matcher" "matcher") | nindent 8 }}`
       installflags+=('--set' "customize.scanner-v4-matcher.envVars.SCANNER_V4_MATCHER_READINESS=${SCANNER_V4_MATCHER_READINESS}")
+      if [[ -n "${SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST}" ]]; then
+        installflags+=('--set' "customize.scanner-v4-matcher.envVars.SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST=${SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST//,/\\,}")
+      fi
     fi
   fi
 
@@ -249,7 +252,15 @@ function install_secured_cluster_with_helm() {
 }
 
 echo '>>> Begin setup'
-fetch_last_nightly_tag
+
+# Check if a PR image tag was exported by a previous step
+if [[ -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/acs_image_tag" ]]; then
+  ACS_VERSION_TAG="$(cat "${SHARED_DIR}/acs_image_tag")"
+  echo "Using PR image tag from previous step: ${ACS_VERSION_TAG}"
+else
+  fetch_last_nightly_tag
+fi
+
 prepare_helm_templates
 helm version || install_helm
 
@@ -266,6 +277,11 @@ wait_deploy scanner
 wait_deploy scanner-db
 wait_deploy sensor
 wait_deploy admission-control
+
+# Save admin password for use by later steps (e.g., diagnostics collection)
+if [[ -n "${SHARED_DIR:-}" ]]; then
+  echo "${ROX_PASSWORD}" > "${SHARED_DIR}/rox_admin_password"
+fi
 
 retry oc get pods --namespace stackrox
 

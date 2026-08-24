@@ -6,7 +6,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.22"
+    tag: "5.0"
 build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/vsphere-csi-driver
@@ -18,8 +18,7 @@ images:
     to: vsphere-csi-driver-syncer
 promotion:
   to:
-  - disabled: true
-    name: "5.0"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -43,15 +42,18 @@ tests:
   commands: GOFLAGS="-mod=readonly" make unit-test
   container:
     from: src
-- as: e2e-vsphere
+- always_run: false
+  as: e2e-vsphere
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-csi
+- always_run: false
+  as: e2e-vsphere-csi
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-csi
-- as: e2e-vsphere-ovn-upgrade
+- always_run: false
+  as: e2e-vsphere-ovn-upgrade
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-upgrade-vsphere
@@ -63,7 +65,8 @@ tests:
     env:
       TEST_SCENARIOS: \[CSI-Driver\]|\[vSphere CSI Driver\]
     workflow: openshift-e2e-vsphere-csi-extended
-- as: e2e-vsphere-csi-vcf9
+- always_run: false
+  as: e2e-vsphere-csi-vcf9
   steps:
     cluster_profile: vsphere-elastic
     env:

@@ -17,18 +17,20 @@ images:
     to: kubevirt-cloud-controller-manager
 promotion:
   to:
-  - name: 4.22-priv
-    namespace: ocp-private
+  - name: "5.1"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -49,19 +51,13 @@ tests:
   commands: GOFLAGS="-mod=readonly" make test
   container:
     from: src
-- as: hypershift-kubevirt-conformance-baremetalds
+- as: hypershift-kubevirt-conformance-azure
+  optional: true
   steps:
-    cluster_profile: equinix-ocp-hcp
+    cluster_profile: openshift-org-azure
     env:
-      HYPERSHIFT_NODE_COUNT: "2"
-      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: redhat-operators
-      LVM_CATALOG_SOURCE: redhat-operators
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
-      LVM_OPERATOR_SUB_SOURCE: redhat-operators
-      METALLB_OPERATOR_SUB_SOURCE: redhat-operators
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.20
-      REDHAT_OPERATORS_INDEX_TAG: v4.20
-    workflow: hypershift-kubevirt-baremetalds-conformance
+      TEST_ARGS: --run \[sig-kubevirt\].services|LoadBalancer|terminating.endpoints
+    workflow: hypershift-kubevirt-azure-conformance
 - as: verify-deps
   steps:
     env:

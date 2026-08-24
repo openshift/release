@@ -3,14 +3,17 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.31.0
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   ubi-min9:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
 binary_build_commands: make binary
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.tools
+  from_repository: true
 images:
   items:
   - dockerfile_path: Dockerfile
@@ -21,7 +24,7 @@ images:
     to: oran-o2ims-operator-bundle
   - dockerfile_path: Dockerfile.must-gather
     to: oran-o2ims-operator-must-gather
-  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|OWNERS_ALIASES|\.md$|^hack/|renovate\.json
 operator:
   bundles:
   - as: operator-bundle
@@ -32,18 +35,18 @@ operator:
     with: pipeline:oran-o2ims-operator
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.0"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
       reference_policy: Local
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.0"
       namespace: ocp
       reference_policy: Local
 resources:
@@ -57,10 +60,27 @@ test_binary_build_commands: |
   ./hack/install-markdownlint.sh
 tests:
 - as: ci-job
-  commands: make ci-job
+  commands: |
+    unset VERSION
+    unset GOFLAGS
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
+    make ci-job
   container:
     from: src
-  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|OWNERS_ALIASES|\.md$|^hack/|renovate\.json
+- as: e2e
+  commands: |
+    unset VERSION
+    unset GOFLAGS
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
+    make test-e2e
+  container:
+    from: src
+  run_if_changed: \.go$|^go\.mod$
 - always_run: false
   as: scorecard
   run_if_changed: ^bundle/
@@ -71,7 +91,7 @@ tests:
       OO_BUNDLE: oran-o2ims-operator-bundle
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
-      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: oran-o2ims
       USER_TAGS: |
         ci-job-source prowci
@@ -90,6 +110,47 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: install-bundle-tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      OO_INSTALL_NAMESPACE: oran-o2ims
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: oran-o2ims
+      SCANNER_NAMESPACE: oran-o2ims
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: oran-o2ims-wait-for-tls-pods
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- as: install-bundle-tls-scan-periodic
+  cron: 0 3 * * 5
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      OO_INSTALL_NAMESPACE: oran-o2ims
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: oran-o2ims
+      SCANNER_NAMESPACE: oran-o2ims
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: oran-o2ims-wait-for-tls-pods
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 - always_run: false
   as: markdownlint
   commands: |

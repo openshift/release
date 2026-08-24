@@ -1,0 +1,77 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.0
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: functions-operator
+releases:
+  latest:
+    integration:
+      name: "4.22"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: GOFLAGS="" make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: lint
+  commands: GOFLAGS="" GOLANGCI_LINT_CACHE=/tmp/.cache make lint
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: e2e-deploy-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: deploy
+      cli: latest
+      commands: |
+        GOFLAGS="" IMG="${OPERATOR_IMG}" KUBECTL=oc make deploy
+        oc wait --for=condition=Ready pod -n func-operator-system -l control-plane=controller-manager --timeout=5m
+      dependencies:
+      - env: OPERATOR_IMG
+        name: functions-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: verify
+      cli: latest
+      commands: |
+        echo "Verifying CRDs..."
+        oc get crd functions.functions.dev
+        oc get crd objectbucketsources.sources.functions.dev
+
+        echo "Verifying operator pod is running..."
+        oc get pods -n func-operator-system -l control-plane=controller-manager -o wide
+
+        echo "Verifying metrics endpoint..."
+        oc get service -n func-operator-system func-operator-controller-manager-metrics-service
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: functions-operator

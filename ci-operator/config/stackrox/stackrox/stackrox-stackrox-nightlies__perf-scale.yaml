@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-ui-test-0.5.7
+    tag: stackrox-ui-test-stable
 releases:
   latest:
     release:
@@ -22,6 +22,16 @@ test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: 24nodes-scale-scannerv4-test
   cron: 0 6 * * *
+  reporter_config:
+    channel: '#acs-perfscale'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-stackrox
@@ -33,10 +43,15 @@ tests:
       ROX_SCANNER_V4_ENABLED: "true"
       SCANNER_V4_MATCHER_READINESS: vulnerability
       SCANNER_V4_MATCHER_READINESS_MAX_WAIT: "3600"
+      SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST: nvd,manual
       USER_TAGS: |
         TicketId 382
         RoxProject PerfScale
       ZONES_COUNT: "3"
+    post:
+    - ref: stackrox-stackrox-perf-scale-post
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
     test:
     - chain: stackrox-perfscale
     workflow: stackrox-install-helm

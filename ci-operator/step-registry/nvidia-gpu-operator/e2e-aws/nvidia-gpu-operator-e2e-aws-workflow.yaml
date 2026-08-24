@@ -3,8 +3,11 @@ workflow:
   steps:
     pre:
       - chain: ipi-conf-aws
+      - ref: ipi-conf-aws-secureboot
       - chain: ipi-install
     test:
+      - ref: aws-secureboot-verify
+      - ref: nvidia-gpu-operator-merge-stage-credentials
       - as: gpu-operator-e2e
         commands: make run-tests
         from: nvidia-ci
@@ -48,6 +51,7 @@ workflow:
               The patch must be written according to RFC 6902, which is used with `kubectl patch` command.
     post:
       - ref: gather-must-gather
+      - ref: aws-deprovision-secureboot
       - ref: ipi-deprovision-deprovision
       - ref: aws-deprovision-users-and-policies
       - ref: aws-deprovision-verification

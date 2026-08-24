@@ -2,7 +2,11 @@
 set -euo pipefail
 
 echo "Set KUBECONFIG to management cluster"
-export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
+if [[ $HOSTED_MANAGEMENT_CLUSTER == "hosted-mgmt2" ]]; then
+	export KUBECONFIG=/var/run/hypershift-workload-credentials-hosted-mgmt2/kubeconfig
+else
+	export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
+fi
 
 HOSTED_CLUSTER_FILE="$SHARED_DIR/hosted_cluster.txt"
 if [ -f "$HOSTED_CLUSTER_FILE" ]; then

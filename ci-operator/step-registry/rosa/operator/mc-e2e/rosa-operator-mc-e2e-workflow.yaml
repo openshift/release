@@ -1,0 +1,34 @@
+workflow:
+  as: rosa-operator-mc-e2e
+  steps:
+    env:
+      HOSTED_CP: "true"
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      OCM_LOGIN_ENV: staging
+      CHANNEL_GROUP: stable
+      REPLICAS: "3"
+    pre:
+    - chain: rosa-aws-sts-hcp-provision
+    - ref: rosa-cluster-wait-ready-hosted-cp
+    - ref: rosa-cluster-credentials-hypershift-mgmt
+    - ref: rosa-operator-mc-e2e-setup
+    test:
+    - ref: rosa-operator-e2e
+    post:
+    - chain: rosa-cluster-deprovision
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: rosa-e2e-cleanup-vpc
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+  documentation: |-
+    Provisions an HCP on a CI sector, fetches the Management Cluster
+    kubeconfig, runs operator e2e tests against the MC, then deprovisions.
+    Used for testing MC-resident operator code paths (HCP reconcilers,
+    synthetic monitoring probes, VPC endpoint management).
+
+    The operator is NOT installed or cleaned up. It is fleet-managed via
+    MCC/PKO on the MC. Tests run against the existing deployment.

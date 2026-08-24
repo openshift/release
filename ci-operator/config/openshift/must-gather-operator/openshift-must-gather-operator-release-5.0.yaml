@@ -28,8 +28,7 @@ operator:
     with: stable:must-gather
 promotion:
   to:
-  - disabled: true
-    name: "5.0"
+  - name: "5.0"
     namespace: ocp
 releases:
   initial:
@@ -41,6 +40,12 @@ releases:
       include_built_images: true
       name: "5.0"
       namespace: ocp
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -65,7 +70,6 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: must-gather-operator-codecov-token
-  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -80,31 +84,31 @@ tests:
   commands: make lint
   container:
     from: src
-  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: test
   commands: make test
   container:
     from: src
-  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: validate-boilerplate
   commands: make validate
   container:
     from: src
   optional: true
-  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: e2e-gcp-operator
   steps:
     cluster_profile: openshift-org-gcp
     dependencies:
       OO_BUNDLE: must-gather-operator-bundle
     env:
-      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: must-gather-operator
     test:
     - as: install
       cli: latest
       commands: |
         oc -n must-gather-operator rollout status deployment must-gather-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: must-gather-operator-bundle
       from: src
       resources:
         requests:
@@ -123,6 +127,43 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
+- as: e2e-hypershift-operator
+  cron: '@weekly'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: must-gather-operator-bundle
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      HYPERSHIFT_SKIP_VERSION_VALIDATION: "true"
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: must-gather-operator
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n must-gather-operator rollout status deployment must-gather-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: must-gather-operator-bundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-hypershift
 - always_run: false
   as: e2e-gcp-operator-rhcos10-fips
   optional: true
@@ -133,7 +174,7 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
-      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: must-gather-operator
       OSSTREAM: rhel-10
     test:
@@ -169,7 +210,7 @@ tests:
       OO_BUNDLE: must-gather-operator-bundle
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: must-gather-operator
       OSSTREAM: rhel-10
     test:

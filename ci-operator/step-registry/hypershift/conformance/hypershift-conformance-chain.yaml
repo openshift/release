@@ -50,6 +50,7 @@ chain:
       oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
       oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-25-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY
       oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY
+      oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.10.1 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-22-registry-k8s-io-pause-3-10-1-a6__nK-VRxiifU0Z
       oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.10.1 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-25-registry-k8s-io-pause-3-10-1-a6__nK-VRxiifU0Z
       oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/etcd:3.5.15-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-15-0-W7c5qq4cz4EE20EQ
       EOF
@@ -69,11 +70,23 @@ chain:
         export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
         export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
         export HYPERSHIFT_NAMESPACE="$(oc get hostedclusters -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
-        export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+        if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT}" == "true" ]]; then
+          export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+        else
+          export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+        fi
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
         [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       else
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        # When HOSTED_CP is set, the management cluster kubeconfig is not derived
+        # automatically. Set HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG and
+        # HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE from SHARED_DIR artifacts
+        if [[ -f "${SHARED_DIR}/hs-mc.kubeconfig" && -f "${SHARED_DIR}/cluster-name" ]]; then
+          export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+          ROSA_CLUSTER_NAME="$(cat "${SHARED_DIR}/cluster-name")"
+          export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc --kubeconfig="${HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG}" get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"${ROSA_CLUSTER_NAME}\")].metadata.namespace}")"
+        fi
       fi
 
       if [[ $MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT == "true" ]]; then
@@ -180,6 +193,9 @@ chain:
             mirror_test_images
             patch_image_streams
             export TEST_PROVIDER='{"type":"kubevirt","disconnected":true}'
+            # Patching image stream causes Node rollout to start, so we need to wait for it to finish otherwise
+            # mass test failures will occur.
+            oc --kubeconfig="${HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG}" wait nodepools -n "${HYPERSHIFT_NAMESPACE}" "${CLUSTER_NAME}" --for=condition=AllMachinesReady=True --timeout=45m
           else
             export TEST_PROVIDER='{"type":"kubevirt"}'
           fi
@@ -202,6 +218,8 @@ chain:
       fi
 
       if [[ -n "${TEST_SKIPS}" ]]; then
+          # Strip whitespace around \| separators injected by YAML >- folding
+          TEST_SKIPS=$(echo "$TEST_SKIPS" | sed 's/ *\\|/\\|/g; s/\\| */\\|/g')
           TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
           echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
           if [[ -n "${TEST_INCLUDES}" ]]; then
@@ -210,7 +228,7 @@ chain:
             cat /tmp/test_includes | grep -v "${TEST_SKIPS_SPECIFIC:-placeholder_no_match}" >>/tmp/tests
           fi
 
-          echo "Skipping tests:"
+          echo "Tests to be skipped:"
           echo "${TESTS}" | grep -vxFf /tmp/tests || {
             exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS";
             if [[ "${IGNORE_EMPTY_TEST_SKIPS:-false}" == "true" ]]; then
@@ -221,6 +239,14 @@ chain:
             fi
           }
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+
+          # Warn about individual skip patterns that match nothing.
+          # Assumes \| is only used as a top-level OR (true for all known usages at the time of writing).
+          echo "${TEST_SKIPS}" | sed 's/\\|/\n/g' | while IFS= read -r pattern; do
+              [[ -z "${pattern}" ]] && continue
+              echo "${TESTS}" | grep "${pattern}" > /dev/null 2>&1 ||
+                  echo "Warning: TEST_SKIPS pattern matched 0 tests (test renamed/removed or regex invalid): ${pattern}"
+          done
       fi
 
       openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
@@ -311,6 +337,9 @@ chain:
       default: "false"
       documentation: |-
         If set to true, the job will ignore empty test skips and return a non-zero exit code.
+    - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+      default: "false"
+      documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
     resources:
       requests:
         cpu: "3"

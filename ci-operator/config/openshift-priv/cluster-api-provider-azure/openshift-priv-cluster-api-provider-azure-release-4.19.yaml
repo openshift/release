@@ -29,18 +29,20 @@ images:
     to: azure-cluster-api-controllers
 promotion:
   to:
-  - name: 4.19-priv
-    namespace: ocp-private
+  - name: "4.19"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.19-priv
-      namespace: ocp-private
+      name: "4.19"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
-      namespace: ocp-private
+      name: "4.19"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -54,8 +56,9 @@ tests:
   commands: openshift/unit-tests.sh
   container:
     from: src
-- as: e2e-azure-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-azure-capi-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -68,8 +71,9 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-azure
-- as: e2e-azure
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-azure
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
@@ -102,9 +106,10 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: e2e-azure-serial
+- always_run: false
+  as: e2e-azure-serial
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   shard_count: 2
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-serial
@@ -114,7 +119,8 @@ tests:
   container:
     from: commitchecker
   optional: true
-- as: hypershift-e2e-aks
+- always_run: false
+  as: hypershift-e2e-aks
   steps:
     cluster_profile: hypershift-aks
     env:

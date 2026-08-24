@@ -1,7 +1,7 @@
 base_images:
   base:
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
     tag: base
 build_root:
   from_repository: true
@@ -16,18 +16,20 @@ images:
     to: vsphere-csi-driver-syncer
 promotion:
   to:
-  - name: 4.12-priv
-    namespace: ocp-private
+  - name: "4.12"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -40,11 +42,13 @@ tests:
   commands: make unit-test
   container:
     from: src
-- as: e2e-vsphere
+- always_run: false
+  as: e2e-vsphere
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-csi
+- always_run: false
+  as: e2e-vsphere-csi
   steps:
     cluster_profile: vsphere-elastic
     env:

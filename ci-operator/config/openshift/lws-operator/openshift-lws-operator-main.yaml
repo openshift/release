@@ -1,6 +1,6 @@
 base_images:
   kubernetes-sigs-lws:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: kubernetes-sigs-lws
 build_root:
@@ -11,7 +11,7 @@ images:
     to: lws-operator
 promotion:
   to:
-  - name: "5.0"
+  - name: "5.1"
     namespace: ocp
 resources:
   '*':
@@ -19,7 +19,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "5.0"
+  name: "5.1"
   namespace: ocp
 tests:
 - as: verify
@@ -86,6 +86,26 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-operator-serial-ote
+  optional: true
+  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: lws-operator
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/lws-operator-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: lws-operator
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/lws-operator/operator/serial
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main

@@ -15,9 +15,13 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   tools:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: tools
 binary_build_commands: make build
 build_root:
@@ -32,9 +36,10 @@ images:
     to: hello-openshift
 promotion:
   to:
-  - disabled: true
-    name: 4.22-priv
-    namespace: ocp-private
+  - name: "4.22"
+    namespace: ocp-priv
+prowgen:
+  private: true
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -44,13 +49,13 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   nightly-arm64:
     candidate:
       architecture: arm64
@@ -397,6 +402,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
       TEST_REQUIRES_BUILDFARM_NET_ADMIN: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -414,6 +421,7 @@ tests:
   capabilities:
   - intranet
   optional: true
+  pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/two_node)
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
@@ -422,10 +430,20 @@ tests:
   capabilities:
   - intranet
   optional: true
-  pipeline_run_if_changed: (baremetal|metal3|ironic)
+  pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/two_node)
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing
+- always_run: false
+  as: e2e-metal-ovn-two-node-fencing-recovery
+  capabilities:
+  - intranet
+  - nested-podman
+  optional: true
+  pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/two_node)
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-fencing-recovery
 - always_run: false
   as: e2e-metal-ipi-ovn
   capabilities:
@@ -550,9 +568,7 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true
@@ -657,7 +673,7 @@ tests:
       --allow-missing-architectures=e2e-19-registry-k8s-io-e2e-test-images-node-perf-tf-wide-deep \
       --allow-missing-architectures=registry-k8s-io-cloud-provider-gcp-gcp-compute-persistent-disk-csi-driver \
       --allow-missing-architectures=e2e-quay-io-keycloak-keycloak \
-      --allow-missing-architectures=e2e-quay-io-crio-zstd-chunked-1 \
+      --allow-missing-architectures=e2e-quay-io-crio-artifact-subpath-8cuvQpZ0AoyNahYr \
       --allow-missing-architectures=e2e-quay-io-kubevirt-fedora-with-test-tooling-container-disk \
       --log-level=debug
   container:

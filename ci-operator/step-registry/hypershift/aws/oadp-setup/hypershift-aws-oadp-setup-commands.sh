@@ -5,7 +5,7 @@ set -euo pipefail
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 REGION="${OADP_AWS_REGION:-us-east-1}"
 BUCKET_NAME="${OADP_S3_BUCKET_NAME:-hypershift-oadp-${CLUSTER_NAME}}"
-OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/redhat-user-workloads/ocp-art-tenant/oadp-hypershift-oadp-plugin-main:main}"
+OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/konveyor/hypershift-oadp-plugin:latest}"
 export AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
 
 echo "Setting up OADP prerequisites for backup/restore tests"

@@ -130,7 +130,7 @@ tests:
     workflow: ipi-aws
 - always_run: false
   as: e2e-aws-ovn
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
@@ -194,7 +194,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-op
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -246,7 +246,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-aws-ovn-upgrade
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
@@ -415,7 +415,7 @@ tests:
     workflow: openshift-e2e-gcp-single-node
 - always_run: false
   as: e2e-gcp-op-single-node
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -439,7 +439,7 @@ tests:
 - always_run: false
   as: e2e-openstack
   optional: true
-  run_if_changed: .*/on-prem/.*|.*openstack.*
+  pipeline_run_if_changed: .*/on-prem/.*|.*openstack.*
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -465,7 +465,7 @@ tests:
     workflow: openshift-e2e-openstack-external-lb
 - always_run: false
   as: e2e-hypershift
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^pkg/controller/bootimage/ami\.go$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
@@ -604,17 +604,33 @@ tests:
 - always_run: false
   as: e2e-aws-mco-disruptive
   optional: true
+  reporter_config:
+    channel: '#trt-alert-mco'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-gcp-mco-disruptive
   optional: true
+  reporter_config:
+    channel: '#trt-alert-mco'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-gcp
 zz_generated_metadata:

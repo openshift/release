@@ -54,14 +54,23 @@ for suite in "${TEST_SUITES[@]}"; do
     -i "${PROJECT_DIR}/temp_ssh_key" "cd ${remote_dir}; ./eco-gotests-run.sh || true"
 done
 
+SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
+
 echo "Gather artifacts from bastion"
 # shellcheck disable=SC2154
 for suite in "${TEST_SUITES[@]}"; do
   remote_dir="/tmp/eco_gotests_${suite}"
   artifact_dir="${ARTIFACT_DIR}/junit_eco_gotests_${suite}"
   mkdir -p "${artifact_dir}"
-  scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "${PROJECT_DIR}/temp_ssh_key" \
-    "${BASTION_USER}@${BASTION_IP}:${remote_dir}/report/*.xml" "${artifact_dir}/"
+  scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+    "${BASTION_USER}@${BASTION_IP}:${remote_dir}/report/*.xml" \
+    "${artifact_dir}/" || echo "No XML artifacts in eco_gotests_${suite} — skipping"
+  ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
+    "cd ${remote_dir}/report && find . -mindepth 1 ! -name '*.xml' -type f \
+     | zip /tmp/k8sreporter_${suite}.zip -@ 2>/dev/null || true"
+  scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+    "${BASTION_USER}@${BASTION_IP}:/tmp/k8sreporter_${suite}.zip" \
+    "${artifact_dir}/" 2>/dev/null || echo "No k8sreporter artifacts in eco_gotests_${suite} — skipping"
 done
 
 rm -rf "${PROJECT_DIR}/temp_ssh_key"

@@ -1,12 +1,56 @@
 ref:
   as: tls-scanner-run
-  from: src
+  from: cli
   cli: latest
   commands: tls-scanner-run-commands.sh
   env:
   - name: SCAN_NAMESPACE
     default: ""
     documentation: "Comma-separated list of namespaces to scan. Empty means scan all namespaces."
+  - name: SCANNER_NAMESPACE
+    default: ""
+    documentation: |-
+      Namespace where the scanner pod is deployed. When set, the scanner runs
+      in this existing namespace instead of creating a dedicated 'tls-scanner'
+      namespace.
+  - name: PQC_CHECK
+    default: "false"
+    documentation: "Set to 'true' to check post-quantum cryptography readiness (scanner will only check TLS 1.3 and mlkem/mlkem25519 support)."
+  - name: SCAN_LIMIT_IPS
+    default: ""
+    documentation: "Max IPs to scan (empty/0 = no limit). Bounds actual TLS scans after full endpoint discovery."
+  - name: SCANNER_CPU
+    default: "4"
+    documentation: "Deprecated: use SCANNER_CPU_REQUEST and SCANNER_CPU_LIMIT. Kept as fallback."
+  - name: SCANNER_MEMORY
+    default: "4Gi"
+    documentation: "Deprecated: use SCANNER_MEM_REQUEST and SCANNER_MEM_LIMIT. Kept as fallback."
+  - name: SCANNER_CPU_REQUEST
+    default: ""
+    documentation: "CPU request for the scanner pod."
+  - name: SCANNER_CPU_LIMIT
+    default: ""
+    documentation: "CPU limit for the scanner pod."
+  - name: SCANNER_MEM_REQUEST
+    default: ""
+    documentation: "Memory request for the scanner pod."
+  - name: SCANNER_MEM_LIMIT
+    default: ""
+    documentation: "Memory limit for the scanner pod."
+  - name: TLS_SCANNER_CLUSTER_LABEL
+    default: ""
+    documentation: |-
+      HyperShift scan target label. Set to "management" to scan the shared
+      management cluster hosted control plane namespace, or "guest" to scan the
+      hosted cluster. Empty uses the step KUBECONFIG and scans all namespaces.
+  - name: TLS_PROFILE_TYPE
+    default: ""
+    documentation: |-
+      Expected cluster TLS profile type for compliance checks (Old, Intermediate,
+      Modern). When set, passes --tls-profile-type to tls-scanner instead of
+      reading APIServer/cluster from the API. Required for HyperShift hosted
+      control planes where the guest APIServer CR may not mirror HostedCluster
+      configuration.
   dependencies:
   - env: RELEASE_IMAGE_LATEST
     name: release:latest
@@ -25,3 +69,4 @@ ref:
   documentation: |-
     Runs the TLS scanner against all pods in the target cluster.
     The scanner runs with cluster-admin privileges and full host access.
+    Set PQC_CHECK=true to check post-quantum cryptography readiness (scanner will only check TLS 1.3 and mlkem/mlkem25519 support).

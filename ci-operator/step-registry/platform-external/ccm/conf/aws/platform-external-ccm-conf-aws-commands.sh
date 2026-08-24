@@ -94,6 +94,7 @@ spec:
           requests:
             cpu: 200m
             memory: 50Mi
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /etc/kubernetes
           name: host-etc-kube

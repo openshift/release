@@ -15,6 +15,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   tools:
     name: "4.22"
     namespace: ocp
@@ -395,6 +399,8 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
       TEST_REQUIRES_BUILDFARM_NET_ADMIN: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -429,6 +435,7 @@ tests:
   as: e2e-metal-ovn-two-node-fencing-recovery
   capabilities:
   - intranet
+  - nested-podman
   optional: true
   pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/two_node)
   steps:
@@ -558,9 +565,7 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true
@@ -665,7 +670,7 @@ tests:
       --allow-missing-architectures=e2e-19-registry-k8s-io-e2e-test-images-node-perf-tf-wide-deep \
       --allow-missing-architectures=registry-k8s-io-cloud-provider-gcp-gcp-compute-persistent-disk-csi-driver \
       --allow-missing-architectures=e2e-quay-io-keycloak-keycloak \
-      --allow-missing-architectures=e2e-quay-io-crio-zstd-chunked-1 \
+      --allow-missing-architectures=e2e-quay-io-crio-artifact-subpath-8cuvQpZ0AoyNahYr \
       --allow-missing-architectures=e2e-quay-io-kubevirt-fedora-with-test-tooling-container-disk \
       --log-level=debug
   container:

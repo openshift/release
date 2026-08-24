@@ -15,6 +15,10 @@ base_images:
     name: cincinnati-graph-data
     namespace: cincinnati-ci-public
     tag: stable
+  tls-scanner-tool:
+    name: "5.0"
+    namespace: ocp
+    tag: tls-scanner-tool
   ubi:
     name: ubi
     namespace: ocp
@@ -99,6 +103,31 @@ tests:
           cpu: 500m
           memory: 1000Mi
     workflow: generic-claim
+- always_run: false
+  as: install-bundle-tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCAN_NAMESPACE: install-osus-here
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace install-osus-here
+        operator-sdk run bundle -n install-osus-here "$OO_BUNDLE" --security-context-config restricted
+        oc wait --for condition=Available -n install-osus-here deployment updateservice-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: cincinnati-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1000Mi
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 - as: scorecard
   steps:
     allow_best_effort_post_steps: true
@@ -149,6 +178,11 @@ tests:
     - ref: fips-check-image-scan
 - as: fips-image-scan-operator-production
   cron: '@weekly'
+  reporter_config:
+    channel: '#team-cincinnati-alert'
+    job_states_to_report:
+    - failure
+    report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>.
   steps:
     test:
     - as: check-payload

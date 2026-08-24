@@ -25,4 +25,4 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 echo "Deleting OVE ISO from aux host"
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${OVE_ISO_STORAGE_HOST}" rm -f "/opt/html/${CLUSTER_NAME}.agent-ove.x86_64.iso"
+timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${OVE_ISO_STORAGE_HOST}" rm -f "/var/mnt/data-storage/html/${CLUSTER_NAME}.agent-ove.x86_64.iso"

@@ -14,24 +14,88 @@ HYPERFLEET_API_URL=$(cat "${SHARED_DIR}/hyperfleet_api_url")
 MAESTRO_URL=$(cat "${SHARED_DIR}/maestro_url")
 
 cp -r /e2e/ /tmp/
-cd "/tmp/e2e/deploy-scripts/"
-cp  .env.example .env
-source .env
+
+# Clone and build from a specific ref if requested (RC/release testing)
+E2E_REF="${MULTISTAGE_PARAM_OVERRIDE_E2E_REF:-}"
+GINKGO_BIN="ginkgo"
+E2E_TEST_BIN="/usr/local/bin/e2e.test"
+TESTDATA="/e2e/testdata"
+if [ -n "$E2E_REF" ]; then
+  log "=== Building E2E from ref: ${E2E_REF} ==="
+  SRC_DIR="$(mktemp -d)"
+  git clone --branch "$E2E_REF" --depth 1 \
+    https://github.com/openshift-hyperfleet/hyperfleet-e2e.git "${SRC_DIR}"
+  cd "${SRC_DIR}"
+  make build
+  # Build ginkgo CLI and test binary for parallel execution
+  (cd .bingo && GOWORK=off go build -mod=mod -modfile=ginkgo.mod \
+    -o "${SRC_DIR}/bin/ginkgo" "github.com/onsi/ginkgo/v2/ginkgo")
+  CGO_ENABLED=0 go test -c -o "${SRC_DIR}/bin/e2e.test" ./e2e
+  GINKGO_BIN="${SRC_DIR}/bin/ginkgo"
+  E2E_TEST_BIN="${SRC_DIR}/bin/e2e.test"
+  TESTDATA="${SRC_DIR}/testdata"
+  rm -rf /tmp/e2e/env /tmp/e2e/configs
+  cp -r "${SRC_DIR}/env" /tmp/e2e/env
+  cp -r "${SRC_DIR}/configs" /tmp/e2e/configs
+  cd -
+  log "=== E2E build complete ==="
+fi
+
+# Change to /tmp/e2e to ensure tests can create .test-work directory
+cd /tmp/e2e
+source /tmp/e2e/env/env.ci
 
 export HYPERFLEET_API_URL
 export MAESTRO_URL
 export HYPERFLEET_E2E_CREDENTIALS_PATH="/var/run/hyperfleet-e2e/"
-export TESTDATA_DIR="/e2e/testdata"
+export TESTDATA_DIR="${TESTDATA}"
+
+# Extract namespace from shared dir
 NAMESPACE=$(cat "${SHARED_DIR}/namespace_name")
 export NAMESPACE
 
+# Extract gcp project id from shared dir
+GCP_PROJECT_ID=$(cat "${SHARED_DIR}/gcp_project_id")
+export GCP_PROJECT_ID
+
+# Extract run id from shared dir
+RUN_ID=$(cat "${SHARED_DIR}/run_id")
+export RUN_ID
+
+# Extract kubeconfig from shared dir
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # Export adapter parameters for the test
 export ADAPTER_CHART_REPO="${ADAPTER_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-adapter.git}"
 export ADAPTER_CHART_REF="${ADAPTER_CHART_REF:-main}"
 export ADAPTER_CHART_PATH="${ADAPTER_CHART_PATH:-charts}"
 export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
 export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
-export ADAPTER_IMAGE_TAG="${ADAPTER_IMAGE_TAG:-latest}"
+export ADAPTER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG:-latest}"
 
-# Run e2e tests via --label-filter
-hyperfleet-e2e test --label-filter=${LABEL_FILTER} --junit-report ${ARTIFACT_DIR}/junit.xml
+# Export API chart parameters for tier2 tests
+export API_CHART_REPO="${API_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-api.git}"
+export API_CHART_REF="${API_CHART_REF:-main}"
+export API_CHART_PATH="${API_CHART_PATH:-charts}"
+
+# JWT authentication via K8s TokenRequest API
+# The E2E framework acquires a JWT at startup using the SA token
+export HYPERFLEET_IDENTITY_TOKENREQUEST_SERVICEACCOUNTNAME="${HYPERFLEET_IDENTITY_TOKENREQUEST_SERVICEACCOUNTNAME:-default}"
+export HYPERFLEET_IDENTITY_TOKENREQUEST_NAMESPACE="${NAMESPACE}"
+export HYPERFLEET_IDENTITY_EXPECTEDIDENTITY="system:serviceaccount:${NAMESPACE}:${HYPERFLEET_IDENTITY_TOKENREQUEST_SERVICEACCOUNTNAME}"
+
+export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_CREDENTIALS_PATH}/hcm-hyperfleet-e2e.json"
+
+# Copy test binary to writable working directory so ginkgo workers inherit
+# a writable CWD (ginkgo sets each worker's CWD to the binary's parent dir)
+cp "${E2E_TEST_BIN}" ./e2e.test
+E2E_TEST_BIN="./e2e.test"
+
+# Run e2e tests via ginkgo CLI with parallel execution
+"${GINKGO_BIN}" \
+  --procs="${PROCS:-8}" \
+  --timeout="${SUITE_TIMEOUT:-2h}" \
+  --label-filter="${LABEL_FILTER}" \
+  --flake-attempts="${FLAKE_ATTEMPTS:-2}" \
+  --junit-report=junit.xml \
+  --output-dir="${ARTIFACT_DIR}" \
+  "${E2E_TEST_BIN}"

@@ -44,6 +44,9 @@ spec:
       serviceAccountName: crier
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
@@ -59,7 +62,7 @@ spec:
           mountPath: /tmp/git-sync
       containers:
       - name: crier
-        image: us-docker.pkg.dev/k8s-infra-prow/images/crier:v20260408-3bbc91829
+        image: us-docker.pkg.dev/k8s-infra-prow/images/crier:v20260819-7593870dc
         args:
         - --github-workers=30
         - --config-path=/etc/config/config.yaml
@@ -106,7 +109,7 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "10Gi"
+            memory: "21Gi"
             cpu: "600m"
       - name: git-sync
         command:
@@ -124,8 +127,8 @@ spec:
           mountPath: /tmp/git-sync
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "0.5"
+            memory: "512Mi"
+            cpu: "100m"
       volumes:
       - name: service-account-token
         projected:

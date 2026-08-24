@@ -387,7 +387,7 @@ resources, triggering new builds, then waits up to 1 hour for builds to complete
 - [Recent executions on Deck](https://prow.ci.openshift.org/?job=periodic-trigger-mabc-images)
 - [infra-periodics.yaml (ProwJob configuration)](https://github.com/openshift/release/blob/master/ci-operator/jobs/infra-periodics.yaml)
 - [hack/manage_mabc_builds.sh](https://github.com/openshift/release/blob/master/hack/manage_mabc_builds.sh)
-- [MABC manifests](https://github.com/openshift/release/tree/master/clusters/build-clusters/multiarch_builds/supplemental-ci-images)
+- [MABC manifests](https://github.com/openshift/release/tree/master/clusters/build-clusters/build-shared/supplemental-ci-images)
 - [multi-arch-builder-controller source](https://github.com/openshift/ci-tools/tree/main/cmd/multi-arch-builder-controller)
 
 ### Job times out waiting for MABC to complete

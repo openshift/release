@@ -134,11 +134,21 @@ then
 fi
 
 # MIRROR IMAGES
- # To avoid 409 too many request error, mirroring image one by one
- for image in `cat /tmp/mirror-images-list.yaml`
- do
-     oc image mirror $image  --insecure=true -a "${new_pull_secret}" \
-         --skip-missing=true --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'
- done
+# To avoid 409 too many request error, mirroring image one by one
+for image in $(cat /tmp/mirror-images-list.yaml)
+do
+    attempts=0
+    max_attempts=3
+    until oc image mirror "$image" --insecure=true -a "${new_pull_secret}" \
+        --skip-missing=true --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'; do
+        attempts=$((attempts + 1))
+        if [ $attempts -ge $max_attempts ]; then
+            echo "Failed to mirror $image after $max_attempts attempts"
+            exit 1
+        fi
+        echo "Mirroring $image attempt $attempts failed, retrying in 30s..."
+        sleep 30
+    done
+done
 
 rm -f "${new_pull_secret}"

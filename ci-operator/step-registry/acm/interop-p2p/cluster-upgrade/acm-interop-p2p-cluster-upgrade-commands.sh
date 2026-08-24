@@ -1,139 +1,128 @@
 #!/bin/bash
-
+#
+# Upgrades the hub cluster to the release image in OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+# (sourced from release:target via the ref dependency).
+# Patches ACM_CLUSTER_UPGRADE_TARGET_CHANNEL when set, admin-ack from Upgradeable condition, then initiates
+# and waits for clusterversion upgrade to complete.
+#
 set -euxo pipefail; shopt -s inherit_errexit
 
-#=====================
-# Export environment variables
-#=====================
-export TARGET_CHANNEL
+eval "$(
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+)"; EnsureReqs jq
 
-#=====================
-# Configuration variables
-#=====================
-timeout_seconds="${ACM_UPGRADE_TIMEOUT_SECONDS:-7200}"  # Default: 2 hours
-poll_interval="${ACM_UPGRADE_POLL_INTERVAL:-30}"       # Default: 30 seconds
+[[ -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" ]]
 
-#=====================
-# Validate required files and variables
-#=====================
-if [[ -z "${ORIGINAL_RELEASE_IMAGE_LATEST:-}" ]]; then
-    echo "[ERROR] ORIGINAL_RELEASE_IMAGE_LATEST environment variable is not set" >&2
-    exit 1
-fi
+typeset targetVersion=''
+typeset digest=''
 
-if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
-    echo "[ERROR] Hub kubeconfig not found: ${SHARED_DIR}/kubeconfig" >&2
-    exit 1
-fi
+WriteUpgradeFailureDiagnostics() {
+    typeset ctx="${1:-cluster}"
+    typeset artifactFile="${ARTIFACT_DIR}/${ctx}-upgrade-failure.txt"
 
-if [[ ! -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
-    echo "[ERROR] Spoke kubeconfig not found: ${SHARED_DIR}/managed-cluster-kubeconfig" >&2
-    exit 1
-fi
-
-#=====================
-# Helper functions
-#=====================
-now() {
-    date +%s
+    # All commands below use || true: this function is already on the failure path.
+    # A secondary failure here must not mask the original error that triggered the call.
+    {
+        printf '%s\n' "=== targetVersion=${targetVersion:-unknown} ==="
+        printf '\n'
+        printf '%s\n' "=== oc get clusterversion version ==="
+        oc get clusterversion version -o wide 2>&1 || true
+        printf '\n'
+        printf '%s\n' "=== oc describe clusterversion version ==="
+        oc describe clusterversion version 2>&1 || true
+        printf '\n'
+        printf '%s\n' "=== oc get events -A (last 40) ==="
+        # tail -40 is informational only; || true covers both transient API errors and
+        # the case where the API server is already unreachable mid-upgrade.
+        oc get events -A --sort-by='.lastTimestamp' 2>&1 | tail -40 || true
+    } > "${artifactFile}"
+    : "Wrote upgrade failure diagnostics to ${artifactFile}"
+    true
 }
 
 #=====================
-# Resolve target version and digest
+# Resolve target version and digest from release image
 #=====================
-echo "[INFO] Resolving latest RC's from release Controller..."
-target_version="$(oc adm release info "${ORIGINAL_RELEASE_IMAGE_LATEST}" -o json | jq -r '.metadata.version')"
+: "Resolving target version and digest from ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+typeset releaseInfoJson
+releaseInfoJson="$(oc adm release info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" -o json)"
 
-if [[ -z "${target_version}" ]]; then
-    echo "[ERROR] Failed to get target version from release image" >&2
-    exit 1
+targetVersion="$(jq -r '.metadata.version' <<< "${releaseInfoJson}")"
+[[ -n "${targetVersion}" ]]
+
+digest="$(jq -r '.digest' <<< "${releaseInfoJson}")"
+[[ -n "${digest}" ]]
+
+: "Target version: ${targetVersion}  digest: ${digest}"
+
+#=====================
+# Upgrade hub cluster
+#=====================
+: "Upgrading hub to version=${targetVersion} channel=${ACM_CLUSTER_UPGRADE_TARGET_CHANNEL}"
+
+if [[ -n "${ACM_CLUSTER_UPGRADE_TARGET_CHANNEL}" ]]; then
+    oc patch clusterversion version \
+        --type merge \
+        -p "$(jq -cn --arg ch "${ACM_CLUSTER_UPGRADE_TARGET_CHANNEL}" '{"spec":{"channel":$ch}}')"
 fi
 
-# Get image digest, digest is required to safely upgrade the cluster using release image
-digest="$(oc adm release info "${ORIGINAL_RELEASE_IMAGE_LATEST}" -o json | jq -r .digest)"
-
-if [[ -z "${digest}" ]]; then
-    echo "[ERROR] Failed to get digest from release image" >&2
-    exit 1
+# Patch admin-ack ConfigMap when the Upgradeable condition requires it.
+typeset upgradeableMsg='' 
+typeset ackKey=''
+# || true: a transient API blip here must not abort the step. An empty result
+# means no Upgradeable condition is present, so ackKey stays empty and the patch
+# is skipped — the subsequent oc adm upgrade will fail loudly if ack is truly required.
+upgradeableMsg="$(oc get clusterversion version \
+    -o jsonpath='{.status.conditions[?(@.type=="Upgradeable")].message}' || true)"
+if [[ -n "${upgradeableMsg}" ]]; then
+    # || true: grep exits 1 when no match is found; that is a valid outcome (no ack
+    # key embedded in the message), not an error.
+    ackKey="$(grep -oE 'ack-[a-zA-Z0-9.-]+' <<< "${upgradeableMsg}" | head -1 || true)"
+fi
+if [[ -n "${ackKey}" ]]; then
+    : "Patching admin-ack '${ackKey}' from Upgradeable condition"
+    oc patch configmap admin-acks-upgrades -n openshift-config \
+        --type merge \
+        -p "$(jq -cn --arg k "${ackKey}" '{data: {($k): "true"}}')" \
+        || : "admin-acks-upgrades patch skipped (ConfigMap may not exist on this cluster)"
+else
+    : "No admin-ack key in Upgradeable condition; skipping patch"
 fi
 
-echo "[INFO] Target version: ${target_version}"
-echo "[INFO] Target digest: ${digest}"
+# Strip tag or digest suffix to get bare registry/repo, then re-pin by digest.
+typeset repo="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE%:*}"
+repo="${repo%@sha256*}"
+
+oc adm upgrade \
+    --to-image="${repo}@${digest}" \
+    --allow-explicit-upgrade \
+    --allow-upgrade-with-warnings \
+    --force
 
 #=====================
-# Set kubeconfig paths
+# Wait for hub cluster upgrade to complete
 #=====================
-hub_kubeconfig="${SHARED_DIR}/kubeconfig"
-spoke_kubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig"
+# Two oc wait calls are needed because oc wait supports only one jsonpath condition each.
+# The first wait guards against a race: immediately after oc adm upgrade, history[0] still
+# reflects the previous upgrade's Completed state. Only once history[0].version matches
+# targetVersion is it safe to poll for Completed.
+: "Waiting for hub to reach version=${targetVersion} (timeout=${ACM_UPGRADE_TIMEOUT})"
 
-#=====================
-# Upgrade functions
-#=====================
-upgrade_cluster() {
-    local kfcg="$1"
-    local ctx="$2"
-    local repo
-
-    echo "[INFO] Upgrading ${ctx} to channel=${TARGET_CHANNEL} and version=${target_version}"
-    echo "[INFO] Target image: ${ORIGINAL_RELEASE_IMAGE_LATEST}"
-    
-    # Update channel
-    oc --kubeconfig="${kfcg}" patch clusterversion version --type merge -p "{\"spec\":{\"channel\":\"${TARGET_CHANNEL}\"}}"
-    
-    # Extract repository from image reference
-    repo="${ORIGINAL_RELEASE_IMAGE_LATEST%:*}"
-    echo "[INFO] Repository: ${repo}"
-    
-    # Initiate upgrade
-    oc --kubeconfig="${kfcg}" adm upgrade --to-image="${repo}@${digest}" --allow-explicit-upgrade --allow-upgrade-with-warnings --force
+oc wait clusterversion/version \
+    --for=jsonpath='{.status.history[0].version}'="${targetVersion}" \
+    --timeout="${ACM_UPGRADE_TIMEOUT}" || {
+    WriteUpgradeFailureDiagnostics "hub"
+    false
 }
 
-wait_for_completed() {
-    local kfcg="$1"
-    local ctx="$2"
-    local target="$3"
-    local start
-    local state
-    local ver
-
-    start="$(now)"
-    echo "[INFO] Waiting for ${ctx} to complete upgrade to ${target}"
-    
-    while true; do
-        # Query clusterversion and get state and version
-        clusterversion_json="$(oc --kubeconfig="${kfcg}" get clusterversion version -o json 2>/dev/null || echo '{}')"
-        state="$(jq -r '.status.history[0].state // empty' <<<"${clusterversion_json}")"
-        ver="$(jq -r '.status.history[0].version // empty' <<<"${clusterversion_json}")"
-        
-        # If state is completed and ver is target version then upgrade finished
-        if [[ "${state}" == "Completed" && "${ver}" == "${target}" ]]; then
-            echo "[SUCCESS] ${ctx}: Upgrade completed to version ${ver}"
-            break
-        fi
-        
-        # If version and state did not reach desired values before timeout then exit
-        if (( $(now) - start > timeout_seconds )); then
-            echo "[ERROR] Timeout waiting for ${ctx} (state='${state:-?}' version='${ver:-?}' target='${target}')" >&2
-            exit 2
-        fi
-        
-        echo "[INFO] ${ctx}: state='${state:-?}', version='${ver:-?}', retry in ${poll_interval}s"
-        sleep "${poll_interval}"
-    done
+oc wait clusterversion/version \
+    --for=jsonpath='{.status.history[0].state}'="Completed" \
+    --timeout="${ACM_UPGRADE_TIMEOUT}" || {
+    WriteUpgradeFailureDiagnostics "hub"
+    false
 }
 
-#=====================
-# Execute upgrades
-#=====================
-# Hub upgrade
-echo "[INFO] Starting hub cluster upgrade"
-upgrade_cluster "${hub_kubeconfig}" "hub"
-wait_for_completed "${hub_kubeconfig}" "hub" "${target_version}"
-
-# Spoke upgrade
-echo "[INFO] Starting spoke cluster upgrade"
-upgrade_cluster "${spoke_kubeconfig}" "spoke"
-wait_for_completed "${spoke_kubeconfig}" "spoke" "${target_version}"
-
-echo "[SUCCESS] All selected clusters are at latest RCs"
-# Check cluster health for hub and spoke clusters after upgrade
+: "Hub cluster upgraded to ${targetVersion}"
+true

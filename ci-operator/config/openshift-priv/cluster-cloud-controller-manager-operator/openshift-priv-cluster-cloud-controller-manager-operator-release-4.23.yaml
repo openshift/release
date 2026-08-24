@@ -17,18 +17,20 @@ images:
     to: cluster-cloud-controller-manager-operator
 promotion:
   to:
-  - name: 4.23-priv
-    namespace: ocp-private
+  - name: "4.23"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -65,13 +67,15 @@ tests:
       resources:
         requests:
           cpu: 200m
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
@@ -95,7 +99,7 @@ tests:
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-azure-ovn-upgrade
-  optional: true
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
@@ -127,7 +131,7 @@ tests:
 - always_run: false
   as: e2e-ibmcloud-ovn
   optional: true
-  run_if_changed: ibm
+  pipeline_run_if_changed: ibm
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
@@ -159,10 +163,32 @@ tests:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-vsphere-ipi
 - always_run: false
+  as: regression-clusterinfra-aws-ipi-ccm
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      E2E_RUN_TAGS: '@ccm'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-aws-ipi
+- always_run: false
+  as: e2e-aws-ipi-ccm-operator-serial-disruptive-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_SUITE: openshift/ccm/operator/disruptive/serial
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- always_run: false
   as: e2e-nutanix-ovn
   cluster: build01
   optional: true
-  run_if_changed: .*nutanix.*
+  pipeline_run_if_changed: .*nutanix.*
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix

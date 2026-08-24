@@ -23,6 +23,9 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: upi-installer
+prowgen:
+  expose: true
+  private: true
 releases:
   arm64-latest:
     release:
@@ -44,6 +47,16 @@ resources:
 tests:
 - as: azure-ipi-arm-f999-logging
   cron: 8 8 29 2 *
+  reporter_config:
+    channel: '#aos-qe-logging'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - pending
+    - success
+    report_template: Job {{.Spec.Job}} state is *{{.Status.State}}* <{{.Status.URL}}|View
+      logs>
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -75,6 +88,16 @@ tests:
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: gcp-ipi-proxy-oidc-amd-f999-logging
   cron: 31 13 29 2 *
+  reporter_config:
+    channel: '#aos-qe-logging'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - pending
+    - success
+    report_template: Job {{.Spec.Job}} state is *{{.Status.State}}* <{{.Status.URL}}|View
+      logs>
   steps:
     cluster_profile: gcp-observability
     env:

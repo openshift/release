@@ -1,4 +1,8 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -12,18 +16,20 @@ images:
     to: cluster-node-tuning-operator
 promotion:
   to:
-  - name: 4.23-priv
-    namespace: ocp-private
+  - name: "4.23"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -46,11 +52,13 @@ tests:
   commands: make vet
   container:
     from: src
-- as: e2e-hypershift
+- always_run: false
+  as: e2e-hypershift
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
-- as: e2e-hypershift-pao
+- always_run: false
+  as: e2e-hypershift-pao
   steps:
     cluster_profile: hypershift-aws
     env:
@@ -74,6 +82,7 @@ tests:
     workflow: hypershift-aws-e2e-cluster
 - always_run: false
   as: e2e-pao-updating-profile-hypershift
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: hypershift-aws
     env:
@@ -95,11 +104,13 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: hypershift-aws-e2e-cluster
-- as: e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-techpreview
+- always_run: false
+  as: e2e-aws-ovn-techpreview
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -115,7 +126,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
+- always_run: false
+  as: e2e-aws-operator
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -127,7 +139,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-gcp-pao
+- always_run: false
+  as: e2e-gcp-pao
   capabilities:
   - intranet
   steps:
@@ -135,8 +148,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: "export RESERVED_CPU_SET=\"0\"\nexport ISOLATED_CPU_SET=\"1-5\"\nexport
-        CLUSTER=mcp-only \nmake cluster-deploy-pao && make pao-functests"
+      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests
       from: src
       resources:
         requests:
@@ -144,7 +156,8 @@ tests:
           memory: 200Mi
       timeout: 2h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-pao-updating-profile
+- always_run: false
+  as: e2e-gcp-pao-updating-profile
   capabilities:
   - intranet
   steps:
@@ -152,8 +165,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: "export RESERVED_CPU_SET=\"0\"\nexport ISOLATED_CPU_SET=\"1-5\"\nexport
-        CLUSTER=mcp-only \nmake cluster-deploy-pao && make pao-functests-updating-profile"
+      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests-updating-profile
       from: src
       resources:
         requests:
@@ -161,7 +173,8 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-pao-workloadhints
+- always_run: false
+  as: e2e-gcp-pao-workloadhints
   capabilities:
   - intranet
   steps:
@@ -169,8 +182,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: "export RESERVED_CPU_SET=\"0\"\nexport ISOLATED_CPU_SET=\"1-5\"\nexport
-        CLUSTER=mcp-only \nmake cluster-deploy-pao && make pao-functests-performance-workloadhints"
+      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests-performance-workloadhints
       from: src
       resources:
         requests:
@@ -178,11 +190,13 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-upgrade
+- always_run: false
+  as: e2e-upgrade
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-no-cluster
+- always_run: false
+  as: e2e-no-cluster
   commands: make test-e2e-local
   container:
     from: src
@@ -207,6 +221,17 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- always_run: false
+  as: e2e-aws-nto-ext
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: openshift/cluster-node-tuning-operator/all
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.23
   org: openshift-priv

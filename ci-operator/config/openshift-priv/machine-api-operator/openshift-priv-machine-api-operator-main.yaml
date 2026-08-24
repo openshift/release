@@ -25,18 +25,20 @@ images:
     to: machine-api-operator
 promotion:
   to:
-  - name: 4.22-priv
-    namespace: ocp-private
+  - name: "5.1"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -63,8 +65,9 @@ tests:
   commands: IS_CONTAINER=TRUE make verify-crds-sync
   container:
     from: src
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
@@ -74,8 +77,9 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$|vsphere
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$|vsphere
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -105,8 +109,9 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-aws
-- as: e2e-aws-ovn-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+- always_run: false
+  as: e2e-aws-ovn-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
@@ -160,10 +165,11 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
-- as: e2e-metal-ipi
+- always_run: false
+  as: e2e-metal-ipi
   capabilities:
   - intranet
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -180,10 +186,11 @@ tests:
     env:
       RUN_UPGRADE_TEST: "true"
     workflow: baremetalds-e2e-upgrade-ovn-ipv4
-- as: e2e-metal-ipi-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -203,10 +210,11 @@ tests:
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-virtualmedia
+- always_run: false
+  as: e2e-metal-ipi-virtualmedia
   capabilities:
   - intranet
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
@@ -229,7 +237,7 @@ tests:
   cluster: build01
   optional: true
   steps:
-    cluster_profile: nutanix-qe
+    cluster_profile: nutanix
     env:
       FEATURE_GATES: '["NutanixMultiSubnets=true"]'
       FEATURE_SET: CustomNoUpgrade

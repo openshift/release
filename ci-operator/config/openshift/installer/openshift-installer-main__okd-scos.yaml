@@ -1,63 +1,128 @@
 base_images:
-  origin_scos-4.22_base-stream9:
-    name: scos-4.22
+  ocp_builder_rhel-9-golang-1.25-openshift-5.0:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-5.0
+  origin_scos-5.0_base-stream9:
+    name: scos-5.0
     namespace: origin
     tag: base-stream9
-  origin_scos-4.22_etcd:
-    name: scos-4.22
+  origin_scos-5.0_cli:
+    name: scos-5.0
+    namespace: origin
+    tag: cli
+  origin_scos-5.0_etcd:
+    name: scos-5.0
     namespace: origin
     tag: etcd
-  origin_scos-4.22_hyperkube:
-    name: scos-4.22
+  origin_scos-5.0_hyperkube:
+    name: scos-5.0
     namespace: origin
     tag: hyperkube
+  origin_scos-5.0_installer-etcd-artifacts:
+    name: scos-5.0
+    namespace: origin
+    tag: installer-etcd-artifacts
+  origin_scos-5.0_installer-kube-apiserver-artifacts:
+    name: scos-5.0
+    namespace: origin
+    tag: installer-kube-apiserver-artifacts
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.22
+    tag: rhel-9-release-golang-1.25-openshift-5.0
 images:
   items:
   - build_args:
     - name: TAGS
       value: scos
     dockerfile_path: images/installer/Dockerfile.upi.ci
-    from: origin_scos-4.22_base-stream9
+    from: origin_scos-5.0_base-stream9
+    inputs:
+      ocp_builder_rhel-9-golang-1.25-openshift-5.0:
+        as:
+        - builder
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
+      origin_scos-5.0_cli:
+        as:
+        - cli
+        - registry.ci.openshift.org/ocp/4.22:cli
+      origin_scos-5.0_installer-etcd-artifacts:
+        as:
+        - etcd-artifacts
+        - registry.ci.openshift.org/ocp/4.22:installer-etcd-artifacts
+      origin_scos-5.0_installer-kube-apiserver-artifacts:
+        as:
+        - kas-artifacts
+        - registry.ci.openshift.org/ocp/4.22:installer-kube-apiserver-artifacts
     to: upi-installer
   - build_args:
     - name: TAGS
       value: scos
     dockerfile_path: images/baremetal/Dockerfile.ci
-    from: origin_scos-4.22_base-stream9
+    from: origin_scos-5.0_base-stream9
     inputs:
-      origin_scos-4.22_etcd:
+      ocp_builder_rhel-9-golang-1.25-openshift-5.0:
+        as:
+        - builder
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
+      origin_scos-5.0_etcd:
         as:
         - etcd
-      origin_scos-4.22_hyperkube:
+        - registry.ci.openshift.org/ocp/4.22:etcd
+      origin_scos-5.0_hyperkube:
         as:
         - kas
+        - registry.ci.openshift.org/ocp/4.22:hyperkube
     to: baremetal-installer
   - build_args:
     - name: TAGS
       value: scos
     dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-    from: origin_scos-4.22_base-stream9
+    from: origin_scos-5.0_base-stream9
+    inputs:
+      ocp_builder_rhel-9-golang-1.25-openshift-5.0:
+        as:
+        - builder
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
+      origin_scos-5.0_installer-etcd-artifacts:
+        as:
+        - etcd-artifacts
+        - registry.ci.openshift.org/ocp/4.22:installer-etcd-artifacts
+      origin_scos-5.0_installer-kube-apiserver-artifacts:
+        as:
+        - kas-artifacts
+        - registry.ci.openshift.org/ocp/4.22:installer-kube-apiserver-artifacts
     to: installer-artifacts
   - build_args:
     - name: TAGS
       value: scos
     dockerfile_path: images/installer/Dockerfile.ci
-    from: origin_scos-4.22_base-stream9
+    from: origin_scos-5.0_base-stream9
+    inputs:
+      ocp_builder_rhel-9-golang-1.25-openshift-5.0:
+        as:
+        - builder
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
+      origin_scos-5.0_installer-etcd-artifacts:
+        as:
+        - etcd-artifacts
+        - registry.ci.openshift.org/ocp/4.22:installer-etcd-artifacts
+      origin_scos-5.0_installer-kube-apiserver-artifacts:
+        as:
+        - kas-artifacts
+        - registry.ci.openshift.org/ocp/4.22:installer-kube-apiserver-artifacts
     to: installer
 promotion:
   to:
-  - name: scos-4.22
+  - name: scos-5.0
     namespace: origin
 releases:
   latest:
     integration:
       include_built_images: true
-      name: scos-4.22
+      name: scos-5.0
       namespace: origin
 resources:
   '*':

@@ -33,7 +33,7 @@ if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
 fi
 
 registry_host=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
-instance_metadata_repo=${registry_host}/yunjiang/c2s-instance-metadata
+instance_metadata_repo=${registry_host}/openshift-install/c2s-instance-metadata
 
 REGION=${LEASED_RESOURCE}
 

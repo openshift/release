@@ -19,6 +19,11 @@ AZURE_OIDC_ISSUER_URL="$(<"${AZURE_OIDC_ISSUER_URL_LOCATION}" jq -r .oidcIssuerU
 AZURE_KMS_INFO_LOCATION="/etc/hypershift-ci-jobs-azurecreds/aks-kms-info.json"
 AKS_KMS_KEY="$(jq -r '."aks-kms-key"' "${AZURE_KMS_INFO_LOCATION}")"
 AKS_KMS_CREDENTIALS_SECRET="$(jq -r '."aks-kms-credentials-secret"' "${AZURE_KMS_INFO_LOCATION}")"
+HIDE_AZURE_KMS_KEY="false"
+if [[ -s "${SHARED_DIR}/azure_managed_hsm_key_id" ]]; then
+  AKS_KMS_KEY="$(<"${SHARED_DIR}/azure_managed_hsm_key_id")"
+  HIDE_AZURE_KMS_KEY="true"
+fi
 
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
@@ -39,6 +44,11 @@ function cleanup() {
 trap cleanup EXIT
 
 export EVENTUALLY_VERBOSE="false"
+
+check_e2e_flag() {
+  grep -q "$1" <<<"$( bin/test-e2e -h 2>&1 )"
+  return $?
+}
 
 EXTERNAL_DNS_ARGS=""
 if [[ "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN:-}" != "" ]]; then
@@ -62,23 +72,27 @@ if [[ -n "$HYPERSHIFT_MANAGED_SERVICE" ]]; then
     export MANAGED_SERVICE="$HYPERSHIFT_MANAGED_SERVICE"
 fi
 
+if [[ -f "${SHARED_DIR}/nodepool_release_images" ]]; then
+    source "${SHARED_DIR}/nodepool_release_images"
+fi
+
 N1_NP_VERSION_TEST_ARGS=""
-if [[ ${OCP_IMAGE_N1} != "${OCP_IMAGE_LATEST}" ]]; then
+if [[ -n "${OCP_IMAGE_N1:-}" && "${OCP_IMAGE_N1}" != "${OCP_IMAGE_LATEST}" ]]; then
   N1_NP_VERSION_TEST_ARGS="--e2e.n1-minor-release-image=${OCP_IMAGE_N1}"
 fi
 
 N2_NP_VERSION_TEST_ARGS=""
-if [[ ${OCP_IMAGE_N2} != "${OCP_IMAGE_LATEST}" ]]; then
+if [[ -n "${OCP_IMAGE_N2:-}" && "${OCP_IMAGE_N2}" != "${OCP_IMAGE_LATEST}" ]]; then
   N2_NP_VERSION_TEST_ARGS="--e2e.n2-minor-release-image=${OCP_IMAGE_N2}"
 fi
 
 N3_NP_VERSION_TEST_ARGS=""
-if [[ ${OCP_IMAGE_N3} != "${OCP_IMAGE_LATEST}" ]]; then
+if [[ -n "${OCP_IMAGE_N3:-}" && "${OCP_IMAGE_N3}" != "${OCP_IMAGE_LATEST}" ]]; then
   N3_NP_VERSION_TEST_ARGS="--e2e.n3-minor-release-image=${OCP_IMAGE_N3}"
 fi
 
 N4_NP_VERSION_TEST_ARGS=""
-if [[ ${OCP_IMAGE_N4} != "${OCP_IMAGE_LATEST}" ]]; then
+if [[ -n "${OCP_IMAGE_N4:-}" && "${OCP_IMAGE_N4}" != "${OCP_IMAGE_LATEST}" ]]; then
   N4_NP_VERSION_TEST_ARGS="--e2e.n4-minor-release-image=${OCP_IMAGE_N4}"
 fi
 
@@ -101,6 +115,11 @@ MARKETPLACE_IMAGE_PARAMS=""
 # Use environment variables if set, otherwise use defaults based on version
 if [[ -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION:-}" ]]; then
   MARKETPLACE_IMAGE_PARAMS="--e2e.azure-marketplace-publisher ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER} --e2e.azure-marketplace-offer ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER} --e2e.azure-marketplace-sku ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU} --e2e.azure-marketplace-version ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
+fi
+
+ADDITIONAL_PULL_SECRET_PARAMS=""
+if check_e2e_flag 'e2e.additional-pull-secret-file' && [[ -f /etc/hypershift-additional-pull-secret/.dockerconfigjson ]]; then
+  ADDITIONAL_PULL_SECRET_PARAMS="--e2e.additional-pull-secret-file=/etc/hypershift-additional-pull-secret/.dockerconfigjson"
 fi
 
 OAUTH_EXTERNAL_OIDC_PARAM=""
@@ -131,6 +150,10 @@ if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
   esac
 fi
 
+if [[ "${HIDE_AZURE_KMS_KEY}" == "true" ]]; then
+  set +x
+fi
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
@@ -150,10 +173,16 @@ hack/ci-test-e2e.sh -test.v \
     ${MI_ARGS:-} \
     ${DP_ARGS:-} \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
-  --e2e.azure-encryption-key-id=${AKS_KMS_KEY} \
+  --e2e.azure-encryption-key-id="${AKS_KMS_KEY}" \
   --e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET} \
   ${MARKETPLACE_IMAGE_PARAMS} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
-  --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
-wait $!
+  --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" \
+  ${ADDITIONAL_PULL_SECRET_PARAMS:-} &
+e2e_pid=$!
+
+if [[ "${HIDE_AZURE_KMS_KEY}" == "true" ]]; then
+  set -x
+fi
+wait "${e2e_pid}"

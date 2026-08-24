@@ -35,6 +35,29 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ovn-rhcos9-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ovn-rhcos9-10-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-rhcos10-techpreview
   interval: 168h
   steps:
@@ -47,11 +70,62 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
+- as: e2e-gcd-ovn
+  cron: 0 0,12 * * *
+  steps:
+    cluster_profile: gcd
+    env:
+      BASE_DOMAIN: ci.gcd.devcluster.openshift.com
+      BASTION_IMAGE_NAME: fedora-coreos-41-20241122-3-0-gcp-x86-64
+      BASTION_IMAGE_PROJECT: eu0:openshift
+      BASTION_MACHINE_TYPE: c3-standard-4
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c3-standard-4
+      CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
+      CONTROL_PLANE_NODE_TYPE: c3-standard-8
+      DEFAULT_MACHINE_OSIMAGE: projects/eu0:openshift/images/rhcos10
+      PUBLISH: Internal
+      TEST_SKIPS: Ensure HTTPRoute object is created\|The HAProxy router should pass
+        the http2 tests\|The HAProxy router should pass the h2spec conformance tests\|should
+        serve a basic image on each replica with a private image\|regional PD should
+        store data and sync across zones\|API LBs follow /readyz of kube-apiserver
+        and stop sending requests
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcd
+- as: e2e-gcd-ovn-techpreview
+  cron: 0 6,18 * * *
+  steps:
+    cluster_profile: gcd
+    env:
+      BASE_DOMAIN: ci.gcd.devcluster.openshift.com
+      BASTION_IMAGE_NAME: fedora-coreos-41-20241122-3-0-gcp-x86-64
+      BASTION_IMAGE_PROJECT: eu0:openshift
+      BASTION_MACHINE_TYPE: c3-standard-4
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c3-standard-4
+      CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
+      CONTROL_PLANE_NODE_TYPE: c3-standard-8
+      DEFAULT_MACHINE_OSIMAGE: projects/eu0:openshift/images/rhcos10
+      FEATURE_SET: TechPreviewNoUpgrade
+      PUBLISH: Internal
+      TEST_SKIPS: Ensure HTTPRoute object is created\|The HAProxy router should pass
+        the http2 tests\|The HAProxy router should pass the h2spec conformance tests\|should
+        serve a basic image on each replica with a private image\|regional PD should
+        store data and sync across zones\|API LBs follow /readyz of kube-apiserver
+        and stop sending requests
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcd
 - as: e2e-gcp-ovn-rhcos10-fips-techpreview-serial
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
       OS_IMAGE_STREAM: rhel-10
@@ -62,6 +136,7 @@ tests:
     - chain: ipi-gcp-pre
     - ref: fips-check
     workflow: openshift-e2e-gcp-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-no-capabilities
   interval: 168h
   steps:
@@ -101,6 +176,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-techpreview-serial
   interval: 168h
   shard_count: 3
@@ -112,6 +188,34 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
+- as: e2e-aws-ovn-rhcos9-techpreview-serial
+  interval: 12h
+  shard_count: 3
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
+- as: e2e-aws-ovn-rhcos9-10-techpreview-serial
+  interval: 12h
+  shard_count: 3
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-rhcos10-techpreview-serial
   interval: 168h
   shard_count: 3
@@ -125,6 +229,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-upgrade
   interval: 168h
   steps:
@@ -188,8 +293,36 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial
+- as: e2e-azure-ovn-serial-rhcos9-techpreview
+  interval: 12h
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-serial
+  timeout: 5h0m0s
+- as: e2e-azure-ovn-serial-rhcos9-10-techpreview
+  interval: 12h
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-serial
+  timeout: 5h0m0s
 - as: e2e-azure-ovn-techpreview-serial
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -198,8 +331,10 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial
+  timeout: 5h0m0s
 - as: e2e-azure-ovn-rhcos10-techpreview-serial
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-azure
     env:
@@ -209,6 +344,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial
+  timeout: 5h0m0s
 - as: e2e-azure-ovn-upgrade
   interval: 168h
   steps:
@@ -219,6 +355,39 @@ tests:
     observers:
       enable:
       - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-azure-ovn-upgrade-rhcos9-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-azure-ovn-upgrade-rhcos9-10-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ovn-conf
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install-stableinitial
+    - ref: ipi-azure-rbac
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-azure-ovn-techpreview-upgrade
   interval: 168h
@@ -295,6 +464,31 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-rhcos9-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-rhcos9-10-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-9
+      OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-ovn-xpn
   interval: 168h
   steps:
@@ -317,25 +511,31 @@ tests:
     workflow: openshift-e2e-gcp-mount-ns-hiding
 - as: e2e-gcp-ovn-techpreview-serial
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-rhcos10-techpreview-serial
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-usernamespace
   cron: '@daily'
   steps:
@@ -418,6 +618,7 @@ tests:
     cluster_profile: openshift-org-azure
     env:
       FAIL_ON_CORE_DUMP: "true"
+      OS_IMAGE_STREAM: rhel-9
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -429,6 +630,7 @@ tests:
     cluster_profile: openshift-org-gcp
     env:
       FAIL_ON_CORE_DUMP: "true"
+      OS_IMAGE_STREAM: rhel-9
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -440,6 +642,7 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       FAIL_ON_CORE_DUMP: "true"
+      OS_IMAGE_STREAM: rhel-9
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -449,6 +652,8 @@ tests:
   cron: 52 17 * * *
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      OS_IMAGE_STREAM: rhel-9
     workflow: openshift-upgrade-vsphere-runc
 zz_generated_metadata:
   branch: main

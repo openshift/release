@@ -164,9 +164,13 @@ else
     : Install oc, set up firewall, etc.
     bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall --no-build --no-build-deps ${configure_args} /tmp/pull-secret
 
-    rhocp="rhocp-${OCP_VERSION}-for-rhel-9-$(uname -m)-rpms"
-    rc="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp/latest-${OCP_VERSION}/el9/os"
-    ec="https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/microshift/ocp-dev-preview/latest-${OCP_VERSION}/el9/os"
+    rhel_major="${MICROSHIFT_OS#rhel-}"
+    rhel_major="${rhel_major%%.*}"
+    el_version="el${rhel_major}"
+
+    rhocp="rhocp-${OCP_VERSION}-for-rhel-${rhel_major}-$(uname -m)-rpms"
+    rc="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/$(uname -m)/microshift/ocp/latest-${OCP_VERSION}/${el_version}/os"
+    ec="https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/$(uname -m)/microshift/ocp-dev-preview/latest-${OCP_VERSION}/${el_version}/os"
 
     # `dnf repoquery` returns 1 when the repository is not available,
     # but returns 0 when the repo is up and package is not present.

@@ -2,15 +2,13 @@
 
 set -euo pipefail
 
-# Load GCP credentials from cluster profile
-GCP_CREDS_FILE="${CLUSTER_PROFILE_DIR}/credentials.json"
 CI_FOLDER_ID="$(<"${CLUSTER_PROFILE_DIR}/ci-folder-id")"
 BILLING_ACCOUNT_ID="$(<"${CLUSTER_PROFILE_DIR}/billing-account-id")"
 GCP_REGION="${GKE_REGION:-us-central1}"
 RELEASE_CHANNEL="${GKE_RELEASE_CHANNEL:-stable}"
 
-# Authenticate with GCP (before set -x to avoid exposing credentials path)
-gcloud auth activate-service-account --key-file="${GCP_CREDS_FILE}"
+# Authenticate with GCP via WIF credential written by hypershift-gcp-wif-auth step
+gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json"
 
 gcloud --version
 
@@ -20,9 +18,13 @@ CLUSTER_NAME="${RESOURCE_NAME_PREFIX}-gke"
 INFRA_ID="${RESOURCE_NAME_PREFIX}"
 
 # Dynamic project IDs (created per-test)
-# Truncate to meet GCP's 30 character limit for project IDs
-CP_PROJECT_ID="${INFRA_ID:0:14}-control-plane"
-HC_PROJECT_ID="${INFRA_ID:0:14}-hosted-cluster"
+# Use BUILD_ID (unique per Prow job) to avoid project ID collisions between
+# concurrent tests sharing the same NAMESPACE and UNIQUE_HASH (e.g. e2e-gke and e2e-v2-gke).
+# Prefix with "ci" to satisfy GCP's requirement that project IDs start with a letter.
+# Result: "ci" + 8 hex chars + suffix = 24-25 chars, under the 30-char GCP limit.
+PROJECT_HASH="ci$(echo -n "${BUILD_ID}" | sha256sum | cut -c1-8)"
+CP_PROJECT_ID="${PROJECT_HASH}-control-plane"
+HC_PROJECT_ID="${PROJECT_HASH}-hosted-cluster"
 
 # Write deprovision-critical values to SHARED_DIR before creating any resources,
 # so the deprovision step can clean up if the step fails or the job is interrupted.
@@ -72,6 +74,7 @@ gcloud services enable \
     iam.googleapis.com \
     iamcredentials.googleapis.com \
     cloudresourcemanager.googleapis.com \
+    storage.googleapis.com \
     --project="${HC_PROJECT_ID}"
 
 # GCP API enablement is eventually consistent: gcloud services enable returns

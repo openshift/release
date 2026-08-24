@@ -1,6 +1,8 @@
 workflow:
   as: baremetal-lab-agent-manual
   steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
     pre:
       - chain: baremetal-lab-agent-conf
       - ref: baremetal-lab-agent-conf-dynamic
@@ -8,8 +10,10 @@ workflow:
     test:
       - ref: baremetal-lab-wait
     post:
+      - chain: gather
+        optional_on_success: true
       - chain: baremetal-lab-agent-post
-      - ref: send-results-to-reportportal
+        best_effort: true
   documentation: |-
     The baremetal-lab-agent-manual workflow is a workflow to use for manual testing. It allows a user to run all the
     pre-provisioning steps (no agent-config.yaml file is generated) and it will then sleep for the manual tests

@@ -206,27 +206,13 @@ tests:
   interval: 168h
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - as: e2e-metal-ipi-ovn-ipv4
   capabilities:
   - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-ovn-bm
-  capabilities:
-  - intranet
-  interval: 168h
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      CLUSTERTYPE: baremetal
     observers:
       enable:
       - observers-resource-watch
@@ -526,47 +512,6 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-techpreview
-- as: e2e-metal-ovn-two-node-fencing-dualstack-techpreview
-  capabilities:
-  - intranet
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        MASTER_DISK=100
-        MASTER_MEMORY=32768
-        NUM_MASTERS=2
-        NUM_WORKERS=0
-        FEATURE_SET="TechPreviewNoUpgrade"
-        BMC_DRIVER=redfish
-    workflow: baremetalds-two-node-fencing-techpreview
-- as: e2e-metal-ovn-two-node-fencing-ipv6-techpreview
-  capabilities:
-  - intranet
-  cron: 0 */6 * * *
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6
-        MASTER_DISK=100
-        MASTER_MEMORY=32768
-        NUM_MASTERS=2
-        NUM_WORKERS=0
-        FEATURE_SET="TechPreviewNoUpgrade"
-        BMC_DRIVER=redfish
-    workflow: baremetalds-two-node-fencing-techpreview
-- as: e2e-metal-ovn-two-node-fencing-etcd-certrotation-techpreview
-  capabilities:
-  - intranet
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      TEST_SUITE: openshift/etcd/certrotation
-    workflow: baremetalds-two-node-fencing-techpreview
 - as: e2e-metal-ovn-two-node-fencing-techpreview
   capabilities:
   - intranet
@@ -574,164 +519,6 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-techpreview
-- as: e2e-metal-ovn-two-node-fencing-validation-techpreview
-  capabilities:
-  - intranet
-  cron: 30 23 * * *
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      DEVSCRIPTS_CONFIG: |
-        BMC_DRIVER=redfish
-        FEATURE_SET="TechPreviewNoUpgrade"
-        IP_STACK=v4
-        MASTER_DISK=100
-        MASTER_MEMORY=32768
-        MASTER_VCPU=8
-        NUM_MASTERS=2
-        NUM_WORKERS=0
-      DISRUPTIVE_FENCING: "true"
-      FENCING_VALIDATION: "true"
-    workflow: baremetalds-two-node-fencing-post-install-validation
-- as: e2e-metal-ovn-two-node-fencing-degraded-tn-suite-techpreview
-  capabilities:
-  - intranet
-  cron: 30 23 * * *
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      DEGRADED_NODE: "true"
-      DEVSCRIPTS_CONFIG: |
-        BMC_DRIVER=redfish
-        FEATURE_SET="TechPreviewNoUpgrade"
-        IP_STACK=v4
-        MASTER_DISK=100
-        MASTER_MEMORY=32768
-        MASTER_VCPU=8
-        NUM_MASTERS=2
-        NUM_WORKERS=0
-      SKIP_READINESS_CHECKS: "true"
-      TEST_ARGS: |
-        --run=.*\[Degraded\].* --disable-monitor=etcd-log-analyzer,node-lifecycle,on-prem-haproxy,on-prem-keepalived,initial-and-final-operator-log-scraper,apiserver-incluster-availability,kubelet-log-collector,audit-log-analyzer,metrics-endpoints-down,alert-summary-serializer,cpu-metric-collector,pod-network-avalibility,service-type-load-balancer-availability,ingress-availability,pathological-event-analyzer,legacy-test-framework-invariants,operator-state-analyzer,legacy-cvo-invariants,apiserver-external-availability,azure-metrics-collector,etcd-disk-metrics-intervals,termination-message-policy --cluster-stability=Disruptive
-      TEST_SKIPS: ""
-      TEST_SUITE: openshift/two-node
-    workflow: baremetalds-two-node-fencing
-- as: e2e-metal-ovn-two-node-fencing-degraded-techpreview
-  capabilities:
-  - intranet
-  cron: 30 23 * * *
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      DEGRADED_NODE: "true"
-      DEVSCRIPTS_CONFIG: |
-        BMC_DRIVER=redfish
-        FEATURE_SET="TechPreviewNoUpgrade"
-        IP_STACK=v4
-        MASTER_DISK=100
-        MASTER_MEMORY=32768
-        MASTER_VCPU=8
-        NUM_MASTERS=2
-        NUM_WORKERS=0
-      SKIP_READINESS_CHECKS: "true"
-      TEST_ARGS: --disable-monitor=etcd-log-analyzer,node-lifecycle,on-prem-haproxy,on-prem-keepalived,initial-and-final-operator-log-scraper,apiserver-incluster-availability,kubelet-log-collector,audit-log-analyzer,metrics-endpoints-down,alert-summary-serializer,cpu-metric-collector,pod-network-avalibility,service-type-load-balancer-availability,ingress-availability,pathological-event-analyzer,legacy-test-framework-invariants,operator-state-analyzer,legacy-cvo-invariants,apiserver-external-availability,azure-metrics-collector,etcd-disk-metrics-intervals,high-cpu-test-analyzer,high-cpu-metric-collector
-        --cluster-stability=Disruptive
-      TEST_SKIPS: \[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\] local
-        kubeconfig \\"check-endpoints\.kubeconfig\\" should be present in all kube-apiserver
-        containers \[Suite:openshift/conformance/parallel/minimal\]\|\[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\]
-        local kubeconfig \\"control-plane-node\.kubeconfig\\" should be present in
-        all kube-apiserver containers \[Suite:openshift/conformance/parallel/minimal\]\|\[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\]
-        local kubeconfig \\"lb-ext\.kubeconfig\\" should be present on all masters
-        and work \[Suite:openshift/conformance/parallel/minimal\]\|\[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\]
-        local kubeconfig \\"lb-int\.kubeconfig\\" should be present on all masters
-        and work \[Suite:openshift/conformance/parallel/minimal\]\|\[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\]
-        local kubeconfig \\"localhost-recovery\.kubeconfig\\" should be present on
-        all masters and work \[Suite:openshift/conformance/parallel/minimal\]\|\[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\]
-        local kubeconfig \\"localhost\.kubeconfig\\" should be present on all masters
-        and work \[Suite:openshift/conformance/parallel/minimal\]\|\[sig-api-machinery\]\[Feature:APIServer\]\[Late\]
-        kubelet terminates kube-apiserver gracefully extended \[Suite:openshift/conformance/parallel\]\|\[sig-arch\]\[Early\]
-        Managed cluster should \[apigroup:config\.openshift\.io\] start all core operators
-        \|\[sig-architecture\] Conformance Tests should have at least two untainted
-        nodes \[Conformance\] \[Suite:openshift/conformance/parallel/minimal\] \[Suite:k8s\]\|\[sig-cli\]
-        oc adm must-gather runs successfully for audit logs\|\[sig-cli\] oc adm node-logs
-        \[Suite:openshift/conformance/parallel\]\|\[sig-etcd\] etcd cluster has the
-        same number of master nodes and voting members from the endpoints configmap
-        \[Early\]\[apigroup:config\.openshift\.io\] \[Suite:openshift/conformance/parallel\]\|\[sig-instrumentation\]
-        Prometheus \[apigroup:image\.openshift\.io\] when installed on the cluster
-        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
-        \[Early\]\[apigroup:config\.openshift\.io\] \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        Network Policies when using openshift ovn-kubernetes allow ingress traffic
-        to one pod from a particular namespace in L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        Network Policies when using openshift ovn-kubernetes allow ingress traffic
-        to one pod from a particular namespace in L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        Network Policies when using openshift ovn-kubernetes pods within namespace
-        should be isolated when deny policy is present in L2 dualstack primary UDN
-        \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        Network Policies when using openshift ovn-kubernetes pods within namespace
-        should be isolated when deny policy is present in L3 dualstack primary UDN
-        \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using ClusterUserDefinedNetwork
-        can perform east/west traffic between nodes for two pods connected over a
-        L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using ClusterUserDefinedNetwork
-        can perform east/west traffic between nodes two pods connected over a L3 primary
-        UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using ClusterUserDefinedNetwork
-        isolates overlapping CIDRs with L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using ClusterUserDefinedNetwork
-        isolates overlapping CIDRs with L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using NetworkAttachmentDefinitions
-        can perform east/west traffic between nodes for two pods connected over a
-        L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using NetworkAttachmentDefinitions
-        can perform east/west traffic between nodes two pods connected over a L3 primary
-        UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using NetworkAttachmentDefinitions
-        isolates overlapping CIDRs with L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using NetworkAttachmentDefinitions
-        isolates overlapping CIDRs with L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using UserDefinedNetwork can perform
-        east/west traffic between nodes for two pods connected over a L2 primary UDN
-        \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using UserDefinedNetwork can perform
-        east/west traffic between nodes two pods connected over a L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using UserDefinedNetwork isolates
-        overlapping CIDRs with L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
-        when using openshift ovn-kubernetes created using UserDefinedNetwork isolates
-        overlapping CIDRs with L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-node\]
-        Managed cluster should verify that nodes have no unexpected reboots \[Late\]
-        \[Suite:openshift/conformance/parallel\]\|\[sig-node\]\[apigroup:config\.openshift\.io\]
-        CPU Partitioning node validation should have correct cpuset and cpushare set
-        in crio containers \[Suite:openshift/conformance/parallel\]\|\[sig-instrumentation]
-        Prometheus [apigroup:config\.openshift\.io] when installed on the cluster
-        shouldn't report\|\[sig-architecture] Conformance Tests should have at least
-        two untainted nodes\|\[sig-etcd]\[apigroup:config\.openshift\.io]\[OCPFeatureGate:DualReplica]
-        Two Node with Fencing should have podman etcd containers running on each node\|\[sig-cli\]
-        oc adm must-gather runs successfully \[apigroup:config\.openshift\.io\] \[Suite:openshift/conformance/parallel\]\|\[sig-cli\]
-        oc adm must-gather oc adm inspect should support since and sincetim\|\[sig-cli\]
-        oc adm must-gather Verify logs generated are included in the must-gather directory
-        when running the oc adm must-gather command timeout\|\[sig-cli\] oc adm must-gather
-        must-gather support since and since-time flags timeout\|\[sig-cli\] oc adm
-        must-gather run the must-gather command with own name space\|\[sig-instrumentation]
-        Prometheus .* should start and expose a secured proxy and unsecured metrics
-    workflow: baremetalds-two-node-fencing
-- as: e2e-metal-ovn-two-node-fencing-serial-techpreview
-  capabilities:
-  - intranet
-  cron: 0 */6 * * *
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      TEST_SUITE: openshift/conformance/serial
-    workflow: baremetalds-two-node-fencing
-  timeout: 5h0m0s
-- as: e2e-metal-ovn-two-node-fencing-upgrade-techpreview
-  capabilities:
-  - intranet
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-edge-enablement
-    workflow: baremetalds-two-node-fencing-upgrade
 - as: e2e-metal-ovn-two-node-arbiter-workload-partitioning
   capabilities:
   - intranet
@@ -758,13 +545,6 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
-- as: e2e-metal-ovn-two-node-fencing-extended-techpreview
-  capabilities:
-  - intranet
-  cron: 0 4 * * *
-  steps:
-    cluster_profile: equinix-edge-enablement
-    workflow: baremetalds-two-node-fencing-extended
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -775,6 +555,13 @@ tests:
     workflow: openshift-e2e-aws-proxy
 - as: e2e-vsphere-ovn-techpreview
   cron: 26 21 * * 2
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -784,6 +571,13 @@ tests:
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-ovn-multi-network
   cron: 5 20 * * 1
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -793,6 +587,13 @@ tests:
     workflow: openshift-e2e-vsphere
 - as: e2e-external-vsphere-ccm
   cron: 24 7 * * 5
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: upi-vsphere-platform-external-ccm
@@ -808,6 +609,13 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - as: e2e-vsphere-ovn
   cron: 13 22 * * 0
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -825,6 +633,13 @@ tests:
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-static-ovn
   cron: 51 12 * * 6
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
@@ -837,11 +652,25 @@ tests:
     workflow: openshift-e2e-vsphere-staticip
 - as: e2e-vsphere-externallb-ovn
   cron: 13 1 * * 5
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-externallb
 - as: e2e-vsphere-ovn-serial
   cron: 57 9 * * 6
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -851,6 +680,13 @@ tests:
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-techpreview-serial
   cron: 20,35,50 3,5,12 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -859,6 +695,13 @@ tests:
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi
   cron: 55 15 * * 5
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -876,6 +719,13 @@ tests:
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-ovn-upi-serial
   cron: 48 12 * * 1
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -899,6 +749,13 @@ tests:
     workflow: ipi-vsphere
 - as: e2e-vsphere-ovn-csi
   cron: 9 23 * * 3
+  reporter_config:
+    channel: '#team-ocp-storage-triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -908,6 +765,13 @@ tests:
     workflow: openshift-e2e-vsphere-csi
 - as: e2e-vsphere-ovn-csi-vcf9
   cron: 18,48 2,20 * * *
+  reporter_config:
+    channel: '#team-ocp-storage-triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -922,14 +786,29 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: Feature:VolumeSnapshotDataSource
     workflow: openshift-e2e-vsphere-host-groups-csi
 - as: e2e-vsphere-ovn-zones
   cron: 22 16 * * 0
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-upi-zones
   cron: 5 7 * * 3
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
@@ -942,6 +821,13 @@ tests:
     workflow: openshift-e2e-vsphere-host-groups
 - as: e2e-vsphere-ovn-multi-vcenter
   cron: 5 10 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -953,6 +839,13 @@ tests:
     workflow: openshift-e2e-vsphere-multi-vcenter
 - as: e2e-vsphere-ovn-upi-multi-vcenter
   cron: 31 9 * * *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -975,6 +868,13 @@ tests:
     workflow: openshift-e2e-vsphere-hybrid-env
 - as: e2e-vsphere-ovn-upi-hybrid-env
   cron: '@yearly'
+  reporter_config:
+    channel: '#team-ocp-storage-triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1085,7 +985,7 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-aws
 - as: console-aws
-  interval: 168h
+  cron: 0 0 1 1 *
   steps:
     cluster_profile: openshift-org-aws
     observers:
@@ -1193,104 +1093,17 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-telco5g
-  capabilities:
-  - intranet
-  cron: 11 20 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=false
-        CNF_ORIGIN_TESTS=true
-      T5CI_JOB_TYPE: origintests
-      T5CI_VERSION: "4.21"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-origin
-- as: e2e-telco5g-cnftests
-  capabilities:
-  - intranet
-  cron: 00 22 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: cnftests
-      T5CI_VERSION: "4.21"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-cnf
-- as: e2e-telco5g-ptp
-  capabilities:
-  - intranet
-  cron: 0 0 * * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      SKIP_OCP_INSTALL: "false"
-      T5CI_JOB_TYPE: ptp
-      T5CI_VERSION: "4.21"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-ptp
-- as: e2e-telco5g-hcp-cnftests
-  capabilities:
-  - intranet
-  cron: 00 12 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: hcp-cnftests
-      T5CI_VERSION: "4.21"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-hcp-cnf
-- as: e2e-telco5g-sno-ztp-cnftests
-  capabilities:
-  - intranet
-  cron: 00 20 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: sno-ztp-cnftests
-      T5CI_VERSION: "4.21"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-sno-ztp-cnf
-- as: e2e-telco5g-mno-ztp-cnftests
-  capabilities:
-  - intranet
-  cron: 10 01 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: mno-ztp-cnftests
-      T5CI_VERSION: "4.21"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-mno-ztp-cnf
 - as: telco5g-network-flow-matrix-bm
   capabilities:
   - intranet
   cron: 0 13 * * *
+  reporter_config:
+    channel: '#commatrix-nightlies-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   restrict_network_access: false
   steps:
     env:
@@ -1304,6 +1117,13 @@ tests:
   capabilities:
   - intranet
   cron: 0 13 * * *
+  reporter_config:
+    channel: '#commatrix-nightlies-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   restrict_network_access: false
   steps:
     env:
@@ -1315,6 +1135,13 @@ tests:
     workflow: telco5g-network-flow-matrix-single-node-bm
 - as: aws-ovn-network-flow-matrix
   cron: 0 13 * * *
+  reporter_config:
+    channel: '#commatrix-nightlies-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -1323,6 +1150,13 @@ tests:
     workflow: openshift-e2e-aws-ovn-serial
 - as: aws-ovn-network-flow-matrix-single-node
   cron: 0 13 * * *
+  reporter_config:
+    channel: '#commatrix-nightlies-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -1333,6 +1167,13 @@ tests:
   capabilities:
   - intranet
   cron: 0 13 * * *
+  reporter_config:
+    channel: '#commatrix-nightlies-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -1419,6 +1260,8 @@ tests:
   interval: 168h
   steps:
     cluster_profile: openshift-org-gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
     observers:
       enable:
       - observers-resource-watch
@@ -1444,8 +1287,8 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      COMPUTE_NODE_TYPE: e2-custom-8-32768
-      CONTROL_PLANE_NODE_TYPE: e2-custom-8-32768
+      COMPUTE_NODE_TYPE: e2-standard-8
+      CONTROL_PLANE_NODE_TYPE: e2-standard-8
       TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
         to support the 1.17 Sample API Server using the current Aggregator \| Ensure
         HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
@@ -1475,6 +1318,9 @@ tests:
   interval: 168h
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      TEST_SKIPS: \[sig-node\] Node Lifecycle should run through the lifecycle of
+        a node
     workflow: openshift-e2e-aws-cpu-partitioning
 - as: e2e-aws-ovn-single-node-one-core-serial
   interval: 168h
@@ -1512,7 +1358,7 @@ tests:
 - as: e2e-agent-single-node-ipv6-conformance
   capabilities:
   - intranet
-  cron: 0 */12 * * *
+  cron: 0 0 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -1881,11 +1727,25 @@ tests:
     workflow: openshift-e2e-aws-cert-rotation
 - as: e2e-aws-ovn-edge-zones
   cron: '@weekly'
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-edge-zones
 - as: e2e-aws-ovn-shared-vpc-edge-zones
   cron: '@weekly'
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
@@ -1896,6 +1756,13 @@ tests:
     workflow: openshift-installer-manifests-aws-edge-zones
 - as: e2e-aws-overlay-mtu-ovn-5000
   cron: '@weekly'
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -1903,6 +1770,13 @@ tests:
     workflow: openshift-e2e-aws-network-mtu
 - as: e2e-aws-overlay-mtu-ovn-edge-1100
   cron: '@weekly'
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -1931,11 +1805,25 @@ tests:
     workflow: ipi-aws
 - as: e2e-external-aws
   cron: '@weekly'
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-external-aws
 - as: e2e-external-aws-ccm
   cron: '@weekly'
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -1943,6 +1831,13 @@ tests:
     workflow: openshift-e2e-external-aws
 - as: opct-external-aws-ccm
   cron: '@weekly'
+  reporter_config:
+    channel: '#forum-opct-updates'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -2039,6 +1934,8 @@ tests:
   cron: '@daily'
   steps:
     cluster_profile: openshift-org-gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
     observers:
       enable:
       - observers-resource-watch
@@ -2112,17 +2009,41 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv6-runc
 - as: e2e-rosa-hcp-ovn
-  cron: '@daily'
+  cron: 30 2 * * *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
   steps:
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: rosa-e2e-01
+    env:
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      REGION: us-west-2
     observers:
       enable:
       - observers-resource-watch
     workflow: rosa-aws-hcp-conformance
 - as: e2e-rosa-sts-ovn
-  cron: '@daily'
+  cron: 10 0 * * *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
   steps:
-    cluster_profile: rosa-e2e-01
+    cluster_profile: rosa-e2e-02
     observers:
       enable:
       - observers-resource-watch
@@ -2160,6 +2081,122 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     workflow: openshift-e2e-cert-rotation-short-azure
+- as: e2e-aws-disruptive-longrunning
+  cron: 0 12 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_REQUIRES_SSH: "yes"
+      TEST_SUITE: openshift/disruptive-longrunning
+      TEST_TYPE: suite
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-aws-disruptive-longrunning-techpreview
+  interval: 120h
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/disruptive-longrunning
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-azure-disruptive-longrunning-techpreview
+  interval: 120h
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/disruptive-longrunning
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure
+- as: e2e-gcp-disruptive-longrunning-techpreview
+  interval: 120h
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/disruptive-longrunning
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp
+- as: e2e-vsphere-disruptive-longrunning-techpreview
+  interval: 120h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/disruptive-longrunning
+    workflow: openshift-e2e-vsphere-ovn
+- as: e2e-metal-ipi-ovn-ipv4-disruptive-longrunning-techpreview
+  capabilities:
+  - intranet
+  interval: 120h
+  shard_count: 2
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_SUITE: openshift/disruptive-longrunning
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-ovn-ipv6-disruptive-longrunning-techpreview
+  capabilities:
+  - intranet
+  interval: 120h
+  shard_count: 2
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_SUITE: openshift/disruptive-longrunning
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-dual-disruptive-longrunning-techpreview
+  capabilities:
+  - intranet
+  interval: 120h
+  shard_count: 2
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_SUITE: openshift/disruptive-longrunning
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-aws-single-node-disruptive-longrunning-techpreview
+  interval: 120h
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/disruptive-longrunning
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node
 zz_generated_metadata:
   branch: main
   org: openshift

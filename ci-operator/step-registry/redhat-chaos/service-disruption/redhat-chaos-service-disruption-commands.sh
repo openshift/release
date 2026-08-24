@@ -37,12 +37,22 @@ export NAMESPACE=$TARGET_NAMESPACE
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
-./namespace-scenarios/prow_run.sh
-rc=$?
+collect_artifacts() {
+  local rc=$?
+  set +o errexit
+  # Done running the test
+  if [[ "${TELEMETRY_EVENTS_BACKUP:-}" == "True" && -f /tmp/events.json ]]; then
+    cp /tmp/events.json "${ARTIFACT_DIR}/events.json"
+  fi
+  if [[ -f /tmp/report.out.pdf ]]; then
+    cp /tmp/report.out.pdf "${ARTIFACT_DIR}/kraken.report.pdf"
+  fi
+  exit "$rc"
+}
 
-if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
-    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
-fi
-echo "Done running the test!" 
-echo "Return code: $rc"
-exit $rc
+trap collect_artifacts EXIT
+
+set -euxo pipefail; shopt -s inherit_errexit
+
+./namespace-scenarios/prow_run.sh
+

@@ -94,7 +94,7 @@ validation-gcp:
   hyperfleetApi:
     baseUrl: http://hyperfleet-api.$NAMESPACE_NAME.svc.cluster.local:8000
   validation:
-    statusReporterImage: "registry.ci.openshift.org/ci/status-reporter:latest"
+    statusReporterImage: "quay-proxy.ci.openshift.org/openshift/ci:ci_status-reporter_latest"
     dummy:
       simulateResult: "success"
       resultsPath: "/results/adapter-result.json"
@@ -155,14 +155,14 @@ fi
 
 log "SUCCESS: All pods are Running and deployment is healthy"
 
-log "=== Exposing external IP for hyperfleet-api service ==="
-kubectl patch svc hyperfleet-api -n $NAMESPACE_NAME -p '{"spec": {"type": "LoadBalancer"}}'
+log "=== Exposing external IP for hyperfleet-gateway service ==="
+kubectl patch svc hyperfleet-gateway -n $NAMESPACE_NAME -p '{"spec": {"type": "LoadBalancer"}}'
 
 log "=== Waiting for EXTERNAL-IP to be assigned ==="
 EXTERNAL_IP_READY=false
 
 for _i in $(seq 1 $((TIMEOUT / 10))); do
-  EXTERNAL_IP=$(kubectl get svc hyperfleet-api -n $NAMESPACE_NAME -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  EXTERNAL_IP=$(kubectl get svc hyperfleet-gateway -n $NAMESPACE_NAME -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 
   if [ -n "$EXTERNAL_IP" ] && [ "$EXTERNAL_IP" != "<pending>" ]; then
     log "EXTERNAL-IP assigned: $EXTERNAL_IP"
@@ -177,6 +177,6 @@ done
 
 if [ "$EXTERNAL_IP_READY" != "true" ]; then
   log "ERROR: EXTERNAL-IP was not assigned within ${TIMEOUT} seconds"
-  kubectl get svc hyperfleet-api -n $NAMESPACE_NAME
+  kubectl get svc hyperfleet-gateway -n $NAMESPACE_NAME
   exit 1
 fi

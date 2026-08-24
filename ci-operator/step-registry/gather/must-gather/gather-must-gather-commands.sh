@@ -254,32 +254,60 @@ EOF
 # camgi is a tool that creates an html document for investigating an OpenShift cluster
 # see https://github.com/elmiko/camgi.rs for more information
 function installCamgi() {
-    CAMGI_VERSION="0.10.0"
+    CAMGI_VERSION="0.12.0"
     pushd /tmp
 
     # no internet access in C2S/SC2S env, disable proxy
+    # (a missing proxy script means the environment is misconfigured, which
+    # stays fatal even though installCamgi's own call site is non-fatal)
     if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
       if [ ! -f "${SHARED_DIR}/unset-proxy.sh" ]; then
         echo "ERROR, unset-proxy.sh does not exist."
-        return 1
+        exit 1
       fi
-      source "${SHARED_DIR}/unset-proxy.sh"
+      # installCamgi runs as the condition of an if statement, which
+      # suspends errexit for its whole body -- check source's own status
+      # explicitly so a real failure here still stays fatal.
+      if ! source "${SHARED_DIR}/unset-proxy.sh"; then
+        echo "ERROR, failed to source unset-proxy.sh."
+        exit 1
+      fi
     fi
 
-    curl -L -o camgi.tar https://github.com/elmiko/camgi.rs/releases/download/v"$CAMGI_VERSION"/camgi-"$CAMGI_VERSION"-linux-x86_64.tar
-    tar xvf camgi.tar
-    sha256sum -c camgi.sha256
-    echo "camgi version $CAMGI_VERSION downloaded"
+    # camgi download can hit transient DNS blips (curl exit 6); retry with
+    # backoff and treat a persistent failure as non-fatal below, since camgi
+    # is an optional must-gather visualization, not the data collection.
+    local attempt camgi_downloaded=false
+    for attempt in 1 2 3; do
+      if curl -L --fail --connect-timeout 30 --max-time 60 -o camgi.tar https://github.com/elmiko/camgi.rs/releases/download/v"$CAMGI_VERSION"/camgi-"$CAMGI_VERSION"-linux-x86_64.tar \
+        && tar xvf camgi.tar \
+        && sha256sum -c camgi.sha256; then
+        camgi_downloaded=true
+        break
+      fi
+      echo "WARNING: camgi download attempt ${attempt}/3 failed."
+      [ "$attempt" -lt 3 ] && sleep $((5 * attempt))
+    done
+
+    if [ "$camgi_downloaded" = true ]; then
+      echo "camgi version $CAMGI_VERSION downloaded"
+    else
+      echo "WARNING: failed to download camgi after 3 attempts, skipping camgi report (non-fatal)."
+    fi
 
     if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
       if [ ! -f "${SHARED_DIR}/proxy-conf.sh" ]; then
         echo "ERROR, proxy-conf.sh does not exist."
-        return 1
+        exit 1
       fi
-      source "${SHARED_DIR}/proxy-conf.sh"
+      if ! source "${SHARED_DIR}/proxy-conf.sh"; then
+        echo "ERROR, failed to source proxy-conf.sh."
+        exit 1
+      fi
     fi
 
     popd
+    [ "$camgi_downloaded" = true ]
 }
 
 createInstallJunit
@@ -313,9 +341,16 @@ fi
 
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
 
+# no internet access in C2S/SC2S env, disable proxy
+if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+    source "${SHARED_DIR}/unset-proxy.sh"
+fi
 # Download the binary from mirror
-curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+curl -sL "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
 chmod +x /tmp/mco-sanitize
+if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 set -x # log the MG commands
 echo "Running must-gather..."
@@ -336,9 +371,19 @@ if ! /tmp/mco-sanitize --input="${ARTIFACT_DIR}/must-gather"; then
 fi                                                                                                                     
 
 [ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ] && cp "${ARTIFACT_DIR}/must-gather/event-filter.html" "${ARTIFACT_DIR}/event-filter.html"
-installCamgi
-/tmp/camgi "${ARTIFACT_DIR}/must-gather" > "${ARTIFACT_DIR}/must-gather/camgi.html"
-[ -f "${ARTIFACT_DIR}/must-gather/camgi.html" ] && cp "${ARTIFACT_DIR}/must-gather/camgi.html" "${ARTIFACT_DIR}/camgi.html"
+if installCamgi; then
+  if /tmp/camgi "${ARTIFACT_DIR}/must-gather" > "${ARTIFACT_DIR}/must-gather/camgi.html"; then
+    if [ -f "${ARTIFACT_DIR}/must-gather/camgi.html" ] && ! cp "${ARTIFACT_DIR}/must-gather/camgi.html" "${ARTIFACT_DIR}/camgi.html"; then
+      echo "WARNING: failed to copy camgi.html to ${ARTIFACT_DIR}, skipping (non-fatal)."
+      rm -f "${ARTIFACT_DIR}/camgi.html"
+    fi
+  else
+    echo "WARNING: camgi report generation failed, skipping (non-fatal)."
+    rm -f "${ARTIFACT_DIR}/must-gather/camgi.html"
+  fi
+else
+  echo "WARNING: camgi installation failed, skipping camgi report generation (non-fatal)."
+fi
 tar -czC "${ARTIFACT_DIR}/must-gather" -f "${ARTIFACT_DIR}/must-gather.tar.gz" .
 rm -rf "${ARTIFACT_DIR}"/must-gather
 set +x # stop logging commands

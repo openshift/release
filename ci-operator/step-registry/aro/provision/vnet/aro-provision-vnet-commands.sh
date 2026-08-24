@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 #echo "Installing oc binary"
-#curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar zxvf - oc
+#curl -s https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar zxvf - oc
 #chmod +x oc
 CLUSTER=${CLUSTER:="${NAMESPACE}-${UNIQUE_HASH}"}
 RESOURCEGROUP=${RESOURCEGROUP:=$(cat "${SHARED_DIR}/resourcegroup")}

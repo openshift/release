@@ -1,8 +1,8 @@
 base_images:
-  go_builder:
-    name: builder
+  cli-operator-sdk:
+    name: cli-operator-sdk
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: v1.39.2
   log-file-metric-exporter:
     name: 6.y
     namespace: logging
@@ -23,6 +23,10 @@ base_images:
     name: 5.y
     namespace: logging
     tag: loki-operator-src
+  operator-sdk:
+    name: "4.21"
+    namespace: origin
+    tag: operator-sdk
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -31,25 +35,14 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.26-openshift-4.23
 images:
   items:
   - from: ubi9-minimal
-    inputs:
-      go_builder:
-        as:
-        - registry.redhat.io/ubi9/go-toolset:latest
     to: cluster-logging-operator
-  - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
-    from: ubi9-minimal
-    to: cluster-logging-operator-registry
   - dockerfile_literal: |
-      FROM loki-operator-src AS lo-src
-      FROM registry.redhat.io/ubi9/go-toolset:latest
-      ADD . /go/src/github.com/openshift/cluster-logging-operator
-      COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
-      WORKDIR /go/src/github.com/openshift/cluster-logging-operator
-      USER 0
+      FROM src
+      COPY --from=loki-operator-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
       RUN dnf install gettext -y
       RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
         && chmod 755 kubectl && mv kubectl /go/bin
@@ -58,10 +51,8 @@ images:
       RUN make tools
       RUN chmod -R 777 /go
       RUN make bin/functional-benchmarker
+    from: src
     inputs:
-      go_builder:
-        as:
-        - registry.redhat.io/ubi9/go-toolset:latest
       loki-operator-src:
         as:
         - loki-operator-src
@@ -70,6 +61,7 @@ operator:
   bundles:
   - as: cluster-logging-operator-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/openshift-logging/cluster-logging-operator.*
     with: pipeline:cluster-logging-operator
@@ -85,7 +77,7 @@ promotion:
     namespace: logging
   - additional_images:
       cluster-logging-operator-bundle: cluster-logging-operator-bundle
-    name: "6.6"
+    name: "6.7"
     namespace: logging
 releases:
   latest:
@@ -106,7 +98,7 @@ tests:
   commands: ARTIFACTS_DIR=${ARTIFACT_DIR} make coverage
   container:
     from: src
-- as: e2e-target
+- as: e2e-using-bundle
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -118,17 +110,15 @@ tests:
     version: "4.21"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
+    dependencies:
+      OO_BUNDLE: cluster-logging-operator-bundle
+    env:
+      OO_INSTALL_NAMESPACE: openshift-logging
     test:
     - as: test
       cli: latest
-      commands: export GOFLAGS=-mod=mod ; export PATH=/go/bin:$PATH ; FAKE_HOME_DIR=/tmp/home
-        LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e
+      commands: make test-e2e-from-ci-bundle IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
       dependencies:
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator
       - env: IMAGE_LOGGING_VECTOR
         name: pipeline:logging-vector
       - env: IMAGE_LOGGING_EVENTROUTER
@@ -142,7 +132,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: generic-claim
+    workflow: optional-operators-ci-operator-sdk-generic-claim
 - as: functional-target
   cluster_claim:
     architecture: amd64
@@ -161,8 +151,6 @@ tests:
       commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs make
         test-functional ARTIFACT_DIR=${ARTIFACT_DIR}
       dependencies:
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
         name: pipeline:cluster-logging-operator
       - env: IMAGE_LOGGING_VECTOR

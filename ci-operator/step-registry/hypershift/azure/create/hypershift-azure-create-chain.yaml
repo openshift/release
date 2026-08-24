@@ -147,7 +147,10 @@ chain:
       documentation: "image generation value" 
     - name: CLI
       default: ""
-      documentation: "hcp or hypershift cli path"      
+      documentation: "hcp or hypershift cli path"
+    - name: CNI_PROVIDER
+      default: ""
+      documentation: "The CNI provider to use for the cluster. Supported values: cilium"
     commands: |-
       set -exuo pipefail
 
@@ -396,6 +399,11 @@ chain:
         fi
         "${COMMAND[@]}" > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
+      fi
+
+      # Required for Cilium, see OCPBUGS-85607.
+      if [[ "$CNI_PROVIDER" == "cilium" ]]; then
+        COMMAND+=(--annotations=hypershift.openshift.io/azure-load-balancer-health-probe-mode=servicenodeport)
       fi
       
       "${COMMAND[@]}"

@@ -2,16 +2,21 @@ presubmits:
   openshift-priv/ironic-image:
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build03
-    context: ci/prow/e2e-metal-ipi-bm
+    context: ci/prow/e2e-metal-ipi-sdn-ipv4
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     hidden: true
     labels:
       capability/intranet: intranet
@@ -19,10 +24,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-ironic-image-release-4.12-e2e-metal-ipi-bm
+    name: pull-ci-openshift-priv-ironic-image-release-4.12-e2e-metal-ipi-sdn-ipv4
     path_alias: github.com/openshift/ironic-image
-    rerun_command: /test e2e-metal-ipi-bm
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+    rerun_command: /test e2e-metal-ipi-sdn-ipv4
     spec:
       containers:
       - args:
@@ -32,7 +36,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi-bm
+        - --target=e2e-metal-ipi-sdn-ipv4
         command:
         - ci-operator
         env:
@@ -91,9 +95,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-bm,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-sdn-ipv4,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -104,6 +110,9 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     hidden: true
     labels:
       capability/intranet: intranet
@@ -114,7 +123,6 @@ presubmits:
     name: pull-ci-openshift-priv-ironic-image-release-4.12-e2e-metal-ipi-virtualmedia
     path_alias: github.com/openshift/ironic-image
     rerun_command: /test e2e-metal-ipi-virtualmedia
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
     spec:
       containers:
       - args:
@@ -196,6 +204,9 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -250,6 +261,8 @@ presubmits:
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: .*packages-list.*
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -260,6 +273,9 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     hidden: true
     labels:
       capability/intranet: intranet
@@ -271,7 +287,6 @@ presubmits:
     name: pull-ci-openshift-priv-ironic-image-release-4.12-prevalidation-e2e-metal-ipi-prevalidation
     path_alias: github.com/openshift/ironic-image
     rerun_command: /test prevalidation-e2e-metal-ipi-prevalidation
-    run_if_changed: .*packages-list.*
     spec:
       containers:
       - args:
@@ -344,6 +359,8 @@ presubmits:
     trigger: (?m)^/test( | .* )prevalidation-e2e-metal-ipi-prevalidation,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: .*packages-list.*
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -354,6 +371,9 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     hidden: true
     labels:
       capability/intranet: intranet
@@ -365,7 +385,6 @@ presubmits:
     name: pull-ci-openshift-priv-ironic-image-release-4.12-prevalidation-e2e-metal-ipi-virtualmedia-prevalidation
     path_alias: github.com/openshift/ironic-image
     rerun_command: /test prevalidation-e2e-metal-ipi-virtualmedia-prevalidation
-    run_if_changed: .*packages-list.*
     spec:
       containers:
       - args:
@@ -448,6 +467,9 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.ocp
     hidden: true
     labels:
       ci-operator.openshift.io/variant: prevalidation

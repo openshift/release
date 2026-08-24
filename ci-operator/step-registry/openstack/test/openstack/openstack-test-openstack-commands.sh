@@ -4,7 +4,7 @@ set -Eeuo pipefail
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
-declare TEST_ARGS=''
+declare TEST_ARGS="${TEST_ARGS:-}"
 
 # Force the IPv6 endpoint
 if [[ "${CONFIG_TYPE}" == *"singlestackv6"* ]]; then
@@ -26,7 +26,7 @@ if [[ -n "${OPENSTACK_TEST_SKIPS}" ]]; then
 	TESTS="$(openstack-tests run --dry-run openshift/openstack)"
 	echo "${TESTS}" | grep -v "${OPENSTACK_TEST_SKIPS}" >/tmp/tests
 	echo "Skipping tests:"
-	echo "${TESTS}" | grep "${OPENSTACK_TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the OPENSTACK_TEST_SKIPS regex:'; echo "$OPENSTACK_TEST_SKIPS"; return $exit_code; }
+	echo "${TESTS}" | grep "${OPENSTACK_TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the OPENSTACK_TEST_SKIPS regex:'; echo "$OPENSTACK_TEST_SKIPS"; exit $exit_code; }
 	TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
 fi
 

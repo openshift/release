@@ -13,13 +13,15 @@ images:
     to: cluster-config-api
 promotion:
   to:
-  - name: 4.16-priv
-    namespace: ocp-private
+  - name: "4.16"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.16-priv
-      namespace: ocp-private
+      name: "4.16"
+      namespace: ocp-priv
   initial-minor:
     release:
       channel: candidate
@@ -27,8 +29,8 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: 4.16-priv
-      namespace: ocp-private
+      name: "4.16"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -127,8 +129,9 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-upgrade-minor
-  run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+- always_run: false
+  as: e2e-upgrade-minor
+  pipeline_run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
     cluster_profile: openshift-org-aws
     dependencies:

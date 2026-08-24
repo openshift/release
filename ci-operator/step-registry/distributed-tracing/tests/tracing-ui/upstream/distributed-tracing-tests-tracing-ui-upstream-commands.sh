@@ -15,6 +15,7 @@ vars=(
   CYPRESS_LIGHTSPEED_CONSOLE_IMAGE
   CYPRESS_LIGHTSPEED_PROVIDER_URL
   CYPRESS_LIGHTSPEED_PROVIDER_TOKEN
+  CYPRESS_SKIP_TESTS
 )
 
 # Loop through each variable.
@@ -76,7 +77,7 @@ if ! (oc get clusteroperator console --kubeconfig=${KUBECONFIG}) ; then
   exit 0
 fi
 
-# Function to copy artifacts to the artifact directory after test run.
+# Function to copy artifacts to the artifact directory and SHARED_DIR/qe-agent after test run.
 function copyArtifacts {
   if [ -d "gui_test_screenshots" ]; then
     # Copy JUnit files directly to ARTIFACT_DIR with a unique name for BigQuery ingestion
@@ -88,6 +89,26 @@ function copyArtifacts {
   else
     echo "Directory gui_test_screenshots does not exist. Nothing to copy."
   fi
+
+  # Write flat context file and JUnit XMLs to SHARED_DIR for the qe-agent post-step.
+  # SHARED_DIR only supports flat files (no subdirectories); subdirs are not propagated between steps.
+  local has_failures=false
+  grep -rqE '<(failure|error)[ >]' "${ARTIFACT_DIR}" 2>/dev/null && has_failures=true
+
+  local i=0
+  while IFS= read -r xml; do
+      cp "${xml}" "${SHARED_DIR}/qe-agent-junit-${i}.xml" 2>/dev/null || true
+      i=$((i + 1))
+  done < <(find "${ARTIFACT_DIR}" -name "*.xml" 2>/dev/null)
+
+  cat > "${SHARED_DIR}/qe-agent-context.json" <<EOF
+{
+  "step_script_ref": "distributed-tracing/tests/tracing-ui/upstream/distributed-tracing-tests-tracing-ui-upstream-commands.sh",
+  "has_test_failures": ${has_failures},
+  "env": {}
+}
+EOF
+  echo "QE agent context and ${i} JUnit XML(s) written to SHARED_DIR (has_test_failures=${has_failures})"
 }
 
 ## Add IDP for testing
@@ -165,5 +186,11 @@ export CYPRESS_CACHE_FOLDER=/tmp/Cypress
 # Install npm modules
 npm install
 
-# Run the Cypress tests
-npm run test-cypress-console-headless
+# Run the Cypress tests with grep filter if CYPRESS_SKIP_TESTS is set
+if [[ -n "${CYPRESS_SKIP_TESTS:-}" ]]; then
+  echo "Running Cypress tests with grep pattern: ${CYPRESS_SKIP_TESTS}"
+  npx cypress run --browser chrome --headless --env grep="${CYPRESS_SKIP_TESTS}",grepOmitFiltered=true
+else
+  echo "Running all Cypress tests"
+  npm run test-cypress-console-headless
+fi

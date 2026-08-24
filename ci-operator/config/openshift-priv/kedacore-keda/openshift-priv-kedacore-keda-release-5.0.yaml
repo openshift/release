@@ -1,8 +1,3 @@
-base_images:
-  base:
-    name: 5.0-priv
-    namespace: ocp-private
-    tag: base
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/kedacore-keda
@@ -11,34 +6,36 @@ images:
   - build_args:
     - name: GIT_COMMIT
       value: dummy-ci-commit-value
-    from: base
+    dockerfile_path: openshift/Containerfile.rhel
     to: custom-metrics-autoscaler
   - build_args:
     - name: GIT_COMMIT
       value: dummy-ci-commit-value
-    dockerfile_path: Dockerfile.webhooks
+    dockerfile_path: openshift/Containerfile.webhooks.rhel
     to: custom-metrics-autoscaler-webhooks
   - build_args:
     - name: GIT_COMMIT
       value: dummy-ci-commit-value
-    dockerfile_path: Dockerfile.adapter
+    dockerfile_path: openshift/Containerfile.adapter.rhel
     to: custom-metrics-autoscaler-adapter
   - dockerfile_path: Dockerfile.tests
     to: custom-metrics-autoscaler-tests
 promotion:
   to:
-  - name: 5.0-priv
-    namespace: ocp-private
+  - name: "5.0"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
 resources:
   '*':
     requests:

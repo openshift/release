@@ -31,7 +31,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-ui-test-0.5.7
+    tag: stackrox-ui-test-stable
 releases:
   latest:
     release:
@@ -48,22 +48,17 @@ tests:
   optional: true
   skip_if_only_changed: ^ui/
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - always_run: false
   as: gke-external-pg-17-qa-e2e-tests
   optional: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - always_run: false
   as: gke-oldest-qa-e2e-tests
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       GKE_CLUSTER_VERSION: oldest
       TEST_SUITE: gke-qa-e2e-tests
     workflow: stackrox-stackrox-e2e-job
@@ -72,22 +67,18 @@ tests:
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       GKE_CLUSTER_VERSION: latest
       TEST_SUITE: gke-qa-e2e-tests
     workflow: stackrox-stackrox-e2e-job
 - always_run: true
   as: gke-ui-e2e-tests
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - always_run: false
   as: gke-oldest-ui-e2e-tests
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       GKE_CLUSTER_VERSION: oldest
       TEST_SUITE: gke-ui-e2e-tests
     workflow: stackrox-stackrox-e2e-job
@@ -96,22 +87,18 @@ tests:
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       GKE_CLUSTER_VERSION: latest
       TEST_SUITE: gke-ui-e2e-tests
     workflow: stackrox-stackrox-e2e-job
 - always_run: true
   as: gke-nongroovy-e2e-tests
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - always_run: false
   as: gke-oldest-nongroovy-e2e-tests
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       GKE_CLUSTER_VERSION: oldest
       TEST_SUITE: gke-nongroovy-e2e-tests
     workflow: stackrox-stackrox-e2e-job
@@ -120,7 +107,6 @@ tests:
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       GKE_CLUSTER_VERSION: latest
       TEST_SUITE: gke-nongroovy-e2e-tests
     workflow: stackrox-stackrox-e2e-job
@@ -128,15 +114,6 @@ tests:
   as: gke-nongroovy-compatibility-tests
   optional: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-    workflow: stackrox-stackrox-e2e-job
-- as: gke-sensor-integration-tests
-  optional: true
-  run_if_changed: ^sensor/
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - as: gke-operator-e2e-tests
   optional: true
@@ -173,8 +150,6 @@ tests:
   as: gke-race-condition-qa-e2e-tests
   optional: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - always_run: false
   as: gke-scale-tests
@@ -185,50 +160,37 @@ tests:
   optional: true
   run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|operator|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - always_run: false
   as: eks-qa-e2e-tests
   optional: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-eks-e2e
 - always_run: false
   as: osd-aws-qa-e2e-tests
   optional: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-osd-aws-e2e
 - always_run: false
   as: osd-gcp-qa-e2e-tests
   optional: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-osd-gcp-e2e
 - always_run: false
   as: aro-qa-e2e-tests
   optional: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-aro-e2e
 - always_run: false
   as: rosa-qa-e2e-tests
   optional: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-rosa-e2e
 - always_run: false
   as: rosa-fips-qa-e2e-tests
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       FIPS_ENABLED: "true"
       TEST_SUITE: rosa-qa-e2e-tests
     workflow: stackrox-automation-flavors-rosa-e2e
@@ -237,89 +199,59 @@ tests:
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       TEST_SUITE: rosa-qa-e2e-tests
     workflow: stackrox-automation-flavors-rosa-hcp-e2e
 - always_run: false
   as: aks-qa-e2e-tests
   optional: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-aks-e2e
 - as: merge-gke-operator-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-qa-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-ui-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-nongroovy-e2e-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-nongroovy-compatibility-tests
+  max_concurrency: 6
   postsubmit: true
   skip_if_only_changed: ^ui/
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-scanner-v4-install-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-    workflow: stackrox-stackrox-e2e-job
-- as: merge-gke-sensor-integration-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-upgrade-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-version-compatibility-tests
+  max_concurrency: 6
   postsubmit: true
   steps:
     workflow: stackrox-stackrox-e2e-job
-- always_run: false
-  as: powervs-4-16-qa-corebpf-e2e-tests
-  optional: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-      OCP_CLUSTER_VERSION: stable-4.16
-      TEST_SUITE: powervs-qa-e2e-tests
-    workflow: stackrox-automation-flavors-powervs-e2e
-- always_run: false
-  as: powervs-4-17-qa-corebpf-e2e-tests
-  optional: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-      OCP_CLUSTER_VERSION: stable-4.17
-      TEST_SUITE: powervs-qa-e2e-tests
-    workflow: stackrox-automation-flavors-powervs-e2e
 - always_run: false
   as: powervs-4-18-qa-corebpf-e2e-tests
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       OCP_CLUSTER_VERSION: stable-4.18
       TEST_SUITE: powervs-qa-e2e-tests
     workflow: stackrox-automation-flavors-powervs-e2e
@@ -328,7 +260,6 @@ tests:
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       OCP_CLUSTER_VERSION: stable-4.19
       TEST_SUITE: powervs-qa-e2e-tests
     workflow: stackrox-automation-flavors-powervs-e2e
@@ -337,7 +268,6 @@ tests:
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       OCP_CLUSTER_VERSION: stable-4.20
       TEST_SUITE: powervs-qa-e2e-tests
     workflow: stackrox-automation-flavors-powervs-e2e
@@ -346,15 +276,21 @@ tests:
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       OCP_CLUSTER_VERSION: stable-4.21
       TEST_SUITE: powervs-qa-e2e-tests
     workflow: stackrox-automation-flavors-powervs-e2e
-- as: daily-powervs-stable-corebpf-qa-e2e-tests
-  cron: 30 06 * * *
+- always_run: false
+  as: powervs-4-22-qa-corebpf-e2e-tests
+  optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
+      OCP_CLUSTER_VERSION: stable-4.22
+      TEST_SUITE: powervs-qa-e2e-tests
+    workflow: stackrox-automation-flavors-powervs-e2e
+- as: daily-powervs-stable-corebpf-qa-e2e-tests
+  cron: 0 0 31 2 *
+  steps:
+    env:
       OCP_CLUSTER_VERSION: stable
       TEST_SUITE: powervs-qa-e2e-tests
     workflow: stackrox-automation-flavors-powervs-e2e
@@ -363,7 +299,6 @@ tests:
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       IBM_CLOUD_OPENSHIFT_CHANNEL: stable-4.14
       TEST_SUITE: ibmcloudz-qa-e2e-tests
     workflow: stackrox-automation-flavors-ibmcloudz-e2e
@@ -372,7 +307,6 @@ tests:
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       IBM_CLOUD_OPENSHIFT_CHANNEL: stable-4.15
       TEST_SUITE: ibmcloudz-qa-e2e-tests
     workflow: stackrox-automation-flavors-ibmcloudz-e2e
@@ -381,7 +315,6 @@ tests:
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       IBM_CLOUD_OPENSHIFT_CHANNEL: stable-4.16
       TEST_SUITE: ibmcloudz-qa-e2e-tests
     workflow: stackrox-automation-flavors-ibmcloudz-e2e
@@ -390,23 +323,20 @@ tests:
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       IBM_CLOUD_OPENSHIFT_CHANNEL: stable-4.17
       TEST_SUITE: ibmcloudz-qa-e2e-tests
     workflow: stackrox-automation-flavors-ibmcloudz-e2e
 - as: daily-ibmcloudz-lts-qa-e2e-tests
-  cron: 0 2 * * 1-5
+  cron: 0 0 31 2 *
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       IBM_CLOUD_OPENSHIFT_CHANNEL: stable-4.14
       TEST_SUITE: ibmcloudz-qa-e2e-tests
     workflow: stackrox-automation-flavors-ibmcloudz-e2e
 - as: daily-ibmcloudz-latest-qa-e2e-tests
-  cron: 0 8 * * 1-5
+  cron: 0 0 31 2 *
   steps:
     env:
-      COLLECTION_METHOD: core_bpf
       IBM_CLOUD_OPENSHIFT_CHANNEL: stable-4.17
       TEST_SUITE: ibmcloudz-qa-e2e-tests
     workflow: stackrox-automation-flavors-ibmcloudz-e2e

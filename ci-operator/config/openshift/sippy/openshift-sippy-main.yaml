@@ -3,6 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   yamllint:
     name: yamllint
     namespace: ci
@@ -18,6 +22,45 @@ images:
   - context_dir: chat
     dockerfile_path: Dockerfile
     to: sippy-chat
+  - dockerfile_path: .devcontainer/Dockerfile
+    to: sippy-devcontainer
+  - dockerfile_literal: |
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git-core && dnf clean all
+      COPY golang /usr/lib/golang
+      COPY node_modules /usr/lib/node_modules
+      COPY bin/ /usr/bin/
+      COPY --chown=1000:0 src /workspace
+      RUN ln -sf /usr/lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm && ln -sf /usr/lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx
+      ENV GOROOT=/usr/lib/golang
+      ENV PATH=/usr/lib/golang/bin:${PATH}
+      WORKDIR /workspace
+      USER 1000
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: golang
+          source_path: /usr/lib/golang/.
+        - destination_dir: node_modules
+          source_path: /usr/lib/node_modules/.
+        - destination_dir: bin
+          source_path: /usr/bin/make
+        - destination_dir: bin
+          source_path: /usr/bin/gotestsum
+        - destination_dir: bin
+          source_path: /usr/bin/node
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift/sippy/.
+    to: sippy-integration
+promotion:
+  to:
+  - excluded_images:
+    - sippy
+    - sippy-chat
+    name: sippy
+    namespace: ci
 resources:
   '*':
     requests:
@@ -38,6 +81,10 @@ tests:
   commands: HOME=/tmp make lint
   container:
     from: src
+- as: verify
+  commands: HOME=/tmp make verify
+  container:
+    from: src
 - as: yaml-lint
   commands: IS_CONTAINER=TRUE ./hack/yaml-lint.sh
   container:
@@ -52,7 +99,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.22"
   steps:
     workflow: sippy-e2e
 - as: security
@@ -60,6 +107,42 @@ tests:
     env:
       PROJECT_NAME: openshift/sippy
     workflow: openshift-ci-security
+- as: integration
+  capabilities:
+  - nested-podman
+  commands: |
+    set -euo pipefail
+    # ci-operator overrides the image ENTRYPOINT, so the nested-podman
+    # entrypoint.sh does not run automatically. Invoke it explicitly to create
+    # the podman configuration (registries.conf/storage.conf) before use.
+    /entrypoint.sh
+    # entrypoint.sh only writes config; it does not start the API service.
+    # Start the podman system service so testcontainers-go has a socket to talk to.
+    PODMAN_PID=""
+    cleanup() {
+      if [[ -n "${PODMAN_PID}" ]]; then
+        kill "${PODMAN_PID}" 2>/dev/null || true
+        wait "${PODMAN_PID}" 2>/dev/null || true
+      fi
+    }
+    trap cleanup EXIT
+    podman system service --time=0 &
+    PODMAN_PID=$!
+    # Wait for the podman socket to become available.
+    SOCKET_PATH="$(podman info --format '{{.Host.RemoteSocket.Path}}')"
+    for _ in $(seq 1 30); do
+      [[ -S "${SOCKET_PATH}" ]] && break
+      sleep 1
+    done
+    # Point testcontainers-go at the podman socket and disable the ryuk reaper,
+    # which does not work reliably in the rootless nested-podman environment.
+    export DOCKER_HOST="unix://${SOCKET_PATH}"
+    export TESTCONTAINERS_RYUK_DISABLED=true
+    make integration
+  container:
+    from: sippy-integration
+  nested_podman: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hypershift-tekton-bot
+  namespace: hypershift
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hypershift-tekton-bot
+  namespace: hypershift
+rules:
+- apiGroups:
+  - ""
+  - image.openshift.io
+  resources:
+  - imagestreams
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  - image.openshift.io
+  resources:
+  - imagestreamtags
+  verbs:
+  - get
+  - list
+  - create
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hypershift-tekton-bot
+  namespace: hypershift
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: hypershift-tekton-bot
+subjects:
+- kind: ServiceAccount
+  name: hypershift-tekton-bot
+  namespace: hypershift
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    kubernetes.io/service-account.name: hypershift-tekton-bot
+  labels:
+    ci.openshift.io/non-expiring-token: "true"
+    ci.openshift.io/token-version: version-0
+  name: hypershift-tekton-bot-token-version-0
+  namespace: hypershift
+type: kubernetes.io/service-account-token

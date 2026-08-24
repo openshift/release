@@ -1,4 +1,8 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -47,11 +51,13 @@ tests:
   commands: make vet
   container:
     from: src
-- as: e2e-hypershift
+- always_run: false
+  as: e2e-hypershift
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
-- as: e2e-hypershift-pao
+- always_run: false
+  as: e2e-hypershift-pao
   steps:
     cluster_profile: hypershift-aws
     test:
@@ -70,11 +76,13 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: hypershift-aws-e2e-cluster
-- as: e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-techpreview
+- always_run: false
+  as: e2e-aws-ovn-techpreview
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -90,8 +98,19 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws
-- as: e2e-nightly
+- always_run: false
+  as: e2e-nightly
   cron: 28 18 11 4 *
+  reporter_config:
+    channel: '#psap-ci-alerts'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -104,7 +123,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
-- as: e2e-aws-operator
+- always_run: false
+  as: e2e-aws-operator
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -116,7 +136,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-gcp-pao
+- always_run: false
+  as: e2e-gcp-pao
   capabilities:
   - intranet
   steps:
@@ -132,7 +153,8 @@ tests:
           memory: 200Mi
       timeout: 2h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-pao-updating-profile
+- always_run: false
+  as: e2e-gcp-pao-updating-profile
   capabilities:
   - intranet
   steps:
@@ -148,7 +170,8 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-pao-workloadhints
+- always_run: false
+  as: e2e-gcp-pao-workloadhints
   capabilities:
   - intranet
   steps:
@@ -164,11 +187,13 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-upgrade
+- always_run: false
+  as: e2e-upgrade
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-no-cluster
+- always_run: false
+  as: e2e-no-cluster
   commands: make test-e2e-local
   container:
     from: src

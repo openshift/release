@@ -36,7 +36,7 @@ function pull_artifacts() {
     suffix="${6:-}"
     wget -O "/opt/dnsmasq/tftpboot/${1}/vmlinuz_${arch}${suffix}" "${2}"
     wget -O "/opt/dnsmasq/tftpboot/${1}/initramfs_${arch}${suffix}.img" "${3}"
-    wget -O "/opt/html/${1}/rootfs-${arch}${suffix}.img" "${4}"
+    wget -O "/var/mnt/data-storage/html/${1}/rootfs-${arch}${suffix}.img" "${4}"
 EOF
 }
 

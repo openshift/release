@@ -46,20 +46,19 @@ fi
 cp "${json_files[@]}" "${ARTIFACT_DIR}/" 2>/dev/null || true
 
 # Set up Python environment and install orion
-python --version
 pushd /tmp
 python -m virtualenv ./venv_report
 source ./venv_report/bin/activate
 
 if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name')
+    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 else
     LATEST_TAG=$TAG
 fi
-git clone --branch "$LATEST_TAG" "$ORION_REPO" --depth 1
+git clone -q --branch "$LATEST_TAG" "$ORION_REPO" --depth 1
 pushd orion
-pip install -r requirements.txt
-pip install .
+pip install -q -r requirements.txt
+pip install -q .
 popd && popd
 
 # Build comma-separated file list for orion --report

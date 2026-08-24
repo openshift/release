@@ -9,6 +9,10 @@ ref:
     default: ""
     documentation: |-
       Additional arguments to be passed to 'openshift-test'
+  - name: TEST_ARGS_2
+    default: ""
+    documentation: |-
+      Additional arguments to be passed to the 2nd call of 'openshift-test', e.g., when TEST_TYPE=upgrade-paused.
   - name: SHARD_ARGS
     default: ""
     documentation: |-
@@ -41,6 +45,12 @@ ref:
   - name: TEST_SUITE
     default: openshift/conformance/parallel
     documentation: The test suite to run.  Use 'openshift-test run --help' to list available suites.
+  - name: ENCRYPTION_PROVIDER
+    default: ""
+    documentation: |-
+      Optional encryption provider for etcd encryption e2e suites (for example aescbc or aesgcm).
+      When set, it is available to openshift-tests / external test binaries that select the
+      encryption provider via this environment variable.
   - name: TEST_UPGRADE_SUITE
     default: all
     documentation: The test suite to run in upgrade tests.  Use 'openshift-test run --help' to list available suites.
@@ -48,9 +58,13 @@ ref:
     default: ""
     documentation: |
       Regular expression (POSIX basic regular expression) of tests to skip.
+      This mechanism is intended for temporary use only (e.g., while a fix is in progress).
+      Permanent test skips should be implemented directly in Go test code using environmental
+      skip logic, keeping skip conditions co-located with the test itself.
       It is suggested to test the regex to make sure that it matches with the available tests.
       Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
       that are printed in Prow won't exactly match the list returned by openshift-tests.
+      Note that stale patterns (from renamed or removed tests) go undetected and the previously-skipped test will run unexpectedly.
   - name: TEST_UPGRADE_OPTIONS
     default: ""
     documentation: Options controlling how an upgrade is performed. See `openshift-test run-upgrade --help` for more details.
@@ -112,6 +126,12 @@ ref:
     default: ""
     documentation:
       If tcpdump tool can be used to debug cluster issue when disruption occurs.
+  - name: EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS
+    default: ""
+    documentation: |-
+      Comma-separated list of payload image tags whose test extension binaries
+      should not be extracted. Used to skip binaries that are not available for
+      the target architecture (e.g. vsphere-csi-driver-operator on ppc64le).
   dependencies:
   - name: "release:latest"
     env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE

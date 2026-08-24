@@ -41,21 +41,43 @@ resources:
 tests:
 - as: e2e-openstack-ovn-techpreview
   minimum_interval: 48h
+  reporter_config:
+    channel: '#shiftstack-bot'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> :volcano:'
   steps:
     cluster_profile: openstack-vexxhost
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       ROTATE_CLOUD_CREDENTIALS: "true"
+      TEST_ARGS: --disable-monitor=termination-message-policy
       TEST_SUITE: openshift/conformance/parallel
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ovn-serial-techpreview
   minimum_interval: 48h
+  reporter_config:
+    channel: '#shiftstack-bot'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> :volcano:'
   steps:
     cluster_profile: openstack-vexxhost
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       ROTATE_CLOUD_CREDENTIALS: "true"
+      TEST_ARGS: --disable-monitor=termination-message-policy
       TEST_SUITE: openshift/conformance/serial
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack-ote
     workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.21

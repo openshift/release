@@ -47,14 +47,23 @@ else
     exit 1
 fi
 
-export AWS_ACCESS_ID AWS_BUCKET_NAME AWS_SECRET_KEY
+export AWS_ACCESS_ID AWS_BUCKET_NAME AWS_SECRET_KEY AWS_ENDPOINT AWS_REGION
 
+AWS_REGION="eu-west-1"
+AWS_ENDPOINT="https://s3.eu-west-1.amazonaws.com"
 AWS_ACCESS_ID="$( cat /usr/local/ci-secrets/openshift-pipelines-scaling-pipelines/aws-access-id )"
 AWS_BUCKET_NAME="$( cat /usr/local/ci-secrets/openshift-pipelines-scaling-pipelines/aws-bucket-name )"
 AWS_SECRET_KEY="$( cat /usr/local/ci-secrets/openshift-pipelines-scaling-pipelines/aws-secret-key )"
 
 cd "$(mktemp -d)"
 git clone --branch main https://github.com/openshift-pipelines/performance.git .
+
+# If this is a PR check of the performance repo (not rehearse job), switch to PR branch
+if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
+    echo "[INFO] Presubmit job detected - switching to PR #${PULL_NUMBER}"
+    git fetch origin "pull/${PULL_NUMBER}/head"
+    git checkout -b "pr-${PULL_NUMBER}" FETCH_HEAD
+fi
 
 # Collect load test results at the end
 trap './ci-scripts/collect-results.sh; trap EXIT' SIGINT EXIT

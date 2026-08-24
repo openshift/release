@@ -54,8 +54,21 @@ spec:
         app: prow
         component: tot
     spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: NotIn
+                values:
+                - r5.4xlarge
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
@@ -71,7 +84,7 @@ spec:
           mountPath: /tmp/git-sync
       containers:
       - name: tot
-        image: us-docker.pkg.dev/k8s-infra-prow/images/tot:v20260408-3bbc91829
+        image: us-docker.pkg.dev/k8s-infra-prow/images/tot:v20260819-7593870dc
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
@@ -91,7 +104,7 @@ spec:
           mountPath: /var/repo
         resources:
           requests:
-            memory: "6Gi"
+            memory: "18Gi"
             cpu: "20m"
         livenessProbe:
           httpGet:
@@ -119,8 +132,8 @@ spec:
           mountPath: /tmp/git-sync
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "0.5"
+            memory: "512Mi"
+            cpu: "100m"
       volumes:
       - name: tot-volume
         persistentVolumeClaim:

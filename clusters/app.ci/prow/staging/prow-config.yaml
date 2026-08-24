@@ -6,16 +6,28 @@ metadata:
 data:
   config.yaml: |
     disabled_clusters:
+    - core-ci
     - build01
+    - build02
+    - build03
     - build04
+    - build05
+    - build06
+    - build07
+    - build08
+    - build10
+    - build11
+    - build12
+    - build13
+    - hosted-mgmt
+    - hosted-mgmt2
     - vsphere
     - vsphere02
-    #TODO: only focusing on app.ci for now, these will eventually be enabled
     prowjob_namespace: ci-staging
     pod_namespace: ci-staging
     in_repo_config:
       enabled:
-        "*": true
+        "*": false
     deck:
      spyglass:
        gcs_browser_prefixes:
@@ -32,6 +44,11 @@ data:
          - build-log.txt
        - lens:
            name: junit
+           config:
+             groups:
+             - name: "Informing tests"
+               selector: "properties/property[@name='lifecycle' and @value='informing']"
+               collapsed: true
          required_files:
          - .*/junit.*\.xml
        - lens:
@@ -58,10 +75,10 @@ data:
             grace_period: 1h0m0s
           gcs_credentials_secret: gce-sa-credentials-gcs-private
           utility_images:
-            clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260408-3bbc91829
-            entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260408-3bbc91829
-            initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260408-3bbc91829
-            sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260408-3bbc91829
+            clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260819-7593870dc
+            entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260819-7593870dc
+            initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260819-7593870dc
+            sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260819-7593870dc
     tide:
       display_all_tide_queries_in_status: true
       max_goroutines: 100
@@ -114,6 +131,7 @@ data:
         - do-not-merge/invalid-owners-file
         repos:
         - Prucek/ci-staging
+        - Prucek/GNU_go_sort
       - author: openshift-bot
         labels:
         - rehearsals-ack
@@ -124,6 +142,13 @@ data:
         - needs-rebase
         repos:
         - smg247/release
+    scheduler:
+      enabled: true
+      external:
+        url: http://staging-dispatcher
+        cache:
+          entry_timeout_interval: 30m
+          cleanup_interval: 1h
     decorate_all_jobs: true
     periodics:
     - interval: 18h

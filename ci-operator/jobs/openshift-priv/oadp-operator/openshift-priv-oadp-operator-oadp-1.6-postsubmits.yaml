@@ -4,10 +4,15 @@ postsubmits:
     always_run: true
     branches:
     - ^oadp-1\.6$
-    cluster: build10
+    cluster: build01
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile
+      - build/ci-Dockerfile
     hidden: true
     labels:
       capability/arm64: arm64
@@ -26,6 +31,8 @@ postsubmits:
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=oadp-operator-bundle
+        - --target=test-oadp-operator
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -55,9 +62,6 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

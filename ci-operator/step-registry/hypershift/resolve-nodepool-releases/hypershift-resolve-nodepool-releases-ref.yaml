@@ -1,0 +1,34 @@
+ref:
+  as: hypershift-resolve-nodepool-releases
+  cli: latest
+  commands: hypershift-resolve-nodepool-releases-commands.sh
+  credentials:
+  - mount_path: /etc/ci-pull-credentials
+    name: ci-pull-credentials
+    namespace: test-credentials
+  env:
+    - default: ""
+      name: NODEPOOL_N1_VERSION
+      documentation: "OCP minor version for n-1 NodePool skew test (e.g. 4.22). Resolved via release controller API."
+    - default: ""
+      name: NODEPOOL_N2_VERSION
+      documentation: "OCP minor version for n-2 NodePool skew test (e.g. 4.21). Resolved via release controller API."
+    - default: ""
+      name: NODEPOOL_N3_VERSION
+      documentation: "OCP minor version for n-3 NodePool skew test (e.g. 4.20). Resolved via release controller API."
+    - default: ""
+      name: NODEPOOL_N4_VERSION
+      documentation: "OCP minor version for n-4 NodePool skew test (e.g. 4.19). Resolved via release controller API."
+  from: hypershift-tests
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 10m0s
+  documentation: |-
+    Resolves N-minor OCP release images via the release controller API and
+    writes them to ${SHARED_DIR}/nodepool_release_images for consumption by
+    downstream run-e2e steps. Verifies each resolved image is available in the
+    registry before accepting it. Falls back to the nightly stream when CI
+    stream images have been garbage-collected.

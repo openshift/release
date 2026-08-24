@@ -1,15 +1,58 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  rhdh-e2e-runner:
+    name: rhdh-e2e-runner
+    namespace: ci
+    tag: main
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.20
   use_build_cache: true
+images:
+  items:
+  - dockerfile_literal: |
+      FROM rhdh-e2e-runner
+      USER root
+      COPY --from=nested-podman /entrypoint.sh /entrypoint.sh
+      RUN apt-get update && \
+          apt-get install -y --no-install-recommends uidmap catatonit fuse-overlayfs && \
+          apt-get clean && rm -rf /var/lib/apt/lists/* && \
+          chmod +x /entrypoint.sh && \
+          setcap cap_setuid+ep /usr/bin/newuidmap && \
+          setcap cap_setgid+ep /usr/bin/newgidmap && \
+          touch /etc/subuid /etc/subgid && \
+          chmod 666 /etc/subuid /etc/subgid && \
+          chmod g=u /etc/passwd /etc/group && \
+          mkdir -p /home/user /projects && \
+          chgrp -R 0 /home/user && \
+          chmod -R g=u /home/user /projects
+      ENV HOME=/home/user
+      ENV BUILDAH_ISOLATION=chroot
+      USER 1000
+      WORKDIR /projects
+      ENTRYPOINT ["/usr/bin/catatonit","--","/entrypoint.sh"]
+    from: rhdh-e2e-runner
+    inputs:
+      nested-podman:
+        as:
+        - nested-podman
+    to: rhdh-e2e-runner-podman
+  run_if_changed: ^$
 releases:
   latest:
     release:
       architecture: amd64
-      channel: fast
-      version: "4.20"
+      channel: stable
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -29,7 +72,7 @@ tests:
     owner: rhdh
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.20"
   skip_if_only_changed: ^docs/|rpms\.lock\.yaml|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md|\\.mdc|\\.toml$
   steps:
     allow_skip_on_success: true
@@ -49,10 +92,46 @@ tests:
     owner: rhdh
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.20"
   cron: 0 4 * * *
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    - chain: gather
+    test:
+    - ref: redhat-developer-rhdh-ocp-helm-nightly
+    workflow: generic-claim
+- always_run: false
+  as: e2e-ocp-helm-localization-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  cron: 0 3 * * *
+  max_concurrency: 1
+  optional: true
+  presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     post:
@@ -71,11 +150,17 @@ tests:
       region: us-east-2
     owner: rhdh
     product: ocp
-    timeout: 1h0m0s
+    timeout: 2h0m0s
     version: "4.19"
   cron: 0 5 * * TUE,THU,SAT,SUN
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -88,7 +173,7 @@ tests:
     - ref: redhat-developer-rhdh-ocp-helm-nightly
     workflow: generic-claim
 - always_run: false
-  as: e2e-ocp-v4-20-helm-nightly
+  as: e2e-ocp-v4-22-helm-nightly
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -96,19 +181,62 @@ tests:
       region: us-east-2
     owner: rhdh
     product: ocp
-    timeout: 1h0m0s
-    version: "4.20"
-  cron: 0 5 * * TUE,THU,SAT,SUN
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 0 1 * * TUE,THU,SAT,SUN
+  max_concurrency: 1
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
-      OC_CLIENT_VERSION: stable-4.20
+      OC_CLIENT_VERSION: stable-4.22
     post:
     - ref: redhat-developer-rhdh-send-data-router
     - ref: redhat-developer-rhdh-send-alert
     - chain: gather
+    test:
+    - ref: redhat-developer-rhdh-ocp-helm-nightly
+    workflow: generic-claim
+- always_run: false
+  as: e2e-ocp-v4-22-fips-helm-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+      variant: fips
+    owner: rhdh
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  cron: 0 6 * * MON
+  max_concurrency: 1
+  optional: true
+  presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+  steps:
+    allow_skip_on_success: true
+    env:
+      FIPS_ENABLED: "true"
+      OC_CLIENT_VERSION: stable-4.22
+    post:
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    - chain: gather
+    pre:
+    - ref: fips-check
     test:
     - ref: redhat-developer-rhdh-ocp-helm-nightly
     workflow: generic-claim
@@ -121,11 +249,17 @@ tests:
       region: us-east-2
     owner: rhdh
     product: ocp
-    timeout: 1h0m0s
+    timeout: 2h0m0s
     version: "4.21"
   cron: 0 2 * * TUE,THU,SAT,SUN
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -138,12 +272,81 @@ tests:
     - ref: redhat-developer-rhdh-ocp-helm-nightly
     workflow: generic-claim
 - always_run: false
-  as: e2e-aks-helm-nightly
-  cron: 50 3 * * TUE,THU,SAT,SUN
+  as: e2e-ocp-disconnected-helm-nightly
+  cron: 0 3 31 12 *
+  max_concurrency: 4
   optional: true
   presubmit: true
   steps:
     allow_skip_on_success: true
+    cluster_profile: aws-rhdh-disconnected
+    env:
+      BASE_DOMAIN: rhdh-qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      ENABLE_IDMS: "yes"
+      OCP_ARCH: amd64
+      PROPAGATE_USER_TAGS: "yes"
+      USER_TAGS: |
+        app-code rhdh-003
+        service-phase dev
+        cost-center 726
+        scenario ocp-disconnected
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post-disconnected
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    test:
+    - ref: redhat-developer-rhdh-ocp-helm-disconnected-nightly
+    workflow: openshift-e2e-aws-disconnected
+- always_run: false
+  as: e2e-ocp-disconnected-operator-nightly
+  capabilities:
+  - nested-podman
+  cron: 0 4 31 12 *
+  max_concurrency: 4
+  nested_podman: true
+  optional: true
+  presubmit: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-rhdh-disconnected
+    env:
+      BASE_DOMAIN: rhdh-qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      ENABLE_IDMS: "yes"
+      OCP_ARCH: amd64
+      PROPAGATE_USER_TAGS: "yes"
+      USER_TAGS: |
+        app-code rhdh-003
+        service-phase dev
+        cost-center 726
+        scenario ocp-disconnected
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post-disconnected
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    test:
+    - ref: redhat-developer-rhdh-ocp-operator-disconnected-nightly
+    workflow: openshift-e2e-aws-disconnected
+- always_run: false
+  as: e2e-aks-helm-nightly
+  cron: 50 3 * * TUE,THU,SAT,SUN
+  optional: true
+  presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+  steps:
+    allow_skip_on_success: true
+    env:
+      MAPT_KUBERNETES_VERSION: "1.36"
     post:
     - ref: redhat-developer-rhdh-send-data-router
     - ref: redhat-developer-rhdh-send-alert
@@ -156,8 +359,16 @@ tests:
   cron: 0 4 * * TUE,THU,SAT,SUN
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
+    env:
+      MAPT_KUBERNETES_VERSION: "1.36"
     post:
     - ref: redhat-developer-rhdh-send-data-router
     - ref: redhat-developer-rhdh-send-alert
@@ -170,8 +381,16 @@ tests:
   cron: 0 4 * * TUE,THU,SAT,SUN
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
+    env:
+      MAPT_KUBERNETES_VERSION: "1.36"
     post:
     - ref: redhat-developer-rhdh-send-data-router
     - ref: redhat-developer-rhdh-send-alert
@@ -184,8 +403,16 @@ tests:
   cron: 0 4 * * TUE,THU,SAT,SUN
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
+    env:
+      MAPT_KUBERNETES_VERSION: "1.36"
     post:
     - ref: redhat-developer-rhdh-send-data-router
     - ref: redhat-developer-rhdh-send-alert
@@ -198,6 +425,12 @@ tests:
   cron: 0 4 * * TUE,THU,SAT,SUN
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     post:
@@ -210,6 +443,12 @@ tests:
   cron: 0 6 * * TUE,THU,SAT,SUN
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     post:
@@ -227,10 +466,16 @@ tests:
     owner: rhdh
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.20"
   cron: 0 5 * * TUE,THU,SAT,SUN
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     post:
@@ -243,6 +488,7 @@ tests:
 - always_run: false
   as: cleanup-mapt-destroy-orphaned-aks-clusters
   cron: 0 2 * * SUN
+  max_concurrency: 1
   optional: true
   presubmit: true
   steps:
@@ -255,9 +501,12 @@ tests:
 - always_run: false
   as: cleanup-mapt-destroy-orphaned-eks-clusters
   cron: 0 2 * * SUN
+  max_concurrency: 1
   optional: true
   presubmit: true
   steps:
+    post:
+    - ref: redhat-developer-rhdh-eks-mapt-orphaned-cleanup
     pre:
     - ref: redhat-developer-rhdh-eks-mapt-orphaned-get
     test:
@@ -265,8 +514,15 @@ tests:
 - always_run: false
   as: e2e-osd-gcp-helm-nightly
   cron: 30 7 * * TUE,THU,SAT,SUN
+  max_concurrency: 1
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -281,8 +537,15 @@ tests:
 - always_run: false
   as: e2e-osd-gcp-operator-nightly
   cron: 30 5 * * TUE,THU,SAT,SUN
+  max_concurrency: 1
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - error
+    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
+      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -309,12 +572,26 @@ tests:
     owner: rhdh
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.20"
   cron: 0 4 * * TUE,THU,SAT,SUN
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}<!subteam^S07BMJ56R8S>
+      <@U08UP0REWG1> :failed: {{end}} Job *`{{.Spec.Job}}`* ended with *{{.Status.State}}*.
+      Open Report: <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-operator-auth-providers-nightly/redhat-developer-rhdh-ocp-operator-nightly/artifacts/showcase-auth-providers/index.html|nightly>
+      | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-operator-auth-providers-nightly/redhat-developer-rhdh-ocp-operator-nightly/artifacts/|Open
+      artifacts> | <{{.Status.URL}}|View logs>'
   steps:
     allow_skip_on_success: true
+    post:
+    - ref: redhat-developer-rhdh-send-data-router
+    - chain: gather
     test:
     - ref: redhat-developer-rhdh-ocp-operator-nightly
     workflow: generic-claim
@@ -328,12 +605,27 @@ tests:
     owner: rhdh
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.20"
   cron: 0 4 * * TUE,THU,SAT,SUN
+  max_concurrency: 1
   optional: true
   presubmit: true
+  reporter_config:
+    channel: '#rhdh-e2e-alerts'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}<!subteam^S07BMJ56R8S>
+      <@U08UP0REWG1> :failed: {{end}} Job *`{{.Spec.Job}}`* ended with *{{.Status.State}}*.
+      Open Report: <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-helm-upgrade-nightly/redhat-developer-rhdh-ocp-helm-upgrade-nightly/artifacts/showcase-upgrade-nightly/index.html|nightly>
+      | <https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-helm-upgrade-nightly/redhat-developer-rhdh-ocp-helm-upgrade-nightly/artifacts/|Open
+      artifacts> | <{{.Status.URL}}|View logs>'
   steps:
     allow_skip_on_success: true
+    post:
+    - ref: redhat-developer-rhdh-send-data-router
+    - chain: gather
     test:
     - ref: redhat-developer-rhdh-ocp-helm-upgrade-nightly
     workflow: generic-claim

@@ -1,9 +1,29 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
   items:
   - dockerfile_path: build/Dockerfile
-    to: unused
+    to: ocm-agent-operator
+  - dockerfile_literal: |
+      FROM scratch
+      COPY deploy_pko/ /package/
+    to: operator-pko
+  - dockerfile_literal: |
+      FROM src
+      RUN CGO_ENABLED=0 go test ./test/e2e -v -c --tags=osde2e -o /usr/local/bin/e2e.test
+    from: src
+    to: operator-e2e
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -17,7 +37,6 @@ tests:
     make e2e-binary-build
   container:
     from: src
-  run_if_changed: ^(test/e2e/.*|go\.mod|go\.sum)$
 - as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -27,7 +46,6 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: ocm-agent-operator-codecov-token
-  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -42,17 +60,143 @@ tests:
   commands: make lint
   container:
     from: src
-  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: test
   commands: make test
   container:
     from: src
-  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
 - as: validate
   commands: make validate
   container:
     from: src
-  skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- as: rosa-sts-e2e
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:ocm-agent-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      OPERATOR_CRDS: managedfleetnotificationrecords.ocmagent.managed.openshift.io,managedfleetnotifications.ocmagent.managed.openshift.io,managednotifications.ocmagent.managed.openshift.io,ocmagents.ocmagent.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: ocm-agent-operator
+      OPERATOR_NAME: ocm-agent-operator
+      OPERATOR_NAMESPACE: openshift-ocm-agent-operator
+      OPERATOR_WAIT_DEPLOYMENTS: ocm-agent
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: rosa-sts-e2e-promotion-int
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:ocm-agent-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      LEASE_ENV: integration
+      OPERATOR_CRDS: managedfleetnotificationrecords.ocmagent.managed.openshift.io,managedfleetnotifications.ocmagent.managed.openshift.io,managednotifications.ocmagent.managed.openshift.io,ocmagents.ocmagent.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: ocm-agent-operator
+      OPERATOR_NAME: ocm-agent-operator
+      OPERATOR_NAMESPACE: openshift-ocm-agent-operator
+      OPERATOR_WAIT_DEPLOYMENTS: ocm-agent
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: rosa-sts-e2e-promotion-stage
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:ocm-agent-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      LEASE_ENV: staging
+      OPERATOR_CRDS: managedfleetnotificationrecords.ocmagent.managed.openshift.io,managedfleetnotifications.ocmagent.managed.openshift.io,managednotifications.ocmagent.managed.openshift.io,ocmagents.ocmagent.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: ocm-agent-operator
+      OPERATOR_NAME: ocm-agent-operator
+      OPERATOR_NAMESPACE: openshift-ocm-agent-operator
+      OPERATOR_WAIT_DEPLOYMENTS: ocm-agent
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: osd-gcp-e2e
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:ocm-agent-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      LEASE_TYPE: osd-gcp
+      OPERATOR_CRDS: managedfleetnotificationrecords.ocmagent.managed.openshift.io,managedfleetnotifications.ocmagent.managed.openshift.io,managednotifications.ocmagent.managed.openshift.io,ocmagents.ocmagent.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: ocm-agent-operator
+      OPERATOR_NAME: ocm-agent-operator
+      OPERATOR_NAMESPACE: openshift-ocm-agent-operator
+      OPERATOR_WAIT_DEPLOYMENTS: ocm-agent
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: osd-gcp-e2e-promotion-int
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:ocm-agent-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      LEASE_ENV: integration
+      LEASE_TYPE: osd-gcp
+      OPERATOR_CRDS: managedfleetnotificationrecords.ocmagent.managed.openshift.io,managedfleetnotifications.ocmagent.managed.openshift.io,managednotifications.ocmagent.managed.openshift.io,ocmagents.ocmagent.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: ocm-agent-operator
+      OPERATOR_NAME: ocm-agent-operator
+      OPERATOR_NAMESPACE: openshift-ocm-agent-operator
+      OPERATOR_WAIT_DEPLOYMENTS: ocm-agent
+    workflow: rosa-cluster-lease-e2e-workflow
+- as: osd-gcp-e2e-promotion-stage
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:ocm-agent-operator
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      LEASE_ENV: staging
+      LEASE_TYPE: osd-gcp
+      OPERATOR_CRDS: managedfleetnotificationrecords.ocmagent.managed.openshift.io,managedfleetnotifications.ocmagent.managed.openshift.io,managednotifications.ocmagent.managed.openshift.io,ocmagents.ocmagent.managed.openshift.io
+      OPERATOR_DEPLOYMENT_NAME: ocm-agent-operator
+      OPERATOR_NAME: ocm-agent-operator
+      OPERATOR_NAMESPACE: openshift-ocm-agent-operator
+      OPERATOR_WAIT_DEPLOYMENTS: ocm-agent
+    workflow: rosa-cluster-lease-e2e-workflow
 zz_generated_metadata:
   branch: master
   org: openshift

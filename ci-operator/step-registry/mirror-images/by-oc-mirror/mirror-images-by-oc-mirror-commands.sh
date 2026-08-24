@@ -103,13 +103,58 @@ KUBECONFIG="" oc registry login
 
 run_command "which oc"
 run_command "oc version --client"
+
+# Create combined pull secret early (needed to access private mirror for version detection)
+combined_pull_secret_tmp=$(mktemp)
+registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | tr -d '\n' | base64 -w 0)
+cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${combined_pull_secret_tmp}"
+
+# Extract the full OCP version from the target release (using combined pull secret to access mirror)
+ocp_full_version=$(oc adm release info --registry-config ${combined_pull_secret_tmp} ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} -o jsonpath='{.metadata.version}')
+echo "Target OCP version: ${ocp_full_version}"
+
+# Detect architecture for oc-mirror download
+ARCH=$(uname -m)
+case ${ARCH} in
+    x86_64) ARCH="amd64" ;;
+    aarch64) ARCH="arm64" ;;
+esac
+
+# oc-mirror is now distributed via CGW which only publishes "latest"
+oc_mirror_version="latest"
+
+# Download oc-mirror from CGW (Content Gateway)
+CGWURL="https://mirror.openshift.com/pub/cgw"
+oc_mirror_download_dir=$(mktemp -d)
+pushd "${oc_mirror_download_dir}"
+echo "Downloading oc-mirror from ${CGWURL}/oc-mirror/${oc_mirror_version}/"
+curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+    "${CGWURL}/oc-mirror/${oc_mirror_version}/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
+
+# Verify the integrity of the downloaded tarball
+echo "Verifying oc-mirror.tar.gz integrity..."
+curl -fL --retry 5 --connect-timeout 30 -o sha256sum.txt \
+    "${CGWURL}/oc-mirror/${oc_mirror_version}/sha256sum.txt"
+grep "oc-mirror-rhel9-linux-${ARCH}.tar.gz" sha256sum.txt | sed "s/oc-mirror-rhel9-linux-${ARCH}.tar.gz/oc-mirror.tar.gz/" | sha256sum -c - || {
+    echo "ERROR: oc-mirror.tar.gz checksum verification failed"
+    exit 1
+}
+echo "Checksum verification passed"
+
+tar -xzf oc-mirror.tar.gz
+chmod +x oc-mirror
+oc_mirror_bin="${oc_mirror_download_dir}/oc-mirror"
+popd
+
+run_command "'${oc_mirror_bin}' version --output=yaml"
+
 oc_mirror_dir=$(mktemp -d)
 pushd "${oc_mirror_dir}"
 new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 
-# combine custom registry credential and default pull secret
-registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
-cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
+# Reuse the combined pull secret created earlier
+cp "${combined_pull_secret_tmp}" "${new_pull_secret}"
+rm -f "${combined_pull_secret_tmp}"
 oc registry login --to "${new_pull_secret}"
 
 # This is required by oc-mirror since 4.18, refer to OCPBUGS-43986.
@@ -140,9 +185,6 @@ oc registry login --to "${new_pull_secret}"
 #        fi
 #    fi
 #done
-
-oc_mirror_bin="oc-mirror"
-run_command "'${oc_mirror_bin}' version --output=yaml"
 
 
 # set the imagesetconfigure

@@ -28,9 +28,10 @@ function run_command() {
 
 function get_ocp_version() {
     OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
+    OCP_MAJOR=$(echo "${OCP_VERSION}" | cut -d '.' -f1)
     OCP_MAJOR_MINOR=$(echo "${OCP_VERSION}" | cut -d '.' -f1,2)
     OCP_MINOR=$(echo "${OCP_VERSION}" | cut -d '.' -f2)
-    echo "Detected OCP version: ${OCP_VERSION} (${OCP_MAJOR_MINOR}, minor=${OCP_MINOR})"
+    echo "Detected OCP version: ${OCP_VERSION} (${OCP_MAJOR_MINOR}, major=${OCP_MAJOR}, minor=${OCP_MINOR})"
 }
 
 function check_olm_capability() {
@@ -114,7 +115,7 @@ function update_global_auth() {
 }
 
 function create_mirror_policy() {
-    if [[ ${OCP_MINOR} -le 12 ]]; then
+    if [[ ${OCP_MAJOR} -eq 4 && ${OCP_MINOR} -le 12 ]]; then
         echo "OCP 4.12 or earlier — creating ImageContentSourcePolicy"
         cat <<EOF | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
@@ -181,7 +182,7 @@ function create_catalog_source() {
     echo "Creating stage FBC catalogsource: ${CATALOGSOURCE_NAME}"
     echo "Using index image: ${index_image}"
 
-    if [[ ${OCP_MINOR} -ge 15 ]]; then
+    if ! [[ ${OCP_MAJOR} -eq 4 && ${OCP_MINOR} -lt 15 ]]; then
         echo "OCP 4.15+ — using FBC format with grpcPodConfig.extractContent"
         cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1

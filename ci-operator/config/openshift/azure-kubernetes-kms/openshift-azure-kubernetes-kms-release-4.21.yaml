@@ -1,4 +1,8 @@
 base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -37,10 +41,13 @@ tests:
   commands: make unit-test
   container:
     from: src
-- as: e2e-hypershift
+- always_run: false
+  as: e2e-hypershift
   steps:
-    cluster_profile: hypershift-aws
-    workflow: hypershift-aws-e2e-external
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+    workflow: hypershift-azure-aks-e2e
 - as: verify-deps
   steps:
     env:

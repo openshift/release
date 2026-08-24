@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+exec > >(tee -i ${SHARED_DIR}/setup-output.log) 2>&1
+
+cat > "${SHARED_DIR}/diagnose-telco5g-cluster-setup.early" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-cluster-setup
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+EOF
+
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
@@ -20,7 +29,7 @@ HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 # Clusters to use for cnf-tests, and to exclude from selection in other jobs
-PREPARED_CLUSTER=("cnfdu1")
+PREPARED_CLUSTER=("cnfdu1" "cnfdu3")
 
 source $SHARED_DIR/main.env
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
@@ -62,8 +71,11 @@ ADDITIONAL_ARG=""
 # default to the first cluster in the array, unless 4.17 or 4.18
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
     ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
+    if [[ "$T5CI_VERSION" == "4.23" ]] || [[ "$T5CI_VERSION" == "5.0" ]]; then
+        ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
+    fi
 else
-    ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} "
+    ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]} "
 fi
 
 # Choose topology for different job types:
@@ -88,7 +100,7 @@ if [[ "$T5CI_JOB_TYPE"  == "cnftests" ]]; then
 elif [[ "$T5CI_JOB_TYPE"  == "origintests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
 elif [[ "$T5CI_JOB_TYPE"  == "sno-cnftests" ]]; then
-    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology sno"
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v --topology sno"
 elif [[ "$T5CI_JOB_TYPE"  == *"sriov"* ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v --topology sno"
 fi
@@ -264,6 +276,13 @@ cat << EOF > ~/fetch-kubeconfig.yml
       dest: $SHARED_DIR/kubeconfig
       flat: yes
 
+  - name: Save original kubeconfig before modification
+    copy:
+      src: $SHARED_DIR/kubeconfig
+      dest: $SHARED_DIR/kubeconfig.original
+      remote_src: false
+    delegate_to: localhost
+
   - name: Modify local copy of kubeconfig
     replace:
       path: $SHARED_DIR/kubeconfig
@@ -318,8 +337,22 @@ status=0
 if [[ "$T5_JOB_DESC" != "periodic-cnftests" ]]; then
     PROCEED_AFTER_FAILURES="true"
 fi
+
+rm -f "${SHARED_DIR}/diagnose-telco5g-cluster-setup.early"
+cat > "${SHARED_DIR}/diagnose-telco5g-cluster-setup" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-cluster-setup
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+export CLUSTER_NAME=${CLUSTER_NAME:-unknown}
+export PLAN_NAME=${PLAN_NAME:-unknown}
+EOF
+
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
+gzip -c /tmp/setup-output.log > ${SHARED_DIR}/setup-output.log.gz 2>/dev/null || true
+
+[[ ${status} -eq 0 ]] && rm -f "${SHARED_DIR}/diagnose-telco5g-cluster-setup"
 exit ${status}
 

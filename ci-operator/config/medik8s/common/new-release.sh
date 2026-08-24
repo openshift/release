@@ -33,13 +33,16 @@ fi
 cd ${REPO}
 
 # copy only the newest main config (highest OCP version)
-latest_main=$(ls | grep 'main__' | sed -r 's#^.*__##; s#\\.yaml$##' | sort -V | tail -1)
+latest_main=$(printf '%s\n' medik8s-"${1}"-main__*.yaml \
+  | sed -nE 's#^.*__([0-9]+\.[0-9]+)\.yaml$#\1#p' \
+  | sort -V \
+  | tail -1)
 if [ -z "${latest_main}" ]; then
   echo "No main__*.yaml config files found"
   exit 1
 fi
 
-file="medik8s-${1}-main__${latest_main}"
+file="medik8s-${1}-main__${latest_main}.yaml"
 if [ ! -f "${file}" ]; then
   echo "Expected config ${file} not found"
   exit 1

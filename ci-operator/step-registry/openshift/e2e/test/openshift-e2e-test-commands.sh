@@ -216,13 +216,18 @@ esac
 mkdir -p /tmp/output
 cd /tmp/output
 
-if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64"  ]]; then
+if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64" ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-468.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-468.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+    UNIVERSE_DOMAIN=$(jq -r ".universe_domain // empty" "${GCP_SHARED_CREDENTIALS_FILE}" 2>/dev/null)
+    if [[ -n "${UNIVERSE_DOMAIN}" ]]; then
+      export GOOGLE_CLOUD_UNIVERSE_DOMAIN="${UNIVERSE_DOMAIN}"
+      gcloud config set universe_domain "${UNIVERSE_DOMAIN}"
+    fi
     gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
     gcloud config set project "${PROJECT}"
     popd
@@ -285,10 +290,21 @@ function upgrade_paused() {
     OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE="$(echo $TARGET_RELEASES | cut -f1 -d,)"
     OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE="$(echo $TARGET_RELEASES | cut -f2 -d,)"
 
+    # Mimic https://github.com/openshift/installer/blob/98d5859f6cb6d2660cf9ffbed8885d9c9907ec56/pkg/asset/ignition/bootstrap/cvoignore.go#L142-L158
+    # which is available from 4.21+
+    installed_version=$(oc get clusterversion version -o jsonpath='{.status.history[-1].version}')
+    echo "The installed version is $installed_version"
+    if [[ $installed_version == "4.20."* ]]; then
+        echo "Overriding the cluster-scoped 'openshift' ClusterImagePolicy"
+        oc patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/overrides", "value": [{"group": "config.openshift.io", "kind": "ClusterImagePolicy", "name": "openshift", "namespace": "", "unmanaged": true}]}]'
+        echo "Showing the ClusterVersion spec"
+        oc get clusterversion version -o jsonpath-as-json='{.spec}'
+    fi
+
     oc patch mcp/worker --type merge --patch '{"spec":{"paused":true}}'
 
     echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}"
-    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
+    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" "${TEST_ARGS:-}" \
         --to-image "${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
@@ -299,7 +315,7 @@ function upgrade_paused() {
 
     echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}"
     openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
-        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" \
+        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" "${TEST_ARGS_2:-}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
@@ -326,9 +342,17 @@ function suite() {
     if [[ -n "${TEST_SKIPS}" ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
-        echo "Skipping tests:" &&
+        echo "Tests to be skipped:" &&
         echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
-        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests" &&
+
+        # Warn about individual skip patterns that match nothing.
+        # Assumes \| is only used as a top-level OR (true for all known usages at the time of writing).
+        echo "${TEST_SKIPS}" | sed 's/\\|/\n/g' | while IFS= read -r pattern; do
+            [[ -z "${pattern}" ]] && continue
+            echo "${TESTS}" | grep "${pattern}" > /dev/null 2>&1 ||
+                echo "Warning: TEST_SKIPS pattern matched 0 tests (test renamed/removed or regex invalid): ${pattern}"
+        done
     fi &&
 
     set -x &&
@@ -555,7 +579,7 @@ suite-conformance)
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
     ;;
 suite)
-    suite
+    TEST_LIMIT_START_TIME="$(date +%s)" suite
     ;;
 ipsec-suite)
      # Rollout IPsec Full mode and run the suite.

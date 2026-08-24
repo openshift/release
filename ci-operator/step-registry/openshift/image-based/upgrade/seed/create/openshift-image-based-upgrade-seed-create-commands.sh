@@ -93,6 +93,30 @@ if [[ ! -z "${RECERT_IMAGE_OVERRIDE}" ]]; then
   RECERT_IMAGE=$RECERT_IMAGE_OVERRIDE
 fi
 
+# Export lifecycle-agent git coordinates for ib-orchestrate-vm.
+# - lifecycle-agent presubmit: pin to the PR commit (CI_LCA_GIT_REF/PULL).
+# - openshift/release rehearsal of lifecycle-agent jobs: branch checkout only
+#   (main or release-4.x); CI_LCA_GIT_* stay empty.
+# - Other jobs: leave CI_LCA_GIT_* empty; ib-orchestrate-vm uses defaults.
+CI_LCA_GIT_REF=""
+CI_LCA_GIT_PULL=""
+if [[ "${REPO_OWNER}/${REPO_NAME}" == "openshift-kni/lifecycle-agent" ]]; then
+  CI_LCA_GIT_REF="${PULL_PULL_SHA:-}"
+  CI_LCA_GIT_PULL="${PULL_NUMBER:-}"
+  LCA_GIT_BRANCH="${PULL_BASE_REF:-${LCA_GIT_BRANCH:-}}"
+elif [[ "${JOB_NAME}" == rehearse-* ]] && [[ "${JOB_NAME}" == *lifecycle-agent* ]]; then
+  LCA_GIT_BRANCH="$(echo "${JOB_SPEC}" | jq -r '[.extra_refs[]? | select(.org == "openshift-kni" and .repo == "lifecycle-agent") | .base_ref][0] // empty')"
+  if [[ -z "${LCA_GIT_BRANCH}" ]]; then
+    if [[ "${JOB_NAME}" =~ lifecycle-agent-release-([0-9]+\.[0-9]+) ]]; then
+      LCA_GIT_BRANCH="release-${BASH_REMATCH[1]}"
+    elif [[ "${JOB_NAME}" == *lifecycle-agent-main-* ]]; then
+      LCA_GIT_BRANCH="main"
+    else
+      LCA_GIT_BRANCH="main"
+    fi
+  fi
+fi
+
 echo "Creating seed script..."
 cat <<EOF > ${SHARED_DIR}/create_seed.sh
 #!/bin/bash
@@ -103,6 +127,10 @@ export BACKUP_SECRET=\$(<${BACKUP_SECRET_FILE})
 export SEED_VM_NAME="${SEED_VM_NAME}"
 export SEED_VERSION="${SEED_VERSION}"
 export LCA_OPERATOR_BUNDLE_IMAGE="${OO_BUNDLE}"
+export CI_LCA_GIT_REF="${CI_LCA_GIT_REF}"
+export CI_LCA_GIT_PULL="${CI_LCA_GIT_PULL}"
+export LCA_GIT_REPO="https://github.com/openshift-kni/lifecycle-agent"
+export LCA_GIT_BRANCH="${LCA_GIT_BRANCH:-main}"
 export SEED_RELEASE_IMAGE="${RELEASE_IMAGE}"
 export RECERT_IMAGE="${RECERT_IMAGE}"
 export SEED_FLOATING_TAG="${SEED_FLOATING_TAG}"
