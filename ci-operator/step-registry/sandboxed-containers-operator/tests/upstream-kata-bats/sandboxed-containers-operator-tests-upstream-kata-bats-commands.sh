@@ -1,6 +1,17 @@
 #!/bin/bash
 set -uo pipefail
 
+# This step runs best_effort: true in the tests chain, so a non-zero exit here
+# does not stop later steps. It records its real outcome (PASS/FAIL/SKIP) to
+# ${SHARED_DIR}/osc-test-status/, which the terminal
+# sandboxed-containers-operator-tests-report step reads to fail the job when any
+# test step fails. Exiting non-zero on failure also marks this step red in the
+# per-step view.
+STATUS_DIR="${SHARED_DIR}/osc-test-status"
+mkdir -p "${STATUS_DIR}"
+STATUS_FILE="${STATUS_DIR}/upstream-kata-bats"
+record_status() { echo "$1" > "${STATUS_FILE}"; }
+
 fail_junit() {
     local msg="$1"
     mkdir -p "${ARTIFACT_DIR}"
@@ -12,8 +23,18 @@ fail_junit() {
 JEOF
 }
 
+# Record the failure and exit non-zero so the report step fails the job.
+fail_step() {
+    local msg="$1"
+    echo "ERROR: ${msg}"
+    fail_junit "${msg}"
+    record_status "FAIL"
+    exit 1
+}
+
 if [[ "${TEST_UPSTREAM_KATA_BATS_ENABLE:-}" == "false" ]]; then
     echo "TEST_UPSTREAM_KATA_BATS_ENABLE=false; skipping."
+    record_status "SKIP"
     exit 0
 fi
 
@@ -46,20 +67,18 @@ FULL_TIMEOUT="60m"
 echo "Cloning ${TEST_UPSTREAM_KATA_BATS_REPO} branch ${TEST_UPSTREAM_KATA_BATS_BRANCH}..."
 WORKDIR=$(mktemp -d)
 if ! git clone --depth 1 --branch "${TEST_UPSTREAM_KATA_BATS_BRANCH}" "${TEST_UPSTREAM_KATA_BATS_REPO}" "${WORKDIR}"; then
-    echo "ERROR: git clone failed."
-    fail_junit "git clone failed"
-    exit 0
+    fail_step "git clone failed"
 fi
-cd "${WORKDIR}" || { echo "ERROR: cd failed"; fail_junit "cd to workdir failed"; exit 0; }
+cd "${WORKDIR}" || fail_step "cd to workdir failed"
 
 # Install bats to a user-writable location
 BATS_PREFIX="/tmp/bats-install"
 if ! command -v bats &>/dev/null; then
     echo "Installing bats..."
     if [[ -d "tests/bats" ]]; then
-        cd tests/bats || { echo "ERROR: cd tests/bats failed"; fail_junit "cd tests/bats failed"; exit 0; }
+        cd tests/bats || fail_step "cd tests/bats failed"
         ./install.sh "${BATS_PREFIX}"
-        cd "${WORKDIR}" || { echo "ERROR: cd workdir failed"; fail_junit "cd workdir failed"; exit 0; }
+        cd "${WORKDIR}" || fail_step "cd workdir failed"
     else
         git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core
         /tmp/bats-core/install.sh "${BATS_PREFIX}"
@@ -105,12 +124,14 @@ run_bats "smoke" "${SMOKE_TIMEOUT}" ${SMOKE_FILES} || smoke_rc=$?
 if [[ "${smoke_rc}" -ne 0 ]]; then
     echo "Smoke tests failed (rc=${smoke_rc}); skipping full tests."
     cp "${ARTIFACT_DIR}/junit_smoke.xml" "${ARTIFACT_DIR}/junit.xml" 2>/dev/null || true
-    exit 0
+    record_status "FAIL"
+    exit 1
 fi
 
 if [[ "${TEST_UPSTREAM_KATA_BATS_FULL_ENABLE:-}" == "true" ]]; then
+    full_rc=0
     # shellcheck disable=SC2086
-    run_bats "full" "${FULL_TIMEOUT}" ${FULL_FILES} || true
+    run_bats "full" "${FULL_TIMEOUT}" ${FULL_FILES} || full_rc=$?
 
     if [[ -f "${ARTIFACT_DIR}/junit_smoke.xml" && -f "${ARTIFACT_DIR}/junit_full.xml" ]]; then
         echo "Merging smoke and full JUnit results..."
@@ -125,8 +146,16 @@ if [[ "${TEST_UPSTREAM_KATA_BATS_FULL_ENABLE:-}" == "true" ]]; then
         cp "${ARTIFACT_DIR}/junit_smoke.xml" "${ARTIFACT_DIR}/junit.xml" 2>/dev/null || true
     fi
 
+    if [[ "${full_rc}" -ne 0 ]]; then
+        echo "Full tests failed (rc=${full_rc})."
+        record_status "FAIL"
+        exit 1
+    fi
+
+    record_status "PASS"
     exit 0
 fi
 
 cp "${ARTIFACT_DIR}/junit_smoke.xml" "${ARTIFACT_DIR}/junit.xml" 2>/dev/null || true
+record_status "PASS"
 exit 0

@@ -4,6 +4,13 @@ workflow:
     allow_best_effort_post_steps: true
     env:
       TEST_PARALLEL: 1
+      # Make openshift-extended-test exit non-zero on failure and record its
+      # outcome to ${SHARED_DIR}/osc-test-status/openshift-extended, like the
+      # e2e-poc and upstream-kata-bats steps. It stays best_effort so it does
+      # not block other test steps; the terminal report step reads the marker
+      # and fails the job when it reports FAIL.
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_RESULT_MARKER: osc-test-status/openshift-extended
       MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
       MUST_GATHER_TIMEOUT: "35m"
       ENABLE_MUST_GATHER: "true"

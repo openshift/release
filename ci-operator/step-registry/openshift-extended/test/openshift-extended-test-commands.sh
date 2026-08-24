@@ -27,11 +27,25 @@ function save_oidc_tokens {
 }
 
 function exit_trap {
+    local rc=$?
     echo "Exit trap triggered"
     date '+%s' > "${SHARED_DIR}/TEST_TIME_TEST_END" || :
     warn_0_case_executed
     if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
         save_oidc_tokens
+    fi
+    # Optionally record this step's outcome as PASS/FAIL for downstream gate
+    # steps. Opt-in via TEST_RESULT_MARKER (a path relative to SHARED_DIR);
+    # consumers that leave it empty are unaffected. The result is meaningful
+    # only when FORCE_SUCCESS_EXIT=no, so $rc reflects the real test result.
+    if [[ -n "${TEST_RESULT_MARKER:-}" ]]; then
+        local marker="${SHARED_DIR}/${TEST_RESULT_MARKER}"
+        mkdir -p "$(dirname "${marker}")" 2>/dev/null || :
+        if [[ "${rc}" -eq 0 ]]; then
+            echo "PASS" > "${marker}" || :
+        else
+            echo "FAIL" > "${marker}" || :
+        fi
     fi
 }
 

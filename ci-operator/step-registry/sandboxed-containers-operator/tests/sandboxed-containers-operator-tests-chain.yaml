@@ -7,9 +7,14 @@ chain:
     best_effort: true
   - ref: sandboxed-containers-operator-tests-upstream-kata-bats
     best_effort: true
+  - ref: sandboxed-containers-operator-tests-report
   documentation: |-
     Test chain for sandboxed-containers-operator e2e.
-    All three steps always attempt regardless of earlier failures.
-    Individual steps are skipped when their enable var is "false":
+    All test steps run best_effort: true so each attempts regardless of earlier
+    failures. Individual steps are skipped when their enable var is "false":
     TEST_OPENSHIFT_EXTENDED_ENABLE, TEST_E2E_POC_ENABLE,
     TEST_UPSTREAM_KATA_BATS_ENABLE.
+    Each step records PASS/FAIL/SKIP to ${SHARED_DIR}/osc-test-status/. The
+    final sandboxed-containers-operator-tests-report step is NOT best_effort:
+    it reads those markers and fails the job if any step reported FAIL, so
+    failures are visible without blocking earlier steps.
