@@ -18,6 +18,8 @@ if [[ ! "${PROVISIONER_LAUNCH_TIMEOUT}" =~ ^[0-9]+$ ]]; then
   log "ERROR: PROVISIONER_LAUNCH_TIMEOUT must be a non-negative integer, got '${PROVISIONER_LAUNCH_TIMEOUT}'. Using default 900."
   PROVISIONER_LAUNCH_TIMEOUT=900
 fi
+DNS_GRACE_PERIOD=${DNS_GRACE_PERIOD:-900}
+FATAL_CONSECUTIVE_THRESHOLD=${FATAL_CONSECUTIVE_THRESHOLD:-3}
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
 log(){
@@ -160,6 +162,7 @@ dyn_start_time=${start_time}
 CLUSTER_PREVIOUS_STATE="claim"
 record_cluster "timers" "status" "claim"
 loop_count=0
+fatal_consecutive_count=0
 while true; do
   rosa describe cluster -c "${CLUSTER_ID}" -o json > ${cluster_info_json}
   CLUSTER_STATE=$(cat ${cluster_info_json} | jq -r '.state')
@@ -196,12 +199,49 @@ while true; do
         install_log_output=$(timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
         fatal_pattern=$(echo "${install_log_output}" | grep -E "ProvisionFailed|failed to create|InvalidSubnet|LimitExceeded|QuotaExceeded|InsufficientFreeAddresses|UnauthorizedAccess" || true)
         if [[ -n "${fatal_pattern}" ]]; then
-          log "ERROR: Fatal error detected in install logs:"
-          log "${fatal_pattern}"
-          log "Failing early due to unrecoverable error."
-          record_cluster "timers" "status" "${CLUSTER_STATE}"
-          FAILED_INSTALL="yes"
-          break
+          # Check if the error is DNS-related (transient during cluster provisioning)
+          dns_related=$(echo "${fatal_pattern}" | grep -E "no such host|dial tcp: lookup" || true)
+          if [[ -n "${dns_related}" ]] && [[ "${CLUSTER_STATE}" == "installing" ]]; then
+            dns_elapsed=$(( current_time - dyn_start_time ))
+            if (( dns_elapsed < DNS_GRACE_PERIOD )); then
+              log "WARNING: DNS-related error detected but within grace period ($(( dns_elapsed / 60 ))m / $(( DNS_GRACE_PERIOD / 60 ))m). Ignoring transient DNS failure."
+              log "  ${dns_related}"
+              fatal_consecutive_count=0
+            else
+              fatal_consecutive_count=$(( fatal_consecutive_count + 1 ))
+              if (( fatal_consecutive_count >= FATAL_CONSECUTIVE_THRESHOLD )); then
+                log "ERROR: Fatal error detected in install logs (${fatal_consecutive_count} consecutive checks):"
+                log "${fatal_pattern}"
+                log "Failing early due to unrecoverable error."
+                record_cluster "timers" "status" "${CLUSTER_STATE}"
+                FAILED_INSTALL="yes"
+                break
+              else
+                log "WARNING: Fatal error detected (${fatal_consecutive_count}/${FATAL_CONSECUTIVE_THRESHOLD} consecutive). Will retry."
+                log "  ${fatal_pattern}"
+              fi
+            fi
+          else
+            # Non-DNS fatal error: apply consecutive threshold
+            fatal_consecutive_count=$(( fatal_consecutive_count + 1 ))
+            if (( fatal_consecutive_count >= FATAL_CONSECUTIVE_THRESHOLD )); then
+              log "ERROR: Fatal error detected in install logs (${fatal_consecutive_count} consecutive checks):"
+              log "${fatal_pattern}"
+              log "Failing early due to unrecoverable error."
+              record_cluster "timers" "status" "${CLUSTER_STATE}"
+              FAILED_INSTALL="yes"
+              break
+            else
+              log "WARNING: Fatal error detected (${fatal_consecutive_count}/${FATAL_CONSECUTIVE_THRESHOLD} consecutive). Will retry."
+              log "  ${fatal_pattern}"
+            fi
+          fi
+        else
+          # Clean check: reset consecutive counter
+          if (( fatal_consecutive_count > 0 )); then
+            log "Install log check clean. Resetting consecutive failure counter (was ${fatal_consecutive_count})."
+          fi
+          fatal_consecutive_count=0
         fi
 
         # Provisioner launch detection: for Classic clusters, check if Hive ever started
