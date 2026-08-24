@@ -34,25 +34,51 @@ typeset -a spokeKubeconfigsArr=()
 typeset -a spokeNamesArr=()
 
 # ── Cleanup — remove broker credentials on EXIT ───────────────────────────────
+# Subshell: no parent-context updates needed; xtrace restores automatically.
 Cleanup() {
-    typeset _wasTracing=false
-    [[ $- == *x* ]] && _wasTracing=true
-    set +x
-    rm -f "${brokerInfoFile}"
-    [[ "${_wasTracing}" == "true" ]] && set -x
+    ( set +x
+        rm -f "${brokerInfoFile}" || true
+    true )  # always succeed: cleanup must not abort the step's final exit status
 }
 trap Cleanup EXIT
 
 # ── InstallSubctl — install subctl to /tmp/bin/ ───────────────────────────────
+# Downloads directly from GitHub releases and extracts with tar -xJf.
+# Requires xz, which is pre-installed in the cli-with-git step image.
+# NOTE: InstallSubctl is duplicated in cloud-prepare and verify command scripts.
+# Each step runs in its own container so the binary cannot be shared via /tmp.
+# When changing this function, sync the identical copy in those two scripts.
 InstallSubctl() {
     mkdir -p /tmp/bin
-    if [[ -x "${subctlBin}" ]]; then
-        return 0
+    [[ -x "${subctlBin}" ]] && return 0
+
+    typeset version="${SUBMARINER_SUBCTL_VERSION:-release-0.24}"
+
+    # Trusted SHA-256 digests for subctl linux/amd64 archives.
+    # To add a new version: compute sha256sum of the .tar.xz and add an entry below.
+    typeset -A _subctlDigests=(
+        [release-0.24]="6c5e2a022dfe7bd1d9628010837767be0e9aba3a06f95b8b57021c6d6669229b"
+    )
+    typeset expectedSha="${_subctlDigests["${version}"]:-}"
+    if [[ -z "${expectedSha}" ]]; then
+        : "SUBMARINER_SUBCTL_VERSION=${version} is not in the trusted digest allowlist; add its SHA-256 to _subctlDigests"
+        false
     fi
-    curl -Ls https://get.submariner.io | bash
-    cp "${HOME}/.local/bin/subctl" "${subctlBin}"
+
+    typeset archiveName="subctl-${version}-linux-amd64.tar.xz"
+    typeset tarUrl="https://github.com/submariner-io/subctl/releases/download/subctl-${version}/${archiveName}"
+    typeset tmpTar; tmpTar="$(mktemp /tmp/subctl-XXXXXX.tar.xz)"
+    typeset tmpDir; tmpDir="$(mktemp -d /tmp/subctl-dir-XXXXXX)"
+
+    curl -fsSL "${tarUrl}" -o "${tmpTar}"
+    printf '%s  %s\n' "${expectedSha}" "${tmpTar}" | sha256sum -c -
+    tar -xJf "${tmpTar}" -C "${tmpDir}"
+    typeset extracted; extracted="$(find "${tmpDir}" -maxdepth 2 -name 'subctl' -type f | head -1)"
+    [[ -n "${extracted}" ]] || { echo "ERROR: subctl binary not found in extracted archive ${tmpTar}" >&2; false; }
+    cp "${extracted}" "${subctlBin}"
     chmod +x "${subctlBin}"
-    true
+    rm -rf "${tmpDir}" "${tmpTar}"
+    [[ -x "${subctlBin}" ]]
 }
 
 # ── LoadSpokeConfig — populate spoke arrays from SHARED_DIR ───────────────────

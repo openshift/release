@@ -39,7 +39,7 @@ echo "Claude Code CLI: $(claude --version 2>/dev/null || echo 'unknown')"
 # ---------------------------------------------------------------------------
 # 4. Validate and load the qe-agent skill by name.
 #    Skills are hosted in the openshift/release step registry alongside this
-#    step, under ci-operator/step-registry/openshift-observability/qe-agent/skills/.
+#    step, under ci-operator/step-registry/openshift-observability/qe-agent/resources/skills/.
 #    Each team sets AGENT_SKILL to the name of their skill file (without .md).
 # ---------------------------------------------------------------------------
 if [[ -z "${AGENT_SKILL:-}" ]]; then
@@ -55,8 +55,8 @@ if [[ ! "${AGENT_SKILL}" =~ ^[A-Za-z0-9_-]+$ ]]; then
   exit 0
 fi
 
-readonly SKILL_BASE_URL="https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/openshift-observability/qe-agent/skills"
-readonly SKILL_URL="${SKILL_BASE_URL}/${AGENT_SKILL}.md"
+readonly SKILL_BASE_URL="https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/openshift-observability/qe-agent/resources/skills"
+readonly SKILL_URL="${SKILL_BASE_URL}/${AGENT_SKILL}/SKILL.md"
 
 echo "Fetching qe-agent skill '${AGENT_SKILL}' from ${SKILL_URL}..."
 
@@ -66,7 +66,7 @@ SKILL_CONTENT=$(curl -fsS --max-redirs 0 --connect-timeout 10 --max-time 30 --re
 
 if [[ -z "${SKILL_CONTENT}" ]]; then
   echo "ERROR: Failed to fetch skill '${AGENT_SKILL}' — check that the file exists at:"
-  echo "       ci-operator/step-registry/openshift-observability/qe-agent/skills/${AGENT_SKILL}.md"
+  echo "       ci-operator/step-registry/openshift-observability/qe-agent/resources/skills/${AGENT_SKILL}/SKILL.md"
   exit 0
 fi
 

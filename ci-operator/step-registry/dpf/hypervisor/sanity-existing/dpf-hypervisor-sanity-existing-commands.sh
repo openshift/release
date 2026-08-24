@@ -68,8 +68,9 @@ ls -ltr /root/dpf-ci
 which oc
 echo "=== Running oc commands on the DPF cluster from extracted kubeconfig"
 
-oc get co
+oc version
 oc get nodes -o wide
+oc get co
 oc get dpu -A
 oc get dpuservice -A
 oc get application -A

@@ -12,24 +12,30 @@ ref:
   - namespace: ci
     name: osdfm-qe-credentials
     mount_path: /usr/local/osdfm-qe-credentials
+  # Public repo: ci-operator will not auto-inject this. Needed to clone private GitHub repos.
+  - namespace: ci
+    name: github-credentials-openshift-ci-robot-private-git-cloner
+    mount_path: /usr/local/github-credentials
   env:
-  - name: OCM_BACKEND_TESTS_REF
+  - name: ROSA_BACKEND_TESTS_REF
     default: master
     documentation: |-
-      Git ref for ocm-backend-tests tarball used to run osdfm_release.sh.
+      Git branch or tag of openshift-online/rosa-backend-tests to clone
+      for osdfm_release.sh. Default branch of that repo is master.
   - name: COMMIT_SHA
     default: ""
     documentation: |-
       Optional osd-fleet-manager commit SHA to promote. When empty,
-      osdfm_release.sh uses the latest osd-fleet-manager master commit.
+      osdfm_release.sh clones the repo and promotes whatever HEAD is
+      (the default branch is main).
   documentation: |-
     Runs osdfm_release.sh after a successful OSDFM integration basic
     periodic test to open an app-interface MR promoting osd-fleet-manager
-    from integration to stage. Requires osdfm-qe-credentials secret
-    (osdfm_gitlab_token, osdfm_webhook_url).
+    from integration to stage.
 
-    This is a post step, so ci-operator runs it even if the preceding test
-    step failed. Before doing anything, it checks the exit code recorded by
-    the test step (via rosa-e2e-ocm-fvt-commands.sh) at
-    ${SHARED_DIR}/ocm-fvt-exit-code and skips the promotion unless that
-    test explicitly succeeded.
+    Requires osdfm-qe-credentials (osdfm_gitlab_token, osdfm_webhook_url)
+    and github-credentials-openshift-ci-robot-private-git-cloner for HTTPS
+    clones of private rosa-backend-tests and osd-fleet-manager.
+
+    Post step: runs even if the test failed. Promotes only when
+    ${SHARED_DIR}/ocm-fvt-exit-code is 0.

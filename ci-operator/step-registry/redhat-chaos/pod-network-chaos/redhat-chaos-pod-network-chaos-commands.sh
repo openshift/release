@@ -39,16 +39,22 @@ set -o nounset
 set -o pipefail
 set -x
 
+collect_artifacts() {
+  local rc=$?
+  set +o errexit
+  # Finished running pod-network chaos
+  if [[ "${TELEMETRY_EVENTS_BACKUP:-}" == "True" && -f /tmp/events.json ]]; then
+    cp /tmp/events.json "${ARTIFACT_DIR}/events.json"
+  fi
+  if [[ -f /tmp/report.out.pdf ]]; then
+    cp /tmp/report.out.pdf "${ARTIFACT_DIR}/kraken.report.pdf"
+  fi
+  exit "$rc"
+}
+
+trap collect_artifacts EXIT
+
+set -euxo pipefail; shopt -s inherit_errexit
+
 ./pod-network-chaos/prow_run.sh
-rc=$?
 
-if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
-    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
-fi
-
-
-if [[ -f /tmp/report.out.pdf ]]; then
-  cp /tmp/report.out.pdf ${ARTIFACT_DIR}/kraken.report.pdf
-fi
-echo "Finished running pod-network chaos"
-echo "Return code: $rc"
