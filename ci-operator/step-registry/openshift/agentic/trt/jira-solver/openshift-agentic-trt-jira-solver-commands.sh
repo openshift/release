@@ -116,8 +116,39 @@ HOOKS_DIR="/tmp/ci-hooks"
 mkdir -p "${HOOKS_DIR}"
 cat > "${HOOKS_DIR}/block-gh.sh" <<'HOOK_EOF'
 #!/bin/bash
-jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny",
-  permissionDecisionReason: "CI mode: do not use the gh CLI. Push the branch with git; the pipeline creates the PR after you exit."}}'
+set -euo pipefail
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "block-gh hook requires jq" >&2
+    exit 2
+fi
+
+cmd=$(jq -r '.tool_input.command // ""') || exit 2
+
+first_executable() {
+    local -a words
+    read -r -a words <<< "$1"
+    local w
+    for w in "${words[@]}"; do
+        if [[ "$w" == [A-Za-z_][A-Za-z0-9_]*=* ]]; then
+            continue
+        fi
+        printf '%s\n' "${w##*/}"
+        return 0
+    done
+}
+
+while IFS= read -r segment; do
+    if [[ -z "${segment}" ]]; then
+        continue
+    fi
+    exe=$(first_executable "$segment")
+    if [[ "${exe}" == gh ]]; then
+        jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny",
+          permissionDecisionReason: "CI mode: do not use the gh CLI. Push the branch with git; the pipeline creates the PR after you exit."}}' || exit 2
+        exit 0
+    fi
+done < <(printf '%s\n' "$cmd" | sed -E 's/(&&|\|\||;|\|)/\n/g')
 HOOK_EOF
 chmod +x "${HOOKS_DIR}/block-gh.sh"
 cat > "${HOOKS_DIR}/settings.json" <<'HOOK_SETTINGS_EOF'
@@ -126,7 +157,7 @@ cat > "${HOOKS_DIR}/settings.json" <<'HOOK_SETTINGS_EOF'
     "PreToolUse": [
       {
         "matcher": "Bash",
-        "hooks": [{ "type": "command", "if": "Bash(gh *)", "command": "/tmp/ci-hooks/block-gh.sh" }]
+        "hooks": [{ "type": "command", "command": "/tmp/ci-hooks/block-gh.sh" }]
       }
     ]
   }
