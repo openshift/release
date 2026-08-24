@@ -109,6 +109,10 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "5Gi"
+            cpu: "0.7"
       - name: slack-bot
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_slack-bot_latest
         imagePullPolicy: Always
@@ -137,22 +141,34 @@ spec:
             secretKeyRef:
               name: prowjob-dispatcher-control
               key: channel_id
+        resources:
+          requests:
+            memory: "12Gi"
+            cpu: "100m"
         ports:
         - name: main
           containerPort: 8888
         - name: metrics
           containerPort: 9090
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 60
+          timeoutSeconds: 3
         livenessProbe:
           httpGet:
             path: /healthz
             port: 8081
-          initialDelaySeconds: 20
+          initialDelaySeconds: 60
           periodSeconds: 15
         readinessProbe:
           httpGet:
             path: /healthz/ready
             port: 8081
-          initialDelaySeconds: 5
+          initialDelaySeconds: 60
           periodSeconds: 10
         volumeMounts:
         - name: dispatcher-control
