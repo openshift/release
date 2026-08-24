@@ -122,33 +122,79 @@ if ! command -v jq >/dev/null 2>&1; then
     echo "block-gh hook requires jq" >&2
     exit 2
 fi
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "block-gh hook requires python3" >&2
+    exit 2
+fi
 
 cmd=$(jq -r '.tool_input.command // ""') || exit 2
 
-first_executable() {
-    local -a words
-    read -r -a words <<< "$1"
-    local w
-    for w in "${words[@]}"; do
-        if [[ "$w" == [A-Za-z_][A-Za-z0-9_]*=* ]]; then
-            continue
-        fi
-        printf '%s\n' "${w##*/}"
-        return 0
-    done
-}
+result=$(HOOK_BASH_CMD="$cmd" python3 - <<'PY'
+import os, re, shlex, sys
 
-while IFS= read -r segment; do
-    if [[ -z "${segment}" ]]; then
-        continue
-    fi
-    exe=$(first_executable "$segment")
-    if [[ "${exe}" == gh ]]; then
-        jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny",
-          permissionDecisionReason: "CI mode: do not use the gh CLI. Push the branch with git; the pipeline creates the PR after you exit."}}' || exit 2
-        exit 0
-    fi
-done < <(printf '%s\n' "$cmd" | sed -E 's/(&&|\|\||;|\|)/\n/g')
+cmd = os.environ.get("HOOK_BASH_CMD", "")
+UNSAFE = re.compile(r"\$\(|`|<\(|>\(|\$\{|\$'")
+WRAPPERS = {"command", "exec", "env", "nice", "nohup", "time"}
+SHELLS = {"bash", "sh", "dash", "zsh", "ksh"}
+
+
+def argv(s):
+    return shlex.split(s, posix=True)
+
+
+def skip_env(tokens):
+    i = 0
+    while i < len(tokens) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", tokens[i]):
+        i += 1
+    return tokens[i:]
+
+
+def skip_wrappers(tokens):
+    tokens = skip_env(tokens)
+    while tokens and tokens[0].rsplit("/", 1)[-1] in WRAPPERS:
+        tokens = tokens[1:]
+        while tokens and tokens[0].startswith("-"):
+            tokens = tokens[1:]
+    return tokens
+
+
+def deny_command(text):
+    if UNSAFE.search(text):
+        return True
+    for part in re.split(r"(?:&&|\|\||[;|\n])", text):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            tokens = skip_wrappers(argv(part))
+        except ValueError:
+            return True
+        if not tokens:
+            continue
+        exe = tokens[0].rsplit("/", 1)[-1]
+        if exe == "gh":
+            return True
+        if exe == "eval":
+            return deny_command(" ".join(tokens[1:]))
+        if exe in SHELLS and "-c" in tokens:
+            i = tokens.index("-c")
+            if i + 1 < len(tokens) and deny_command(tokens[i + 1]):
+                return True
+    return False
+
+
+try:
+    sys.stdout.write("deny" if deny_command(cmd) else "allow")
+except Exception as exc:
+    print(exc, file=sys.stderr)
+    sys.exit(2)
+PY
+) || exit 2
+
+if [[ "${result}" == deny ]]; then
+    jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny",
+      permissionDecisionReason: "CI mode: do not use the gh CLI. Push the branch with git; the pipeline creates the PR after you exit."}}' || exit 2
+fi
 HOOK_EOF
 chmod +x "${HOOKS_DIR}/block-gh.sh"
 cat > "${HOOKS_DIR}/settings.json" <<'HOOK_SETTINGS_EOF'
