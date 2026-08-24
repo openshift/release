@@ -6,7 +6,7 @@
 |-------|-------|
 | **Alert** | `ghproxy-down` (component monitor) |
 | **Cluster** | `app.ci` |
-| **Check** | `max(up{job="ghproxy"}) > 0` — fires when ghproxy metrics target is unreachable |
+| **Check** | `max(up{job="ghproxy"}) > 0` — evaluates to true when at least one target is reachable; the component monitor reports **Down** when this query returns false or no series |
 | **Dashboard** | SHIP Status Dashboard (auto-clears when component monitor detects ghproxy is back up) |
 | **Severity** | `critical` |
 
@@ -187,9 +187,12 @@ oc --context "$CTX" run ghproxy-cache-cleanup -n ci \
   }' \
   -- sh -c 'rm -rf /cache/* && echo done'
 
-# Wait for the cleanup pod to finish
+# Wait for the cleanup pod to complete (one-shot pod — wait for Succeeded phase)
 oc --context "$CTX" wait pod/ghproxy-cache-cleanup -n ci \
-  --for=condition=Ready --timeout=120s || true
+  --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s
+# If the wait fails or times out, check the pod status and logs before proceeding:
+#   oc --context "$CTX" get pod ghproxy-cache-cleanup -n ci -o wide
+#   oc --context "$CTX" logs -n ci ghproxy-cache-cleanup
 oc --context "$CTX" logs -n ci ghproxy-cache-cleanup
 
 # Remove the cleanup pod
@@ -215,9 +218,8 @@ oc --context "$CTX" get pods -n ci -l app=prow,component=ghproxy \
   -o wide --show-all 2>/dev/null || \
 oc --context "$CTX" get pods -n ci -l app=prow,component=ghproxy -o wide
 
-# Force-delete pods stuck in Failed / Succeeded state
+# Force-delete ALL remaining ghproxy pods (including Running pods stuck terminating)
 oc --context "$CTX" delete pods -n ci -l app=prow,component=ghproxy \
-  --field-selector=status.phase!=Running \
   --grace-period=0 --force
 
 # Also delete the stuck cleanup pod
@@ -277,9 +279,20 @@ oc --context "$CTX" scale deploy/ghproxy -n ci --replicas=1
 oc --context "$CTX" rollout status deploy/ghproxy -n ci --timeout=180s
 ```
 
-> **Note:** The recreated PVC will get a new PV. The old `volumeName`
-> binding in the deployment YAML (if any) is not required — dynamic
-> provisioning assigns a fresh volume.
+> **Argo CD coordination:** The ghproxy PVC is managed by Argo CD from
+> [`ghproxy.yaml`](../../clusters/app.ci/prow/03_deployment/ghproxy.yaml),
+> which declares a `volumeName` binding to a specific PV. Argo CD
+> auto-syncs and self-heals this subtree. Before deleting the PVC,
+> either **pause Argo CD sync** for the ghproxy application (to prevent
+> it from reconciling the old state while you work) or **update the
+> manifest in a PR first** to remove or change the `volumeName` if the
+> old PV is no longer valid. After recreation, verify the PVC is
+> `Bound` before scaling the deployment back up:
+>
+> ```bash
+> oc --context "$CTX" get pvc ghproxy -n ci
+> # STATUS should show "Bound"
+> ```
 
 ## Verify recovery
 
