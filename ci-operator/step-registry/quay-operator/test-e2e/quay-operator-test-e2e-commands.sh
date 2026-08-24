@@ -206,8 +206,38 @@ if [[ -s "${SHARED_DIR}/ssl.cert" ]]; then
   echo "SSL_CERT_FILE=${SSL_CERT_FILE}"
 fi
 
+# Route DNS/connectivity readiness gate. The suite fires hundreds of rapid
+# apiRequestContext calls with tight 5-10s timeouts; on a freshly provisioned
+# cluster the test pod's resolver intermittently returns ENOTFOUND for the *.apps
+# wildcard (and TCP/TLS is slow) until the record and resolver cache warm. Starting
+# the run into a cold resolver is the top source of flakes/failures. Block until the
+# route both resolves AND answers over HTTPS several times in a row before launching
+# Playwright. Best-effort: warn and proceed on timeout so we never hard-fail here.
+QUAY_HOST="${QUAY_ROUTE#*://}"; QUAY_HOST="${QUAY_HOST%%/*}"
+echo "Waiting for Quay route DNS + HTTPS readiness..."
+ready=0
+for attempt in $(seq 1 60); do
+  http_code="$(curl -sk -o /dev/null -m 10 -w '%{http_code}' "${QUAY_ROUTE}/api/v1/discovery" 2>/dev/null || echo 000)"
+  if getent ahosts "${QUAY_HOST}" >/dev/null 2>&1 && [[ "${http_code}" != "000" ]]; then
+    ready=$((ready + 1))
+    echo "  readiness ${ready}/5 (attempt ${attempt}, http=${http_code})"
+    [[ "${ready}" -ge 5 ]] && break
+  else
+    [[ "${ready}" -ne 0 ]] && echo "  readiness reset (attempt ${attempt}, http=${http_code})"
+    ready=0
+  fi
+  sleep 5
+done
+if [[ "${ready}" -ge 5 ]]; then
+  echo "Quay route is resolvable and responding; starting tests."
+else
+  echo "WARNING: Quay route did not reach stable DNS+HTTPS readiness in time; proceeding anyway" >&2
+fi
+
 # Tests excluded from the run. Beyond unsupported auth backends (OIDC/LDAP), this
-# quarantines tests tracking known product bugs and UI/version gaps that no Quay#
+# quarantines tests tracking known product bugs and UI/version gaps that no Quay
+# config can fix. See E2E_FAILURE_REPORT.md in the repo root for the rationale.
+#
 # NOTE: the primary defense against version skew is version-matching the tests to
 # the deployed image's build commit via PLAYWRIGHT_GIT_BRANCH (set in the config to
 # the same source ref as the pinned catalog). When that clone succeeds, the skew
@@ -230,10 +260,13 @@ QUARANTINE=(
   'creation-date pruning does not age-prune cosign \.sig tags'
   # Quota-notification specs (org + user). NOT version skew: these specs and the
   # quota/notif UI are byte-identical at the pinned test ref and at HEAD, so
-  # version-matching does not change them. They fail on an ENVIRONMENT gap (the
-  # notification email path / feature enablement), which the deploy now addresses
-  # via mailpit + FEATURE_MAILING + FEATURE_QUOTA_NOTIFICATIONS. Kept quarantined
-  # until a real run confirms delivery; drop the passing ones then.
+  # version-matching does not change them. They are brittle in the quay suite itself
+  # at this ref (confirmed in the 2091876334434258944 artifacts): non-exact text
+  # locators like getByText('Quota Warning') match two cells (the notification title
+  # "Slack Quota Warning" AND the event column) -> strict-mode violation, plus
+  # #entity-search-input renders a <div> not an <input> (locator.fill fails), plus
+  # duplicate rows left by imperfect test cleanup. All deterministic, no Quay config
+  # fixes them. Track upstream; drop fragments if/when the specs are hardened.
   'create and delete namespace notification logs render descriptions'
   'deleting quota removes all namespace notification configs'
   'email notification fires on quota threshold crossing'
@@ -242,6 +275,7 @@ QUARANTINE=(
   'can create a Slack notification'
   'can create a Quay notification with team recipient'
   'Quay notification — submit disabled without recipient'
+  'API-created notification appears in UI list'
   # Repositories list domainRoute link — duplicated /repository/ path. PROJQUAY-11202.
   'tag link stays correct from /repository/\.\.\./testrepository\.\.\. path'
 )
