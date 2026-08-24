@@ -71,6 +71,20 @@ chain:
         AZURE_WORKLOAD_IDENTITIES_FILE="/etc/hypershift-ci-jobs-self-managed-azure-e2e-mc/workload-identities.json"
         AZURE_OIDC_ISSUER_URL="https://smazure.blob.core.windows.net/smazure"
         AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-ci-jobs-self-managed-azure/serviceaccount-signer.private"
+        # Ensure Premium SSD v2 StorageClass exists on the ops cluster for mgmt cluster etcd
+        oc apply -f - <<'EOF'
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: managed-csi-premium-v2
+      provisioner: disk.csi.azure.com
+      parameters:
+        skuName: PremiumV2_LRS
+        cachingMode: None
+      reclaimPolicy: Delete
+      volumeBindingMode: WaitForFirstConsumer
+      allowVolumeExpansion: true
+      EOF
         bin/hypershift create cluster azure \
           --annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID} \
           --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
@@ -95,7 +109,8 @@ chain:
           --release-stream=${DEFAULT_RELEASE_STREAM} \
           --namespace=${HYPERSHIFT_NAMESPACE} \
           --assign-service-principal-roles \
-          --dns-zone-rg-name=os4-common
+          --dns-zone-rg-name=os4-common \
+          --etcd-storage-class=managed-csi-premium-v2
       else
         echo "Creating AWS management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
         bin/hypershift create cluster aws \

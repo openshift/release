@@ -101,6 +101,7 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
     echo "ERROR: backplane login did not write kubeconfig at ${KUBECONFIG}" >&2
     exit 1
   fi
+  chmod 0600 "${hive_kubeconfig_src}"
 
   # Elevated kubeconfig for osdfm AAO secret reads.
   hive_kubeconfig="$(mktemp /tmp/hive-kubeconfig.XXXXXX)"
@@ -306,30 +307,44 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && "${OCM_FVT_USE_BACKPLANE:-false}" == 
     oc -n "${prom_ns}" get svc "${prom_svc}" -o name 2>&1 || true
 
     pf_log="${prom_artifact_dir}/prom-port-forward.log"
-    # Listen on 0.0.0.0 so podman host-gateway can reach the port-forward.
-    oc -n "${prom_ns}" port-forward --address 0.0.0.0 "svc/${prom_svc}" 9090:9090 \
-      >"${pf_log}" 2>&1 &
-    prom_pf_pid=$!
+    pf_max_retries=3
+    for (( pf_try=1; pf_try<=pf_max_retries; pf_try++ )); do
+      echo "port-forward attempt ${pf_try}/${pf_max_retries}"
+      # Listen on 0.0.0.0 so podman host-gateway can reach the port-forward.
+      oc -n "${prom_ns}" port-forward --address 0.0.0.0 "svc/${prom_svc}" 9090:9090 \
+        >"${pf_log}" 2>&1 &
+      prom_pf_pid=$!
 
-    ready=false
-    attempts=30
-    while (( attempts-- > 0 )); do
-      if ! kill -0 "${prom_pf_pid}" 2>/dev/null; then
-        echo "port-forward exited early (pid ${prom_pf_pid})"
+      ready=false
+      attempts=60
+      while (( attempts-- > 0 )); do
+        if ! kill -0 "${prom_pf_pid}" 2>/dev/null; then
+          echo "port-forward exited early (pid ${prom_pf_pid})"
+          break
+        fi
+        if curl -sS -o /dev/null --max-time 1 "http://127.0.0.1:9090/api/v1/query?query=up" 2>/dev/null; then
+          ready=true
+          break
+        fi
+        sleep 1
+      done
+
+      if [[ "${ready}" == "true" ]]; then
         break
       fi
-      if curl -sS -o /dev/null --max-time 1 "http://127.0.0.1:9090/api/v1/query?query=up" 2>/dev/null; then
-        ready=true
-        break
-      fi
-      sleep 1
-    done
 
-    if [[ "${ready}" != "true" ]]; then
-      echo "ERROR: Prometheus port-forward not ready" >&2
+      echo "WARNING: port-forward attempt ${pf_try} failed" >&2
       cat "${pf_log}" 2>/dev/null || true
       kill "${prom_pf_pid}" 2>/dev/null || true
       wait "${prom_pf_pid}" 2>/dev/null || true
+      prom_pf_pid=""
+      if (( pf_try < pf_max_retries )); then
+        sleep 2
+      fi
+    done
+
+    if [[ "${ready}" != "true" ]]; then
+      echo "ERROR: Prometheus port-forward not ready after ${pf_max_retries} attempts" >&2
       prom_pf_pid=""
     else
       # Spot-check Prom; log truncated snippets only.

@@ -1,0 +1,60 @@
+base_images:
+  base:
+    name: "5.1"
+    namespace: ocp-priv
+    tag: base-rhel9
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-9-golang-1.25-openshift-4.22:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp-priv
+    tag: rhel-9-golang-1.25-openshift-4.22
+canonical_go_repository: github.com/openshift/tls-scanner
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    inputs:
+      ocp_builder_rhel-9-golang-1.25-openshift-4.22: {}
+    to: tls-scanner-tool
+promotion:
+  to:
+  - disabled: true
+    name: "5.1"
+    namespace: ocp-priv
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: "5.1"
+      namespace: ocp-priv
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp-priv
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  tls-scanner-run:
+    limits:
+      cpu: "4"
+      memory: 4Gi
+    requests:
+      cpu: "4"
+      memory: 4Gi
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift-priv
+  repo: tls-scanner
+  variant: periodics

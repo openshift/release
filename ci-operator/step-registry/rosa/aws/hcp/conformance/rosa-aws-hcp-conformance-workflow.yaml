@@ -31,6 +31,7 @@ workflow:
         NetworkPolicy between server and client should stop enforcing policies after they are deleted\|
         In-tree Volumes.*Driver: local.*subPath should support\|
         DRA.*kubelet.*DynamicResourceAllocation\|
+        \[FeatureGate:DRAExtendedResource\]\|
         decrease memory limit below usage\|
         CSI Mock selinux on mount SELinuxMount\|
         CSI Mock volume expansion Expansion with recovery\|
@@ -48,7 +49,14 @@ workflow:
         AWSServiceLBNetworkSecurityGroup\|
         cloud-provider-aws-e2e.*BYO.*Security Group\|
         cloud-provider-aws-e2e.*transition from.*SG\|
-        InPlace Resize Container
+        InPlace Resize Container\|
+        Monitor:apiserver-incluster-availability.*monitor test apiserver-incluster-availability\|
+        CSI.*csi-hostpath.*provisioning\|
+        Security should support seccomp runtime/default\|
+        PersistentVolumes-local.*block\|
+        Pre-provisioned PV.*ntfs\|
+        Probe configuration.*OTP.*terminationGracePeriodSeconds.*OCP-44493\|
+        should successfully create sandboxes\|ovs-vswitchd should not log any unreasonably long poll intervals
     pre:
       - chain: rosa-aws-sts-hcp-provision-nightly
       - ref: rosa-cluster-credentials-hypershift-mgmt
@@ -57,6 +65,8 @@ workflow:
     test:
       - chain: hypershift-conformance
     post:
+      - chain: rosa-gather-hcp-diagnostics
+        best_effort: true
       - ref: osd-gather-extra
       - ref: rosa-cluster-mc-restore-image-policy
       - chain: rosa-cluster-deprovision

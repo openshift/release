@@ -3,6 +3,10 @@ base_images:
     name: "5.1"
     namespace: ocp-priv
     tag: base-rhel9
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_builder_rhel-9-golang-1.25-openshift-4.22:
     name: builder
     namespace: ocp
@@ -22,7 +26,8 @@ images:
     to: tls-scanner-tool
 promotion:
   to:
-  - name: "5.1"
+  - disabled: true
+    name: "5.1"
     namespace: ocp-priv
 prowgen:
   private: true
@@ -114,6 +119,25 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: openshift-e2e-azure-ovn
+- as: tls13-adherence-metal
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      PQC_CHECK: "false"
+      SCANNER_CPU_LIMIT: "4"
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: baremetalds-e2e
 - as: tls13-pqc-readiness
   optional: true
   steps:

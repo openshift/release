@@ -16,31 +16,24 @@ MOUNTED_HOST_INVENTORY="/var/host_variables"
 MOUNTED_GROUP_INVENTORY="/var/group_variables"
 
 # ----------------------------------------------------------------------
-# setup_ssh_jump
+# setup_direct_ssh
 #
-# Configures SSH ProxyCommand through the hypervisor (hv6) to reach
-# a host on the isolated network. Appends ansible_ssh_common_args and
-# ansible_remote_tmp to the host_vars file so Ansible tunnels SSH
-# transparently and uses a writable temp directory.
+# Configures direct SSH to a bastion host. Appends
+# ansible_ssh_common_args, ansible_ssh_private_key_file, and
+# ansible_remote_tmp to the host_vars file.
 #
 # Parameters:
-#   1 - mounted_host_inventory: path to host variables mount
+#   1 - mounted_host_inventory: path to host variables mount (unused, kept for compat)
 #   2 - mounted_group_inventory: path to group variables mount
 #   3 - host_vars_file: path to host_vars file to append to
 # ----------------------------------------------------------------------
 
-setup_ssh_jump() {
+setup_direct_ssh() {
     local mounted_host_inventory="$1"
     local mounted_group_inventory="$2"
     local host_vars_file="$3"
 
-    local hypervisor_ip
-    hypervisor_ip=$(tr -d '[:space:]' < "${mounted_host_inventory}/common/hypervisor/ansible_host")
-
-    local ssh_user
-    ssh_user=$(tr -d '[:space:]' < "${mounted_group_inventory}/common/all/ansible_user")
-
-    local ssh_key_file="/tmp/ssh-jump-key"
+    local ssh_key_file="/tmp/ssh-direct-key"
     [[ $- == *x* ]] && local was_tracing=true || local was_tracing=false
     set +x
     cat "${mounted_group_inventory}/common/all/ansible_ssh_private_key" > "${ssh_key_file}"
@@ -51,24 +44,20 @@ setup_ssh_jump() {
 import yaml, sys
 
 key = 'ansible_ssh_common_args'
-ssh_key, user, host = sys.argv[1], sys.argv[2], sys.argv[3]
-proxy = (
+ssh_opts = (
     '-o StrictHostKeyChecking=no '
     '-o UserKnownHostsFile=/dev/null '
     '-o ServerAliveInterval=60 '
-    '-o ServerAliveCountMax=720 '
-    '-o ProxyCommand=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
-    '-o ServerAliveInterval=60 -o ServerAliveCountMax=720 '
-    f'-i {ssh_key} -W %h:%p {user}@{host}\"'
+    '-o ServerAliveCountMax=720'
 )
-print(yaml.dump({key: proxy}, default_flow_style=False, allow_unicode=True).rstrip())
-" "${ssh_key_file}" "${ssh_user}" "${hypervisor_ip}" >> "${host_vars_file}"
+print(yaml.dump({key: ssh_opts}, default_flow_style=False, allow_unicode=True).rstrip())
+" >> "${host_vars_file}"
 
     echo "ansible_ssh_private_key_file: ${ssh_key_file}" >> "${host_vars_file}"
 
     echo "ansible_remote_tmp: ~/.ansible/tmp" >> "${host_vars_file}"
 
-    echo "SSH jump configured: container -> ${ssh_user}@${hypervisor_ip} -> $(basename "${host_vars_file}")"
+    echo "Direct SSH configured for: $(basename "${host_vars_file}")"
 }
 
 # ----------------------------------------------------------------------
@@ -125,8 +114,8 @@ print(yaml.dump({key: value}, default_flow_style=False, allow_unicode=True).rstr
 #
 # Sets up the complete Ansible inventory from Kubernetes secret mounts:
 #   1. Creates group_vars from common and spoke-specific group variables
-#   2. Creates host_vars from hypervisor, spoke, and hub bastion credentials
-#   3. Configures SSH jump through hypervisor to reach bastion
+#   2. Creates host_vars from spoke and hub bastion credentials
+#   3. Configures direct SSH to hub bastion
 #
 # Parameters:
 #   1 - spoke_cluster: spoke cluster name (e.g., spree-02)
@@ -162,11 +151,6 @@ setup_ansible_inventory() {
     # Copy spoke credentials to temporary location
     mkdir -p /tmp/"${spoke_cluster}" && chmod 700 /tmp/"${spoke_cluster}"
 
-    # Copy common hypervisor credentials (shared across all spokes)
-    if [[ -d "${MOUNTED_HOST_INVENTORY}/common/hypervisor" ]]; then
-        cp -r "${MOUNTED_HOST_INVENTORY}/common/hypervisor" /tmp/"${spoke_cluster}"/hypervisor
-    fi
-
     # Copy spoke-specific credentials (master0, etc.)
     if [[ -d "${MOUNTED_HOST_INVENTORY}/${spoke_cluster}" ]]; then
         cp -r "${MOUNTED_HOST_INVENTORY}/${spoke_cluster}/"* /tmp/"${spoke_cluster}"/
@@ -179,9 +163,7 @@ setup_ansible_inventory() {
         process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
     done
 
-    # Process hub host credentials and configure SSH jump.
-    # Hub hosts (bastion, master0, etc.) are on the isolated network behind
-    # the hypervisor. Spoke hosts are directly reachable and don't need a jump.
+    # Process hub host credentials and configure direct SSH.
     if [[ -d "${MOUNTED_HOST_INVENTORY}/${hub_cluster}" ]]; then
         for hub_host_dir in "${MOUNTED_HOST_INVENTORY}/${hub_cluster}/"*/; do
             [[ -d "${hub_host_dir}" ]] || continue
@@ -197,7 +179,7 @@ setup_ansible_inventory() {
 
             echo "Process hub host inventory: ${hub_host_name}"
             process_inventory "${hub_host_dir}" "${hub_host_vars_file}"
-            setup_ssh_jump "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
+            setup_direct_ssh "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
                 "${hub_host_vars_file}"
         done
     fi
@@ -214,7 +196,8 @@ setup_ansible_inventory() {
 #
 # Populates group_vars (all, bastions, hypervisors) and host_vars
 # (hypervisor, bastion) from Kubernetes secret mounts, then configures
-# SSH jump through the hypervisor to reach the bastion.
+# direct SSH to the bastion. The hypervisor host_vars
+# are processed if present but skipped for SSH configuration.
 #
 # Parameters:
 #   1 - hub_cluster: hub cluster name (e.g., kni-qe-70) — used to
@@ -258,8 +241,8 @@ setup_infra_inventory() {
     for host_vars_file in "${infra_inv}"/host_vars/*; do
         [[ -f "${host_vars_file}" ]] || continue
         [[ "$(basename "${host_vars_file}")" == "hypervisor" ]] && continue
-        echo "Configuring SSH jump for: $(basename "${host_vars_file}")"
-        setup_ssh_jump "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
+        echo "Configuring direct SSH for: $(basename "${host_vars_file}")"
+        setup_direct_ssh "${MOUNTED_HOST_INVENTORY}" "${MOUNTED_GROUP_INVENTORY}" \
             "${host_vars_file}"
     done
 

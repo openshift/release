@@ -18,10 +18,11 @@ cat > "${SHARED_DIR}/git-helpers.sh" << 'HEREDOC_EOF'
 #   refresh_fork_token            - Refresh fork token (no-op in PAT mode)
 #   refresh_upstream_token        - Refresh upstream token (no-op in PAT mode)
 #   refresh_all_tokens            - Refresh all tokens (no-op in PAT mode)
-#   sync_fork_with_upstream       - Sync fork main with upstream main
+#   sync_fork_with_upstream       - Sync fork with upstream default branch
 #   check_branch_changes          - Detect code changes on current branch
 
 GITHUB_APP_CREDS_DIR="/var/run/claude-code-service-account"
+DEFAULT_BRANCH="${JIRA_AGENT_DEFAULT_BRANCH:-main}"
 
 # ── PAT mode ──────────────────────────────────────────────────────────────────
 
@@ -334,30 +335,30 @@ refresh_all_tokens() {
   refresh_upstream_token
 }
 
-# Sync fork main branch with upstream main.
+# Sync fork default branch with upstream.
 # Must be called from inside the repo working directory.
-# Requires: JIRA_AGENT_UPSTREAM_REPO
+# Requires: JIRA_AGENT_UPSTREAM_REPO, DEFAULT_BRANCH
 sync_fork_with_upstream() {
   echo "Syncing fork with upstream ${JIRA_AGENT_UPSTREAM_REPO}..."
   git config user.name "OpenShift CI Bot"
   git config user.email "ci-bot@redhat.com"
   git remote add upstream "https://github.com/${JIRA_AGENT_UPSTREAM_REPO}.git"
-  git fetch upstream main
-  git checkout main
-  git rebase upstream/main
+  git fetch upstream "$DEFAULT_BRANCH"
+  git checkout "$DEFAULT_BRANCH"
+  git rebase "upstream/$DEFAULT_BRANCH"
   echo "Fork synced with upstream successfully"
 }
 
-# Check if code changes exist on the current branch vs main.
+# Check if code changes exist on the current branch vs default branch.
 # Sets: HAS_CODE_CHANGES (true/false), BRANCH_NAME, PR_URL (empty)
 check_branch_changes() {
   BRANCH_NAME=$(git branch --show-current)
   HAS_CODE_CHANGES=false
   PR_URL=""
 
-  if [ "$BRANCH_NAME" != "main" ] && [ "$BRANCH_NAME" != "master" ] && [ -n "$BRANCH_NAME" ]; then
+  if [ "$BRANCH_NAME" != "$DEFAULT_BRANCH" ] && [ -n "$BRANCH_NAME" ]; then
     local diff_files
-    diff_files=$(git diff main...HEAD --name-only 2>/dev/null || echo "")
+    diff_files=$(git diff "$DEFAULT_BRANCH"...HEAD --name-only 2>/dev/null || echo "")
     if [ -n "$diff_files" ]; then
       HAS_CODE_CHANGES=true
       echo "Code changes detected on branch $BRANCH_NAME"
@@ -365,12 +366,12 @@ check_branch_changes() {
   fi
 }
 
-# Reset working tree to upstream main for a clean starting state between issues.
+# Reset working tree to upstream default branch for a clean starting state between issues.
 reset_to_main() {
   # Claude Code may leave a stale lock after timeout/kill between issues
   rm -f .git/index.lock
-  git checkout main 2>/dev/null || true
-  git reset --hard upstream/main 2>/dev/null || true
+  git checkout "$DEFAULT_BRANCH" 2>/dev/null || true
+  git reset --hard "upstream/$DEFAULT_BRANCH" 2>/dev/null || true
 }
 
 # Append a jira-agent report link to a PR description.

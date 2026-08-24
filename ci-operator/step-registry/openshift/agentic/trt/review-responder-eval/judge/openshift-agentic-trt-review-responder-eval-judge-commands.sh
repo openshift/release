@@ -16,6 +16,7 @@ EVAL_CONFIG="${EVAL_CONFIG:-/opt/ai-helpers/evals/review-responder/review-respon
 prow-agent-eval judge \
     --config="${EVAL_CONFIG}" \
     --shared-dir="${SHARED_DIR}" \
-    --artifact-dir="${ARTIFACT_DIR}"
+    --artifact-dir="${ARTIFACT_DIR}" \
+    --mode=followup
 
 echo "=== TRT Review Responder Eval Judge Complete ==="

@@ -191,6 +191,70 @@ in 3.11).''')
         'kind': 'RoleBinding',
         'metadata': {
             'name': 'art-publish',
+            'namespace': 'origin-arm64'
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'ClusterRole',
+            'name': 'system:image-builder'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'art-publish',
+            'namespace': 'ocp'
+        }]
+    }, comment='Allow ART to mirror images to the origin-arm64 namespace so that OKD ARM64 images can be provided')
+
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'Role',
+        'metadata': {
+            'name': 'art-publish-modify-release',
+            'namespace': 'origin-arm64'
+        },
+        'rules': [
+            {
+                'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreams'],
+                'verbs': ['get', 'list', 'watch', 'update', 'patch']
+            },
+            {
+                'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreamimports'],
+                'verbs': ['create']
+            },
+            {
+                'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreamtags'],
+                'verbs': ['get', 'list', 'watch', 'update', 'patch', 'delete']
+            }
+        ]
+    })
+
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'art-publish-modify-release',
+            'namespace': 'origin-arm64'
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Role',
+            'name': 'art-publish-modify-release'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'art-publish',
+            'namespace': 'ocp'
+        }]
+    })
+
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'art-publish',
             'namespace': 'ocp-priv'
         },
         'roleRef': {

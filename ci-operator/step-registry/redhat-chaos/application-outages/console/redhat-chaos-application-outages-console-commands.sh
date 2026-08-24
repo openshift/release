@@ -43,15 +43,23 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
+collect_artifacts() {
+  local rc=$?
+ 
+  set +o errexit
+  # Finished running application outages scenarios
+  if [[ "${TELEMETRY_EVENTS_BACKUP:-}" == "True" && -f /tmp/events.json ]]; then
+    cp /tmp/events.json "${ARTIFACT_DIR}/events.json"
+  fi
+  if [[ -f /tmp/report.out.pdf ]]; then
+    cp /tmp/report.out.pdf "${ARTIFACT_DIR}/kraken.report.pdf"
+  fi
+  exit "$rc"
+}
+
+trap collect_artifacts EXIT
+
+set -euxo pipefail; shopt -s inherit_errexit
+
 ./application-outages/prow_run.sh
-rc=$?
 
-if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
-    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
-fi
-
-if [[ -f /tmp/report.out.pdf ]]; then
-  cp /tmp/report.out.pdf ${ARTIFACT_DIR}/kraken.report.pdf
-fi
-echo "Finished running application outages scenarios"
-echo "Return code: $rc"

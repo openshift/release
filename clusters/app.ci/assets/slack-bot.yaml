@@ -129,12 +129,51 @@ spec:
         - --prow-job-config-path=/var/repo/release/ci-operator/jobs
         - --keywords-config-path=/etc/slack-bot-config/config.yaml
         - --helpdesk-alias=subteam^STSR51Q76
+        - --dispatcher-control-url=http://prowjob-dispatcher.ci.svc.cluster.local:8080
+        - --dispatcher-control-token-path=/etc/dispatcher-control/token
+        - --dispatch-command-channel-id=$(DISPATCH_COMMAND_CHANNEL_ID)
+        - --enable-dispatch-capacity=false
+        - --enable-dispatch-drain=false
+        - --enable-dispatch-capability-scope=false
+        env:
+        - name: DISPATCH_COMMAND_CHANNEL_ID
+          valueFrom:
+            secretKeyRef:
+              name: prowjob-dispatcher-control
+              key: channel_id
+        resources:
+          requests:
+            memory: "12Gi"
+            cpu: "100m"
         ports:
         - name: main
           containerPort: 8888
         - name: metrics
           containerPort: 9090
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 60
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 10
         volumeMounts:
+        - name: dispatcher-control
+          mountPath: /etc/dispatcher-control
+          readOnly: true
         - name: slack
           mountPath: /etc/slack
           readOnly: true
@@ -152,11 +191,10 @@ spec:
         - name: slack-bot-config
           mountPath: /etc/slack-bot-config
           readOnly: true
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "100m"
       volumes:
+      - name: dispatcher-control
+        secret:
+          secretName: prowjob-dispatcher-control
       - name: slack
         secret:
           secretName: slack-credentials-dptp-bot

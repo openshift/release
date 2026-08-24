@@ -394,6 +394,7 @@ echo "export DS_OPENSHIFT_VERSION=\$(openshift_version)" >> /tmp/ds-vars.conf
 echo "export DS_REGISTRY=\$LOCAL_REGISTRY_DNS_NAME:\$LOCAL_REGISTRY_PORT" >> /tmp/ds-vars.conf
 echo "export DS_WORKING_DIR=\$WORKING_DIR" >> /tmp/ds-vars.conf
 echo "export DS_IP_STACK=\$IP_STACK" >> /tmp/ds-vars.conf
+echo "export DS_AGENT_E2E_TEST_BOOT_MODE=\${AGENT_E2E_TEST_BOOT_MODE:-}" >> /tmp/ds-vars.conf
 EOF
 
 scp "${SSHOPTS[@]}" "root@${IP}:/tmp/ds-vars.conf" "${SHARED_DIR}/"
