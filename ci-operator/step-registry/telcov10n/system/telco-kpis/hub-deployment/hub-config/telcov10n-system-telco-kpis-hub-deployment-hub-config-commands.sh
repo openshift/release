@@ -36,6 +36,7 @@ main() {
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e "kubeconfig=${kubeconfig}" \
         -e "ocp_version=${VERSION}" \
+        -e "disable_image_policy=${DISABLE_IMAGE_POLICY:-false}" \
         ${DEBUG_FLAG}
 
     echo "=== Step 3/4: Configure kustomize plugin ==="
