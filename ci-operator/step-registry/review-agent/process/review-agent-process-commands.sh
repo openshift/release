@@ -8,6 +8,12 @@ REVIEW_AGENT_AUTH_MODE="${REVIEW_AGENT_AUTH_MODE:-app}"
 REVIEW_AGENT_PAT_KEY="${REVIEW_AGENT_PAT_KEY:-gh-pat}"
 REVIEW_AGENT_FORK_ORG="${REVIEW_AGENT_FORK_ORG:-}"
 
+# Apply Gangway API overrides early (before validation and fork derivation)
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_UPSTREAM_REPO:-}" ]]; then
+  echo "Applying Gangway override: REVIEW_AGENT_UPSTREAM_REPO=${MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_UPSTREAM_REPO}"
+  export REVIEW_AGENT_UPSTREAM_REPO="${MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_UPSTREAM_REPO}"
+fi
+
 # Validate required env vars
 if [[ "$REVIEW_AGENT_AUTH_MODE" == "app" ]] && [[ -z "${REVIEW_AGENT_FORK_REPO:-}" ]]; then
   echo "ERROR: REVIEW_AGENT_FORK_REPO is required in App auth mode (e.g. https://github.com/hypershift-community/hypershift)"
@@ -32,7 +38,7 @@ echo "Configuration: AUTH_MODE=$REVIEW_AGENT_AUTH_MODE"
 # Derive clone directory from fork repo URL
 CLONE_DIR="/tmp/$(basename "$REVIEW_AGENT_FORK_REPO")"
 
-# Apply Gangway API overrides (MULTISTAGE_PARAM_OVERRIDE_* prefix)
+# Apply remaining Gangway API overrides
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_TARGET_PR:-}" ]]; then
   echo "Applying Gangway override: REVIEW_AGENT_TARGET_PR=${MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_TARGET_PR}"
   export REVIEW_AGENT_TARGET_PR="${MULTISTAGE_PARAM_OVERRIDE_REVIEW_AGENT_TARGET_PR}"
