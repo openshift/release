@@ -354,7 +354,6 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
         fi
         continue
     fi
-    gate_failures=0
 
     comment_decision=$(grep -Eo '^COMMENT_WORK=(yes|no)$' "${GATE_LOG}" | tail -1 || true)
     ci_decision=$(grep -Eo '^CI_WORK=(yes|no)$' "${GATE_LOG}" | tail -1 || true)
@@ -367,6 +366,7 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
         fi
         continue
     fi
+    gate_failures=0
     extracted='[]'
     if got_checks=$(extract_failing_checks "${GATE_LOG}"); then
         extracted="${got_checks}"
