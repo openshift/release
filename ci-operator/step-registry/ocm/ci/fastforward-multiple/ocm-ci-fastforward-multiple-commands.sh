@@ -1783,6 +1783,16 @@ if [[ ${#SKIPPED_NO_ACCESS[@]} -gt 0 ]]; then
     echo "  - ${repo}"
   done
   echo ""
+
+  # A repo skipped for lack of write access is an unexpected access problem
+  # (revoked token, org membership change, repo transferred/deleted, etc.),
+  # not an intentional exclusion (those are handled separately via
+  # SKIPPED_REPOS / SKIP_VERSIONS_PATH and never reach SKIPPED_NO_ACCESS).
+  # Mark the job as failed so Prow reports failure/error and the Slack
+  # alert configured in _prowconfig.yaml fires, instead of this condition
+  # silently persisting across every 2h run.
+  echo "WARNING: ${#SKIPPED_NO_ACCESS[@]} repo(s) skipped due to no write access; marking job as failed for alerting"
+  exit_code=$((exit_code | 1))
 fi
 
 # List failures if any
