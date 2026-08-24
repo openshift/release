@@ -1,0 +1,159 @@
+base_images:
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
+releases:
+  latest:
+    integration:
+      name: "4.22"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: tls-scanner-default
+  interval: 72h
+  steps:
+    cluster_profile: aws-sandboxed-containers-operator
+    env:
+      AWS_REGION_OVERRIDE: us-east-2
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
+      CATALOG_SOURCE_NAME: brew-catalog
+      ENABLEPEERPODS: "true"
+      RUNTIMECLASS: kata-remote
+      SCAN_NAMESPACE: openshift-sandboxed-containers-operator
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: C00113
+      TEST_TIMEOUT: "90"
+      WORKLOAD_TO_TEST: peer-pods
+    test:
+    - ref: openshift-extended-test
+    - as: create-peer-pod
+      cli: latest
+      commands: |
+        cat <<'EOF' | oc apply -f -
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: tls-scan-peerpod
+          namespace: openshift-sandboxed-containers-operator
+        spec:
+          runtimeClassName: kata-remote
+          containers:
+            - name: hello-openshift
+              image: quay.io/openshift/origin-hello-openshift
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 8080
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
+        EOF
+        oc wait pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --for=condition=Ready --timeout=10m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    - as: delete-peer-pod
+      cli: latest
+      commands: |
+        oc delete pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --ignore-not-found --timeout=5m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: sandboxed-containers-operator-e2e-aws
+- as: tls-scanner-pqc
+  interval: 72h
+  steps:
+    cluster_profile: aws-sandboxed-containers-operator
+    env:
+      AWS_REGION_OVERRIDE: us-east-2
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
+      CATALOG_SOURCE_NAME: brew-catalog
+      ENABLEPEERPODS: "true"
+      PQC_CHECK: "true"
+      RUNTIMECLASS: kata-remote
+      SCAN_NAMESPACE: openshift-sandboxed-containers-operator
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: C00113
+      TEST_TIMEOUT: "90"
+      WORKLOAD_TO_TEST: peer-pods
+    test:
+    - ref: openshift-extended-test
+    - as: create-peer-pod
+      cli: latest
+      commands: |
+        cat <<'EOF' | oc apply -f -
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: tls-scan-peerpod
+          namespace: openshift-sandboxed-containers-operator
+        spec:
+          runtimeClassName: kata-remote
+          containers:
+            - name: hello-openshift
+              image: quay.io/openshift/origin-hello-openshift
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 8080
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
+        EOF
+        oc wait pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --for=condition=Ready --timeout=10m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    - as: delete-peer-pod
+      cli: latest
+      commands: |
+        oc delete pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --ignore-not-found --timeout=5m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: sandboxed-containers-operator-e2e-aws
+zz_generated_metadata:
+  branch: devel
+  org: openshift
+  repo: sandboxed-containers-operator
+  variant: periodics
