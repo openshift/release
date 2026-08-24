@@ -1,0 +1,19 @@
+chain:
+  as: hypershift-mce-agent-e2e-v2
+  documentation: |-
+    Runs the v2 Ginkgo e2e suite against an Agent bare-metal HostedCluster provisioned by
+    the hypershift-mce-agent-metal3-create chain, filtered to the nodepool-agent tests.
+  steps:
+  - as: tests
+    cli: latest
+    commands: |-
+      export E2E_HOSTED_CLUSTER_NAME=$(cat ${SHARED_DIR}/cluster-name)
+      export E2E_HOSTED_CLUSTER_NAMESPACE=local-cluster
+      bin/test-e2e-v2 --ginkgo.junit-report=${ARTIFACT_DIR}/junit_report.xml --ginkgo.v --ginkgo.label-filter='nodepool-agent'
+    timeout: 120m
+    grace_period: 5m
+    from: hypershift-tests
+    resources:
+      requests:
+        cpu: "1"
+        memory: 200Mi
