@@ -55,7 +55,7 @@ fi
 
 clone_playwright_sources() {
   local repo="$1"
-  local branch="$2"
+  local ref="$2"
   local dest="$3"
 
   rm -rf "${dest}"
@@ -63,20 +63,34 @@ clone_playwright_sources() {
   export GIT_TERMINAL_PROMPT=0
 
   if command -v git >/dev/null 2>&1; then
-    git clone --depth 1 --branch "${branch}" "${repo}" "${dest}"
+    # A 40-char hex ref is a commit SHA. `git clone --branch` only accepts a
+    # branch or tag name, so for a SHA we init + shallow-fetch that exact commit
+    # and check it out (GitHub allows fetching any reachable SHA). This is what
+    # lets us version-match the tests to the deployed image's build commit.
+    if [[ "${ref}" =~ ^[0-9a-f]{40}$ ]]; then
+      git init -q "${dest}"
+      git -C "${dest}" remote add origin "${repo}"
+      git -C "${dest}" fetch --depth 1 origin "${ref}"
+      git -C "${dest}" checkout -q FETCH_HEAD
+    else
+      git clone --depth 1 --branch "${ref}" "${repo}" "${dest}"
+    fi
     return
   fi
 
-  echo "git is not installed; downloading archive for ${branch}..."
+  echo "git is not installed; downloading archive for ${ref}..."
   local archive
   archive="$(mktemp /tmp/quay-src.XXXXXX.tar.gz)"
   local base="${repo%.git}"
-  if curl -fsSL "${base}/archive/refs/heads/${branch}.tar.gz" -o "${archive}"; then
+  # GitHub serves /archive/<sha>.tar.gz for a commit as well as branch/tag names.
+  if curl -fsSL "${base}/archive/${ref}.tar.gz" -o "${archive}"; then
     :
-  elif curl -fsSL "${base}/archive/refs/tags/${branch}.tar.gz" -o "${archive}"; then
+  elif curl -fsSL "${base}/archive/refs/heads/${ref}.tar.gz" -o "${archive}"; then
+    :
+  elif curl -fsSL "${base}/archive/refs/tags/${ref}.tar.gz" -o "${archive}"; then
     :
   else
-    echo "ERROR: failed to download ${repo} at ${branch}" >&2
+    echo "ERROR: failed to download ${repo} at ${ref}" >&2
     rm -f "${archive}"
     exit 1
   fi
@@ -193,22 +207,33 @@ if [[ -s "${SHARED_DIR}/ssl.cert" ]]; then
 fi
 
 # Tests excluded from the run. Beyond unsupported auth backends (OIDC/LDAP), this
-# quarantines tests tracking known product bugs and UI/version gaps that no Quay
-# config can fix. See E2E_FAILURE_REPORT.md for the rationale per entry.
+# quarantines tests tracking known product bugs and UI/version gaps that no Quay#
+# NOTE: the primary defense against version skew is version-matching the tests to
+# the deployed image's build commit via PLAYWRIGHT_GIT_BRANCH (set in the config to
+# the same source ref as the pinned catalog). When that clone succeeds, the skew
+# entries below simply do not exist in the checked-out suite and these grep-invert
+# fragments no-op. They remain only as a safety net for when the run falls back to
+# the image-baked tests (PLAYWRIGHT_GIT_BRANCH unset / clone failed).
 BASE_GREP_INVERT='@auth:OIDC|@auth:LDAP'
 
 # JS-regex fragments matched against the full Playwright test title.
 QUARANTINE=(
-  # Cosign .sig cascade on delete/retarget & autoprune — product feature gap on the
-  # deployed 3.18 image; .sig is not cascade-deleted/pruned with its subject. PROJQUAY-11682.
+  # Cosign .sig cascade on delete/retarget & autoprune — version skew: the cascade
+  # backend (data/model/oci/tag.py) and these specs both landed on redhat-3.18 in
+  # PROJQUAY-12551 (2026-08-07), AFTER the deployed catalog build (2026-07-30), so
+  # the deployed image lacks the feature. Version-matching the tests removes these;
+  # the fragments are a fallback for baked-HEAD runs. PROJQUAY-11682.
   'deleting subject image tag cascades to cosign \.sig tag'
   'deleting one alias keeps cosign \.sig while another alias remains'
   'retargeting last alias cascades cosign \.sig for displaced digest'
   'tag-count pruning excludes cosign \.sig tags and cascades on prune'
   'creation-date pruning does not age-prune cosign \.sig tags'
-  # Quota-notification specs (org + user) — selectors target a newer UI than 3.18
-  # ships (strict-mode dup labels; entity-search is a <div> not <input>) or depend on
-  # a quota-notification email path that does not deliver on this build.
+  # Quota-notification specs (org + user). NOT version skew: these specs and the
+  # quota/notif UI are byte-identical at the pinned test ref and at HEAD, so
+  # version-matching does not change them. They fail on an ENVIRONMENT gap (the
+  # notification email path / feature enablement), which the deploy now addresses
+  # via mailpit + FEATURE_MAILING + FEATURE_QUOTA_NOTIFICATIONS. Kept quarantined
+  # until a real run confirms delivery; drop the passing ones then.
   'create and delete namespace notification logs render descriptions'
   'deleting quota removes all namespace notification configs'
   'email notification fires on quota threshold crossing'
