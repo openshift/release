@@ -355,11 +355,11 @@ function render_osc_operands_chart() {
     # Generate SSH keys via the chart's Makefile (ed25519, into files/ for .Files.Get)
     make -C "${operands_chart}" ssh-keys >&2
 
-    # Read cloud config from peerpods-param-cm (created by peerpods-param-cm step)
+    # Read cloud config from peer-pods-cm (created by peerpods-param-cm step)
     local cm_data
-    cm_data=$(oc get configmap peerpods-param-cm -n default -o json 2>/dev/null || echo "")
+    cm_data=$(oc get configmap peer-pods-cm -n "${OSC_NAMESPACE}" -o json 2>/dev/null || echo "")
     if [[ -n "${cm_data}" ]]; then
-      echo ">>> Reading cloud config from peerpods-param-cm" >&2
+      echo ">>> Reading cloud config from peer-pods-cm" >&2
 
       # Extract common values
       local vxlan_port proxy_timeout
@@ -408,7 +408,7 @@ function render_osc_operands_chart() {
           ;;
       esac
     else
-      echo ">>> WARNING: peerpods-param-cm not found in default namespace" >&2
+      echo ">>> WARNING: peer-pods-cm not found in ${OSC_NAMESPACE} namespace" >&2
     fi
   else
     helm_args+=("--set" "peerpods.enabled=false")
@@ -557,94 +557,6 @@ function install_osc_operands() {
   oc_with_retry oc apply -f "${operands_yaml}"
 }
 
-function create_peer_pods_secret() {
-  echo ">>> Creating peer-pods-secret in ${OSC_NAMESPACE}"
-
-  # Check if secret already exists
-  if oc get secret peer-pods-secret -n "${OSC_NAMESPACE}" &>/dev/null; then
-    echo ">>> peer-pods-secret already exists, skipping"
-    return 0
-  fi
-
-  # Detect identity mode from osc-config or default to manual
-  local identity_mode
-  identity_mode=$(oc get configmap osc-config -n default -o jsonpath='{.data.identityMode}' 2>/dev/null || echo "manual")
-
-  case "${identity_mode}" in
-    cco)
-      echo ">>> Identity mode: cco (Cloud Credential Operator handles credentials)"
-      return 0
-      ;;
-    sts)
-      echo ">>> Identity mode: sts (credentials via subscription environment)"
-      return 0
-      ;;
-    manual|*)
-      echo ">>> Identity mode: manual (copying credentials from peerpods-param-secret)"
-      ;;
-  esac
-
-  # Read peerpods-param-secret from default namespace
-  if ! oc get secret peerpods-param-secret -n default &>/dev/null; then
-    echo ">>> WARNING: peerpods-param-secret not found in default namespace"
-    return 0
-  fi
-
-  local provider
-  provider=$(get_cloud_provider)
-
-  case "${provider}" in
-    azure)
-      # Extract Azure service principal credentials
-      local sp_json
-      sp_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.osServicePrincipal\.json}' 2>/dev/null || echo "")
-      if [[ -z "${sp_json}" ]]; then
-        # Try auth.json format
-        sp_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.auth\.json}' 2>/dev/null || echo "")
-      fi
-
-      if [[ -n "${sp_json}" ]]; then
-        local decoded
-        decoded=$(echo "${sp_json}" | base64 -d)
-        local client_id client_secret tenant_id
-        client_id=$(echo "${decoded}" | jq -r '.clientId // .azure.azure_client_id // ""')
-        client_secret=$(echo "${decoded}" | jq -r '.clientSecret // .azure.azure_client_secret // ""')
-        tenant_id=$(echo "${decoded}" | jq -r '.tenantId // .azure.azure_tenant_id // ""')
-
-        local subscription_id
-        subscription_id=$(oc get secret azure-credentials -n kube-system -o jsonpath='{.data.azure_subscription_id}' 2>/dev/null | base64 -d || echo "")
-
-        set +x
-        oc_with_retry oc create secret generic peer-pods-secret \
-          -n "${OSC_NAMESPACE}" \
-          --from-literal="AZURE_CLIENT_ID=${client_id}" \
-          --from-literal="AZURE_CLIENT_SECRET=${client_secret}" \
-          --from-literal="AZURE_TENANT_ID=${tenant_id}" \
-          --from-literal="AZURE_SUBSCRIPTION_ID=${subscription_id}"
-      else
-        echo ">>> WARNING: Could not extract Azure credentials from peerpods-param-secret"
-      fi
-      ;;
-    aws)
-      # Extract AWS credentials
-      local auth_json
-      auth_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.auth\.json}' 2>/dev/null || echo "")
-      if [[ -n "${auth_json}" ]]; then
-        echo "${auth_json}" | base64 -d > "${SCRATCH}/auth.json"
-        oc_with_retry oc create secret generic peer-pods-secret \
-          -n "${OSC_NAMESPACE}" \
-          --from-file="${SCRATCH}/auth.json"
-        rm -f "${SCRATCH}/auth.json"
-      else
-        echo ">>> WARNING: Could not extract AWS credentials from peerpods-param-secret"
-      fi
-      ;;
-    *)
-      echo ">>> WARNING: peer-pods-secret creation not implemented for provider: ${provider}"
-      ;;
-  esac
-}
-
 function wait_for_kataconfig() {
   echo ">>> Waiting for KataConfig to be ready (this may take up to 2 hours for node reboots)"
 
@@ -734,10 +646,6 @@ install_osc_operator "${CHARTS_DIR}"
 wait_for_operator
 
 # Phase 4: Install operands
-if [[ "${ENABLEPEERPODS}" == "true" ]]; then
-  create_peer_pods_secret
-fi
-
 install_osc_operands "${CHARTS_DIR}"
 wait_for_kataconfig
 
