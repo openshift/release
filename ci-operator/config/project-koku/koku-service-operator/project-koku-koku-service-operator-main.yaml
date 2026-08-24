@@ -12,6 +12,42 @@ images:
   items:
   - dockerfile_path: Dockerfile
     to: koku-service-operator
+  - dockerfile_literal: |-
+      FROM src
+      USER root
+      RUN dnf install -y python3.11 python3.11-pip jq git && dnf clean all && \
+          alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 20
+      RUN python3 -m pip install --no-cache-dir \
+          'pytest>=7' 'pytest-timeout>=2' 'pytest-html>=4' \
+          'requests>=2.28' 'urllib3>=1.26' \
+          'python-jose[cryptography]>=3.3' 'cryptography>=41' \
+          'PyYAML>=6' 'kubernetes>=25' 'boto3>=1.28' 'koku-nise>=4'
+    from: src
+    to: koku-service-operator-e2e
+  - dockerfile_literal: |-
+      FROM bundle AS bundle
+      FROM operator-sdk AS builder
+      USER 0
+      RUN mkdir -p /configs
+      RUN if ! command -v opm >/dev/null 2>&1; then echo "opm missing from operator-sdk image" >&2; exit 1; fi
+      COPY --from=bundle / /bundle
+      RUN opm render /bundle -o yaml > /tmp/bundle.yaml && \
+          { echo '---'; echo 'schema: olm.package'; echo 'name: koku-service-operator'; echo 'defaultChannel: beta'; } > /configs/index.yaml && \
+          cat /tmp/bundle.yaml >> /configs/index.yaml && \
+          printf '%s\n' '---' 'schema: olm.channel' 'package: koku-service-operator' 'name: beta' 'entries:' '- name: koku-service-operator.v0.0.1' >> /configs/index.yaml && \
+          opm validate /configs
+      FROM operator-sdk
+      USER 0
+      COPY --from=builder /configs /configs
+      EXPOSE 50051
+      ENTRYPOINT ["opm"]
+      CMD ["serve", "/configs"]
+    from: operator-sdk
+    inputs:
+      koku-service-operator-bundle:
+        as:
+        - bundle
+    to: koku-service-operator-catalog
 operator:
   bundles:
   - as: koku-service-operator-bundle
@@ -79,6 +115,280 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: generic-claim
+- always_run: false
+  as: e2e-pytest
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  optional: true
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NS=cost-onprem
+        dump() {
+          mkdir -p "${ARTIFACT_DIR}"
+          oc -n "${NS}" logs deploy/koku-service-operator-controller-manager > "${ARTIFACT_DIR}/operator.log" 2>/dev/null || true
+          oc -n "${NS}" get csv,og,catsrc,sub,ip,deploy,po,event -o yaml > "${ARTIFACT_DIR}/olm-resources.yaml" 2>/dev/null || true
+          oc get csv -A -o yaml > "${ARTIFACT_DIR}/csv.yaml" 2>/dev/null || true
+          oc -n "${NS}" get cmsc -o yaml > "${ARTIFACT_DIR}/cmsc.yaml" 2>/dev/null || true
+          oc -n "${NS}" get events --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/events.txt" 2>/dev/null || true
+        }
+        trap dump EXIT
+        oc create namespace "${NS}" --dry-run=client -o yaml | oc apply -f -
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: cost-onprem
+          namespace: ${NS}
+        spec:
+          targetNamespaces:
+          - ${NS}
+        ---
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          name: koku-service-operator
+          namespace: ${NS}
+        spec:
+          displayName: koku-service-operator (CI)
+          publisher: prow
+          sourceType: grpc
+          image: ${CATALOG_IMG}
+          grpcPodConfig:
+            securityContextConfig: restricted
+        ---
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: koku-service-operator
+          namespace: ${NS}
+        spec:
+          channel: beta
+          name: koku-service-operator
+          source: koku-service-operator
+          sourceNamespace: ${NS}
+          installPlanApproval: Automatic
+        EOF
+        oc wait catalogsource/koku-service-operator -n "${NS}" \
+          --for=jsonpath='{.status.connectionState.lastObservedState}'=READY --timeout=5m
+        for _ in $(seq 1 60); do
+          CSV="$(oc get subscription koku-service-operator -n "${NS}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+          [[ -n "${CSV}" ]] && break
+          sleep 10
+        done
+        [[ -n "${CSV}" ]]
+        oc wait csv/"${CSV}" -n "${NS}" \
+          --for=jsonpath='{.status.phase}'=Succeeded --timeout=10m
+        oc wait deployment/koku-service-operator-controller-manager -n "${NS}" \
+          --for=condition=Available --timeout=5m
+      dependencies:
+      - env: CATALOG_IMG
+        name: koku-service-operator-catalog
+      from: src
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: stack
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export INFRA_NAMESPACE=cost-onprem-infra
+        export OPERATOR_NAMESPACE=cost-onprem
+        export SKIP_PYTEST=1
+        ./hack/ci/e2e.sh
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    - as: smoke
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export HELM_RELEASE_NAME=cost-onprem
+        ./scripts/run-pytest.sh --no-venv --smoke
+        mkdir -p "${ARTIFACT_DIR}"
+        if [[ -f test/pytest/reports/junit.xml ]]; then
+          cp test/pytest/reports/junit.xml "${ARTIFACT_DIR}/junit_smoke.xml"
+        fi
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    - as: pytest
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export HELM_RELEASE_NAME=cost-onprem
+        set +e
+        ./scripts/run-pytest.sh --no-venv --no-ui
+        rc=$?
+        set -e
+        mkdir -p "${ARTIFACT_DIR}"
+        if [[ -f test/pytest/reports/junit.xml ]]; then
+          cp test/pytest/reports/junit.xml "${ARTIFACT_DIR}/junit_e2e.xml"
+        fi
+        exit "${rc}"
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    workflow: generic-claim
+- always_run: false
+  as: e2e-iqe
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  optional: true
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NS=cost-onprem
+        dump() {
+          mkdir -p "${ARTIFACT_DIR}"
+          oc -n "${NS}" logs deploy/koku-service-operator-controller-manager > "${ARTIFACT_DIR}/operator.log" 2>/dev/null || true
+          oc -n "${NS}" get csv,og,catsrc,sub,ip,deploy,po,event -o yaml > "${ARTIFACT_DIR}/olm-resources.yaml" 2>/dev/null || true
+          oc get csv -A -o yaml > "${ARTIFACT_DIR}/csv.yaml" 2>/dev/null || true
+          oc -n "${NS}" get cmsc -o yaml > "${ARTIFACT_DIR}/cmsc.yaml" 2>/dev/null || true
+          oc -n "${NS}" get events --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/events.txt" 2>/dev/null || true
+        }
+        trap dump EXIT
+        oc create namespace "${NS}" --dry-run=client -o yaml | oc apply -f -
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: cost-onprem
+          namespace: ${NS}
+        spec:
+          targetNamespaces:
+          - ${NS}
+        ---
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          name: koku-service-operator
+          namespace: ${NS}
+        spec:
+          displayName: koku-service-operator (CI)
+          publisher: prow
+          sourceType: grpc
+          image: ${CATALOG_IMG}
+          grpcPodConfig:
+            securityContextConfig: restricted
+        ---
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: koku-service-operator
+          namespace: ${NS}
+        spec:
+          channel: beta
+          name: koku-service-operator
+          source: koku-service-operator
+          sourceNamespace: ${NS}
+          installPlanApproval: Automatic
+        EOF
+        oc wait catalogsource/koku-service-operator -n "${NS}" \
+          --for=jsonpath='{.status.connectionState.lastObservedState}'=READY --timeout=5m
+        for _ in $(seq 1 60); do
+          CSV="$(oc get subscription koku-service-operator -n "${NS}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+          [[ -n "${CSV}" ]] && break
+          sleep 10
+        done
+        [[ -n "${CSV}" ]]
+        oc wait csv/"${CSV}" -n "${NS}" \
+          --for=jsonpath='{.status.phase}'=Succeeded --timeout=10m
+        oc wait deployment/koku-service-operator-controller-manager -n "${NS}" \
+          --for=condition=Available --timeout=5m
+      dependencies:
+      - env: CATALOG_IMG
+        name: koku-service-operator-catalog
+      from: src
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: stack
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export INFRA_NAMESPACE=cost-onprem-infra
+        export OPERATOR_NAMESPACE=cost-onprem
+        export SKIP_PYTEST=1
+        ./hack/ci/e2e.sh
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    - as: smoke
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export HELM_RELEASE_NAME=cost-onprem
+        ./scripts/run-pytest.sh --no-venv --smoke
+        mkdir -p "${ARTIFACT_DIR}"
+        if [[ -f test/pytest/reports/junit.xml ]]; then
+          cp test/pytest/reports/junit.xml "${ARTIFACT_DIR}/junit_smoke.xml"
+        fi
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    - as: iqe
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export HELM_RELEASE_NAME=cost-onprem
+        set +e
+        ./scripts/run-iqe-tests.sh --profile smoke
+        rc=$?
+        set -e
+        mkdir -p "${ARTIFACT_DIR}"
+        if [[ -f tests/reports/iqe_junit.xml ]]; then
+          cp tests/reports/iqe_junit.xml "${ARTIFACT_DIR}/junit_iqe.xml"
+        fi
+        exit "${rc}"
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
