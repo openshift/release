@@ -196,6 +196,13 @@ spec:
           name: local
         securityContext:
           privileged: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
       containers:
       - name: nfs-provisioner
         image: ${NFS_IMAGE}
@@ -235,6 +242,13 @@ spec:
             add:
             - DAC_READ_SEARCH
             - SYS_RESOURCE
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
         args:
         - "-provisioner=${PROVISIONER_NAME}"
         env:
@@ -261,26 +275,14 @@ spec:
           path: /srv
 EOF
 
-echo "INFO: Waiting for NFS provisioner pod to be Running"
-elapsed=0
-while [ "${elapsed}" -lt 300 ]; do
-  phase=$(oc -n "${NS}" get pods -l "app=nfs-sbr-provisioner" \
-    -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "Pending")
-  if [ "${phase}" = "Running" ]; then
-    echo "INFO: NFS provisioner pod is Running"
-    break
-  fi
-  echo "INFO: Pod phase=${phase}, waiting..."
-  sleep 10
-  elapsed=$((elapsed + 10))
-done
-
-if [ "${elapsed}" -ge 300 ]; then
-  echo "ERROR: NFS provisioner pod did not reach Running within 5 minutes"
-  oc -n "${NS}" get pods -o wide
-  oc -n "${NS}" get events --sort-by='.lastTimestamp'
+echo "INFO: Waiting for NFS provisioner deployment rollout"
+if ! oc -n "${NS}" rollout status deployment/nfs-provisioner --timeout=300s; then
+  echo "ERROR: NFS provisioner deployment did not become ready within 5 minutes"
+  oc -n "${NS}" get pods -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,RESTARTS:.status.containerStatuses[0].restartCount
+  oc -n "${NS}" get events --field-selector reason!=Pulled --sort-by='.lastTimestamp' | tail -20
   exit 1
 fi
+echo "INFO: NFS provisioner deployment is ready"
 
 echo "INFO: Creating StorageClass ${SC_NAME}"
 oc apply -f - <<EOF
