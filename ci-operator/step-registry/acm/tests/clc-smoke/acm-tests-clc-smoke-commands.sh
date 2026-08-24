@@ -30,7 +30,10 @@ function Main() {
         awsAccKeyID="$(sed -nE 's/^\s*aws_access_key_id\s*=\s*//p;T;q' "${awsCredFile}")"
         awsAccKeyToken="$(sed -nE 's/^\s*aws_secret_access_key\s*=\s*//p;T;q' "${awsCredFile}")"
 
-        [ -n "${awsAccKeyID}" ] && [ -n "${awsAccKeyToken}" ]
+        if [[ -z "${awsAccKeyID}" ]] || [[ -z "${awsAccKeyToken}" ]]; then
+            echo "ERROR: AWS credentials incomplete in ${awsCredFile}"
+            return 1
+        fi
 
         echo "Updating credentials in ${optionFile}..."
         yq -o json eval . "${optionFile}" |

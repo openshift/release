@@ -19,11 +19,11 @@ Creates 1 AWS managed cluster using minimal test suite (filtered via `CUSTOMER_T
 
 > **IMPORTANT**
 > You must use the [acm-tests-clc-destroy-ref](../clc-destroy/README.md) as a post step when using this clc-smoke-ref. If you do not and succeed in running the clc-smoke-ref then you will leave clusters running on the ACM QE team's cloud.
-
->Example usage in a config file
->```
->    post:
->    - ref: acm-tests-clc-destroy
+>
+> Example usage in a config file:
+> ```yaml
+>     post:
+>     - ref: acm-tests-clc-destroy
 >    test:
 >    - ref: install-operators
 >    - ref: acm-mch
