@@ -3,6 +3,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.17
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   aws-efs-csi-operator-create-efs:
     name: "5.0"
     namespace: ocp
@@ -5109,6 +5113,76 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-dual-stack
+- as: metal-ds-hypershift-agent-ovn-egressip-debug
+  capabilities:
+  - intranet
+  cron: 36 15 1,17 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      CLUSTERTYPE: host_384gb_el9
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=3
+        WORKER_MEMORY=32768
+        WORKER_VCPU=16
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=256G
+        NUM_EXTRA_WORKERS=3
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      HYPERSHIFT_NAMESPACE: local-cluster
+      LVM_OPERATOR_SUB_CHANNEL: stable-5.0
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      MCE_VERSION: "2.17"
+      TIMEOUT: +18 hours
+    post:
+    - ref: hypershift-agent-ovn-ipecho-deprovision
+    - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-deprovision
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - ref: enable-qe-catalogsource
+    - chain: hypershift-mce-agent-lvm
+    - ref: hypershift-mce-install
+    - ref: hypershift-mce-conf-os-images
+    - as: patch-os-images-50
+      commands: |
+        set -euo pipefail
+        OS_IMAGES_FILE="${SHARED_DIR}/default_os_images.json"
+        if jq -e '.[] | select(.openshift_version == "5.0")' "$OS_IMAGES_FILE" > /dev/null 2>&1; then
+          echo "5.0 entries already present, skipping patch"
+        else
+          echo "Adding OCP 5.0 OS images to default_os_images.json"
+          jq '. += [
+            {"openshift_version":"5.0","cpu_architecture":"x86_64","url":"https://mirror.openshift.com/pub/openshift-v4/x86_64/dependencies/rhcos/pre-release/5.0.0-ec.5/rhcos-5.0.0-ec.5-x86_64-live-iso.x86_64.iso","version":"9.8.20260428-0"},
+            {"openshift_version":"5.0","cpu_architecture":"arm64","url":"https://mirror.openshift.com/pub/openshift-v4/aarch64/dependencies/rhcos/pre-release/5.0.0-ec.5/rhcos-5.0.0-ec.5-aarch64-live-iso.aarch64.iso","version":"9.8.20260428-0"},
+            {"openshift_version":"5.0","cpu_architecture":"ppc64le","url":"https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/pre-release/5.0.0-ec.5/rhcos-5.0.0-ec.5-ppc64le-live-iso.ppc64le.iso","version":"9.8.20260428-0"},
+            {"openshift_version":"5.0","cpu_architecture":"s390x","url":"https://mirror.openshift.com/pub/openshift-v4/s390x/dependencies/rhcos/pre-release/5.0.0-ec.5/rhcos-5.0.0-ec.5-s390x-live-iso.s390x.iso","version":"9.8.20260428-0"}
+          ]' "$OS_IMAGES_FILE" > /tmp/patched_os_images.json
+          mv /tmp/patched_os_images.json "$OS_IMAGES_FILE"
+          echo "Patched. Versions now available:"
+          jq -r '.[].openshift_version' "$OS_IMAGES_FILE" | sort -V | uniq
+        fi
+      from: dev-scripts
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - ref: hypershift-mce-agent-create-agentserviceconfig
+    - ref: hypershift-agent-create-config-dns
+    - ref: hypershift-mce-agent-create-hostedcluster
+    - ref: hypershift-agent-create-proxy
+    - ref: hypershift-agent-create-add-worker-metal3
+    - ref: cucushift-hypershift-extended-enable-qe-catalogsource
+    - ref: hypershift-agent-create-metallb-catalogsource
+    - ref: hypershift-agent-create-metallb
+    - ref: hypershift-agent-check-conditions
+    - ref: hypershift-agent-ovn-ipecho-provision
+    test:
+    - ref: wait
+  timeout: 20h0m0s
 zz_generated_metadata:
   branch: release-5.0
   org: openshift
