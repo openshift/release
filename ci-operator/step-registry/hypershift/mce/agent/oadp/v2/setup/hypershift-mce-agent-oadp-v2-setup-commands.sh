@@ -83,22 +83,5 @@ spec:
     profile: default
 EOF
 
-echo "Creating VolumeSnapshotLocation..."
-cat <<EOF | oc apply -f -
-apiVersion: velero.io/v1
-kind: VolumeSnapshotLocation
-metadata:
-  name: ${CLUSTER_NAME}
-  namespace: openshift-adp
-spec:
-  provider: aws
-  credential:
-    name: cloud-credentials
-    key: cloud
-  config:
-    region: minio
-    profile: default
-EOF
-
 timeout 5m bash -c "until [[ \$(oc get dataProtectionApplication/dpa-sample -n openshift-adp -o jsonpath='{.status.conditions[?(@.type==\"Reconciled\")].status}' 2>/dev/null) == \"True\" ]]; do sleep 15; done"
 timeout 5m bash -c "until [[ \$(oc get backupStorageLocation/${CLUSTER_NAME} -n openshift-adp -o jsonpath='{.status.phase}' 2>/dev/null) == \"Available\" ]]; do sleep 15; done"
