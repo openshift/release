@@ -75,6 +75,7 @@ $(cat "${ISSUE_JSON}")
 ## Additional Instructions
 
 - Write the PR description to \`${WORKDIR}/artifacts/pr-description.md\`.
+- Do not use the \`gh\` CLI. The pipeline creates the PR after you exit. Push the feature branch with git and write the PR description file.
 - Do not modify CI configuration or generated files.
 - Save working files (e.g. solve plans) to \`/tmp/\` — do NOT create a \`.work/\` directory in the repo.
 
@@ -108,6 +109,30 @@ if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
     cat "${WORKDIR}/.agentic/solve-config.md" >> "${SYSTEM_PROMPT}"
 fi
 
+# Block gh inside the Claude session. jira-solve --ci only needs git; the
+# pipeline opens the PR after Claude exits. --settings lives under /tmp so we
+# do not write into a cloned repo that may ship its own .claude/settings.json.
+HOOKS_DIR="/tmp/ci-hooks"
+mkdir -p "${HOOKS_DIR}"
+cat > "${HOOKS_DIR}/block-gh.sh" <<'HOOK_EOF'
+#!/bin/bash
+jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny",
+  permissionDecisionReason: "CI mode: do not use the gh CLI. Push the branch with git; the pipeline creates the PR after you exit."}}'
+HOOK_EOF
+chmod +x "${HOOKS_DIR}/block-gh.sh"
+cat > "${HOOKS_DIR}/settings.json" <<'HOOK_SETTINGS_EOF'
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "if": "Bash(gh *)", "command": "/tmp/ci-hooks/block-gh.sh" }]
+      }
+    ]
+  }
+}
+HOOK_SETTINGS_EOF
+
 # --- Run Claude to solve the issue ---
 echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
 
@@ -115,12 +140,13 @@ CLAUDE_EXIT=0
 timeout 5400 claude \
     --model "${CLAUDE_MODEL}" \
     --allowedTools "${ALLOWED_TOOLS}" \
+    --settings "${HOOKS_DIR}/settings.json" \
     --output-format stream-json \
     --append-system-prompt-file "${SYSTEM_PROMPT}" \
     -p "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
 
 Create a feature branch — do NOT commit on the current branch.
-Write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
+Do not use the gh CLI — the pipeline creates the PR after you exit. Push the branch with git and write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
     --verbose 2>&1 | tee "${WORKDIR}/artifacts/claude-output.log" || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
@@ -129,9 +155,10 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         --model "${CLAUDE_MODEL}" \
         --continue \
         --allowedTools "${ALLOWED_TOOLS}" \
+        --settings "${HOOKS_DIR}/settings.json" \
         --output-format stream-json \
         --max-turns 10 \
-        -p "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
+        -p "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to ${WORKDIR}/artifacts/pr-description.md. Do not use the gh CLI — the pipeline creates the PR after you exit." \
         --verbose 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || true
 elif [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
     echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
