@@ -146,8 +146,7 @@ fi
 echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hypervisor"
 
 echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
-# Pass the CI release payload (resolved by ci-operator from the releases.latest
-# config) so openshift-dpf deploys the nightly build instead of the default GA version.
+# Pass the CI release payload (resolved by ci-operator from the releases.latest config)
 PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
 echo "PAYLOAD_URL=${PAYLOAD_URL:-<not set>}"
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
