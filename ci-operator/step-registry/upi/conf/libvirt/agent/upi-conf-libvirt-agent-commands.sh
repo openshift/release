@@ -44,39 +44,37 @@ else
 fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
-echo "Creating the agent-config.yaml file..."
-cat >> "${SHARED_DIR}/agent-config.yaml" << EOF
+CONTROL_COUNT="${CONTROL_COUNT:-3}"
+COMPUTE_COUNT="${COMPUTE_COUNT:-2}"
+
+echo "Creating the agent-config.yaml file (CONTROL_COUNT=${CONTROL_COUNT} COMPUTE_COUNT=${COMPUTE_COUNT})..."
+{
+  cat << EOF
 apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
   name: ${CLUSTER_NAME}
 rendezvousIP: 192.168.$(leaseLookup "subnet").10
 hosts:
-  - hostname: control-0.${BASE_URL}
-    role: master
-    interfaces:
-      - name: enc1
-        macAddress: $(leaseLookup '"control-plane"[0].mac')
-  - hostname: control-1.${BASE_URL}
-    role: master
-    interfaces:
-      - name: enc1
-        macAddress: $(leaseLookup '"control-plane"[1].mac')
-  - hostname: control-2.${BASE_URL}
-    role: master
-    interfaces:
-      - name: enc1
-        macAddress: $(leaseLookup '"control-plane"[2].mac')
-  - hostname: compute-0.${BASE_URL}
-    role: worker
-    interfaces:
-      - name: enc1
-        macAddress: $(leaseLookup 'compute[0].mac')
-  - hostname: compute-1.${BASE_URL}
-    role: worker
-    interfaces:
-      - name: enc1
-        macAddress: $(leaseLookup 'compute[1].mac')
 EOF
+  for (( i=0; i<CONTROL_COUNT; i++ )); do
+    cat << EOF
+  - hostname: control-${i}.${BASE_URL}
+    role: master
+    interfaces:
+      - name: enc1
+        macAddress: $(leaseLookup "\"control-plane\"[${i}].mac")
+EOF
+  done
+  for (( i=0; i<COMPUTE_COUNT; i++ )); do
+    cat << EOF
+  - hostname: compute-${i}.${BASE_URL}
+    role: worker
+    interfaces:
+      - name: enc1
+        macAddress: $(leaseLookup "compute[${i}].mac")
+EOF
+  done
+} > "${SHARED_DIR}/agent-config.yaml"
 
 cat "${SHARED_DIR}/agent-config.yaml"

@@ -45,11 +45,16 @@ BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
 echo "Creating the libvirt network.xml file..."
 
+CONTROL_COUNT="${CONTROL_COUNT:-3}"
+COMPUTE_COUNT="${COMPUTE_COUNT:-2}"
+
 # This network xml forces the IP address of the rendezvous host to use the bootstrap IP.
 # We do this so that we can debug agent-based clusters by taking advantage of the open
 # SSH tunnel we created to pull debug logs for our libvirt IPI and UPI default workflows.
+# CONTROL_COUNT=1 / COMPUTE_COUNT=0 is SNO (control-0 only, rendezvous = bootstrap IP).
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  cat >> "${SHARED_DIR}/network.xml" << EOF
+  {
+    cat << EOF
 <network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
   <name>${CLUSTER_NAME}</name>
   <forward mode='nat'>
@@ -64,23 +69,34 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
       <hostname>api.${BASE_URL}</hostname>
       <hostname>api-int.${BASE_URL}</hostname>
     </host>
-    <host ip='$(leaseLookup '"control-plane"[0].ip')'>
+EOF
+    for (( i=0; i<CONTROL_COUNT-1; i++ )); do
+      cat << EOF
+    <host ip='$(leaseLookup "\"control-plane\"[${i}].ip")'>
       <hostname>api.${BASE_URL}</hostname>
       <hostname>api-int.${BASE_URL}</hostname>
     </host>
-    <host ip='$(leaseLookup '"control-plane"[1].ip')'>
-      <hostname>api.${BASE_URL}</hostname>
-      <hostname>api-int.${BASE_URL}</hostname>
-    </host>
+EOF
+    done
+    cat << EOF
   </dns>
   <ip family='ipv4' address='192.168.$(leaseLookup "subnet").1' prefix='24'>
     <dhcp>
       <range start='192.168.$(leaseLookup "subnet").2' end='192.168.$(leaseLookup "subnet").254'/>
-      <host mac='$(leaseLookup '"control-plane"[0].mac')' name='control-0.${BASE_URL}' ip='$(leaseLookup 'bootstrap[0].ip')'/>
-      <host mac='$(leaseLookup '"control-plane"[1].mac')' name='control-1.${BASE_URL}' ip='$(leaseLookup '"control-plane"[0].ip')'/>
-      <host mac='$(leaseLookup '"control-plane"[2].mac')' name='control-2.${BASE_URL}' ip='$(leaseLookup '"control-plane"[1].ip')'/>
-      <host mac='$(leaseLookup 'compute[0].mac')' name='compute-0.${BASE_URL}' ip='$(leaseLookup 'compute[0].ip')'/>
-      <host mac='$(leaseLookup 'compute[1].mac')' name='compute-1.${BASE_URL}' ip='$(leaseLookup 'compute[1].ip')'/>
+EOF
+    for (( i=0; i<CONTROL_COUNT; i++ )); do
+      if [ "${i}" -eq 0 ]; then
+        ip="$(leaseLookup 'bootstrap[0].ip')"
+      else
+        ip="$(leaseLookup "\"control-plane\"[$((i-1))].ip")"
+      fi
+      mac="$(leaseLookup "\"control-plane\"[${i}].mac")"
+      echo "      <host mac='${mac}' name='control-${i}.${BASE_URL}' ip='${ip}'/>"
+    done
+    for (( i=0; i<COMPUTE_COUNT; i++ )); do
+      echo "      <host mac='$(leaseLookup "compute[${i}].mac")' name='compute-${i}.${BASE_URL}' ip='$(leaseLookup "compute[${i}].ip")'/>"
+    done
+    cat << EOF
     </dhcp>
   </ip>
   <dnsmasq:options>
@@ -88,6 +104,7 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
   </dnsmasq:options>
 </network>
 EOF
+  } > "${SHARED_DIR}/network.xml"
 
 else
   cat >> "${SHARED_DIR}/network.xml" << EOF
