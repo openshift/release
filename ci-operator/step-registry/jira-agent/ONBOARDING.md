@@ -1,19 +1,22 @@
 # Jira Agent Onboarding Guide
 
-This guide walks you through setting up the **jira-agent** periodic Prow job for your OpenShift team. The jira-agent automatically picks up Jira issues, solves them using Claude Code, runs code review, addresses findings, creates PRs, and sends Slack notifications.
+This guide walks you through setting up the **jira-agent** periodic Prow job for your OpenShift team. The jira-agent automatically picks up Jira issues, solves them using the selected agent harness, runs code review, addresses findings, creates PRs, and sends Slack notifications. GPT models use Codex; other models use Claude Code.
 
 ## How It Works
 
 The jira-agent runs as a periodic Prow job that:
 
-1. **Setup** — Verifies Claude Code CLI and Vertex AI credentials
+1. **Setup** — Verifies the selected agent CLI and its credentials
 2. **Process** — For each Jira issue matching your JQL query:
    - Phase 1: Runs `/openshift-developer:jira-solve` to analyze and fix the issue
    - Phase 2: Runs pre-commit code review
    - Phase 3: Addresses review findings
    - Phase 4: Creates a PR to your upstream repo
    - Labels the Jira issue, transitions status, sets assignee, sends Slack notification
-3. **Report** — Generates an HTML report with token usage, cost breakdown, and phase output
+3. **Report** — Generates an HTML report with token usage, available cost breakdown, and phase output
+
+Codex reports include token counts and wall-clock duration. Because Codex phase JSONL does not
+include pricing, Codex cost is shown as unavailable; Claude phases retain native OTEL cost metrics.
 
 Your team creates a **thin workflow YAML** that sets team-specific env vars and references the generic step registry components. No bash scripting required.
 
@@ -24,7 +27,7 @@ Before starting, you need:
 - [ ] **A GitHub App** installed on both your fork org and upstream repo (for push and PR creation)
 - [ ] **A fork organization** on GitHub where the agent pushes branches (see below)
 - [ ] **Vault secret** synced to OpenShift CI with your credentials (see [Credentials Setup](#credentials-setup))
-- [ ] **Vertex AI access** via a Google Cloud service account (for Claude Code)
+- [ ] **Agent credentials** — OpenAI API access for Codex (the default) or Vertex AI access for Claude Code
 - [ ] **Jira labels** on issues you want the agent to process (e.g., `issue-for-agent`)
 - [ ] **(Optional)** Slack incoming webhook for PR notifications
 
@@ -144,7 +147,9 @@ make update
 
 ## Credentials Setup
 
-The jira-agent reads credentials from `/var/run/claude-code-service-account/`. Your Vault secret must contain these keys:
+The jira-agent reads team credentials from `/var/run/claude-code-service-account/`. The default Codex model also reads an OpenAI API key from the `sa-codex-openshift-ci` credential mounted at `/var/run/codex-openai-api-key/token`.
+
+Your team Vault secret must contain these keys:
 
 | Key | Description |
 |-----|-------------|
@@ -156,6 +161,8 @@ The jira-agent reads credentials from `/var/run/claude-code-service-account/`. Y
 | `jira-pat` | Jira API token (personal access token) |
 | `slack-webhook-url` | **(Optional)** Slack incoming webhook URL |
 | `gh-to-slack-ids` | **(Optional)** JSON mapping of GitHub usernames to Slack user IDs |
+
+The `sa-codex-openshift-ci` secret must contain a `token` key when using a GPT model.
 
 ### GitHub App Setup
 
@@ -202,7 +209,11 @@ Find Slack member IDs by viewing a user's profile in Slack and clicking "Copy me
 | `JIRA_AGENT_REVIEW_PROFILE` | No | `""` | Profile for the code-review plugin |
 | `JIRA_AGENT_SLACK_EMOJI` | No | `:robot:` | Slack message emoji prefix |
 | `JIRA_AGENT_MAX_ISSUES` | No | `1` | Maximum issues to process per run |
-| `CLAUDE_MODEL` | No | `claude-opus-4-6` | Claude model to use |
+| `JIRA_AGENT_MODEL` | No | `gpt-5.6-sol` | Model to use; `gpt-*` selects Codex, other models select Claude Code |
+| `JIRA_AGENT_EFFORT` | No | `xhigh` | Reasoning effort for the selected harness |
+| `JIRA_AGENT_HARNESS` | No | Auto-selected | Optional `codex` or `claude-code` override |
+| `CLAUDE_MODEL` | No | — | Deprecated compatibility override for `JIRA_AGENT_MODEL` |
+| `OPENAI_API_KEY_PATH` | No | `/var/run/codex-openai-api-key/token` | OpenAI API key path when Codex is selected |
 | `JIRA_BASE_URL` | No | `https://redhat.atlassian.net` | Jira instance base URL |
 
 ## Jira Setup

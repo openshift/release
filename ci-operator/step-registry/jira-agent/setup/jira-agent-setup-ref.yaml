@@ -19,6 +19,30 @@ ref:
     default: "/var/run/claude-code-service-account/google-token"
     documentation: |-
       Path to the Google Cloud service account JSON key file for Vertex AI authentication.
+  - name: JIRA_AGENT_MODEL
+    default: "gpt-5.6-sol"
+    documentation: |-
+      Model used by the Jira agent. Models beginning with "gpt-" use Codex;
+      other models use Claude Code.
+  - name: JIRA_AGENT_EFFORT
+    default: "xhigh"
+    documentation: |-
+      Reasoning effort for the selected harness. Codex supports minimal, low,
+      medium, high, xhigh, and max; Claude Code supports low, medium, high,
+      xhigh, and max.
+  - name: JIRA_AGENT_HARNESS
+    default: ""
+    documentation: |-
+      Optional harness override. When empty, the harness is selected from
+      JIRA_AGENT_MODEL.
+  - name: CLAUDE_MODEL
+    default: ""
+    documentation: |-
+      Deprecated compatibility override for JIRA_AGENT_MODEL.
+  - name: OPENAI_API_KEY_PATH
+    default: "/var/run/codex-openai-api-key/token"
+    documentation: |-
+      Path to the OpenAI API key used when the Codex harness is selected.
   resources:
     requests:
       cpu: 100m
@@ -27,8 +51,11 @@ ref:
   - namespace: test-credentials
     name: sa-claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: sa-codex-openshift-ci
+    mount_path: /var/run/codex-openai-api-key
   documentation: |-
     Generic setup step for the Jira agent periodic job.
-    Verifies Claude Code CLI is available.
-    Uses Vertex AI for Claude authentication via GCP service account.
+    Verifies the selected agent CLI is available.
+    Uses Vertex AI for Claude authentication or an OpenAI API key for Codex.
     Teams onboarding this workflow should create team-specific ref YAMLs (or use a shared credential name), because the credential secret name is defined in the ref.

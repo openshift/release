@@ -51,6 +51,10 @@ format_number() {
 # Format a cost value as "$X.XXXX"
 format_cost() {
   local cost_usd=${1:-0}
+  if [ "$cost_usd" = "N/A" ] || [ -z "$cost_usd" ]; then
+    echo "N/A"
+    return
+  fi
   printf '$%.4f' "$cost_usd"
 }
 
@@ -58,7 +62,22 @@ format_cost() {
 sum_costs() {
   local a=${1:-0}
   local b=${2:-0}
+  if [ "$a" = "N/A" ] || [ "$b" = "N/A" ]; then
+    echo "N/A"
+    return
+  fi
   awk -v a="$a" -v b="$b" 'BEGIN {printf "%.6f", (a + b)}' 2>/dev/null || echo "0"
+}
+
+# Read a cost value while preserving unavailable Codex pricing as N/A.
+read_cost_field() {
+  local file=$1
+  if [ -f "$file" ] && [ -s "$file" ] && \
+     jq -e '.total_cost_usd | numbers' "$file" >/dev/null 2>&1; then
+    jq -r '.total_cost_usd' "$file"
+  else
+    echo "N/A"
+  fi
 }
 
 # HTML-escape a string
@@ -178,7 +197,10 @@ while IFS= read -r line; do
     P_CACHE_CREATE=$(read_token_field "$TOKEN_FILE" "cache_creation_input_tokens")
     P_MODEL=$(read_token_field "$TOKEN_FILE" "model")
     P_DURATION=$(read_duration "$DURATION_FILE")
-    P_COST_RAW=$(read_token_field "$TOKEN_FILE" "total_cost_usd")
+    P_COST_RAW="N/A"
+    if [ -f "$TOKEN_FILE" ] && [ -s "$TOKEN_FILE" ]; then
+      P_COST_RAW=$(read_cost_field "$TOKEN_FILE")
+    fi
     if [ "$P_MODEL" != "0" ] && [ "$P_MODEL" != "unknown" ]; then
       MODEL="$P_MODEL"
     fi
@@ -189,7 +211,13 @@ while IFS= read -r line; do
     ISSUE_TOTAL_OUTPUT=$((ISSUE_TOTAL_OUTPUT + P_OUTPUT))
     ISSUE_TOTAL_CACHE_READ=$((ISSUE_TOTAL_CACHE_READ + P_CACHE_READ))
     ISSUE_TOTAL_CACHE_CREATE=$((ISSUE_TOTAL_CACHE_CREATE + P_CACHE_CREATE))
-    ISSUE_TOTAL_COST_USD=$(sum_costs "$ISSUE_TOTAL_COST_USD" "$P_COST_RAW")
+    if [ -f "$TOKEN_FILE" ] && [ -s "$TOKEN_FILE" ]; then
+      if [ "$P_COST_RAW" = "N/A" ]; then
+        ISSUE_TOTAL_COST_USD="N/A"
+      else
+        ISSUE_TOTAL_COST_USD=$(sum_costs "$ISSUE_TOTAL_COST_USD" "$P_COST_RAW")
+      fi
+    fi
     ISSUE_TOTAL_DURATION=$((ISSUE_TOTAL_DURATION + P_DURATION))
 
     if [ "$P_INPUT" -gt 0 ] || [ "$P_OUTPUT" -gt 0 ]; then

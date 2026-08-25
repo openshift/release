@@ -3,21 +3,21 @@ set -euo pipefail
 
 cat > "${SHARED_DIR}/claude-helpers.sh" << 'HEREDOC_EOF'
 #!/bin/bash
-# Claude CLI helper functions for jira-agent phases.
+# Agent CLI helper functions for jira-agent phases.
 #
 # Usage:
 #   source "${SHARED_DIR}/claude-helpers.sh"
 #
 # Functions:
-#   run_claude               - Run claude via agentic-ci for OTEL collection
+#   run_agent                - Run the selected agent via agentic-ci for OTEL collection
 #   extract_session_metrics  - Extract OTEL metrics for BigQuery autodl
 #   generate_autodl          - Generate domain-specific BigQuery autodl JSON
 #   get_session_id           - Extract session_id from stream-json output
-#   extract_claude_outputs   - Extract text/tools/errors from stream-json
-#   extract_claude_tokens    - Extract token usage metrics
+#   extract_agent_outputs    - Extract text/tools/errors from agent JSONL
+#   extract_agent_tokens     - Extract token usage metrics
 #   record_phase_duration    - Record phase wall-clock time
-#   run_claude_phase         - Run a full Claude CLI phase with extraction
-#   validate_jira_plugin     - Verify openshift-developer plugin is installed
+#   run_agent_phase          - Run a full agent CLI phase with extraction
+#   validate_jira_plugin     - Verify the Jira solve skill is installed
 #   build_solve_prompt       - Build Phase 1 (solve) prompt
 #   build_review_prompt      - Build Phase 2 (review) prompt
 #   build_fix_prompt         - Build Phase 3 (fix) prompt
@@ -29,14 +29,19 @@ cat > "${SHARED_DIR}/claude-helpers.sh" << 'HEREDOC_EOF'
 
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+if [ -z "${AGENT_MODEL:-}" ] || [ -z "${AGENT_HARNESS:-}" ] || [ -z "${AGENT_EFFORT:-}" ]; then
+  echo "ERROR: Resolved agent configuration must be sourced before claude-helpers.sh"
+  return 1
+fi
+export AGENT_MODEL AGENT_HARNESS AGENT_EFFORT
 
-# Wrapper: run claude via agentic-ci for native OTEL collection.
+# Wrapper: run the selected agent via agentic-ci for native OTEL collection.
 # Uses --no-streaming so stdout passes through raw for tee/reports.
 # Filters to JSON lines only (agentic-ci log lines are stripped).
 # Captures OTEL JSONL per invocation and appends to the consolidated log.
 #
-# Usage: run_claude <phase> <issue_key> <prompt> <output_file> [extra agentic-ci/claude args...]
-run_claude() {
+# Usage: run_agent <phase> <issue_key> <prompt> <output_file> [extra agent args...]
+run_agent() {
   local phase=$1; shift
   local issue_key=$1; shift
   local prompt="$1"; shift
@@ -45,20 +50,53 @@ run_claude() {
   local phase_otel="/tmp/claude-${issue_key}-${phase}-otel.jsonl"
   local raw_output="/tmp/claude-${issue_key}-${phase}-raw.jsonl"
   local log_file="/tmp/claude-${issue_key}-${phase}.log"
+  local harness_args=()
+
+  case "$AGENT_HARNESS" in
+    claude-code)
+      harness_args=(--permission-mode default --verbose --output-format stream-json "$@")
+      ;;
+    codex)
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          --append-system-prompt)
+            prompt="$2"$'\n\n'"$prompt"
+            shift 2
+            ;;
+          --allowedTools|--max-turns|--output-format|--permission-mode)
+            shift 2
+            ;;
+          --verbose)
+            shift
+            ;;
+          --effort)
+            AGENT_EFFORT="$2"
+            shift 2
+            ;;
+          *)
+            echo "ERROR: Unsupported Codex agent argument: $1"
+            return 2
+            ;;
+        esac
+      done
+      harness_args=(-c "model_reasoning_effort=${AGENT_EFFORT}")
+      ;;
+    *)
+      echo "ERROR: Unsupported agent harness: $AGENT_HARNESS"
+      return 2
+      ;;
+  esac
 
   local rc=0
   agentic-ci run \
     --backend local \
-    --harness claude-code \
-    --model "${CLAUDE_MODEL}" \
+    --harness "${AGENT_HARNESS}" \
+    --model "${AGENT_MODEL}" \
     --workdir /tmp/project-repo \
     --no-streaming \
     "${prompt}" \
     -- \
-    --permission-mode default \
-    --verbose \
-    --output-format stream-json \
-    "$@" \
+    "${harness_args[@]}" \
     > "$raw_output" 2>"$log_file" \
     || rc=$?
 
@@ -78,6 +116,11 @@ run_claude() {
 # Usage: extract_session_metrics <issue_key> <phase>
 extract_session_metrics() {
   local issue_key=$1 phase=$2
+
+  if [ "$AGENT_HARNESS" != "claude-code" ]; then
+    echo "Info: Claude OTEL session metrics are not supported for ${AGENT_HARNESS}; using agent JSONL token metrics"
+    return 0
+  fi
 
   if [ ! -f "${EXTRACT_METRICS}" ]; then
     echo "Warning: extract_metrics.py not found, skipping session metrics"
@@ -146,53 +189,108 @@ generate_autodl() {
   echo "Generated autodl: ${autodl_file}"
 }
 
-# Extract session_id from stream-json result line.
+# Extract session_id from the agent JSONL output.
+# Codex thread IDs are hashed before they are written to published artifacts.
 # Usage: get_session_id <json_file>
 get_session_id() {
   local json_file=$1
-  grep '"type":"result"' "$json_file" 2>/dev/null | head -1 | jq -r '.session_id // ""' 2>/dev/null || echo ""
+  if [ "$AGENT_HARNESS" = "codex" ]; then
+    local thread_id
+    thread_id=$(jq -r 'select(.type == "thread.started") | .thread_id // ""' "$json_file" 2>/dev/null | head -1 || echo "")
+    if [ -n "$thread_id" ]; then
+      printf '%s' "$thread_id" | sha256sum | cut -d' ' -f1
+    fi
+  else
+    grep '"type":"result"' "$json_file" 2>/dev/null | head -1 | jq -r '.session_id // ""' 2>/dev/null || echo ""
+  fi
 }
 
 # ── Output extraction ─────────────────────────────────────────────────────────
 
-# Extract text, tool usage, and errors from Claude stream-json output.
+# Extract text, tool usage, and errors from agent JSONL output.
 # The report step expects "output" as the artifact prefix for Phase 1 (solve),
 # so callers should pass the appropriate artifact_prefix.
 #
-# Usage: extract_claude_outputs <json_file> <issue_key> <artifact_prefix>
-extract_claude_outputs() {
+# Usage: extract_agent_outputs <json_file> <issue_key> <artifact_prefix>
+extract_agent_outputs() {
   local json_file=$1 issue_key=$2 prefix=$3
-  jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' \
-    "$json_file" > "${SHARED_DIR}/claude-${issue_key}-${prefix}-text.txt" 2>/dev/null || true
-  jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' \
-    "$json_file" 2>/dev/null | sort | uniq -c | sort -rn \
-    > "${SHARED_DIR}/claude-${issue_key}-${prefix}-tools.txt" 2>/dev/null || true
-  jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' \
-    "$json_file" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' \
-    > "${SHARED_DIR}/claude-${issue_key}-${prefix}-errors.txt" 2>/dev/null || true
+  if [ "$AGENT_HARNESS" = "codex" ]; then
+    jq -r 'select(.type == "item.completed" and .item.type == "agent_message") | .item.text // empty' \
+      "$json_file" > "${SHARED_DIR}/claude-${issue_key}-${prefix}-text.txt" 2>/dev/null || true
+    {
+      jq -r 'select(.type == "item.completed" and .item.type == "command_execution") | "Shell command"' "$json_file"
+      jq -r 'select(.type == "item.completed" and .item.type == "mcp_tool_call") | "MCP tool call"' "$json_file"
+      jq -r 'select(.type == "item.completed" and .item.type == "web_search") | "Web search"' "$json_file"
+      jq -r 'select(.type == "item.completed" and .item.type == "file_change") | "File change"' "$json_file"
+    } 2>/dev/null | sed '/^[[:space:]]*$/d' | sort | uniq -c | sort -rn \
+      > "${SHARED_DIR}/claude-${issue_key}-${prefix}-tools.txt" 2>/dev/null || true
+    {
+      jq -r 'select(.type == "error") | "Codex error"' "$json_file"
+      jq -r 'select(.type == "turn.failed") | "Codex turn failed"' "$json_file"
+      jq -r 'select(.type == "item.completed" and .item.type == "mcp_tool_call" and (.item.error != null or .item.status == "failed" or .item.status == "error")) | "MCP tool call failed"' "$json_file"
+    } 2>/dev/null | sed '/^[[:space:]]*$/d' | sort | uniq -c | sort -rn \
+      > "${SHARED_DIR}/claude-${issue_key}-${prefix}-errors.txt" 2>/dev/null || true
+  else
+    jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' \
+      "$json_file" > "${SHARED_DIR}/claude-${issue_key}-${prefix}-text.txt" 2>/dev/null || true
+    jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' \
+      "$json_file" 2>/dev/null | sort | uniq -c | sort -rn \
+      > "${SHARED_DIR}/claude-${issue_key}-${prefix}-tools.txt" 2>/dev/null || true
+    jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' \
+      "$json_file" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' \
+      > "${SHARED_DIR}/claude-${issue_key}-${prefix}-errors.txt" 2>/dev/null || true
+  fi
 }
 
-# Extract token usage metrics from the Claude stream-json result line.
+# Extract token usage metrics from the selected agent's JSONL output.
 # Token files always use the phase_name (solve/review/fix/pr) as the report step expects.
 #
-# Usage: extract_claude_tokens <json_file> <issue_key> <phase_name>
-extract_claude_tokens() {
-  local json_file=$1 issue_key=$2 phase=$3
+# Usage: extract_agent_tokens <json_file> <issue_key> <phase_name> [duration_ms]
+extract_agent_tokens() {
+  local json_file=$1 issue_key=$2 phase=$3 duration_ms=${4:-0}
   local default_json='{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}'
-  grep '"type":"result"' "$json_file" \
-    | head -1 \
-    | jq '{
-        total_cost_usd: (.total_cost_usd // 0),
-        duration_ms: (.duration_ms // 0),
-        num_turns: (.num_turns // 0),
-        input_tokens: (.usage.input_tokens // 0),
-        output_tokens: (.usage.output_tokens // 0),
-        cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
-        cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
-        model_usage: (.modelUsage // {}),
-        model: ((.modelUsage // {} | keys | first) // "unknown")
-      }' > "${SHARED_DIR}/claude-${issue_key}-${phase}-tokens.json" 2>/dev/null \
-    || echo "$default_json" > "${SHARED_DIR}/claude-${issue_key}-${phase}-tokens.json"
+  if [ "$AGENT_HARNESS" = "codex" ]; then
+    jq -s --arg model "$AGENT_MODEL" --argjson duration_ms "$duration_ms" '
+      ([.[] | select(.type == "turn.completed") | .usage // {}]) as $usages |
+      ($usages | map(.input_tokens // 0) | add // 0) as $input_tokens |
+      ($usages | map(.output_tokens // 0) | add // 0) as $output_tokens |
+      ($usages | map(.cached_input_tokens // 0) | add // 0) as $cache_read_tokens |
+      ($usages | map(.cache_write_input_tokens // 0) | add // 0) as $cache_creation_tokens |
+      {
+        total_cost_usd: null,
+        duration_ms: $duration_ms,
+        num_turns: ($usages | length),
+        input_tokens: $input_tokens,
+        output_tokens: $output_tokens,
+        cache_read_input_tokens: $cache_read_tokens,
+        cache_creation_input_tokens: $cache_creation_tokens,
+        model_usage: {
+          ($model): {
+            inputTokens: $input_tokens,
+            outputTokens: $output_tokens,
+            cacheReadInputTokens: $cache_read_tokens,
+            cacheCreationInputTokens: $cache_creation_tokens
+          }
+        },
+        model: $model
+      }' "$json_file" > "${SHARED_DIR}/claude-${issue_key}-${phase}-tokens.json" 2>/dev/null \
+      || echo '{"total_cost_usd":null,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "${SHARED_DIR}/claude-${issue_key}-${phase}-tokens.json"
+  else
+    grep '"type":"result"' "$json_file" \
+      | head -1 \
+      | jq '{
+          total_cost_usd: (.total_cost_usd // 0),
+          duration_ms: (.duration_ms // 0),
+          num_turns: (.num_turns // 0),
+          input_tokens: (.usage.input_tokens // 0),
+          output_tokens: (.usage.output_tokens // 0),
+          cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
+          cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
+          model_usage: (.modelUsage // {}),
+          model: ((.modelUsage // {} | keys | first) // "unknown")
+        }' > "${SHARED_DIR}/claude-${issue_key}-${phase}-tokens.json" 2>/dev/null \
+      || echo "$default_json" > "${SHARED_DIR}/claude-${issue_key}-${phase}-tokens.json"
+  fi
   echo "Phase ${phase} tokens: $(cat "${SHARED_DIR}/claude-${issue_key}-${phase}-tokens.json")"
 }
 
@@ -210,14 +308,14 @@ record_phase_duration() {
 
 # ── Phase runner ──────────────────────────────────────────────────────────────
 
-# Run a Claude CLI phase: invoke claude via agentic-ci, extract outputs/tokens/duration/metrics.
+# Run an agent CLI phase via agentic-ci, extracting outputs/tokens/duration/metrics.
 #
-# Usage: run_claude_phase <issue_key> <phase_name> <artifact_prefix> <prompt> <allowed_tools> <max_turns> [extra_claude_args...]
+# Usage: run_agent_phase <issue_key> <phase_name> <artifact_prefix> <prompt> <allowed_tools> <max_turns> [extra_agent_args...]
 #   artifact_prefix: used for text/tools/errors filenames (e.g. "output" for solve, "review" for review)
-#   extra args are passed directly to agentic-ci/claude CLI (e.g. --append-system-prompt "...")
+#   extra args are passed to the selected agent (e.g. --append-system-prompt "...").
 #
 # Sets global: PHASE_EXIT_CODE, PHASE_SESSION_ID
-run_claude_phase() {
+run_agent_phase() {
   local issue_key=$1 phase=$2 artifact_prefix=$3 prompt=$4 tools=$5 max_turns=$6
   shift 6
 
@@ -231,19 +329,27 @@ run_claude_phase() {
   echo "=========================================="
 
   PHASE_EXIT_CODE=0
-  run_claude "$phase" "$issue_key" "$prompt" "$json_file" \
-    --allowedTools "$tools" \
-    --max-turns "$max_turns" \
-    --effort max \
-    "$@" \
-    || PHASE_EXIT_CODE=$?
+  if [ "$AGENT_HARNESS" = "codex" ]; then
+    run_agent "$phase" "$issue_key" "$prompt" "$json_file" \
+      --effort "$AGENT_EFFORT" \
+      "$@" \
+      || PHASE_EXIT_CODE=$?
+  else
+    run_agent "$phase" "$issue_key" "$prompt" "$json_file" \
+      --allowedTools "$tools" \
+      --max-turns "$max_turns" \
+      --effort "$AGENT_EFFORT" \
+      "$@" \
+      || PHASE_EXIT_CODE=$?
+  fi
 
-  extract_claude_outputs "$json_file" "$issue_key" "$artifact_prefix"
-  extract_claude_tokens "$json_file" "$issue_key" "$phase"
+  extract_agent_outputs "$json_file" "$issue_key" "$artifact_prefix"
+  record_phase_duration "$issue_key" "$phase" "$phase_start"
+  extract_agent_tokens "$json_file" "$issue_key" "$phase" \
+    "$(( $(cat "${SHARED_DIR}/claude-${issue_key}-${phase}-duration.txt") * 1000 ))"
   extract_session_metrics "$issue_key" "$phase"
   PHASE_SESSION_ID=$(get_session_id "$json_file")
   generate_autodl "$issue_key" "$phase" "$([ $PHASE_EXIT_CODE -eq 0 ] && echo success || echo failed)" "" "$PHASE_SESSION_ID"
-  record_phase_duration "$issue_key" "$phase" "$phase_start"
 
   if [ $PHASE_EXIT_CODE -eq 0 ]; then
     echo "Phase ${phase} completed for ${issue_key}"
@@ -254,9 +360,35 @@ run_claude_phase() {
 
 # ── Prompt builders ───────────────────────────────────────────────────────────
 
-# Validate that the openshift-developer plugin is installed and jira-solve skill is available.
+# Validate that the selected harness has the openshift-developer plugin and jira-solve skill.
 # Exits with error if plugin is missing.
 validate_jira_plugin() {
+  if [ "$AGENT_HARNESS" = "codex" ]; then
+    local plugin_json plugin_version codex_home plugin_dir
+    if ! plugin_json=$(codex plugin list --json --marketplace ai-helpers 2>/dev/null); then
+      echo "ERROR: Unable to inspect installed Codex plugins"
+      exit 1
+    fi
+    if ! plugin_version=$(printf '%s\n' "$plugin_json" | jq -er '
+      first(
+        .installed[]
+        | select(.pluginId == "openshift-developer@ai-helpers" and .installed == true and .enabled == true)
+        | .version // empty
+      )
+    '); then
+      echo "ERROR: openshift-developer plugin is not installed and enabled for Codex"
+      exit 1
+    fi
+    codex_home="${CODEX_HOME:-${HOME}/.codex}"
+    plugin_dir="${codex_home}/plugins/cache/ai-helpers/openshift-developer/${plugin_version}"
+    if [ ! -f "${plugin_dir}/skills/jira-solve/SKILL.md" ]; then
+      echo "ERROR: Installed Codex openshift-developer plugin lacks the jira-solve skill"
+      exit 1
+    fi
+    echo "openshift-developer plugin validated for Codex"
+    return
+  fi
+
   local plugin_dir
   plugin_dir=$(claude plugin list --json 2>/dev/null \
     | jq -r '.[] | select(.id | test("^openshift-developer@")) | .installPath' 2>/dev/null) || true
@@ -264,7 +396,7 @@ validate_jira_plugin() {
     echo "ERROR: openshift-developer plugin jira-solve skill not found — is openshift-developer bundle installed?"
     exit 1
   fi
-  echo "openshift-developer plugin validated (jira-solve skill loaded)"
+  echo "openshift-developer plugin validated for Claude Code"
 }
 
 # Build the prompt for Phase 1 (solve).
@@ -303,7 +435,7 @@ build_pr_prompt() {
   echo "/openshift-developer:create-pr ${issue_key} --upstream ${JIRA_AGENT_UPSTREAM_REPO} --head ${FORK_ORG}:${BRANCH_NAME}"
 }
 
-# Extract the PR URL from Claude's PR-phase output.
+# Extract the PR URL from the PR-phase output.
 # Arguments: <issue_key>
 # Requires: JIRA_AGENT_UPSTREAM_REPO
 # Outputs: prints the URL to stdout (empty string if not found)
@@ -337,7 +469,7 @@ process_single_issue() {
   local fork_context="IMPORTANT: You are working in a fork (${JIRA_AGENT_FORK_REPO}). Git push is pre-configured to work with the fork. After creating commits on your feature branch, push the branch to origin. Do NOT create a Pull Request - the PR will be created in a subsequent automated step after code review. ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
 
   # Phase 1: Solve the issue
-  run_claude_phase "$issue_key" "solve" "output" \
+  run_agent_phase "$issue_key" "solve" "output" \
     "$(build_solve_prompt "$issue_key")" \
     "Bash Read Write Edit Grep Glob WebFetch Agent Skill Task LSP mcp__plugin_golang_gopls__*" 300 \
     --append-system-prompt "$fork_context"
@@ -363,7 +495,7 @@ process_single_issue() {
   fi
 
   # Phase 2: Code review
-  run_claude_phase "$issue_key" "review" "review" \
+  run_agent_phase "$issue_key" "review" "review" \
     "$(build_review_prompt)" \
     "Bash Read Grep Glob Task Agent Skill LSP mcp__plugin_golang_gopls__*" 225 \
     --append-system-prompt "${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
@@ -378,7 +510,7 @@ process_single_issue() {
   refresh_fork_token
 
   if [ -n "$review_findings" ]; then
-    run_claude_phase "$issue_key" "fix" "fix" \
+    run_agent_phase "$issue_key" "fix" "fix" \
       "$(build_fix_prompt)" \
       "Bash Read Write Edit Grep Glob Agent Skill Task LSP mcp__plugin_golang_gopls__*" 225 \
       --append-system-prompt "REVIEW FINDINGS:
@@ -393,7 +525,7 @@ ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
   # Phase 4: Create PR
   refresh_all_tokens
 
-  run_claude_phase "$issue_key" "pr-creation" "pr" \
+  run_agent_phase "$issue_key" "pr-creation" "pr" \
     "$(build_pr_prompt "$issue_key")" \
     "Bash Read Grep Glob" 90 \
     --append-system-prompt "${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"

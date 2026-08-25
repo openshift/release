@@ -16,7 +16,7 @@ workflow:
       JIRA_AGENT_AUTH_MODE: "pat"
       JIRA_AGENT_FORK_ORG: "jira-solve-bot"
       JIRA_AGENT_UPSTREAM_REPO: "openshift/hypershift"
-      JIRA_AGENT_JQL: 'project in (OCPBUGS, CNTRLPLANE) AND resolution = Unresolved AND status in (New, "To Do") AND component = "HyperShift" AND labels = issue-for-agent AND labels = ready-to-solve AND labels != agent-processed'
+      JIRA_AGENT_JQL: 'project in (OCPBUGS, CNTRLPLANE) AND resolution = Unresolved AND status in (New, "To Do") AND component in ("HyperShift", "HyperShift / Agent", "HyperShift / ARO", "HyperShift / GCP", "HyperShift / OCP Virtualization", "HyperShift / OpenStack", "HyperShift / ROSA", "Hosted Control Planes") AND labels = issue-for-agent AND labels = ready-to-solve AND labels != agent-processed'
       JIRA_AGENT_TARGET_STATUS: '{"OCPBUGS":"ASSIGNED","CNTRLPLANE":"Code Review"}'
       JIRA_AGENT_ASSIGNEE: "hypershift-automation"
       JIRA_AGENT_TOOL_SETUP_SCRIPT: "GOFLAGS='' go install golang.org/x/tools/gopls@v0.21.0 && python3.9 -m ensurepip --user 2>/dev/null || true && python3.9 -m pip install --user pre-commit 2>&1 | tail -1"
@@ -27,5 +27,10 @@ workflow:
     HyperShift-specific wrapper for the generic Jira Agent workflow.
     Uses PAT auth mode — auto-forks openshift/hypershift into jira-solve-bot
     and creates PRs against the upstream repo.
+    Jira selection includes the HyperShift implementation components
+    (HyperShift, HyperShift / Agent, HyperShift / ARO, HyperShift / GCP,
+    HyperShift / OCP Virtualization, HyperShift / OpenStack, HyperShift / ROSA,
+    and Hosted Control Planes) when the issue has the required issue-for-agent
+    and ready-to-solve labels.
 
     Credentials: Uses hypershift-team-claude-prow (shared secret with gh-pat).

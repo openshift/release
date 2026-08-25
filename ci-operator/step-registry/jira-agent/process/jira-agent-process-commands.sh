@@ -5,6 +5,15 @@ echo "=== Jira Agent Process ==="
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 
+AGENT_CONFIG_FILE="${SHARED_DIR}/jira-agent-config.sh"
+if [ ! -r "$AGENT_CONFIG_FILE" ]; then
+  echo "ERROR: Resolved agent configuration not found at $AGENT_CONFIG_FILE"
+  echo "ERROR: jira-agent-setup must run before jira-agent-process"
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$AGENT_CONFIG_FILE"
+
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_JIRA_AGENT_ISSUE_KEY:-}" ]]; then
   echo "Applying Gangway override: JIRA_AGENT_ISSUE_KEY=${MULTISTAGE_PARAM_OVERRIDE_JIRA_AGENT_ISSUE_KEY}"
   export JIRA_AGENT_ISSUE_KEY="${MULTISTAGE_PARAM_OVERRIDE_JIRA_AGENT_ISSUE_KEY}"
@@ -68,13 +77,16 @@ export JIRA_BASE_URL="${JIRA_BASE_URL:-https://redhat.atlassian.net}"
 export MAX_ISSUES=${JIRA_AGENT_MAX_ISSUES:-1}
 export STATE_FILE="${SHARED_DIR}/processed-issues.txt"
 export REPORT_STEP="${JIRA_AGENT_REPORT_STEP:-jira-agent-report}"
+if [ "$AGENT_HARNESS" = "claude-code" ] && [ -z "${CLAUDE_CODE_SUBAGENT_MODEL:-}" ]; then
+  export CLAUDE_CODE_SUBAGENT_MODEL="$AGENT_MODEL"
+fi
 export SUBAGENT_PROMPT="SUBAGENTS: Launch ALL subagents in parallel (single message with multiple Task tool calls) for maximum speed. Each subagent should be given subagent_type: \"general-purpose\". Do NOT set the model parameter — let subagents inherit the parent model, as these analysis tasks require a capable model."
 export SECURITY_PROMPT="SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v', 'git remote get-url origin', 'git config --list', 'git config --global credential.helper', or 'cat ~/.gitconfig'."
 
 export BASH_DEFAULT_TIMEOUT_MS=1200000
 export BASH_MAX_TIMEOUT_MS=1200000
 
-echo "Configuration: AUTH_MODE=$JIRA_AGENT_AUTH_MODE MAX_ISSUES=$MAX_ISSUES"
+echo "Configuration: AUTH_MODE=$JIRA_AGENT_AUTH_MODE MAX_ISSUES=$MAX_ISSUES HARNESS=$AGENT_HARNESS MODEL=$AGENT_MODEL EFFORT=$AGENT_EFFORT"
 
 # ── Source libraries ───────────────────────────────────────────────────────────
 
@@ -92,11 +104,26 @@ if ! ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>&1; then
   echo "Warning: ssh-keyscan failed — SSH host key verification may fail later"
 fi
 
-echo "Installing Claude Code plugins..."
-claude plugin marketplace add openshift-eng/ai-helpers
-claude plugin marketplace add RedHatProductSecurity/prodsec-skills
-claude plugin install openshift-developer@ai-helpers
-claude plugin install prow-agent@ai-helpers
+case "$AGENT_HARNESS" in
+  claude-code)
+    echo "Installing Claude Code plugins..."
+    claude plugin marketplace add openshift-eng/ai-helpers
+    claude plugin marketplace add RedHatProductSecurity/prodsec-skills
+    claude plugin install openshift-developer@ai-helpers
+    claude plugin install prow-agent@ai-helpers
+    ;;
+  codex)
+    echo "Installing Codex plugins..."
+    codex plugin marketplace add /opt/ai-helpers
+    codex plugin marketplace add RedHatProductSecurity/prodsec-skills
+    codex plugin add openshift-developer@ai-helpers
+    codex plugin add prow-agent@ai-helpers
+    ;;
+  *)
+    echo "ERROR: Unsupported JIRA_AGENT_HARNESS=$AGENT_HARNESS (expected claude-code or codex)"
+    exit 1
+    ;;
+esac
 
 # ── Credentials ───────────────────────────────────────────────────────────────
 
@@ -104,6 +131,24 @@ load_credentials
 load_jira_credentials
 load_slack_credentials
 load_github_slack_map
+
+if [ "$AGENT_HARNESS" = "codex" ] && [ -z "${OPENAI_API_KEY:-}" ]; then
+  if [ ! -r "$OPENAI_API_KEY_PATH" ]; then
+    echo "ERROR: Codex requires an OpenAI API key at $OPENAI_API_KEY_PATH"
+    exit 1
+  fi
+  was_tracing=false
+  if [[ $- == *x* ]]; then
+    was_tracing=true
+    set +x
+  fi
+  OPENAI_API_KEY=$(cat "$OPENAI_API_KEY_PATH")
+  export OPENAI_API_KEY
+  if $was_tracing; then
+    set -x
+  fi
+  echo "OpenAI API key loaded for Codex."
+fi
 
 if [ -n "${JIRA_AGENT_TOOL_SETUP_SCRIPT:-}" ]; then
   echo "Running project-specific tool setup..."
@@ -187,6 +232,7 @@ PHASES = [
 def parse_stream_json(path):
     blocks = []
     cost = turns = inp = outp = duration = 0
+    cost_available = True
     model = session = "unknown"
     for line in open(path):
         line = line.strip()
@@ -207,6 +253,14 @@ def parse_stream_json(path):
             inp = u.get("input_tokens", 0)
             outp = u.get("output_tokens", 0)
             duration = m.get("duration_ms", 0)
+        elif t == "thread.started":
+            session = m.get("thread_id", session)
+        elif t == "turn.completed":
+            cost_available = False
+            turns += 1
+            usage = m.get("usage", {})
+            inp += usage.get("input_tokens", 0)
+            outp += usage.get("output_tokens", 0)
         if t == "assistant":
             for c in m.get("message", {}).get("content", []):
                 ct = c.get("type", "")
@@ -224,7 +278,28 @@ def parse_stream_json(path):
                 for item in r:
                     if isinstance(item, dict) and item.get("type") == "text":
                         blocks.append(("tool_result", item.get("text", "")[:1000]))
-    return blocks, {"cost": cost, "turns": turns, "input": inp, "output": outp,
+        elif t == "item.completed":
+            item = m.get("item", {})
+            item_type = item.get("type", "")
+            if item_type == "agent_message":
+                blocks.append(("assistant", item.get("text", "")))
+            elif item_type == "command_execution":
+                blocks.append(("tool_use", "Shell command"))
+            elif item_type == "mcp_tool_call":
+                blocks.append(("tool_use", "MCP tool call"))
+            elif item_type == "web_search":
+                blocks.append(("tool_use", "Web search"))
+            elif item_type == "file_change":
+                blocks.append(("tool_use", "File change"))
+            if item_type == "mcp_tool_call" and (
+                    item.get("error") is not None
+                    or item.get("status") in ("failed", "error")):
+                blocks.append(("tool_result", "MCP tool call failed"))
+        elif t == "error":
+            blocks.append(("tool_result", "Codex error"))
+        elif t == "turn.failed":
+            blocks.append(("tool_result", "Codex turn failed"))
+    return blocks, {"cost": cost if cost_available else None, "turns": turns, "input": inp, "output": outp,
                     "duration": duration, "model": model, "session": session}
 
 def render_blocks(blocks):
@@ -258,13 +333,31 @@ for issue_key in issues:
         blocks, stats = parse_stream_json(stream_file)
         if not blocks:
             continue
-        total_cost += stats["cost"]
+        if stats["cost"] is not None and total_cost is not None:
+            total_cost += stats["cost"]
+        else:
+            total_cost = None
+        if stats["duration"] == 0:
+            duration_phase = {
+                "output": "solve",
+                "pr": "pr-creation",
+            }.get(phase_key, phase_key)
+            duration_file = os.path.join(
+                os.path.dirname(state_file),
+                f"claude-{issue_key}-{duration_phase}-duration.txt",
+            )
+            if os.path.exists(duration_file):
+                try:
+                    stats["duration"] = int(open(duration_file).read().strip()) * 1000
+                except (ValueError, OSError):
+                    pass
         dur_s = stats["duration"] // 1000
         dur_str = f"{dur_s // 60}m {dur_s % 60}s" if dur_s >= 60 else f"{dur_s}s"
         is_open = "open" if phase_key == "output" else ""
+        cost_str = f"${stats['cost']:.4f}" if stats["cost"] is not None else "cost unavailable"
         issue_sections.append(f'''
 <details {is_open}>
-<summary>{phase_label} — {stats["turns"]} turns, ${stats["cost"]:.4f}, {dur_str}</summary>
+<summary>{phase_label} — {stats["turns"]} turns, {cost_str}, {dur_str}</summary>
 <div class="phase">{render_blocks(blocks)}</div>
 </details>''')
     if issue_sections:
@@ -299,7 +392,7 @@ details[open] summary {{ margin-bottom: 0.5em; }}
 <body>
 {back_link}
 <h1>Conversation Transcript</h1>
-<p style="color:#666">Total cost: ${total_cost:.4f}</p>
+<p style="color:#666">Total cost: {f"${total_cost:.4f}" if total_cost is not None else "unavailable for Codex phases"}</p>
 {"".join(sections) if sections else "<p>No transcript data available.</p>"}
 </body>
 </html>''')

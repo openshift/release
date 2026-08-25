@@ -130,18 +130,38 @@ ref:
     default: "1"
     documentation: |-
       Maximum number of Jira issues to process per run.
-  - name: CLAUDE_MODEL
-    default: "claude-opus-4-6"
+  - name: JIRA_AGENT_MODEL
+    default: "gpt-5.6-sol"
     documentation: |-
-      Claude model to use for processing Jira issues.
+      Model to use for processing Jira issues. Models beginning with "gpt-"
+      use the Codex harness; other models use Claude Code.
+  - name: JIRA_AGENT_EFFORT
+    default: "xhigh"
+    documentation: |-
+      Reasoning effort for the selected harness. Codex supports minimal, low,
+      medium, high, xhigh, and max; Claude Code supports low, medium, high,
+      xhigh, and max.
+  - name: JIRA_AGENT_HARNESS
+    default: ""
+    documentation: |-
+      Optional harness override. When empty, models beginning with "gpt-"
+      select Codex and other models select Claude Code.
+  - name: CLAUDE_MODEL
+    default: ""
+    documentation: |-
+      Deprecated compatibility override for JIRA_AGENT_MODEL.
   - name: CLAUDE_CODE_SUBAGENT_MODEL
-    default: "claude-opus-4-6"
+    default: ""
     documentation: |-
       Claude Code CLI environment variable that overrides the model used by
       subagents spawned via the Agent tool. Without this, agent types like
       Explore default to haiku. Setting it ensures all subagents use the
-      same model as the parent session.
+      configured Claude model when Claude Code is selected.
       See: https://docs.anthropic.com/en/docs/claude-code/settings#environment-variables
+  - name: OPENAI_API_KEY_PATH
+    default: "/var/run/codex-openai-api-key/token"
+    documentation: |-
+      Path to the OpenAI API key used when the Codex harness is selected.
   - name: JIRA_BASE_URL
     default: "https://redhat.atlassian.net"
     documentation: |-
@@ -165,13 +185,21 @@ ref:
   - namespace: test-credentials
     name: hypershift-team-claude-prow
     mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: sa-codex-openshift-ci
+    mount_path: /var/run/codex-openai-api-key
   documentation: |-
     Generic process step for the Jira agent periodic job.
     This step runs a four-phase pipeline for each issue:
-    Phase 1 - Solve: Runs /openshift-developer:jira-solve to implement changes, commit, and push the branch
-    Phase 2 - Review: Runs /code-review:pre-commit-review for code quality (read-only)
+    Phase 1 - Solve: Runs /openshift-developer:jira-solve through the selected
+      agent harness to implement changes, commit, and push the branch
+    Phase 2 - Review: Runs /code-review:pre-commit-review for code quality
+      (read-only)
     Phase 3 - Fix: Addresses review findings by editing code, committing, and pushing fixes
     Phase 4 - PR Creation: Creates a draft PR via gh CLI after review is complete
+
+    Models beginning with "gpt-" use Codex with OpenAI credentials. Other
+    models use Claude Code with Vertex AI credentials.
 
     Supports two auth modes:
     - "app" (default): GitHub App with separate fork/upstream installation tokens.

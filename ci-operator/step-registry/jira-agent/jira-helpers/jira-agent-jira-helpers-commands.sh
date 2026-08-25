@@ -204,7 +204,9 @@ query_jira_issues() {
   fi
   search_body="$CURL_BODY"
 
-  total_results=$(echo "$search_body" | jq -r '.total // 0')
+  # The /search/jql endpoint may omit `total` while still returning issues.
+  # Count the returned issue records so the log reflects the data we process.
+  total_results=$(echo "$search_body" | jq -r '(.issues // []) | length')
   echo "Jira search returned $total_results result(s)"
   ISSUES=$(echo "$search_body" | jq -r '.issues[]? | "\(.key) \(.fields.summary)"')
 
