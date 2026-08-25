@@ -29,10 +29,53 @@ if oc get nmstate nmstate -n "${NMSTATE_NS}" >/dev/null 2>&1; then
   exit 0
 fi
 
+BREW_DOCKERCONFIGJSON="${BREW_DOCKERCONFIGJSON:-/var/run/brew-pullsecret/.dockerconfigjson}"
+if [ ! -f "${BREW_DOCKERCONFIGJSON}" ]; then
+  echo "ERROR: Brew pull secret not found at ${BREW_DOCKERCONFIGJSON}"
+  exit 1
+fi
+
+# Merge brew.registry.redhat.io into the existing cluster pull secret.
+# Do not replace the secret; BM already needs payload/CNV auths.
+# Disable tracing due to pull-secret handling.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+oc get secret pull-secret -n openshift-config -o json \
+  | jq -r '.data[".dockerconfigjson"]' | base64 -d > /tmp/existing_pull_secret.json
+jq -s '.[0] * .[1]' /tmp/existing_pull_secret.json "${BREW_DOCKERCONFIGJSON}" \
+  > /tmp/merged_pull_secret.json
+oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged_pull_secret.json
+rm -f /tmp/existing_pull_secret.json /tmp/merged_pull_secret.json
+$WAS_TRACING && set -x
+
+echo "Allowing insecure registry-proxy.engineering.redhat.com and applying brew ICSP"
+oc patch image.config.openshift.io/cluster --type merge \
+  -p '{"spec":{"registrySources":{"insecureRegistries":["registry-proxy.engineering.redhat.com"]}}}'
+
+cat << EOF | oc apply -f -
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: brew-registry
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry.redhat.io
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry.stage.redhat.io
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry-proxy.engineering.redhat.com
+EOF
+
+echo "Waiting for cluster to stabilize after pull-secret and ICSP updates"
+oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=40m
+
 # Nightly payloads do not publish kubernetes-nmstate-operator in GA redhat-operators.
-# Use the public ART nightly index (same source as
-# hack/ocp-install-nightly-art-operators.sh) without Brew employee tokens.
-# CatalogSource pattern matches openshift-qe-installer-bm-day2-cnv.
+# Use the ART nightly index (same catalog image as
+# hack/ocp-install-nightly-art-operators.sh) with CI brew-registry-pullsecret.
 if [ -z "${NMSTATE_CATALOG_IMAGE}" ]; then
   OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d '.' -f 1,2)
   NMSTATE_CATALOG_IMAGE="quay.io/openshift-release-dev/ocp-release-nightly:iib-int-index-art-operators-${OCP_VERSION}"
@@ -55,8 +98,14 @@ spec:
       interval: 8h
 EOF
 
-oc wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY \
-  catalogsource/"${CATALOG_NAME}" -n openshift-marketplace --timeout=10m
+if ! oc wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY \
+  catalogsource/"${CATALOG_NAME}" -n openshift-marketplace --timeout=10m; then
+  echo "CatalogSource ${CATALOG_NAME} did not become READY"
+  oc get catalogsource "${CATALOG_NAME}" -n openshift-marketplace -o yaml || true
+  oc get pods -n openshift-marketplace || true
+  oc describe pods -n openshift-marketplace -l olm.catalogSource="${CATALOG_NAME}" || true
+  exit 1
+fi
 
 STARTING_CSV=$(oc get packagemanifest -l catalog="${CATALOG_NAME}" -n openshift-marketplace -o jsonpath="{$.items[?(@.metadata.name=='${NMSTATE_PACKAGE}')].status.channels[?(@.name==\"${NMSTATE_CHANNEL}\")].currentCSV}")
 if [ -z "${STARTING_CSV}" ]; then
