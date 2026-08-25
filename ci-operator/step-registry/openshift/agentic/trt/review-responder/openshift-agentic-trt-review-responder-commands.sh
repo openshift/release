@@ -314,12 +314,7 @@ push_failures=0
 
 while true; do
     iteration=$(( iteration + 1 ))
-    if [[ "${EVAL_MODE:-}" == "true" ]]; then
-        echo "Eval mode: skipping wait (iteration ${iteration})..."
-    else
-        echo "Waiting 5 minutes before checking (iteration ${iteration})..."
-        sleep 300
-    fi
+    echo "Checking (iteration ${iteration})..."
 
     current_head=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json headRefOid -q .headRefOid 2>/dev/null || echo "")
 
@@ -432,6 +427,9 @@ Your GitHub login is ${BOT_LOGIN}." \
         echo "Minimum iterations reached and no activity for 3 consecutive checks. Exiting."
         break
     fi
+
+    echo "Waiting 5 minutes before next check..."
+    sleep 300
 done
 
 echo "=== TRT Review Responder Complete ==="
