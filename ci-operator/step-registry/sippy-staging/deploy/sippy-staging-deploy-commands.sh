@@ -5,27 +5,10 @@ STAGING_LIVE=false
 
 shutdown() {
     echo "==> Shutting down staging environment..."
-    local children i
-    children="$(jobs -p 2>/dev/null || true)"
-    if [[ -n "${children}" ]]; then
-        # shellcheck disable=SC2086
-        kill ${children} 2>/dev/null || true
-        for i in $(seq 1 10); do
-            children="$(jobs -p 2>/dev/null || true)"
-            [[ -z "${children}" ]] && break
-            sleep 0.5
-        done
-        children="$(jobs -p 2>/dev/null || true)"
-        if [[ -n "${children}" ]]; then
-            # shellcheck disable=SC2086
-            kill -9 ${children} 2>/dev/null || true
-            for i in $(seq 1 5); do
-                children="$(jobs -p 2>/dev/null || true)"
-                [[ -z "${children}" ]] && break
-                sleep 0.2
-            done
-        fi
-    fi
+    trap '' TERM INT
+    pkill -TERM '^(sippy|httpd|cloudflared)$' 2>/dev/null || true
+    sleep 2
+    pkill -KILL '^(sippy|httpd|cloudflared)$' 2>/dev/null || true
     podman stop --all --time 5 >/dev/null 2>&1 || true
 }
 
