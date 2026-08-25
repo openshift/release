@@ -44,7 +44,7 @@ else
 fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
-echo "Creating the agent-config.yaml file..."
+echo "Creating the SNO agent-config.yaml file..."
 cat >> "${SHARED_DIR}/agent-config.yaml" << EOF
 apiVersion: v1alpha1
 kind: AgentConfig
@@ -57,26 +57,6 @@ hosts:
     interfaces:
       - name: enc1
         macAddress: $(leaseLookup '"control-plane"[0].mac')
-  - hostname: control-1.${BASE_URL}
-    role: master
-    interfaces:
-      - name: enc1
-        macAddress: $(leaseLookup '"control-plane"[1].mac')
-  - hostname: control-2.${BASE_URL}
-    role: master
-    interfaces:
-      - name: enc1
-        macAddress: $(leaseLookup '"control-plane"[2].mac')
-  - hostname: compute-0.${BASE_URL}
-    role: worker
-    interfaces:
-      - name: enc1
-        macAddress: $(leaseLookup 'compute[0].mac')
-  - hostname: compute-1.${BASE_URL}
-    role: worker
-    interfaces:
-      - name: enc1
-        macAddress: $(leaseLookup 'compute[1].mac')
 EOF
 
 cat "${SHARED_DIR}/agent-config.yaml"
