@@ -396,8 +396,8 @@ CONFIG = {
     'gcp-quota-slice': {
         'us-central1': 35,
         'us-east1': 35,
-        'us-east4': 35,
-        'us-west1': 35,
+        'us-east4': 5,
+        'us-west1': 5,
     },
     'gcp-3-quota-slice': {
         'us-central1': 35,
