@@ -44,37 +44,56 @@ else
 fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
-CONTROL_COUNT="${CONTROL_COUNT:-3}"
-COMPUTE_COUNT="${COMPUTE_COUNT:-2}"
-
-echo "Creating the agent-config.yaml file (CONTROL_COUNT=${CONTROL_COUNT} COMPUTE_COUNT=${COMPUTE_COUNT})..."
-{
-  cat << EOF
+echo "Creating the agent-config.yaml file..."
+# SNO: CONTROL_COUNT=1 COMPUTE_COUNT=0. Existing HA agent jobs leave these unset and keep 3+2.
+if [ "${CONTROL_COUNT:-3}" = "1" ] && [ "${COMPUTE_COUNT:-2}" = "0" ]; then
+cat >> "${SHARED_DIR}/agent-config.yaml" << EOF
 apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
   name: ${CLUSTER_NAME}
 rendezvousIP: 192.168.$(leaseLookup "subnet").10
 hosts:
-EOF
-  for (( i=0; i<CONTROL_COUNT; i++ )); do
-    cat << EOF
-  - hostname: control-${i}.${BASE_URL}
+  - hostname: control-0.${BASE_URL}
     role: master
     interfaces:
       - name: enc1
-        macAddress: $(leaseLookup "\"control-plane\"[${i}].mac")
+        macAddress: $(leaseLookup '"control-plane"[0].mac')
 EOF
-  done
-  for (( i=0; i<COMPUTE_COUNT; i++ )); do
-    cat << EOF
-  - hostname: compute-${i}.${BASE_URL}
+else
+cat >> "${SHARED_DIR}/agent-config.yaml" << EOF
+apiVersion: v1alpha1
+kind: AgentConfig
+metadata:
+  name: ${CLUSTER_NAME}
+rendezvousIP: 192.168.$(leaseLookup "subnet").10
+hosts:
+  - hostname: control-0.${BASE_URL}
+    role: master
+    interfaces:
+      - name: enc1
+        macAddress: $(leaseLookup '"control-plane"[0].mac')
+  - hostname: control-1.${BASE_URL}
+    role: master
+    interfaces:
+      - name: enc1
+        macAddress: $(leaseLookup '"control-plane"[1].mac')
+  - hostname: control-2.${BASE_URL}
+    role: master
+    interfaces:
+      - name: enc1
+        macAddress: $(leaseLookup '"control-plane"[2].mac')
+  - hostname: compute-0.${BASE_URL}
     role: worker
     interfaces:
       - name: enc1
-        macAddress: $(leaseLookup "compute[${i}].mac")
+        macAddress: $(leaseLookup 'compute[0].mac')
+  - hostname: compute-1.${BASE_URL}
+    role: worker
+    interfaces:
+      - name: enc1
+        macAddress: $(leaseLookup 'compute[1].mac')
 EOF
-  done
-} > "${SHARED_DIR}/agent-config.yaml"
+fi
 
 cat "${SHARED_DIR}/agent-config.yaml"
