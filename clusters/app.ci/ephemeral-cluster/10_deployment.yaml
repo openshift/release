@@ -66,19 +66,25 @@ spec:
             cpu: "100m"
       - image: quay-proxy.ci.openshift.org/openshift/ci:ci_dptp-controller-manager_latest
         name: ephemeral-cluster
+        command:
+        - /bin/bash
+        - -c
+        - |
+          if ! empty_jobs_dir=$(mktemp --tmpdir=/tmp jobs.XXXXX); then
+            echo "ERROR: Failed to create temporary jobs directory" >&2
+            exit 1
+          fi
+          exec dptp-controller-manager \
+            --leader-election-namespace=ci \
+            --leader-election-suffix=ec \
+            --release-repo-git-sync-path=/var/repo/release \
+            --job-config-path="$empty_jobs_dir" \
+            --enable-controller=ephemeral_cluster_provisioner \
+            --dry-run=false \
+            --kubeconfig-dir=/var/kubeconfigs \
+            --kubeconfig-suffix=config \
+            --ephemeralClusterProvisionerOptions.privilegedTenants=testplatform-ci-tenant
         imagePullPolicy: Always
-        args:
-        - --leader-election-namespace=ci
-        - --leader-election-suffix=ec
-        - --release-repo-git-sync-path=/var/repo/release
-        - --enable-controller=ephemeral_cluster_provisioner
-        - --dry-run=false
-        - --kubeconfig-dir=/var/kubeconfigs
-        - --kubeconfig-suffix=config
-        - --ephemeralClusterProvisionerOptions.privilegedTenants=testplatform-ci-tenant
-        env:
-        - name: GOMEMLIMIT
-          value: "8GiB"
         ports:
         - name: metrics
           containerPort: 8080
