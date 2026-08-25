@@ -39,6 +39,7 @@ images:
       FROM operator-sdk
       USER 0
       COPY --from=builder /configs /configs
+      USER 65532
       EXPOSE 50051
       ENTRYPOINT ["opm"]
       CMD ["serve", "/configs"]
@@ -133,13 +134,14 @@ tests:
       commands: |
         set -euo pipefail
         NS=cost-onprem
+        _redact() { sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'; }
         dump() {
           mkdir -p "${ARTIFACT_DIR}"
-          oc -n "${NS}" logs deploy/koku-service-operator-controller-manager > "${ARTIFACT_DIR}/operator.log" 2>/dev/null || true
-          oc -n "${NS}" get csv,og,catsrc,sub,ip,deploy,po,event -o yaml > "${ARTIFACT_DIR}/olm-resources.yaml" 2>/dev/null || true
-          oc get csv -A -o yaml > "${ARTIFACT_DIR}/csv.yaml" 2>/dev/null || true
-          oc -n "${NS}" get cmsc -o yaml > "${ARTIFACT_DIR}/cmsc.yaml" 2>/dev/null || true
-          oc -n "${NS}" get events --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/events.txt" 2>/dev/null || true
+          oc -n "${NS}" logs deploy/koku-service-operator-controller-manager 2>/dev/null | _redact > "${ARTIFACT_DIR}/operator.log" || true
+          oc -n "${NS}" get csv,og,catsrc,sub,ip,deploy,po,event -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/olm-resources.yaml" || true
+          oc get csv -A -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/csv.yaml" || true
+          oc -n "${NS}" get cmsc -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/cmsc.yaml" || true
+          oc -n "${NS}" get events --sort-by=.lastTimestamp 2>/dev/null | _redact > "${ARTIFACT_DIR}/events.txt" || true
         }
         trap dump EXIT
         oc create namespace "${NS}" --dry-run=client -o yaml | oc apply -f -
@@ -208,7 +210,7 @@ tests:
         export INFRA_NAMESPACE=cost-onprem-infra
         export OPERATOR_NAMESPACE=cost-onprem
         export SKIP_PYTEST=1
-        ./hack/ci/e2e.sh
+        ./hack/ci/e2e.sh 2>&1 | sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'
       from: koku-service-operator-e2e
       resources:
         requests:
@@ -221,7 +223,7 @@ tests:
         export NAMESPACE=cost-onprem
         export CR_NAME=cost-onprem
         export HELM_RELEASE_NAME=cost-onprem
-        ./scripts/run-pytest.sh --no-venv --smoke
+        ./scripts/run-pytest.sh --no-venv --smoke 2>&1 | sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'
         mkdir -p "${ARTIFACT_DIR}"
         if [[ -f test/pytest/reports/junit.xml ]]; then
           cp test/pytest/reports/junit.xml "${ARTIFACT_DIR}/junit_smoke.xml"
@@ -239,8 +241,8 @@ tests:
         export CR_NAME=cost-onprem
         export HELM_RELEASE_NAME=cost-onprem
         set +e
-        ./scripts/run-pytest.sh --no-venv --no-ui
-        rc=$?
+        ./scripts/run-pytest.sh --no-venv --no-ui 2>&1 | sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'
+        rc=${PIPESTATUS[0]}
         set -e
         mkdir -p "${ARTIFACT_DIR}"
         if [[ -f test/pytest/reports/junit.xml ]]; then
@@ -270,13 +272,14 @@ tests:
       commands: |
         set -euo pipefail
         NS=cost-onprem
+        _redact() { sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'; }
         dump() {
           mkdir -p "${ARTIFACT_DIR}"
-          oc -n "${NS}" logs deploy/koku-service-operator-controller-manager > "${ARTIFACT_DIR}/operator.log" 2>/dev/null || true
-          oc -n "${NS}" get csv,og,catsrc,sub,ip,deploy,po,event -o yaml > "${ARTIFACT_DIR}/olm-resources.yaml" 2>/dev/null || true
-          oc get csv -A -o yaml > "${ARTIFACT_DIR}/csv.yaml" 2>/dev/null || true
-          oc -n "${NS}" get cmsc -o yaml > "${ARTIFACT_DIR}/cmsc.yaml" 2>/dev/null || true
-          oc -n "${NS}" get events --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/events.txt" 2>/dev/null || true
+          oc -n "${NS}" logs deploy/koku-service-operator-controller-manager 2>/dev/null | _redact > "${ARTIFACT_DIR}/operator.log" || true
+          oc -n "${NS}" get csv,og,catsrc,sub,ip,deploy,po,event -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/olm-resources.yaml" || true
+          oc get csv -A -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/csv.yaml" || true
+          oc -n "${NS}" get cmsc -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/cmsc.yaml" || true
+          oc -n "${NS}" get events --sort-by=.lastTimestamp 2>/dev/null | _redact > "${ARTIFACT_DIR}/events.txt" || true
         }
         trap dump EXIT
         oc create namespace "${NS}" --dry-run=client -o yaml | oc apply -f -
@@ -358,7 +361,7 @@ tests:
         export NAMESPACE=cost-onprem
         export CR_NAME=cost-onprem
         export HELM_RELEASE_NAME=cost-onprem
-        ./scripts/run-pytest.sh --no-venv --smoke
+        ./scripts/run-pytest.sh --no-venv --smoke 2>&1 | sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'
         mkdir -p "${ARTIFACT_DIR}"
         if [[ -f test/pytest/reports/junit.xml ]]; then
           cp test/pytest/reports/junit.xml "${ARTIFACT_DIR}/junit_smoke.xml"
@@ -376,8 +379,8 @@ tests:
         export CR_NAME=cost-onprem
         export HELM_RELEASE_NAME=cost-onprem
         set +e
-        ./scripts/run-iqe-tests.sh --profile smoke
-        rc=$?
+        ./scripts/run-iqe-tests.sh --profile smoke 2>&1 | sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'
+        rc=${PIPESTATUS[0]}
         set -e
         mkdir -p "${ARTIFACT_DIR}"
         if [[ -f tests/reports/iqe_junit.xml ]]; then
