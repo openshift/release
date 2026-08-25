@@ -639,9 +639,19 @@ tests:
       CONTROL_COUNT: "1"
       INSTALLER_TYPE: agent
       NODE_TUNING: "true"
-      TEST_TYPE: conformance-parallel
       USE_EXTERNAL_DNS: "true"
       VOLUME_CAPACITY: 120G
+    test:
+    - as: verify-sno-cluster
+      commands: |
+        set -euo pipefail
+        oc wait node --all --for=condition=Ready=true --timeout=30m
+        oc wait --all=true clusteroperator --for=condition=Available=True --timeout=30m
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
     workflow: openshift-e2e-libvirt-vpn
 zz_generated_metadata:
   branch: main
