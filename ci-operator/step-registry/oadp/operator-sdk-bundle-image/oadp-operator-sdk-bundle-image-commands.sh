@@ -352,19 +352,35 @@ if [[ -n "${SKIP_TLS_VERIFY_ARG:-}" ]]; then
   OPTIONAL_ARGS+=("${SKIP_TLS_VERIFY_ARG}")
 fi
 
-set +o errexit
-(
-  cd /tmp
-  # ${OPTIONAL_ARGS[@]+"${OPTIONAL_ARGS[@]}"}, not a bare
-  # "${OPTIONAL_ARGS[@]}": expanding a zero-element array under
-  # set -o nounset only stopped erroring in bash 4.4+. bash 3.2 (still
-  # the macOS system default, and plausible in other minimal base
-  # images) hard-errors ("unbound variable") on the bare form for an
-  # empty array; this guarded form works on both.
-  operator-sdk run bundle "${OO_BUNDLE_EFFECTIVE}" -n "${OO_INSTALL_NAMESPACE}" --verbose "${OPTIONAL_ARGS[@]+"${OPTIONAL_ARGS[@]}"}" --timeout="${OO_INSTALL_TIMEOUT_MINUTES}m" --security-context-config="${OO_SECURITY_CONTEXT}"
-)
-RUN_BUNDLE_STATUS=$?
-set -o errexit
+# operator-sdk run bundle spins up its own opm-image-based registry pod to
+# resolve/serve the bundle, so a transient registry hiccup pulling
+# quay.io/operator-framework/opm:latest (e.g. a 502 from the mirror) fails
+# this command before it ever reaches the actual bundle install -- retry
+# the whole invocation a few times rather than failing the step on what is
+# usually just an infra flake unrelated to OO_BUNDLE itself.
+BUNDLE_ATTEMPT=1
+while true; do
+    set +o errexit
+    (
+      cd /tmp
+      # ${OPTIONAL_ARGS[@]+"${OPTIONAL_ARGS[@]}"}, not a bare
+      # "${OPTIONAL_ARGS[@]}": expanding a zero-element array under
+      # set -o nounset only stopped erroring in bash 4.4+. bash 3.2 (still
+      # the macOS system default, and plausible in other minimal base
+      # images) hard-errors ("unbound variable") on the bare form for an
+      # empty array; this guarded form works on both.
+      operator-sdk run bundle "${OO_BUNDLE_EFFECTIVE}" -n "${OO_INSTALL_NAMESPACE}" --verbose "${OPTIONAL_ARGS[@]+"${OPTIONAL_ARGS[@]}"}" --timeout="${OO_INSTALL_TIMEOUT_MINUTES}m" --security-context-config="${OO_SECURITY_CONTEXT}"
+    )
+    RUN_BUNDLE_STATUS=$?
+    set -o errexit
+
+    if [[ "${RUN_BUNDLE_STATUS}" -eq 0 ]] || [[ "${BUNDLE_ATTEMPT}" -ge "${OO_RUN_BUNDLE_ATTEMPTS}" ]]; then
+        break
+    fi
+    echo "[$(date --utc +%FT%T.%3NZ)] operator-sdk run bundle failed (exit ${RUN_BUNDLE_STATUS}, attempt ${BUNDLE_ATTEMPT}/${OO_RUN_BUNDLE_ATTEMPTS}) -- retrying after backoff in case this was a transient infra pull failure"
+    sleep $(( BUNDLE_ATTEMPT * 30 ))
+    BUNDLE_ATTEMPT=$(( BUNDLE_ATTEMPT + 1 ))
+done
 
 if [[ "${RUN_BUNDLE_STATUS}" -ne 0 ]]; then
     # A generic timeout here can mask a real OLM-side blocker rather than
