@@ -159,7 +159,8 @@ if [[ -n "${RELEASE_IMAGE_LATEST:-}" ]]; then
     PAYLOAD_URL="registry.ci.openshift.org/ocp/release:${_version}"
     echo "PAYLOAD_URL resolved (version: ${_version})"
   else
-    echo "WARNING: could not resolve RELEASE_IMAGE_LATEST, falling back to .env defaults"
+    echo "ERROR: RELEASE_IMAGE_LATEST is set but could not resolve its version"
+    exit 1
   fi
   unset _version
 else
