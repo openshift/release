@@ -11,7 +11,7 @@ SC_NAME="nfs-sbr-dynamic"
 NFS_IMAGE="quay.io/openshifttest/nfs-provisioner@sha256:f402e6039b3c1e60bf6596d283f3c470ffb0a1e169ceb8ce825e3218cd66c050"
 
 echo "INFO: Creating namespace ${NS}"
-oc create ns "${NS}"
+oc create ns "${NS}" --dry-run=client -o yaml | oc apply -f -
 
 oc label ns "${NS}" --overwrite \
   security.openshift.io/scc.podSecurityLabelSync=false \
@@ -95,6 +95,8 @@ allowHostPID: false
 allowHostPorts: false
 allowPrivilegedContainer: false
 allowedCapabilities:
+- CHOWN
+- DAC_OVERRIDE
 - DAC_READ_SEARCH
 - SYS_RESOURCE
 apiVersion: security.openshift.io/v1
@@ -125,7 +127,6 @@ volumes:
 EOF
 
 oc adm policy add-scc-to-user nfs-sbr-provisioner "system:serviceaccount:${NS}:nfs-provisioner"
-oc adm policy add-scc-to-user privileged "system:serviceaccount:${NS}:nfs-provisioner"
 
 echo "INFO: Creating Service and Deployment"
 oc -n "${NS}" apply -f - <<EOF
@@ -195,7 +196,9 @@ spec:
         - mountPath: /srv
           name: local
         securityContext:
-          privileged: true
+          capabilities:
+            drop: ["ALL"]
+            add: [DAC_OVERRIDE, CHOWN]
         resources:
           requests:
             cpu: 50m
@@ -238,7 +241,9 @@ spec:
           containerPort: 662
           protocol: UDP
         securityContext:
+          allowPrivilegeEscalation: false
           capabilities:
+            drop: ["ALL"]
             add:
             - DAC_READ_SEARCH
             - SYS_RESOURCE
