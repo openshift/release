@@ -1,7 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+STAGING_LIVE=false
+
+shutdown() {
+    echo "==> Shutting down staging environment..."
+    local children
+    children="$(jobs -p 2>/dev/null || true)"
+    if [[ -n "${children}" ]]; then
+        # shellcheck disable=SC2086
+        kill ${children} 2>/dev/null || true
+        wait 2>/dev/null || true
+    fi
+    podman stop --all --time 5 >/dev/null 2>&1 || true
+}
+
+# After the environment is live, TERM (timeout/abort) is a successful end.
+trap 'shutdown; if [[ "${STAGING_LIVE}" == "true" ]]; then exit 0; fi' TERM INT
 
 cd /workspace
 
@@ -192,6 +207,9 @@ if [[ "${URL_SURFACED}" != "true" ]]; then
 fi
 
 echo "==> Staging environment is live. Sleeping for ${STAGING_TIMEOUT} seconds..."
+STAGING_LIVE=true
 sleep "${STAGING_TIMEOUT}"
 
 echo "==> Staging timeout reached. Shutting down."
+shutdown
+exit 0
