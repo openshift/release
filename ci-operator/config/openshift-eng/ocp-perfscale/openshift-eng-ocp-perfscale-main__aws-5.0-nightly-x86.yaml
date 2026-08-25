@@ -267,6 +267,39 @@ tests:
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws-ovn-fips
+- as: batch-churn-fips-6nodes
+  cron: 0 6 * * 1
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: false
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "3"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHAOS_ACTION: rollout
+      CHAOS_CYCLES_COUNT: "10"
+      CHAOS_DELAY: "10"
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.4xlarge
+      KB_FLAGS: --local-indexing --timeout=6h
+      PROFILE_TYPE: regular
+      RUN_ORION: "true"
+      VERSION: "5.0"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-batch-churn
+    - ref: openshift-qe-orion-batch-churn
+    workflow: openshift-qe-installer-aws-ovn-fips
 - as: control-plane-etcdencrypt-24nodes
   cron: 0 3 * * 3
   reporter_config:
