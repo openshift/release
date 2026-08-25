@@ -9,12 +9,6 @@ ref:
   timeout: 1h0m0s
   grace_period: 10m0s
   env:
-    - name: SUBMARINER_SUBCTL_VERSION
-      default: "release-0.24"
-      documentation: |-
-        subctl release tag to download from GitHub releases.
-        Format: release-<major>.<minor> (e.g. release-0.24).
-        Must match the Submariner operator version deployed by broker-join.
     - name: ACM_SPOKE_CLUSTER_COUNT
       default: "2"
       documentation: |-
@@ -50,6 +44,16 @@ ref:
       documentation: |-
         When "true", broker-join failures are logged but do not fail the job.
         Used for iterative debugging of broker deployment and cluster join.
+    - name: SUBMARINER_VERIFY_HUB_SPOKE
+      default: "false"
+      documentation: |-
+        When "true", also join the hub cluster (KUBECONFIG) to the Submariner broker
+        after joining all spokes.  Required for hub-spoke CCLM: without hub joining,
+        there are no IPsec tunnels between hub pods and spoke pods, so
+        virt-synchronization-controller on port 8443 is unreachable across clusters.
+        The hub must have a gateway-labeled node (provided by cloud-prepare when
+        SUBMARINER_VERIFY_HUB_SPOKE=true) before this step runs.
+        Set to "false" for spoke-to-spoke topologies where the hub is management-only.
   documentation: |-
     Step 2 of 3 in the Submariner installation chain.
 
@@ -67,6 +71,10 @@ ref:
     Asserts submariner-globalnet is absent and remote subnets are not 242.x.
     Finally waits for OpenShift CoreDNS (dns-default) or kube-system coredns
     to include the Lighthouse clusterset.local stub zone on each spoke.
+
+    When SUBMARINER_VERIFY_HUB_SPOKE=true, also joins the hub cluster (KUBECONFIG)
+    to the broker and runs the same readiness + DNS forwarding + Globalnet checks
+    on the hub, establishing IPsec tunnels between hub and all spokes.
 
     Submariner broker is deployed WITHOUT Globalnet. Spokes must use
     non-overlapping pod CIDRs (acm-interop-p2p-cluster-install ResolveSpokeCidr)
