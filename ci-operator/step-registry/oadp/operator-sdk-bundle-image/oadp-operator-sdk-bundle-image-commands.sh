@@ -36,7 +36,7 @@ fi
 
 if [[ -f "${SHARED_DIR}/operator-install-namespace.txt" ]]; then
     OO_INSTALL_NAMESPACE=$(cat "$SHARED_DIR"/operator-install-namespace.txt)
-elif ! oc get namespace "$OO_INSTALL_NAMESPACE"; then
+elif ! oc get namespace "$OO_INSTALL_NAMESPACE" 2>/dev/null; then
     echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE' which does not exist: creating"
     NS_NAMESTANZA="name: $OO_INSTALL_NAMESPACE"
 else
@@ -45,14 +45,15 @@ fi
 
 echo "Checking/installing oc..."
 if ! command -v oc &> /dev/null; then
-    cd /tmp && curl -L https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && tar xzvf oc.tar.gz
+    curl -L https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o /tmp/oc.tar.gz && tar xzvf /tmp/oc.tar.gz -C /tmp
+    export PATH="/tmp:${PATH}"
 fi
 echo "Installing oc done"
-./oc version --client
+oc version --client
 
 if [[ -n "${NS_NAMESTANZA:-}" ]]; then
     OO_INSTALL_NAMESPACE=$(
-        ./oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+        oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -63,10 +64,10 @@ fi
 
 if [[ "${OO_INSTALL_NAMESPACE}" =~ ^openshift- ]] && [[ "${OO_PSA_ENFORCE_PRIVILEGED}" != "true" ]]; then
     echo "[$(date --utc +%FT%T.%3NZ)] Setting label security.openshift.io/scc.podSecurityLabelSync value to true on the namespace \"$OO_INSTALL_NAMESPACE\""
-    ./oc label --overwrite ns "${OO_INSTALL_NAMESPACE}" security.openshift.io/scc.podSecurityLabelSync=true
+    oc label --overwrite ns "${OO_INSTALL_NAMESPACE}" security.openshift.io/scc.podSecurityLabelSync=true
 else
-    ./oc label --overwrite ns "${OO_INSTALL_NAMESPACE}" openshift.io/cluster-monitoring=true
-    ./oc label --overwrite ns "${OO_INSTALL_NAMESPACE}" security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged
+    oc label --overwrite ns "${OO_INSTALL_NAMESPACE}" openshift.io/cluster-monitoring=true
+    oc label --overwrite ns "${OO_INSTALL_NAMESPACE}" security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged
 fi
 
 OPTIONAL_ARGS=()
@@ -97,15 +98,15 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
     # from any of the checks below would otherwise leave them in /tmp for
     # the rest of the pod's lifetime.
     trap 'rm -f /tmp/.dockerconfigjson /tmp/oo-merged-auth.json /tmp/oo-auth-splice.sed "${INSECURE_READ_ERR:-}"' EXIT
-    (umask 077; ./oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm)
+    (umask 077; oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm)
     echo "[$(date --utc +%FT%T.%3NZ)] Diagnostic: registries in pull secret: $(grep -oE '"[a-zA-Z0-9.-]+"[[:space:]]*:[[:space:]]*\{[[:space:]]*"auth"' /tmp/.dockerconfigjson | sed -E 's/^"([^"]+)".*/\1/' | paste -sd ', ' -)"
 
     echo "[$(date --utc +%FT%T.%3NZ)] Enabling the test cluster's own image registry default route"
-    ./oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
+    oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
 
     DEST_HOST=""
     for _ in $(seq 1 30); do
-        DEST_HOST=$(./oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}' 2>/dev/null || true)
+        DEST_HOST=$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}' 2>/dev/null || true)
         [[ -n "${DEST_HOST}" ]] && break
         sleep 5
     done
@@ -141,7 +142,7 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
     # would otherwise land inside EXISTING_INSECURE itself and get treated
     # as a real hostname by the substring check and array build below.
     INSECURE_READ_ERR=$(mktemp)
-    if ! EXISTING_INSECURE=$(./oc get image.config.openshift.io/cluster -o jsonpath='{.spec.registrySources.insecureRegistries[*]}' 2>"${INSECURE_READ_ERR}"); then
+    if ! EXISTING_INSECURE=$(oc get image.config.openshift.io/cluster -o jsonpath='{.spec.registrySources.insecureRegistries[*]}' 2>"${INSECURE_READ_ERR}"); then
         echo "[$(date --utc +%FT%T.%3NZ)] Failed to read the current insecureRegistries list; refusing to patch and risk dropping existing entries: $(cat "${INSECURE_READ_ERR}")" >&2
         rm -f "${INSECURE_READ_ERR}"
         exit 1
@@ -165,7 +166,7 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
         # steps (SA/token creation, mirroring) that follow -- capturing
         # it later risked the MCO already starting its rollout in that
         # gap, poisoning the "pre-change" baseline the wait below relies on.
-        MCP_BASELINE=$(./oc get mcp -o jsonpath='{range .items[*]}{.metadata.name}={.status.configuration.name}{"\n"}{end}')
+        MCP_BASELINE=$(oc get mcp -o jsonpath='{range .items[*]}{.metadata.name}={.status.configuration.name}{"\n"}{end}')
         if [[ -z "${MCP_BASELINE//[[:space:]]/}" ]]; then
             # No MachineConfigPools means the wait loop below would iterate
             # zero pools, leave ALL_DONE at its initial "true", and report
@@ -173,7 +174,7 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
             echo "[$(date --utc +%FT%T.%3NZ)] No MachineConfigPools found; cannot confirm the insecure-registry trust rollout" >&2
             exit 1
         fi
-        ./oc patch image.config.openshift.io/cluster --type=merge -p "{\"spec\":{\"registrySources\":{\"insecureRegistries\":${INSECURE_JSON}}}}"
+        oc patch image.config.openshift.io/cluster --type=merge -p "{\"spec\":{\"registrySources\":{\"insecureRegistries\":${INSECURE_JSON}}}}"
 
         # Deterministic MCO rollout wait: nothing else in this
         # OO_MIRROR_TO_CLUSTER_REGISTRY block depends on the node-level
@@ -192,10 +193,10 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
             DEGRADED_MCP=""
             while IFS='=' read -r mcp_name old_config; do
                 [[ -z "${mcp_name}" ]] && continue
-                new_config=$(./oc get mcp "${mcp_name}" -o jsonpath='{.status.configuration.name}' 2>/dev/null || true)
-                updated_count=$(./oc get mcp "${mcp_name}" -o jsonpath='{.status.updatedMachineCount}' 2>/dev/null || true)
-                total_count=$(./oc get mcp "${mcp_name}" -o jsonpath='{.status.machineCount}' 2>/dev/null || true)
-                degraded_count=$(./oc get mcp "${mcp_name}" -o jsonpath='{.status.degradedMachineCount}' 2>/dev/null || true)
+                new_config=$(oc get mcp "${mcp_name}" -o jsonpath='{.status.configuration.name}' 2>/dev/null || true)
+                updated_count=$(oc get mcp "${mcp_name}" -o jsonpath='{.status.updatedMachineCount}' 2>/dev/null || true)
+                total_count=$(oc get mcp "${mcp_name}" -o jsonpath='{.status.machineCount}' 2>/dev/null || true)
+                degraded_count=$(oc get mcp "${mcp_name}" -o jsonpath='{.status.degradedMachineCount}' 2>/dev/null || true)
                 # Default empty (not just failed) lookups too -- a pool
                 # queried before its counts are populated returns "" with
                 # exit 0, which `|| echo` alone wouldn't catch, and "" == ""
@@ -216,8 +217,8 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
                 # the remaining polls, so waiting out the rest of the 90
                 # iterations only delays a failure that's already certain.
                 echo "[$(date --utc +%FT%T.%3NZ)] MachineConfigPool ${DEGRADED_MCP} reports degraded machines; aborting the rollout wait early" >&2
-                ./oc get mcp -o wide || true
-                ./oc get nodes -o wide || true
+                oc get mcp -o wide || true
+                oc get nodes -o wide || true
                 exit 1
             fi
             [[ "${ALL_DONE}" == "true" ]] && break
@@ -230,8 +231,8 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
             # certificate anyway -- limping forward just defers to a later,
             # less diagnostic failure inside operator-sdk run bundle.
             echo "[$(date --utc +%FT%T.%3NZ)] MachineConfigPool rollout did not confirm completion within the wait budget" >&2
-            ./oc get mcp -o wide || true
-            ./oc get nodes -o wide || true
+            oc get mcp -o wide || true
+            oc get nodes -o wide || true
             exit 1
         fi
     else
@@ -247,9 +248,9 @@ if [[ "${OO_MIRROR_TO_CLUSTER_REGISTRY}" == "true" ]]; then
     # any username with a valid SA token as the password (standard
     # OpenShift convention, e.g. `podman login -u unused -p $(oc whoami -t)`).
     OO_ROBOT_SA="oo-bundle-pusher"
-    ./oc create serviceaccount "${OO_ROBOT_SA}" -n "${OO_INSTALL_NAMESPACE}" --dry-run=client -o yaml | ./oc apply -f -
-    ./oc policy add-role-to-user system:image-builder -z "${OO_ROBOT_SA}" -n "${OO_INSTALL_NAMESPACE}"
-    cat <<EOF | ./oc apply -f -
+    oc create serviceaccount "${OO_ROBOT_SA}" -n "${OO_INSTALL_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+    oc policy add-role-to-user system:image-builder -z "${OO_ROBOT_SA}" -n "${OO_INSTALL_NAMESPACE}"
+    cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Secret
 metadata:
@@ -262,7 +263,7 @@ EOF
 
     ROBOT_TOKEN=""
     for _ in $(seq 1 30); do
-        ROBOT_TOKEN=$(./oc get secret "${OO_ROBOT_SA}-token" -n "${OO_INSTALL_NAMESPACE}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || true)
+        ROBOT_TOKEN=$(oc get secret "${OO_ROBOT_SA}-token" -n "${OO_INSTALL_NAMESPACE}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || true)
         [[ -n "${ROBOT_TOKEN}" ]] && break
         sleep 2
     done
@@ -313,7 +314,7 @@ EOF
     # source) followed by an insecure push (to DEST_HOST only), e.g. via a
     # local --dir stage, would close the gap, but needs its own validation
     # before swapping in.
-    ./oc image mirror --registry-config="${MERGED_AUTH_FILE}" --filter-by-os=linux/amd64 --insecure=true "${OO_BUNDLE}=${OO_BUNDLE_MIRROR}"
+    oc image mirror --registry-config="${MERGED_AUTH_FILE}" --filter-by-os=linux/amd64 --insecure=true "${OO_BUNDLE}=${OO_BUNDLE_MIRROR}"
     rm -f "${MERGED_AUTH_FILE}"
     OO_BUNDLE_EFFECTIVE="${OO_BUNDLE_MIRROR}"
 
@@ -324,7 +325,7 @@ EOF
     # denied" on an anonymous HEAD despite the binding existing:
     # www-authenticate="Basic realm=openshift,error=\"access denied\""),
     # so add-role-to-group is the correct subject kind.
-    ./oc policy add-role-to-group system:image-puller system:unauthenticated -n "${OO_INSTALL_NAMESPACE}"
+    oc policy add-role-to-group system:image-puller system:unauthenticated -n "${OO_INSTALL_NAMESPACE}"
 
     # Deliberately NOT revoked once operator-sdk run bundle returns: the
     # CatalogSource OLM creates gets its own long-lived registry/grpc pod
@@ -370,22 +371,22 @@ if [[ "${RUN_BUNDLE_STATUS}" -ne 0 ]]; then
     # just slow resync/resolution -- dump the actual state so it's
     # diagnosable instead of guessed at.
     echo "[$(date --utc +%FT%T.%3NZ)] operator-sdk run bundle failed (exit ${RUN_BUNDLE_STATUS}) -- dumping OLM diagnostics"
-    ./oc get catalogsource -n "${OO_INSTALL_NAMESPACE}" -o yaml || true
-    ./oc get subscription -n "${OO_INSTALL_NAMESPACE}" -o yaml || true
-    ./oc get installplan -n "${OO_INSTALL_NAMESPACE}" -o yaml || true
-    ./oc get pods -n "${OO_INSTALL_NAMESPACE}" -o wide || true
-    REG_POD=$(./oc get pods -n "${OO_INSTALL_NAMESPACE}" -l olm.catalogSource -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    oc get catalogsource -n "${OO_INSTALL_NAMESPACE}" -o yaml || true
+    oc get subscription -n "${OO_INSTALL_NAMESPACE}" -o yaml || true
+    oc get installplan -n "${OO_INSTALL_NAMESPACE}" -o yaml || true
+    oc get pods -n "${OO_INSTALL_NAMESPACE}" -o wide || true
+    REG_POD=$(oc get pods -n "${OO_INSTALL_NAMESPACE}" -l olm.catalogSource -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
     if [[ -n "${REG_POD}" ]]; then
         echo "[$(date --utc +%FT%T.%3NZ)] Logs for registry pod ${REG_POD}"
-        ./oc logs "${REG_POD}" -n "${OO_INSTALL_NAMESPACE}" --all-containers || true
+        oc logs "${REG_POD}" -n "${OO_INSTALL_NAMESPACE}" --all-containers || true
     fi
-    ./oc get events -n "${OO_INSTALL_NAMESPACE}" --sort-by=.lastTimestamp || true
-    ./oc get pods -n openshift-operator-lifecycle-manager -o wide || true
+    oc get events -n "${OO_INSTALL_NAMESPACE}" --sort-by=.lastTimestamp || true
+    oc get pods -n openshift-operator-lifecycle-manager -o wide || true
     exit "${RUN_BUNDLE_STATUS}"
 fi
 
 echo "check deployment"
 if [[ ! -z "${DEPLOYMENT}" ]]; then
-    ./oc wait --timeout=10m --for condition=Available -n openshift-file-integrity deployment $DEPLOYMENT
+    oc wait --timeout=10m --for condition=Available -n "${OO_INSTALL_NAMESPACE}" deployment "$DEPLOYMENT"
 fi
 echo "[$(date --utc +%FT%T.%3NZ)] Script Completed Execution Successfully !"
