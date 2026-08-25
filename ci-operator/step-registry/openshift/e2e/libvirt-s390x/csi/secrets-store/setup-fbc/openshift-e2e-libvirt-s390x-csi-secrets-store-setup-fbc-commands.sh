@@ -35,16 +35,12 @@ SUBSCRIPTION_NAME="secrets-store-csi-driver-operator"
 SUBSCRIPTION_PACKAGE="secrets-store-csi-driver-operator"
 SUBSCRIPTION_CHANNEL="stable"
 CLUSTER_CSI_DRIVER_NAME="secrets-store.csi.k8s.io"
-CSV_READY_TIMEOUT=600   # seconds to wait for CSV to reach Succeeded
+CSV_READY_TIMEOUT=900   # seconds to wait for CSV to reach Succeeded
 
 # Pull secret from deploy-konflux credential (same as AWS weekly test)
 PULL_SECRET_FILE="/var/run/secrets/pull-secret/.dockerconfigjson"
 CLUSTER_PULL_SECRET_NAME="pull-secret"
 CLUSTER_PULL_SECRET_NAMESPACE="openshift-config"
-
-# Temp directory for oras pull output
-WORK_DIR=$(mktemp -d)
-trap 'rm -rf "${WORK_DIR}"' EXIT
 
 # --- Helper: print a section header ---
 section() {
@@ -73,47 +69,13 @@ check_arch_and_deps() {
     echo "Checking required tools..."
 
     # Verify tools already present in the step image (ocp/cli-jq).
-    for tool in oc jq curl tar; do
+    for tool in oc jq; do
         if ! command -v "${tool}" &>/dev/null; then
             echo "ERROR: Required tool '${tool}' not found in PATH."
             exit 1
         fi
         echo "  [OK] ${tool}"
     done
-
-    # Install jq to /tmp/bin if not present
-    if ! command -v jq &>/dev/null; then
-        echo "Installing jq (amd64 for build farm pod)..."
-        JQ_VERSION="1.7.1"
-        JQ_URL="https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64"
-        curl -fsSL "${JQ_URL}" -o /tmp/bin/jq || {
-            echo "ERROR: Failed to download jq from ${JQ_URL}."
-            exit 1
-        }
-        chmod +x /tmp/bin/jq
-        echo "  [OK] jq $(jq --version)"
-    else
-        echo "  [OK] jq $(jq --version)"
-    fi
-
-    # Install oras to /tmp/bin if not present
-    if ! command -v oras &>/dev/null; then
-        echo "Installing oras (amd64 for build farm pod)..."
-        ORAS_VERSION="1.3.1"
-        ORAS_TARBALL="oras_${ORAS_VERSION}_linux_amd64.tar.gz"
-        ORAS_URL="https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/${ORAS_TARBALL}"
-        echo "   Downloading: ${ORAS_URL}"
-        curl -fsSL "${ORAS_URL}" -o /tmp/oras.tar.gz || {
-            echo "ERROR: Failed to download oras from ${ORAS_URL}."
-            exit 1
-        }
-        tar -xzf /tmp/oras.tar.gz -C /tmp/bin oras
-        chmod +x /tmp/bin/oras
-        rm -f /tmp/oras.tar.gz
-        echo "  [OK] oras version: $(oras version 2>/dev/null || echo 'unknown')"
-    else
-        echo "  [OK] oras version: $(oras version 2>/dev/null || echo 'unknown')"
-    fi
 
     echo
     echo "All dependency checks passed."
@@ -141,8 +103,12 @@ extract_cluster_version() {
         exit 1
     fi
 
-    # Build the final FBC image reference
-    FINAL_FBC_IMAGE="${FBC_IMAGE_REPO}:ocp__${OCP_VERSION}__${OPERATOR_NAME}"
+    if [ -n "${FBC_IMAGE:-}" ]; then
+        FINAL_FBC_IMAGE="${FBC_IMAGE}"
+        echo "Using FBC_IMAGE override: ${FINAL_FBC_IMAGE}"
+    else
+        FINAL_FBC_IMAGE="${FBC_IMAGE_REPO}:ocp__${OCP_VERSION}__${OPERATOR_NAME}"
+    fi
 
     echo "Cluster version  : ${OCP_FULL_VERSION}"
     echo "OCP version used : ${OCP_VERSION}"
@@ -250,7 +216,11 @@ EOF
 }
 
 # ==============================================================================
-# STEP 5: Discover Related Images and Apply ImageDigestMirrorSet (IDMS)
+# STEP 5: Apply ImageDigestMirrorSet (IDMS)
+#
+# Hardcoded mirrors matching the working AWS weekly job, plus openshift5
+# sources (CRO s390x pattern). Dynamic oras discover is not used: oras runs
+# on the CI pod, which has no registry auth for art-fbc.
 # ==============================================================================
 generate_and_apply_idms() {
     if [ "${USE_GA_BUILD}" = true ]; then
@@ -258,81 +228,47 @@ generate_and_apply_idms() {
         return 0
     fi
 
-    section "STEP 5: Generating and Applying ImageDigestMirrorSet (IDMS)"
+    section "STEP 5: Applying ImageDigestMirrorSet (IDMS)"
 
-    echo "1. Discovering attached artifacts from FBC image..."
-    mapfile -t ARTIFACT_DIGESTS < <(
-        oras discover --format json "${FINAL_FBC_IMAGE}" | \
-        jq -r '.referrers[]
-               | select(.artifactType == "application/vnd.konflux-ci.attached-artifact")
-               | .digest'
-    )
-
-    if [ ${#ARTIFACT_DIGESTS[@]} -eq 0 ]; then
-        echo "ERROR: No attached artifacts found on image '${FINAL_FBC_IMAGE}'."
-        exit 1
-    fi
-    echo "   Found ${#ARTIFACT_DIGESTS[@]} attached artifact(s)"
-
-    echo
-    echo "2. Pulling all attached artifacts..."
-    for DIGEST in "${ARTIFACT_DIGESTS[@]}"; do
-        echo "   Pulling ${DIGEST}..."
-        (
-            cd "${WORK_DIR}"
-            oras pull "${FBC_IMAGE_REPO}@${DIGEST}"
-        )
-    done
-
-    RELATED_IMAGES_FILE="${WORK_DIR}/related-images.json"
-    if [ ! -f "${RELATED_IMAGES_FILE}" ]; then
-        echo "ERROR: 'related-images.json' was not found after pulling artifacts."
-        exit 1
-    fi
-
-    echo "   Found related-images.json"
-
-    echo
-    echo "3. Parsing image list from related-images.json..."
-    mapfile -t IMAGE_LIST < <(
-        jq -r '.[]' "${RELATED_IMAGES_FILE}" | sed 's/@sha256:[a-f0-9]*//'
-    )
-
-    if [ -z "${IMAGE_LIST[*]}" ]; then
-        echo "ERROR: No related images found via oras discover."
-        echo "       Cannot generate IDMS. Exiting."
-        exit 1
-    fi
-
-    if [ ${#IMAGE_LIST[@]} -eq 0 ]; then
-        echo "ERROR: No images found in related-images.json. Cannot generate IDMS."
-        exit 1
-    fi
-    echo "   Found ${#IMAGE_LIST[@]} image(s) to mirror"
-
-    echo
-    echo "4. Building and applying ImageDigestMirrorSet..."
-
-    MIRRORS_YAML=""
-    for SOURCE_IMAGE in "${IMAGE_LIST[@]}"; do
-        MIRRORS_YAML+="
-  - mirrors:
-    - ${MIRROR_REPO}
-    source: ${SOURCE_IMAGE}"
-    done
-
-    IDMS_YAML=$(cat <<EOF
----
+    cat <<EOF | oc apply -f -
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
 metadata:
   name: ${OPERATOR_NAME}-images-mirror-set
 spec:
-  imageDigestMirrors:${MIRRORS_YAML}
+  imageDigestMirrors:
+  - mirrors:
+    - ${MIRROR_REPO}
+    source: registry.redhat.io/openshift4/ose-secrets-store-csi-driver-rhel9-operator
+  - mirrors:
+    - ${MIRROR_REPO}
+    source: registry.redhat.io/openshift4/ose-secrets-store-csi-driver-operator-bundle
+  - mirrors:
+    - ${MIRROR_REPO}
+    source: registry.redhat.io/openshift4/ose-secrets-store-csi-driver-rhel9
+  - mirrors:
+    - ${MIRROR_REPO}
+    source: registry.redhat.io/openshift4/ose-csi-node-driver-registrar-rhel9
+  - mirrors:
+    - ${MIRROR_REPO}
+    source: registry.redhat.io/openshift4/ose-csi-livenessprobe-rhel9
+  - mirrors:
+    - ${MIRROR_REPO}
+    source: registry.redhat.io/openshift5/ose-secrets-store-csi-driver-rhel9-operator
+  - mirrors:
+    - ${MIRROR_REPO}
+    source: registry.redhat.io/openshift5/ose-secrets-store-csi-driver-operator-bundle
+  - mirrors:
+    - ${MIRROR_REPO}
+    source: registry.redhat.io/openshift5/ose-secrets-store-csi-driver-rhel9
+  - mirrors:
+    - ${MIRROR_REPO}
+    source: registry.redhat.io/openshift5/ose-csi-node-driver-registrar-rhel9
+  - mirrors:
+    - ${MIRROR_REPO}
+    source: registry.redhat.io/openshift5/ose-csi-livenessprobe-rhel9
 EOF
-)
 
-    echo "${IDMS_YAML}" | oc apply -f -
     echo "IDMS applied."
 }
 
@@ -368,14 +304,25 @@ wait_for_catalog_source() {
     done
 
     echo "ERROR: CatalogSource did not reach READY state within ${timeout}s."
+    echo "If the FBC tag does not exist for this OCP version, set FBC_IMAGE on the job."
     oc get catalogsource "${FBC_CATALOG_NAME}" -n openshift-marketplace -o yaml || true
     oc get pods -n openshift-marketplace -l "olm.catalogSource=${FBC_CATALOG_NAME}" -o wide || true
+    oc describe pods -n openshift-marketplace -l "olm.catalogSource=${FBC_CATALOG_NAME}" || true
     exit 1
 }
 
 # ==============================================================================
-# STEP 7: Wait for MachineConfigPool rollout triggered by IDMS
+# STEP 7: Wait for MachineConfigPool rollout triggered by pull-secret / IDMS
 # ==============================================================================
+mcp_rollout_in_progress() {
+    oc get mcp -o json | jq -e '
+      [.items[] | select(
+        ((.status.machineCount // 0) != (.status.updatedMachineCount // 0))
+        or ([.status.conditions[]? | select(.type=="Updating" and .status=="True")] | length > 0)
+      )] | length > 0
+    ' >/dev/null
+}
+
 wait_for_mcp_rollout() {
     if [ "${USE_GA_BUILD}" = true ]; then
         section "STEP 7: Skipping - No MCP Rollout Needed (TEST_GA_BUILD=true)"
@@ -387,10 +334,27 @@ wait_for_mcp_rollout() {
     echo "Pull-secret and IDMS changes trigger a MachineConfig update which reboots nodes."
     echo "Giving the MCO time to render the new MachineConfig..."
     sleep 60
-    echo "Waiting for MachineConfigPools to become Updated..."
     oc get mcp
-    oc wait mcp/master --for condition=Updated --timeout=15m
-    oc wait mcp/worker --for condition=Updated --timeout=15m
+
+    local start_deadline=$((SECONDS + 180))
+    local rollout_started=false
+    echo "Waiting up to 3m for an MCP rollout to start..."
+    while (( SECONDS < start_deadline )); do
+        if mcp_rollout_in_progress; then
+            rollout_started=true
+            break
+        fi
+        sleep 10
+    done
+
+    if [ "${rollout_started}" = true ]; then
+        echo "MCP rollout detected; waiting for Updated..."
+    else
+        echo "No MCP rollout detected within 3m; waiting for Updated anyway (may already be current)."
+    fi
+
+    oc wait mcp/master --for condition=Updated --timeout=30m
+    oc wait mcp/worker --for condition=Updated --timeout=30m
     oc get mcp
     echo "MachineConfigPools are Updated."
 }
@@ -409,8 +373,25 @@ install_operator() {
     fi
 
     echo
-    echo "1. Applying OperatorGroup..."
-    oc apply -f - <<EOF
+    echo "1. Ensuring OperatorGroup..."
+    # OLM allows only one OperatorGroup per namespace. openshift-cluster-csi-drivers
+    # already has one for in-cluster CSI operators — do not create a second, and
+    # do not rewrite its targetNamespaces (that would affect other CSI operators).
+    local og_names
+    og_names=$(oc get operatorgroup -n "${OPERATOR_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)
+    local og_count
+    og_count=$(echo "${og_names}" | wc -w | tr -d ' ')
+
+    if [ "${og_count}" -gt 1 ]; then
+        echo "ERROR: multiple OperatorGroups in namespace '${OPERATOR_NAMESPACE}': ${og_names}"
+        oc get operatorgroup -n "${OPERATOR_NAMESPACE}" -o yaml || true
+        exit 1
+    elif [ -n "${og_names}" ]; then
+        echo "Using existing OperatorGroup '${og_names}'."
+        oc get operatorgroup "${og_names}" -n "${OPERATOR_NAMESPACE}"
+    else
+        echo "No OperatorGroup found; creating '${OPERATORGROUP_NAME}'."
+        oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -418,6 +399,7 @@ metadata:
   namespace: ${OPERATOR_NAMESPACE}
 spec: {}
 EOF
+    fi
 
     echo
     echo "2. Applying Subscription..."
@@ -477,6 +459,8 @@ wait_for_csv() {
 
             if [ "${CSV_PHASE}" = "Failed" ]; then
                 echo "ERROR: CSV '${CSV_NAME}' has Failed."
+                oc get csv "${CSV_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml || true
+                oc get events -n "${OPERATOR_NAMESPACE}" --sort-by='.lastTimestamp' | tail -30 || true
                 exit 1
             fi
         else

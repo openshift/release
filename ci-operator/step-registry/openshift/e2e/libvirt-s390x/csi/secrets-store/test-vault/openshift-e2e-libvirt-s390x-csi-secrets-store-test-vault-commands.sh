@@ -141,6 +141,8 @@ validate_files() {
 
     if [ ! -f "${VAULT_LICENSE_STRING_FILE}" ]; then
         echo "ERROR: Required file not found: ${VAULT_LICENSE_STRING_FILE}"
+        echo "Mounted credential filenames (contents not printed):"
+        ls -1 "${VAULT_CREDS_DIR}" 2>/dev/null || echo "  (directory missing)"
         missing=$(( missing + 1 ))
     else
         echo "  [OK] ${VAULT_LICENSE_STRING_FILE}"
@@ -315,6 +317,9 @@ new_content, n = old_helm_pattern.subn(new_helm_block, content)
 if n == 0:
     print("ERROR: helm install pattern not matched.")
     sys.exit(1)
+if 'vault-license' not in new_content:
+    print("ERROR: vault-license secret creation was not inserted (comment text may have drifted).")
+    sys.exit(1)
 
 with open(path, 'w') as f:
     f.write(new_content)
@@ -341,6 +346,7 @@ def bump(m):
     return m.group(0)
 
 content = re.sub(r'--timeout=([0-9]+)([sm])', bump, content)
+content = re.sub(r'^WAIT_TIME=\d+', 'WAIT_TIME=300', content, count=1, flags=re.MULTILINE)
 with open(path, 'w') as f:
     f.write(content)
 print("Timeout values updated.")
@@ -546,9 +552,9 @@ run_bats_tests() {
 # ==============================================================================
 # Main
 # ==============================================================================
-collect_versions
 check_arch_and_deps
 validate_files
+collect_versions
 clone_repo
 replace_busybox_images
 patch_vault_bats
