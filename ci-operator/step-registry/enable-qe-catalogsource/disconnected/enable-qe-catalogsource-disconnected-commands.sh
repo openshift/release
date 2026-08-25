@@ -635,18 +635,29 @@ kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
 
 if [[ $OO_INDEX == "" ]];then
     origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
-    mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 else
     origin_index_image="$OO_INDEX"
-    # Route the override through the pull-through proxy that fronts its registry, so
-    # OO_INDEX also takes effect on non-C2S clusters. There mirror_optional_images is
-    # never called, and the catalogsource pulls mirror_index_image directly; without
-    # this the override silently had no effect and the job stayed pinned to the
-    # kube-version-derived aosqe-index tag.
+fi
+
+# On C2S/SC2S, mirror_optional_images re-publishes origin_index_image under the
+# canonical aosqe targetCatalog/targetTag, so the catalogsource keeps pointing there.
+mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+
+if [[ $OO_INDEX != "" && $mirror -eq 0 ]]; then
+    # Nothing re-publishes the override on a non-C2S cluster, so the catalogsource has
+    # to pull it directly -- which in a disconnected install means going through one of
+    # the pull-through proxies create_settled_icsp configures. Only those registries are
+    # fronted, so match them explicitly and fail loudly on anything else rather than
+    # building a reference the proxy cannot resolve.
     case "$OO_INDEX" in
-        quay.io/*) mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/${OO_INDEX#quay.io/}" ;;
-        */*/*)     mirror_index_image="${MIRROR_PROXY_REGISTRY}/${OO_INDEX#*/}" ;;
-        *)         mirror_index_image="$OO_INDEX" ;;
+        quay.io/openshifttest/*|quay.io/openshift-qe-optional-operators/*|quay.io/olmqe/*)
+            mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/${OO_INDEX#quay.io/}" ;;
+        registry.redhat.io/*|brew.registry.redhat.io/*|registry.stage.redhat.io/*|registry-proxy.engineering.redhat.com/*)
+            mirror_index_image="${MIRROR_PROXY_REGISTRY}/${OO_INDEX#*/}" ;;
+        *)
+            echo "ERROR: OO_INDEX=${OO_INDEX} is not in a registry fronted by the mirror proxy."
+            echo "Supported: quay.io/{openshifttest,openshift-qe-optional-operators,olmqe}, registry.redhat.io, brew.registry.redhat.io, registry.stage.redhat.io, registry-proxy.engineering.redhat.com"
+            exit 1 ;;
     esac
 fi
 echo "origin_index_image: ${origin_index_image}"
