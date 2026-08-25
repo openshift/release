@@ -306,6 +306,9 @@ log_chronyd_status() {
 }
 
 
+# TEST-ONLY: do not redeploy the Telco5G cluster for this rehearsal PR.
+SKIP_OCP_INSTALL="true"
+
 #Set status and run playbooks
 status=0
 
