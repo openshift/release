@@ -146,9 +146,25 @@ fi
 echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hypervisor"
 
 echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
-# Pass the CI release payload (resolved by ci-operator from the releases.latest config)
-PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
-echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
+# Resolve the CI release payload to a pullspec the hypervisor can reach.
+# RELEASE_IMAGE_LATEST points to a build-cluster-internal registry
+# (registry.buildXX.ci.openshift.org) that the hypervisor cannot access. We
+# extract the version here (the CI pod has auth) and construct the equivalent
+# public CI registry URL (registry.ci.openshift.org/ocp/release:VERSION).
+PAYLOAD_URL=""
+if [[ -n "${RELEASE_IMAGE_LATEST:-}" ]]; then
+  echo "Resolving RELEASE_IMAGE_LATEST to a public pullspec..."
+  _version=$(oc adm release info "${RELEASE_IMAGE_LATEST}" -o jsonpath='{.metadata.version}' 2>/dev/null || true)
+  if [[ -n "$_version" ]]; then
+    PAYLOAD_URL="registry.ci.openshift.org/ocp/release:${_version}"
+    echo "PAYLOAD_URL resolved (version: ${_version})"
+  else
+    echo "WARNING: could not resolve RELEASE_IMAGE_LATEST, falling back to .env defaults"
+  fi
+  unset _version
+else
+  echo "RELEASE_IMAGE_LATEST is not set, using .env defaults"
+fi
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
   cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
