@@ -37,7 +37,7 @@ DEPLOY_FRRK8S_FROM_CNO=${DEPLOY_FRRK8S_FROM_CNO:-""}
 #  scp "${SSHOPTS[@]}" -r "${METALLB_SRC_DIR}" "root@${IP}:/root/dev-scripts/"
 #else
 echo "### Cloning metallb"
-ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/ && rm -rf metallb/ && git clone ${METALLB_REPO} && mv metallb-openshift metallb && cd metallb/ && git checkout cidual"
+ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/ && rm -rf metallb/ && git clone ${METALLB_REPO} && mv metallb-openshift metallb && cd metallb/ && git checkout testrelease"
 #fi
 
 if [ -d "${FRRK8S_SRC_DIR}" ]; then
