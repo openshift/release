@@ -95,8 +95,6 @@ allowHostPID: false
 allowHostPorts: false
 allowPrivilegedContainer: false
 allowedCapabilities:
-- CHOWN
-- DAC_OVERRIDE
 - DAC_READ_SEARCH
 - SYS_RESOURCE
 apiVersion: security.openshift.io/v1
@@ -127,6 +125,7 @@ volumes:
 EOF
 
 oc adm policy add-scc-to-user nfs-sbr-provisioner "system:serviceaccount:${NS}:nfs-provisioner"
+oc adm policy add-scc-to-user privileged "system:serviceaccount:${NS}:nfs-provisioner"
 
 echo "INFO: Creating Service and Deployment"
 oc -n "${NS}" apply -f - <<EOF
@@ -196,9 +195,7 @@ spec:
         - mountPath: /srv
           name: local
         securityContext:
-          capabilities:
-            drop: ["ALL"]
-            add: [DAC_OVERRIDE, CHOWN]
+          privileged: true
         resources:
           requests:
             cpu: 50m
