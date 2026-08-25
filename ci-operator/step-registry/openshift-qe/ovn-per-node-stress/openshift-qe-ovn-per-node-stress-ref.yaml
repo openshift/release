@@ -1,0 +1,38 @@
+ref:
+  as: openshift-qe-ovn-per-node-stress
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-ovn-per-node-stress-commands.sh
+  timeout: 4h0m0s
+  grace_period: 10m0s
+  env:
+  - name: PODS_PER_NODE
+    default: "400"
+    documentation: |-
+      Number of pods to pin on each worker node via nodeSelector. Each worker
+      gets its own Deployment; pods are not spread by the scheduler.
+  - name: MAX_PODS
+    default: "2500"
+    documentation: |-
+      Expected kubelet maxPods on workers before the stress test runs.
+  - name: STRESS_NAMESPACE
+    default: "test-ocpbugs-98252"
+    documentation: Namespace used for per-node stress Deployments.
+  - name: STRESS_IMAGE
+    default: "quay.io/centos/centos:stream9"
+    documentation: Container image for stress pods. Pre-pulled on each node before burst.
+  - name: STRESS_TIMEOUT
+    default: "45m"
+    documentation: Timeout per worker for all pods to reach Available.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    OCPBUGS-98252 verification workload. After libovsdb pre-check, deploys
+    PODS_PER_NODE replicas pinned to each worker with nodeSelector (not
+    kube-burner scheduler spread). Verifies all pods reach Running with zero
+    stuck ContainerCreating on every worker.
