@@ -328,3 +328,7 @@ fi
 
 kubectl get nodes -o wide
 kubectl get pods -o wide --namespace stackrox
+
+echo '>>> Full pod specs for stackrox namespace (env vars, resources, node placement)'
+kubectl get pods -n stackrox -o yaml > "${ARTIFACT_DIR}/stackrox-pods.yaml"
+echo "Saved to stackrox-pods.yaml ($(wc -l < "${ARTIFACT_DIR}/stackrox-pods.yaml") lines)"
