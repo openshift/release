@@ -93,6 +93,9 @@ INSTALL_DIR="/tmp/installer"
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="registry.build05.ci.openshift.org/ci-ln-7r8q7xk/release:latest"
+export MULTI_RELEASE_IMAGE="registry.build05.ci.openshift.org/ci-ln-7r8q7xk/release:latest"
+
 echo "[INFO] Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}..."
 echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 echo "[INFO] Set OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY to true for nightly payload"
