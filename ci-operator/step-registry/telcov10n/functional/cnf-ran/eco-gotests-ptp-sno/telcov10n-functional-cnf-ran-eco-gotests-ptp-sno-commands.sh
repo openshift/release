@@ -77,6 +77,16 @@ ssh -o ServerAliveInterval=30 \
 
 SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
 
+# Redact the bastion address from scp/ssh error output before it lands in the
+# public build log — keep the rest of the message (e.g. "Connection refused",
+# "Permission denied") for debugging.
+redact_bastion() {
+  local text="$1"
+  text="${text//${BASTION_USER}@${BASTION_IP}/<bastion>}"
+  text="${text//${BASTION_IP}/<bastion>}"
+  printf '%s\n' "${text}"
+}
+
 echo "Gather artifacts from bastion to ARTIFACT_DIR (for GCS)"
 # SCP all XML files to ARTIFACT_DIR so Prow uploads them to GCS for debugging.
 # This is the only transfer from bastion to CI pod — processing happens on the bastion.
@@ -91,7 +101,7 @@ for i in 0 1 2 3; do
     if grep -q "No such file or directory" <<<"${xml_output}"; then
       echo "No XML artifacts in eco_gotests_ptp_${i} — skipping"
     else
-      echo "${xml_output}" >&2
+      redact_bastion "${xml_output}" >&2
       exit 1
     fi
   fi
@@ -101,7 +111,7 @@ for i in 0 1 2 3; do
     if grep -q "No such file or directory" <<<"${console_output}"; then
       echo "No console.log in eco_gotests_ptp_${i} — skipping"
     else
-      echo "${console_output}" >&2
+      redact_bastion "${console_output}" >&2
       exit 1
     fi
   fi
