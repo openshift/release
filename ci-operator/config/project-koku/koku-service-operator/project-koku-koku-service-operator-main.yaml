@@ -1,4 +1,8 @@
 base_images:
+  operator-registry:
+    name: "4.20"
+    namespace: ocp
+    tag: operator-registry
   operator-sdk:
     name: "4.19"
     namespace: origin
@@ -22,32 +26,40 @@ images:
           'requests>=2.28' 'urllib3>=1.26' \
           'python-jose[cryptography]>=3.3' 'cryptography>=41' \
           'PyYAML>=6' 'kubernetes>=25' 'boto3>=1.28' 'koku-nise>=4'
+      RUN mkdir -p /home/e2e /tmp/e2e-reports && \
+          chown -R 65532:0 /home/e2e /tmp/e2e-reports && \
+          chmod -R g=u /home/e2e /tmp/e2e-reports
+      ENV HOME=/home/e2e
+      USER 65532
     from: src
     to: koku-service-operator-e2e
   - dockerfile_literal: |-
       FROM bundle AS bundle
-      FROM operator-sdk AS builder
+      FROM builder AS builder
       USER 0
       RUN mkdir -p /configs
-      RUN if ! command -v opm >/dev/null 2>&1; then echo "opm missing from operator-sdk image" >&2; exit 1; fi
       COPY --from=bundle / /bundle
       RUN opm render /bundle -o yaml > /tmp/bundle.yaml && \
           { echo '---'; echo 'schema: olm.package'; echo 'name: koku-service-operator'; echo 'defaultChannel: beta'; } > /configs/index.yaml && \
           cat /tmp/bundle.yaml >> /configs/index.yaml && \
           printf '%s\n' '---' 'schema: olm.channel' 'package: koku-service-operator' 'name: beta' 'entries:' '- name: koku-service-operator.v0.0.1' >> /configs/index.yaml && \
           opm validate /configs
-      FROM operator-sdk
+      FROM registry
       USER 0
       COPY --from=builder /configs /configs
+      LABEL operators.operatorframework.io.index.configs.v1=/configs
       USER 65532
       EXPOSE 50051
-      ENTRYPOINT ["opm"]
-      CMD ["serve", "/configs"]
-    from: operator-sdk
+      ENTRYPOINT ["/bin/opm"]
+      CMD ["serve", "/configs", "--cache-dir=/tmp/cache"]
+    from: operator-registry
     inputs:
       koku-service-operator-bundle:
         as:
         - bundle
+      operator-registry:
+        as:
+        - builder
     to: koku-service-operator-catalog
 operator:
   bundles:
@@ -134,13 +146,17 @@ tests:
       commands: |
         set -euo pipefail
         NS=cost-onprem
-        _redact() { sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'; }
+        _redact() {
+          sed -E \
+            -e 's|https?://[^[:space:]"]+|<URL redacted>|g' \
+            -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g'
+        }
         dump() {
           mkdir -p "${ARTIFACT_DIR}"
           oc -n "${NS}" logs deploy/koku-service-operator-controller-manager 2>/dev/null | _redact > "${ARTIFACT_DIR}/operator.log" || true
           oc -n "${NS}" get csv,og,catsrc,sub,ip,deploy,po,event -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/olm-resources.yaml" || true
           oc get csv -A -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/csv.yaml" || true
-          oc -n "${NS}" get cmsc -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/cmsc.yaml" || true
+          oc -n "${NS}" get cmsc -o jsonpath='{range .items[*]}---{"\n"}name: {.metadata.name}{"\n"}namespace: {.metadata.namespace}{"\n"}created: {.metadata.creationTimestamp}{"\n"}conditions:{"\n"}{range .status.conditions[*]}  - type: {.type}{"\n"}    status: {.status}{"\n"}    reason: {.reason}{"\n"}    message: {.message}{"\n"}    lastTransitionTime: {.lastTransitionTime}{"\n"}{end}{"\n"}{end}' 2>/dev/null | _redact > "${ARTIFACT_DIR}/cmsc-status.txt" || true
           oc -n "${NS}" get events --sort-by=.lastTimestamp 2>/dev/null | _redact > "${ARTIFACT_DIR}/events.txt" || true
         }
         trap dump EXIT
@@ -211,7 +227,9 @@ tests:
         export INFRA_NAMESPACE=cost-onprem-infra
         export OPERATOR_NAMESPACE=cost-onprem
         export SKIP_PYTEST=1
-        ./hack/ci/e2e.sh 2>&1 | sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'
+        ./hack/ci/e2e.sh 2>&1 | sed -E \
+          -e 's|https?://[^[:space:]"]+|<URL redacted>|g' \
+          -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g'
       from: koku-service-operator-e2e
       resources:
         requests:
@@ -225,10 +243,15 @@ tests:
         export NAMESPACE=cost-onprem
         export CR_NAME=cost-onprem
         export HELM_RELEASE_NAME=cost-onprem
-        ./scripts/run-pytest.sh --no-venv --smoke 2>&1 | sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'
+        ./scripts/run-pytest.sh --no-venv --smoke 2>&1 | sed -E \
+          -e 's|https?://[^[:space:]"]+|<URL redacted>|g' \
+          -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g'
         mkdir -p "${ARTIFACT_DIR}"
         if [[ -f test/pytest/reports/junit.xml ]]; then
-          cp test/pytest/reports/junit.xml "${ARTIFACT_DIR}/junit_smoke.xml"
+          sed -E \
+            -e 's|https?://[^[:space:]"<]+|<URL redacted>|g' \
+            -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g' \
+            test/pytest/reports/junit.xml > "${ARTIFACT_DIR}/junit_smoke.xml"
         fi
       from: koku-service-operator-e2e
       resources:
@@ -244,12 +267,17 @@ tests:
         export CR_NAME=cost-onprem
         export HELM_RELEASE_NAME=cost-onprem
         set +e
-        ./scripts/run-pytest.sh --no-venv --no-ui 2>&1 | sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'
+        ./scripts/run-pytest.sh --no-venv --no-ui 2>&1 | sed -E \
+          -e 's|https?://[^[:space:]"]+|<URL redacted>|g' \
+          -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g'
         rc=${PIPESTATUS[0]}
         set -e
         mkdir -p "${ARTIFACT_DIR}"
         if [[ -f test/pytest/reports/junit.xml ]]; then
-          cp test/pytest/reports/junit.xml "${ARTIFACT_DIR}/junit_e2e.xml"
+          sed -E \
+            -e 's|https?://[^[:space:]"<]+|<URL redacted>|g' \
+            -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g' \
+            test/pytest/reports/junit.xml > "${ARTIFACT_DIR}/junit_e2e.xml"
         fi
         exit "${rc}"
       from: koku-service-operator-e2e
@@ -275,13 +303,17 @@ tests:
       commands: |
         set -euo pipefail
         NS=cost-onprem
-        _redact() { sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'; }
+        _redact() {
+          sed -E \
+            -e 's|https?://[^[:space:]"]+|<URL redacted>|g' \
+            -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g'
+        }
         dump() {
           mkdir -p "${ARTIFACT_DIR}"
           oc -n "${NS}" logs deploy/koku-service-operator-controller-manager 2>/dev/null | _redact > "${ARTIFACT_DIR}/operator.log" || true
           oc -n "${NS}" get csv,og,catsrc,sub,ip,deploy,po,event -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/olm-resources.yaml" || true
           oc get csv -A -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/csv.yaml" || true
-          oc -n "${NS}" get cmsc -o yaml 2>/dev/null | _redact > "${ARTIFACT_DIR}/cmsc.yaml" || true
+          oc -n "${NS}" get cmsc -o jsonpath='{range .items[*]}---{"\n"}name: {.metadata.name}{"\n"}namespace: {.metadata.namespace}{"\n"}created: {.metadata.creationTimestamp}{"\n"}conditions:{"\n"}{range .status.conditions[*]}  - type: {.type}{"\n"}    status: {.status}{"\n"}    reason: {.reason}{"\n"}    message: {.message}{"\n"}    lastTransitionTime: {.lastTransitionTime}{"\n"}{end}{"\n"}{end}' 2>/dev/null | _redact > "${ARTIFACT_DIR}/cmsc-status.txt" || true
           oc -n "${NS}" get events --sort-by=.lastTimestamp 2>/dev/null | _redact > "${ARTIFACT_DIR}/events.txt" || true
         }
         trap dump EXIT
@@ -352,7 +384,9 @@ tests:
         export INFRA_NAMESPACE=cost-onprem-infra
         export OPERATOR_NAMESPACE=cost-onprem
         export SKIP_PYTEST=1
-        ./hack/ci/e2e.sh
+        ./hack/ci/e2e.sh 2>&1 | sed -E \
+          -e 's|https?://[^[:space:]"]+|<URL redacted>|g' \
+          -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g'
       from: koku-service-operator-e2e
       resources:
         requests:
@@ -366,10 +400,15 @@ tests:
         export NAMESPACE=cost-onprem
         export CR_NAME=cost-onprem
         export HELM_RELEASE_NAME=cost-onprem
-        ./scripts/run-pytest.sh --no-venv --smoke 2>&1 | sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'
+        ./scripts/run-pytest.sh --no-venv --smoke 2>&1 | sed -E \
+          -e 's|https?://[^[:space:]"]+|<URL redacted>|g' \
+          -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g'
         mkdir -p "${ARTIFACT_DIR}"
         if [[ -f test/pytest/reports/junit.xml ]]; then
-          cp test/pytest/reports/junit.xml "${ARTIFACT_DIR}/junit_smoke.xml"
+          sed -E \
+            -e 's|https?://[^[:space:]"<]+|<URL redacted>|g' \
+            -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g' \
+            test/pytest/reports/junit.xml > "${ARTIFACT_DIR}/junit_smoke.xml"
         fi
       from: koku-service-operator-e2e
       resources:
@@ -385,12 +424,17 @@ tests:
         export CR_NAME=cost-onprem
         export HELM_RELEASE_NAME=cost-onprem
         set +e
-        ./scripts/run-iqe-tests.sh --profile smoke 2>&1 | sed -E 's|https?://[^[:space:]]+|<URL redacted>|g'
+        ./scripts/run-iqe-tests.sh --profile smoke 2>&1 | sed -E \
+          -e 's|https?://[^[:space:]"]+|<URL redacted>|g' \
+          -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g'
         rc=${PIPESTATUS[0]}
         set -e
         mkdir -p "${ARTIFACT_DIR}"
         if [[ -f tests/reports/iqe_junit.xml ]]; then
-          cp tests/reports/iqe_junit.xml "${ARTIFACT_DIR}/junit_iqe.xml"
+          sed -E \
+            -e 's|https?://[^[:space:]"<]+|<URL redacted>|g' \
+            -e 's|[a-zA-Z0-9-][a-zA-Z0-9._-]*\.svc\.cluster\.local(:[0-9]{1,5})?|<internal-host redacted>|g' \
+            tests/reports/iqe_junit.xml > "${ARTIFACT_DIR}/junit_iqe.xml"
         fi
         exit "${rc}"
       from: koku-service-operator-e2e
