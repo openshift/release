@@ -56,6 +56,9 @@ spec:
                 - r5.4xlarge
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
@@ -134,6 +137,7 @@ spec:
         - --root=/tmp/git-sync
         - --max-failures=3
         - --link=release
+        - --sync-timeout=300s
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         imagePullPolicy: Always
         volumeMounts:
@@ -141,8 +145,8 @@ spec:
           mountPath: /tmp/git-sync
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "0.5"
+            memory: "512Mi"
+            cpu: "100m"
       volumes:
       - name: prow-config
         configMap:

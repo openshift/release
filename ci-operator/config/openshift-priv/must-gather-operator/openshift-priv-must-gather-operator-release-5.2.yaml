@@ -3,6 +3,10 @@ base_images:
     name: "5.2"
     namespace: ocp-priv
     tag: base-rhel9
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
@@ -261,6 +265,18 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
+- always_run: false
+  as: oape-review-handler
+  optional: true
+  steps:
+    test:
+    - ref: oape-review-handler
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: must-gather-review-agent-trigger
 zz_generated_metadata:
   branch: release-5.2
   org: openshift-priv

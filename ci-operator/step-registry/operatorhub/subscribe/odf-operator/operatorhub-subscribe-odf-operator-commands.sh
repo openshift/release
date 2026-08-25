@@ -10,11 +10,13 @@ if [[ -f "${SHARED_DIR}/redhat_operators_catalog_source_name" ]]; then
   echo "Found custom CatalogSource name: ${CUSTOM_CATALOG_SOURCE}"
   ODF_OPERATOR_SUB_SOURCE="${CUSTOM_CATALOG_SOURCE}"
   
-  # Derive the channel from the CatalogSource name
-  EXTRACTED_VERSION=$(echo "${CUSTOM_CATALOG_SOURCE}" | sed -n 's/.*-v\([0-9]*\)-\([0-9]*\)$/\1.\2/p')
-  if [[ -n "${EXTRACTED_VERSION}" ]]; then
-    ODF_OPERATOR_SUB_CHANNEL="stable-${EXTRACTED_VERSION}"
-    echo "Derived ODF_OPERATOR_SUB_CHANNEL from CatalogSource: ${ODF_OPERATOR_SUB_CHANNEL}"
+  if [[ -z "${ODF_OPERATOR_SUB_CHANNEL}" ]]; then
+    # Derive the channel from the CatalogSource name
+    EXTRACTED_VERSION=$(echo "${CUSTOM_CATALOG_SOURCE}" | sed -n 's/.*-v\([0-9]*\)-\([0-9]*\)$/\1.\2/p')
+    if [[ -n "${EXTRACTED_VERSION}" ]]; then
+      ODF_OPERATOR_SUB_CHANNEL="stable-${EXTRACTED_VERSION}"
+      echo "Derived ODF_OPERATOR_SUB_CHANNEL from CatalogSource: ${ODF_OPERATOR_SUB_CHANNEL}"
+    fi
   fi
 fi
 

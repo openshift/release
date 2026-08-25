@@ -23,6 +23,10 @@ base_images:
     name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -434,6 +438,7 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       MAX_VCENTERS: "1"
       OS_IMAGE_STREAM: rhel-9
+      POOL_COUNT: "3"
       TEST_ARGS: --run=MCO.Bootimages
       TEST_SKIPS: ""
       TEST_SUITE: openshift/machine-config-operator/longduration
@@ -858,6 +863,12 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: ipi-aws
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: mco-review-agent-trigger
 zz_generated_metadata:
   branch: main
   org: openshift-priv
