@@ -1,0 +1,36 @@
+ref:
+  as: rosa-e2e-collect-cs-telemetry
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: cli
+  commands: rosa-e2e-collect-cs-telemetry-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 5m0s
+  grace_period: 30s
+  credentials:
+  - namespace: ci
+    name: rhobs-oidc-staging
+    mount_path: /usr/local/rhobs-oidc
+  env:
+  - name: RHOBS_ENV
+    default: staging
+    documentation: |-
+      RHOBS environment to query. Determines the Loki API URL.
+      Valid values: staging, production, integration.
+  - name: CS_NAMESPACE
+    default: ""
+    documentation: |-
+      Clusters Service namespace to query. When empty, auto-detected
+      from RHOBS_ENV (uhc-stage for staging, uhc-production for production,
+      uhc-integration for integration).
+  documentation: |-
+    Fetches Clusters Service telemetry logs from RHOBS Loki for the
+    duration of the test job and writes them to ARTIFACT_DIR.
+    Captures lifecycle events (install IT*, deprovision UT*, upgrade
+    UCT*/UNT*, nodepool NT*) that help diagnose cluster provisioning
+    and day-2 operation failures. Requires RHOBS OIDC credentials
+    and a start timestamp from rosa-e2e-record-start-time pre-step.

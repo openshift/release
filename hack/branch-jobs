@@ -1,0 +1,59 @@
+#!/bin/sh
+
+set -euo pipefail
+
+# Seed release branch jobs from master to a new branch.
+#
+# Usage: TO=3.11 ./branch-jobs
+#
+# Argument:
+# * <empty>: displays latest commit on the branch
+# * tag:     creates the tags and branches locally
+# * reset:   deletes the branches or tags to start over
+# * push:    actually push the branches and tags
+
+base=$( dirname "${BASH_SOURCE[0]}")
+source "${base}/lib/constants.sh"
+
+BRANCH=${BRANCH:-master}
+TO_BRANCH="release-${TO}"
+
+file="$( mktemp -t prowjobs )"
+
+# TODO: force all repos to normalize to a standard branch strategy (monitoring team)
+for repo in `managed_repos "${BRANCH}"`; do
+  if [[ -n "${2-}" && "${2-}" != "${repo}" ]]; then
+    continue
+  fi
+
+  if ! jobs="$( python "${base}/lib/jobs_with_labels.py" "${base}/../ci-operator/jobs/${repo}/*.yaml" "${repo}" "${BRANCH}" "artifacts" )"; then
+    echo "info: ${repo} has no jobs tagged for artifacts on branch ${BRANCH}" 2>&1
+    continue
+  fi
+
+  # branch the master ci-operator config
+  if [[ -f "${base}/../ci-operator/config/${repo}/${BRANCH}.yaml" ]]; then
+    if [[ ! -f "${base}/../ci-operator/config/${repo}/${TO_BRANCH}.yaml" ]]; then
+      echo "${TO_BRANCH} | ${repo} | Creating ci-operator/config/${repo}/${TO_BRANCH}.yaml"
+      cp "${base}/../ci-operator/config/${repo}/${BRANCH}.yaml" "${base}/../ci-operator/config/${repo}/${TO_BRANCH}.yaml"
+    fi
+  fi
+
+  # branch the job definitions
+  if jobdefs="$( find "${base}/../ci-operator/jobs/${repo}" -name "*.yaml" -type f 2>/dev/null )"; then
+    for file in ${jobdefs}; do
+      name="$( basename $file .yaml )"
+      if [[ -f "${base}/../ci-operator/jobs/${repo}/${name}-${TO_BRANCH}.yaml" ]]; then
+        continue
+      fi
+      echo "${TO_BRANCH} | ${repo} | Creating ${name}-${TO_BRANCH}.yaml"
+      out="$( python "${base}/lib/clone_jobs.py" $file "${BRANCH}" "${TO_BRANCH}" "${TO}" )"
+      if [[ -n "${out}" ]]; then
+        echo "${out}" > "${base}/../ci-operator/jobs/${repo}/${name}-${TO_BRANCH}.yaml"
+      fi
+    done
+  else
+    echo "info: ${repo} has no job definitions" 2>&1
+    continue
+  fi
+done

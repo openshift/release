@@ -1,0 +1,50 @@
+ref:
+  as: cucushift-installer-googlesheet-select-target
+  from: upi-installer
+  grace_period: 10m
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-clusters-record
+    mount_path: /var/run/vault/clusters-record
+  commands: cucushift-installer-googlesheet-select-target-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: TEST_OBJECT
+    default: ""
+    documentation: >-
+      Valid options: Regions LocalZones WavelengthZones InstanceTypes
+  - name: SHEET_NAME_PREFIX
+    default: ""
+    documentation: >-
+      Default is ${PLATFORM}_${TEST_OBJECT}, e.g. "AWS_Regions"
+  - name: SPREADSHEET_NAME
+    default: ""
+    documentation: >-
+      Default is ${VERSION}, e.g. "421".
+      The spreadsheet ids should have been defined in Vault:
+      {
+        "421": "<id>",
+        "<another_prefix>": "<id>"
+      }
+  - name: CLUSTER_PARAMETER_SELECT_CONDITIONS
+    default: |
+      [
+        [
+            {"column": "OverallResult", "value": "", "operator": "equals"}
+        ],
+        [
+            {"column": "OverallResult", "value": "FAIL", "operator": "equals"}
+        ],
+        [
+            {"column": "CreatedDate", "value": "30", "operator": "days_before"}
+        ]
+      ]
+    documentation: >-
+      1. No run record
+      2. Failed last time
+      3. it's been 30 days since last run
+  documentation: >-
+    Select cluster params from Google Sheet record.

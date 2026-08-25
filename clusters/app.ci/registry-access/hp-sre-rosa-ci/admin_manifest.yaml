@@ -1,0 +1,62 @@
+# this is the ServiceAccount whose credentials you will use
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: hp-sre-rosa-ci
+automountServiceAccountToken: false
+---
+# this grants your ServiceAccount rights to pull images from all namespaces
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: hp-sre-rosa-ci-image-puller-binding
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: hp-sre-rosa-ci
+    name: image-puller
+---
+# this adds the group members as viewers of the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: hp-sre-rosa-ci-viewer-binding
+  namespace: hp-sre-rosa-ci
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: hp-sre-rosa-ci
+---
+# this grants the group members the right to create tokens for the image-puller SA
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: image-puller-token-creator
+  namespace: hp-sre-rosa-ci
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    resourceNames: ["image-puller"]
+    verbs: ["create"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: hp-sre-rosa-ci-token-creator-binding
+  namespace: hp-sre-rosa-ci
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: image-puller-token-creator
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: hp-sre-rosa-ci

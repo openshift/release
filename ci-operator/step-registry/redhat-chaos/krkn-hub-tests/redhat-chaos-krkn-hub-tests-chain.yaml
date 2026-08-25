@@ -1,0 +1,57 @@
+
+chain:
+  as: redhat-chaos-krkn-hub-tests
+  env:
+  - name: ENABLE_ALERTS
+    default: "True"
+  - name: ALERTS_PATH
+    default: "/home/krkn/kraken/config/alerts_openshift.yaml"
+  - name: CHECK_CRITICAL_ALERTS
+    default: "True"
+  - name: TELEMETRY_ENABLED
+    default: "True"
+  - name: TELEMETRY_API_URL
+    default: "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production"
+  - name: TELEMETRY_USERNAME
+    default: "redhat-chaos"
+  - name: TELEMETRY_PROMETHEUS_BACKUP
+    default: "True"
+  - name: TELEMETRY_FULL_PROMETHEUS_BACKUP
+    default: "True"
+  - name: TELEMTRY_BACKUP_THREADS
+    default: "5"
+  - name: TELEMETRY_ARCHIVE_PATH
+    default: "/tmp"
+  - name: TELEMETRY_MAX_RETRIES
+    default: "0"
+  - name: TELEMETRY_ARCHIVE_SIZE
+    default: "1000000"
+  - name: TELEMETRY_LOGS_BACKUP
+    default: "True"
+  - name: TELEMTRY_CLI_PATH
+    default: "/usr/local/bin/oc"
+  - name: TELEMETRY_EVENTS_BACKUP
+    default: "True"
+  - name: TELEMTRY_CLI_PATH
+    default: "/usr/local/bin/oc"
+  - name: ENABLE_ES
+    default: "True"
+  - name: CAPTURE_METRICS
+    default: "True"
+  - name: METRICS_PATH
+    default: "/home/krkn/kraken/config/metrics-report.yaml"
+  - name: GC
+    default: "false"
+  - name: CD_V2_EXTRA_FLAGS
+    default: ""
+  steps:
+  - ref: openshift-qe-cluster-density-v2
+  - ref: redhat-chaos-observer-start
+  - chain: redhat-chaos-krkn-hub-etcd-tests
+  - chain: redhat-chaos-krkn-hub-console-tests
+  - chain: redhat-chaos-krkn-hub-ovn-disruption
+  - chain: redhat-chaos-krkn-hub-prometheus-tests
+  - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
+  - ref: redhat-chaos-pod-scenarios-kube-apiserver-disruption
+  documentation: |-
+    This workflow executes chaos scenarios to ensure OpenShift is resilient and performant.

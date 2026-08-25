@@ -1,0 +1,155 @@
+base_images:
+  cerberus:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: daily-virt-6nodes
+  capabilities:
+  - intranet
+  cron: 0 1 * * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: metal-perfscale-cpt
+    env:
+      BOND: "true"
+      CNV_VERSION: "5.0"
+      CONFIG: config/standard-scalelab.yml
+      ENABLE_LOCAL_INDEX: "true"
+      INFRA: "true"
+      OUTPUT_FORMAT: JUNIT
+      PUBLIC_VLAN: "false"
+      RUN_ORION: deferred
+      VERSION: "5.0"
+      VM: "true"
+    post:
+    - ref: openshift-qe-installer-bm-gather-extra
+    - ref: openshift-qe-installer-bm-must-gather
+    test:
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-cnv
+    - chain: openshift-qe-data-path-tests
+    - ref: openshift-qe-orion-data-path
+    - ref: openshift-qe-orion-ingress
+    - ref: openshift-qe-orion-virt-data-path
+    - ref: openshift-qe-virt-udn-density
+    - ref: openshift-qe-orion-virt-udn-density
+    - ref: openshift-qe-virt-density-nomount
+    - ref: openshift-qe-orion-virt-density-nomount
+    - ref: openshift-qe-orion-report
+    workflow: openshift-qe-installer-bm-deploy
+- as: network-workloads
+  capabilities:
+  - intranet
+  cron: 0 9 */2 * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      ENABLE_LOCAL_INDEX: "true"
+      ENABLE_TECHPREVIEW: "true"
+      EXTERNAL_WEBSERVER_IP: 172.27.187.82
+      NETWORK_WORKLOAD: udn-bgp
+      NUM_WORKER_NODES: "6"
+      PUBLIC_VLAN: "false"
+      TYPE: mno
+    post:
+    - ref: openshift-qe-installer-bm-gather-extra
+    - ref: openshift-qe-installer-bm-must-gather
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-prereqs
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-cluster-health
+    - ref: openshift-qe-installer-bm-day2-network-workloads
+    - ref: openshift-qe-udn-bgp
+    - ref: openshift-qe-installer-bm-day2-network-workloads-post
+    - ref: openshift-qe-egressip
+    - ref: openshift-qe-evpn
+- as: daily-telco-core-6nodes
+  capabilities:
+  - intranet
+  cron: 0 17 * * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: metal-perfscale-cpt
+    env:
+      CHURN_CYCLES: "2"
+      CHURN_PERCENT: "50"
+      EXTRA_FLAGS: --perf-profile=cpt-pao --gc-metrics=false --gc=true --phased=true
+        --idle-duration=15m
+      ITERATIONS: "15"
+      LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
+      OCP_BUILD: dev
+      OPERATOR_SOURCE_INDEX: prega-operator-index
+      RUN_ORION: "true"
+      TELCO: "true"
+    post:
+    - ref: openshift-qe-installer-bm-gather-extra
+    - ref: openshift-qe-installer-bm-must-gather
+    test:
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-prega-operators
+    - ref: openshift-qe-installer-bm-day2-sriov
+    - ref: openshift-qe-installer-bm-day2-metallb
+    - ref: openshift-qe-installer-bm-day2-perf-profile-rds-core
+    - ref: openshift-qe-rds-core
+    - ref: openshift-qe-orion-rds-core
+    workflow: openshift-qe-installer-bm-deploy
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-perfscale
+  variant: metal-5.0-nightly-x86

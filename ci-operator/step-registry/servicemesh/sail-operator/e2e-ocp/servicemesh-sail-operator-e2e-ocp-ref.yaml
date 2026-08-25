@@ -1,0 +1,57 @@
+ref:
+  as: servicemesh-sail-operator-e2e-ocp
+  from: src
+  resources:
+    requests:
+      cpu: '1'
+      memory: 500Mi
+  credentials:
+  - mount_path: /tmp/secrets
+    name: quay-sail
+    namespace: test-credentials
+  timeout: 3h0m0s
+  commands: servicemesh-sail-operator-e2e-ocp-commands.sh
+  env:
+  - name: MAISTRA_NAMESPACE
+    documentation: |-
+      The namespace where the test pod is running
+  - name: MAISTRA_SC_POD
+    documentation: |-
+      The name of the test pod where tests will be executed
+  - name: XDG_CACHE_HOME
+    documentation: |-
+      Cache directory for build tools
+  - name: VERSIONS_YAML_CONFIG
+    default: ""
+    documentation: |-
+      Optional environment variable to set VERSIONS_YAML_FILE. For 4.19 use 'export VERSIONS_YAML_FILE=versions.yaml && ' to be prepended to the make command
+  - name: OLM
+    default: "true"
+    documentation: |-
+      Set to "false" to avoid creating and deploying the operator using the OLM bundle. By default, the operator will be created and deployed using the OLM bundle. Setting to "false" will cause the operator to be deployed using helm after building the operator image.
+  - name: E2E_COMMAND
+    default: "make test.e2e.ocp"
+    documentation: |-
+      The make command to execute for e2e tests
+  - name: EXPECTED_REGISTRY
+    default: '^docker\.io|^gcr\.io|^registry\.istio\.io|^registry\.redhat\.io'
+    documentation: |-
+      Which registry should be expected in tests for checking correct images. Adding the default ones + registry.redhat.io for OCP tests when OLM is used
+  - name: CI
+    default: "true"
+    documentation: |-
+      Set to true to indicate that the tests are running in a CI environment
+  - name: PR_NUMBER
+    default: ""
+    documentation: |-
+      The pull request number for the current build, if applicable
+  - name: HUB
+    default: "quay.io/sail-dev"
+    documentation: |-
+      Container registry hub to use for pushing images when CI=true
+  - name: GINKGO_LABEL_FILTER
+    default: ""
+    documentation: |-
+      Optional Ginkgo label filter expression to select/skip tests (e.g. "!tls-profile")
+  documentation: |-
+    Executes sail operator e2e tests (with default values against product operator (ossm operator)). Ensure that your pipeline has `maistra-builder` as the build root, since `from: src` is used here and the script expects the sail repository to be in the root directory.

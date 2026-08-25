@@ -1,0 +1,25 @@
+workflow:
+  as: hypershift-azure-performance-test
+  documentation: |-
+    This workflow performs comprehensive performance testing for Azure self-managed HyperShift clusters.
+    It sets up a nested management cluster, installs the HyperShift operator, executes performance
+    benchmarking scenarios, and collects metrics for cluster lifecycle operations.
+
+    Performance scenarios tested:
+    1. HostedCluster creation time
+    2. NodePool scaling performance (scale up from 2→10 nodes, scale down from 10→2 nodes)
+    3. API server availability during operations
+    4. HostedCluster deletion time
+
+    The workflow uses the standard Azure self-managed infrastructure with a nested OpenShift
+    management cluster and measures performance against baseline targets.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-azure-setup-private-link
+    - ref: hypershift-install
+    test:
+    - ref: hypershift-azure-performance-test
+    post:
+    - chain: hypershift-destroy-nested-management-cluster

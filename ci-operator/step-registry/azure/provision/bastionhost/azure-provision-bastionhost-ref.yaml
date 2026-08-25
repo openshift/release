@@ -1,0 +1,64 @@
+ref:
+  as: azure-provision-bastionhost
+  from_image:
+    namespace: ocp
+    name: "4.13"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-provision-bastionhost-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: qe-proxy-creds
+    mount_path: /var/run/vault/proxy
+  env:
+  - name: RESOURCE_GROUP
+    default: ""
+    documentation: |-
+      The resource group name that is already existing.
+  - name: VNET_NAME
+    default: ""
+    documentation: |-
+      The vnet name that is already existing.
+  - name: BASTION_BOOT_IMAGE
+    default: ""
+    documentation: |-
+      Specify bastion boot image directly from Azure Marketplace to provision bastion vm.
+  - name: BASTION_VHD_URI
+    default: "https://rhcos.blob.core.windows.net/imagebucket/rhcos-412.86.202212081411-0-azure.x86_64.vhd"
+    documentation: |-
+      BYO azure VHD for bastion host. The default rhcos image value is gotten from 4.12.0-rc.8 installer.
+  - name: BASTION_VM_SIZE
+    default: "Standard_DS1_v2"
+    documentation: |-
+      Specify the vm size to provision bastion host
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "no"
+    documentation: |-
+      Register DNS for mirror registry.
+  - name: BASE_DOMAIN
+    default: ""
+    documentation: |-
+      A domain name in the cluster profile, it is required to override when REGISTER_MIRROR_REGISTRY_DNS is enabled.
+  - name: BASE_RESOURCE_GROUP
+    default: "os4-common"
+    documentation: |-
+      The base resource group where base domain resides, it is required when REGISTER_MIRROR_REGISTRY_DNS is enabled.
+  - name: AZURE_VNET_ADDRESS_PREFIXES
+    default: "10.0.0.0/16"
+    documentation: |-
+      Specify the address prefixes for azure vnet.
+  - name: IP_FAMILY
+    default: ""
+    documentation: enable ipv6 stack or not. "" (default) means IPv4 only;
+      "DualStackIPv6Primary" or "DualStackIPv4Primary" means enabling IPv6.
+  - name: AZURE_VNET_IPV6_ADDRESS_PREFIXES
+    default: "fd00:29cc:9e56::/48"
+    documentation: |-
+      Specify the ipv6 address prefixes for azure vnet.
+      Default vaule is fd00:29cc:9e56::/48 if not defined.
+  documentation: |-
+    Provision a bastion in a provided resource group and vnet
