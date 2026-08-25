@@ -43,6 +43,10 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
   fi
   echo "Using backplane credentials from ${cred_dir} (or env)"
 
+  if [[ "${OCM_FVT_SKIP_BACKPLANE_LOGIN:-false}" == "true" ]]; then
+    echo "Skipping backplane CLI install and login (OCM_FVT_SKIP_BACKPLANE_LOGIN=true)"
+  else
+
   # Defaults match *-ref.yaml; CLI versions align with rosa-clusters-service build/backplane.py.
   backplane_cluster_id="${OCM_FVT_BACKPLANE_CLUSTER_ID:-1g268u7pp694gj152nj16me4sv615lpv}"
   backplane_ocm_url="${OCM_FVT_BACKPLANE_OCM_URL:-https://api.openshift.com}"
@@ -126,6 +130,7 @@ if [[ "${OCM_FVT_USE_BACKPLANE:-false}" == "true" ]]; then
 
   echo "Elevated backplane kubeconfig ready for cluster ${backplane_cluster_id}"
   echo "================================"
+  fi
 fi
 
 old_umask=$(umask)
