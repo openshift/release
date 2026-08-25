@@ -7,7 +7,7 @@
 # Results (JUnit XML, Polarion XML) are collected to ARTIFACT_DIR and mirrored to SHARED_DIR.
 # Ref: https://github.com/rh-ecosystem-edge/eco-gotests/blob/main/README.md
 #
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
 
 # CI framework writes hub kubeconfig to SHARED_DIR/kubeconfig; eco-gotests requires KUBECONFIG.
 export KUBECONFIG="${KUBECONFIG:-${SHARED_DIR}/kubeconfig}"

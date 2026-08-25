@@ -4,7 +4,7 @@
 # Feature/label defaults live in p2p-telco-mount-ns-ref.yaml.
 # Runner: https://github.com/rh-ecosystem-edge/eco-gotests
 #
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
 
 export KUBECONFIG="${KUBECONFIG:-${SHARED_DIR}/kubeconfig}"
 
