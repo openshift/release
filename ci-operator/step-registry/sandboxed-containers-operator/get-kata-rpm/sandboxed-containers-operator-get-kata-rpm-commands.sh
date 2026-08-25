@@ -28,7 +28,8 @@ if [ -n "${KATA_RPM_BUILD_TASK}" ];then
 else
     ver=$(echo "$KATA_RPM_VERSION" | cut -d- -f1)
     build=$(echo "$KATA_RPM_VERSION" | cut -d- -f2)
-    kata_rpm_base_url="https://download.devel.redhat.com/brewroot/vol/rhel-9/packages/kata-containers"
+    rhel_ver=$(echo "$build" | sed 's/.*el\([0-9]*\).*/\1/')
+    kata_rpm_base_url="https://download.devel.redhat.com/brewroot/vol/rhel-${rhel_ver}/packages/kata-containers"
     kata_rpm_build_url="${kata_rpm_base_url}/${ver}/${build}/${arch}/kata-containers-${KATA_RPM_VERSION}.${arch}.rpm"
 fi
 
