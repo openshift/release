@@ -28,7 +28,7 @@ images:
       FROM prow-agent-eval AS proweval
       FROM sippy-devcontainer
       USER root
-      RUN dnf install -y podman fuse-overlayfs shadow-utils openssl && dnf clean all
+      RUN dnf install -y podman fuse-overlayfs shadow-utils openssl python3-pip && dnf clean all
       COPY --from=podman /entrypoint.sh /entrypoint.sh
       RUN setcap cap_setuid+ep /usr/bin/newuidmap && \
           setcap cap_setgid+ep /usr/bin/newgidmap && \
@@ -41,7 +41,12 @@ images:
            /home/vscode/.claude/plugins/known_marketplaces.json
       RUN chgrp -R 0 /opt/ai-helpers /home/vscode/.claude && \
           chmod -R g=u /opt/ai-helpers /home/vscode/.claude
-      COPY --from=proweval /usr/local/bin/prow-agent-eval /usr/local/bin/prow-agent-eval
+      COPY --from=proweval /opt/prow-agent-eval /opt/prow-agent-eval
+      COPY --from=proweval /opt/agent-eval-harness /opt/agent-eval-harness
+      RUN pip3 install --no-cache-dir /opt/agent-eval-harness && \
+          pip3 install --no-cache-dir /opt/prow-agent-eval && \
+          chmod -R g=u /opt/prow-agent-eval /opt/agent-eval-harness
+      ENV AGENT_EVAL_HARNESS_ROOT=/opt/agent-eval-harness
       COPY ci-operator/step-registry/openshift/agentic/trt/jira-solver/openshift-agentic-trt-jira-solver-commands.sh /opt/scripts/solve.sh
       COPY ci-operator/step-registry/openshift/agentic/trt/review-responder/openshift-agentic-trt-review-responder-commands.sh /opt/scripts/review-respond.sh
       RUN chmod +x /opt/scripts/solve.sh /opt/scripts/review-respond.sh
@@ -73,7 +78,7 @@ tests:
 - as: jira-solver-eval
   capabilities:
   - nested-podman
-  run_if_changed: ^ci-operator/step-registry/openshift/agentic/trt/
+  cron: '@yearly'
   steps:
     env:
       ALLOWED_TOOLS: Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill
@@ -86,7 +91,7 @@ tests:
 - as: review-responder-eval
   capabilities:
   - nested-podman
-  run_if_changed: ^ci-operator/step-registry/openshift/agentic/trt/
+  cron: '@yearly'
   steps:
     env:
       ALLOWED_TOOLS: Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill

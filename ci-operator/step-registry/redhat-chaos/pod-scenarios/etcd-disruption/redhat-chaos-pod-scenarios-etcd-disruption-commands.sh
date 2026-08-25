@@ -56,24 +56,24 @@ else
     export HEALTH_CHECK_URL=https://$console_url
     echo "Using console health check URL: $HEALTH_CHECK_URL"
 fi
-set -o nounset
-set -o pipefail
-set -x
+
+collect_artifacts() {
+  local rc=$?
+  set +o errexit
+  # Done running the test
+  oc get pods -n "$TARGET_NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{.status.conditions[?(@.type=="Ready")].lastTransitionTime}{"\t"}{.status.startTime}{"\t"}{.metadata.creationTimestamp}{"\n"}{end}'
+  cat /tmp/*.log 2>/dev/null
+  if [[ "${TELEMETRY_EVENTS_BACKUP:-}" == "True" && -f /tmp/events.json ]]; then
+    cp /tmp/events.json "${ARTIFACT_DIR}/events.json"
+  fi
+  if [[ -f /tmp/report.out.pdf ]]; then
+    cp /tmp/report.out.pdf "${ARTIFACT_DIR}/kraken.report.pdf"
+  fi
+  exit "$rc"
+}
+
+trap collect_artifacts EXIT
+
+set -euxo pipefail; shopt -s inherit_errexit
 
 ./pod-scenarios/prow_run.sh
-rc=$?
-echo "Done running the test!" 
-oc get pods -n $TARGET_NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{.status.conditions[?(@.type=="Ready")].lastTransitionTime}{"\t"}{.status.startTime}{"\t"}{.metadata.creationTimestamp}{"\n"}{end}' 
-
-cat /tmp/*.log 
-if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
-    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
-fi
-
-
-if [[ -f /tmp/report.out.pdf ]]; then
-  cp /tmp/report.out.pdf ${ARTIFACT_DIR}/kraken.report.pdf
-fi
-
-echo "Return code: $rc"
-exit $rc

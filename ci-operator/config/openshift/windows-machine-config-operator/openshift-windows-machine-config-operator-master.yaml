@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   operator-sdk:
     name: "4.19"
     namespace: origin
@@ -74,7 +78,7 @@ tests:
   commands: make lint
   container:
     from: src
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 - as: unit
   commands: make unit
   container:
@@ -439,6 +443,22 @@ tests:
     - ref: openshift-windows-install-wmco
     - ref: tls-scanner-run
     workflow: ipi-aws-ovn-hybrid
+- as: periodic-jira-agent
+  cron: 0 9 * * *
+  steps:
+    env:
+      JIRA_AGENT_MAX_ISSUES: "1"
+    workflow: windows-jira-agent
+- as: periodic-review-agent
+  cron: '@yearly'
+  steps:
+    workflow: windows-review-agent
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: windows-review-agent-trigger
 zz_generated_metadata:
   branch: master
   org: openshift

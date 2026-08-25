@@ -151,23 +151,23 @@ function download_oc_mirror() {
       ;;
   esac
 
-  base_url="https://mirror.openshift.com/pub/openshift-v4/${architecture}/clients/ocp/latest"
+  base_url="https://mirror.openshift.com/pub/cgw/oc-mirror/latest"
   curl -fL --retry 5 --connect-timeout 30 \
     -o "${work_dir}/oc-mirror.tar.gz" \
-    "${base_url}/oc-mirror.tar.gz"
+    "${base_url}/oc-mirror-rhel9-linux-${architecture}.tar.gz"
   curl -fL --retry 5 --connect-timeout 30 \
     -o "${work_dir}/sha256sum.txt" \
     "${base_url}/sha256sum.txt"
 
-  checksum_line=$(grep -E '(^|[[:space:]*])oc-mirror\.tar\.gz$' \
+  checksum_line=$(grep -E "(^|[[:space:]*])oc-mirror-rhel9-linux-${architecture}\.tar\.gz$" \
     "${work_dir}/sha256sum.txt" | head -n 1)
   if [[ -z "${checksum_line}" ]]; then
-    echo "The published checksum list does not contain oc-mirror.tar.gz."
+    echo "The published checksum list does not contain oc-mirror-rhel9-linux-${architecture}.tar.gz."
     return 1
   fi
   (
     cd "${work_dir}"
-    printf '%s\n' "${checksum_line}" | sha256sum -c -
+    printf '%s\n' "${checksum_line}" | sed "s/oc-mirror-rhel9-linux-${architecture}.tar.gz/oc-mirror.tar.gz/" | sha256sum -c -
   )
 
   tar -xzf "${work_dir}/oc-mirror.tar.gz" -C "${work_dir}" oc-mirror

@@ -14,6 +14,12 @@ workflow:
     test:
       - ref: rosa-e2e-test
     post:
+      - ref: rosa-gap-analysis-api-resources-and-crd
+        best_effort: true
+      - ref: rosa-gap-analysis-critical-alerts
+        best_effort: true
+      - ref: rosa-gap-analysis-cluster-install-delete-metrics
+        best_effort: true
       - chain: rosa-cluster-deprovision
         best_effort: true
       - ref: rosa-sts-account-roles-delete
@@ -23,6 +29,8 @@ workflow:
       - ref: aws-deprovision-stacks
         best_effort: true
   documentation: |-
-    This workflow provisions a ROSA Classic STS cluster and runs the
-    rosa-e2e managed service validation suite filtered to Classic-compatible
-    tests, then tears down the cluster.
+    This workflow provisions a ROSA Classic STS cluster, runs the rosa-e2e managed
+    service validation suite filtered to Classic-compatible tests, writes
+    rosa-gap-analysis snapshots (API/CRDs, alerts, and cluster install health)
+    from the single Classic cluster while it is still up, then tears down the
+    cluster. Classic does not capture a management cluster.

@@ -22,6 +22,18 @@ _yaml_quote() { local v="${1//\\/\\\\}"; v="${v//\"/\\\"}"; printf '%s' "$v"; }
 main() {
     [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
 
+    # Normalize and validate the publication mode early. Assigning the default
+    # here ensures all later references to $REPORT_PUBLISH_MODE are consistent
+    # (a bare case ":-prod" would only apply the default for that expression).
+    REPORT_PUBLISH_MODE="${REPORT_PUBLISH_MODE:-prod}"
+    case "${REPORT_PUBLISH_MODE}" in
+        prod|dev-bastion|dev-hypervisor) ;;
+        *)
+            echo "ERROR: unsupported REPORT_PUBLISH_MODE '${REPORT_PUBLISH_MODE}'; must be prod, dev-bastion, or dev-hypervisor" >&2
+            return 1
+            ;;
+    esac
+
     echo "Generating report for spoke: ${SPOKE_CLUSTER}"
 
     setup_ansible_inventory "${SPOKE_CLUSTER}" "${HUB_CLUSTER}"
@@ -84,7 +96,7 @@ main() {
     fi
 
     _has_report_repo=false
-    if [ "${DEVELOPMENT_MODE}" != "true" ] && [ -n "${REPORT_REPO_URL:-}" ]; then
+    if [ "${REPORT_PUBLISH_MODE}" = "prod" ] && [ -n "${REPORT_REPO_URL:-}" ]; then
         if [ -f /var/reports-repo/git_repo_token ]; then
             set +x
             {
@@ -99,25 +111,36 @@ main() {
         fi
     fi
 
+    # Always forward git_repo_token so the playbook can derive kpi_targets_token
+    # for fetching live KPI thresholds from GitLab — required even in development_mode
+    # where the report-repo block above is skipped.
+    if [ -f /var/reports-repo/git_repo_token ]; then
+        set +x
+        echo "git_repo_token: \"$(_yaml_quote "$(cat /var/reports-repo/git_repo_token)")\"" >> "${SENSITIVE_VARS_FILE}"
+        $_was_tracing && set -x
+    else
+        echo "WARNING: /var/reports-repo/git_repo_token not found — KPI targets will use hardcoded fallback"
+    fi
+
     if [ -n "${DEBUG_FLAG}" ] && [ "$(wc -l < "${SENSITIVE_VARS_FILE}")" -gt 1 ]; then
         echo "WARNING: -vvv is active with sensitive credentials in vars file; ensure tasks use no_log: true"
     fi
 
-    echo "Running generate-report playbook (development_mode: ${DEVELOPMENT_MODE}, splunk: ${PUSH_ENABLED:-false}, report_repo: ${_has_report_repo}, force: ${FORCE_REPORT:-false})"
+    echo "Running generate-report playbook (report_publish_mode: ${REPORT_PUBLISH_MODE}, splunk: ${PUSH_ENABLED:-false}, report_repo: ${_has_report_repo}, force: ${FORCE_REPORT:-false})"
 
-    set +x
+    # Secrets are already in SENSITIVE_VARS_FILE (written under set +x above);
+    # the command line only passes the file path, so tracing is safe here.
     ansible-playbook ./playbooks/telco-kpis/generate-report.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e spoke_cluster="${SPOKE_CLUSTER}" \
         -e output_filename="${OUTPUT_FILENAME}" \
         -e timestamp="${TIMESTAMP}" \
-        -e development_mode="${DEVELOPMENT_MODE}" \
+        -e report_publish_mode="${REPORT_PUBLISH_MODE}" \
         -e "@${SENSITIVE_VARS_FILE}" \
         "${FILTER_FLAG[@]}" \
         "${SPLUNK_FLAG[@]}" \
         "${FORCE_REPORT_FLAG[@]}" \
         ${DEBUG_FLAG}
-    $_was_tracing && set -x
 
     echo "Report generation completed for ${SPOKE_CLUSTER}"
 }

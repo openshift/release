@@ -26,23 +26,24 @@ main() {
         exit 1
     fi
 
-    local images_file="/tmp/mirror-images-extra-vars.json"
-    python3 -c "
-import json, sys
+    # Build the images list and base64-encode it so it survives -e quoting intact.
+    # The playbook decodes with: images_b64 | b64decode | from_json
+    local images_b64
+    images_b64=$(python3 -c "
+import json, sys, base64
 raw = json.loads(sys.argv[1])
 source_images = raw.get('images', [])
 result = []
 for src in source_images:
     name_tag = src.rsplit('/', 1)[-1]
     result.append({'source': src, 'dest': 'ran-test/' + name_tag})
-with open(sys.argv[2], 'w') as f:
-    json.dump({'images': result}, f)
-print(f'Mirroring {len(result)} image(s)')
-" "${RAN_IMAGES}" "${images_file}"
+print(f'Mirroring {len(result)} image(s)', file=sys.stderr)
+print(base64.b64encode(json.dumps(result).encode()).decode())
+" "${RAN_IMAGES}")
 
     ansible-playbook ./playbooks/telco-kpis/mirror-images.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
-        -e "@${images_file}" \
+        -e "images_b64=${images_b64}" \
         -e "registry_host=disconnected.registry.local" \
         ${DEBUG_FLAG}
 

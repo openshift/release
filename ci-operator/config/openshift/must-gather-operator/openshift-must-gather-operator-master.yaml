@@ -3,6 +3,10 @@ base_images:
     name: "5.1"
     namespace: ocp
     tag: base-rhel9
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
@@ -368,6 +372,28 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
+- always_run: false
+  as: oape-review-handler
+  optional: true
+  steps:
+    test:
+    - ref: oape-review-handler
+- as: periodic-jira-agent
+  cron: 0 9 * * *
+  steps:
+    env:
+      JIRA_AGENT_MAX_ISSUES: "1"
+    workflow: must-gather-jira-agent
+- as: periodic-review-agent
+  cron: '@yearly'
+  steps:
+    workflow: must-gather-review-agent
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: must-gather-review-agent-trigger
 zz_generated_metadata:
   branch: master
   org: openshift

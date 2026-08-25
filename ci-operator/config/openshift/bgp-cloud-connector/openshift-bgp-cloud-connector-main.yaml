@@ -32,6 +32,34 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: verify
+  commands: make verify
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: fips-image-scan
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    dependencies:
+      SCAN_IMAGE: bgp-cloud-connector
+    test:
+    - ref: fips-check-image-scan
+- always_run: false
+  as: e2e-aws
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: hack/ci-e2e-aws.sh
+      from: src
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift

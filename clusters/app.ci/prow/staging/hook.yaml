@@ -38,17 +38,15 @@ spec:
         - --link=release-staging
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
-        - name: release-staging
+        - name: git-sync
           mountPath: /tmp/git-sync
       containers:
       - name: hook
-        image: quay.io/prucek/prow:hook_db
-        imagePullPolicy: Always
+        image: us-docker.pkg.dev/k8s-infra-prow/images/hook:v20260819-7593870dc
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
         - --job-config-path=/etc/jobs
-        - --job-config-path=/var/repo/release-staging/ci-operator/jobs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
@@ -74,11 +72,14 @@ spec:
         - name: plugins
           mountPath: /etc/plugins
           readOnly: true
-        - name: job-configs
+        - name: combined-jobs
           mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
           readOnly: true
-        - name: release-staging
-          mountPath: /var/repo
+        - name: git-sync
+          mountPath: /etc/jobs/release-staging
+          readOnly: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -104,7 +105,7 @@ spec:
         - --link=release-staging
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
-        - name: release-staging
+        - name: git-sync
           mountPath: /tmp/git-sync
         resources:
           requests:
@@ -120,11 +121,13 @@ spec:
       - name: plugins
         configMap:
           name: plugins
+      - name: combined-jobs
+        emptyDir: {}
+      - name: git-sync
+        emptyDir: {}
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs
-      - name: release-staging
-        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

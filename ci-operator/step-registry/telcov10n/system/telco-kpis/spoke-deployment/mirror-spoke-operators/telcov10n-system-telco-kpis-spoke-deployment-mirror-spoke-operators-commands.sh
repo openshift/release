@@ -32,15 +32,30 @@ main() {
     if [[ -n "${SPOKE_LOCKDOWN_URI:-}" ]]; then
         echo "Using spoke lockdown: ${SPOKE_LOCKDOWN_URI}"
         extra_vars+=(-e "spoke_lockdown_uri=${SPOKE_LOCKDOWN_URI}")
+        # version is intentionally omitted in lockdown mode: mirror-spoke-operators.yml
+        # extracts spoke_ocp_version from the lockdown and overwrites the version fact,
+        # so passing it here would be redundant and could mask lockdown mismatches.
     else
         extra_vars+=(-e "version=${VERSION}")
     fi
 
     if [[ "${GENERATE_SPOKE_LOCKDOWN:-false}" == "true" ]]; then
         echo "Spoke lockdown generation enabled"
-        extra_vars+=(-e "generate_spoke_lockdown=true")
+        local timestamp
+        timestamp=$(date -u +%Y%m%d_%H%M%S)
+        local lockdown_filename="lockdown-spoke-${VERSION:-unknown}-${ARCHITECTURE:-x86_64}-${timestamp}-${BUILD_ID:-0}-prow.json"
+        # lockdown_output_file is what the playbook checks to trigger generation:
+        #   ocp_operator_mirror_generate_lockdown: "{{ (lockdown_output_file | default('') | length > 0) }}"
+        # Write to /tmp on the bastion (tasks run via SSH there, not inside the container).
+        extra_vars+=(-e "lockdown_output_file=/tmp/${lockdown_filename}")
         extra_vars+=(-e "hub_name=${HUB_CLUSTER}")
-        extra_vars+=(-e "architecture=${ARCHITECTURE:-x86_64}")
+        # Prow exposes BUILD_ID; use it as build_number for lockdown metadata.
+        extra_vars+=(-e "build_number=${BUILD_ID:-0}")
+        # In lockdown-validation mode (SPOKE_LOCKDOWN_URI set) architecture is extracted
+        # from the lockdown JSON — do not override it here.
+        if [[ -z "${SPOKE_LOCKDOWN_URI:-}" ]]; then
+            extra_vars+=(-e "architecture=${ARCHITECTURE:-x86_64}")
+        fi
     fi
 
     ansible-playbook ./playbooks/telco-kpis/mirror-spoke-operators.yml \

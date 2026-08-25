@@ -8,6 +8,9 @@ ref:
     name: sa-claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
   - namespace: test-credentials
+    name: sa-codex-openshift-ci
+    mount_path: /var/run/codex-openai-api-key
+  - namespace: test-credentials
     name: trt-alert-slack-webhook-url
     mount_path: /var/run/slack-webhook
   - namespace: test-credentials
@@ -32,7 +35,54 @@ ref:
   - name: GOOGLE_APPLICATION_CREDENTIALS
     default: "/var/run/claude-code-service-account/google-token"
   - name: CLAUDE_MODEL
-    default: "claude-opus-4-6"
+    default: "claude-opus-5"
+  - name: CODEX_MODEL
+    default: "gpt-5.6-sol"
+  - name: OPENAI_API_KEY_PATH
+    default: "/var/run/codex-openai-api-key/token"
+    documentation: |-
+      Path to the OpenAI API key mounted from the
+      sa-codex-openshift-ci secret. The key is exported as
+      OPENAI_API_KEY only when the Codex harness is selected.
+  - name: AGENT_HARNESS
+    default: "claude-code"
+    documentation: |-
+      Agentic CI harness used for payload analysis. Supported values are
+      claude-code and codex.
+  - name: AGENT_EFFORT
+    default: "low"
+    documentation: |-
+      Default effort used by the selected agent harness. Supported Claude
+      values are low, medium, high, xhigh, and max. Supported Codex values
+      are minimal, low, medium, high, xhigh, and max.
+  - name: MULTISTAGE_PARAM_OVERRIDE_AGENT_HARNESS
+    default: ""
+    documentation: |-
+      Gangway API override for AGENT_HARNESS. Supported values are
+      claude-code and codex. Codex uses the API key mounted from the
+      sa-codex-openshift-ci secret. When triggering via Gangway, this can
+      be combined with model and effort overrides:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_AGENT_HARNESS": "codex",
+          "MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL": "gpt-5.6-sol",
+          "MULTISTAGE_PARAM_OVERRIDE_AGENT_EFFORT": "high"
+        }
+      }
+  - name: MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL
+    default: ""
+    documentation: |-
+      Gangway API override for the model used by the selected agent
+      harness. When unset, CLAUDE_MODEL or CODEX_MODEL supplies the
+      harness-specific default.
+  - name: MULTISTAGE_PARAM_OVERRIDE_AGENT_EFFORT
+    default: ""
+    documentation: |-
+      Gangway API override for the effort used by the selected agent
+      harness. Supported Claude values are low, medium, high, xhigh, and
+      max. Supported Codex values are minimal, low, medium, high, xhigh,
+      and max, subject to model support. When unset, AGENT_EFFORT supplies
+      the configured default.
   - name: SLACK_WEBHOOK_URL
     default: "/var/run/slack-webhook/url"
   - name: GITHUB_TOKEN_PATH
@@ -56,7 +106,7 @@ ref:
   timeout: 12h0m0s
   grace_period: 1m0s
   documentation: |-
-    Analyzes rejected release payloads using Claude AI. Creates a
-    deterministic snapshot of payload data, then runs the
-    payload-analysis skill to identify root causes and generate an
-    HTML report with revert recommendations.
+    Analyzes rejected release payloads using a configurable AI coding
+    agent harness. Creates a deterministic snapshot of payload data,
+    then runs the payload-analysis skill to identify root causes and
+    generate an HTML report with revert recommendations.

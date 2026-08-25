@@ -407,7 +407,6 @@ generate_workflow azure azure-qe sandboxed-containers-operator-e2e-azure coco >>
 generate_workflow aro azure-qe sandboxed-containers-operator-e2e-aro peerpods >> "${OUTPUT_FILE}"
 generate_workflow aro azure-qe sandboxed-containers-operator-e2e-aro coco >> "${OUTPUT_FILE}"
 generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws peerpods >> "${OUTPUT_FILE}"
-generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws coco >> "${OUTPUT_FILE}"
 	cat >> "${OUTPUT_FILE}" <<EOF
 zz_generated_metadata:
   branch: devel
