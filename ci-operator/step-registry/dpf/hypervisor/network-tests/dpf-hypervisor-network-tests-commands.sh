@@ -35,21 +35,6 @@ cp "${SHARED_DIR}/.env" .env
 echo "Verifying cluster access..."
 oc get nodes
 
-# Select two worker-dpu nodes
-TFT_SERVER_NODE=$(oc get nodes --no-headers | grep worker-dpu | awk 'NR==1 {print $1}')
-TFT_CLIENT_NODE=$(oc get nodes --no-headers | grep worker-dpu | awk 'NR==2 {print $1}')
-
-if [[ -z "${TFT_SERVER_NODE}" ]] || [[ -z "${TFT_CLIENT_NODE}" ]]; then
-    echo "ERROR: Need at least 2 worker-dpu nodes, found:"
-    oc get nodes --no-headers | grep worker-dpu || true
-    exit 1
-fi
-
-echo "TFT_SERVER_NODE=${TFT_SERVER_NODE}"
-echo "TFT_CLIENT_NODE=${TFT_CLIENT_NODE}"
-
-export TFT_SERVER_NODE
-export TFT_CLIENT_NODE
 export TFT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export TFT_EXTERNAL_SERVER="${REMOTE_HOST}:5201"
 
