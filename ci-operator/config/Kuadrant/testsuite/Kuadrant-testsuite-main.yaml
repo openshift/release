@@ -1,0 +1,89 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  libvirt-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: libvirt-installer
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM quay.io/kuadrant/testsuite:latest
+    to: kuadrant-testsuite
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  ppc64le-latest:
+    candidate:
+      architecture: ppc64le
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-ppc64le
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: libvirt-ppc64le-s2s
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.22"
+      COMPUTE_COUNT: "2"
+      CONTROL_COUNT: "3"
+      # Larger guests than upi-install-libvirt defaults (24567 MiB / 10 vCPU).
+      # Matches multiarch libvirt DOMAIN_MEMORY bumps; helps Kuadrant/Istio +
+      # in-cluster testsuite Job on the 2 compute workers.
+      DOMAIN_MEMORY: "34816"
+      DOMAIN_VCPUS: "16"
+      COREDNS_LB_HOST: "241"
+      COREDNS_ZONE: k.example.com
+      ETCD_DISK_SPEED: slow
+      ISTIO_CONTROL_NAMESPACE: openshift-operators
+      ISTIO_VERSION: v1.30-latest
+      KUADRANT_CATALOG_SOURCE: redhat-operators
+      KUADRANT_CHANNEL: stable
+      KUADRANT_SUBSCRIPTION_NAME: rhcl-operator
+      NODE_TUNING: "true"
+      OSSM_STARTING_CSV: servicemeshoperator3.v3.4.1
+      RHCL_STARTING_CSV: rhcl-operator.v1.4.2
+      # xdist workers on the in-cluster Job (paired with Job CPU below).
+      PYTEST_FLAGS: -n4
+      RUN_SMOKE: "true"
+      RUN_AUTHORINO: "false"
+      RUN_LIMITADOR: "false"
+      RUN_DNSTLS: "false"
+      RUN_OBSERVABILITY: "false"
+      RUN_KUADRANT: "true"
+      USE_EXTERNAL_DNS: "true"
+      USE_RAMFS: "true"
+    workflow: kuadrant-ppc64le
+zz_generated_metadata:
+  branch: main
+  org: Kuadrant
+  repo: testsuite
