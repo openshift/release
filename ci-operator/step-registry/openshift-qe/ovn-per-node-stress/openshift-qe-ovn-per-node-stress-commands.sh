@@ -17,6 +17,9 @@ STRESS_IMAGE="${STRESS_IMAGE:-quay.io/centos/centos:stream9}"
 STRESS_TIMEOUT="${STRESS_TIMEOUT:-45m}"
 REPORT="${ARTIFACT_DIR}/ovn-per-node-stress.log"
 FAILURES=0
+STRESS_FAILED=false
+DEBUG_NAMESPACE="${DEBUG_NAMESPACE:-default}"
+SCALE_BATCH="${SCALE_BATCH:-100}"
 
 log() {
     echo "$*" | tee -a "${REPORT}"
@@ -25,9 +28,37 @@ log() {
 cleanup() {
     set +e
     oc scale deployment --all --replicas=0 -n "${STRESS_NAMESPACE}" --request-timeout=120s 2>/dev/null || true
-    oc delete namespace "${STRESS_NAMESPACE}" --wait=false --request-timeout=120s 2>/dev/null || true
+    if ! ${STRESS_FAILED}; then
+        oc delete namespace "${STRESS_NAMESPACE}" --wait=false --request-timeout=120s 2>/dev/null || true
+    else
+        log "Keeping namespace ${STRESS_NAMESPACE} after failure for gather artifacts"
+    fi
 }
 trap cleanup EXIT
+
+log_pod_failures() {
+    local node="$1"
+    local dep_name="$2"
+    local create_err running stuck
+    create_err=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | awk '$3=="CreateContainerError"{c++} END{print c+0}')
+    running=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | awk '$3=="Running"{c++} END{print c+0}')
+    stuck=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | awk '$3=="ContainerCreating"{c++} END{print c+0}')
+    log "Pod status on ${node}: Running=${running} ContainerCreating=${stuck} CreateContainerError=${create_err}"
+    oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null \
+        | awk '{print $3}' | sort | uniq -c | sort -rn | tee -a "${REPORT}" || true
+    local sample
+    sample=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | awk '$3!="Running"{print $1; exit}')
+    if [[ -n "${sample}" ]]; then
+        log "Sample failing pod ${sample} events:"
+        oc describe pod -n "${STRESS_NAMESPACE}" "${sample}" 2>/dev/null | grep -A15 '^Events:' | tee -a "${REPORT}" || true
+    fi
+}
+
+node_debug() {
+    local node="$1"
+    shift
+    oc debug -n "${DEBUG_NAMESPACE}" "node/${node}" -- "$@"
+}
 
 mkdir -p "${ARTIFACT_DIR}"
 : > "${REPORT}"
@@ -121,10 +152,37 @@ PY
 
 prepull_image() {
     local node="$1"
-    log "Pre-pulling ${STRESS_IMAGE} on ${node}..."
-    oc debug "node/${node}" -- chroot /host crictl pull "${STRESS_IMAGE}" >> "${REPORT}" 2>&1 || {
-        log "WARN: pre-pull failed on ${node}; continuing anyway"
-    }
+    log "Pre-pulling ${STRESS_IMAGE} on ${node} (oc debug -n ${DEBUG_NAMESPACE})..."
+    if ! node_debug "${node}" chroot /host crictl pull "${STRESS_IMAGE}" >> "${REPORT}" 2>&1; then
+        log "ERROR: pre-pull failed on ${node}; cannot burst ${PODS_PER_NODE} pods without cached image"
+        STRESS_FAILED=true
+        FAILURES=$((FAILURES + 1))
+        return 1
+    fi
+    log "Pre-pull succeeded on ${node}"
+}
+
+wait_for_running_on_node() {
+    local node="$1"
+    local want="$2"
+    local timeout="${3:-15m}"
+    local timeout_min="${timeout%m}"
+    local running stuck create_err
+    for _ in $(seq 1 $((timeout_min * 6))); do
+        running=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | awk '$3=="Running"{c++} END{print c+0}')
+        stuck=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | awk '$3=="ContainerCreating"{c++} END{print c+0}')
+        create_err=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | awk '$3=="CreateContainerError"{c++} END{print c+0}')
+        if [[ "${create_err}" -gt 0 ]]; then
+            log "ERROR: ${create_err} CreateContainerError on ${node} at replica target ${want}"
+            return 1
+        fi
+        if [[ "${running}" -ge "${want}" ]]; then
+            return 0
+        fi
+        sleep 10
+    done
+    log "TIMEOUT: ${node} reached Running=${running}, wanted ${want} within ${timeout}"
+    return 1
 }
 
 deploy_on_node() {
@@ -133,7 +191,9 @@ deploy_on_node() {
     dep_name="${dep_name//./-}"
 
     expand_node_subnet "${node}"
-    prepull_image "${node}"
+    if ! prepull_image "${node}"; then
+        return 1
+    fi
 
     log ""
     log "=== Deploying ${PODS_PER_NODE} pods on ${node} (deployment ${dep_name}) ==="
@@ -147,7 +207,7 @@ metadata:
   name: ${dep_name}
   namespace: ${STRESS_NAMESPACE}
 spec:
-  replicas: ${PODS_PER_NODE}
+  replicas: 0
   selector:
     matchLabels:
       app: ${dep_name}
@@ -176,14 +236,29 @@ spec:
             memory: 32Mi
 EOF
 
-    local end_ts running stuck cc
+    local target end_ts running stuck cc
+    target=0
+    while [[ ${target} -lt "${PODS_PER_NODE}" ]]; do
+        target=$((target + SCALE_BATCH))
+        if [[ ${target} -gt "${PODS_PER_NODE}" ]]; then
+            target=${PODS_PER_NODE}
+        fi
+        log "Scaling ${dep_name} to ${target} replicas on ${node}..."
+        oc scale "deployment/${dep_name}" -n "${STRESS_NAMESPACE}" --replicas="${target}"
+        if ! wait_for_running_on_node "${node}" "${target}" "15m"; then
+            log "FAIL: ${node} did not reach ${target} Running during ramp-up"
+            log_pod_failures "${node}" "${dep_name}"
+            STRESS_FAILED=true
+            FAILURES=$((FAILURES + 1))
+            return 1
+        fi
+    done
+
     if ! end_ts=$(oc wait "deployment/${dep_name}" -n "${STRESS_NAMESPACE}" \
         --for=condition=Available --timeout="${STRESS_TIMEOUT}" -o jsonpath='{.status.conditions[?(@.type=="Available")].lastUpdateTime}' 2>>"${REPORT}"); then
-        running=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | awk '$3=="Running"{c++} END{print c+0}')
-        stuck=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | awk '$3=="ContainerCreating"{c++} END{print c+0}')
-        log "FAIL: ${node} did not reach ${PODS_PER_NODE} Available within ${STRESS_TIMEOUT} (Running=${running}, ContainerCreating=${stuck})"
-        oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null \
-            | awk '{print $3}' | sort | uniq -c | sort -rn | tee -a "${REPORT}" || true
+        log "FAIL: ${node} deployment not Available within ${STRESS_TIMEOUT}"
+        log_pod_failures "${node}" "${dep_name}"
+        STRESS_FAILED=true
         FAILURES=$((FAILURES + 1))
         return 1
     fi
@@ -191,13 +266,15 @@ EOF
     running=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | awk '$3=="Running"{c++} END{print c+0}')
     stuck=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | awk '$3=="ContainerCreating"{c++} END{print c+0}')
     cc=$(oc get pods -n "${STRESS_NAMESPACE}" --field-selector "spec.nodeName=${node}" --no-headers 2>/dev/null | wc -l)
-    ovs_count=$(oc debug "node/${node}" -- chroot /host pgrep -c ovs-vsctl 2>/dev/null || echo 0)
+    ovs_count=$(node_debug "${node}" chroot /host pgrep -c ovs-vsctl 2>/dev/null || echo 0)
 
     log "PASS: ${node} Running=${running} total_on_node=${cc} ContainerCreating=${stuck} ovs-vsctl=${ovs_count}"
     log "  started: ${start_ts}  available: ${end_ts}"
 
     if [[ "${running}" -lt "${PODS_PER_NODE}" ]] || [[ "${stuck}" -gt 0 ]]; then
         log "FAIL: ${node} expected ${PODS_PER_NODE} Running with 0 ContainerCreating"
+        log_pod_failures "${node}" "${dep_name}"
+        STRESS_FAILED=true
         FAILURES=$((FAILURES + 1))
         return 1
     fi
@@ -216,5 +293,6 @@ log "  failures: ${FAILURES}"
 log "========================================"
 
 if [[ ${FAILURES} -gt 0 ]]; then
+    STRESS_FAILED=true
     exit 1
 fi
