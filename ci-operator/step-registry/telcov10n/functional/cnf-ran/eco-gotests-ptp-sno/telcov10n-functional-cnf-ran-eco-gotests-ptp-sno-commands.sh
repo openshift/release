@@ -85,12 +85,26 @@ declare -A PTP_CYCLE_NAMES=( [0]="BC-OC" [1]="OC-2-PORT" [2]="T-TSC" [3]="T-BC" 
 for i in 0 1 2 3; do
   local_dir="${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}-${PTP_CYCLE_NAMES[$i]}"
   mkdir -p "${local_dir}"
-  scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
-    "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_ptp_${i}/report/*.xml" \
-    "${local_dir}/" || echo "No XML artifacts in eco_gotests_ptp_${i} — skipping"
-  scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
-    "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_ptp_${i}/report/console.log" \
-    "${local_dir}/" 2>/dev/null || echo "No console.log in eco_gotests_ptp_${i} — skipping"
+  if ! xml_output=$(scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+      "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_ptp_${i}/report/*.xml" \
+      "${local_dir}/" 2>&1); then
+    if grep -q "No such file or directory" <<<"${xml_output}"; then
+      echo "No XML artifacts in eco_gotests_ptp_${i} — skipping"
+    else
+      echo "${xml_output}" >&2
+      exit 1
+    fi
+  fi
+  if ! console_output=$(scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+      "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_ptp_${i}/report/console.log" \
+      "${local_dir}/" 2>&1); then
+    if grep -q "No such file or directory" <<<"${console_output}"; then
+      echo "No console.log in eco_gotests_ptp_${i} — skipping"
+    else
+      echo "${console_output}" >&2
+      exit 1
+    fi
+  fi
   ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
     "cd /tmp/eco_gotests_ptp_${i}/report && find . -mindepth 1 ! -name '*.xml' ! -name 'console.log' -type f \
      | zip /tmp/k8sreporter_ptp_${i}.zip -@ 2>/dev/null || true"
