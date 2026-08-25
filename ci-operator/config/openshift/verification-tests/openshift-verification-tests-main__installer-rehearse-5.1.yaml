@@ -61,6 +61,20 @@ tests:
     env:
       MINIMAL_PERMISSIONS_WITHOUT_DNS: "yes"
     workflow: cucushift-installer-rehearse-gcp-ipi-custom-dns
+- as: installer-rehearse-aws-proxy
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build05.ci.openshift.org/ci-ln-sf5bgyt/release:latest
+      PROXY_NO_PROXY: .cluster.local,.svc,10.128.0.0/14,169.254.169.254
+      SLEEP_DURATION: 9h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-provision
 - as: installer-rehearse-gcp-regions
   cron: '@yearly'
   steps:
