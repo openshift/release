@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+sleep 10
 INSTALL_DIR=/tmp
 
 trap 'prepare_next_steps' EXIT TERM
