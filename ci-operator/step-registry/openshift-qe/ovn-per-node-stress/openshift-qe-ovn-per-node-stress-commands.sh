@@ -72,7 +72,7 @@ log "========================================"
 log ""
 
 log "=== Waiting for worker maxPods=${MAX_PODS} ==="
-for i in $(seq 1 80); do
+for _ in $(seq 1 80); do
     read -r -a caps <<< "$(oc get nodes -l node-role.kubernetes.io/worker= \
         -o jsonpath='{range .items[*]}{.status.capacity.pods}{" "}{end}')"
     if [[ ${#caps[@]} -gt 0 ]] && [[ "${caps[*]// /}" != "" ]]; then
