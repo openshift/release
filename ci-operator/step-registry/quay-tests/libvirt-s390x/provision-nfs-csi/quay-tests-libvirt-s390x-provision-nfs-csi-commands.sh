@@ -41,8 +41,8 @@ fi
 if [[ ! -f "${GIT_URL_FILE}" ]]; then
   echo "ERROR: Git repo URL file not found: ${GIT_URL_FILE}"
   echo "The env default is a pod file path, not a Vault path."
-  echo "Add Vault field key/csi-provisioner-git-url to hypershift-agent-ibmz-credentials"
-  echo "and ensure ci-secret-bootstrap syncs it to build12:test-credentials."
+  echo "Expected ocp-addons-key secret keys at ${CREDENTIALS_DIR}/csi-provisioner-git-url"
+  echo "and ${CREDENTIALS_DIR}/csi_provisioner_git_key (see listing above)."
   exit 1
 fi
 
