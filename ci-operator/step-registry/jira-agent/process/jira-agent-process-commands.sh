@@ -114,6 +114,10 @@ case "$AGENT_HARNESS" in
     ;;
   codex)
     echo "Installing Codex plugins..."
+    if ! mkdir -p "$CODEX_HOME"; then
+      echo "ERROR: Unable to create CODEX_HOME at $CODEX_HOME"
+      exit 1
+    fi
     codex plugin marketplace add /opt/ai-helpers
     codex plugin marketplace add RedHatProductSecurity/prodsec-skills
     codex plugin add openshift-developer@ai-helpers
