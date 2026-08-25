@@ -635,11 +635,20 @@ kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
 
 if [[ $OO_INDEX == "" ]];then
     origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+    mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 else
     origin_index_image="$OO_INDEX"
+    # Route the override through the pull-through proxy that fronts its registry, so
+    # OO_INDEX also takes effect on non-C2S clusters. There mirror_optional_images is
+    # never called, and the catalogsource pulls mirror_index_image directly; without
+    # this the override silently had no effect and the job stayed pinned to the
+    # kube-version-derived aosqe-index tag.
+    case "$OO_INDEX" in
+        quay.io/*) mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/${OO_INDEX#quay.io/}" ;;
+        */*/*)     mirror_index_image="${MIRROR_PROXY_REGISTRY}/${OO_INDEX#*/}" ;;
+        *)         mirror_index_image="$OO_INDEX" ;;
+    esac
 fi
-
-mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 echo "origin_index_image: ${origin_index_image}"
 echo "mirror_index_image: ${mirror_index_image}"
 
