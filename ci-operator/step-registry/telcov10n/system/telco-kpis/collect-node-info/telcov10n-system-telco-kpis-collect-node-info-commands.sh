@@ -37,6 +37,7 @@ main() {
         -e spoke_cluster="${SPOKE_CLUSTER}" \
         -e spoke_kubeconfig="${SPOKE_KUBECONFIG}" \
         -e skip_rebuild_image="${SKIP_REBUILD_IMAGE}" \
+        -e report_headline="${REPORT_HEADLINE:-}" \
         ${DEBUG_FLAG}
 
     echo "Copy artifacts to ARTIFACT_DIR and SHARED_DIR"
