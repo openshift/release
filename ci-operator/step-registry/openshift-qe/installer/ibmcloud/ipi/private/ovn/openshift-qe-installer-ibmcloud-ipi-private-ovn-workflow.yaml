@@ -1,0 +1,43 @@
+workflow:
+  as: openshift-qe-installer-ibmcloud-ipi-private-ovn
+  steps:
+    pre:
+    - ref: ibmcloud-provision-resourcegroup
+    - ref: ibmcloud-provision-vpc
+    - ref: ibmcloud-provision-vpc-endpoints-gateway
+    - chain: ibmcloud-provision-bastionhost
+    - ref: proxy-config-generate
+    - chain: ipi-conf-ibmcloud
+    - ref: ipi-conf-ibmcloud-provisionednetwork
+    - ref: ipi-conf-ibmcloud-custom-endpoints
+    - ref: ovn-conf
+    - chain: ipi-install
+    - chain: create-infra-move-ingress-monitoring-registry
+    post:
+    - ref: gather-proxy
+    - ref: gather-installer-boostrap-logs-in-bastion
+    - ref: ibmcloud-deprovision-bastionhost
+    - ref: ibmcloud-deprovision-vpc-resources
+    - ref: ibmcloud-deprovision-vpc
+    - ref: ibmcloud-deprovision-resourcegroup
+    - chain: ipi-deprovision
+    env:
+      BASE_DOMAIN: ibmcloud-perfscale-private.private-cloud.com
+      IBMCLOUD_DNS_INSTANCE_NAME: ibmcloud-perfscale-private
+      PUBLISH: Internal
+      SERVICE_ENDPOINT_IAM: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_VPC: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_ResourceController: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_ResourceManager: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_DNSServices: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_COS: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_GlobalSearch: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_GlobalTagging: DEFAULT_ENDPOINT
+      SERVICE_ENDPOINT_KeyProtect: DEFAULT_ENDPOINT
+  documentation: |-
+    IBMCloud IPI Private OVN provision and deprovision workflow with bastion host.
+    Uses PUBLISH: Internal to create a private cluster with IBM Cloud DNS Services
+    (no CIS required). A bastion host with Squid proxy provides external access
+    to the private cluster API. VPC endpoint gateways provide private network
+    access to IBM Cloud services. Includes creating infra nodes and moving
+    ingress, monitoring, and registry to infra nodes.
