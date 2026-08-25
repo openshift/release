@@ -5,10 +5,6 @@ set -o errexit
 set -o pipefail
 
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-# Use mounted registry-pull-credentials secret.
-# $CLUSTER_PROFILE_DIR/pull-secret cannot be used here.
-# It doesn't have the auths for the CI build registries (e.g. registry.build01.ci.openshift.org).
 CI_REGISTRY_PULL_SECRET="/var/run/albo/registry/.dockerconfigjson"
 REGION="${LEASED_RESOURCE}"
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
@@ -38,11 +34,24 @@ else
     echo "Did not find compatible cloud provider cluster_profile"; exit 1
 fi
 
-if [ ! -z "${ROSA_TOKEN}" ]; then
-    echo "Logging into staging with offline token using rosa cli $(rosa version)"
-    rosa login --env "staging" --token "${ROSA_TOKEN}" || { echo "Login failed"; exit 1; }
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+    echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials using rosa cli $(rosa version)"
+    rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}" || { echo "Login failed"; exit 1; }
+elif [[ -n "${ROSA_TOKEN}" ]]; then
+    echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli $(rosa version)"
+    rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}" || { echo "Login failed"; exit 1; }
 else
-    echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"; exit 1
+    echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"; exit 1
 fi
 
 echo "=> getting identity provider name"
