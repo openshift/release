@@ -156,9 +156,10 @@ spec:
         - --dispatch-override-namespace=ci
         - --control-api-token-path=/etc/dispatcher-control/token
         - --dispatch-command-channel-id=$(DISPATCH_COMMAND_CHANNEL_ID)
-        - --enable-runtime-capacity=false
-        - --enable-runtime-drain=false
-        - --enable-runtime-capability-scope=false
+        - --enable-runtime-capacity=true
+        - --enable-runtime-drain=true
+        - --enable-runtime-capability-scope=true
+        - --scheduler-propagation-bound=3m
         - --enable-legacy-event-endpoint=false
         - --slack-token-path=/etc/slack/oauth_token
         - --self-approve=true
@@ -166,6 +167,7 @@ spec:
         - --prometheus-bearer-token-path=/etc/prometheus/token
         - --prometheus-days-before=14
         - --create-pr=true
+        - --fallback-observer-token-path=/etc/dispatcher-fallback-observer/token
         env:
         - name: DISPATCH_COMMAND_CHANNEL_ID
           valueFrom:
@@ -204,6 +206,9 @@ spec:
           readOnly: true
         - name: release
           mountPath: /var/repo
+        - mountPath: /etc/dispatcher-fallback-observer
+          name: dispatcher-fallback-observer
+          readOnly: true
       - name: git-sync
         resources:
           requests:
@@ -240,6 +245,9 @@ spec:
           secretName: app-ci-openshift-user-workload-monitoring-credentials
       - name: release
         emptyDir: {}
+      - name: dispatcher-fallback-observer
+        secret:
+          secretName: prowjob-dispatcher-fallback-observer
       - name: token
         secret:
           secretName: github-credentials-openshift-bot
