@@ -165,7 +165,7 @@ if ! npm install; then
 fi
 
 echo "--- Running Cypress @ols tests ---"
-npx cypress run --browser chrome --headless --env grepTags='@ols --@flaky --@demo --@xfail'
+npm run test-cypress-perses-ols
 ret=$?
 if [[ ${ret} -ne 0 ]]; then
   echo "Cypress tests failed with exit code ${ret}, continuing to allow subsequent steps to run."
