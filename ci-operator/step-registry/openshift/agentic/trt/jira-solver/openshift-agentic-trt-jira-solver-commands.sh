@@ -25,7 +25,6 @@ fi
 echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
 
 # --- Metrics instrumentation ---
-EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 
 agentic_ci() {

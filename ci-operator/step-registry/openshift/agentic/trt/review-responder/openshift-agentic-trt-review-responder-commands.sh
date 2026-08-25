@@ -19,7 +19,6 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
 fi
 
 # --- Metrics instrumentation ---
-EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 
 agentic_ci() {
