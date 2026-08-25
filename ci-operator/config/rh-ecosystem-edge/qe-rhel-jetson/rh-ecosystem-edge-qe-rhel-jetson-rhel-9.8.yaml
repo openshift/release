@@ -11,6 +11,7 @@ build_root:
 images:
   items:
   - dockerfile_literal: |
+      FROM src AS source
       FROM ubi-python
       USER 0
       RUN dnf install -y git && \
@@ -18,15 +19,14 @@ images:
           ln -sf /usr/bin/pip3.12 /usr/bin/pip && \
           pip install --no-cache-dir ruff pytest PyYAML requests paramiko && \
           dnf clean all
-      COPY . /workspace/
+      COPY --from=source /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson /workspace
       WORKDIR /workspace
       USER 1001
     from: ubi-python
     inputs:
       src:
-        paths:
-        - destination_dir: .
-          source_path: /go/src/github.com/rh-ecosystem-edge/qe-rhel-jetson
+        as:
+        - src
     to: qe-rhel-jetson
 resources:
   '*':
