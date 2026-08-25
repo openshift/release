@@ -101,7 +101,7 @@ server_name="${CLUSTER_NAME}-buildhost"
 MACHINE_TYPE="n4-standard-8"
 gcloud compute instances create "${server_name}" \
 	${IMAGE_ARGS} \
-	--boot-disk-type pd-ssd \
+	--boot-disk-type hyperdisk-balanced \
 	--boot-disk-size=200GB \
 	--machine-type=${MACHINE_TYPE} \
 	--metadata ssh-keys="${SSH_USER}:$(cat ${SHARED_DIR}/vpc-sshkey.pub)" \
