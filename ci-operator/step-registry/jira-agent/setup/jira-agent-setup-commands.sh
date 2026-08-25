@@ -7,6 +7,8 @@ AGENT_MODEL="${CLAUDE_MODEL:-${JIRA_AGENT_MODEL:-gpt-5.6-sol}}"
 AGENT_HARNESS="${JIRA_AGENT_HARNESS:-}"
 AGENT_EFFORT="${JIRA_AGENT_EFFORT:-xhigh}"
 OPENAI_API_KEY_PATH="${OPENAI_API_KEY_PATH:-/var/run/codex-openai-api-key/token}"
+CODEX_HOME="${CODEX_HOME:-/workspace/jira-agent-codex-home}"
+export CODEX_HOME
 if [ -z "$AGENT_HARNESS" ]; then
   case "$AGENT_MODEL" in
     gpt-*) AGENT_HARNESS="codex" ;;
@@ -59,6 +61,7 @@ umask 077
   printf 'export AGENT_HARNESS=%q\n' "$AGENT_HARNESS"
   printf 'export AGENT_EFFORT=%q\n' "$AGENT_EFFORT"
   printf 'export OPENAI_API_KEY_PATH=%q\n' "$OPENAI_API_KEY_PATH"
+  printf 'export CODEX_HOME=%q\n' "$CODEX_HOME"
 } > "$AGENT_CONFIG_FILE"
 
 echo "Setup complete"

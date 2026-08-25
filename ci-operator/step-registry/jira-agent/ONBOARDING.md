@@ -17,6 +17,8 @@ The jira-agent runs as a periodic Prow job that:
 
 Codex reports include token counts and wall-clock duration. Because Codex phase JSONL does not
 include pricing, Codex cost is shown as unavailable; Claude phases retain native OTEL cost metrics.
+The default `CODEX_HOME` is `/workspace/jira-agent-codex-home`, a writable location that allows
+Codex to create its per-invocation helper aliases when Prow uses a random UID.
 
 Your team creates a **thin workflow YAML** that sets team-specific env vars and references the generic step registry components. No bash scripting required.
 
@@ -214,6 +216,7 @@ Find Slack member IDs by viewing a user's profile in Slack and clicking "Copy me
 | `JIRA_AGENT_HARNESS` | No | Auto-selected | Optional `codex` or `claude-code` override |
 | `CLAUDE_MODEL` | No | — | Deprecated compatibility override for `JIRA_AGENT_MODEL` |
 | `OPENAI_API_KEY_PATH` | No | `/var/run/codex-openai-api-key/token` | OpenAI API key path when Codex is selected |
+| `CODEX_HOME` | No | `/workspace/jira-agent-codex-home` | Writable Codex home directory for runtime plugin and helper-alias state |
 | `JIRA_BASE_URL` | No | `https://redhat.atlassian.net` | Jira instance base URL |
 
 ## Jira Setup

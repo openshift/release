@@ -14,6 +14,8 @@ the generic step registry components. No bash scripting required.
 Codex phases expose token counts and wall-clock duration from their JSONL output. Codex does
 not provide pricing in the phase stream, so reports mark cost as unavailable rather than
 reporting a false zero; Claude phases continue to use native OTEL cost metrics.
+The workflow uses a writable `/workspace`-based `CODEX_HOME` by default so Codex can create
+its per-invocation helper aliases under Prow's random runtime UID.
 
 ## Quick Start
 
