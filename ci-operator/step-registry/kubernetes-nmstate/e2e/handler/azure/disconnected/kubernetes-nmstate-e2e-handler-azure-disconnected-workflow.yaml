@@ -1,0 +1,23 @@
+workflow:
+  as: kubernetes-nmstate-e2e-handler-azure-disconnected
+  steps:
+    env:
+      SKIP_IMAGE_BUILD: "true"
+      IMAGE_BUILDER: podman
+      HANDLER_NAMESPACE: openshift-nmstate
+      OPERATOR_NAMESPACE: openshift-nmstate
+    pre:
+    - chain: ipi-azure-pre-disconnected
+    test:
+    - ref: kubernetes-nmstate-e2e-handler
+    post:
+    - ref: gather-mirror-registry
+    - chain: gather-network
+    - chain: ipi-deprovision
+    - ref: azure-deprovision-resourcegroup
+  documentation: |-
+    Provision a disconnected OpenShift cluster on Azure, mirror the kubernetes-nmstate
+    handler and operator images into the bastion registry (via MIRROR_CUSTOM_IMAGES on
+    mirror-images-custom, inside ipi-azure-pre-disconnected), and run the handler e2e
+    tests. Set IP_FAMILY=DualStackIPv6Primary in the test to exercise the disconnected
+    IPv6 path. The resource-group deprovision removes the VNet and bastion.
