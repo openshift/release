@@ -7,19 +7,24 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.24-linux
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 build_root:
   from_repository: true
-canonical_go_repository: github.com/stolostron/search-collector
+canonical_go_repository: github.com/stolostron/search-v2-operator
 images:
   items:
   - dockerfile_path: Dockerfile
     from: base
-    to: search-collector
+    inputs:
+      stolostron_builder_go1.25-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+    to: search-v2-operator
 promotion:
   to:
-  - disabled: true
-    name: "5.1"
-    namespace: stolostron
   - disabled: true
     name: "5.2"
     namespace: stolostron
@@ -34,44 +39,17 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-collector
+      SOURCE_IMAGE_REF: search-v2-operator
     env:
-      IMAGE_REPO: search-collector
+      IMAGE_REPO: search-v2-operator
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: test-on-kind-cluster
-  steps:
-    env:
-      AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
-      AWS_INSTANCE_TYPE: t3.xlarge
-    post:
-    - ref: ocm-e2e-kind-destroy
-    pre:
-    - ref: ocm-ci-rbac
-    - ref: ocm-e2e-kind-create
-    test:
-    - as: e2e
-      commands: |
-        echo "COMPONENT_IMAGE_REF=$COMPONENT_IMAGE_REF"
-        export SELF="make -f Makefile.prow"
-        set -o pipefail
-        make -f Makefile.prow test-e2e
-        set +o pipefail
-      dependencies:
-      - env: COMPONENT_IMAGE_REF
-        name: search-collector
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ocm-e2e-kind
 - as: lint
   commands: |
     GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
   container:
     from: src
-- as: test-unit
+- as: unit-test
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow unit-test
@@ -80,9 +58,6 @@ tests:
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
-    export DEPLOYED_IN_HUB=true
-    export SONAR_GO_TEST_ARGS="./... -coverpkg=./..."
-    go clean -cache -modcache
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
@@ -90,6 +65,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-5.2
   org: openshift-priv
-  repo: stolostron-search-collector
+  repo: stolostron-search-v2-operator
