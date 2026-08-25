@@ -24,14 +24,10 @@ OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 
 agentic_ci() {
     local timeout_seconds=""
-    local model="${CLAUDE_MODEL}"
-    local log_file=""
     local extra_args=()
     while [[ "${1:-}" == --* ]]; do
         case "$1" in
             --timeout) timeout_seconds="$2"; shift 2 ;;
-            --model) model="$2"; shift 2 ;;
-            --log) log_file="$2"; shift 2 ;;
             *) extra_args+=("$1"); shift ;;
         esac
     done
@@ -40,12 +36,13 @@ agentic_ci() {
         agentic-ci run
         --backend local
         --harness claude-code
-        --model "${model}"
+        --model "${CLAUDE_MODEL}"
         --workdir "${WORKDIR}"
         "${extra_args[@]+"${extra_args[@]}"}"
         "${prompt}"
         --
         --permission-mode default
+        --allowedTools "${ALLOWED_TOOLS}"
         --verbose
         "$@"
     )
@@ -55,17 +52,9 @@ agentic_ci() {
     run_tmp=$(mktemp -d /tmp/agentic-ci-wrapper.XXXXXX)
     local rc=0
     if [[ -n "${timeout_seconds}" ]]; then
-        if [[ -n "${log_file}" ]]; then
-            TMPDIR="${run_tmp}" timeout "${timeout_seconds}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" | tee "${log_file}" >/dev/null || rc=${PIPESTATUS[0]}
-        else
-            TMPDIR="${run_tmp}" timeout "${timeout_seconds}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
-        fi
+        TMPDIR="${run_tmp}" timeout "${timeout_seconds}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
     else
-        if [[ -n "${log_file}" ]]; then
-            TMPDIR="${run_tmp}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" | tee "${log_file}" >/dev/null || rc=${PIPESTATUS[0]}
-        else
-            TMPDIR="${run_tmp}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
-        fi
+        TMPDIR="${run_tmp}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
     fi
     find "${run_tmp}" -name 'claude-otel.jsonl' -type f -exec cat {} + >> "${OTEL_LOG}" 2>/dev/null || true
     rm -rf "${run_tmp}"
@@ -376,22 +365,28 @@ while true; do
 
     echo "Running gate (${GATE_MODEL})..."
     GATE_LOG="${WORKDIR}/artifacts/gate-${iteration}.log"
+    # Direct claude, not agentic_ci: the gate needs --output-format text so we
+    # can grep COMMENT_WORK=/CI_WORK=/FAILING_CHECKS=. agentic-ci injects
+    # --include-partial-messages, which requires stream-json.
     set +e
-    agentic_ci --timeout 120 --model "${GATE_MODEL}" --log "${GATE_LOG}" \
-        "Decide if PR #${PR_NUM} in ${UPSTREAM_REPO} has review work. Execute the Gate Process Implementation steps with Bash. Do not invoke Skill or slash commands. This is CI mode (--ci).
+    timeout 120 claude \
+        --model "${GATE_MODEL}" \
+        --allowedTools "Bash" \
+        --disallowedTools "${DISALLOWED_TOOLS[@]}" \
+        --max-turns 20 \
+        --output-format text \
+        --append-system-prompt-file "${GATE_PROMPT}" \
+        -p "Decide if PR #${PR_NUM} in ${UPSTREAM_REPO} has review work. Execute the Gate Process Implementation steps with Bash. Do not invoke Skill or slash commands. This is CI mode (--ci).
 
 Our GitHub login is ${BOT_LOGIN}. Ignore comments from this login.
 Previous FAILING_CHECKS JSON array: ${PREV_FAILING}
 Previous HEAD_REF_OID: ${PREV_HEAD:-<none>}
 Current HEAD_REF_OID: ${current_head:-<none>}" \
-        --allowedTools "Bash" \
-        --disallowedTools "${DISALLOWED_TOOLS[@]}" \
-        --max-turns 20 \
-        --output-format text \
-        --append-system-prompt-file "${GATE_PROMPT}"
-    gate_rc=$?
+        --verbose 2>&1 | tee "${GATE_LOG}"
+    gate_rc=${PIPESTATUS[0]}
     set -e
     echo "Gate exit status: ${gate_rc}"
+    cat "${GATE_LOG}" >> "${WORKDIR}/artifacts/claude-output.log" 2>/dev/null || true
 
     if [[ "${gate_rc}" -ne 0 ]]; then
         gate_failures=$(( gate_failures + 1 ))
@@ -444,7 +439,6 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
                 "Address review comments on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the Review Response Process instructions in your system prompt. This is CI mode (--ci).
 
 Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login." \
-                --allowedTools "${ALLOWED_TOOLS}" \
                 --disallowedTools "${DISALLOWED_TOOLS[@]}" \
                 --output-format stream-json \
                 --append-system-prompt-file "${SYSTEM_PROMPT}" \
@@ -461,7 +455,6 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
 Read failing checks from ${CHECKS_FILE} and treat that JSON as --failing-checks.
 The git remote for ${UPSTREAM_REPO} is origin. Do not run git remote -v.
 Your GitHub login is ${BOT_LOGIN}." \
-                --allowedTools "${ALLOWED_TOOLS}" \
                 --disallowedTools "${DISALLOWED_TOOLS[@]}" \
                 --output-format stream-json \
                 --append-system-prompt-file "${CI_PROMPT}" \
