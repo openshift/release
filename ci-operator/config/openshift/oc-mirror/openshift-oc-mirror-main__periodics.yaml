@@ -10,6 +10,8 @@ promotion:
   - disabled: true
     name: "5.1"
     namespace: ocp
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -36,6 +38,11 @@ tests:
     env:
       ENABLE_IDMS: "yes"
       MIRROR_BIN: oc-mirror
+      TEST_STEPS: openshift-e2e-test mirror-images-by-oc-mirror mirror-images-by-oc-mirror-conf-mirror
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post-disconnected
+    - ref: mirror-images-by-oc-mirror-analyze-e2e-failure
     workflow: openshift-e2e-aws-disconnected
 zz_generated_metadata:
   branch: main
