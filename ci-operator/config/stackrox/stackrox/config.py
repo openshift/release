@@ -776,13 +776,13 @@ def check_configs(data):
         #   allow -stable, not -latest, for master
         #   no -stable or -latest tags for release branches
         # > latest is OK for in-flight PRs, but the check should still fail, to prevent merging such PR
+        tag = config.build_root_tag
         if config.branch == 'master':
             if 'latest' in tag:
                 check_error(f"{config.short_filename}: master branch '{config.branch}' "
                             f"must not use 'latest' build root tag '{tag}'. "
                             f"Pin to 'stable' or a specific version (e.g. stackrox-ui-test-0.5.7).")
         if config.branch.startswith('release-'):
-            tag = config.build_root_tag
             if not tag:
                 break
             if 'latest' in tag:
