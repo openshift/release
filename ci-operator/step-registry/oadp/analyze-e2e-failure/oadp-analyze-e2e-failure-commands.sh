@@ -65,10 +65,30 @@ fi
 echo "Claude Code CLI: $(claude --version 2>/dev/null || echo 'unknown')"
 
 # ---------------------------------------------------------------------------
+# 2b. Redact sensitive information before it ever reaches CI logs/artifacts
+# ---------------------------------------------------------------------------
+# Claude has Bash/Read/WebFetch access and reads must-gather/pod logs that may
+# themselves contain leaked credentials/tokens. Never stream its raw tool
+# output to stdout (Prow's build-log.txt is public); only a redacted summary
+# is ever printed or written to ARTIFACT_DIR.
+redact_secrets() {
+  sed -E \
+    -e 's/AKIA[0-9A-Z]{16}/[REDACTED-AWS-ACCESS-KEY]/g' \
+    -e 's/(aws_secret_access_key[" :=]+)[A-Za-z0-9/+=]{40}/\1[REDACTED-AWS-SECRET]/g' \
+    -e 's/"private_key": ?"-----BEGIN[^"]*END[^"]*"/"private_key": "[REDACTED-GCP-PRIVATE-KEY]"/g' \
+    -e 's/Bearer +[A-Za-z0-9._~+-]+=*/Bearer [REDACTED-TOKEN]/g' \
+    -e 's/(password[" :=]+)[^ "'"'"']+/\1[REDACTED-PASSWORD]/gi' \
+    -e 's/(api[_-]?key[" :=]+)[^ "'"'"']+/\1[REDACTED-APIKEY]/gi' \
+    -e 's/(token[" :=]+)[A-Za-z0-9._~+-]+=*/\1[REDACTED-TOKEN]/gi' \
+    -e 's/(secret[" :=]+)[^ "'"'"']{16,}/\1[REDACTED-SECRET]/gi' \
+    -e 's/eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/[REDACTED-JWT-TOKEN]/g' \
+    -e 's/-----BEGIN (RSA |EC )?PRIVATE KEY-----[^-]*-----END (RSA |EC )?PRIVATE KEY-----/[REDACTED-PRIVATE-KEY]/g'
+}
+
+# ---------------------------------------------------------------------------
 # 3. Run Claude with the pre-installed ai-helpers skill
 # ---------------------------------------------------------------------------
-echo "Prow job URL: $PROW_JOB_URL"
-echo "Failed step: $FAILED_STEP"
+echo "Analyzing failed step: $FAILED_STEP"
 
 SYSTEM_PROMPT="IMPORTANT CI CONTEXT:
 - You are running inside the CI job itself as a post-step.
@@ -103,7 +123,7 @@ timeout 1200 claude -p "/ci:prow-job-analysis ${PROW_JOB_URL} --fast" \
   --verbose \
   --output-format stream-json \
   2> "${ARTIFACT_DIR}/claude-failure-analysis.log" \
-  | tee "${ARTIFACT_DIR}/claude-failure-analysis.json"
+  > "${ARTIFACT_DIR}/claude-failure-analysis.json"
 CLAUDE_EXIT=$?
 set -e
 
@@ -134,15 +154,25 @@ NUM_TURNS=$(echo "$TOKENS_JSON" | jq -r '.num_turns // 0')
 
 jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' \
   "${ARTIFACT_DIR}/claude-failure-analysis.json" \
+  | redact_secrets \
   > "${ARTIFACT_DIR}/claude-failure-analysis-text.txt" 2>/dev/null || true
 
 echo "$TOKENS_JSON" > "${SHARED_DIR}/claude-failure-analysis-tokens.json" 2>/dev/null || true
+
+# Redact the report Claude wrote directly, and the raw stream-json transcript
+# (which can contain full tool-call inputs/outputs from artifacts it read),
+# in place before either is left in ARTIFACT_DIR for GCS upload.
+for f in "${ARTIFACT_DIR}/failure-analysis.md" "${ARTIFACT_DIR}/claude-failure-analysis.json" "${ARTIFACT_DIR}/claude-failure-analysis.log"; do
+  if [[ -f "$f" ]]; then
+    redact_secrets < "$f" > "${f}.redacted" 2>/dev/null && mv "${f}.redacted" "$f"
+  fi
+done
 
 echo ""
 echo "=== Failure Analysis Complete ==="
 echo "Claude exit code: $CLAUDE_EXIT"
 echo "Duration: ${DURATION_S}s"
 echo "Turns: ${NUM_TURNS}"
-echo "Analysis: ${ARTIFACT_DIR}/failure-analysis.md"
+echo "Analysis (redacted): ${ARTIFACT_DIR}/failure-analysis.md"
 
 exit 0
