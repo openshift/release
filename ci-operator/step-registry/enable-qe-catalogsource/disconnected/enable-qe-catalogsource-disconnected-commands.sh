@@ -647,17 +647,20 @@ if [[ $OO_INDEX != "" && $mirror -eq 0 ]]; then
     # Nothing re-publishes the override on a non-C2S cluster, so the catalogsource has
     # to pull it directly -- which in a disconnected install means going through one of
     # the pull-through proxies create_settled_icsp configures. Only those registries are
-    # fronted, so match them explicitly and fail loudly on anything else rather than
-    # building a reference the proxy cannot resolve.
+    # fronted, so match them explicitly and fall back to the canonical index on
+    # anything else rather than building a reference the proxy cannot resolve.
     case "$OO_INDEX" in
         quay.io/openshifttest/*|quay.io/openshift-qe-optional-operators/*|quay.io/olmqe/*)
             mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/${OO_INDEX#quay.io/}" ;;
         registry.redhat.io/*|brew.registry.redhat.io/*|registry.stage.redhat.io/*|registry-proxy.engineering.redhat.com/*)
             mirror_index_image="${MIRROR_PROXY_REGISTRY}/${OO_INDEX#*/}" ;;
         *)
-            echo "ERROR: OO_INDEX=${OO_INDEX} is not in a registry fronted by the mirror proxy."
-            echo "Supported: quay.io/{openshifttest,openshift-qe-optional-operators,olmqe}, registry.redhat.io, brew.registry.redhat.io, registry.stage.redhat.io, registry-proxy.engineering.redhat.com"
-            exit 1 ;;
+            # Not a registry the proxy fronts (for example a ci-operator pipeline
+            # pullspec on registry.buildXX.ci.openshift.org). Constructing a proxied
+            # reference for it would not resolve, so keep the previous behaviour of
+            # using the canonical index and say so instead of failing the job.
+            echo "WARNING: OO_INDEX=${OO_INDEX} is not in a registry fronted by the mirror proxy; using ${mirror_index_image}"
+            echo "WARNING: proxied registries are quay.io/{openshifttest,openshift-qe-optional-operators,olmqe}, registry.redhat.io, brew.registry.redhat.io, registry.stage.redhat.io, registry-proxy.engineering.redhat.com" ;;
     esac
 fi
 echo "origin_index_image: ${origin_index_image}"
