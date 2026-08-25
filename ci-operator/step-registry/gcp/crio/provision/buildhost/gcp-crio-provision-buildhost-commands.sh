@@ -98,7 +98,7 @@ ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[
 echo "${REGION}" >>"${SHARED_DIR}/region"
 server_name="${CLUSTER_NAME}-buildhost"
 
-MACHINE_TYPE="n2-standard-8"
+MACHINE_TYPE="n4-standard-8"
 gcloud compute instances create "${server_name}" \
 	${IMAGE_ARGS} \
 	--boot-disk-type pd-ssd \
