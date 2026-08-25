@@ -45,6 +45,22 @@ fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
 echo "Creating the agent-config.yaml file..."
+# SNO: CONTROL_COUNT=1 COMPUTE_COUNT=0. Existing HA agent jobs leave these unset and keep 3+2.
+if [ "${CONTROL_COUNT:-3}" = "1" ] && [ "${COMPUTE_COUNT:-2}" = "0" ]; then
+cat >> "${SHARED_DIR}/agent-config.yaml" << EOF
+apiVersion: v1alpha1
+kind: AgentConfig
+metadata:
+  name: ${CLUSTER_NAME}
+rendezvousIP: 192.168.$(leaseLookup "subnet").10
+hosts:
+  - hostname: control-0.${BASE_URL}
+    role: master
+    interfaces:
+      - name: enc1
+        macAddress: $(leaseLookup '"control-plane"[0].mac')
+EOF
+else
 cat >> "${SHARED_DIR}/agent-config.yaml" << EOF
 apiVersion: v1alpha1
 kind: AgentConfig
@@ -78,5 +94,6 @@ hosts:
       - name: enc1
         macAddress: $(leaseLookup 'compute[1].mac')
 EOF
+fi
 
 cat "${SHARED_DIR}/agent-config.yaml"
