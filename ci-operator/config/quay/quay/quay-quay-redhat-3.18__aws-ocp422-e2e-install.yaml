@@ -59,6 +59,13 @@ tests:
         FEATURE_EDIT_QUOTA: true
         FEATURE_CHANGE_TAG_EXPIRATION: true
         FEATURE_IMAGE_PULL_STATS: false
+        # Build-log and action-log archival default to storage location "local_us"
+        # (Quay's built-in config.py default). Our S3 storage is registered under
+        # the single location name "default", so the archiver workers throw
+        # KeyError: 'local_us' (seen ~9x/run in the build manager log) and never
+        # archive logs. Point both archivers at our actual location.
+        LOG_ARCHIVE_LOCATION: default
+        ACTION_LOG_ARCHIVE_LOCATION: default
         FEATURE_MAILING: true
         MAIL_SERVER: mailpit.quay-enterprise.svc.cluster.local
         MAIL_PORT: 1025

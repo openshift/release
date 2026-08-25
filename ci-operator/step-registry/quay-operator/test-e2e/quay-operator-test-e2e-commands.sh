@@ -285,10 +285,21 @@ for q in "${QUARANTINE[@]}"; do GREP_INVERT_DEFAULT="${GREP_INVERT_DEFAULT}|${q}
 PLAYWRIGHT_GREP_INVERT="${PLAYWRIGHT_GREP_INVERT:-${GREP_INVERT_DEFAULT}}"
 echo "Excluding tests matching: ${PLAYWRIGHT_GREP_INVERT}"
 
-echo "Running Playwright smoke tests from ${PLAYWRIGHT_WORKDIR} (branch ${PLAYWRIGHT_GIT_BRANCH:-image})..."
+# Playwright parallelism. The suite's playwright.config.ts uses `workers: CI ? 4`.
+# The @container tests each push a REAL image over the self-signed Quay route, and
+# @feature:BUILD_SUPPORT tests drive virtual-builder builds; at 4 concurrent workers
+# these heavy pushes/builds contend and intermittently exceed the 60s test timeout
+# and the suite's tight per-call apiRequestContext timeouts (5s create-repo, 10s
+# build-status), producing flaky timeouts even though the product is healthy (the
+# same operations pass on retry). Cap concurrency to relieve that contention. The CLI
+# --workers flag overrides the config value; override via PLAYWRIGHT_WORKERS if needed.
+PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-2}"
+
+echo "Running Playwright smoke tests from ${PLAYWRIGHT_WORKDIR} (branch ${PLAYWRIGHT_GIT_BRANCH:-image}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
 npx playwright test \
   --grep-invert "${PLAYWRIGHT_GREP_INVERT}" \
+  --workers "${PLAYWRIGHT_WORKERS}" \
   --reporter=junit,html \
   2>&1 | tee "${ARTIFACT_DIR}/playwright-output.log"
 popd
