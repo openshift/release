@@ -59,11 +59,15 @@ fi
 
 ssh_key_string="$(cat "${GIT_KEY_FILE}")"
 tmp_ssh_key="/tmp/csi-provisioner-git-ssh-key"
-envsubst <<EOF >"${tmp_ssh_key}"
+if grep -q 'BEGIN .* PRIVATE KEY' "${GIT_KEY_FILE}"; then
+  cp "${GIT_KEY_FILE}" "${tmp_ssh_key}"
+else
+  cat >"${tmp_ssh_key}" <<EOF
 -----BEGIN OPENSSH PRIVATE KEY-----
 ${ssh_key_string}
 -----END OPENSSH PRIVATE KEY-----
 EOF
+fi
 chmod 0600 "${tmp_ssh_key}"
 
 workdir="${ARTIFACT_DIR:-/tmp}/csi-provisioner-clone"
