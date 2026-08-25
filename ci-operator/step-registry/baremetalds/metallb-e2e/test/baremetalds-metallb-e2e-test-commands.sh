@@ -80,8 +80,6 @@ echo "### running metallb E2E tests"
 # setting +e so we won't exit in case of test failure and the artifacts are going to be copied
 set +e
 ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/metallb/openshift-ci/ && ${vars} ./run_e2e.sh"
-if [ $? -ne 0 ]; then
-  scp "${SSHOPTS[@]}" -r "root@${IP}:/logs/artifacts" "${ARTIFACT_DIR}"
-  exit 1
-fi
-set -e
+rc=$?
+scp "${SSHOPTS[@]}" -r "root@${IP}:/root/dev-scripts/metallb/e2etest/junit-report.xml" "${ARTIFACT_DIR}/junit_e2e.xml" || true
+exit "${rc}"
