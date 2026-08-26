@@ -36,6 +36,9 @@ images:
     dockerfile_path: ./packages/notebooks/Dockerfile.workspace
     to: odh-mod-arch-notebooks-image
   - context_dir: .
+    dockerfile_path: ./packages/data-registry/Dockerfile.workspace
+    to: odh-mod-arch-data-registry-image
+  - context_dir: .
     dockerfile_path: ./distributions/core-bff/Dockerfile.workspace
     to: odh-core-bff-image
   - context_dir: .
@@ -226,6 +229,23 @@ tests:
       SOURCE_IMAGE_REF: odh-mod-arch-notebooks-image
     env:
       IMAGE_REPO: odh-mod-arch-notebooks
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-data-registry-pr-image-mirror
+  run_if_changed: ^packages/data-registry/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-data-registry-image
+    env:
+      IMAGE_REPO: odh-mod-arch-data-registry
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-data-registry-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-data-registry-image
+    env:
+      IMAGE_REPO: odh-mod-arch-data-registry
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-core-bff-pr-image-mirror
