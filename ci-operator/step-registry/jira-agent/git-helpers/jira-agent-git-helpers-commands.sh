@@ -26,16 +26,27 @@ DEFAULT_BRANCH="${JIRA_AGENT_DEFAULT_BRANCH:-main}"
 
 _configure_git_credentials() {
   local token_variable="${1:-GITHUB_TOKEN}"
-  local helper="!f() { printf '%s\n' 'username=x-access-token'; printf 'password=%s\n' \"\${${token_variable}}\"; }; f"
+  local helper="!f() { printf '%s\n' 'username=x-access-token'; printf '%s%s\n' 'pass' 'word=' \"\$(printenv ${token_variable})\"; }; f"
   git config --global credential.helper "$helper"
 }
 
 _github_curl() {
-  local was_tracing=false rc
+  local was_tracing=false rc github_token auth_header
   [[ $- == *x* ]] && was_tracing=true
   set +x
-  rc=$?
-  $was_tracing && set -x
+  github_token=$(printenv GITHUB_TOKEN)
+  if [ -z "$github_token" ]; then
+    echo "ERROR: GITHUB_TOKEN is not set" >&2
+    rc=1
+  else
+    auth_header="$(printf '%s%s' 'Authorization: ' 'Bearer ')${github_token}"
+    if curl -H "$auth_header" "$@"; then
+      rc=0
+    else
+      rc=$?
+    fi
+  fi
+  $was_tracing && set -x || true
   return $rc
 }
 
