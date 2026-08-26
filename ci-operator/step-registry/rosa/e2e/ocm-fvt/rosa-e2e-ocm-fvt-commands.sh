@@ -132,9 +132,23 @@ old_umask=$(umask)
 umask 077
 podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
 prom_pf_pid=""
+pf_watchdog_pid=""
+pf_pid_file=""
 appsre_kubeconfig=""
 cleanup_ocm_fvt() {
-  if [[ -n "${prom_pf_pid}" ]]; then
+  if [[ -n "${pf_watchdog_pid}" ]]; then
+    kill "${pf_watchdog_pid}" 2>/dev/null || true
+    wait "${pf_watchdog_pid}" 2>/dev/null || true
+  fi
+  if [[ -n "${pf_pid_file}" && -f "${pf_pid_file}" ]]; then
+    local cur_pid
+    cur_pid="$(cat "${pf_pid_file}" 2>/dev/null || true)"
+    if [[ -n "${cur_pid}" ]]; then
+      kill "${cur_pid}" 2>/dev/null || true
+      wait "${cur_pid}" 2>/dev/null || true
+    fi
+    rm -f "${pf_pid_file}"
+  elif [[ -n "${prom_pf_pid}" ]]; then
     kill "${prom_pf_pid}" 2>/dev/null || true
     wait "${prom_pf_pid}" 2>/dev/null || true
   fi
@@ -368,6 +382,56 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" && "${OCM_FVT_USE_BACKPLANE:-false}" == 
       echo "NO_PROXY=${prom_host_fqdn},localhost,127.0.0.1" >> "${podman_env_file}"
       echo "no_proxy=${prom_host_fqdn},localhost,127.0.0.1" >> "${podman_env_file}"
       echo "Prometheus PF ready (pid ${prom_pf_pid}); podman --add-host ${prom_host_fqdn}:host-gateway"
+
+      # Start background watchdog to monitor and auto-restart PF if it drops.
+      pf_pid_file="$(mktemp /tmp/prom-pf-pid.XXXXXX)"
+      echo "${prom_pf_pid}" > "${pf_pid_file}"
+      (
+        wd_kubeconfig="${appsre_kubeconfig}"
+        wd_ns="${prom_ns}"
+        wd_svc="${prom_svc}"
+        wd_log="${pf_log}"
+        wd_pid_file="${pf_pid_file}"
+        while true; do
+          sleep 10
+          if ! curl -sS -o /dev/null --max-time 2 \
+            "http://127.0.0.1:9090/api/v1/query?query=up" 2>/dev/null; then
+            echo "[PF-WATCHDOG] $(date '+%Y-%m-%d %H:%M:%S') Port-forward health check failed, restarting..."
+            old_pid="$(cat "${wd_pid_file}" 2>/dev/null || true)"
+            if [[ -n "${old_pid}" ]]; then
+              kill "${old_pid}" 2>/dev/null || true
+              for (( wd_wait=0; wd_wait<10; wd_wait++ )); do
+                if ! kill -0 "${old_pid}" 2>/dev/null; then
+                  break
+                fi
+                sleep 1
+              done
+            fi
+            KUBECONFIG="${wd_kubeconfig}" oc -n "${wd_ns}" port-forward \
+              --address 0.0.0.0 "svc/${wd_svc}" 9090:9090 \
+              >>"${wd_log}" 2>&1 &
+            new_pid=$!
+            echo "${new_pid}" > "${wd_pid_file}"
+            echo "[PF-WATCHDOG] New port-forward started (pid ${new_pid})"
+            wd_ready=false
+            for (( wd_i=0; wd_i<30; wd_i++ )); do
+              if curl -sS -o /dev/null --max-time 1 \
+                "http://127.0.0.1:9090/api/v1/query?query=up" 2>/dev/null; then
+                wd_ready=true
+                break
+              fi
+              sleep 1
+            done
+            if [[ "${wd_ready}" == "true" ]]; then
+              echo "[PF-WATCHDOG] Port-forward restored (pid ${new_pid})"
+            else
+              echo "[PF-WATCHDOG] WARNING: Port-forward restart failed" >&2
+            fi
+          fi
+        done
+      ) &
+      pf_watchdog_pid=$!
+      echo "[PF-WATCHDOG] Started background port-forward watchdog (pid ${pf_watchdog_pid})"
     fi
 
     # Restore Hive kubeconfig; port-forward stays up until EXIT cleanup.
