@@ -147,10 +147,10 @@ echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hyp
 
 echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
 # Resolve the CI release payload to a pullspec the hypervisor can reach.
-# RELEASE_IMAGE_LATEST_FROM_BUILD_FARM points to the build-farm registry that
-# the CI pod can access without extra auth (declared as a dependency in the ref).
-# The hypervisor cannot reach CI-internal registries, so we extract the version
-# and construct the equivalent public CI registry URL.
+# RELEASE_IMAGE_LATEST_FROM_BUILD_FARM points to a CI-internal registry that
+# the hypervisor cannot access. The ref declares cli: latest, which provides
+# an oc binary with CI registry auth. We extract the version and construct the
+# equivalent public CI registry URL.
 PAYLOAD_URL=""
 if [[ -n "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM:-}" ]]; then
   echo "Resolving RELEASE_IMAGE_LATEST_FROM_BUILD_FARM to a public pullspec..."
