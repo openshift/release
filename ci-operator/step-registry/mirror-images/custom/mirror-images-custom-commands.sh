@@ -193,7 +193,6 @@ if [[ "${MIRROR_IN_BASTION}" == "yes" ]]; then
   bastion_user="$(<"${SHARED_DIR}/bastion_ssh_user")"
   ssh_opts="-o UserKnownHostsFile=/dev/null -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no"
   remote_auth="/tmp/mirror-images-custom-auth.json"
-  remote_list="/tmp/mirror-images-custom-list.txt"
   remote_oc="/tmp/oc"
 
   oc_bin="oc"
@@ -208,16 +207,20 @@ if [[ "${MIRROR_IN_BASTION}" == "yes" ]]; then
   fi
 
   bscp "${authfile}" "${remote_auth}"
-  bscp "${mirror_list}" "${remote_list}"
-  # Remove the uploaded credential and list when the step ends.
-  REMOTE_CLEANUP_CMD="bssh 'rm -f ${remote_auth} ${remote_list}'"
+  # Remove the uploaded credential when the step ends.
+  REMOTE_CLEANUP_CMD="bssh 'rm -f ${remote_auth}'"
 
   mirror_flags="--insecure=true"
   if bssh "${oc_bin} image mirror --help 2>&1 | grep -q -- --keep-manifest-list"; then
     mirror_flags="${mirror_flags} --keep-manifest-list=true"
   fi
-  echo "Remote mirror command: ${oc_bin} image mirror ${mirror_flags} --registry-config=${remote_auth} --filename=${remote_list}"
-  retry 3 bssh "${oc_bin} image mirror ${mirror_flags} --registry-config=${remote_auth} --filename=${remote_list}"
+  # Mirror one image per invocation: several images (e.g. handler + operator) share the
+  # same destination repo (.../pipeline), which `oc image mirror` refuses to accept in a
+  # single mapping set ("each destination tag may only be specified once").
+  for pair in "${mirror_pairs[@]}"; do
+    echo "mirroring (bastion): ${pair}"
+    retry 3 bssh "${oc_bin} image mirror ${mirror_flags} --registry-config=${remote_auth} ${pair}"
+  done
 
   echo "verifying mirrored images exist in the bastion registry"
   for t in "${verify_targets[@]}"; do
@@ -230,8 +233,11 @@ else
   if oc image mirror --help 2>&1 | grep -q -- --keep-manifest-list; then
     mirror_flags+=(--keep-manifest-list=true)
   fi
-  echo "Mirror command: oc image mirror ${mirror_flags[*]} --registry-config=${authfile} --filename=${mirror_list}"
-  retry 3 oc image mirror "${mirror_flags[@]}" "--registry-config=${authfile}" "--filename=${mirror_list}"
+  # Mirror one image per invocation (see the note in the bastion branch above).
+  for pair in "${mirror_pairs[@]}"; do
+    echo "mirroring: ${pair}"
+    retry 3 oc image mirror "${mirror_flags[@]}" "--registry-config=${authfile}" "${pair}"
+  done
 
   echo "verifying mirrored images exist in the bastion registry"
   for t in "${verify_targets[@]}"; do
