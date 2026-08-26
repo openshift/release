@@ -21,8 +21,11 @@ eval "$(
 )"; EnsureReqs jq yq
 
 if [[ -n "${SHARED_DIR}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+    [[ "${_wasTracing}" == "true" ]] && set -x
 fi
 
 [[ -n "${KUBECONFIG}" ]]
@@ -111,7 +114,7 @@ CleanupVm() {
             -n "${ns}" --ignore-not-found --wait=false
     done < <(oc --kubeconfig="${kc}" get pvc -n "${ns}" -o json \
         | jq -r --arg dv "${dvName}" \
-            '.items[].metadata.name | select(test("^(" + $dv + "|prime-))"))' \
+            '.items[].metadata.name | select(test("^(" + $dv + "|prime-)" ))' \
         || true)
 
     oc --kubeconfig="${kc}" wait --for=delete "datavolume/${dvName}" \
