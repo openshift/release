@@ -1,9 +1,13 @@
 ref:
-  # Use src instead of e2etests: e2etests is only built/imported by some NetObserv
-  # repos (e.g. operator). Jobs like netobserv-web-console build e2e-integration-tests
-  # instead, so from: e2etests causes ImagePullBackOff (manifest unknown). This step
-  # only needs a shell to read SHARED_DIR, so src is always available.
-  from: src
+  # Use an external image via from_image rather than from: no per-config image is
+  # common to all consumers. e2etests exists only in some repos (not web-console);
+  # src exists only in configs with a build_root (the operator nightly periodics have
+  # none, so from: src makes the graph unsatisfiable). This step only needs a shell to
+  # read SHARED_DIR, so pull a stock tooling image that is always available.
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
   as: netobserv-evaluate-failures
   commands: netobserv-evaluate-failures-commands.sh
   resources:
