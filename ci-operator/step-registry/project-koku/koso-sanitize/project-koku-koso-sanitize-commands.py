@@ -18,7 +18,7 @@ import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Iterable
 
 CREDENTIAL = "[credential redacted]"
 CUSTOMER = "[customer-data redacted]"
@@ -111,9 +111,21 @@ BINARY_SUFFIXES = {
     ".pyc",
     ".whl",
 }
-REPORT_SUFFIXES = {".xml", ".html", ".json", ".log", ".txt", ".yaml", ".yml", ".gz", ".tgz", ".zip"}
 SKIP_NAMES = {"koso-sanitize.sh", "koso-sanitize.py", "koso-sanitize-commands.py"}
 KUBECONFIG_NAMES = {"kubeconfig", "kubeadmin-password"}
+# SHARED_DIR is a handoff between steps. Only these report artifacts may be
+# rewritten or withheld; cluster metadata, manifests, and logs stay intact.
+SHARED_REPORT_NAMES = frozenset(
+    {
+        "junit.xml",
+        "iqe_junit.xml",
+        "report.html",
+        "pytest_report.html",
+        "iqe_report.html",
+    }
+)
+SHARED_REPORT_PREFIXES = ("junit",)
+SHARED_REPORT_DIR_NAMES = frozenset({"reports"})
 
 _QUOTED_KEY_VALUE = r"""
     (?P<qk>['"])(?P<qkey>{key})(?P=qk)
@@ -168,9 +180,9 @@ BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._+/=-]+")
 JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
 URL_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9+.-]*://[^\s\"'<>]+")
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-SSN_RE = re.compile(r"(^|[^0-9])[0-9]{3}-[0-9]{2}-[0-9]{4}([^0-9]|$)")
-CARD_SEP_RE = re.compile(r"(^|[^0-9])(?:[0-9]{4}[- ][0-9]{4}[- ][0-9]{4}[- ][0-9]{4})([^0-9]|$)")
-CARD_RE = re.compile(r"(^|[^0-9])[0-9]{16}([^0-9]|$)")
+SSN_RE = re.compile(r"(?<![0-9])[0-9]{3}-[0-9]{2}-[0-9]{4}(?![0-9])")
+CARD_SEP_RE = re.compile(r"(?<![0-9])(?:[0-9]{4}[- ][0-9]{4}[- ][0-9]{4}[- ][0-9]{4})(?![0-9])")
+CARD_RE = re.compile(r"(?<![0-9])[0-9]{16}(?![0-9])")
 INTERNAL_SVC_RE = re.compile(
     r"[A-Za-z0-9._-]+\.(?:svc|pod)(?:\.cluster\.local)?(?::[0-9]{1,5})?"
 )
@@ -179,12 +191,13 @@ INTERNAL_NAME_RE = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._-]*\.(?:internal|corp|lan|private)(?:\.[A-Za-z0-9.-]+)*(?::[0-9]{1,5})?"
 )
 RFC1918_RE = re.compile(
-    r"(^|[^0-9])"
+    r"(?<![0-9])"
     r"(?:10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
     r"|172\.(?:1[6-9]|2[0-9]|3[0-1])\.[0-9]{1,3}\.[0-9]{1,3}"
     r"|192\.168\.[0-9]{1,3}\.[0-9]{1,3}"
     r"|127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})"
     r"(?::[0-9]{1,5})?"
+    r"(?![0-9])"
 )
 RESPONSE_RE = re.compile(
     r"(?i)((?:Response:|response\.text\s*[=:])\s*)(?:\{.*\}|\[.*\])"
@@ -252,13 +265,6 @@ def _redact_html_tag(match: re.Match[str]) -> str:
     return HTML_ATTR_VALUE_RE.sub(_attr, tag)
 
 
-def _ssn_card_sub(placeholder: str) -> Callable[[re.Match[str]], str]:
-    def _sub(match: re.Match[str]) -> str:
-        return f"{match.group(1)}{placeholder}{match.group(match.lastindex)}"
-
-    return _sub
-
-
 def sanitize_text(text: str) -> str:
     """Redact credentials, PII, URLs, and internal hosts from mixed log/report text."""
     if not text:
@@ -278,13 +284,13 @@ def sanitize_text(text: str) -> str:
     text = OC_DIAL_TCP_RE.sub(rf"\1{HOST}", text)
     text = URL_RE.sub(URL, text)
     text = EMAIL_RE.sub(EMAIL, text)
-    text = SSN_RE.sub(_ssn_card_sub(SSN), text)
-    text = CARD_SEP_RE.sub(_ssn_card_sub(CARD), text)
-    text = CARD_RE.sub(_ssn_card_sub(CARD), text)
+    text = SSN_RE.sub(SSN, text)
+    text = CARD_SEP_RE.sub(CARD, text)
+    text = CARD_RE.sub(CARD, text)
     text = INTERNAL_SVC_RE.sub(HOST, text)
     text = INTERNAL_APPS_RE.sub(HOST, text)
     text = INTERNAL_NAME_RE.sub(HOST, text)
-    text = RFC1918_RE.sub(lambda m: f"{m.group(1)}{HOST}", text)
+    text = RFC1918_RE.sub(HOST, text)
     return text
 
 
@@ -395,13 +401,12 @@ def _sanitize_gzip(path: Path) -> bool:
 
 
 def _sanitize_tar_gz(path: Path) -> bool:
+    if not hasattr(tarfile, "data_filter"):
+        return False
     tmpdir = Path(tempfile.mkdtemp())
     try:
         with tarfile.open(path, "r:gz") as tar:
-            if hasattr(tarfile, "data_filter"):
-                tar.extractall(tmpdir, filter="data")
-            else:
-                tar.extractall(tmpdir)
+            tar.extractall(tmpdir, filter="data")
         if not sanitize_tree(tmpdir, withhold=True):
             return False
         tmp = Path(tempfile.mkstemp(suffix=".tgz")[1])
@@ -492,19 +497,33 @@ def sanitize_tree(root: Path, *, withhold: bool = True) -> bool:
     return all_ok
 
 
+def _is_owned_shared_report(path: Path, root: Path) -> bool:
+    """True when path is a report we own under SHARED_DIR, not a consumer input."""
+    name = path.name.lower()
+    if name in SHARED_REPORT_NAMES or name.startswith(SHARED_REPORT_PREFIXES):
+        return True
+    try:
+        rel = path.relative_to(root)
+    except ValueError:
+        return False
+    return any(part.lower() in SHARED_REPORT_DIR_NAMES for part in rel.parts[:-1])
+
+
 def sanitize_shared_reports(root: Path) -> bool:
-    """Sanitize report-like files in SHARED_DIR; never touch kubeconfigs."""
+    """Sanitize report-owned paths in SHARED_DIR; leave consumer inputs intact.
+
+    The install step invokes this from an EXIT trap. Matching every .json/.yaml/
+    .yml/.log under SHARED_DIR would rewrite or withhold files later steps still
+    read. Only explicit report names and report subdirectories are in scope.
+    """
     if not root.is_dir():
         return True
     all_ok = True
     for child in sorted(root.rglob("*")):
         if not child.is_file() or should_skip_name(child) or _is_kubeconfig_name(child):
             continue
-        suffix = child.suffix.lower()
-        name = child.name.lower()
-        if suffix not in REPORT_SUFFIXES and not name.startswith("junit"):
+        if not _is_owned_shared_report(child, root):
             continue
-        # Never delete kubeconfig-adjacent shared files; withhold reports only.
         if not sanitize_file(child, withhold=True):
             all_ok = False
     return all_ok
@@ -678,6 +697,26 @@ STREAM_CASES: list[tuple[str, str, tuple[str, ...]]] = [
         ("alice@example.com", "123-45-6789", "4111-1111-1111-1111", "https://secret.example/path", "api.internal.example"),
     ),
     (
+        "adjacent-ssns",
+        "123-45-6789 987-65-4321",
+        ("123-45-6789", "987-65-4321"),
+    ),
+    (
+        "adjacent-cards-sep",
+        "4111-1111-1111-1111 4222-2222-2222-2222",
+        ("4111-1111-1111-1111", "4222-2222-2222-2222"),
+    ),
+    (
+        "adjacent-cards",
+        "4111111111111111 4222222222222222",
+        ("4111111111111111", "4222222222222222"),
+    ),
+    (
+        "adjacent-rfc1918",
+        "10.0.0.1 192.168.1.1",
+        ("10.0.0.1", "192.168.1.1"),
+    ),
+    (
         "oc-connection-refused",
         "The connection to the server api.ci-op-abc.origin-ci-int-aws.dev.rhcloud.com:6443 was refused - did you specify the right host or port?",
         ("api.ci-op-abc.origin-ci-int-aws.dev.rhcloud.com:6443",),
@@ -742,11 +781,46 @@ def run_selftest() -> None:
         shared_kube.write_text("kind: Config\nusers:\n- name: admin\n  client-key-data: c2VjcmV0\n")
         shared_report = shared / "junit.xml"
         shared_report.write_text("<password>pw-value</password>")
+        html_report = shared / "report.html"
+        html_report.write_text('<input name="password" value="pw-value"/>')
+        reports_dir = shared / "reports"
+        reports_dir.mkdir()
+        nested_report = reports_dir / "suite.json"
+        nested_report.write_text('{"password": "pw-value"}')
+        # Consumer inputs that must survive an install-step EXIT trap.
+        metadata = shared / "metadata.json"
+        metadata_body = '{"cluster": "ci-op-abc", "url": "https://api.example.com"}'
+        metadata.write_text(metadata_body)
+        yaml_file = shared / "cluster.yaml"
+        yaml_body = "apiVersion: v1\nkind: Namespace\n"
+        yaml_file.write_text(yaml_body)
+        yml_file = shared / "values.yml"
+        yml_body = "replicaCount: 1\n"
+        yml_file.write_text(yml_body)
+        log_file = shared / "installer.log"
+        log_body = "installing cluster at https://api.example.com\n"
+        log_file.write_text(log_body)
+        foreign_json = shared / "blob.json"
+        foreign_json.write_bytes(b"\x00\x01secret-bytes\xff")
         sanitize_shared_reports(shared)
         if not shared_kube.exists():
             raise AssertionError("shared-dir kubeconfig must not be deleted")
         if "pw-value" in shared_report.read_text():
             raise AssertionError("shared-dir report must be redacted")
+        if "pw-value" in html_report.read_text():
+            raise AssertionError("shared-dir html report must be redacted")
+        if "pw-value" in nested_report.read_text():
+            raise AssertionError("shared-dir reports/ subtree must be redacted")
+        if metadata.read_text() != metadata_body:
+            raise AssertionError("shared-dir metadata.json must not be rewritten")
+        if yaml_file.read_text() != yaml_body:
+            raise AssertionError("shared-dir yaml must not be rewritten")
+        if yml_file.read_text() != yml_body:
+            raise AssertionError("shared-dir yml must not be rewritten")
+        if log_file.read_text() != log_body:
+            raise AssertionError("shared-dir log must not be rewritten")
+        if not foreign_json.exists():
+            raise AssertionError("non-report shared-dir file must not be withheld")
 
         _run_wrapper_selftest(tmp)
     finally:
