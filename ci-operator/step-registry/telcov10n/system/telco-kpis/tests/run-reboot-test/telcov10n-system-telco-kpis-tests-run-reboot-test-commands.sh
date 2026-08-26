@@ -38,7 +38,7 @@ main() {
         -e reboot_count="${REBOOT_COUNT}" \
         -e ran_integration_repo="${RAN_INTEGRATION_REPO}" \
         -e cnf_gotests_repo="${CNF_GOTESTS_REPO}" \
-        -e skip_rebuild_image="${SKIP_REBUILD_IMAGE}" \
+        -e force_pull_test_runner_image="${FORCE_PULL_TEST_RUNNER_IMAGE}" \
         ${DEBUG_FLAG} || rc=$?
 
     echo "Reboot test completed for ${SPOKE_CLUSTER} (rc=${rc})"

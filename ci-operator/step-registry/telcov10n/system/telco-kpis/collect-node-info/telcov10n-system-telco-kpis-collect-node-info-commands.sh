@@ -36,7 +36,6 @@ main() {
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e spoke_cluster="${SPOKE_CLUSTER}" \
         -e spoke_kubeconfig="${SPOKE_KUBECONFIG}" \
-        -e skip_rebuild_image="${SKIP_REBUILD_IMAGE}" \
         -e report_headline="${REPORT_HEADLINE:-}" \
         ${DEBUG_FLAG}
 
