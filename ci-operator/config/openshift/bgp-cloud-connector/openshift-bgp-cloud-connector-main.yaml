@@ -1,9 +1,22 @@
+base_images:
+  operator-sdk:
+    name: "4.22"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   from_repository: true
 images:
   items:
   - dockerfile_path: Dockerfile
     to: bgp-cloud-connector
+operator:
+  bundles:
+  - as: bgp-cloud-connector-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: controller:latest
+    with: pipeline:bgp-cloud-connector
 releases:
   initial:
     integration:
@@ -55,6 +68,85 @@ tests:
       commands: hack/ci-e2e-aws.sh
       from: src
       grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-operator
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # Both controllers watch FRRConfiguration and RouteAdvertisements
+        # from SetupWithManager, and CNO creates those two CRDs only in
+        # response to this patch. Without them the caches never sync, the
+        # manager exits after two minutes, and the CSV never installs.
+        # The operator applies this same patch itself as the first phase
+        # of reconcile, but it cannot stay alive long enough to do so;
+        # when that is fixed, this step comes out and the job proves the
+        # install a catalogue user actually performs.
+        oc patch network.operator.openshift.io cluster --type=merge \
+          -p '{"spec":{"additionalRoutingCapabilities":{"providers":["FRR"]},"defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+
+        deadline=$((SECONDS + 900))
+
+        for crd in frrconfigurations.frrk8s.metallb.io routeadvertisements.k8s.ovn.org; do
+          echo "waiting for crd/${crd}..."
+          until oc wait --for=condition=Established "crd/${crd}" --timeout=10s >/dev/null 2>&1; do
+            if (( SECONDS >= deadline )); then
+              oc get network.operator.openshift.io cluster -o yaml >&2
+              echo "timed out waiting for crd/${crd}" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+        done
+
+        # The rollout is what says CNO finished rather than that it
+        # started. Measured at about two minutes on 4.22.
+        echo "waiting for the frr-k8s rollout..."
+        until oc -n openshift-frr-k8s rollout status daemonset/frr-k8s --timeout=2m >/dev/null 2>&1; do
+          if (( SECONDS >= deadline )); then
+            oc -n openshift-frr-k8s get pods >&2
+            echo "timed out waiting for the frr-k8s daemonset" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+
+        oc -n openshift-frr-k8s get daemonset frr-k8s
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-cudn-bgp-routing --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either
+        # way.
+        operator-sdk run bundle -n openshift-cudn-bgp-routing --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        oc -n openshift-cudn-bgp-routing wait --for=condition=Available \
+          deployment/openshift-cudn-bgp-routing-controller-manager --timeout=5m
+        oc -n openshift-cudn-bgp-routing get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
