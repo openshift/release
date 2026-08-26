@@ -105,7 +105,7 @@ REGION="${LEASED_RESOURCE}"
 echo "Using region: ${REGION}"
 
 ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[0] | cut -d "/" -f9)
-MACHINE_TYPE="${BASTION_MACHINE_TYPE:-n4-standard-4}"
+MACHINE_TYPE="${BASTION_MACHINE_TYPE:-n2-standard-2}"
 
 #####################################
 ##########Create Bastion#############

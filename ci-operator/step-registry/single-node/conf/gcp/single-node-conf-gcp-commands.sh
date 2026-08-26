@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SINGLE_NODE_GCP_INSTANCE_TYPE="n4-standard-16"
+SINGLE_NODE_GCP_INSTANCE_TYPE="n2-standard-16"
 if [ "${OCP_ARCH}" = "arm64" ]; then
   SINGLE_NODE_GCP_INSTANCE_TYPE="t2a-standard-16"
 fi
