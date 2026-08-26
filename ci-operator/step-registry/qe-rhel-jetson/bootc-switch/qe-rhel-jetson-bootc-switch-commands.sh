@@ -62,6 +62,9 @@ registry_user: ""
 registry_pass: ""
 EOF
 
+# Extract the tag portion from the full image reference (e.g. "latest" from "repo/image:latest")
+BOOTC_IMAGE_TAG="${BOOTC_IMAGE##*:}"
+
 EXTRA_VARS_FILE=$(mktemp /tmp/ansible-extra-vars.XXXXXX.yml)
 trap 'rm -f "${EXTRA_VARS_FILE}"' EXIT
 
@@ -73,6 +76,7 @@ ansible_ssh_user: root
 ansible_ssh_private_key_file: ${SSH_KEY}
 ansible_become: false
 bootc_image: "${BOOTC_IMAGE}"
+bootc_image_tag: "${BOOTC_IMAGE_TAG}"
 skip_registry_login: true
 EOF
 
