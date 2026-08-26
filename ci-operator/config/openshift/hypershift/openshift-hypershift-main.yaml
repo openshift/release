@@ -12,7 +12,7 @@ base_images:
     namespace: ci
     tag: latest
   cli:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -24,11 +24,11 @@ base_images:
     namespace: hypershift
     tag: latest
   manila-csi-driver-operator-test:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: manila-csi-driver-operator-test
   openstack-cinder-csi-driver-operator-test:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: openstack-cinder-csi-driver-operator-test
 build_root:
@@ -66,7 +66,7 @@ promotion:
     - hypershift-cli
     - hypershift-operator
     - hypershift-tests
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
   - additional_images:
       hypershift-operator: hypershift-operator
@@ -87,18 +87,23 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "5.0"
-  initial-422:
+      version: "5.1"
+  initial-50:
     candidate:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.22"
+      version: "5.0"
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
+  latest-50:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.0"
   latest-421:
     candidate:
       product: ocp
@@ -115,13 +120,13 @@ releases:
       product: ocp
       relative: 1
       stream: nightly
-      version: "5.0"
+      version: "5.1"
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "5.0"
+      version: "5.1"
 resources:
   '*':
     limits:
@@ -174,30 +179,45 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
-      NODEPOOL_N1_VERSION: "4.22"
-      NODEPOOL_N2_VERSION: "4.21"
-      NODEPOOL_N3_VERSION: "4.20"
-      NODEPOOL_N4_VERSION: "4.19"
+      NODEPOOL_N1_VERSION: "5.0"
+      NODEPOOL_N2_VERSION: "4.22"
+      NODEPOOL_N3_VERSION: "4.21"
+      NODEPOOL_N4_VERSION: "4.20"
     post:
     - ref: hypershift-analyze-e2e-failure
     - chain: cucushift-installer-rehearse-azure-aks-deprovision
     workflow: hypershift-azure-aks-e2e
 - always_run: false
-  as: e2e-aks-4-22
+  as: e2e-aks-managed-hsm
+  optional: true
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: ^TestCreateClusterCustomConfig$
+      HYPERSHIFT_AZURE_MANAGED_HSM: "true"
+      HYPERSHIFT_AZURE_MANAGED_HSM_LOCATION: eastus
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    workflow: hypershift-azure-aks-e2e
+- always_run: false
+  as: e2e-aks-5-0
   pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift-aks
     dependencies:
-      OCP_IMAGE_LATEST: release:latest-422
-      OCP_IMAGE_PREVIOUS: release:initial-422
+      OCP_IMAGE_LATEST: release:latest-50
+      OCP_IMAGE_PREVIOUS: release:initial-50
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
-      NODEPOOL_N1_VERSION: "4.21"
-      NODEPOOL_N2_VERSION: "4.20"
-      NODEPOOL_N3_VERSION: "4.19"
-      NODEPOOL_N4_VERSION: "4.18"
+      NODEPOOL_N1_VERSION: "4.22"
+      NODEPOOL_N2_VERSION: "4.21"
+      NODEPOOL_N3_VERSION: "4.20"
+      NODEPOOL_N4_VERSION: "4.19"
     workflow: hypershift-azure-aks-e2e
 - always_run: false
   as: e2e-aro-hcp
@@ -229,10 +249,10 @@ tests:
     cluster_profile: hypershift-aws
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      NODEPOOL_N1_VERSION: "4.22"
-      NODEPOOL_N2_VERSION: "4.21"
-      NODEPOOL_N3_VERSION: "4.20"
-      NODEPOOL_N4_VERSION: "4.19"
+      NODEPOOL_N1_VERSION: "5.0"
+      NODEPOOL_N2_VERSION: "4.22"
+      NODEPOOL_N3_VERSION: "4.21"
+      NODEPOOL_N4_VERSION: "4.20"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     post:
     - ref: hypershift-analyze-e2e-failure
@@ -324,10 +344,10 @@ tests:
     env:
       CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      NODEPOOL_N1_VERSION: "4.22"
-      NODEPOOL_N2_VERSION: "4.21"
-      NODEPOOL_N3_VERSION: "4.20"
-      NODEPOOL_N4_VERSION: "4.19"
+      NODEPOOL_N1_VERSION: "5.0"
+      NODEPOOL_N2_VERSION: "4.22"
+      NODEPOOL_N3_VERSION: "4.21"
+      NODEPOOL_N4_VERSION: "4.20"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-nested
 - always_run: false
@@ -337,10 +357,10 @@ tests:
     cluster_profile: hypershift-aws
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      NODEPOOL_N1_VERSION: "4.22"
-      NODEPOOL_N2_VERSION: "4.21"
-      NODEPOOL_N3_VERSION: "4.20"
-      NODEPOOL_N4_VERSION: "4.19"
+      NODEPOOL_N1_VERSION: "5.0"
+      NODEPOOL_N2_VERSION: "4.22"
+      NODEPOOL_N3_VERSION: "4.21"
+      NODEPOOL_N4_VERSION: "4.20"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-nested
@@ -370,23 +390,34 @@ tests:
       TEST_CPO_OVERRIDE: "1"
     workflow: hypershift-aws-e2e-nested
 - always_run: false
-  as: e2e-aws-4-22
+  as: e2e-aws-5-0
   capabilities:
   - build-tmpfs
   pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift-aws
     dependencies:
-      OCP_IMAGE_LATEST: release:latest-422
-      OCP_IMAGE_PREVIOUS: release:initial-422
+      OCP_IMAGE_LATEST: release:latest-50
+      OCP_IMAGE_PREVIOUS: release:initial-50
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      NODEPOOL_N1_VERSION: "4.21"
-      NODEPOOL_N2_VERSION: "4.20"
-      NODEPOOL_N3_VERSION: "4.19"
-      NODEPOOL_N4_VERSION: "4.18"
+      NODEPOOL_N1_VERSION: "4.22"
+      NODEPOOL_N2_VERSION: "4.21"
+      NODEPOOL_N3_VERSION: "4.20"
+      NODEPOOL_N4_VERSION: "4.19"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       RUN_KARPENTER_TESTS: "true"
+    workflow: hypershift-aws-e2e-nested
+- always_run: false
+  as: e2e-aws-major-version-upgrade
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_LATEST: release:latest-50
+      OCP_IMAGE_PREVIOUS: release:latest-422
+    env:
+      CI_TESTS_RUN: TestNodePool/HostedCluster/TestNodePoolMajorVersionUpgrade
     workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-kubevirt-aws-ovn-reduced
@@ -394,6 +425,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
       E2E_TEST_REGEX: ^TestCreateCluster$|TestAutoscaling
@@ -414,7 +446,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-422
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-50
     env:
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
@@ -429,7 +461,7 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-422
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-50
     env:
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D16as_v5
@@ -490,7 +522,7 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-422
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-50
     env:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
       HYPERSHIFT_NODE_COUNT: "2"

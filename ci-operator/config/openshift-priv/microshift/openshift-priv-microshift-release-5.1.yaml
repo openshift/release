@@ -23,10 +23,28 @@ images:
           source_path: /go/src/github.com/openshift/microshift
     optional: true
     to: microshift-test-rpm
+  - dockerfile_literal: |
+      FROM src
+      USER 0
+      RUN dnf install -y podman shadow-utils jq file && dnf clean all && \
+          setcap cap_setuid+ep /usr/bin/newuidmap && \
+          setcap cap_setgid+ep /usr/bin/newgidmap && \
+          touch /etc/subgid /etc/subuid && \
+          chmod g=u /etc/subuid /etc/subgid && \
+          chmod g=u /etc/passwd /etc/group
+      ENV BUILDAH_ISOLATION=chroot
+      USER 1000
+    inputs:
+      src:
+        as:
+        - src
+    to: rebase-cryptoscan-src
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - microshift-test-rpm
+    - rebase-cryptoscan-src
     name: "5.1"
     namespace: ocp-priv
 prowgen:
@@ -89,12 +107,17 @@ tests:
   steps:
     workflow: openshift-ci-security
 - as: test-rebase
+  capabilities:
+  - intranet
+  - nested-podman
+  nested_podman: true
   optional: true
+  restrict_network_access: false
   run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod|vendor/.*|deps/.*)$
   steps:
     env:
       DRY_RUN: "y"
-    workflow: openshift-microshift-rebase
+    workflow: openshift-microshift-rebase-cryptoscan
 - as: e2e-aws-tests
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:

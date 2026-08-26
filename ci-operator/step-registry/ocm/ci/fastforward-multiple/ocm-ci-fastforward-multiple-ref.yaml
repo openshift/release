@@ -26,8 +26,13 @@ ref:
         Required. Path to a YAML file containing a component mapping for fast-forwarding as:
         .components[{
           bundle: <product>-operator-bundle,
-          repository: https://github.com/<owner>/<repo>
+          repository: https://github.com/<owner>/<repo>,
+          deprecated: <true|false> (optional),
+          removed_in_version: <X.Y> (optional)
         }]
+        A component with deprecated: true and removed_in_version set is skipped
+        for that version and any later version, but is still fast-forwarded to
+        versions before removed_in_version.
     - name: DESTINATION_VERSIONS
       default: ""
       documentation: |-
@@ -39,6 +44,16 @@ ref:
         creating Tekton files on a branch with no existing templates. Falls back to
         fetching template files from the previous release branch (e.g., backplane-2.17
         or release-2.17).
+    - name: SKIP_VERSIONS_PATH
+      default: ""
+      documentation: |-
+        Optional. Path to a YAML file defining per-repo version exclusions.
+        Format:
+          skip_versions:
+          - repo: <repo-name>
+            versions:
+            - "X.Y"
+        If empty or file not found, no per-repo version skipping is applied.
   documentation: |-
     This step fast forwards a source branch to a destination branch in a GitHub
     repo.

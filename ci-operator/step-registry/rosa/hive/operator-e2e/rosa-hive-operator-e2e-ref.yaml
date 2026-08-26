@@ -1,0 +1,45 @@
+ref:
+  as: rosa-hive-operator-e2e
+  from: operator-e2e
+  grace_period: 5m
+  commands: rosa-hive-operator-e2e-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 30m0s
+  dependencies:
+  - name: OPERATOR_IMAGE
+    env: OPERATOR_IMAGE
+  env:
+  - name: OPERATOR_NAME
+    documentation: Name of the operator being tested (e.g. certman-operator).
+  - name: BACKPLANE_CLUSTER_ID
+    documentation: OCM internal cluster ID of the hive cluster.
+  - name: BACKPLANE_ELEVATE_REASON
+    documentation: Trackable reason for elevated access (Jira key or PD URL).
+  - name: OCM_LOGIN_ENV
+    default: "production"
+    documentation: OCM environment where the hive cluster is registered.
+  - name: BACKPLANE_PROXY_URL
+    default: "http://squid.corp.redhat.com:3128"
+    documentation: Corp proxy for backplane access from the build farm.
+  - name: BACKPLANE_CLI_VERSION
+    default: "0.11.0"
+    documentation: ocm-backplane CLI version to install.
+  - name: GINKGO_FOCUS
+    default: ""
+    documentation: Ginkgo focus filter for selecting test suites.
+  - name: GINKGO_LABEL_FILTER
+    default: ""
+    documentation: Ginkgo label filter for selecting test suites.
+  - name: OPERATOR_NAMESPACE
+    default: ""
+    documentation: Override operator namespace (default openshift-<OPERATOR_NAME>).
+  documentation: |-
+    Runs operator e2e tests against a hive cluster with elevated backplane
+    access. Re-establishes OCM login and backplane elevation in each pod
+    since Prow steps run in separate containers.
+
+    Requires the operator-e2e image to be built with rosa-aws-cli as the
+    base (for ocm and oc CLI tools) plus the e2e.test binary.

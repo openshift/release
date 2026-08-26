@@ -27,7 +27,7 @@ tests:
 - as: daily-virt-6nodes
   capabilities:
   - intranet
-  cron: 30 0 * * *
+  cron: 0 1 * * *
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -72,7 +72,7 @@ tests:
 - as: network-workloads
   capabilities:
   - intranet
-  cron: 30 7 */2 * *
+  cron: 0 9 */2 * *
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
     job_states_to_report:
@@ -107,6 +107,47 @@ tests:
     - ref: openshift-qe-installer-bm-day2-network-workloads-post
     - ref: openshift-qe-egressip
     - ref: openshift-qe-evpn
+- as: daily-telco-core-6nodes
+  capabilities:
+  - intranet
+  cron: 0 17 * * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: metal-perfscale-cpt
+    env:
+      CHURN_CYCLES: "2"
+      CHURN_PERCENT: "50"
+      EXTRA_FLAGS: --perf-profile=cpt-pao --gc-metrics=false --gc=true --phased=true
+        --idle-duration=15m
+      ITERATIONS: "15"
+      LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
+      OCP_BUILD: dev
+      OPERATOR_SOURCE_INDEX: prega-operator-index
+      RUN_ORION: "true"
+      TELCO: "true"
+    post:
+    - ref: openshift-qe-installer-bm-gather-extra
+    - ref: openshift-qe-installer-bm-must-gather
+    test:
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-prega-operators
+    - ref: openshift-qe-installer-bm-day2-sriov
+    - ref: openshift-qe-installer-bm-day2-metallb
+    - ref: openshift-qe-installer-bm-day2-perf-profile-rds-core
+    - ref: openshift-qe-rds-core
+    - ref: openshift-qe-orion-rds-core
+    workflow: openshift-qe-installer-bm-deploy
 zz_generated_metadata:
   branch: main
   org: openshift-eng

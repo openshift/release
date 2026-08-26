@@ -113,6 +113,7 @@ if [[ -f "${AWSCRED}" ]]; then
 fi
 
 GCP_CREDENTIALS_FILE="${GCP_CREDENTIALS_FILE:-/etc/rosa-e2e-gcp/osd-ccs-gcp.json}"
+OSD_AWS_CREDENTIALS_DIR="${OSD_AWS_CREDENTIALS_DIR:-/etc/rosa-e2e-osd-aws}"
 
 # Resolve the latest available version for a given cloud provider and version prefix
 resolve_version() {
@@ -120,6 +121,12 @@ resolve_version() {
     if [[ "${type}" == "osd-gcp" ]]; then
         ocm get /api/clusters_mgmt/v1/versions \
             --parameter search="enabled = 'true' AND raw_id like '${version_prefix}%' AND channel_group = '${channel}' AND gcp_marketplace_enabled = 'true'" \
+            --parameter size=100 2>/dev/null \
+            | jq -r '.items[].raw_id // empty' 2>/dev/null \
+            | sort -V | tail -n1
+    elif [[ "${type}" == "osd-aws" ]]; then
+        ocm get /api/clusters_mgmt/v1/versions \
+            --parameter search="enabled = 'true' AND raw_id like '${version_prefix}%' AND channel_group = '${channel}'" \
             --parameter size=100 2>/dev/null \
             | jq -r '.items[].raw_id // empty' 2>/dev/null \
             | sort -V | tail -n1
@@ -138,6 +145,8 @@ provision_cluster() {
 
     if [[ "${type}" == "osd-gcp" ]]; then
         provision_gcp_cluster "${name}" "${region}" "${version}" "${channel}" "${compute_nodes}" "${machine_type}"
+    elif [[ "${type}" == "osd-aws" ]]; then
+        provision_osd_aws_cluster "${name}" "${region}" "${version}" "${channel}" "${compute_nodes}" "${machine_type}"
     else
         provision_sts_cluster "${name}" "${region}" "${version}" "${channel}" "${compute_nodes}" "${machine_type}" "${cluster_json}" "${desired_cm}"
     fi
@@ -162,6 +171,46 @@ provision_gcp_cluster() {
         --compute-machine-type "${machine_type}" \
         --compute-nodes "${compute_nodes}" \
         || { log "ERROR: Failed to create GCP cluster ${name}"; return 1; }
+}
+
+provision_osd_aws_cluster() {
+    local name="$1" region="$2" version="$3" channel="$4"
+    local compute_nodes="$5" machine_type="$6"
+
+    local cred_file="${OSD_AWS_CREDENTIALS_DIR}/credentials"
+    if [[ ! -f "${cred_file}" ]]; then
+        log "WARNING: OSD AWS CCS credentials not found at ${cred_file}. Skipping ${name}."
+        return 1
+    fi
+
+    local aws_access_key_id aws_secret_access_key
+    aws_access_key_id=$(grep -m1 'aws_access_key_id' "${cred_file}" | cut -d= -f2 | tr -d ' ')
+    aws_secret_access_key=$(grep -m1 'aws_secret_access_key' "${cred_file}" | cut -d= -f2 | tr -d ' ')
+
+    if [[ -z "${aws_access_key_id}" || -z "${aws_secret_access_key}" ]]; then
+        log "WARNING: Could not parse AWS credentials from ${cred_file}. Skipping ${name}."
+        return 1
+    fi
+
+    local aws_account_id
+    aws_account_id=$(AWS_SHARED_CREDENTIALS_FILE="${cred_file}" aws sts get-caller-identity --query Account --output text 2>/dev/null || true)
+    if [[ -z "${aws_account_id}" ]]; then
+        log "WARNING: Cannot determine AWS account ID for osdCcsAdmin. Skipping ${name}."
+        return 1
+    fi
+
+    ocm create cluster "${name}" \
+        --ccs \
+        --provider aws \
+        --aws-account-id "${aws_account_id}" \
+        --aws-access-key-id "${aws_access_key_id}" \
+        --aws-secret-access-key "${aws_secret_access_key}" \
+        --region "${region}" \
+        --version "${version}" \
+        --channel-group "${channel}" \
+        --compute-machine-type "${machine_type}" \
+        --compute-nodes "${compute_nodes}" \
+        || { log "ERROR: Failed to create OSD AWS cluster ${name}"; return 1; }
 }
 
 provision_sts_cluster() {
@@ -213,7 +262,7 @@ provision_sts_cluster() {
 # Delete a cluster based on its type
 delete_cluster() {
     local cluster_id="$1" type="$2"
-    if [[ "${type}" == "osd-gcp" ]]; then
+    if [[ "${type}" == "osd-gcp" || "${type}" == "osd-aws" ]]; then
         ocm delete "/api/clusters_mgmt/v1/clusters/${cluster_id}" || true
     else
         local cluster_desc roles_prefix oidc_config_id describe_attempt
@@ -255,7 +304,7 @@ delete_cluster() {
 # List available upgrades for a cluster
 list_upgrades() {
     local cluster_id="$1" type="$2" desired_version="$3"
-    if [[ "${type}" == "osd-gcp" ]]; then
+    if [[ "${type}" == "osd-gcp" || "${type}" == "osd-aws" ]]; then
         ocm get "/api/clusters_mgmt/v1/clusters/${cluster_id}" 2>/dev/null \
             | jq -r --arg desired "${desired_version}" \
               '.version.available_upgrades[] | select(startswith($desired))' 2>/dev/null \
@@ -273,7 +322,7 @@ schedule_upgrade() {
     local cluster_id="$1" type="$2" target_version="$3"
     local next_run
     next_run=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-    if [[ "${type}" == "osd-gcp" ]]; then
+    if [[ "${type}" == "osd-gcp" || "${type}" == "osd-aws" ]]; then
         echo "{\"version\": \"${target_version}\", \"schedule_type\": \"manual\", \"next_run\": \"${next_run}\"}" \
             | ocm post "/api/clusters_mgmt/v1/clusters/${cluster_id}/upgrade_policies"
     else

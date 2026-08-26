@@ -41,6 +41,9 @@ spec:
       serviceAccountName: prow-controller-manager
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
@@ -56,7 +59,7 @@ spec:
           mountPath: /tmp/git-sync
       containers:
       - name: prow-controller-manager
-        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260729-7f8580d8d
+        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260819-7593870dc
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
@@ -97,7 +100,7 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "8Gi"
+            memory: "16Gi"
             cpu: "600m"
       - name: git-sync
         command:
@@ -115,8 +118,8 @@ spec:
           mountPath: /tmp/git-sync
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "0.5"
+            memory: "512Mi"
+            cpu: "100m"
       volumes:
       - name: service-account-token
         projected:

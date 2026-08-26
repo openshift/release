@@ -55,4 +55,4 @@ JETSON_HOST="${EFFECTIVE_HOST}" \
 JETSON_PORT="${EFFECTIVE_PORT}" \
 JETSON_USERNAME="root" \
 JETSON_KEY_PATH="${SSH_KEY}" \
-pytest "${TEST_SUITE}" -v --junit-xml="${ARTIFACT_DIR}/junit.xml"
+pytest ${TEST_SUITE} -v --junit-xml="${ARTIFACT_DIR}/junit.xml"

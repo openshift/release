@@ -1,28 +1,32 @@
 base_images:
   assisted-image-service:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -36,11 +40,11 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_os:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: rhel-coreos
   tls-scanner-tool:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: tls-scanner-tool
 build_root:
@@ -75,17 +79,17 @@ promotion:
     - custom-os-image
     - src-with-skopeo
     - zacks-toolbox
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -431,6 +435,7 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       MAX_VCENTERS: "1"
       OS_IMAGE_STREAM: rhel-9
+      POOL_COUNT: "3"
       TEST_ARGS: --run=MCO.Bootimages
       TEST_SKIPS: ""
       TEST_SUITE: openshift/machine-config-operator/longduration
@@ -855,6 +860,22 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: ipi-aws
+- as: periodic-jira-agent
+  cron: 0 9 * * *
+  steps:
+    env:
+      JIRA_AGENT_MAX_ISSUES: "1"
+    workflow: mco-jira-agent
+- as: periodic-review-agent
+  cron: '@yearly'
+  steps:
+    workflow: mco-review-agent
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: mco-review-agent-trigger
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -11,15 +11,15 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
+  rosa-e2e:
+    name: rosa-e2e
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.23
-images:
-  items:
-  - dockerfile_path: Containerfile
-    to: rosa-e2e
 releases:
   latest:
     candidate:
@@ -98,18 +98,82 @@ tests:
       REGION: us-west-2
       REPLICAS: "3"
     workflow: rosa-e2e-hcp
-- as: rosa-hcp-e2e-staging-nightly-5-0
+- as: rosa-hcp-e2e-staging-candidate-5-0
   cron: 30 4 * * *
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: rosa-e2e-01
     env:
-      CHANNEL_GROUP: nightly
+      CHANNEL_GROUP: candidate
       CLUSTER_SECTOR: rosa-e2e
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
       LABEL_FILTER: Platform:HCP
       OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "5.0"
+      REGION: us-west-2
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp
+- as: rosa-hcp-e2e-integration-stable-4-20
+  cron: 0 8 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: hypershift-ci
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: "4.20"
+      REGION: us-west-2
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp
+- as: rosa-hcp-e2e-integration-stable-4-21
+  cron: 30 8 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: hypershift-ci
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: "4.21"
+      REGION: us-west-2
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp
+- as: rosa-hcp-e2e-integration-stable-4-22
+  cron: 0 9 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: hypershift-ci
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-west-2
+      REPLICAS: "3"
+    workflow: rosa-e2e-hcp
+- as: rosa-hcp-e2e-integration-candidate-5-0
+  cron: 30 9 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: candidate
+      CLUSTER_SECTOR: hypershift-ci
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: integration
       OPENSHIFT_VERSION: "5.0"
       REGION: us-west-2
       REPLICAS: "3"

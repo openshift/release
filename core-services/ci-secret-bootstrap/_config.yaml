@@ -441,6 +441,10 @@ secret_configs:
     - build_farm
     name: gce-sa-credentials-gcs-private
     namespace: ci
+  - cluster_groups:
+    - build_farm
+    name: gce-sa-credentials-gcs-private
+    namespace: ci-staging
 - from:
     service-account.json:
       field: credentials.json
@@ -2633,6 +2637,10 @@ secret_configs:
     namespace: ci
   - cluster_groups:
     - non_app_ci
+    name: cluster-secrets-azure-perfscale-qe
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
     name: cluster-secrets-azuremag-qe
     namespace: ci
 - from:
@@ -3000,6 +3008,10 @@ secret_configs:
     - build_farm
     name: boskos-credentials
     namespace: ci
+  - cluster_groups:
+    - build_farm
+    name: boskos-credentials
+    namespace: ci-staging
 - from:
     AWS_ACCESS_KEY_ID:
       field: AWS_ACCESS_KEY_ID
@@ -3949,6 +3961,10 @@ secret_configs:
     - build_farm
     name: result-aggregator
     namespace: ci
+  - cluster_groups:
+    - build_farm
+    name: result-aggregator
+    namespace: ci-staging
 - from:
     sa.pj-rehearse.app.ci.config:
       field: sa.pj-rehearse.app.ci.config
@@ -4299,6 +4315,25 @@ secret_configs:
     namespace: ci
   - cluster: core-ci
     name: qe-private-deck-viewer
+    namespace: ci
+- from:
+    channel_id:
+      field: channel_id
+      item: prowjob-dispatcher-control
+    token:
+      field: token
+      item: prowjob-dispatcher-control
+  to:
+  - cluster: app.ci
+    name: prowjob-dispatcher-control
+    namespace: ci
+- from:
+    token:
+      field: token
+      item: prowjob-dispatcher-fallback-observer
+  to:
+  - cluster: app.ci
+    name: prowjob-dispatcher-fallback-observer
     namespace: ci
 - from:
     app_id:
@@ -5410,6 +5445,48 @@ secret_configs:
     name: cluster-secrets-nutanix
     namespace: ci
 - from:
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+      - auth_field: token_image-puller_build04_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build04.ci.openshift.org
+    ssh-privatekey:
+      field: ssh-privatekey
+      item: openshift-ci-aws-credentials
+    ssh-publickey:
+      field: ssh-publickey
+      item: openshift-ci-aws-credentials
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-azure-perfscale-qe
+    namespace: ci
+- from:
     .awscred:
       field: .awscred
       item: openshift-ci-aws-credentials
@@ -5679,6 +5756,23 @@ secret_configs:
     namespace: ci
   - cluster: core-ci
     name: hypershift-operator-oidc-provider-s3-credentials
+    namespace: ci
+- from:
+    bucket:
+      field: bucket
+      item: hypershift-oidc-2
+    credentials:
+      field: credentials
+      item: hypershift-oidc-2
+    region:
+      field: region
+      item: hypershift-oidc-2
+  to:
+  - cluster: hosted-mgmt2
+    name: hypershift-operator-oidc-provider-s3-credentials
+    namespace: hypershift
+  - cluster: app.ci
+    name: hypershift-operator-oidc-provider-s3-credentials-2
     namespace: ci
 - from:
     .dockerconfigjson:

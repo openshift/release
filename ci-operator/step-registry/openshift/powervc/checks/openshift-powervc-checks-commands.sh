@@ -6,7 +6,7 @@ set -o errexit
 set -o pipefail
 
 # PowerVC helper release to download for this step.
-readonly POWERVC_TOOL_VERSION="v2.4.6"
+readonly POWERVC_TOOL_VERSION="v2.4.8"
 
 #######################################
 # Log an informational message with a timestamp.
@@ -42,6 +42,7 @@ function log_warning() {
 #######################################
 function cleanup_on_exit() {
         local rc="${1:-0}"
+
         if [[ "${rc}" -eq 0 ]]; then
                 return 0
         fi
@@ -63,7 +64,7 @@ trap 'cleanup_on_exit $?' EXIT
 #
 # Currently required variables:
 #   CLOUD – name of the target OpenStack/PowerVC cloud passed to
-#           ocp-ipi-powervc and print-stream-json.sh.
+#           PowerVC-Tool and print-stream-json.sh.
 #
 # Globals:
 #   CLOUD – (in) must be non-empty; validated but not modified.
@@ -94,6 +95,118 @@ function validate_environment() {
 }
 
 #######################################
+# Retry a command a fixed number of times with a constant delay between
+# attempts.
+#
+# The function logs every attempt, returns immediately on the first success,
+# and emits a final error after the last failure.
+#
+# Arguments:
+#   $1 - Maximum number of attempts.
+#   $2 - Delay in seconds between attempts.
+#   $3 - Description of the operation for log messages.
+#   $@ - Command and arguments to execute after the first three parameters.
+# Returns:
+#   0 if the command succeeds within the allowed attempts.
+#   1 if the command fails on every attempt.
+#######################################
+function retry_command() {
+	local max_attempts="${1}"
+	local delay="${2}"
+	local description="${3}"
+	shift 3
+	local cmd=("$@")
+
+	local attempt=1
+	while (( attempt <= max_attempts )); do
+		log_info "Attempt ${attempt}/${max_attempts}: ${description}"
+		if "${cmd[@]}"; then
+			log_info "Success: ${description}"
+			return 0
+		fi
+
+		if (( attempt < max_attempts )); then
+			log_warning "Failed, retrying in ${delay}s..."
+			sleep "${delay}"
+		fi
+		((attempt++))
+	done
+
+	log_error "Failed after ${max_attempts} attempts: ${description}"
+	return 1
+}
+
+#######################################
+# Download a helper binary, optionally verify its SHA256 checksum, and mark it
+# executable.
+#
+# When SHA verification is enabled (the default) the function downloads both the
+# target file and its matching .sha256 file, verifies the checksum from the
+# target directory, and leaves the executable in place only when verification
+# succeeds.  When disabled the SHA download and check are skipped entirely.
+#
+# Arguments:
+#   $1 - Source URL.
+#   $2 - Destination path for the downloaded file.
+#   $3 - Human-readable description used in log messages.
+#   $4 - (optional) Whether to download and verify the SHA256 checksum.
+#        Accepts "true" or "false". Defaults to "true".
+# Returns:
+#   0 if the file is downloaded (and checksum verification passes when enabled).
+#   1 if a download fails or checksum verification fails.
+# Side Effects:
+#   Writes the file and (when enabled) checksum file at the destination path
+#   and changes the downloaded file mode.
+#######################################
+function download_tool_w_sha() {
+	local url="${1}"
+	local output="${2}"
+	local description="${3}"
+	local verify_sha="${4:-true}"
+	local rc=0
+
+	log_info "Downloading ${description} from ${url}"
+	if ! retry_command 3 5 "Download ${description}" \
+		curl --fail --location --silent \
+			--show-error --connect-timeout 30 --max-time 120 \
+			--output "${output}" "${url}"; then
+		log_error "Could not download ${url}"
+		return 1
+	fi
+
+	chmod +x "${output}"
+
+	if [[ "${verify_sha}" == "true" ]]; then
+		url="${url}.sha256"
+		output="${output}.sha256"
+		log_info "Downloading ${description} SHA256 from ${url}"
+		if ! retry_command 3 5 "Download ${description} SHA256" \
+			curl --fail --location --silent \
+				--show-error --connect-timeout 30 --max-time 120 \
+				--output "${output}" "${url}"; then
+			log_error "Could not download ${url}"
+			return 1
+		fi
+
+		pushd "$(dirname "${output}")" > /dev/null || {
+			log_error "Failed to change directory to $(dirname "${output}")"
+			return 1
+		}
+		if ! sha256sum --check "$(basename "${output}")"; then
+			log_error "sha256 sum failed verification"
+			rm -f "${output}" "${output%.sha256}"
+			popd > /dev/null || true
+			return 1
+		fi
+		popd > /dev/null || rc=$?
+	fi
+
+	log_info "Successfully installed ${description}"
+
+	return ${rc}
+}
+
+#######################################
 # Download helper binaries, configure a private HOME directory, and install
 # OpenStack credentials so subsequent steps can reach the PowerVC cloud.
 #
@@ -110,7 +223,7 @@ function validate_environment() {
 #   4. Copies clouds.yaml (to both $HOME and $HOME/.config/openstack/) and
 #      ocp-ci-ca.pem from SECRETS_DIR, then rewrites any hardcoded
 #      /tmp/ocp-ci-ca.pem path in both copies to the real $HOME path.
-#   5. Verifies that ocp-ipi-powervc and openstack are resolvable on PATH.
+#   5. Verifies that PowerVC-Tool and openstack are resolvable on PATH.
 #
 # Globals:
 #   POWERVC_TOOL_VERSION – (in)  GitHub release tag used to build the download
@@ -165,40 +278,19 @@ function install_required_tools() {
 			;;
 	esac
 
-	local tool_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}"
-	local -a tools
-	tools=(
-		"ocp-ipi-powervc-linux-${machine}:ocp-ipi-powervc"
-		"print-stream-json.sh:print-stream-json.sh"
-	)
-	local tool
-	local source_name
-	local destination_name
+	local tool_bin="ocp-ipi-powervc-linux-${machine}"
+	local powervc_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}/${tool_bin}"
+	if ! download_tool_w_sha "${powervc_url}" "${tmp_bin_dir}/${tool_bin}" "${tool_bin} ${POWERVC_TOOL_VERSION}"; then
+		log_error "Could not download ${powervc_url}"
+		exit 1
+	fi
+	mv "${tmp_bin_dir}/${tool_bin}" "${tmp_bin_dir}/PowerVC-Tool"
 
-	local max_attempts=10
-	local attempt
-
-	for tool in "${tools[@]}"; do
-		source_name="${tool%%:*}"
-		destination_name="${tool#*:}"
-		log_info "Downloading tool: ${source_name}"
-		for (( attempt=1; attempt<=max_attempts; attempt++ )); do
-			if curl --location --fail --silent \
-				--connect-timeout 30 --max-time 300 --show-error \
-				--output "${tmp_bin_dir}/${destination_name}" \
-				"${tool_url}/${source_name}"; then
-				break
-			fi
-			log_warning "Download attempt ${attempt}/${max_attempts} failed for ${source_name}"
-			if (( attempt == max_attempts )); then
-				log_error "Failed to download ${source_name} after ${max_attempts} attempts"
-				exit 1
-			fi
-			# A progressive back-off of sleep is applied between retries to avoid hammering the server.
-			sleep $(( attempt * 5 ))
-		done
-		chmod ugo+x "${tmp_bin_dir}/${destination_name}"
-	done
+	local print_stream_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}/print-stream-json.sh"
+	if ! download_tool_w_sha "${print_stream_url}" "${tmp_bin_dir}/print-stream-json.sh" "print-stream-json ${POWERVC_TOOL_VERSION}"; then
+		log_error "Could not download ${print_stream_url}"
+		exit 1
+	fi
 
 	# Setup OpenStack configuration
 	log_info "Setting up OpenStack credentials..."
@@ -238,7 +330,7 @@ function install_required_tools() {
 
 	# Verify all required tools are available
 	log_info "Verifying installed tools..."
-	local tools=("ocp-ipi-powervc" "openstack")
+	local tools=("PowerVC-Tool" "print-stream-json.sh" "openstack")
 	for tool in "${tools[@]}"; do
 		if ! command -v "${tool}" &>/dev/null; then
 			log_error "Required tool '${tool}' is not available"

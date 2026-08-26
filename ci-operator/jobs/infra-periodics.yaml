@@ -50,6 +50,55 @@ periodics:
         secretName: hypershift-operator-oidc-provider-s3-credentials
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 5 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-hosted-mgmt2-hypershift-deployment
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the hypershift
+        deployment on `hosted-mgmt2` has not been completed. Please check if anything
+        blocks the process.
+  spec:
+    containers:
+    - args:
+      - install
+      - --enable-uwm-telemetry-remote-write=false
+      - --hypershift-image=quay-proxy.ci.openshift.org/openshift/ci:hypershift_hypershift-operator_latest
+      - --oidc-storage-provider-s3-bucket-name=hosted-mgmt2-hypershift-oidc
+      - --oidc-storage-provider-s3-credentials=/mgmt-aws/credentials
+      - --oidc-storage-provider-s3-region=us-east-2
+      command:
+      - /usr/bin/hypershift
+      env:
+      - name: KUBECONFIG
+        value: /etc/build-farm-credentials/sa.config-updater.hosted-mgmt2.config
+      image: quay-proxy.ci.openshift.org/openshift/ci:hypershift_hypershift-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+      - mountPath: /mgmt-aws
+        name: mgmt-aws-s3-credentials
+        readOnly: true
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        secretName: config-updater
+    - name: mgmt-aws-s3-credentials
+      secret:
+        secretName: hypershift-operator-oidc-provider-s3-credentials-2
+- agent: kubernetes
+  cluster: app.ci
   cron: 0 8 * * 1-5
   decorate: true
   labels:
@@ -986,7 +1035,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260729-7f8580d8d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260819-7593870dc
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1021,7 +1070,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260729-7f8580d8d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260819-7593870dc
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1043,7 +1092,7 @@ periodics:
   - base_ref: main
     org: openshift
     repo: release
-  - base_ref: openshift-5.0
+  - base_ref: openshift-5.1
     org: openshift
     repo: ocp-build-data
   labels:
@@ -1062,9 +1111,8 @@ periodics:
       - --git-email=148852131+openshift-merge-bot[bot]@users.noreply.github.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
-      - --current-release=5.0
-      - --future-release=4.23
-      - --future-release=5.1
+      - --current-release=5.1
+      - --future-release=5.2
       - --self-approve=true
       - --assign=openshift/test-platform
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
@@ -1341,7 +1389,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260729-7f8580d8d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260819-7593870dc
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1399,7 +1447,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260729-7f8580d8d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260819-7593870dc
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1491,7 +1539,7 @@ periodics:
           --github-allowed-burst=600 \
           --allow-repo-archival \
           --ignore-enterprise-teams
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260729-7f8580d8d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260819-7593870dc
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1523,7 +1571,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260729-7f8580d8d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260819-7593870dc
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1553,8 +1601,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=5.0
-      - --future-release=5.1
+      - --current-release=5.1
+      - --future-release=5.2
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -1604,6 +1652,59 @@ periodics:
       resources:
         requests:
           cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 6 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-mcp-server-fast-forward
+  reporter_config:
+    slack:
+      channel: '#pixaa-rebasebot-alerts'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs>
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        dnf install -y git
+        export HOME=/tmp
+        cd /tmp
+        # Avoid putting credentials in argv/env/logs
+        git_cmd() {
+          git -c credential.helper= -c credential.helper='!f() { echo username=openshift-merge-robot; printf password=; cat /etc/github/oauth; echo; }; f' "$@"
+        }
+        src=main
+        dst=release-0.5
+        repo_url=https://github.com/openshift/openshift-mcp-server.git
+        echo "Fast-forwarding ${src} -> ${dst} for openshift/openshift-mcp-server"
+        git_cmd clone -b "${dst}" "${repo_url}" repo
+        cd repo
+        git_cmd pull --ff-only origin "${src}"
+        git_cmd push
+      command:
+      - /bin/bash
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-jq_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 100m
       volumeMounts:
       - mountPath: /etc/github
         name: token
@@ -1678,9 +1779,9 @@ periodics:
       - --dry-run=false
       - --config-dir=./ci-operator/config/
       - --current-release=4.22
-      - --current-release=5.0
+      - --current-release=5.1
       - --future-release=4.23
-      - --future-release=5.1
+      - --future-release=5.2
       command:
       - blocking-issue-creator
       env:
@@ -2092,7 +2193,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260729-7f8580d8d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260819-7593870dc
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2124,7 +2225,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260729-7f8580d8d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260819-7593870dc
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2156,7 +2257,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260729-7f8580d8d
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260819-7593870dc
       imagePullPolicy: Always
       name: ""
       resources:
@@ -3325,7 +3426,8 @@ periodics:
       channel: '#pixaa-rebasebot-alerts'
       job_states_to_report:
       - failure
-      report_template: Job {{.Spec.Job}} failed. https://prow.ci.openshift.org/?job={{.Spec.Job}}
+      report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs>
   spec:
     containers:
     - args:
@@ -3368,3 +3470,298 @@ periodics:
     - name: token
       secret:
         secretName: github-credentials-openshift-ci-robot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 0 31 2 *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-ci-openshift-hive-master-hermetic-update-lockfile
+  reporter_config:
+    slack:
+      channel: '#team-hive-alert'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: Job {{.Spec.Job}} failed. https://prow.ci.openshift.org/?job={{.Spec.Job}}
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -euo pipefail
+        # Never enable xtrace: this script handles subscription and GitHub credentials.
+        set +o xtrace
+
+        log() { echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] $*"; }
+        info() { log "[info] $*"; }
+        error() { log "[error] $*"; exit 1; }
+
+        export HOME=/tmp
+
+        LOCKFILE_DIR="hack/hermetic"
+        LOCKFILE_PATH="${LOCKFILE_DIR}/rpms.lock.yaml"
+        REPOFILE_PATH="${LOCKFILE_DIR}/redhat.repo"
+        INPUT_PATH="${LOCKFILE_DIR}/rpms.in.yaml"
+        PR_TITLE="[Automated] Update RPM lockfile for hermetic builds"
+        BRANCH_NAME="automated-rpm-lockfile-update"
+        GITHUB_API="https://api.github.com"
+        FORK_REMOTE="fork"
+        GITHUB_REPO_ORG="openshift"
+        GITHUB_REPO_NAME="hive"
+        GITHUB_REPO_BRANCH="master"
+        GITHUB_PR_USER="openshift-merge-robot"
+        GITHUB_PR_EMAIL="openshift-merge-robot@users.noreply.github.com"
+        ACTIVATION_KEY_DIR="/var/run/activation-key"
+        GITHUB_TOKEN_PATH="/etc/github/oauth"
+
+        # --- Install tooling ---
+        info "installing tooling"
+        dnf install -y subscription-manager python3 python3-pip git skopeo jq
+
+        # --- Credentials ---
+        [[ -d "${ACTIVATION_KEY_DIR}" ]] || error "activation key directory not found: ${ACTIVATION_KEY_DIR}"
+        ORG_FILE="${ACTIVATION_KEY_DIR}/org"
+        if [[ -f "${ACTIVATION_KEY_DIR}/activationkey" ]]; then
+          KEY_FILE="${ACTIVATION_KEY_DIR}/activationkey"
+        elif [[ -f "${ACTIVATION_KEY_DIR}/activation-key" ]]; then
+          KEY_FILE="${ACTIVATION_KEY_DIR}/activation-key"
+        else
+          error "activation key file not found in ${ACTIVATION_KEY_DIR} (expected activationkey or activation-key)"
+        fi
+        [[ -f "${ORG_FILE}" ]] || error "org file not found: ${ORG_FILE}"
+
+        [[ -f "${GITHUB_TOKEN_PATH}" ]] || error "GitHub token file not found: ${GITHUB_TOKEN_PATH}"
+        GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+        [[ -n "${GITHUB_TOKEN}" ]] || error "GitHub token file is empty"
+
+        # --- Subscription Manager ---
+        export SMDEV_CONTAINER_OFF=1
+        if [[ -e /etc/rhsm-host ]]; then
+          unlink /etc/rhsm-host || true
+        fi
+
+        info "registering with subscription-manager"
+        registered=false
+        for attempt in 1 2 3; do
+          if subscription-manager register --force \
+              --org "$(cat "${ORG_FILE}")" \
+              --activationkey "$(cat "${KEY_FILE}")"; then
+            registered=true
+            break
+          fi
+          info "subscription-manager register failed (attempt ${attempt}/3), retrying"
+          sleep 5
+        done
+        [[ "${registered}" == true ]] || error "subscription-manager register failed after 3 attempts"
+
+        cleanup() {
+          subscription-manager unregister >/dev/null 2>&1 || true
+        }
+        trap cleanup EXIT
+
+        # --- Clone hive ---
+        info "cloning openshift/hive (${GITHUB_REPO_BRANCH})"
+        cd /tmp
+        git -c credential.helper= -c credential.helper="!f() { echo username=x-access-token; printf password=; cat ${GITHUB_TOKEN_PATH}; echo; }; f" \
+          clone --branch "${GITHUB_REPO_BRANCH}" "https://github.com/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}.git" hive-repo
+        cd hive-repo
+
+        [[ -f "${INPUT_PATH}" ]] || error "missing ${INPUT_PATH}"
+        [[ -f "${REPOFILE_PATH}" ]] || error "missing ${REPOFILE_PATH}"
+        [[ -f "${LOCKFILE_PATH}" ]] || error "missing ${LOCKFILE_PATH}"
+
+        # --- Patch entitlement cert paths ---
+        info "patching entitlement certificate paths in ${REPOFILE_PATH} (not committed)"
+        shopt -s nullglob
+        keys=(/etc/pki/entitlement/*-key.pem)
+        shopt -u nullglob
+        [[ ${#keys[@]} -gt 0 ]] || error "no entitlement key found under /etc/pki/entitlement"
+        ssl_key="${keys[0]}"
+        ssl_cert="${ssl_key/-key.pem/.pem}"
+        [[ -f "${ssl_cert}" ]] || error "entitlement cert not found next to ${ssl_key}"
+        sed -i -E \
+          -e "s|^sslclientkey = .*|sslclientkey = ${ssl_key}|" \
+          -e "s|^sslclientcert = .*|sslclientcert = ${ssl_cert}|" \
+          "${REPOFILE_PATH}"
+
+        # --- Install rpm-lockfile-prototype ---
+        info "installing rpm-lockfile-prototype"
+        tag=$(curl -sS -H "Authorization: token ${GITHUB_TOKEN}" \
+          "${GITHUB_API}/repos/konflux-ci/rpm-lockfile-prototype/releases/latest" \
+          | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+        [[ -n "${tag}" ]] || error "failed to resolve latest rpm-lockfile-prototype tag"
+        python3 -m pip install --user \
+          "https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/${tag}.tar.gz"
+        export PATH="${HOME}/.local/bin:${PATH}"
+        command -v rpm-lockfile-prototype >/dev/null || error "rpm-lockfile-prototype not on PATH"
+
+        # --- Generate lockfile ---
+        info "generating ${LOCKFILE_PATH} with rpm-lockfile-prototype ${tag} (bare)"
+        (
+          cd "${LOCKFILE_DIR}"
+          rpm-lockfile-prototype --bare --outfile rpms.lock.yaml rpms.in.yaml
+        )
+
+        # Discard repo-file path edits; only the lockfile may be proposed.
+        git checkout -- "${REPOFILE_PATH}"
+
+        if git diff --quiet -- "${LOCKFILE_PATH}"; then
+          info "lockfile is already up to date"
+          exit 0
+        fi
+
+        # --- Create or update PR ---
+        info "lockfile changed; preparing pull request"
+        git config user.name "${GITHUB_PR_USER}"
+        git config user.email "${GITHUB_PR_EMAIL}"
+
+        github_api() {
+          local method="$1"
+          local endpoint="$2"
+          local data="${3:-}"
+          if [[ -n "${data}" ]]; then
+            curl -sS -X "${method}" \
+              -H "Authorization: token ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/json" \
+              -d "${data}" \
+              "${GITHUB_API}${endpoint}"
+          else
+            curl -sS -X "${method}" \
+              -H "Authorization: token ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "${GITHUB_API}${endpoint}"
+          fi
+        }
+
+        fork_http=$(curl -sS -o /dev/null -w "%{http_code}" \
+          -H "Authorization: token ${GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "${GITHUB_API}/repos/${GITHUB_PR_USER}/${GITHUB_REPO_NAME}")
+        if [[ "${fork_http}" != "200" ]]; then
+          info "creating fork ${GITHUB_PR_USER}/${GITHUB_REPO_NAME}"
+          github_api POST "/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/forks" '{"default_branch_only":true}' >/dev/null
+          for _ in $(seq 1 12); do
+            fork_http=$(curl -sS -o /dev/null -w "%{http_code}" \
+              -H "Authorization: token ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "${GITHUB_API}/repos/${GITHUB_PR_USER}/${GITHUB_REPO_NAME}")
+            [[ "${fork_http}" == "200" ]] && break
+            sleep 10
+          done
+          [[ "${fork_http}" == "200" ]] || error "fork ${GITHUB_PR_USER}/${GITHUB_REPO_NAME} not ready"
+        fi
+
+        git remote add "${FORK_REMOTE}" "https://github.com/${GITHUB_PR_USER}/${GITHUB_REPO_NAME}.git" 2>/dev/null || \
+          git remote set-url "${FORK_REMOTE}" "https://github.com/${GITHUB_PR_USER}/${GITHUB_REPO_NAME}.git"
+
+        existing_pr=$(github_api GET "/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/pulls?state=open&per_page=100" | python3 -c "
+        import json, sys
+        prs = json.load(sys.stdin)
+        if not isinstance(prs, list):
+            sys.exit(0)
+        title = '${PR_TITLE}'
+        user = '${GITHUB_PR_USER}'
+        for pr in prs:
+            if pr.get('title') == title and pr.get('user', {}).get('login') == user:
+                print(f\"{pr['number']}|{pr['head']['ref']}|{pr['html_url']}\")
+                break
+        ")
+
+        git add "${LOCKFILE_PATH}"
+        if [[ -n "${existing_pr}" ]]; then
+          existing_number=$(echo "${existing_pr}" | cut -d'|' -f1)
+          existing_branch=$(echo "${existing_pr}" | cut -d'|' -f2)
+          existing_url=$(echo "${existing_pr}" | cut -d'|' -f3)
+          info "found existing PR #${existing_number} on ${existing_branch}"
+          git -c credential.helper= -c credential.helper="!f() { echo username=x-access-token; printf password=; cat ${GITHUB_TOKEN_PATH}; echo; }; f" \
+            fetch "${FORK_REMOTE}" "${existing_branch}"
+          if git diff --staged --quiet "${FORK_REMOTE}/${existing_branch}" -- "${LOCKFILE_PATH}"; then
+            info "existing PR already has the same lockfile: ${existing_url}"
+            exit 0
+          fi
+          BRANCH_NAME="${existing_branch}"
+        fi
+
+        git checkout -B "${BRANCH_NAME}"
+        git commit -m "Update RPM lockfile for hermetic builds
+
+        Generated by rpm-lockfile-prototype from hack/hermetic/rpms.in.yaml.
+        "
+
+        info "pushing ${BRANCH_NAME} to ${GITHUB_PR_USER}/${GITHUB_REPO_NAME}"
+        git -c credential.helper= -c credential.helper="!f() { echo username=x-access-token; printf password=; cat ${GITHUB_TOKEN_PATH}; echo; }; f" \
+          push --force "${FORK_REMOTE}" "${BRANCH_NAME}"
+
+        if [[ -n "${existing_pr}" ]]; then
+          info "updated existing PR: ${existing_url}"
+          exit 0
+        fi
+
+        diff_stat=$(git diff HEAD~1 --stat -- "${LOCKFILE_PATH}")
+        pr_body=$(cat <<PREOF
+        ## Summary
+        This automated PR regenerates \`hack/hermetic/rpms.lock.yaml\` for hive hermetic builds using \`rpm-lockfile-prototype\` in bare mode. \`redhat.repo\` and \`rpms.in.yaml\` are not modified.
+
+        ## File changes
+        \`\`\`
+        ${diff_stat}
+        \`\`\`
+
+        ---
+        **Generated by:** periodic-ci-openshift-hive-master-hermetic-update-lockfile
+        **Generated at:** $(date +%Y-%m-%dT%H:%M:%S%z)
+        PREOF
+        )
+
+        export PR_TITLE PR_HEAD="${GITHUB_PR_USER}:${BRANCH_NAME}" PR_BASE="${GITHUB_REPO_BRANCH}" PR_BODY="${pr_body}"
+        pr_json=$(python3 -c "
+        import json, os
+        print(json.dumps({
+            'title': os.environ['PR_TITLE'],
+            'head': os.environ['PR_HEAD'],
+            'base': os.environ['PR_BASE'],
+            'body': os.environ['PR_BODY'],
+        }))
+        ")
+
+        info "creating pull request"
+        pr_response=$(github_api POST "/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/pulls" "${pr_json}")
+        pr_url=$(echo "${pr_response}" | python3 -c "
+        import json, sys
+        data = json.load(sys.stdin)
+        print(data.get('html_url', ''))
+        ")
+        if [[ -z "${pr_url}" ]]; then
+          err=$(echo "${pr_response}" | python3 -c "
+        import json, sys
+        data = json.load(sys.stdin)
+        print(data.get('message', data.get('errors', 'unknown error')))
+        " 2>/dev/null || echo "unknown error")
+          error "failed to create PR: ${err}"
+        fi
+        info "created PR: ${pr_url}"
+      command:
+      - /bin/bash
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-jq_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+      - mountPath: /var/run/activation-key
+        name: activation-key
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
+    - name: activation-key
+      secret:
+        secretName: hive-subscription-manager-activation-key

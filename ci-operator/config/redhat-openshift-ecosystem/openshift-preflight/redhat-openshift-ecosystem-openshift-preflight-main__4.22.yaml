@@ -9,11 +9,9 @@ build_root:
 images:
   items:
   - dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi9/ubi:latest
+      FROM registry.access.redhat.com/ubi10/ubi:latest
 
       RUN cat /etc/os-release
-      ARG OPERATOR_SDK_VERSION=1.42.3
-      ARG ARCH=amd64
 
       ADD openshift-preflight /src
       ADD preflight /src/preflight
@@ -22,13 +20,10 @@ images:
         jq \
         bzip2 \
         gzip \
-        iptables \
+        nftables \
         findutils \
         git \
         && dnf clean all
-
-      RUN curl -Lo /usr/local/bin/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_linux_${ARCH} \
-        && chmod 755 /usr/local/bin/operator-sdk
     inputs:
       bin:
         paths:
@@ -80,8 +75,6 @@ tests:
         echo ${PULL_PULL_SHA} | tee ${ARTIFACT_DIR}/pull-request-sha.txt
         echo "== preflight version - this includes the merge pr for this commit =="
         ./preflight --version | tee ${ARTIFACT_DIR}/preflight-version.txt
-        echo "== operator-sdk version =="
-        operator-sdk version | tee ${ARTIFACT_DIR}/operator-sdk-version.txt
         git log --oneline | head > ${ARTIFACT_DIR}/git-log-last-ten.txt
         git rev-parse HEAD > ${ARTIFACT_DIR}/git-rev-parse-head.txt
         make test-e2e ARTIFACTS_DIR=${PREFLIGHT_E2E_ARTIFACTS}

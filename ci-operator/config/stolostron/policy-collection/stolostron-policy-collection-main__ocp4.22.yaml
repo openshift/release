@@ -1,20 +1,16 @@
 base_images:
   acmqe-grc-test:
-    name: "2.16"
+    name: "2.17"
     namespace: acm-qe
     tag: acmqe-grc-test
   clc-ui-e2e:
-    name: "2.16"
+    name: "2.17"
     namespace: acm-qe
     tag: clc-ui-e2e
   cli:
     name: "4.22"
     namespace: ocp
     tag: cli
-  console-e2e:
-    name: main
-    namespace: acm-qe
-    tag: console-e2e
   fetch-managed-clusters:
     name: autotest
     namespace: acm-qe
@@ -23,10 +19,6 @@ base_images:
     name: "2.17"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
-  ocs-ci-tests:
-    name: ocs-ci-container
-    namespace: ci
-    tag: stable
   tests-private:
     name: tests-private
     namespace: ci
@@ -48,6 +40,17 @@ images:
     from: cli
     optional: true
     to: cli-with-git
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/openjdk-17:1.21
+      USER root
+      RUN microdnf install -y git gzip && microdnf clean all
+      RUN cd /tmp \
+          && curl -sLO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-4.22/openshift-client-linux.tar.gz \
+          && curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-4.22/sha256sum.txt | grep openshift-client-linux.tar.gz | sha256sum -c - \
+          && tar xzf openshift-client-linux.tar.gz -C /usr/local/bin oc kubectl \
+          && rm -f openshift-client-linux.tar.gz
+      USER 1001
+    to: acs-smoke-runner
 releases:
   latest:
     candidate:
@@ -86,19 +89,15 @@ tests:
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-aws-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
-      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8969
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       IGNORE_SECONDARY_POLICIES: "true"
-      MAP_TESTS: "true"
-      ODF_VERSION_MAJOR_MINOR: "4.21"
       OPERATORS: |
         [
-          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
       QUAY_OPERATOR_CHANNEL: stable-3.17
-      TEST_IMPORTANCE: LEVEL0
-      TEST_SCENARIOS: Cluster_Observability
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -122,15 +121,14 @@ tests:
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
     - chain: cucushift-installer-check-cluster-health
+    - ref: stackrox-opp-readiness
+    - ref: stackrox-opp-smoke
     - ref: acm-tests-clc-create
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
-    - ref: interop-tests-ocs-tests
-    - ref: quay-tests-quay-interop-test
+    - ref: interop-opp-odf-health
+    - ref: interop-tests-opp-quay-smoke
     - ref: acm-tests-observability
-    - ref: acm-tests-grc
-    - ref: acm-tests-alc
-    - ref: openshift-extended-test
 - as: interop-opp-vsphere
   capabilities:
   - intranet
@@ -150,27 +148,21 @@ tests:
     cluster_profile: vsphere-connected-2
     env:
       COMPUTE_NODE_REPLICAS: "6"
-      DISABLE_ENVIRONMENT_CHECKER: "true"
-      DR__RP__CR_COMP_NAME: lp-interop--OPP
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-vsphere-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
-      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8969
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       IGNORE_SECONDARY_POLICIES: "true"
-      MAP_TESTS: "true"
-      ODF_VERSION_MAJOR_MINOR: "4.21"
       OPENSHIFT_REQUIRED_CORES: "72"
       OPENSHIFT_REQUIRED_MEMORY: "288"
       OPERATORS: |
         [
-          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
       QUAY_OPERATOR_CHANNEL: stable-3.17
       SIZE_VARIANT: large
-      TEST_IMPORTANCE: LEVEL0
-      TEST_SCENARIOS: Cluster_Observability
     post:
     - ref: acm-fetch-operator-versions
     - ref: acm-must-gather
@@ -184,10 +176,9 @@ tests:
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
     - chain: cucushift-installer-check-cluster-health
-    - ref: interop-tests-ocs-tests
+    - ref: interop-opp-odf-health
     - ref: acm-tests-observability
     - ref: acm-opp-app
-    - ref: openshift-extended-test
     workflow: acm-ipi-vsphere
 zz_generated_metadata:
   branch: main

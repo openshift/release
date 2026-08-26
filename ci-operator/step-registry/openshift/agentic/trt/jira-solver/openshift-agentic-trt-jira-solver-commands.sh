@@ -24,6 +24,50 @@ fi
 
 echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
 
+# --- Metrics instrumentation ---
+OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
+
+agentic_ci() {
+    local timeout_seconds=""
+    local extra_args=()
+    while [[ "${1:-}" == --* ]]; do
+        case "$1" in
+            --timeout) timeout_seconds="$2"; shift 2 ;;
+            *) extra_args+=("$1"); shift ;;
+        esac
+    done
+    local prompt="$1"; shift
+    local cmd=(
+        agentic-ci run
+        --backend local
+        --harness claude-code
+        --model "${CLAUDE_MODEL}"
+        --workdir "${WORKDIR}"
+        "${extra_args[@]+"${extra_args[@]}"}"
+        "${prompt}"
+        --
+        --permission-mode default
+        --allowedTools "${ALLOWED_TOOLS}"
+        --verbose
+        "$@"
+    )
+    # Isolate TMPDIR so parallel eval cases cannot steal/delete each other's
+    # /tmp/agentic-ci-run.* OTEL files.
+    local run_tmp
+    run_tmp=$(mktemp -d /tmp/agentic-ci-wrapper.XXXXXX)
+    local rc=0
+    if [[ -n "${timeout_seconds}" ]]; then
+        TMPDIR="${run_tmp}" timeout "${timeout_seconds}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
+    else
+        TMPDIR="${run_tmp}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
+    fi
+    find "${run_tmp}" -name 'claude-otel.jsonl' -type f -exec cat {} + >> "${OTEL_LOG}" 2>/dev/null || true
+    rm -rf "${run_tmp}"
+    return $rc
+}
+
+PHASE_SETUP_START=$(date +%s)
+
 # --- Workspace setup ---
 WORKDIR="${WORKDIR:-/workspace}"
 cd "${WORKDIR}"
@@ -75,6 +119,7 @@ $(cat "${ISSUE_JSON}")
 ## Additional Instructions
 
 - Write the PR description to \`${WORKDIR}/artifacts/pr-description.md\`.
+- Do not use the \`gh\` CLI. The pipeline creates the PR after you exit. Push the feature branch with git and write the PR description file.
 - Do not modify CI configuration or generated files.
 - Save working files (e.g. solve plans) to \`/tmp/\` — do NOT create a \`.work/\` directory in the repo.
 
@@ -108,37 +153,166 @@ if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
     cat "${WORKDIR}/.agentic/solve-config.md" >> "${SYSTEM_PROMPT}"
 fi
 
+# Block gh inside the Claude session. jira-solve --ci only needs git; the
+# pipeline opens the PR after Claude exits. --settings lives under /tmp so we
+# do not write into a cloned repo that may ship its own .claude/settings.json.
+HOOKS_DIR="/tmp/ci-hooks"
+mkdir -p "${HOOKS_DIR}"
+cat > "${HOOKS_DIR}/block-gh.sh" <<'HOOK_EOF'
+#!/bin/bash
+set -euo pipefail
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "block-gh hook requires jq" >&2
+    exit 2
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "block-gh hook requires python3" >&2
+    exit 2
+fi
+
+cmd=$(jq -r '.tool_input.command // ""') || exit 2
+
+result=$(HOOK_BASH_CMD="$cmd" python3 - <<'PY'
+import os, re, shlex, sys
+
+cmd = os.environ.get("HOOK_BASH_CMD", "")
+UNSAFE = re.compile(r"\$\(|`|<\(|>\(|\$\{|\$'")
+WRAPPERS = {"command", "exec", "env", "nice", "nohup", "time"}
+SHELLS = {"bash", "sh", "dash", "zsh", "ksh"}
+
+
+def argv(s):
+    return shlex.split(s, posix=True)
+
+
+def skip_env(tokens):
+    i = 0
+    while i < len(tokens) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", tokens[i]):
+        i += 1
+    return tokens[i:]
+
+
+def skip_wrappers(tokens):
+    tokens = skip_env(tokens)
+    while tokens and tokens[0].rsplit("/", 1)[-1] in WRAPPERS:
+        tokens = tokens[1:]
+        while tokens and tokens[0].startswith("-"):
+            tokens = tokens[1:]
+    return tokens
+
+
+def deny_command(text):
+    if UNSAFE.search(text):
+        return True
+    for part in re.split(r"(?:&&|\|\||[;|\n])", text):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            tokens = skip_wrappers(argv(part))
+        except ValueError:
+            return True
+        if not tokens:
+            continue
+        exe = tokens[0].rsplit("/", 1)[-1]
+        if exe == "gh":
+            return True
+        if exe == "eval":
+            return deny_command(" ".join(tokens[1:]))
+        if exe in SHELLS and "-c" in tokens:
+            i = tokens.index("-c")
+            if i + 1 < len(tokens) and deny_command(tokens[i + 1]):
+                return True
+    return False
+
+
+try:
+    sys.stdout.write("deny" if deny_command(cmd) else "allow")
+except Exception as exc:
+    print(exc, file=sys.stderr)
+    sys.exit(2)
+PY
+) || exit 2
+
+if [[ "${result}" == deny ]]; then
+    jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny",
+      permissionDecisionReason: "CI mode: do not use the gh CLI. Push the branch with git; the pipeline creates the PR after you exit."}}' || exit 2
+fi
+HOOK_EOF
+chmod +x "${HOOKS_DIR}/block-gh.sh"
+cat > "${HOOKS_DIR}/settings.json" <<'HOOK_SETTINGS_EOF'
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "/tmp/ci-hooks/block-gh.sh" }]
+      }
+    ]
+  }
+}
+HOOK_SETTINGS_EOF
+
 # --- Run Claude to solve the issue ---
+PHASE_SETUP_DURATION=$(( $(date +%s) - PHASE_SETUP_START ))
+PHASE_SOLVE_START=$(date +%s)
 echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
 
 CLAUDE_EXIT=0
-timeout 5400 claude \
-    --model "${CLAUDE_MODEL}" \
-    --allowedTools "${ALLOWED_TOOLS}" \
-    --output-format stream-json \
-    --append-system-prompt-file "${SYSTEM_PROMPT}" \
-    -p "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
+agentic_ci --timeout 5400 \
+    "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
 
 Create a feature branch — do NOT commit on the current branch.
-Write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
-    --verbose 2>&1 | tee "${WORKDIR}/artifacts/claude-output.log" || CLAUDE_EXIT=$?
+Do not use the gh CLI — the pipeline creates the PR after you exit. Push the branch with git and write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
+    --settings "${HOOKS_DIR}/settings.json" \
+    --output-format stream-json \
+    --append-system-prompt-file "${SYSTEM_PROMPT}" \
+    || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo "Claude timed out. Nudging to wrap up..."
-    timeout 600 claude \
-        --model "${CLAUDE_MODEL}" \
+    agentic_ci --timeout 600 \
+        "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to ${WORKDIR}/artifacts/pr-description.md. Do not use the gh CLI — the pipeline creates the PR after you exit." \
         --continue \
-        --allowedTools "${ALLOWED_TOOLS}" \
+        --settings "${HOOKS_DIR}/settings.json" \
         --output-format stream-json \
         --max-turns 10 \
-        -p "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
-        --verbose 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || true
-elif [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
+        || true
+fi
+PHASE_SOLVE_DURATION=$(( $(date +%s) - PHASE_SOLVE_START ))
+
+if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
     echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
+    # Write failure metadata before exiting so post-step can emit metrics
+    PR_RESULT="failed"
+    jq -n \
+        --arg agent "trt-jira-solver" \
+        --arg phase "solve" \
+        --arg issue_key "${JIRA_ISSUE_KEY}" \
+        --arg result "${PR_RESULT}" \
+        --arg pr_url "" \
+        --arg upstream_repo "${UPSTREAM_REPO}" \
+        --argjson claude_exit "${CLAUDE_EXIT}" \
+        --argjson phase_durations "$(jq -n \
+            --argjson setup "${PHASE_SETUP_DURATION}" \
+            --argjson solve "${PHASE_SOLVE_DURATION}" \
+            '{setup: $setup, solve: $solve, pr: 0}')" \
+        '{
+          agent: $agent,
+          phase: $phase,
+          issue_key: $issue_key,
+          result: $result,
+          pr_url: $pr_url,
+          upstream_repo: $upstream_repo,
+          claude_exit: $claude_exit,
+          phase_durations: $phase_durations
+        }' > "${SHARED_DIR}/metrics-metadata-solve.json"
     exit "${CLAUDE_EXIT}"
 fi
 
 # --- Create PR ---
+PHASE_PR_START=$(date +%s)
 BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "")
 if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "master" ]]; then
     echo "ERROR: Claude did not create a feature branch."
@@ -198,5 +372,37 @@ echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
 if [[ -s "${PR_BODY_FILE}" ]]; then
     cp "${PR_BODY_FILE}" "${SHARED_DIR}/pr-description.md"
 fi
+
+PHASE_PR_DURATION=$(( $(date +%s) - PHASE_PR_START ))
+
+# --- Write metrics metadata for post-step ---
+PR_RESULT="success"
+[[ "${CLAUDE_EXIT}" -ne 0 ]] && PR_RESULT="failed"
+
+jq -n \
+    --arg agent "trt-jira-solver" \
+    --arg phase "solve" \
+    --arg issue_key "${JIRA_ISSUE_KEY}" \
+    --arg result "${PR_RESULT}" \
+    --arg pr_url "${PR_URL:-}" \
+    --arg upstream_repo "${UPSTREAM_REPO}" \
+    --argjson claude_exit "${CLAUDE_EXIT}" \
+    --argjson phase_durations "$(jq -n \
+        --argjson setup "${PHASE_SETUP_DURATION}" \
+        --argjson solve "${PHASE_SOLVE_DURATION}" \
+        --argjson pr "${PHASE_PR_DURATION}" \
+        '{setup: $setup, solve: $solve, pr: $pr}')" \
+    '{
+      agent: $agent,
+      phase: $phase,
+      issue_key: $issue_key,
+      result: $result,
+      pr_url: $pr_url,
+      upstream_repo: $upstream_repo,
+      claude_exit: $claude_exit,
+      phase_durations: $phase_durations
+    }' > "${SHARED_DIR}/metrics-metadata-solve.json"
+
+echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-solve.json"
 
 echo "=== TRT Jira Solver Complete ==="

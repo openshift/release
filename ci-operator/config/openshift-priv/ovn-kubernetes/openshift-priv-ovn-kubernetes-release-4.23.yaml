@@ -61,6 +61,16 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-cidr-expansion
 - always_run: false
+  as: e2e-aws-ovn-multi-cidr
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_ARGS: --disable-monitor=legacy-test-framework-invariants-alerts,metrics-endpoints-down
+      TEST_SKIPS: alerts in firing state
+    workflow: openshift-e2e-aws-ovn-multi-cidr
+- always_run: false
   as: e2e-agent-compact-ipv4
   capabilities:
   - intranet
@@ -353,8 +363,13 @@ tests:
     from: src
 - as: lint
   commands: |
+    status=0
     cd go-controller
-    make lint
+    make lint || status=$?
+    cd ../openshift
+    go mod vendor
+    make -f ../go-controller/Makefile lint || status=$?
+    exit $status
   container:
     from: src
 - as: gofmt
@@ -459,6 +474,54 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-udn-density-pods
+- always_run: false
+  as: cudn-density-single-ns-800-24nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      NAMESPACES_PER_CUDN: "1"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      ORION_CONFIG: examples/small-scale-cudn-density-single-ns-800.yaml
+      OVERRIDE_ITERATIONS: "800"
+      RUN_ORION: "false"
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    test:
+    - chain: openshift-qe-cudn-density
+- always_run: false
+  as: cudn-density-single-ns-1000-24nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      NAMESPACES_PER_CUDN: "1"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      ORION_CONFIG: examples/small-scale-cudn-density-single-ns-1000.yaml
+      OVERRIDE_ITERATIONS: "1000"
+      RUN_ORION: "false"
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    test:
+    - chain: openshift-qe-cudn-density
 - always_run: false
   as: cudn-incremental-1000-24nodes
   optional: true

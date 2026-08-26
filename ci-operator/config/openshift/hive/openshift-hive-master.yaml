@@ -82,12 +82,12 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: hive-codecov-token
-- as: security
+- as: snyk
+  optional: true
   skip_if_only_changed: ^(?:docs|\.tekton)/|\.md$|^(?:.*/)?(?:\.gitignore|.coderabbit.yaml|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
-      SNYK_CODE_ADDITIONAL_ARGS: -d --severity-threshold=high
-      SNYK_DEPS_ADDITIONAL_ARGS: -d
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
       SNYK_ENABLE_DEPS_SCAN: "true"
     workflow: openshift-ci-security
 - as: e2e
@@ -182,8 +182,9 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
-- as: e2e-gcp
-  run_if_changed: gcp
+- always_run: false
+  as: e2e-gcp
+  pipeline_run_if_changed: gcp
   steps:
     cluster_profile: openshift-org-gcp
     test:
@@ -202,8 +203,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-azure
-  run_if_changed: azure
+- always_run: false
+  as: e2e-azure
+  pipeline_run_if_changed: azure
   steps:
     cluster_profile: openshift-org-azure
     test:

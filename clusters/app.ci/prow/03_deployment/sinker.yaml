@@ -23,6 +23,9 @@ spec:
       serviceAccountName: sinker
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
@@ -37,7 +40,7 @@ spec:
           mountPath: /tmp/git-sync
       containers:
       - name: sinker
-        image: us-docker.pkg.dev/k8s-infra-prow/images/sinker:v20260729-7f8580d8d
+        image: us-docker.pkg.dev/k8s-infra-prow/images/sinker:v20260819-7593870dc
         args:
         - --config-path=/var/repo/release/core-services/prow/02_config/_config.yaml
         - --supplemental-prow-config-dir=/var/repo/release/core-services/prow/02_config
@@ -60,9 +63,13 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "10Gi"
+            memory: "20Gi"
             cpu: "50m"
       - name: git-sync
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
         command:
         - /git-sync
         args:

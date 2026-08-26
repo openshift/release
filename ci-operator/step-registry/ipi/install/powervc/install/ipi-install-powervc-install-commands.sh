@@ -22,9 +22,9 @@ set -o errtrace
 #   DEBUG - Enable debug logging (default: false)
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.4.6"
-readonly YQ_VERSION="v4.53.2"
-readonly IBMCLOUD_VERSION="2.45.0"
+readonly POWERVC_TOOL_VERSION="v2.4.8"
+readonly YQ_VERSION="v4.53.6"
+readonly IBMCLOUD_VERSION="2.46.0"
 
 # Color codes for output (only use if terminal supports it)
 if [[ -t 2 ]]; then
@@ -54,12 +54,12 @@ function log_info() {
 	echo -e "${GREEN}[${timestamp}] INFO:${NC} $*" >&2
 }
 
-# log_warn - Log warning messages to stderr
+# log_warning - Log warning messages to stderr
 # Arguments:
 #   $* - Warning message to log
 # Output:
 #   Formatted warning message with timestamp to stderr
-function log_warn() {
+function log_warning() {
 	local timestamp
 	timestamp="$(date +'%Y-%m-%d %H:%M:%S')"
 	echo -e "${YELLOW}[${timestamp}] WARN:${NC} $*" >&2
@@ -120,17 +120,22 @@ trap 'error_handler ${LINENO} $?' ERR
 # Utility Functions
 # ============================================================================
 
-# retry_command - Retry a command with exponential backoff
+#######################################
+# Retry a command a fixed number of times with a constant delay between
+# attempts.
+#
+# The function logs every attempt, returns immediately on the first success,
+# and emits a final error after the last failure.
+#
 # Arguments:
-#   $1 - Maximum number of attempts
-#   $2 - Delay in seconds between attempts
-#   $3 - Description of the operation
-#   $@ - Command and arguments to execute
+#   $1 - Maximum number of attempts.
+#   $2 - Delay in seconds between attempts.
+#   $3 - Description of the operation for log messages.
+#   $@ - Command and arguments to execute after the first three parameters.
 # Returns:
-#   0 - Command succeeded
-#   1 - Command failed after all attempts
-# Example:
-#   retry_command 3 5 "Download file" curl -O https://example.com/file
+#   0 if the command succeeds within the allowed attempts.
+#   1 if the command fails on every attempt.
+#######################################
 function retry_command() {
 	local max_attempts="${1}"
 	local delay="${2}"
@@ -147,7 +152,7 @@ function retry_command() {
 		fi
 
 		if (( attempt < max_attempts )); then
-			log_warn "Failed, retrying in ${delay}s..."
+			log_warning "Failed, retrying in ${delay}s..."
 			sleep "${delay}"
 		fi
 		((attempt++))
@@ -157,26 +162,74 @@ function retry_command() {
 	return 1
 }
 
-# download_tool - Download and make executable a tool from URL
+#######################################
+# Download a helper binary, optionally verify its SHA256 checksum, and mark it
+# executable.
+#
+# When SHA verification is enabled (the default) the function downloads both the
+# target file and its matching .sha256 file, verifies the checksum from the
+# target directory, and leaves the executable in place only when verification
+# succeeds.  When disabled the SHA download and check are skipped entirely.
+#
 # Arguments:
-#   $1 - URL to download from
-#   $2 - Output file path
-#   $3 - Description of the tool
+#   $1 - Source URL.
+#   $2 - Destination path for the downloaded file.
+#   $3 - Human-readable description used in log messages.
+#   $4 - (optional) Whether to download and verify the SHA256 checksum.
+#        Accepts "true" or "false". Defaults to "true".
 # Returns:
-#   0 - Download successful
-#   1 - Download failed
+#   0 if the file is downloaded (and checksum verification passes when enabled).
+#   1 if a download fails or checksum verification fails.
 # Side Effects:
-#   Creates executable file at output path
-function download_tool() {
+#   Writes the file and (when enabled) checksum file at the destination path
+#   and changes the downloaded file mode.
+#######################################
+function download_tool_w_sha() {
 	local url="${1}"
 	local output="${2}"
 	local description="${3}"
+	local verify_sha="${4:-true}"
+	local rc=0
 
 	log_info "Downloading ${description} from ${url}"
-	retry_command 3 5 "Download ${description}" \
-		curl --fail --location --silent --show-error --output "${output}" "${url}"
+	if ! retry_command 3 5 "Download ${description}" \
+		curl --fail --location --silent \
+			--show-error --connect-timeout 30 --max-time 120 \
+			--output "${output}" "${url}"; then
+		log_error "Could not download ${url}"
+		return 1
+	fi
+
 	chmod +x "${output}"
+
+	if [[ "${verify_sha}" == "true" ]]; then
+		url="${url}.sha256"
+		output="${output}.sha256"
+		log_info "Downloading ${description} SHA256 from ${url}"
+		if ! retry_command 3 5 "Download ${description} SHA256" \
+			curl --fail --location --silent \
+				--show-error --connect-timeout 30 --max-time 120 \
+				--output "${output}" "${url}"; then
+			log_error "Could not download ${url}"
+			return 1
+		fi
+
+		pushd "$(dirname "${output}")" > /dev/null || {
+			log_error "Failed to change directory to $(dirname "${output}")"
+			return 1
+		}
+		if ! sha256sum --check "$(basename "${output}")"; then
+			log_error "sha256 sum failed verification"
+			rm -f "${output}" "${output%.sha256}"
+			popd > /dev/null || true
+			return 1
+		fi
+		popd > /dev/null || rc=$?
+	fi
+
 	log_info "Successfully installed ${description}"
+
+	return ${rc}
 }
 
 # verify_command - Check if a command exists in PATH
@@ -216,6 +269,8 @@ function verify_command() {
 function install_required_tools() {
 	log_info "Installing required tools..."
 
+	local tmp_bin_dir="/tmp/bin"
+
 	# Set up environment - use pushd/popd for better directory management
 	if ! pushd /tmp > /dev/null; then
 		log_error "Failed to change to /tmp directory"
@@ -227,13 +282,13 @@ function install_required_tools() {
 	export HOME
 
 	# Create bin directory and add to PATH
-	if ! mkdir -p /tmp/bin; then
-		log_error "Failed to create /tmp/bin directory"
+	mkdir -p "${tmp_bin_dir}" || {
+		log_error "Failed to create ${tmp_bin_dir} directory"
 		popd > /dev/null || true
 		return 1
-	fi
+	}
 
-	PATH="/tmp/bin:${PATH}"
+	PATH="${tmp_bin_dir}:${PATH}"
 	export PATH
 
 	# Install PowerVC-Tool
@@ -243,7 +298,12 @@ function install_required_tools() {
 
 	local tool_bin="ocp-ipi-powervc-linux-${machine}"
 	local powervc_url="https://github.com/IBM/ocp-ipi-powervc/releases/download/${POWERVC_TOOL_VERSION}/${tool_bin}"
-	download_tool "${powervc_url}" "/tmp/bin/PowerVC-Tool" "PowerVC-Tool ${POWERVC_TOOL_VERSION}"
+	if ! download_tool_w_sha "${powervc_url}" "${tmp_bin_dir}/${tool_bin}" "${tool_bin} ${POWERVC_TOOL_VERSION}"; then
+		log_error "Could not download ${powervc_url}"
+		popd > /dev/null || true
+		return 1
+	fi
+	mv "${tmp_bin_dir}/${tool_bin}" "${tmp_bin_dir}/PowerVC-Tool"
 
 	# Install yq-v4 if not present
 	if ! command -v yq-v4 &> /dev/null; then
@@ -251,7 +311,11 @@ function install_required_tools() {
 		local yq_arch
 		yq_arch="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
 		local yq_url="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${yq_arch}"
-		download_tool "${yq_url}" "/tmp/bin/yq-v4" "yq-v4 ${YQ_VERSION}"
+		if ! download_tool_w_sha "${yq_url}" "${tmp_bin_dir}/yq-v4" "yq-v4 ${YQ_VERSION}" "false"; then
+			log_error "Could not download ${yq_url}"
+			popd > /dev/null || true
+			return 1
+		fi
 	else
 		log_info "yq-v4 already installed"
 	fi
@@ -261,10 +325,16 @@ function install_required_tools() {
 
 	if [[ ! -f "${ibmcloud_tarball}" ]]; then
 		log_info "Installing IBM Cloud CLI version ${IBMCLOUD_VERSION}"
+
 		local ibmcloud_url="https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IBMCLOUD_VERSION}/IBM_Cloud_CLI_${IBMCLOUD_VERSION}_amd64.tar.gz"
 
-		retry_command 3 5 "Download IBM Cloud CLI" \
-			curl --fail --location --output "${ibmcloud_tarball}" "${ibmcloud_url}"
+		if ! retry_command 3 5 "Download IBM Cloud CLI" \
+			curl --fail --connect-timeout 30 --max-time 120 \
+				--location --output "${ibmcloud_tarball}" "${ibmcloud_url}"; then
+			log_error "Could not download ${ibmcloud_url}"
+			popd > /dev/null || true
+			return 1
+		fi
 
 		if ! tar xzf "${ibmcloud_tarball}" -C /tmp; then
 			log_error "Failed to extract IBM Cloud CLI tarball"
@@ -274,18 +344,25 @@ function install_required_tools() {
 
 		if [[ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]]; then
 			log_error "/tmp/Bluemix_CLI/bin/ibmcloud does not exist after extraction"
+			popd > /dev/null || true
 			return 1
 		fi
 
 		# Verify signature
 		log_info "Verifying IBM Cloud CLI signature..."
 		local pubkey_url="https://ibmcloud-cli-installer-public-keys.s3.us.cloud-object-storage.appdomain.cloud/ibmcloud-cli.pub"
-		retry_command 3 5 "Download IBM Cloud CLI public key" \
-			curl --fail --output /tmp/ibmcloud-cli.pub "${pubkey_url}"
+		if ! retry_command 3 5 "Download IBM Cloud CLI public key" \
+			curl --fail --connect-timeout 30 --max-time 120 \
+				--location --output /tmp/ibmcloud-cli.pub "${pubkey_url}"; then
+			log_error "Could not download ${pubkey_url}"
+			popd > /dev/null || true
+			return 1
+		fi
 
 		pushd /tmp/Bluemix_CLI/bin/ > /dev/null || return 1
 		if ! openssl dgst -sha256 -verify /tmp/ibmcloud-cli.pub -signature ibmcloud.sig ibmcloud; then
 			log_error "IBM Cloud CLI signature verification failed"
+			popd > /dev/null || true
 			popd > /dev/null || true
 			return 1
 		fi
@@ -303,6 +380,7 @@ function install_required_tools() {
 		log_info "Checking ibmcloud version..."
 		if ! ibmcloud --version; then
 			log_error "IBM Cloud CLI is not working properly"
+			popd > /dev/null || true
 			return 1
 		fi
 	else
@@ -326,7 +404,7 @@ function install_required_tools() {
 	for plugin in "${plugins[@]}"; do
 		log_info "Installing plugin: ${plugin}"
 		if ! ibmcloud plugin install "${plugin}" -f; then
-			log_warn "Failed to install plugin: ${plugin}"
+			log_warning "Failed to install plugin: ${plugin}"
 		fi
 	done
 
@@ -341,6 +419,7 @@ function install_required_tools() {
 			log_error "Critical plugin '${plugin}' is not installed or not working"
 			ls -la "${HOME}/.bluemix/" || true
 			ls -la "${HOME}/.bluemix/plugins/" || true
+			popd > /dev/null || true
 			return 1
 		fi
 		log_info "Verified plugin: ${plugin}"
@@ -352,6 +431,7 @@ function install_required_tools() {
 
 	if [[ ! -f "${SECRETS_DIR}/clouds.yaml" ]]; then
 		log_error "clouds.yaml not found in ${SECRETS_DIR}"
+		popd > /dev/null || true
 		return 1
 	fi
 
@@ -395,7 +475,7 @@ function populate_artifact_dir() {
 	if compgen -G "${DIR}/log-bundle-*.tar.gz" > /dev/null 2>&1; then
 		log_info "Copying log bundle(s)..."
 		cp "${DIR}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null || {
-			log_warn "Failed to copy some log bundles"
+			log_warning "Failed to copy some log bundles"
 		}
 	else
 		log_debug "No log bundles found"
@@ -413,13 +493,13 @@ function populate_artifact_dir() {
 
 	if [[ -f "${DIR}/.openshift_install.log" ]]; then
 		sed -E "${redact_pattern}" "${DIR}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log" || {
-			log_warn "Failed to redact .openshift_install.log"
+			log_warning "Failed to redact .openshift_install.log"
 		}
 	fi
 
 	if [[ -f "${SHARED_DIR}/installation_stats.log" ]]; then
 		sed -E "${redact_pattern}" "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log" || {
-			log_warn "Failed to redact installation_stats.log"
+			log_warning "Failed to redact installation_stats.log"
 		}
 	fi
 
@@ -467,9 +547,9 @@ function prepare_next_steps() {
 			"${DIR}/auth/kubeadmin-password" \
 			"${DIR}/metadata.json"; do
 			if [[ -f "${artifact}" ]]; then
-				cp "${artifact}" "${SHARED_DIR}/" || log_warn "Failed to copy $(basename "${artifact}")"
+				cp "${artifact}" "${SHARED_DIR}/" || log_warning "Failed to copy $(basename "${artifact}")"
 			else
-				log_warn "Missing: $(basename "${artifact}")"
+				log_warning "Missing: $(basename "${artifact}")"
 			fi
 		done
 	fi
@@ -546,7 +626,7 @@ function init_ibmcloud() {
 
 	# Target us-south region
 	if ! ibmcloud target -r us-south; then
-		log_warn "Failed to target us-south region, continuing anyway"
+		log_warning "Failed to target us-south region, continuing anyway"
 	fi
 
 	log_info "IBM Cloud CLI initialized successfully"
@@ -613,7 +693,7 @@ function hack_cleanup_containers() {
 
 				log_debug "Deleting OpenStack Object: ${object}"
 				if ! openstack --os-cloud="${CLOUD}" object delete "${container}" "${object}" 2>/dev/null; then
-					log_warn "Failed to delete object: ${object}"
+					log_warning "Failed to delete object: ${object}"
 				else
 					object_count=$((object_count + 1))
 				fi
@@ -624,7 +704,7 @@ function hack_cleanup_containers() {
 			# Delete container
 			log_info "Deleting OpenStack container: ${container}"
 			if ! openstack --os-cloud="${CLOUD}" container delete "${container}" 2>/dev/null; then
-				log_warn "Failed to delete container: ${container}"
+				log_warning "Failed to delete container: ${container}"
 			fi
 		done < <(openstack --os-cloud="${CLOUD}" container list --format csv 2>/dev/null | sed -e '/\(Name\|container_name\)/d' -e 's,",,g' | grep -F -- "${CLUSTER_NAME}" || true)
 
@@ -746,7 +826,7 @@ EOF
 		fi
 
 		date "+%F %X" > "${SHARED_DIR}/CLUSTER_CLEAR_RESOURCE_END_TIME_${attempt}"
-		log_warn "Destroy attempt ${attempt} failed"
+		log_warning "Destroy attempt ${attempt} failed"
 
 		if (( attempt < max_attempts )); then
 			log_info "Waiting before retry..."
@@ -792,7 +872,7 @@ function dump_resources() {
 	fi
 
 	if [[ ! -f "${DIR}/metadata.json" ]]; then
-		log_warn "Could not find ${DIR}/metadata.json for watch-create"
+		log_warning "Could not find ${DIR}/metadata.json for watch-create"
 		return 0
 	fi
 
@@ -809,7 +889,7 @@ function dump_resources() {
 			log_debug "Adding user entry to /etc/passwd"
 			echo "test:x:$(id -u):$(id -u):test:/tmp:/sbin/nologin" >> /etc/passwd
 		else
-			log_warn "/etc/passwd is not writable, skipping user entry"
+			log_warning "/etc/passwd is not writable, skipping user entry"
 		fi
 	fi
 
@@ -833,7 +913,7 @@ function dump_resources() {
 		--kubeconfig "${DIR}/auth/kubeconfig" \
 		--bastionRsa "${SSH_PRIV_KEY_FILE}" \
 		--shouldDebug false; then
-		log_warn "PowerVC-Tool watch-create failed, but continuing"
+		log_warning "PowerVC-Tool watch-create failed, but continuing"
 	fi
 }
 
@@ -1012,7 +1092,7 @@ chmod 700 ~/.ssh
 
 # Copy all files from cluster profile to ~/.ssh
 if ! cp "${CLUSTER_PROFILE_DIR}"/* ~/.ssh/ 2>/dev/null; then
-	log_warn "Failed to copy some files from ${CLUSTER_PROFILE_DIR} to ~/.ssh/"
+	log_warning "Failed to copy some files from ${CLUSTER_PROFILE_DIR} to ~/.ssh/"
 fi
 
 # Record installation start time
@@ -1116,7 +1196,7 @@ if [[ -f "${DIR}/metadata.json" ]]; then
 			--shouldDebug true; then
 			log_info "Metadata erased successfully"
 		else
-			log_warn "Failed to erase metadata, continuing anyway"
+			log_warning "Failed to erase metadata, continuing anyway"
 		fi
 	else
 		log_info "No common prefix found between the strings"
@@ -1130,10 +1210,10 @@ if [[ -f "${DIR}/metadata.json" ]]; then
 		--shouldDebug true; then
 		log_info "Metadata sent successfully"
 	else
-		log_warn "Failed to send metadata, continuing anyway"
+		log_warning "Failed to send metadata, continuing anyway"
 	fi
 else
-	log_warn "Could not find ${DIR}/metadata.json for send-metadata"
+	log_warning "Could not find ${DIR}/metadata.json for send-metadata"
 fi
 
 # Create cluster
@@ -1157,7 +1237,7 @@ if [[ ${ret} -eq 0 ]]; then
 	SKIP_WAIT_FOR=true
 	log_info "Cluster creation completed successfully"
 else
-	log_warn "Cluster creation failed with exit code ${ret}, will try wait-for install-complete"
+	log_warning "Cluster creation failed with exit code ${ret}, will try wait-for install-complete"
 fi
 
 # Wait for installation to complete if needed
@@ -1188,9 +1268,9 @@ dump_resources
 log_info "Extracting installation statistics..."
 if [[ -f "${DIR}/.openshift_install.log" ]]; then
 	grep -E '(Creation complete|level=error|: [0-9ms]*")' "${DIR}/.openshift_install.log" > "${SHARED_DIR}/installation_stats.log" || \
-		log_warn "Failed to extract installation statistics"
+		log_warning "Failed to extract installation statistics"
 else
-	log_warn "Installation log not found: ${DIR}/.openshift_install.log"
+	log_warning "Installation log not found: ${DIR}/.openshift_install.log"
 fi
 
 # Handle success case
@@ -1206,10 +1286,10 @@ if [[ ${ret} -eq 0 ]]; then
 			echo "https://${console_url}" > "${SHARED_DIR}/console.url"
 			log_info "Console URL: https://${console_url}"
 		else
-			log_warn "Failed to retrieve console URL"
+			log_warning "Failed to retrieve console URL"
 		fi
 	else
-		log_warn "Kubeconfig not found, cannot retrieve console URL"
+		log_warning "Kubeconfig not found, cannot retrieve console URL"
 	fi
 else
 	log_error "Installation failed with exit code ${ret}"

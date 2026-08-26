@@ -16,6 +16,21 @@ spec:
         app: prow-controller-manager
     spec:
       serviceAccountName: prow-controller-manager
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/Prucek/release-staging.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release-staging
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: git-sync
+          mountPath: /tmp/git-sync
       containers:
       - name: prow-controller-manager
         args:
@@ -25,6 +40,7 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --enable-controller=plank
+        - --enable-controller=scheduler
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --projected-token-file=/var/sa-token/token
@@ -36,7 +52,7 @@ spec:
             secretKeyRef:
               name: openshift-prow-github-app
               key: appid
-        image: quay.io/prucek/prow:prow-controller-manager_db
+        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260819-7593870dc
         volumeMounts:
         - name: service-account-token
           mountPath: /var/sa-token
@@ -49,9 +65,32 @@ spec:
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
           readOnly: true
-        - name: job-configs
+        - name: combined-jobs
           mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
           readOnly: true
+        - name: git-sync
+          mountPath: /etc/jobs/release-staging
+          readOnly: true
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/Prucek/release-staging.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release-staging
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: git-sync
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       volumes:
       - name: service-account-token
         projected:
@@ -67,6 +106,10 @@ spec:
       - name: build-farm-credentials
         secret:
           secretName: prow-controller-manager
+      - name: combined-jobs
+        emptyDir: {}
+      - name: git-sync
+        emptyDir: {}
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs

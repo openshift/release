@@ -118,6 +118,129 @@ extract_version_from_branch() {
   return 1
 }
 
+# Compare two X.Y version strings numerically by major then minor.
+# Echoes -1, 0, or 1 (a <, ==, > b).
+compare_versions() {
+  local a_major="${1%%.*}"
+  local a_minor="${1##*.}"
+  local b_major="${2%%.*}"
+  local b_minor="${2##*.}"
+
+  if [[ $a_major -lt $b_major ]]; then
+    echo "-1"
+  elif [[ $a_major -gt $b_major ]]; then
+    echo "1"
+  elif [[ $a_minor -lt $b_minor ]]; then
+    echo "-1"
+  elif [[ $a_minor -gt $b_minor ]]; then
+    echo "1"
+  else
+    echo "0"
+  fi
+}
+
+# Compare a Tekton file's embedded version against a target X.Y version.
+# Prefers the semantic version embedded in the file content (e.g. a
+# "release-5.0" / "backplane-5.0" branch reference), since compact filename
+# versions (e.g. "50", "217") don't sort correctly once a minor version
+# reaches double digits (mirrors get_highest_tekton_version's approach).
+# Falls back to comparing the compact filename version numerically if no
+# semantic version can be extracted from the file content.
+# Echoes -1, 0, or 1 (file version <, ==, > target).
+tekton_file_version_compare() {
+  local file=$1
+  local branch_prefix=$2
+  local file_ver_compact=$3  # e.g. "50" or "5-0"
+  local target_version=$4    # e.g. "5.0"
+
+  local semantic_version
+  # `|| true` guards against `grep` finding no match (exit 1) so the
+  # fallback below always runs, regardless of any future `set -e` change.
+  semantic_version=$(grep -oE "${branch_prefix}-[0-9]+\.[0-9]+" "$file" 2>/dev/null | head -1 | cut -d'-' -f2 || true)
+
+  if [[ -n "$semantic_version" ]]; then
+    compare_versions "$semantic_version" "$target_version"
+    return
+  fi
+
+  # Fallback: parse the compact filename version into major.minor and
+  # compare with compare_versions, instead of comparing the compact
+  # representations as plain integers. A plain-integer comparison
+  # misorders versions once a minor version reaches double digits, e.g.
+  # compact "217" (2.17) vs "50" (5.0) would read as 217 > 50 and treat
+  # 2.17 as newer than 5.0.
+  local file_major file_minor
+  if [[ "$file_ver_compact" == *-* ]]; then
+    # globalhub-style compact version, already major-minor delimited (e.g. "5-0")
+    file_major="${file_ver_compact%%-*}"
+    file_minor="${file_ver_compact##*-}"
+  else
+    # acm/mce-style compact version: 3+ digits is MAJOR + 2-digit MINOR
+    # (e.g. "217" -> 2.17), otherwise MAJOR + 1-digit MINOR (e.g. "50" -> 5.0)
+    # (mirrors the same convention used in create_tekton_files).
+    local compact_num=$((10#${file_ver_compact}))
+    if [[ ${#file_ver_compact} -ge 3 ]]; then
+      file_major=$((compact_num / 100))
+      file_minor=$((compact_num % 100))
+    else
+      file_major=$((compact_num / 10))
+      file_minor=$((compact_num % 10))
+    fi
+  fi
+
+  compare_versions "${file_major}.${file_minor}" "${target_version}"
+}
+
+# Remove Tekton files whose embedded version is <= max_version (X.Y format).
+# Must be called with cwd inside the target git working tree, on the branch
+# already checked out. Stages removals with `git rm`. All log output goes to
+# stderr; only the result is written to stdout as "<removed> <failed>", so
+# callers can safely capture it via command substitution and must treat a
+# non-zero <failed> count as an error rather than silently proceeding.
+cleanup_stale_tekton_files() {
+  local product_prefix=$1
+  local branch_prefix=$2
+  local max_version=$3  # e.g. "5.0" - files at or below this are removed
+
+  local removed=0
+  local failed=0
+
+  for old_file in .tekton/*-"${product_prefix}"-*-*.yaml; do
+    [[ -f "$old_file" ]] || continue
+
+    local old_filename
+    old_filename=$(basename "$old_file")
+
+    local old_ver_compact=""
+    if [[ "${product_prefix}" == "globalhub" ]]; then
+      if [[ "$old_filename" =~ ${product_prefix}-([0-9]+-[0-9]+)- ]]; then
+        old_ver_compact="${BASH_REMATCH[1]}"
+      fi
+    else
+      if [[ "$old_filename" =~ ${product_prefix}-([0-9]+)- ]]; then
+        old_ver_compact="${BASH_REMATCH[1]}"
+      fi
+    fi
+
+    [[ -n "$old_ver_compact" ]] || continue
+
+    local cmp
+    cmp=$(tekton_file_version_compare "$old_file" "${branch_prefix}" "${old_ver_compact}" "${max_version}")
+
+    if [[ "$cmp" == "-1" || "$cmp" == "0" ]]; then
+      echo "INFO: Removing stale Tekton file: ${old_filename} (<= ${max_version})" >&2
+      if git rm -q "$old_file" >/dev/null 2>&1; then
+        removed=$((removed + 1))
+      else
+        echo "ERROR: Could not remove ${old_file}" >&2
+        failed=$((failed + 1))
+      fi
+    fi
+  done
+
+  echo "$removed $failed"
+}
+
 # Transform Tekton files from source version to destination version
 # After fast-forward, renames and updates Tekton files for new branch
 transform_tekton_files() {
@@ -246,18 +369,47 @@ transform_tekton_files() {
       files_transformed=$((files_transformed + 1))
     done
 
-    if [[ "$files_found" == "false" ]]; then
-      echo "INFO: No ${source_pattern}*.yaml files found to transform"
+    # Remove any remaining Tekton files older than or equal to
+    # LAST_RELEASE_VERSION. The exact source_version files (if any) were
+    # already renamed above via `git mv`; this sweeps up stragglers from
+    # earlier release cycles that rode along via fast-forward (e.g. an
+    # acm-50- template that was never cleaned up on this branch).
+    local removed_stale=0
+    local failed_cleanup=0
+    if [[ -n "${last_release_version:-}" ]]; then
+      local cleanup_result
+      cleanup_result=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${last_release_version}")
+      removed_stale="${cleanup_result%% *}"
+      failed_cleanup="${cleanup_result##* }"
+    fi
+
+    if [[ "${failed_cleanup}" -gt 0 ]]; then
+      echo "ERROR: Failed to remove ${failed_cleanup} stale Tekton file(s) <= ${last_release_version}, aborting"
+      exit 1
+    fi
+
+    if [[ "$files_found" == "false" ]] && [[ "${removed_stale}" -eq 0 ]]; then
+      echo "INFO: No ${source_pattern}*.yaml files found to transform, nothing stale to clean up"
       exit 0
     fi
 
     echo "INFO: Transformed ${files_transformed} files"
+    if [[ "${removed_stale}" -gt 0 ]]; then
+      echo "INFO: Removed ${removed_stale} stale Tekton file(s) <= ${last_release_version}"
+    fi
 
     # Commit transformation
     git config user.email "${GITHUB_USER}@users.noreply.github.com"
     git config user.name "${GITHUB_USER}"
 
-    git commit -m "Transform Tekton files from ${source_version} to ${dest_version}
+    local commit_message="Transform Tekton files from ${source_version} to ${dest_version}"
+    if [[ "${removed_stale}" -gt 0 ]]; then
+      commit_message="${commit_message}
+
+Remove ${removed_stale} stale Tekton file(s) <= ${last_release_version}"
+    fi
+
+    git commit -m "${commit_message}
 
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 
@@ -543,62 +695,18 @@ create_tekton_files() {
 
     cd "$repo" || exit 1
 
-    # First check if files already exist on DEFAULT branch
-    log "INFO Checking if files already exist on ${default_branch}"
-    local all_versions_exist=true
-    for dest_version in ${dest_versions}; do
-      local dest_ver_compact
-      if [[ "${product}" == "globalhub" ]]; then
-        dest_ver_compact="${dest_version//./-}"
-      else
-        dest_ver_compact="${dest_version//./}"
-      fi
-
-      if ! compgen -G ".tekton/*-${product_prefix}-${dest_ver_compact}-*.yaml" >/dev/null; then
-        all_versions_exist=false
-        log "INFO ${product_prefix}-${dest_ver_compact} files missing on ${default_branch}"
-        break
-      else
-        log "INFO ${product_prefix}-${dest_ver_compact} files already exist on ${default_branch}"
-      fi
-    done
-
-    if [[ "$all_versions_exist" == "true" ]]; then
-      log "INFO All requested versions already exist on ${default_branch}, nothing to do"
-
-      # Clean up stale PR branch if exists
-      local pr_branch="add-tekton-files-${dest_versions// /-}"
-      if git ls-remote --heads origin "${pr_branch}" | grep -q "${pr_branch}"; then
-        log "INFO Stale PR branch ${pr_branch} found, cleaning up"
-
-        # Close PR if exists
-        if command -v gh >/dev/null 2>&1; then
-          export GH_TOKEN="${token}"
-          local pr_num
-          pr_num=$(gh pr list --repo "${owner}/${repo}" --head "${pr_branch}" --json number --jq '.[0].number' 2>/dev/null || echo "")
-
-          if [[ -n "${pr_num}" ]]; then
-            log "INFO Closing obsolete PR #${pr_num}"
-            if gh pr close "${pr_num}" --repo "${owner}/${repo}" \
-              --comment "Closing - all Tekton files already merged to ${default_branch}" 2>&1; then
-              log "INFO Closed PR #${pr_num}"
-            else
-              log "WARNING Failed to close PR #${pr_num}"
-            fi
-          fi
-        fi
-
-        # Delete branch
-        log "INFO Deleting stale branch ${pr_branch}"
-        if git push origin --delete "${pr_branch}" 2>&1; then
-          log "INFO Deleted branch ${pr_branch}"
-        else
-          log "WARNING Failed to delete branch ${pr_branch}"
-        fi
-      fi
-
-      exit 0
-    fi
+    # NOTE: We intentionally do not short-circuit here even when every
+    # requested version already exists on ${default_branch}. An earlier
+    # version of this function returned immediately in that case (after
+    # only tidying up an obsolete PR branch), which skipped the stale
+    # Tekton file cleanup below entirely - so files <= LAST_RELEASE_VERSION
+    # could persist indefinitely as long as no new destination version
+    # needed to be created. The per-version loop further down already
+    # no-ops correctly (via `continue`) for any version that already
+    # exists, and the "no new files" handling after cleanup already closes
+    # obsolete PRs/branches based on an actual diff against
+    # ${default_branch}, so falling through here is both simpler and
+    # strictly more correct than special-casing "all versions exist".
 
     # Create branch for PR
     local pr_branch="add-tekton-files-${dest_versions// /-}"
@@ -781,6 +889,26 @@ create_tekton_files() {
       fi
     done
 
+    # Remove Tekton files for versions <= LAST_RELEASE_VERSION.
+    # LAST_RELEASE_VERSION was only kept around as a template for creating
+    # the versions above; now that those new versions have been created on
+    # ${default_branch}, the old template is stale and should not persist.
+    local removed_stale=0
+    local failed_cleanup=0
+    if [[ -n "${LAST_RELEASE_VERSION:-}" ]]; then
+      log "INFO Cleaning up Tekton files <= LAST_RELEASE_VERSION (${LAST_RELEASE_VERSION})"
+      local cleanup_result
+      cleanup_result=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${LAST_RELEASE_VERSION}")
+      removed_stale="${cleanup_result%% *}"
+      failed_cleanup="${cleanup_result##* }"
+      log "INFO Removed ${removed_stale} stale Tekton file(s)"
+
+      if [[ "${failed_cleanup}" -gt 0 ]]; then
+        log "ERROR Failed to remove ${failed_cleanup} stale Tekton file(s) <= LAST_RELEASE_VERSION, aborting"
+        exit 1
+      fi
+    fi
+
     # Check if PR exists for branch (even if no new files)
     local pr_title
     pr_title="Add Tekton files for ${product_prefix} versions: ${dest_versions}"
@@ -789,24 +917,36 @@ create_tekton_files() {
 $(for v in ${dest_versions}; do echo "- ${product_prefix}-${v//./}"; done)
 
 Generated from existing ${product_prefix}-${highest_version} templates."
+    if [[ "${removed_stale}" -gt 0 ]]; then
+      pr_body="${pr_body}
+
+Also removes ${removed_stale} stale Tekton file(s) for version <= ${LAST_RELEASE_VERSION}, which are no longer needed now that the versions above exist."
+    fi
 
     local pr_exists=false
+    local pr_num=""
     if command -v gh >/dev/null 2>&1; then
       export GH_TOKEN="${token}"
 
       log "INFO Checking if PR already exists for ${pr_branch}"
-      if gh pr list --head "${pr_branch}" --json number --jq '.[0].number' 2>&1 | grep -q '^[0-9]'; then
+      pr_num=$(gh pr list --head "${pr_branch}" --json number --jq '.[0].number' 2>/dev/null || echo "")
+      if [[ -n "${pr_num}" ]]; then
         pr_exists=true
-        log "INFO PR already exists for ${pr_branch}"
+        log "INFO PR already exists for ${pr_branch} (#${pr_num})"
       fi
     fi
 
-    if [[ "$files_created" == "false" ]]; then
-      log "INFO No new files to create"
+    if [[ "$files_created" == "false" ]] && [[ "${removed_stale}" -eq 0 ]]; then
+      log "INFO No new files to create and nothing stale to clean up"
 
-      # Create PR if branch existed on remote (has commits) but no PR
-      if [[ "$pr_exists" == "false" ]] && [[ "$branch_existed_on_remote" == "true" ]] && command -v gh >/dev/null 2>&1; then
-        # Check if branch differs from default branch
+      if [[ "$branch_existed_on_remote" == "true" ]] && command -v gh >/dev/null 2>&1; then
+        # Check if branch differs from default branch. This covers both:
+        # - a pre-existing PR branch that turned out to need no changes
+        #   (e.g. all requested versions already existed on default_branch
+        #   and there was nothing stale to remove), which should be closed
+        #   and deleted rather than left open indefinitely
+        # - a pre-existing PR branch with real, uncommitted-here changes
+        #   from a previous run, which should get its PR (re)created
         log "INFO Checking if ${pr_branch} differs from ${default_branch}"
         if ! git fetch origin "${default_branch}" 2>&1; then
           log "WARNING Could not fetch ${default_branch}"
@@ -815,6 +955,17 @@ Generated from existing ${product_prefix}-${highest_version} templates."
 
         if git diff --quiet "origin/${default_branch}" HEAD; then
           log "INFO Branch ${pr_branch} is identical to ${default_branch}, no PR needed"
+
+          if [[ -n "${pr_num}" ]]; then
+            log "INFO Closing obsolete PR #${pr_num}"
+            if gh pr close "${pr_num}" --repo "${owner}/${repo}" \
+              --comment "Closing - all Tekton files already merged to ${default_branch}" 2>&1; then
+              log "INFO Closed PR #${pr_num}"
+            else
+              log "WARNING Failed to close PR #${pr_num}"
+            fi
+          fi
+
           log "INFO Deleting orphaned branch ${pr_branch}"
           if git push origin --delete "${pr_branch}" 2>&1; then
             log "INFO Successfully deleted ${pr_branch}"
@@ -824,14 +975,16 @@ Generated from existing ${product_prefix}-${highest_version} templates."
           exit 0
         fi
 
-        log "INFO Creating PR for existing branch with changes"
+        if [[ "$pr_exists" == "false" ]]; then
+          log "INFO Creating PR for existing branch with changes"
 
-        if ! gh pr create \
-          --title "${pr_title}" \
-          --body "${pr_body}" \
-          --base "${default_branch}" \
-          --head "${pr_branch}" 2>&1; then
-          log "WARNING PR creation failed"
+          if ! gh pr create \
+            --title "${pr_title}" \
+            --body "${pr_body}" \
+            --base "${default_branch}" \
+            --head "${pr_branch}" 2>&1; then
+            log "WARNING PR creation failed"
+          fi
         fi
       fi
 
@@ -843,8 +996,15 @@ Generated from existing ${product_prefix}-${highest_version} templates."
     git config user.name "OpenShift CI Robot"
     git config user.email "noreply@openshift.io"
 
-    log "INFO Committing: Add Tekton files for versions: ${dest_versions}"
-    git commit -s -m "Add Tekton files for versions: ${dest_versions}" 2>&1
+    local commit_message="Add Tekton files for versions: ${dest_versions}"
+    if [[ "${removed_stale}" -gt 0 ]]; then
+      commit_message="${commit_message}
+
+Remove ${removed_stale} stale Tekton file(s) for version <= ${LAST_RELEASE_VERSION}"
+    fi
+
+    log "INFO Committing: ${commit_message}"
+    git commit -s -m "${commit_message}" 2>&1
 
     # Push branch (use -u for new branch, --force-with-lease if we reset existing branch)
     log "INFO Pushing ${pr_branch} to origin"
@@ -995,6 +1155,7 @@ echo "Fast-forward workflow inputs:
 * REPO_MAP_PATH: ${REPO_MAP_PATH}
 * DESTINATION_VERSIONS: ${DESTINATION_VERSIONS}
 * LAST_RELEASE_VERSION: ${LAST_RELEASE_VERSION:-<not set>}
+* SKIP_VERSIONS_PATH: ${SKIP_VERSIONS_PATH:-<not set>}
 * ARTIFACT_DIR: ${ARTIFACT_DIR:-<not set>}
 "
 
@@ -1045,6 +1206,84 @@ SKIPPED_REPOS=(
   "grafana-dashboard-loader"
   "memcached"
 )
+
+# Per-repo version exclusions loaded from SKIP_VERSIONS_PATH (YAML file)
+SKIPPED_REPO_VERSIONS=()
+
+if [[ -n "${SKIP_VERSIONS_PATH:-}" ]]; then
+  if [[ ! -f "${SKIP_VERSIONS_PATH}" ]]; then
+    echo "ERROR: SKIP_VERSIONS_PATH set but file not found: ${SKIP_VERSIONS_PATH}"
+    exit 1
+  fi
+
+  echo "INFO: Loading per-repo version exclusions from ${SKIP_VERSIONS_PATH}"
+  yq_output=""
+  if ! yq_output=$(yq '.skip_versions[] | .repo as $r | .versions[] | $r + ":" + .' "${SKIP_VERSIONS_PATH}"); then
+    echo "ERROR: Failed to parse ${SKIP_VERSIONS_PATH}"
+    exit 1
+  fi
+
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] && SKIPPED_REPO_VERSIONS+=("$entry")
+  done <<< "$yq_output"
+
+  echo "INFO: Loaded ${#SKIPPED_REPO_VERSIONS[@]} repo:version exclusion(s)"
+  for entry in "${SKIPPED_REPO_VERSIONS[@]+"${SKIPPED_REPO_VERSIONS[@]}"}"; do
+    echo "  - ${entry}"
+  done
+fi
+
+is_repo_version_skipped() {
+  local repo=$1
+  local version=$2
+  if [[ ${#SKIPPED_REPO_VERSIONS[@]} -eq 0 ]]; then
+    return 1
+  fi
+  for entry in "${SKIPPED_REPO_VERSIONS[@]}"; do
+    if [[ "${entry}" == "${repo}:${version}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Returns 0 if version_a >= version_b (major.minor comparison)
+is_version_gte() {
+  local a_major="${1%%.*}"
+  local a_minor="${1##*.}"
+  local b_major="${2%%.*}"
+  local b_minor="${2##*.}"
+  if [[ $a_major -gt $b_major ]]; then
+    return 0
+  elif [[ $a_major -eq $b_major && $a_minor -ge $b_minor ]]; then
+    return 0
+  fi
+  return 1
+}
+
+# Returns 0 (skip) if REPO_MAP_PATH marks the component at $repo_url deprecated
+# with a removed_in_version <= $version, meaning the repo no longer exists on
+# that release line and should not be fast-forwarded to it.
+# Matches on the documented .repository field (full URL), not .name, since a
+# component's .name does not always match the last path segment of its
+# .repository URL (e.g. "multicluster-operators-application" vs. repository
+# ".../multicloud-operators-application").
+is_repo_deprecated_for_version() {
+  local repo_url=$1
+  local version=$2
+
+  local removed_in
+  removed_in=$(yq '.components[] | select(.repository == "'"${repo_url}"'") | select(.deprecated == true) | .removed_in_version' "${REPO_MAP_PATH}" 2>/dev/null | head -1)
+
+  if [[ -z "${removed_in}" || "${removed_in}" == "null" ]]; then
+    return 1
+  fi
+
+  if is_version_gte "${version}" "${removed_in}"; then
+    return 0
+  fi
+  return 1
+}
 
 # Repos with release-* default branch - exclude from main fast-forward
 # These are processed separately to handle non-main default branches
@@ -1146,7 +1385,23 @@ for product in mce acm globalhub; do
       # NORMAL REPO HANDLING: default branch is main/master
       echo "INFO: Using normal fast-forward (${default_branch} → release branches)"
 
+      # Build filtered version list for this repo (excluding per-repo version skips
+      # and versions where the repo is marked deprecated/removed in REPO_MAP_PATH)
+      REPO_DEST_VERSIONS=""
       for version in ${DESTINATION_VERSIONS}; do
+        if is_repo_deprecated_for_version "https://github.com/${owner_repo}" "${version}"; then
+          echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (deprecated component)"
+          continue
+        fi
+        if is_repo_version_skipped "${repo}" "${version}"; then
+          echo "INFO: Skipping ${owner_repo} ${default_branch} → ${branch_prefix}-${version} (per-repo version exclusion)"
+          continue
+        fi
+        REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS} ${version}"
+      done
+      REPO_DEST_VERSIONS="${REPO_DEST_VERSIONS# }"
+
+      for version in ${REPO_DEST_VERSIONS}; do
         branch="${branch_prefix}-${version}"
         echo "INFO: Fast-forwarding ${owner_repo} ${default_branch} → ${branch}"
         log_file="${ARTIFACT_DIR}/fastforward-${owner_repo//\//-}-${branch}.log"
@@ -1177,13 +1432,18 @@ for product in mce acm globalhub; do
         fi
       done
 
-      # After fast-forward, create Tekton files for all destination versions
+      if [[ -z "${REPO_DEST_VERSIONS}" ]]; then
+        echo "INFO: All versions skipped for ${owner_repo}, skipping Tekton file creation"
+        continue
+      fi
+
+      # After fast-forward, create Tekton files for non-skipped versions
       echo "INFO: Creating Tekton files for ${owner_repo}"
       tekton_log_file="${ARTIFACT_DIR}/tekton-${owner_repo//\//-}.log"
 
       TOTAL_TEKTON=$((TOTAL_TEKTON + 1))
 
-      if create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "${default_branch}" "${DESTINATION_VERSIONS}" "${tekton_log_file}"; then
+      if create_tekton_files "${owner}" "${repo}" "${product}" "${branch_prefix}" "${default_branch}" "${REPO_DEST_VERSIONS}" "${tekton_log_file}"; then
         status=0
       else
         status=$?
@@ -1291,11 +1551,29 @@ for product in mce acm globalhub; do
 
       # Fast-forward to destination branches and transform Tekton files
       for version in ${DESTINATION_VERSIONS}; do
+        # Check if repo is deprecated/removed as of this version
+        if is_repo_deprecated_for_version "https://github.com/${owner_repo}" "${version}"; then
+          echo "INFO: Skipping ${owner_repo} → ${repo_branch_prefix}-${version} (deprecated component)"
+          continue
+        fi
+
+        # Check per-repo version exclusion
+        if is_repo_version_skipped "${repo}" "${version}"; then
+          echo "INFO: Skipping ${owner_repo} → ${repo_branch_prefix}-${version} (per-repo version exclusion)"
+          continue
+        fi
+
         dest_branch="${repo_branch_prefix}-${version}"
 
         # Skip if dest_branch same as default_branch
         if [[ "${dest_branch}" == "${default_branch}" ]]; then
           echo "INFO: Skipping ${dest_branch} (same as default branch)"
+          continue
+        fi
+
+        # Skip destination versions older than default — can't fast-forward backwards
+        if ! is_version_gte "${version}" "${default_version}"; then
+          echo "INFO: Skipping ${owner_repo} → ${dest_branch} (${version} is older than default ${default_version})"
           continue
         fi
 
@@ -1540,6 +1818,16 @@ if [[ ${#SKIPPED_NO_ACCESS[@]} -gt 0 ]]; then
     echo "  - ${repo}"
   done
   echo ""
+
+  # A repo skipped for lack of write access is an unexpected access problem
+  # (revoked token, org membership change, repo transferred/deleted, etc.),
+  # not an intentional exclusion (those are handled separately via
+  # SKIPPED_REPOS / SKIP_VERSIONS_PATH and never reach SKIPPED_NO_ACCESS).
+  # Mark the job as failed so Prow reports failure/error and the Slack
+  # alert configured in _prowconfig.yaml fires, instead of this condition
+  # silently persisting across every 2h run.
+  echo "WARNING: ${#SKIPPED_NO_ACCESS[@]} repo(s) skipped due to no write access; marking job as failed for alerting"
+  exit_code=$((exit_code | 1))
 fi
 
 # List failures if any

@@ -83,10 +83,12 @@ oc annotate serviceaccount operator -n hypershift \
   "iam.gke.io/gcp-service-account=${SA_EMAIL}" \
   --overwrite
 
-# Restart the operator to pick up the new annotation
+# Restart the operator to pick up the new annotation.
+# Use a 600s timeout because GKE Autopilot may need to scale up nodes
+# to schedule the new pods with projected WIF tokens.
 echo "Restarting operator deployment to pick up Workload Identity"
 oc rollout restart deployment/operator -n hypershift
-oc rollout status deployment/operator -n hypershift --timeout=300s
+oc rollout status deployment/operator -n hypershift --timeout=600s
 
 # ============================================================================
 # Step 6: Configure ExternalDNS Workload Identity
@@ -121,6 +123,6 @@ oc annotate serviceaccount external-dns -n hypershift \
 
 oc rollout restart deployment/external-dns -n hypershift
 echo "Waiting for ExternalDNS rollout..."
-oc rollout status deployment/external-dns -n hypershift --timeout=300s
+oc rollout status deployment/external-dns -n hypershift --timeout=600s
 
 echo "GCP Workload Identity setup complete"

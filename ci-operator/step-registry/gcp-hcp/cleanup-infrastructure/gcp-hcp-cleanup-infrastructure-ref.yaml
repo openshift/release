@@ -1,0 +1,41 @@
+ref:
+  as: gcp-hcp-cleanup-infrastructure
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  commands: gcp-hcp-cleanup-infrastructure-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  credentials:
+  - mount_path: /etc/terraform-cloud
+    name: tfcloud-ci-secret
+    namespace: ci
+  env:
+  - name: GCP_REGION
+    default: "us-central1"
+    documentation: "GCP region for e2e infrastructure deployment"
+  timeout: 30m0s
+  grace_period: 10m0s
+  best_effort: true
+  documentation: |-
+    Performs comprehensive infrastructure cleanup for GCP HCP e2e environments.
+    
+    This step force-deletes GCP projects instead of relying on terraform destroy,
+    which can fail due to orphaned NEGs or other resources. The cleanup process:
+    
+    1. Stops ArgoCD to prevent resource recreation
+    2. Deletes Gateway API resources (triggers NEG cleanup)
+    3. Force-deletes any remaining NEGs
+    4. Deletes DNS records from regional zones
+    5. Force-deletes GCP projects (cascades to all resources)
+    6. Clears Terraform Cloud workspace state
+    
+    WIF credential is read from SHARED_DIR/wif-cred.json (written by hypershift-gcp-wif-auth).
+    TFC token is mounted from the tfcloud-ci-secret credential.
+    
+    Uses best_effort: true so cleanup failures don't block the job.
+    
+    This approach is more reliable than terraform destroy for ephemeral e2e environments.

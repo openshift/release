@@ -36,6 +36,9 @@ spec:
     spec:
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
@@ -51,7 +54,7 @@ spec:
           mountPath: /tmp/git-sync
       containers:
       - name: needs-rebase
-        image: us-docker.pkg.dev/k8s-infra-prow/images/needs-rebase:v20260729-7f8580d8d
+        image: us-docker.pkg.dev/k8s-infra-prow/images/needs-rebase:v20260819-7593870dc
         args:
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
@@ -84,7 +87,7 @@ spec:
           mountPath: /var/repo
         resources:
           requests:
-            memory: "75Mi"
+            memory: "1Gi"
             cpu: "30m"
         livenessProbe:
           httpGet:
@@ -112,8 +115,8 @@ spec:
           mountPath: /tmp/git-sync
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "0.5"
+            memory: "512Mi"
+            cpu: "100m"
       volumes:
       - name: hmac
         secret:

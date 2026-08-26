@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   operator-sdk:
     name: "4.19"
     namespace: origin
@@ -12,7 +16,7 @@ base_images:
     namespace: ocp-priv
     tag: windows-machine-config-operator-test
   tls-scanner-tool:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp-priv
     tag: tls-scanner-tool
 binary_build_commands: make build
@@ -31,6 +35,7 @@ operator:
     context_dir: .
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
+    skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   substitutions:
   - pullspec: REPLACE_IMAGE
     with: pipeline:windows-machine-config-operator-test
@@ -38,19 +43,19 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    name: "5.0"
+    name: "5.1"
     namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp-priv
 resources:
   '*':
@@ -76,7 +81,7 @@ tests:
   commands: make lint
   container:
     from: src
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 - as: unit
   commands: make unit
   container:
@@ -112,7 +117,7 @@ tests:
       CONTROL_PLANE_REPLICAS: "1"
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
-      TEST_ARGS: --disable-monitor=pod-network-avalibility,required-scc-annotation-checker,termination-message-policy,kubelet-log-collector
+      TEST_ARGS: --monitor=e2e-test-analyzer
       TEST_SUITE: windows-machine-config-operator/all
     test:
     - as: wmco-setup-and-test
@@ -322,6 +327,12 @@ tests:
     - ref: openshift-windows-install-wmco
     - ref: tls-scanner-run
     workflow: ipi-aws-ovn-hybrid
+- always_run: false
+  as: address-review-comments
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: windows-review-agent-trigger
 zz_generated_metadata:
   branch: master
   org: openshift-priv

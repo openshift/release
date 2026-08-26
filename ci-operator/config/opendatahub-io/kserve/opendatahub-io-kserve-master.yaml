@@ -41,6 +41,12 @@ images:
     to: kserve-router
   - dockerfile_path: kserve-module-controller.Dockerfile
     to: kserve-module-controller
+  - dockerfile_path: localmodel.Dockerfile
+    from: ubi_minimal
+    to: kserve-localmodel-controller
+  - dockerfile_path: localmodel-agent.Dockerfile
+    from: ubi_minimal
+    to: kserve-localmodelnode-agent
   - context_dir: python/
     dockerfile_path: storage-initializer.Dockerfile
     to: kserve-storage-initializer
@@ -148,9 +154,19 @@ tests:
     - as: e2e-graph
       cli: latest
       commands: |-
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then ln -s oc kubectl; fi
+        cat > kustomize <<'WRAP'
+        #!/bin/sh
+        exec oc kustomize "$@"
+        WRAP
+        chmod +x kustomize
+        popd
         export GITHUB_SHA=stable
         make e2e-graph-ocp RUNNING_LOCAL=false
       dependencies:
+      - env: KSERVE_MODULE_CONTROLLER_IMAGE
+        name: kserve-module-controller
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller
       - env: LLMISVC_CONTROLLER_IMAGE
@@ -214,8 +230,19 @@ tests:
     test:
     - as: e2e-raw
       cli: latest
-      commands: make e2e-raw-ocp RUNNING_LOCAL=false
+      commands: |-
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then ln -s oc kubectl; fi
+        cat > kustomize <<'WRAP'
+        #!/bin/sh
+        exec oc kustomize "$@"
+        WRAP
+        chmod +x kustomize
+        popd
+        make e2e-raw-ocp RUNNING_LOCAL=false
       dependencies:
+      - env: KSERVE_MODULE_CONTROLLER_IMAGE
+        name: kserve-module-controller
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller
       - env: LLMISVC_CONTROLLER_IMAGE
@@ -275,8 +302,19 @@ tests:
     test:
     - as: e2e-predictor
       cli: latest
-      commands: make e2e-predictor-ocp RUNNING_LOCAL=false
+      commands: |-
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then ln -s oc kubectl; fi
+        cat > kustomize <<'WRAP'
+        #!/bin/sh
+        exec oc kustomize "$@"
+        WRAP
+        chmod +x kustomize
+        popd
+        make e2e-predictor-ocp RUNNING_LOCAL=false
       dependencies:
+      - env: KSERVE_MODULE_CONTROLLER_IMAGE
+        name: kserve-module-controller
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller
       - env: LLMISVC_CONTROLLER_IMAGE
@@ -336,8 +374,19 @@ tests:
     test:
     - as: e2e-llm-inference-service
       cli: latest
-      commands: make e2e-llmisvc-ocp RUNNING_LOCAL=false
+      commands: |-
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then ln -s oc kubectl; fi
+        cat > kustomize <<'WRAP'
+        #!/bin/sh
+        exec oc kustomize "$@"
+        WRAP
+        chmod +x kustomize
+        popd
+        make e2e-llmisvc-ocp RUNNING_LOCAL=false
       dependencies:
+      - env: KSERVE_MODULE_CONTROLLER_IMAGE
+        name: kserve-module-controller
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller
       - env: LLMISVC_CONTROLLER_IMAGE
@@ -415,6 +464,20 @@ tests:
       dependencies:
       - env: KSERVE_MODULE_CONTROLLER_IMAGE
         name: kserve-module-controller
+      - env: KSERVE_CONTROLLER_IMAGE
+        name: kserve-controller
+      - env: LLMISVC_CONTROLLER_IMAGE
+        name: llmisvc-controller
+      - env: KSERVE_AGENT_IMAGE
+        name: kserve-agent
+      - env: KSERVE_ROUTER_IMAGE
+        name: kserve-router
+      - env: STORAGE_INITIALIZER_IMAGE
+        name: kserve-storage-initializer
+      - env: LOCALMODEL_CONTROLLER_IMAGE
+        name: kserve-localmodel-controller
+      - env: LOCALMODELNODE_AGENT_IMAGE
+        name: kserve-localmodelnode-agent
       from: src
       resources:
         requests:

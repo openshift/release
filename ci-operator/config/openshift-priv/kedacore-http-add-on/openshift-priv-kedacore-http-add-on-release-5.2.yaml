@@ -1,0 +1,113 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/kedacore-http-add-on
+images:
+  items:
+  - dockerfile_path: openshift/Containerfile.operator.rhel
+    to: custom-metrics-autoscaler-http-add-on-operator
+  - dockerfile_path: openshift/Containerfile.interceptor.rhel
+    to: custom-metrics-autoscaler-http-add-on-interceptor
+  - dockerfile_path: openshift/Containerfile.scaler.rhel
+    to: custom-metrics-autoscaler-http-add-on-scaler
+  - dockerfile_path: openshift/Containerfile.grpc-echo.rhel
+    to: custom-metrics-autoscaler-http-add-on-grpc-echo
+promotion:
+  to:
+  - excluded_images:
+    - custom-metrics-autoscaler-http-add-on-grpc-echo
+    name: "5.2"
+    namespace: ocp-priv
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: "5.2"
+      namespace: ocp-priv
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.2"
+      namespace: ocp-priv
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: GOFLAGS="" GOLANGCI_LINT_CACHE=/tmp/golangci-lint-cache make lint
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: unit
+  commands: go tool gotestsum --junitfile="${ARTIFACT_DIR}/junit_unit.xml" -- ./...
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: verify-history
+  commands: hack/verify-history.sh
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: http-addon-e2e-aws
+  cluster_claim:
+    architecture: amd64
+    as: unused
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "5.0"
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    post:
+    - as: e2e-clean
+      cli: latest
+      commands: GOFLAGS="" make e2e-test-openshift-clean
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - chain: gather
+    test:
+    - as: e2e-setup
+      cli: latest
+      commands: |
+        GOFLAGS="" make e2e-test-openshift-setup
+      dependencies:
+      - env: IMAGE_HTTP_ADDON_OPERATOR
+        name: custom-metrics-autoscaler-http-add-on-operator
+      - env: IMAGE_HTTP_ADDON_INTERCEPTOR
+        name: custom-metrics-autoscaler-http-add-on-interceptor
+      - env: IMAGE_HTTP_ADDON_SCALER
+        name: custom-metrics-autoscaler-http-add-on-scaler
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: e2e-run
+      cli: latest
+      commands: |
+        GOFLAGS="" make e2e-test-openshift-ci
+      dependencies:
+      - env: IMAGE_GRPC_ECHO
+        name: custom-metrics-autoscaler-http-add-on-grpc-echo
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: kedacore-http-add-on
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-5.2
+  org: openshift-priv
+  repo: kedacore-http-add-on
