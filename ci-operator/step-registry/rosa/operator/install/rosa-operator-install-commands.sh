@@ -315,6 +315,16 @@ done
 # Wait for additional operator-managed deployments to become ready.
 # Some operators create secondary deployments (e.g., ocm-agent-operator
 # creates an ocm-agent Deployment) after reconciling their CRs.
+# Seed operator CRs (and prerequisite secrets) required to bring up
+# secondary workloads. On ephemeral lease clusters there are no SSS/MCC
+# provisioned CRs to restore, so operators that only create their workload
+# Deployment in response to a CR (e.g. ocm-agent-operator creates the
+# ocm-agent Deployment from an OcmAgent CR) need a seed manifest applied here.
+if [[ -n "${OPERATOR_SEED_MANIFEST:-}" ]]; then
+    log "Applying operator seed manifest"
+    echo "${OPERATOR_SEED_MANIFEST}" | oc apply -f -
+fi
+
 if [[ -n "${OPERATOR_WAIT_DEPLOYMENTS:-}" ]]; then
     IFS=',' read -ra WAIT_DEPS <<< "${OPERATOR_WAIT_DEPLOYMENTS}"
     for dep in "${WAIT_DEPS[@]}"; do
