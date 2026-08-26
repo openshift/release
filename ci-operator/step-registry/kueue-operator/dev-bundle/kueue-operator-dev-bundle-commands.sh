@@ -49,7 +49,7 @@ resolve_latest_image() {
   echo "${repo}:${latest}"
 }
 
-REPO="quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-bundle-dev-main"
+REPO="${BUNDLE_REPO:-quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-bundle-dev-main}"
 BUNDLE_IMAGE=$(resolve_latest_image "$REPO")
 
 if [[ -z "$BUNDLE_IMAGE" ]]; then
