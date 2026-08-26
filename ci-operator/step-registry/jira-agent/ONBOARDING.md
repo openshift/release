@@ -21,6 +21,9 @@ The default `CODEX_HOME` is `/workspace/jira-agent-codex-home`, a writable locat
 Codex to create its per-invocation helper aliases when Prow uses a random UID.
 The workflow validates the created PR against the expected fork branch and Jira issue before
 sending Slack notification or adding the `agent-processed` label.
+For Claude Code runs, the core `ai-helpers` marketplace is installed from the helper image's
+local `/opt/ai-helpers` copy; the separate `prodsec-skills` marketplace still requires its
+configured source.
 
 Your team creates a **thin workflow YAML** that sets team-specific env vars and references the generic step registry components. No bash scripting required.
 

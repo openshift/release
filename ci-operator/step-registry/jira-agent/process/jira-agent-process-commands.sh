@@ -107,7 +107,7 @@ fi
 case "$AGENT_HARNESS" in
   claude-code)
     echo "Installing Claude Code plugins..."
-    claude plugin marketplace add openshift-eng/ai-helpers
+    claude plugin marketplace add /opt/ai-helpers
     claude plugin marketplace add RedHatProductSecurity/prodsec-skills
     claude plugin install openshift-developer@ai-helpers
     claude plugin install prow-agent@ai-helpers
