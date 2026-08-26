@@ -239,6 +239,7 @@ if [[ -f "${SHARED_DIR}/gcp_custom_endpoint" ]]; then
   done
   set -e
 
+
   if [[ ${count} -ne "${#services[@]}" ]]; then
     echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to wait for the custom endpoint turning into accessible, abort. " && exit 1
   fi
