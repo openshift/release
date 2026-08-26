@@ -147,6 +147,7 @@ _UNQUOTED_KEY_VALUE = r"""
 
 
 def _kv_regex(key_alt: str) -> re.Pattern[str]:
+    """Compile a quoted/unquoted key-value regex for the given key alternatives."""
     quoted = _QUOTED_KEY_VALUE.format(key=key_alt)
     unquoted = _UNQUOTED_KEY_VALUE.format(key=key_alt)
     return re.compile(rf"(?:{quoted})|(?:{unquoted})", re.IGNORECASE | re.VERBOSE)
@@ -209,14 +210,17 @@ OC_DIAL_TCP_RE = re.compile(r"(dial tcp(?:: lookup)? )\S+")
 
 
 def _redact_sensitive_kv(match: re.Match[str]) -> str:
+    """Replace a matched credential key-value with CREDENTIAL."""
     return _redact_kv_match(match, CREDENTIAL)
 
 
 def _redact_pii_kv(match: re.Match[str]) -> str:
+    """Replace a matched PII key-value with CUSTOMER."""
     return _redact_kv_match(match, CUSTOMER)
 
 
 def _redact_kv_match(match: re.Match[str], placeholder: str) -> str:
+    """Rebuild a key-value match with the value replaced by placeholder."""
     qk = match.groupdict().get("qk")
     if qk:
         key = match.group("qkey")
@@ -234,27 +238,32 @@ def _redact_kv_match(match: re.Match[str], placeholder: str) -> str:
 
 
 def _redact_http_header(match: re.Match[str]) -> str:
+    """Replace an HTTP header value with CREDENTIAL, keeping the header name."""
     return f"{match.group('h')}: {CREDENTIAL}"
 
 
 def _redact_xml_tag(match: re.Match[str]) -> str:
+    """Replace an XML element's text with CREDENTIAL or CUSTOMER."""
     tag = match.group("tag")
     placeholder = CUSTOMER if re.fullmatch(PII_KEY, tag, re.IGNORECASE) else CREDENTIAL
     return f"<{tag}>{placeholder}</{tag}>"
 
 
 def _html_tag_has_sensitive(tag: str) -> bool:
+    """True when an HTML tag looks like a credential or PII field."""
     return bool(
         re.search(rf"(?i)(?<![A-Za-z0-9_])(?:{SENSITIVE_KEY}|{PII_KEY}|type\s*=\s*['\"]password['\"])", tag)
     )
 
 
 def _redact_html_tag(match: re.Match[str]) -> str:
+    """Redact sensitive attribute values inside a single HTML tag."""
     tag = match.group(0)
     if not _html_tag_has_sensitive(tag):
         return tag
 
     def _attr(attr_match: re.Match[str]) -> str:
+        """Replace a sensitive HTML attribute value, leaving name attributes intact."""
         attr = attr_match.group("attr")
         q = attr_match.group("q")
         if attr.lower() == "name":
@@ -295,6 +304,7 @@ def sanitize_text(text: str) -> str:
 
 
 def _is_kubeconfig_name(path: Path) -> bool:
+    """True when the path name looks like a kubeconfig or kubeadmin password."""
     name = path.name.lower()
     if name in KUBECONFIG_NAMES or name.endswith(".kubeconfig"):
         return True
@@ -302,6 +312,7 @@ def _is_kubeconfig_name(path: Path) -> bool:
 
 
 def _looks_like_kubeconfig(text: str) -> bool:
+    """True when text looks like a Kubernetes kubeconfig document."""
     lowered = text.lower()
     if "kind: config" not in lowered and "kind:config" not in lowered:
         return False
@@ -312,6 +323,7 @@ def _looks_like_kubeconfig(text: str) -> bool:
 
 
 def _is_binary_bytes(data: bytes) -> bool:
+    """True when the payload is unlikely to be sanitizable text."""
     if not data:
         return False
     if b"\x00" in data[:8192]:
@@ -338,6 +350,7 @@ def decode_text(data: bytes) -> str | None:
 
 
 def should_skip_name(path: Path) -> bool:
+    """True when path is this sanitizer's own source and must not be rewritten."""
     return path.name in SKIP_NAMES
 
 
@@ -357,21 +370,25 @@ def is_unpublishable(path: Path, data: bytes | None = None, text: str | None = N
 
 
 def _write_text(path: Path, text: str) -> None:
+    """Write UTF-8 text to path."""
     path.write_text(text, encoding="utf-8")
 
 
 def _replace_file(src: Path, dest: Path) -> None:
+    """Replace dest with src, creating parent directories as needed."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(src), str(dest))
 
 
 def _withhold(path: Path, *, delete: bool) -> bool:
+    """Delete path when requested and return False (not publishable)."""
     if delete and path.exists():
         path.unlink()
     return False
 
 
 def sanitize_bytes(data: bytes, path: Path | None = None) -> str | None:
+    """Decode and redact bytes; return None for binaries and kubeconfigs."""
     text = decode_text(data)
     if text is None:
         return None
@@ -381,6 +398,7 @@ def sanitize_bytes(data: bytes, path: Path | None = None) -> str | None:
 
 
 def _sanitize_gzip(path: Path) -> bool:
+    """Sanitize a gzip-compressed text file in place."""
     try:
         with gzip.open(path, "rb") as fh:
             raw = fh.read()
@@ -401,6 +419,7 @@ def _sanitize_gzip(path: Path) -> bool:
 
 
 def _sanitize_tar_gz(path: Path) -> bool:
+    """Extract, sanitize, and rewrite a tar.gz archive in place."""
     if not hasattr(tarfile, "data_filter"):
         return False
     tmpdir = Path(tempfile.mkdtemp())
@@ -421,6 +440,7 @@ def _sanitize_tar_gz(path: Path) -> bool:
 
 
 def _sanitize_zip(path: Path) -> bool:
+    """Extract, sanitize, and rewrite a zip archive in place."""
     tmpdir = Path(tempfile.mkdtemp())
     tmp = Path(tempfile.mkstemp(suffix=".zip")[1])
     tmp.unlink(missing_ok=True)
@@ -512,8 +532,7 @@ def _is_owned_shared_report(path: Path, root: Path) -> bool:
 def sanitize_shared_reports(root: Path) -> bool:
     """Sanitize report-owned paths in SHARED_DIR; leave consumer inputs intact.
 
-    The install step invokes this from an EXIT trap. Matching every .json/.yaml/
-    .yml/.log under SHARED_DIR would rewrite or withhold files later steps still
+    Matching every .json/.yaml/.yml/.log under SHARED_DIR would rewrite or withhold files later steps still
     read. Only explicit report names and report subdirectories are in scope.
     """
     if not root.is_dir():
@@ -596,6 +615,8 @@ _run_sanitized() {{
   return "${{_koso_ps[0]}}"
 }}
 _capture_sanitized() {{
+  # Redacts command stderr onto the wrapper stdout (CI logs). Assigns raw
+  # stdout to VAR; callers must not echo the captured value.
   if [[ $# -lt 2 ]]; then
     echo "_capture_sanitized: usage: _capture_sanitized VAR command [args...]" >&2
     exit 1
@@ -629,6 +650,7 @@ _capture_sanitized() {{
 
 
 def install_from_this_file() -> int:
+    """Copy this sanitizer into SHARED_DIR, install wrappers, and self-test."""
     shared = os.environ.get("SHARED_DIR")
     if not shared:
         print("SHARED_DIR is required for install", file=sys.stderr)
@@ -787,7 +809,7 @@ def run_selftest() -> None:
         reports_dir.mkdir()
         nested_report = reports_dir / "suite.json"
         nested_report.write_text('{"password": "pw-value"}')
-        # Consumer inputs that must survive an install-step EXIT trap.
+        # Consumer inputs that must survive shared-dir report sanitization.
         metadata = shared / "metadata.json"
         metadata_body = '{"cluster": "ci-op-abc", "url": "https://api.example.com"}'
         metadata.write_text(metadata_body)
@@ -957,6 +979,7 @@ fi
 
 
 def _cmd_stream() -> int:
+    """Redact stdin to stdout; fail closed if the stream cannot be sanitized."""
     raw = sys.stdin.buffer.read()
     text = decode_text(raw)
     if text is None:
@@ -967,11 +990,13 @@ def _cmd_stream() -> int:
 
 
 def _cmd_inplace(path: str) -> int:
+    """Sanitize a file in place, withholding it when it cannot be published."""
     sanitize_file(Path(path), withhold=True)
     return 0
 
 
 def _cmd_tree(dirs: Iterable[str]) -> int:
+    """Sanitize every file under each given directory."""
     for raw in dirs:
         if not raw:
             continue
@@ -980,17 +1005,20 @@ def _cmd_tree(dirs: Iterable[str]) -> int:
 
 
 def _cmd_shared_reports(root: str) -> int:
+    """Sanitize only report-owned files under SHARED_DIR."""
     sanitize_shared_reports(Path(root))
     return 0
 
 
 def _cmd_publish(src: str, dest: str) -> int:
+    """Copy a sanitized file to dest; withholding an unsanitizable source is success."""
     # Withholding an unsanitizable file is success for the job; leaking it is not.
     publish_sanitized(Path(src), Path(dest))
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Dispatch CLI flags for install, self-test, stream, and artifact sanitization."""
     args = list(sys.argv[1:] if argv is None else argv)
     if not args or args[0] == "--install":
         return install_from_this_file()
