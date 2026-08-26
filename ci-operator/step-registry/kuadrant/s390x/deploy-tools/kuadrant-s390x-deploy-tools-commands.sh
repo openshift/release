@@ -145,6 +145,9 @@ EOF
 $WAS_TRACING && set -x
 
 echo "--- Mockserver (with echo expectation for testsuite) ---"
+# Phase 1 egress hits GET /get. MockServer treats path /.* as an exact string,
+# not a regex, so the catch-all never matches /get (404). Explicit /get is required.
+# CI points mockserver.url at this tools Route, so Phase 1 uses this ConfigMap.
 cat <<EOF | oc apply -n "${TOOLS_NS}" -f -
 apiVersion: v1
 kind: ConfigMap
@@ -154,23 +157,38 @@ metadata:
     app: mockserver
 data:
   echo_expectation.json: |
-    {
-      "httpRequest": {
-        "path": "/.*"
-      },
-      "httpResponse": {
-        "statusCode": 200,
-        "headers": {
-          "content-type": ["application/json"]
+    [
+      {
+        "id": "get",
+        "priority": 100,
+        "httpRequest": {
+          "path": "/get"
         },
-        "body": {
-          "method": "\${json-unit.any-string}",
-          "path": "\${json-unit.any-string}",
-          "headers": {},
-          "body": ""
+        "httpResponse": {
+          "statusCode": 200,
+          "body": "OK"
+        }
+      },
+      {
+        "id": "echo",
+        "priority": -10,
+        "httpRequest": {
+          "path": "/.*"
+        },
+        "httpResponse": {
+          "statusCode": 200,
+          "headers": {
+            "content-type": ["application/json"]
+          },
+          "body": {
+            "method": "\${json-unit.any-string}",
+            "path": "\${json-unit.any-string}",
+            "headers": {},
+            "body": ""
+          }
         }
       }
-    }
+    ]
 ---
 apiVersion: apps/v1
 kind: Deployment
