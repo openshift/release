@@ -146,26 +146,10 @@ fi
 echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hypervisor"
 
 echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
-# Resolve the CI release payload to a pullspec the hypervisor can reach.
-# RELEASE_IMAGE_LATEST_FROM_BUILD_FARM points to a CI-internal registry that
-# the hypervisor cannot access. The ref declares cli: latest, which provides
-# an oc binary with CI registry auth. We extract the version and construct the
-# equivalent public CI registry URL.
-PAYLOAD_URL=""
-if [[ -n "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM:-}" ]]; then
-  echo "Resolving RELEASE_IMAGE_LATEST_FROM_BUILD_FARM to a public pullspec..."
-  _version=$(oc adm release info "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}" --output=json | jq -r '.metadata.version')
-  if [[ -n "$_version" && "$_version" != "null" ]]; then
-    PAYLOAD_URL="registry.ci.openshift.org/ocp/release:${_version}"
-    echo "PAYLOAD_URL resolved (version: ${_version})"
-  else
-    echo "ERROR: RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is set but could not resolve its version"
-    exit 1
-  fi
-  unset _version
-else
-  echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is not set, using .env defaults"
-fi
+# Pass the CI release payload to the hypervisor for resolution.
+# The bastion has oc and pull secrets to resolve the image.
+PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
+echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
   cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
