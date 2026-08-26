@@ -52,10 +52,12 @@ case "$ES_TYPE" in
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
     if [[ -f "/secret/qe/jira-api-key" ]]; then
+        set +x
         JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
         JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
         JIRA_URL=https://redhat.atlassian.net/
         export JIRA_TOKEN JIRA_EMAIL JIRA_URL
+        set -x
         ORION_EXTRA_FLAGS+=" --jira-ack"
         if [[ "${JOB_TYPE}" == "periodic" ]] && [[ "${JOB_NAME}" == *"payload"* ]] && [[ -z "${PULL_NUMBER:-}" ]]; then
             IS_PR_PAYLOAD=unknown
@@ -126,7 +128,6 @@ json.dump(d, sys.stdout, separators=(',', ':'))
 ")
 fi
 
-EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
 
 # Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
 if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
@@ -214,18 +215,20 @@ if [[ "${JOB_TYPE}" == "periodic" ]]; then
         job_type="periodic"
     fi
 elif [[ "${JOB_TYPE}" == "presubmit" ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
-    pull_number="${PULL_NUMBER}"
-    job_type="pull"
-    CLUSTER_METADATA=$(echo "${CLUSTER_METADATA}" | python -c "import sys,json; d=json.load(sys.stdin); d['organization']='${REPO_OWNER}'; d['repository']='${REPO_NAME}'; print(json.dumps(d,separators=(',',':')))")
-    EXTRA_FLAGS+=" --pr-analysis"
-elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
     # Indicates a ci test triggered in PR against a pull request
-    pull_number="(${PULL_NUMBER} OR 0)"
-    job_type="(periodic OR pull)"
-elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+    if [[ "${JOB_NAME}" =~ ^pull* ]]; then
+        pull_number="(${PULL_NUMBER} OR 0)"
+        job_type="(periodic OR pull)"
     # Indicates a rehearse job triggered from a PR
-    pull_number="(${PULL_NUMBER} OR 0)"
-    job_type="(rehearse OR pull OR periodic)"
+    elif [[ "${JOB_NAME}" == *rehearse* ]]; then
+        pull_number="(${PULL_NUMBER} OR 0)"
+        job_type="(rehearse OR pull OR periodic)"
+    else
+        pull_number="${PULL_NUMBER}"
+        job_type="pull"
+        CLUSTER_METADATA=$(echo "${CLUSTER_METADATA}" | python -c "import sys,json; d=json.load(sys.stdin); d['organization']='${REPO_OWNER}'; d['repository']='${REPO_NAME}'; print(json.dumps(d,separators=(',',':')))")
+        EXTRA_FLAGS+=" --pr-analysis"
+    fi
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
     # Indicates a rehearsal in PR against openshift/release repo
     job_type="(periodic OR rehearse)"
