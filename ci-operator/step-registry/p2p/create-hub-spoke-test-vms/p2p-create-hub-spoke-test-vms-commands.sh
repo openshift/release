@@ -440,13 +440,19 @@ DumpDiagnostics() {
     mkdir -p "${diagDir}"
     typeset -i i
 
+    if [[ "${P2P_HS_CREATE_HUB_VMS}" != "false" ]]; then
+        for ((i = 1; i <= vmCount; i++)); do
+            {
+                oc --kubeconfig="${KUBECONFIG}" get \
+                    "datavolume/${P2P_HS_HUB_VM_PREFIX}-${i}-rootdisk" \
+                    "persistentvolumeclaim/${P2P_HS_HUB_VM_PREFIX}-${i}-rootdisk" \
+                    -n "${P2P_HS_VM_NAMESPACE}" -o wide
+            } > "${diagDir}/hub-vm-${i}-storage.txt" 2>&1 || true
+        done
+        oc --kubeconfig="${KUBECONFIG}" get events -n "${P2P_HS_VM_NAMESPACE}" \
+            --sort-by='.lastTimestamp' > "${diagDir}/hub-events.txt" 2>&1 || true
+    fi
     for ((i = 1; i <= vmCount; i++)); do
-        {
-            oc --kubeconfig="${KUBECONFIG}" get \
-                "datavolume/${P2P_HS_HUB_VM_PREFIX}-${i}-rootdisk" \
-                "persistentvolumeclaim/${P2P_HS_HUB_VM_PREFIX}-${i}-rootdisk" \
-                -n "${P2P_HS_VM_NAMESPACE}" -o wide
-        } > "${diagDir}/hub-vm-${i}-storage.txt" 2>&1 || true
         {
             oc --kubeconfig="${spokeKubeconfig}" get \
                 "datavolume/${P2P_HS_SPOKE_VM_PREFIX}-${i}-rootdisk" \
@@ -454,8 +460,6 @@ DumpDiagnostics() {
                 -n "${P2P_HS_VM_NAMESPACE}" -o wide
         } > "${diagDir}/spoke-vm-${i}-storage.txt" 2>&1 || true
     done
-    oc --kubeconfig="${KUBECONFIG}" get events -n "${P2P_HS_VM_NAMESPACE}" \
-        --sort-by='.lastTimestamp' > "${diagDir}/hub-events.txt" 2>&1 || true
     oc --kubeconfig="${spokeKubeconfig}" get events -n "${P2P_HS_VM_NAMESPACE}" \
         --sort-by='.lastTimestamp' > "${diagDir}/spoke-events.txt" 2>&1 || true
 }
@@ -483,16 +487,20 @@ typeset -i cclmStepRc=0
     ResolveSpokeKubeconfig
 
     # Create VMs on hub (hub→spoke migration sources).
-    CreateClusterVms \
-        "${KUBECONFIG}" \
-        "${P2P_HS_HUB_VM_PREFIX}" \
-        "${P2P_HS_VM_NAMESPACE}" \
-        "${P2P_HS_HUB_STORAGE_CLASS}" \
-        "${P2P_HS_VM_DATA_SOURCE_NAME}" \
-        "${P2P_HS_VM_DATA_SOURCE_NAMESPACE}" \
-        "hub"
+    # Skipped when P2P_HS_CREATE_HUB_VMS=false, e.g. for spoke-round-trip where
+    # hub VMs are populated by the spoke→hub migration leg, not pre-created.
+    if [[ "${P2P_HS_CREATE_HUB_VMS}" != "false" ]]; then
+        CreateClusterVms \
+            "${KUBECONFIG}" \
+            "${P2P_HS_HUB_VM_PREFIX}" \
+            "${P2P_HS_VM_NAMESPACE}" \
+            "${P2P_HS_HUB_STORAGE_CLASS}" \
+            "${P2P_HS_VM_DATA_SOURCE_NAME}" \
+            "${P2P_HS_VM_DATA_SOURCE_NAMESPACE}" \
+            "hub"
+    fi
 
-    # Create VMs on spoke (spoke→hub migration sources).
+    # Create VMs on spoke (spoke→hub migration sources, or round-trip starting point).
     CreateClusterVms \
         "${spokeKubeconfig}" \
         "${P2P_HS_SPOKE_VM_PREFIX}" \
@@ -506,13 +514,17 @@ typeset -i cclmStepRc=0
         mkdir -p "${ARTIFACT_DIR}"
         {
             typeset -i i
+            if [[ "${P2P_HS_CREATE_HUB_VMS}" != "false" ]]; then
+                for ((i = 1; i <= vmCount; i++)); do
+                    printf '=== Hub VM %d (%s-%d) — migration source for hub→spoke ===\n' \
+                        "${i}" "${P2P_HS_HUB_VM_PREFIX}" "${i}"
+                    oc --kubeconfig="${KUBECONFIG}" get \
+                        "virtualmachine/${P2P_HS_HUB_VM_PREFIX}-${i}" \
+                        "virtualmachineinstance/${P2P_HS_HUB_VM_PREFIX}-${i}" \
+                        -n "${P2P_HS_VM_NAMESPACE}" -o wide || true
+                done
+            fi
             for ((i = 1; i <= vmCount; i++)); do
-                printf '=== Hub VM %d (%s-%d) — migration source for hub→spoke ===\n' \
-                    "${i}" "${P2P_HS_HUB_VM_PREFIX}" "${i}"
-                oc --kubeconfig="${KUBECONFIG}" get \
-                    "virtualmachine/${P2P_HS_HUB_VM_PREFIX}-${i}" \
-                    "virtualmachineinstance/${P2P_HS_HUB_VM_PREFIX}-${i}" \
-                    -n "${P2P_HS_VM_NAMESPACE}" -o wide || true
                 printf '=== Spoke VM %d (%s-%d) — migration source for spoke→hub ===\n' \
                     "${i}" "${P2P_HS_SPOKE_VM_PREFIX}" "${i}"
                 oc --kubeconfig="${spokeKubeconfig}" get \

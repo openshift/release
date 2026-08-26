@@ -795,16 +795,30 @@ DumpDiagnostics() {
     typeset hubToSpokeTargetNs="${1:-${MTV_HS_HUB_VM_NAMESPACE}}"
     typeset spokeToHubTargetNs="${2:-${MTV_HS_SPOKE_VM_NAMESPACE}}"
 
-    DumpDirectionDiagnostics "hub-to-spoke" \
-        "${MTV_HS_HUB_TO_SPOKE_PLAN}" "${MTV_HS_HUB_TO_SPOKE_MIGRATION}" \
-        "${KUBECONFIG}" "${spokeKubeconfig}" \
-        "${MTV_HS_HUB_VM_NAMESPACE}" "${hubToSpokeTargetNs}" \
-        "${MTV_HS_HUB_VM_PREFIX}" || true
+    # Dump spoke→hub direction (both "both" and "spoke-round-trip" use this plan/migration).
     DumpDirectionDiagnostics "spoke-to-hub" \
         "${MTV_HS_SPOKE_TO_HUB_PLAN}" "${MTV_HS_SPOKE_TO_HUB_MIGRATION}" \
         "${spokeKubeconfig}" "${KUBECONFIG}" \
         "${MTV_HS_SPOKE_VM_NAMESPACE}" "${spokeToHubTargetNs}" \
         "${MTV_HS_SPOKE_VM_PREFIX}" || true
+
+    if [[ "${cclmDirection}" == "both" || "${cclmDirection}" == "hub-to-spoke" ]]; then
+        # Standard hub→spoke: hub-prefix VMs migrate from hub to spoke.
+        DumpDirectionDiagnostics "hub-to-spoke" \
+            "${MTV_HS_HUB_TO_SPOKE_PLAN}" "${MTV_HS_HUB_TO_SPOKE_MIGRATION}" \
+            "${KUBECONFIG}" "${spokeKubeconfig}" \
+            "${MTV_HS_HUB_VM_NAMESPACE}" "${hubToSpokeTargetNs}" \
+            "${MTV_HS_HUB_VM_PREFIX}" || true
+    fi
+
+    if [[ "${cclmDirection}" == "spoke-round-trip" ]]; then
+        # Return leg: same spoke-prefix VMs, now on hub in spokeToHubTargetNs, going back to spoke.
+        DumpDirectionDiagnostics "hub-to-spoke-return" \
+            "${MTV_HS_HUB_TO_SPOKE_PLAN}" "${MTV_HS_HUB_TO_SPOKE_MIGRATION}" \
+            "${KUBECONFIG}" "${spokeKubeconfig}" \
+            "${spokeToHubTargetNs}" "${hubToSpokeTargetNs}" \
+            "${MTV_HS_SPOKE_VM_PREFIX}" || true
+    fi
 }
 
 OnError() {
@@ -853,12 +867,13 @@ RunOneMigrationDirection() {
 
     vmsJson="$(BuildVmsJson "${vmPrefix}" "${vmNs}" "${vmCount}")"
 
-    # For the spoke→hub return leg, remove any stale VM/DV/PVC on the destination
-    # (hub) left by a previous run — MTV PrepareTarget rejects duplicate VMs.
-    if [[ "${direction}" == "spoke-to-hub" ]]; then
-        JStep "[${direction}] Pre-migration: Cleanup stale destination resources" \
-            CleanupDestinationStaleResources "${dstKc}" "${vmPrefix}" "${targetNs}" "${vmCount}"
-    fi
+    # Always clean up stale VM/DV/PVC on the destination before Plan creation.
+    # CleanupDestinationStaleResources skips any VMI already Running (idempotent).
+    # On a clean first run the oc get calls return not-found and the function no-ops;
+    # on re-runs or return legs it removes leftover objects that would cause
+    # MTV PrepareTarget to reject the Plan with "Target VM already exists".
+    JStep "[${direction}] Pre-migration: Cleanup stale destination resources" \
+        CleanupDestinationStaleResources "${dstKc}" "${vmPrefix}" "${targetNs}" "${vmCount}"
 
     JStep "[${direction}] Migration: Apply Plan (${vmCount} VMs)" \
         ApplyPlan "${planName}" "${srcProvider}" "${dstProvider}" \
@@ -919,8 +934,11 @@ typeset cclmDirection="${P2P_MIGRATION_DIRECTION:-both}"
 
     [[ "${MTV_HS_PLAN_TYPE}" == "live" || "${MTV_HS_PLAN_TYPE}" == "cold" ]]
     (( vmCount >= 1 ))
-    [[ "${cclmDirection}" == "both" || "${cclmDirection}" == "hub-to-spoke" || "${cclmDirection}" == "spoke-to-hub" ]] || {
-        : "ERROR: P2P_MIGRATION_DIRECTION must be 'both', 'hub-to-spoke', or 'spoke-to-hub' (got '${cclmDirection}')"
+    [[ "${cclmDirection}" == "both" \
+    || "${cclmDirection}" == "hub-to-spoke" \
+    || "${cclmDirection}" == "spoke-to-hub" \
+    || "${cclmDirection}" == "spoke-round-trip" ]] || {
+        : "ERROR: P2P_MIGRATION_DIRECTION must be 'both', 'hub-to-spoke', 'spoke-to-hub', or 'spoke-round-trip' (got '${cclmDirection}')"
         exit 1
     }
 
@@ -949,6 +967,42 @@ typeset cclmDirection="${P2P_MIGRATION_DIRECTION:-both}"
             "${MTV_HS_SPOKE_TO_HUB_PLAN}" "${MTV_HS_SPOKE_TO_HUB_MIGRATION}" \
             "${MTV_HS_SPOKE_VM_PREFIX}" "${MTV_HS_SPOKE_VM_NAMESPACE}" "${spokeToHubTargetNs}" \
             "${spokeKubeconfig}" "${KUBECONFIG}"
+    fi
+
+    # Spoke-round-trip: spoke VMs start on spoke, migrate to hub, then return to spoke.
+    #
+    #   Leg 1 (spoke→hub): MTV_HS_SPOKE_VM_PREFIX VMs from spoke (MTV_HS_SPOKE_VM_NAMESPACE)
+    #           are live-migrated to hub (spokeToHubTargetNs).
+    #   Post-leg-1 cleanup: leftover VM/DV/PVC objects on the source spoke are removed
+    #           so the spoke namespace is clean before the return leg.
+    #   Leg 2 (hub→spoke return): the same VMs (now on hub in spokeToHubTargetNs) are
+    #           live-migrated back to spoke (hubToSpokeTargetNs).
+    #
+    # Both legs use the spoke VM prefix; no separate hub-prefix VMs are needed.
+    if [[ "${cclmDirection}" == "spoke-round-trip" ]]; then
+        # Leg 1: spoke → hub
+        RunOneMigrationDirection "spoke-to-hub" \
+            "${MTV_HS_SPOKE_PROVIDER}" "${MTV_HS_HUB_PROVIDER}" \
+            "${MTV_HS_SPOKE_TO_HUB_NETWORK_MAP}" "${MTV_HS_SPOKE_TO_HUB_STORAGE_MAP}" \
+            "${MTV_HS_SPOKE_TO_HUB_PLAN}" "${MTV_HS_SPOKE_TO_HUB_MIGRATION}" \
+            "${MTV_HS_SPOKE_VM_PREFIX}" "${MTV_HS_SPOKE_VM_NAMESPACE}" "${spokeToHubTargetNs}" \
+            "${spokeKubeconfig}" "${KUBECONFIG}"
+
+        # After the spoke→hub migration the source VMIs are no longer Running on the spoke.
+        # Clean up their VM/DV/PVC objects so the spoke namespace is empty and the return
+        # leg can land the VMs there without "VM already exists" collisions.
+        JStep "[spoke-round-trip] Post-leg-1: Cleanup source spoke VM resources" \
+            CleanupDestinationStaleResources \
+                "${spokeKubeconfig}" "${MTV_HS_SPOKE_VM_PREFIX}" \
+                "${MTV_HS_SPOKE_VM_NAMESPACE}" "${vmCount}"
+
+        # Leg 2: hub → spoke return (same VMs, now in spokeToHubTargetNs on hub)
+        RunOneMigrationDirection "hub-to-spoke-return" \
+            "${MTV_HS_HUB_PROVIDER}" "${MTV_HS_SPOKE_PROVIDER}" \
+            "${MTV_HS_HUB_TO_SPOKE_NETWORK_MAP}" "${MTV_HS_HUB_TO_SPOKE_STORAGE_MAP}" \
+            "${MTV_HS_HUB_TO_SPOKE_PLAN}" "${MTV_HS_HUB_TO_SPOKE_MIGRATION}" \
+            "${MTV_HS_SPOKE_VM_PREFIX}" "${spokeToHubTargetNs}" "${hubToSpokeTargetNs}" \
+            "${KUBECONFIG}" "${spokeKubeconfig}"
     fi
 
     true

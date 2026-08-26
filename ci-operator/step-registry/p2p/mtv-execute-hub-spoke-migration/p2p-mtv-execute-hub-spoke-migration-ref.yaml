@@ -172,9 +172,16 @@ ref:
     default: "both"
     documentation: |-
       Controls which migration directions to execute:
-        both         – hub→spoke then spoke→hub (default; backward-compatible bidirectional).
-        hub-to-spoke – only migrate hub VMs to the spoke (use before a spoke upgrade).
-        spoke-to-hub – only migrate spoke VMs back to the hub (use after a spoke upgrade).
+        both             – hub→spoke (hub-prefix VMs) then spoke→hub (spoke-prefix VMs);
+                           default backward-compatible bidirectional with separate VM sets.
+        hub-to-spoke     – only migrate hub-prefix VMs to the spoke (use before a spoke upgrade).
+        spoke-to-hub     – only migrate spoke-prefix VMs to the hub (use after a spoke upgrade).
+        spoke-round-trip – round-trip with a single VM set starting on the spoke:
+                             Leg 1: spoke-prefix VMs from spoke → hub (via spoke-to-hub maps/plan).
+                             Post-leg cleanup: stale spoke VM/DV/PVC objects removed from source spoke.
+                             Leg 2: same VMs from hub → spoke return (via hub-to-spoke maps/plan).
+                           Requires p2p-create-hub-spoke-test-vms with P2P_HS_CREATE_HUB_VMS=false
+                           (spoke VMs only; hub VMs are populated by leg 1, not pre-created).
       The p2p-mtv-spoke-to-hub-migration wrapper ref hardcodes "spoke-to-hub" so it can be
       placed after spoke upgrade steps in a chain without conflicting with a prior
       hub-to-spoke invocation of this step.
