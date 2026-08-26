@@ -73,12 +73,12 @@ EOF
 echo "Waiting for cluster to stabilize after pull-secret and ICSP updates"
 oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=40m
 
-# Nightly payloads do not publish kubernetes-nmstate-operator in GA redhat-operators.
-# Use the ART nightly index (same catalog image as
-# hack/ocp-install-nightly-art-operators.sh) with CI brew-registry-pullsecret.
+# Nightly 5.x payloads do not publish iib-int-index-art-operators-5.0.
+# Use the ART operator index for the compatible OCP stream (4.22 for 5.0).
+# This is not quay.io/openshift-release-dev/ocp-release:4.22 (that is a
+# cluster payload, not a catalog).
 if [ -z "${NMSTATE_CATALOG_IMAGE}" ]; then
-  OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d '.' -f 1,2)
-  NMSTATE_CATALOG_IMAGE="quay.io/openshift-release-dev/ocp-release-nightly:iib-int-index-art-operators-${OCP_VERSION}"
+  NMSTATE_CATALOG_IMAGE="quay.io/openshift-release-dev/ocp-release-nightly:iib-int-index-art-operators-${NMSTATE_CATALOG_VERSION}"
 fi
 echo "Using NMState catalog image ${NMSTATE_CATALOG_IMAGE}"
 
