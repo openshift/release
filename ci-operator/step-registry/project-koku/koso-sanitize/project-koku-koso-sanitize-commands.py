@@ -12,6 +12,7 @@ import gzip
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -189,6 +190,9 @@ RESPONSE_RE = re.compile(
     r"(?i)((?:Response:|response\.text\s*[=:])\s*)(?:\{.*\}|\[.*\])"
 )
 GOT_BODY_RE = re.compile(r"(got\s+[0-9]{3}[:\s]+)(?:\{.*\}|\[.*\])")
+# oc/kubectl connection diagnostics print the API host:port without a URL scheme.
+OC_CONNECTION_SERVER_RE = re.compile(r"(The connection to the server )\S+")
+OC_DIAL_TCP_RE = re.compile(r"(dial tcp(?:: lookup)? )\S+")
 
 
 def _redact_sensitive_kv(match: re.Match[str]) -> str:
@@ -270,6 +274,8 @@ def sanitize_text(text: str) -> str:
     text = JWT_RE.sub(CREDENTIAL, text)
     text = RESPONSE_RE.sub(rf"\1{BODY}", text)
     text = GOT_BODY_RE.sub(rf"\1{BODY}", text)
+    text = OC_CONNECTION_SERVER_RE.sub(rf"\1{HOST}", text)
+    text = OC_DIAL_TCP_RE.sub(rf"\1{HOST}", text)
     text = URL_RE.sub(URL, text)
     text = EMAIL_RE.sub(EMAIL, text)
     text = SSN_RE.sub(_ssn_card_sub(SSN), text)
@@ -554,6 +560,50 @@ _sanitize_shared_reports() {{
 _publish_sanitized() {{
   _koso_sanitize --publish "$1" "$2"
 }}
+_run_sanitized() {{
+  local -a _koso_ps
+  local _koso_restore_e=0
+  [[ $- == *e* ]] && _koso_restore_e=1
+  set +e
+  "$@" 2>&1 | _sanitize
+  _koso_ps=("${{PIPESTATUS[@]}}")
+  if [[ "${{_koso_restore_e}}" -eq 1 ]]; then
+    set -e
+  fi
+  if [[ "${{_koso_ps[1]:-1}}" -ne 0 ]]; then
+    echo "redaction step failed; refusing to publish unsanitized output" >&2
+    exit 1
+  fi
+  return "${{_koso_ps[0]}}"
+}}
+_capture_sanitized() {{
+  if [[ $# -lt 2 ]]; then
+    echo "_capture_sanitized: usage: _capture_sanitized VAR command [args...]" >&2
+    exit 1
+  fi
+  local _koso_var="$1"
+  shift
+  local _koso_out _koso_err _koso_rc _koso_sanc _koso_restore_e=0
+  _koso_out="$(mktemp)"
+  _koso_err="$(mktemp)"
+  [[ $- == *e* ]] && _koso_restore_e=1
+  set +e
+  "$@" >"${{_koso_out}}" 2>"${{_koso_err}}"
+  _koso_rc=$?
+  _sanitize <"${{_koso_err}}"
+  _koso_sanc=$?
+  if [[ "${{_koso_restore_e}}" -eq 1 ]]; then
+    set -e
+  fi
+  if [[ "${{_koso_sanc}}" -ne 0 ]]; then
+    rm -f "${{_koso_out}}" "${{_koso_err}}"
+    echo "redaction step failed; refusing to publish unsanitized output" >&2
+    exit 1
+  fi
+  printf -v "${{_koso_var}}" '%s' "$(<"${{_koso_out}}")"
+  rm -f "${{_koso_out}}" "${{_koso_err}}"
+  return "${{_koso_rc}}"
+}}
 """,
         encoding="utf-8",
     )
@@ -627,6 +677,21 @@ STREAM_CASES: list[tuple[str, str, tuple[str, ...]]] = [
         "alice@example.com 123-45-6789 4111-1111-1111-1111 https://secret.example/path api.internal.example",
         ("alice@example.com", "123-45-6789", "4111-1111-1111-1111", "https://secret.example/path", "api.internal.example"),
     ),
+    (
+        "oc-connection-refused",
+        "The connection to the server api.ci-op-abc.origin-ci-int-aws.dev.rhcloud.com:6443 was refused - did you specify the right host or port?",
+        ("api.ci-op-abc.origin-ci-int-aws.dev.rhcloud.com:6443",),
+    ),
+    (
+        "oc-dial-tcp-timeout",
+        "Unable to connect to the server: dial tcp 10.0.0.1:6443: i/o timeout",
+        ("10.0.0.1:6443",),
+    ),
+    (
+        "oc-dial-tcp-lookup",
+        "Unable to connect to the server: dial tcp: lookup api.internal.example on 172.30.0.10:53: no such host",
+        ("api.internal.example", "172.30.0.10"),
+    ),
 ]
 
 
@@ -682,8 +747,139 @@ def run_selftest() -> None:
             raise AssertionError("shared-dir kubeconfig must not be deleted")
         if "pw-value" in shared_report.read_text():
             raise AssertionError("shared-dir report must be redacted")
+
+        _run_wrapper_selftest(tmp)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _run_wrapper_selftest(tmp: Path) -> None:
+    """Prove _run_sanitized/_capture_sanitized keep oc diagnostics off the log."""
+    shared = tmp / "wrapper-shared"
+    shared.mkdir()
+    py = shared / "koso-sanitize.py"
+    py.write_text(Path(__file__).read_text(encoding="utf-8"), encoding="utf-8")
+    py.chmod(0o755)
+    write_shell_wrappers(shared, py)
+    script = shared / "koso-sanitize.sh"
+    captured_log = tmp / "capture.log"
+    test_sh = tmp / "wrapper-selftest.sh"
+    test_sh.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck disable=SC1091
+source "%s"
+
+fail7() {
+  echo "ok-stdout"
+  echo "The connection to the server api.ci-op-abc.origin-ci-int-aws.dev.rhcloud.com:6443 was refused" >&2
+  return 7
+}
+set +e
+out="$(_run_sanitized fail7)"
+rc=$?
+set -e
+if [[ "${rc}" -ne 7 ]]; then
+  echo "expected exit 7, got ${rc}" >&2
+  exit 1
+fi
+if [[ "${out}" == *api.ci-op-abc.origin-ci-int-aws.dev.rhcloud.com* ]]; then
+  echo "unsanitized host in output: ${out}" >&2
+  exit 1
+fi
+if [[ "${out}" != *ok-stdout* ]]; then
+  echo "stdout missing: ${out}" >&2
+  exit 1
+fi
+
+bin_cmd() {
+  printf '\\x00\\xff'
+  return 0
+}
+set +e
+( _run_sanitized bin_cmd ) >/dev/null
+brc=$?
+set -e
+if [[ "${brc}" -ne 1 ]]; then
+  echo "expected sanitizer failure to exit 1, got ${brc}" >&2
+  exit 1
+fi
+
+set +e
+(
+  set -euo pipefail
+  _run_sanitized bin_cmd || true
+  echo UNREACHABLE
+)
+drc=$?
+set -e
+if [[ "${drc}" -ne 1 ]]; then
+  echo "dump-style || true must not swallow sanitizer failure, got ${drc}" >&2
+  exit 1
+fi
+
+secret_cmd() {
+  printf '%%s' "koku-service-operator.v0.0.1"
+  echo "dial tcp 10.0.0.1:6443: i/o timeout" >&2
+  return 3
+}
+set +e
+_capture_sanitized got secret_cmd > "%s"
+crc=$?
+set -e
+if [[ "${crc}" -ne 3 ]]; then
+  echo "expected capture exit 3, got ${crc}" >&2
+  exit 1
+fi
+if [[ "${got}" != "koku-service-operator.v0.0.1" ]]; then
+  echo "captured value mismatch: ${got}" >&2
+  exit 1
+fi
+if grep -q 'koku-service-operator.v0.0.1' "%s"; then
+  echo "captured stdout leaked to log" >&2
+  exit 1
+fi
+if grep -q '10.0.0.1' "%s"; then
+  echo "unsanitized host in captured stderr log" >&2
+  exit 1
+fi
+
+apply_stdin() {
+  local body
+  body="$(cat)"
+  echo "applied ${#body} bytes"
+  echo "The connection to the server api.ci-op-abc.origin-ci-int-aws.dev.rhcloud.com:6443 was refused" >&2
+  return 0
+}
+set +e
+apply_out="$(_run_sanitized apply_stdin <<'EOF'
+apiVersion: v1
+kind: Namespace
+EOF
+)"
+arc=$?
+set -e
+if [[ "${arc}" -ne 0 ]]; then
+  echo "expected apply-stdin exit 0, got ${arc}" >&2
+  exit 1
+fi
+if [[ "${apply_out}" != *"applied "* ]]; then
+  echo "heredoc stdin was not delivered to command: ${apply_out}" >&2
+  exit 1
+fi
+if [[ "${apply_out}" == *api.ci-op-abc.origin-ci-int-aws.dev.rhcloud.com* ]]; then
+  echo "unsanitized host in apply-stdin output: ${apply_out}" >&2
+  exit 1
+fi
+"""
+        % (script, captured_log, captured_log, captured_log),
+        encoding="utf-8",
+    )
+    result = subprocess.run(["bash", str(test_sh)], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise AssertionError(
+            f"wrapper selftest failed ({result.returncode}): stdout={result.stdout!r} stderr={result.stderr!r}"
+        )
 
 
 def _cmd_stream() -> int:
