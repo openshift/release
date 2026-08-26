@@ -619,19 +619,6 @@ else
 fi
 GATHER_BOOTSTRAP_ARGS=('--bootstrap' "${BOOTSTRAP_IP}")
 
-## Select the appropriate boot disk type for a given machine type.
-## N4-family instances (n4-, n4a-, n4d-) require hyperdisk-balanced;
-## older families (n2-, e2-, etc.) use pd-ssd.
-function boot_disk_type_for() {
-  local -r machine_type="$1"
-  case "${machine_type}" in
-    n4-*|n4a-*|n4d-*|c4-*|c4a-*|c4d-*|h4d-*|x4-*|m4-*|a4-*|a4x-*|g4-*)
-      echo "hyperdisk-balanced" ;;
-    *)
-      echo "pd-ssd" ;;
-  esac
-}
-
 function create_cluster_machines()
 {
   local -r machine_role="$1"; shift
@@ -645,10 +632,9 @@ function create_cluster_machines()
   local -r deprovision_commands_file="$1"; shift
   local -r zones=("$@")
   local CMD index=0
-  local -r disk_type="$(boot_disk_type_for "${node_type}")"
 
   for zone in "${zones[@]}"; do
-    CMD="gcloud compute instances create ${infra_id}-${machine_role}-${index} --boot-disk-size=${root_volume_size}GB --boot-disk-type=${disk_type} --image=${cluster_image} --metadata=^#^user-data='${ignition}' --machine-type=${node_type} --zone=${zone} --no-address --service-account=${service_account} --scopes=https://www.googleapis.com/auth/cloud-platform --tags=${infra_id}-${machine_role} --subnet=${machine_subnet}"
+    CMD="gcloud compute instances create ${infra_id}-${machine_role}-${index} --boot-disk-size=${root_volume_size}GB --boot-disk-type=pd-ssd --image=${cluster_image} --metadata=^#^user-data='${ignition}' --machine-type=${node_type} --zone=${zone} --no-address --service-account=${service_account} --scopes=https://www.googleapis.com/auth/cloud-platform --tags=${infra_id}-${machine_role} --subnet=${machine_subnet}"
     run_command "${CMD}"
     short_wait
 

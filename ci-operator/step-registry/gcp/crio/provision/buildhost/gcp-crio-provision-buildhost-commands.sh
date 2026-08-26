@@ -87,7 +87,7 @@ fi
 if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
 	echo "Could not find VPC network and control-plane subnet" && exit 1
 fi
-ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[0] | cut -d "/" -f9)
+ZONES=$(gcloud compute regions describe ${REGION} --format=json | jq -r '.zones[]' | cut -d "/" -f9 | shuf)
 
 #####################################
 ##########Create server_#############
@@ -98,19 +98,34 @@ ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[
 echo "${REGION}" >>"${SHARED_DIR}/region"
 server_name="${CLUSTER_NAME}-buildhost"
 
-MACHINE_TYPE="n2-standard-8"
-gcloud compute instances create "${server_name}" \
-	${IMAGE_ARGS} \
-	--boot-disk-type pd-ssd \
-	--boot-disk-size=200GB \
-	--machine-type=${MACHINE_TYPE} \
-	--metadata ssh-keys="${SSH_USER}:$(cat ${SHARED_DIR}/vpc-sshkey.pub)" \
-	--network=${NETWORK} \
-	--subnet=${CONTROL_PLANE_SUBNET} \
-	--zone=${ZONE_0} \
-	--tags="${server_name}"
+MACHINE_TYPE="n4-standard-8"
+SSH_PUB_KEY=$(cat ${SHARED_DIR}/vpc-sshkey.pub)
+CREATED_ZONE=""
+for zone in ${ZONES}; do
+	echo "Trying zone ${zone}..."
+	if gcloud compute instances create "${server_name}" \
+		${IMAGE_ARGS} \
+		--boot-disk-type hyperdisk-balanced \
+		--boot-disk-size=200GB \
+		--machine-type=${MACHINE_TYPE} \
+		--metadata ssh-keys="${SSH_USER}:${SSH_PUB_KEY}" \
+		--network=${NETWORK} \
+		--subnet=${CONTROL_PLANE_SUBNET} \
+		--zone=${zone} \
+		--tags="${server_name}"; then
+		CREATED_ZONE="${zone}"
+		break
+	fi
+	echo "Zone ${zone} failed, trying next..."
+done
 
-echo "Created Server instance"
+if [[ -z "${CREATED_ZONE}" ]]; then
+	echo "Failed to create instance in any zone in ${REGION}"
+	exit 1
+fi
+
+ZONE_0="${CREATED_ZONE}"
+echo "Created Server instance in zone ${ZONE_0}"
 
 gcloud compute firewall-rules create "${server_name}-ingress-allow" \
 	--network ${NETWORK} \

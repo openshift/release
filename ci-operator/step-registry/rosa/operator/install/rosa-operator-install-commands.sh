@@ -123,7 +123,24 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
             RESOURCE=$(oc get crd "${crd}" -o jsonpath='{.spec.names.plural}')
             GROUP=$(oc get crd "${crd}" -o jsonpath='{.spec.group}')
             log "Backing up ${RESOURCE}.${GROUP} instances"
-            oc get "${RESOURCE}.${GROUP}" -A -o yaml > "${CR_BACKUP_DIR}/${crd}.yaml" 2>/dev/null || true
+            # Back up only non-test CRs. Test CRs (names starting with "test-")
+            # are created by e2e tests and should not persist across CI runs.
+            ALL_ITEMS=$(oc get "${RESOURCE}.${GROUP}" -A --no-headers -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name 2>/dev/null || true)
+            : > "${CR_BACKUP_DIR}/${crd}.yaml"
+            while IFS= read -r line; do
+                [[ -z "${line}" ]] && continue
+                cr_ns=$(echo "${line}" | awk '{print $1}')
+                cr_name=$(echo "${line}" | awk '{print $2}')
+                if [[ "${cr_name}" == test-* ]]; then
+                    log "  Skipping test CR ${cr_name}"
+                    continue
+                fi
+                if oc get "${RESOURCE}.${GROUP}" "${cr_name}" -n "${cr_ns}" -o yaml >> "${CR_BACKUP_DIR}/${crd}.yaml" 2>/dev/null; then
+                    echo "---" >> "${CR_BACKUP_DIR}/${crd}.yaml"
+                else
+                    log "  WARNING: failed to back up ${cr_name} in ${cr_ns} (may have been deleted)"
+                fi
+            done <<< "${ALL_ITEMS}"
         fi
     done
 fi
