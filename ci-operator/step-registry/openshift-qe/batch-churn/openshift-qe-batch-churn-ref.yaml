@@ -1,0 +1,135 @@
+ref:
+  as: openshift-qe-batch-churn
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e-benchmarking version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: KB_FLAGS
+    default: ""
+    documentation: |-
+      Additional flags for the kube-burner command
+  - name: GC
+    default: "true"
+    documentation: |-
+      Clean up resources after the workload completes
+  - name: GC_METRICS
+    default: "false"
+    documentation: |-
+      Collect metrics during garbage collection
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Metrics profile type: regular, reporting, or both
+  - name: METRICS_PROFILES
+    default: "metrics.yml,etcd-density-metrics.yml"
+    documentation: |-
+      Comma separated list of metrics profiles to use
+  - name: ITERATIONS
+    default: "10"
+    documentation: |-
+      Number of batch namespaces to create
+  - name: CHURN_CYCLES
+    default: "0"
+    documentation: |-
+      Number of churn cycles to execute
+  - name: DEPLOYMENT_COUNT
+    default: "250"
+    documentation: |-
+      Number of single-replica deployments per namespace
+  - name: UNIQUE_SECRETS
+    default: "8"
+    documentation: |-
+      Unique secrets mounted per pod
+  - name: UNIQUE_CMS
+    default: "8"
+    documentation: |-
+      Unique configmaps mounted per pod
+  - name: UNIQUE_KV
+    default: "5"
+    documentation: |-
+      Key-value pairs per unique secret/configmap
+  - name: UNIQUE_KV_LEN
+    default: "32"
+    documentation: |-
+      Character length of each unique value
+  - name: UNIQUE_LARGE_SECRETS
+    default: "8"
+    documentation: |-
+      Large unique secrets per pod
+  - name: UNIQUE_LARGE_SECRET_SIZE
+    default: "8192"
+    documentation: |-
+      Bytes per large unique secret
+  - name: UNIQUE_LARGE_CMS
+    default: "8"
+    documentation: |-
+      Large unique configmaps per pod
+  - name: UNIQUE_LARGE_CM_SIZE
+    default: "8192"
+    documentation: |-
+      Bytes per large unique configmap
+  - name: COMMON_SECRETS
+    default: "1"
+    documentation: |-
+      Shared secrets per namespace
+  - name: COMMON_SECRET_FILES
+    default: "1"
+    documentation: |-
+      Files per common secret
+  - name: COMMON_SECRET_FILE_SIZE
+    default: "131072"
+    documentation: |-
+      Bytes per file in common secret
+  - name: COMMON_CMS
+    default: "2"
+    documentation: |-
+      Shared configmaps per namespace
+  - name: COMMON_CM_SIZE
+    default: "262144"
+    documentation: |-
+      Bytes per common configmap
+  - name: CHAOS_ACTION
+    default: ""
+    documentation: |-
+      Chaos action to run during load: rollout, kill-apiserver, kill-node, kill-etcd
+  - name: CHAOS_DELAY
+    default: "10"
+    documentation: |-
+      Seconds to wait before chaos fires
+  - name: CHAOS_CYCLES_COUNT
+    default: "10"
+    documentation: |-
+      Number of times to repeat the chaos action
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path
+  - name: USER_METADATA
+    default: ""
+    documentation: |-
+      Arbitrary metadata provided to the kube-burner workload in YAML format
+  commands: openshift-qe-batch-churn-commands.sh
+  timeout: 14h
+  credentials:
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the batch-churn workload to stress the API server and etcd
+    via kubelet watch pressure from volume-mounted secrets and configmaps.
+    Uses kube-burner-ocp init with the batch-churn config from the
+    kube-burner-ocp repository.

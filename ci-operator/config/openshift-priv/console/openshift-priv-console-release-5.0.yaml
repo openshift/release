@@ -31,9 +31,12 @@ images:
       COPY . /go/src/github.com/openshift/console/
       WORKDIR /go/src/github.com/openshift/console
       ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
-      RUN cd frontend && node .yarn/releases/yarn-4.14.1.cjs install --immutable && \
+      RUN cd frontend && \
+          YARN="node $(awk '/yarnPath:/{print $2}' .yarnrc.yml)" && \
+          $YARN install --immutable && \
           npx playwright install chromium
-      RUN printf '%s\n' '#!/bin/sh' 'exec node /go/src/github.com/openshift/console/frontend/.yarn/releases/yarn-4.14.1.cjs "$@"' > /usr/local/bin/yarn && \
+      RUN YARN_PATH="frontend/$(awk '/yarnPath:/{print $2}' frontend/.yarnrc.yml)" && \
+          printf '%s\n' '#!/bin/sh' "exec node /go/src/github.com/openshift/console/$YARN_PATH \"\$@\"" > /usr/local/bin/yarn && \
           chmod +x /usr/local/bin/yarn
     from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
     inputs:

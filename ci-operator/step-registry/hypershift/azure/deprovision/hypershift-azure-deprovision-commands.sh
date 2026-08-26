@@ -3,7 +3,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export KUBECONFIG=/etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig
+export KUBECONFIG=/etc/hypershift-ci-jobs-self-managed-azure/kubeconfig
 export AZURE_CREDENTIALS_FILE=/etc/hypershift-ci-jobs-self-managed-azure/credentials.json
 
 # Returns 0 if the resource group name matches CI naming conventions.

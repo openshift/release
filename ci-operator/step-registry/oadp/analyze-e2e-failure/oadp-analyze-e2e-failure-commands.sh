@@ -108,7 +108,15 @@ OADP CONTEXT:
   - must-gather/clusters/<cluster-id>/oadp-must-gather-summary.md: high-level cluster diagnostics summary.
   - must-gather/clusters/<cluster-id>/namespaces/openshift-adp/: Velero/node-agent/plugin pod logs, DPA/BSL/VSL/backup/restore resources.
   - Per-test directories with pod logs from the openshift-adp namespace and application namespaces under test.
-- Known flakes are tracked upstream in tests/e2e/lib/flakes.go (flakePatterns / errorIgnorePatterns) in the openshift/oadp-operator repo — cross-reference failure signatures against known issue patterns before treating them as new bugs."
+
+SOURCE CODE ACCESS (this pod runs on a generic image — the oadp-operator repo is NOT pre-checked-out, unlike the old in-container analysis this replaces):
+- You have git, gh, and general network access in this environment. If artifact-based evidence alone isn't enough to explain a failure, clone the source yourself:
+    git clone --depth 1 --branch ${OADP_BRANCH} https://github.com/openshift/oadp-operator /tmp/oadp-operator
+    git clone --depth 1 --branch ${OADP_BRANCH} https://github.com/openshift/velero /tmp/velero
+  (branch names are mirrored 1:1 between the two repos — confirmed via https://github.com/oadp-rebasebot/oadp-rebase/blob/oadp-dev/repos.yaml, the canonical source of truth for OADP ecosystem repo/branch mappings.)
+- Known flakes are tracked in /tmp/oadp-operator/tests/e2e/lib/flakes.go (flakePatterns / errorIgnorePatterns) — cross-reference failure signatures against known issue patterns before treating them as new bugs.
+- OADP is a thin operator wrapping Velero: most real backup/restore root causes live in Velero's own controller code (/tmp/velero/pkg/controller/), not OADP's wrapper. Grep there for error strings you find in pod logs before concluding something is an OADP-specific bug.
+- If evidence instead points into a cloud-provider plugin or other OADP ecosystem component (e.g. an AWS-specific snapshot error suggesting velero-plugin-for-aws, a KubeVirt VM backup error suggesting kubevirt-velero-plugin, or a HyperShift-specific failure suggesting hypershift-oadp-plugin) rather than core Velero or oadp-operator itself, don't guess the repo/org/branch — fetch https://raw.githubusercontent.com/oadp-rebasebot/oadp-rebase/oadp-dev/repos.yaml (WebFetch or curl) and look up that component's entry: use its \`org\`/\`repo\` for the clone URL, and clone the branch named in its \`dev_branch\` field if present, otherwise ${OADP_BRANCH} (a few repos, e.g. kubevirt-velero-plugin and hypershift-oadp-plugin, only develop on \`main\` and don't mirror OADP's oadp-1.x/oadp-dev branch scheme at all — that's exactly what \`dev_branch\` overrides for). If the branch you pick 404s, retry with \`main\` as a last resort."
 
 echo ""
 echo "Running Claude with /ci:prow-job-analysis skill..."
