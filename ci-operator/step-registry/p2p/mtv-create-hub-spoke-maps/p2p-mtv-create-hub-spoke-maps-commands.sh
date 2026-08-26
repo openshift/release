@@ -1,20 +1,23 @@
 #!/bin/bash
 #
-# Create MTV NetworkMap and StorageMap for hub↔spoke migration on the ACM hub.
+# Create MTV NetworkMap and StorageMap for bi-directional migration on the ACM hub.
 #
-# Hub→Spoke direction: MTV_HS_HUB_TO_SPOKE_* env vars.
-#   Source = MTV hub "host" provider (the hub cluster itself).
-#   Destination = spoke OpenShift provider registered via p2p-mtv-register-providers.
+# Supports hub↔spoke and spoke↔spoke topologies via generalized or legacy env vars:
 #
-# Spoke→Hub direction: MTV_HS_SPOKE_TO_HUB_* env vars.
-#   Source = spoke OpenShift provider.
-#   Destination = MTV hub "host" provider.
+#   Generalized (topology-agnostic, preferred for spoke-spoke):
+#     MTV_SRC_PROVIDER / MTV_DST_PROVIDER       — forward direction src / dst provider names
+#     MTV_FWD_NETWORK_MAP / MTV_FWD_STORAGE_MAP — forward direction map names
+#     MTV_REV_NETWORK_MAP / MTV_REV_STORAGE_MAP — reverse direction map names
+#     MTV_SRC_STORAGE_NAME / MTV_DST_STORAGE_CLASS — forward direction storage mapping
+#     MTV_DST_STORAGE_NAME / MTV_SRC_STORAGE_CLASS — reverse direction storage mapping
 #
-# The hub "host" provider is auto-created by MTV at install time and represents the
-# local hub cluster. No separate registration is needed for it.
+#   Legacy hub↔spoke names (backward-compatible, used when generalized names are absent):
+#     MTV_HS_HUB_PROVIDER / MTV_HS_SPOKE_PROVIDER
+#     MTV_HS_HUB_TO_SPOKE_* / MTV_HS_SPOKE_TO_HUB_*
+#     MTV_HS_HUB_STORAGE_NAME / MTV_HS_SPOKE_STORAGE_CLASS (etc.)
 #
-# Requires p2p-mtv-register-providers (spoke provider Ready) and ODF Available on
-# both hub and spoke before this step.
+# Requires p2p-mtv-register-providers (providers Ready) and ODF Available on
+# both clusters before this step.
 #
 set -euxo pipefail; shopt -s inherit_errexit
 
@@ -25,8 +28,11 @@ eval "$(
 )"; EnsureReqs jq
 
 if [[ -n "${SHARED_DIR}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+    [[ "${_wasTracing}" == "true" ]] && set -x
 fi
 
 [[ -n "${KUBECONFIG}" ]]
@@ -116,39 +122,52 @@ WaitMapReady() {
         --for=condition=Ready --timeout="${MTV_HS_MAP_READY_TIMEOUT}"
 }
 
+# --- Resolve generalized env var aliases (fall back to legacy hub/spoke names) ---
+
+# Forward direction: source cluster → destination cluster.
+typeset _fwdSrcProv="${MTV_SRC_PROVIDER:-${MTV_HS_HUB_PROVIDER}}"
+typeset _fwdDstProv="${MTV_DST_PROVIDER:-${MTV_HS_SPOKE_PROVIDER}}"
+typeset _fwdNetMap="${MTV_FWD_NETWORK_MAP:-${MTV_HS_HUB_TO_SPOKE_NETWORK_MAP}}"
+typeset _fwdStorMap="${MTV_FWD_STORAGE_MAP:-${MTV_HS_HUB_TO_SPOKE_STORAGE_MAP}}"
+typeset _fwdSrcStorName="${MTV_SRC_STORAGE_NAME:-${MTV_HS_HUB_STORAGE_NAME}}"
+typeset _fwdDstStorClass="${MTV_DST_STORAGE_CLASS:-${MTV_HS_SPOKE_STORAGE_CLASS}}"
+# Reverse direction: destination cluster → source cluster.
+typeset _revSrcProv="${MTV_REV_SRC_PROVIDER:-${MTV_HS_SPOKE_PROVIDER}}"
+typeset _revDstProv="${MTV_REV_DST_PROVIDER:-${MTV_HS_HUB_PROVIDER}}"
+typeset _revNetMap="${MTV_REV_NETWORK_MAP:-${MTV_HS_SPOKE_TO_HUB_NETWORK_MAP}}"
+typeset _revStorMap="${MTV_REV_STORAGE_MAP:-${MTV_HS_SPOKE_TO_HUB_STORAGE_MAP}}"
+typeset _revSrcStorName="${MTV_DST_STORAGE_NAME:-${MTV_HS_SPOKE_STORAGE_NAME}}"
+typeset _revDstStorClass="${MTV_SRC_STORAGE_CLASS:-${MTV_HS_HUB_STORAGE_CLASS}}"
+
 # --- Main ---
 
 oc get ns "${MTV_NAMESPACE}" 1>/dev/null
 
-# Wait for both hub (host) and spoke providers to be Ready.
-WaitProviderReady "${MTV_HS_HUB_PROVIDER}"
-WaitProviderReady "${MTV_HS_SPOKE_PROVIDER}"
+# Wait for both providers to be Ready.
+WaitProviderReady "${_fwdSrcProv}"
+WaitProviderReady "${_fwdDstProv}"
 
 # Optionally refresh provider inventory so StorageMap validation uses current state.
 if [[ "${MTV_HS_SKIP_INVENTORY_REFRESH}" != "true" ]]; then
-    RefreshProviderInventory "${MTV_HS_HUB_PROVIDER}"
-    RefreshProviderInventory "${MTV_HS_SPOKE_PROVIDER}"
+    RefreshProviderInventory "${_fwdSrcProv}"
+    RefreshProviderInventory "${_fwdDstProv}"
 fi
 
-# Hub→Spoke direction maps.
-ApplyNetworkMap "${MTV_HS_HUB_TO_SPOKE_NETWORK_MAP}" \
-    "${MTV_HS_HUB_PROVIDER}" "${MTV_HS_SPOKE_PROVIDER}"
-ApplyStorageMap "${MTV_HS_HUB_TO_SPOKE_STORAGE_MAP}" \
-    "${MTV_HS_HUB_PROVIDER}" "${MTV_HS_SPOKE_PROVIDER}" \
-    "${MTV_HS_HUB_STORAGE_NAME}" "${MTV_HS_SPOKE_STORAGE_CLASS}"
+# Forward direction maps (e.g. hub→spoke or spoke-1→spoke-2).
+ApplyNetworkMap "${_fwdNetMap}" "${_fwdSrcProv}" "${_fwdDstProv}"
+ApplyStorageMap "${_fwdStorMap}" "${_fwdSrcProv}" "${_fwdDstProv}" \
+    "${_fwdSrcStorName}" "${_fwdDstStorClass}"
 
-# Spoke→Hub direction maps.
-ApplyNetworkMap "${MTV_HS_SPOKE_TO_HUB_NETWORK_MAP}" \
-    "${MTV_HS_SPOKE_PROVIDER}" "${MTV_HS_HUB_PROVIDER}"
-ApplyStorageMap "${MTV_HS_SPOKE_TO_HUB_STORAGE_MAP}" \
-    "${MTV_HS_SPOKE_PROVIDER}" "${MTV_HS_HUB_PROVIDER}" \
-    "${MTV_HS_SPOKE_STORAGE_NAME}" "${MTV_HS_HUB_STORAGE_CLASS}"
+# Reverse direction maps (e.g. spoke→hub or spoke-2→spoke-1).
+ApplyNetworkMap "${_revNetMap}" "${_revSrcProv}" "${_revDstProv}"
+ApplyStorageMap "${_revStorMap}" "${_revSrcProv}" "${_revDstProv}" \
+    "${_revSrcStorName}" "${_revDstStorClass}"
 
 # Wait for all four maps to be Ready.
-WaitMapReady networkmap "${MTV_HS_HUB_TO_SPOKE_NETWORK_MAP}"
-WaitMapReady storagemap "${MTV_HS_HUB_TO_SPOKE_STORAGE_MAP}"
-WaitMapReady networkmap "${MTV_HS_SPOKE_TO_HUB_NETWORK_MAP}"
-WaitMapReady storagemap "${MTV_HS_SPOKE_TO_HUB_STORAGE_MAP}"
+WaitMapReady networkmap "${_fwdNetMap}"
+WaitMapReady storagemap "${_fwdStorMap}"
+WaitMapReady networkmap "${_revNetMap}"
+WaitMapReady storagemap "${_revStorMap}"
 
 oc get networkmap,storagemap -n "${MTV_NAMESPACE}" \
     > "${ARTIFACT_DIR}/mtv-hub-spoke-maps-status.txt"

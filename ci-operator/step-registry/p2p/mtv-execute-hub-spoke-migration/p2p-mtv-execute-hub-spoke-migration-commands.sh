@@ -27,8 +27,11 @@ eval "$(
 )"; EnsureReqs jq
 
 if [[ -n "${SHARED_DIR}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+    [[ "${_wasTracing}" == "true" ]] && set -x
 fi
 
 [[ -n "${KUBECONFIG}" ]]
@@ -38,24 +41,41 @@ typeset -i vmCount="${P2P_HS_VM_COUNT}"
 typeset -i migrationPollInterval="${MTV_HS_MIGRATION_POLL_INTERVAL_SECONDS}"
 typeset -i syncStuckMinutes="${MTV_HS_SYNC_STUCK_MINUTES}"
 typeset cclmDebugMode="${P2P_CCLM_DEBUG_MODE}"
+# spokeKubeconfig — the source (spoke-1) cluster kubeconfig for hub↔spoke topologies.
+# For spoke-spoke topologies this is the first spoke (source cluster).
 typeset spokeKubeconfig=""
+# destKubeconfig — the destination cluster kubeconfig for spoke-spoke topologies.
+# For hub↔spoke topologies this is always KUBECONFIG (the hub); resolved by ResolveSpokeKubeconfig.
+typeset destKubeconfig=""
 
 # Temp file for JUnit records (PASS/FAIL\tname\telapsed\t[msg]).
 typeset -r junitFile="${TMPDIR:-/tmp}/hub-spoke-cclm-junit-$$.tsv"
 
 typeset diagDir=""
 
-# HubOc — run oc against the ACM hub (MTV management plane + hub KubeVirt endpoint).
-HubOc() {
+# MgmtOc — run oc against the ACM hub, which is always the MTV management plane.
+# The hub hosts Plans, Migrations, Providers, and Maps regardless of which clusters are
+# the actual migration endpoints (hub↔spoke or spoke↔spoke).
+MgmtOc() {
     oc --kubeconfig="${KUBECONFIG}" "$@"
 }
+# HubOc — backward-compatible alias for MgmtOc.
+HubOc() { MgmtOc "$@"; }
 
-# SpokeOc — run oc against the spoke cluster.
+# SpokeOc — run oc against spoke-1 (the source spoke for hub↔spoke or spoke-spoke topologies).
 SpokeOc() {
     oc --kubeconfig="${spokeKubeconfig}" "$@"
 }
 
-# ResolveSpokeKubeconfig — resolve spoke kubeconfig from explicit env or SHARED_DIR index.
+# DestOc — run oc against the destination cluster.
+# For hub↔spoke: hub (KUBECONFIG) for spoke→hub, spoke (spokeKubeconfig) for hub→spoke.
+# For spoke-spoke: spoke-2 (destKubeconfig).
+# Note: for per-direction operations use the explicit srcKc/dstKc parameters instead.
+DestOc() {
+    oc --kubeconfig="${destKubeconfig}" "$@"
+}
+
+# ResolveSpokeKubeconfig — resolve the source spoke kubeconfig from explicit env or SHARED_DIR index.
 ResolveSpokeKubeconfig() {
     [[ -n "${SHARED_DIR}" ]]
 
@@ -72,12 +92,35 @@ ResolveSpokeKubeconfig() {
     [[ -r "${spokeKubeconfig}" ]]
 }
 
-# KcForCluster — return kubeconfig path for "hub" or "spoke" label.
+# ResolveDestKubeconfig — resolve the destination cluster kubeconfig for spoke-spoke topologies.
+# For hub↔spoke topologies the destination is the hub (KUBECONFIG), which is always available.
+# For spoke-spoke, P2P_DEST_KUBECONFIG or P2P_DEST_SPOKE_INDEX must be set.
+ResolveDestKubeconfig() {
+    [[ -n "${SHARED_DIR}" ]]
+
+    if [[ -n "${P2P_DEST_KUBECONFIG}" ]]; then
+        destKubeconfig="${P2P_DEST_KUBECONFIG}"
+    elif [[ -n "${P2P_DEST_SPOKE_INDEX}" ]]; then
+        if [[ -r "${SHARED_DIR}/managed-cluster-kubeconfig-${P2P_DEST_SPOKE_INDEX}" ]]; then
+            destKubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig-${P2P_DEST_SPOKE_INDEX}"
+        else
+            : "Destination spoke kubeconfig not found for index ${P2P_DEST_SPOKE_INDEX}" >&2
+            return 1
+        fi
+    else
+        : "ERROR: spoke-spoke direction requires P2P_DEST_KUBECONFIG or P2P_DEST_SPOKE_INDEX" >&2
+        return 1
+    fi
+    [[ -r "${destKubeconfig}" ]]
+}
+
+# KcForCluster — return kubeconfig path for a cluster role label.
 KcForCluster() {
     typeset cluster="${1:?}"
     case "${cluster}" in
-        hub)   printf '%s' "${KUBECONFIG}" ;;
-        spoke) printf '%s' "${spokeKubeconfig}" ;;
+        hub|mgmt) printf '%s' "${KUBECONFIG}" ;;
+        spoke)    printf '%s' "${spokeKubeconfig}" ;;
+        dest)     printf '%s' "${destKubeconfig}" ;;
         *) : "Unknown cluster label: ${cluster}" >&2; return 1 ;;
     esac
 }
@@ -87,7 +130,7 @@ KcForCluster() {
 # WaitProviderReady — gate until MTV Provider is Ready.
 WaitProviderReady() {
     typeset providerName="${1:?}"
-    HubOc wait "provider/${providerName}" -n "${MTV_NAMESPACE}" \
+    MgmtOc wait "provider/${providerName}" -n "${MTV_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_HS_PLAN_READY_TIMEOUT}"
 }
 
@@ -95,7 +138,7 @@ WaitProviderReady() {
 WaitMapReady() {
     typeset kind="${1:?}"
     typeset name="${2:?}"
-    HubOc wait "${kind}/${name}" -n "${MTV_NAMESPACE}" \
+    MgmtOc wait "${kind}/${name}" -n "${MTV_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_HS_PLAN_READY_TIMEOUT}"
 }
 
@@ -154,21 +197,24 @@ EnsureDecentralizedLiveMigrationGate() {
 
     WaitForDecentralizedLiveMigrationGate "${kc}" && return 0
 
-    oc --kubeconfig="${kc}" patch kubevirt "${MTV_HS_KUBEVIRT_NAME}" \
-        -n "${MTV_HS_CNV_NAMESPACE}" \
-        --type merge \
-        -p '{"spec":{"configuration":{"developerConfiguration":{"featureGates":["DecentralizedLiveMigration"]}}}}'
-
-    WaitForDecentralizedLiveMigrationGate "${kc}"
+    # Do NOT fall back to patching KubeVirt directly: a merge patch would
+    # replace the entire featureGates array with only DecentralizedLiveMigration,
+    # potentially disabling other HCO-managed gates and corrupting cluster state.
+    printf 'ERROR: HCO did not propagate DecentralizedLiveMigration featureGate on %s\n' \
+        "${clusterLabel}" >&2
+    return 1
 }
 
-# MaybeEnsureDecentralizedLiveMigration — enable CCLM gate on both hub and spoke.
+# MaybeEnsureDecentralizedLiveMigration — enable CCLM gate on both source and destination clusters.
+# Takes srcKc and dstKc so the function is topology-agnostic (hub↔spoke or spoke↔spoke).
 MaybeEnsureDecentralizedLiveMigration() {
+    typeset srcKc="${1:?}"
+    typeset dstKc="${2:?}"
     [[ "${MTV_HS_PLAN_TYPE}" != "live" ]] && return 0
     [[ "${MTV_HS_ENSURE_DECENTRALIZED_LIVE_MIGRATION}" != "true" ]] && return 0
 
-    EnsureDecentralizedLiveMigrationGate "${KUBECONFIG}"      "hub"
-    EnsureDecentralizedLiveMigrationGate "${spokeKubeconfig}" "spoke"
+    EnsureDecentralizedLiveMigrationGate "${srcKc}" "src"
+    EnsureDecentralizedLiveMigrationGate "${dstKc}" "dst"
 }
 
 # WaitForSyncControllerReady — CCLM requires virt-synchronization-controller on both clusters.
@@ -182,12 +228,15 @@ WaitForSyncControllerReady() {
         --timeout="${MTV_HS_SYNC_CONTROLLER_WAIT}"
 }
 
-# MaybeWaitForSyncControllers — wait for sync controllers on both hub and spoke.
+# MaybeWaitForSyncControllers — wait for sync controllers on both source and destination clusters.
+# Takes srcKc and dstKc so the function is topology-agnostic (hub↔spoke or spoke↔spoke).
 MaybeWaitForSyncControllers() {
+    typeset srcKc="${1:?}"
+    typeset dstKc="${2:?}"
     [[ "${MTV_HS_PLAN_TYPE}" != "live" ]] && return 0
 
-    WaitForSyncControllerReady "${KUBECONFIG}"      "hub"
-    WaitForSyncControllerReady "${spokeKubeconfig}" "spoke"
+    WaitForSyncControllerReady "${srcKc}" "src"
+    WaitForSyncControllerReady "${dstKc}" "dst"
 }
 
 # PreflightCclm — verify ForkliftController CCLM gate and KubeVirt featureGates.
@@ -198,12 +247,12 @@ PreflightCclm() {
 
     [[ "${MTV_HS_PLAN_TYPE}" != "live" ]] && return 0
 
-    fcGate="$(HubOc get "forkliftcontroller/${MTV_HS_FORKLIFT_CONTROLLER_NAME}" \
+    fcGate="$(MgmtOc get "forkliftcontroller/${MTV_HS_FORKLIFT_CONTROLLER_NAME}" \
         -n "${MTV_NAMESPACE}" \
         -o jsonpath='{.spec.feature_ocp_live_migration}' || true)"
     [[ "${fcGate}" == "true" ]]
 
-    envVal="$(HubOc get "deployment/${MTV_HS_FORKLIFT_CONTROLLER_NAME}" \
+    envVal="$(MgmtOc get "deployment/${MTV_HS_FORKLIFT_CONTROLLER_NAME}" \
         -n "${MTV_NAMESPACE}" \
         -o jsonpath='{.spec.template.spec.containers[*].env[?(@.name=="FEATURE_OCP_LIVE_MIGRATION")].value}' \
         || true)"
@@ -223,12 +272,15 @@ PreflightSubmarinerNoGlobalnet() {
         -n submariner-operator 1>/dev/null
 }
 
-# MaybePreflightSubmarinerNoGlobalnet — check both hub and spoke.
+# MaybePreflightSubmarinerNoGlobalnet — check both source and destination clusters.
+# Takes srcKc and dstKc so the function is topology-agnostic (hub↔spoke or spoke↔spoke).
 MaybePreflightSubmarinerNoGlobalnet() {
+    typeset srcKc="${1:?}"
+    typeset dstKc="${2:?}"
     [[ "${MTV_HS_PLAN_TYPE}" != "live" ]] && return 0
 
-    PreflightSubmarinerNoGlobalnet "${KUBECONFIG}"      "hub"
-    PreflightSubmarinerNoGlobalnet "${spokeKubeconfig}" "spoke"
+    PreflightSubmarinerNoGlobalnet "${srcKc}" "src"
+    PreflightSubmarinerNoGlobalnet "${dstKc}" "dst"
 }
 
 # RefreshProviderInventory — re-scan cluster KubeVirt inventory before live Plan validation.
@@ -237,7 +289,7 @@ RefreshProviderInventory() {
     typeset ts
 
     ts="$(date -u +%s)"
-    HubOc annotate "provider/${providerName}" -n "${MTV_NAMESPACE}" \
+    MgmtOc annotate "provider/${providerName}" -n "${MTV_NAMESPACE}" \
         "forklift.konveyor.io/inventory-refresh=${ts}" --overwrite
 }
 
@@ -250,9 +302,9 @@ RefreshProvidersForLivePlan() {
 
     RefreshProviderInventory "${srcProvider}"
     RefreshProviderInventory "${dstProvider}"
-    HubOc wait "provider/${srcProvider}" -n "${MTV_NAMESPACE}" \
+    MgmtOc wait "provider/${srcProvider}" -n "${MTV_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_HS_PROVIDER_INVENTORY_REFRESH_WAIT}"
-    HubOc wait "provider/${dstProvider}" -n "${MTV_NAMESPACE}" \
+    MgmtOc wait "provider/${dstProvider}" -n "${MTV_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_HS_PROVIDER_INVENTORY_REFRESH_WAIT}"
 }
 
@@ -372,12 +424,11 @@ GetVmRootDiskStorageClass() {
         -o jsonpath='{.spec.storageClassName}' || true)"
     [[ -n "${scName}" ]] && printf '%s' "${scName}" && return 0
 
-    oc --kubeconfig="${kc}" get pvc -n "${vmNs}" -o json \
-        | jq -r --arg pvc "${pvcName}" '
-            (first(.items[] | select(.metadata.name == $pvc) | .spec.storageClassName) //
-             first(.items[].spec.storageClassName) //
-             "") // ""
-        '
+    # No fallback to a namespace-wide storage class: returning an unrelated SC
+    # would silently pass the StorageMap preflight for a different VM's disk.
+    printf 'Unable to resolve root-disk StorageClass for %s in namespace %s\n' \
+        "${vmName}" "${vmNs}" >&2
+    return 1
 }
 
 # PreflightVmStorageMapped — first VM root disk StorageClass must be in StorageMap.
@@ -393,7 +444,7 @@ PreflightVmStorageMapped() {
 
     scUid="$(oc --kubeconfig="${srcKc}" get "storageclass/${vmSc}" \
         -o jsonpath='{.metadata.uid}' || true)"
-    mapJson="$(HubOc get "storagemap/${storMapName}" -n "${MTV_NAMESPACE}" -o json)"
+    mapJson="$(MgmtOc get "storagemap/${storMapName}" -n "${MTV_NAMESPACE}" -o json)"
     mapped="$(jq -r --arg sc "${vmSc}" --arg uid "${scUid}" \
         '[.spec.map[]? | select(.source.name == $sc or (.source.id != null and .source.id == $uid))] | length > 0' \
         <<<"${mapJson}")"
@@ -511,13 +562,13 @@ ApplyPlan() {
                 vms: $vms,
                 type: $planType
             }
-        }' | HubOc create -f - --dry-run=client -o yaml --save-config | HubOc apply -f -
+        }' | MgmtOc create -f - --dry-run=client -o yaml --save-config | MgmtOc apply -f -
 }
 
 # WaitPlanReady — wait for Plan Ready condition.
 WaitPlanReady() {
     typeset planName="${1:?}"
-    HubOc wait "plan/${planName}" -n "${MTV_NAMESPACE}" \
+    MgmtOc wait "plan/${planName}" -n "${MTV_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_HS_PLAN_READY_TIMEOUT}"
 }
 
@@ -527,8 +578,8 @@ ApplyMigration() {
     typeset planName="${2:?}"
 
     {
-        HubOc create -f - --dry-run=client -o yaml --save-config
-    } <<EOF | HubOc apply -f -
+        MgmtOc create -f - --dry-run=client -o yaml --save-config
+    } <<EOF | MgmtOc apply -f -
 apiVersion: forklift.konveyor.io/v1beta1
 kind: Migration
 metadata:
@@ -558,7 +609,7 @@ ParseOcWaitDurationSeconds() {
 # PrintMigrationPipeline — log migration VM pipeline phases.
 PrintMigrationPipeline() {
     typeset migName="${1:?}"
-    HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+    MgmtOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
         -o jsonpath='{range .status.vms[*]}{.name}{"\n"}{range .pipeline[*]}  {.name}: {.phase}{"\n"}{end}{"\n"}{end}' \
         || true
 }
@@ -570,7 +621,7 @@ MigrationPipelinePhase() {
     typeset stepName="${3:?}"
     typeset migJson phase
 
-    migJson="$(HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" -o json || true)"
+    migJson="$(MgmtOc get "migration/${migName}" -n "${MTV_NAMESPACE}" -o json || true)"
     [[ -n "${migJson}" ]] || return 0
 
     phase="$(jq -r --arg vm "${vmName}" --arg step "${stepName}" \
@@ -633,17 +684,17 @@ WaitMigrationSucceeded() {
     deadline=$((SECONDS + $(ParseOcWaitDurationSeconds "${MTV_HS_MIGRATION_TIMEOUT}")))
 
     while (( SECONDS < deadline )); do
-        succeededStatus="$(HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+        succeededStatus="$(MgmtOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
             -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' || true)"
-        failedStatus="$(HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+        failedStatus="$(MgmtOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
             -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' || true)"
-        msg="$(HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+        msg="$(MgmtOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
             -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].message}' || true)"
 
         [[ "${succeededStatus}" == "True" ]] && return 0
 
         if [[ "${failedStatus}" == "True" ]]; then
-            HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+            MgmtOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
                 -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}' \
                 1>&2 || true
             PrintMigrationPipeline "${migName}" 1>&2
@@ -757,13 +808,13 @@ DumpDirectionDiagnostics() {
     typeset dirDiag="${ARTIFACT_DIR}/hub-spoke-migration-diagnostics/${direction}"
     mkdir -p "${dirDiag}"
 
-    HubOc get plan,migration,networkmap,storagemap,provider -n "${MTV_NAMESPACE}" \
+    MgmtOc get plan,migration,networkmap,storagemap,provider -n "${MTV_NAMESPACE}" \
         > "${dirDiag}/hub-mtv-resources.txt" 2>&1 || true
-    HubOc describe "plan/${planName}" -n "${MTV_NAMESPACE}" \
+    MgmtOc describe "plan/${planName}" -n "${MTV_NAMESPACE}" \
         > "${dirDiag}/plan-describe.txt" 2>&1 || true
-    HubOc describe "migration/${migName}" -n "${MTV_NAMESPACE}" \
+    MgmtOc describe "migration/${migName}" -n "${MTV_NAMESPACE}" \
         > "${dirDiag}/migration-describe.txt" 2>&1 || true
-    HubOc get events -n "${MTV_NAMESPACE}" --sort-by='.lastTimestamp' \
+    MgmtOc get events -n "${MTV_NAMESPACE}" --sort-by='.lastTimestamp' \
         > "${dirDiag}/hub-mtv-events.txt" 2>&1 || true
 
     typeset -i i
@@ -792,33 +843,56 @@ DumpDirectionDiagnostics() {
 }
 
 DumpDiagnostics() {
-    typeset hubToSpokeTargetNs="${1:-${MTV_HS_HUB_VM_NAMESPACE}}"
-    typeset spokeToHubTargetNs="${2:-${MTV_HS_SPOKE_VM_NAMESPACE}}"
+    typeset fwdTargetNs="${1:-${_fwdVmNs:-${MTV_HS_HUB_VM_NAMESPACE}}}"
+    typeset revTargetNs="${2:-${_revVmNs:-${MTV_HS_SPOKE_VM_NAMESPACE}}}"
 
-    # Dump spoke→hub direction (both "both" and "spoke-round-trip" use this plan/migration).
-    DumpDirectionDiagnostics "spoke-to-hub" \
-        "${MTV_HS_SPOKE_TO_HUB_PLAN}" "${MTV_HS_SPOKE_TO_HUB_MIGRATION}" \
-        "${spokeKubeconfig}" "${KUBECONFIG}" \
-        "${MTV_HS_SPOKE_VM_NAMESPACE}" "${spokeToHubTargetNs}" \
-        "${MTV_HS_SPOKE_VM_PREFIX}" || true
-
-    if [[ "${cclmDirection}" == "both" || "${cclmDirection}" == "hub-to-spoke" ]]; then
-        # Standard hub→spoke: hub-prefix VMs migrate from hub to spoke.
+    case "${cclmDirection}" in
+    (both|spoke-to-hub)
+        DumpDirectionDiagnostics "spoke-to-hub" \
+            "${_revPlan:-${MTV_HS_SPOKE_TO_HUB_PLAN}}" "${_revMig:-${MTV_HS_SPOKE_TO_HUB_MIGRATION}}" \
+            "${spokeKubeconfig}" "${KUBECONFIG}" \
+            "${_revVmNs:-${MTV_HS_SPOKE_VM_NAMESPACE}}" "${revTargetNs}" \
+            "${_revVmPrefix:-${MTV_HS_SPOKE_VM_PREFIX}}" || true
+        ;;&
+    (both|hub-to-spoke)
         DumpDirectionDiagnostics "hub-to-spoke" \
-            "${MTV_HS_HUB_TO_SPOKE_PLAN}" "${MTV_HS_HUB_TO_SPOKE_MIGRATION}" \
+            "${_fwdPlan:-${MTV_HS_HUB_TO_SPOKE_PLAN}}" "${_fwdMig:-${MTV_HS_HUB_TO_SPOKE_MIGRATION}}" \
             "${KUBECONFIG}" "${spokeKubeconfig}" \
-            "${MTV_HS_HUB_VM_NAMESPACE}" "${hubToSpokeTargetNs}" \
-            "${MTV_HS_HUB_VM_PREFIX}" || true
-    fi
-
-    if [[ "${cclmDirection}" == "spoke-round-trip" ]]; then
-        # Return leg: same spoke-prefix VMs, now on hub in spokeToHubTargetNs, going back to spoke.
+            "${_fwdVmNs:-${MTV_HS_HUB_VM_NAMESPACE}}" "${fwdTargetNs}" \
+            "${_fwdVmPrefix:-${MTV_HS_HUB_VM_PREFIX}}" || true
+        ;;
+    (spoke-round-trip)
+        DumpDirectionDiagnostics "spoke-to-hub" \
+            "${_revPlan:-${MTV_HS_SPOKE_TO_HUB_PLAN}}" "${_revMig:-${MTV_HS_SPOKE_TO_HUB_MIGRATION}}" \
+            "${spokeKubeconfig}" "${KUBECONFIG}" \
+            "${_revVmNs:-${MTV_HS_SPOKE_VM_NAMESPACE}}" "${revTargetNs}" \
+            "${_revVmPrefix:-${MTV_HS_SPOKE_VM_PREFIX}}" || true
         DumpDirectionDiagnostics "hub-to-spoke-return" \
-            "${MTV_HS_HUB_TO_SPOKE_PLAN}" "${MTV_HS_HUB_TO_SPOKE_MIGRATION}" \
+            "${_fwdPlan:-${MTV_HS_HUB_TO_SPOKE_PLAN}}" "${_fwdMig:-${MTV_HS_HUB_TO_SPOKE_MIGRATION}}" \
             "${KUBECONFIG}" "${spokeKubeconfig}" \
-            "${spokeToHubTargetNs}" "${hubToSpokeTargetNs}" \
-            "${MTV_HS_SPOKE_VM_PREFIX}" || true
-    fi
+            "${revTargetNs}" "${fwdTargetNs}" \
+            "${_revVmPrefix:-${MTV_HS_SPOKE_VM_PREFIX}}" || true
+        ;;
+    (spoke-to-spoke)
+        DumpDirectionDiagnostics "spoke-to-spoke" \
+            "${_fwdPlan}" "${_fwdMig}" \
+            "${spokeKubeconfig}" "${destKubeconfig}" \
+            "${_fwdVmNs}" "${fwdTargetNs}" \
+            "${_fwdVmPrefix}" || true
+        ;;
+    (spoke-round-trip-ss)
+        DumpDirectionDiagnostics "spoke-to-spoke-fwd" \
+            "${_fwdPlan}" "${_fwdMig}" \
+            "${spokeKubeconfig}" "${destKubeconfig}" \
+            "${_fwdVmNs}" "${fwdTargetNs}" \
+            "${_fwdVmPrefix}" || true
+        DumpDirectionDiagnostics "spoke-to-spoke-rev" \
+            "${_revPlan}" "${_revMig}" \
+            "${destKubeconfig}" "${spokeKubeconfig}" \
+            "${fwdTargetNs}" "${revTargetNs}" \
+            "${_fwdVmPrefix}" || true
+        ;;
+    esac
 }
 
 OnError() {
@@ -849,13 +923,13 @@ RunOneMigrationDirection() {
     JStep "[${direction}] Preflight: Providers and Maps Ready" \
         PreflightHub "${srcProvider}" "${dstProvider}" "${netMapName}" "${storMapName}"
     JStep "[${direction}] Preflight: DecentralizedLiveMigration Gates" \
-        MaybeEnsureDecentralizedLiveMigration
-    JStep "[${direction}] Preflight: Sync Controllers Available (hub + spoke)" \
-        MaybeWaitForSyncControllers
+        MaybeEnsureDecentralizedLiveMigration "${srcKc}" "${dstKc}"
+    JStep "[${direction}] Preflight: Sync Controllers Available (src + dst)" \
+        MaybeWaitForSyncControllers "${srcKc}" "${dstKc}"
     JStep "[${direction}] Preflight: MTV CCLM Feature Gate Active" \
         PreflightCclm "${srcKc}" "${dstKc}"
     JStep "[${direction}] Preflight: Submariner No Globalnet" \
-        MaybePreflightSubmarinerNoGlobalnet
+        MaybePreflightSubmarinerNoGlobalnet "${srcKc}" "${dstKc}"
     JStep "[${direction}] Preflight: Provider Inventory Refresh" \
         RefreshProvidersForLivePlan "${srcProvider}" "${dstProvider}"
     JStep "[${direction}] Preflight: All Source VMs Running" \
@@ -891,11 +965,11 @@ RunOneMigrationDirection() {
     if [[ -n "${ARTIFACT_DIR}" ]]; then
         mkdir -p "${ARTIFACT_DIR}"
         {
-            HubOc get "plan/${planName}" "migration/${migName}" \
+            MgmtOc get "plan/${planName}" "migration/${migName}" \
                 -n "${MTV_NAMESPACE}" -o wide
-            HubOc get "plan/${planName}" -n "${MTV_NAMESPACE}" \
+            MgmtOc get "plan/${planName}" -n "${MTV_NAMESPACE}" \
                 -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}'
-            HubOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
+            MgmtOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
                 -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}'
             PrintMigrationPipeline "${migName}"
             typeset -i i
@@ -922,13 +996,41 @@ typeset spokeToHubTargetNs="${MTV_HS_SPOKE_TO_HUB_TARGET_NAMESPACE}"
 
 typeset -i cclmStepRc=0
 # P2P_MIGRATION_DIRECTION controls which directions to run:
-#   both        – hub→spoke then spoke→hub (default, backward-compatible)
-#   hub-to-spoke – only the hub→spoke direction
-#   spoke-to-hub – only the spoke→hub direction
-# The p2p-mtv-spoke-to-hub-migration wrapper ref hardcodes this to "spoke-to-hub"
-# so it can appear after a spoke upgrade in the same chain without conflicting with
-# a prior hub-to-spoke invocation.
+#   both              – hub→spoke then spoke→hub (default, backward-compatible)
+#   hub-to-spoke      – only the hub→spoke direction
+#   spoke-to-hub      – only the spoke→hub direction
+#   spoke-round-trip  – spoke VMs: spoke→hub, cleanup spoke, then hub→spoke return
+#   spoke-to-spoke    – spoke-1 VMs → spoke-2 (single direction; requires P2P_DEST_SPOKE_INDEX)
+#   spoke-round-trip-ss – spoke-1→spoke-2, cleanup spoke-1, then spoke-2→spoke-1 return
+#
+# The p2p-mtv-spoke-to-hub-migration wrapper step hardcodes this to "spoke-to-hub" so it can
+# appear after a spoke upgrade in the same chain without conflicting with a prior hub-to-spoke step.
 typeset cclmDirection="${P2P_MIGRATION_DIRECTION:-both}"
+
+# Generalized provider / map names — topology-agnostic aliases for spoke-spoke support.
+# For hub↔spoke topologies these default to the MTV_HS_* env vars (backward-compatible).
+# For spoke-spoke topologies set MTV_SRC_PROVIDER / MTV_DST_PROVIDER and MTV_FWD_* / MTV_REV_*
+# in the calling chain or workflow; hub/spoke-specific names are then unused.
+#
+# Forward direction: source cluster → destination cluster (hub-to-spoke OR spoke-to-spoke fwd)
+typeset _fwdSrcProv="${MTV_SRC_PROVIDER:-${MTV_HS_HUB_PROVIDER}}"
+typeset _fwdDstProv="${MTV_DST_PROVIDER:-${MTV_HS_SPOKE_PROVIDER}}"
+typeset _fwdNetMap="${MTV_FWD_NETWORK_MAP:-${MTV_HS_HUB_TO_SPOKE_NETWORK_MAP}}"
+typeset _fwdStorMap="${MTV_FWD_STORAGE_MAP:-${MTV_HS_HUB_TO_SPOKE_STORAGE_MAP}}"
+typeset _fwdPlan="${MTV_FWD_PLAN:-${MTV_HS_HUB_TO_SPOKE_PLAN}}"
+typeset _fwdMig="${MTV_FWD_MIGRATION:-${MTV_HS_HUB_TO_SPOKE_MIGRATION}}"
+typeset _fwdVmPrefix="${MTV_FWD_VM_PREFIX:-${MTV_HS_HUB_VM_PREFIX}}"
+typeset _fwdVmNs="${MTV_FWD_VM_NAMESPACE:-${MTV_HS_HUB_VM_NAMESPACE}}"
+# Reverse direction: destination cluster → source cluster (spoke-to-hub OR spoke-to-spoke rev)
+typeset _revSrcProv="${MTV_REV_SRC_PROVIDER:-${MTV_HS_SPOKE_PROVIDER}}"
+typeset _revDstProv="${MTV_REV_DST_PROVIDER:-${MTV_HS_HUB_PROVIDER}}"
+typeset _revNetMap="${MTV_REV_NETWORK_MAP:-${MTV_HS_SPOKE_TO_HUB_NETWORK_MAP}}"
+typeset _revStorMap="${MTV_REV_STORAGE_MAP:-${MTV_HS_SPOKE_TO_HUB_STORAGE_MAP}}"
+typeset _revPlan="${MTV_REV_PLAN:-${MTV_HS_SPOKE_TO_HUB_PLAN}}"
+typeset _revMig="${MTV_REV_MIGRATION:-${MTV_HS_SPOKE_TO_HUB_MIGRATION}}"
+typeset _revVmPrefix="${MTV_REV_VM_PREFIX:-${MTV_HS_SPOKE_VM_PREFIX}}"
+typeset _revVmNs="${MTV_REV_VM_NAMESPACE:-${MTV_HS_SPOKE_VM_NAMESPACE}}"
+
 (
     trap OnError ERR
 
@@ -937,72 +1039,111 @@ typeset cclmDirection="${P2P_MIGRATION_DIRECTION:-both}"
     [[ "${cclmDirection}" == "both" \
     || "${cclmDirection}" == "hub-to-spoke" \
     || "${cclmDirection}" == "spoke-to-hub" \
-    || "${cclmDirection}" == "spoke-round-trip" ]] || {
-        : "ERROR: P2P_MIGRATION_DIRECTION must be 'both', 'hub-to-spoke', 'spoke-to-hub', or 'spoke-round-trip' (got '${cclmDirection}')"
+    || "${cclmDirection}" == "spoke-round-trip" \
+    || "${cclmDirection}" == "spoke-to-spoke" \
+    || "${cclmDirection}" == "spoke-round-trip-ss" ]] || {
+        : "ERROR: P2P_MIGRATION_DIRECTION must be one of: both, hub-to-spoke, spoke-to-hub, spoke-round-trip, spoke-to-spoke, spoke-round-trip-ss (got '${cclmDirection}')"
         exit 1
     }
 
     ResolveSpokeKubeconfig
 
-    hubToSpokeTargetNs="${hubToSpokeTargetNs:-${MTV_HS_HUB_VM_NAMESPACE}}"
-    spokeToHubTargetNs="${spokeToHubTargetNs:-${MTV_HS_SPOKE_VM_NAMESPACE}}"
+    # For spoke-spoke directions the destination is a second spoke cluster, not the hub.
+    if [[ "${cclmDirection}" == "spoke-to-spoke" || "${cclmDirection}" == "spoke-round-trip-ss" ]]; then
+        ResolveDestKubeconfig
+    else
+        # For hub↔spoke topologies the destination (from the fwd leg perspective) defaults to hub.
+        destKubeconfig="${KUBECONFIG}"
+    fi
 
-    HubOc get ns "${MTV_NAMESPACE}" 1>/dev/null
+    hubToSpokeTargetNs="${hubToSpokeTargetNs:-${_fwdVmNs}}"
+    spokeToHubTargetNs="${spokeToHubTargetNs:-${_revVmNs}}"
 
-    # Hub→Spoke: hub VMs (hub-vm-1..N) migrate from hub to spoke.
+    MgmtOc get ns "${MTV_NAMESPACE}" 1>/dev/null
+
+    # Hub→Spoke: forward VMs migrate from hub (source) to spoke (destination).
     if [[ "${cclmDirection}" == "hub-to-spoke" || "${cclmDirection}" == "both" ]]; then
         RunOneMigrationDirection "hub-to-spoke" \
-            "${MTV_HS_HUB_PROVIDER}" "${MTV_HS_SPOKE_PROVIDER}" \
-            "${MTV_HS_HUB_TO_SPOKE_NETWORK_MAP}" "${MTV_HS_HUB_TO_SPOKE_STORAGE_MAP}" \
-            "${MTV_HS_HUB_TO_SPOKE_PLAN}" "${MTV_HS_HUB_TO_SPOKE_MIGRATION}" \
-            "${MTV_HS_HUB_VM_PREFIX}" "${MTV_HS_HUB_VM_NAMESPACE}" "${hubToSpokeTargetNs}" \
+            "${_fwdSrcProv}" "${_fwdDstProv}" \
+            "${_fwdNetMap}" "${_fwdStorMap}" \
+            "${_fwdPlan}" "${_fwdMig}" \
+            "${_fwdVmPrefix}" "${_fwdVmNs}" "${hubToSpokeTargetNs}" \
             "${KUBECONFIG}" "${spokeKubeconfig}"
     fi
 
-    # Spoke→Hub: spoke VMs (spoke-vm-1..N) migrate from spoke back to hub.
+    # Spoke→Hub: reverse VMs migrate from spoke (source) back to hub (destination).
     if [[ "${cclmDirection}" == "spoke-to-hub" || "${cclmDirection}" == "both" ]]; then
         RunOneMigrationDirection "spoke-to-hub" \
-            "${MTV_HS_SPOKE_PROVIDER}" "${MTV_HS_HUB_PROVIDER}" \
-            "${MTV_HS_SPOKE_TO_HUB_NETWORK_MAP}" "${MTV_HS_SPOKE_TO_HUB_STORAGE_MAP}" \
-            "${MTV_HS_SPOKE_TO_HUB_PLAN}" "${MTV_HS_SPOKE_TO_HUB_MIGRATION}" \
-            "${MTV_HS_SPOKE_VM_PREFIX}" "${MTV_HS_SPOKE_VM_NAMESPACE}" "${spokeToHubTargetNs}" \
+            "${_revSrcProv}" "${_revDstProv}" \
+            "${_revNetMap}" "${_revStorMap}" \
+            "${_revPlan}" "${_revMig}" \
+            "${_revVmPrefix}" "${_revVmNs}" "${spokeToHubTargetNs}" \
             "${spokeKubeconfig}" "${KUBECONFIG}"
     fi
 
-    # Spoke-round-trip: spoke VMs start on spoke, migrate to hub, then return to spoke.
+    # Spoke-round-trip (hub↔spoke): spoke VMs start on spoke, migrate to hub, then return.
     #
-    #   Leg 1 (spoke→hub): MTV_HS_SPOKE_VM_PREFIX VMs from spoke (MTV_HS_SPOKE_VM_NAMESPACE)
-    #           are live-migrated to hub (spokeToHubTargetNs).
-    #   Post-leg-1 cleanup: leftover VM/DV/PVC objects on the source spoke are removed
-    #           so the spoke namespace is clean before the return leg.
-    #   Leg 2 (hub→spoke return): the same VMs (now on hub in spokeToHubTargetNs) are
-    #           live-migrated back to spoke (hubToSpokeTargetNs).
-    #
-    # Both legs use the spoke VM prefix; no separate hub-prefix VMs are needed.
+    #   Leg 1 (spoke→hub): _revVmPrefix VMs from spoke (_revVmNs) → hub (spokeToHubTargetNs).
+    #   Post-leg-1: clean up source spoke VM/DV/PVC so return leg has no collision.
+    #   Leg 2 (hub→spoke return): same VMs (now on hub in spokeToHubTargetNs) → spoke (hubToSpokeTargetNs).
     if [[ "${cclmDirection}" == "spoke-round-trip" ]]; then
         # Leg 1: spoke → hub
         RunOneMigrationDirection "spoke-to-hub" \
-            "${MTV_HS_SPOKE_PROVIDER}" "${MTV_HS_HUB_PROVIDER}" \
-            "${MTV_HS_SPOKE_TO_HUB_NETWORK_MAP}" "${MTV_HS_SPOKE_TO_HUB_STORAGE_MAP}" \
-            "${MTV_HS_SPOKE_TO_HUB_PLAN}" "${MTV_HS_SPOKE_TO_HUB_MIGRATION}" \
-            "${MTV_HS_SPOKE_VM_PREFIX}" "${MTV_HS_SPOKE_VM_NAMESPACE}" "${spokeToHubTargetNs}" \
+            "${_revSrcProv}" "${_revDstProv}" \
+            "${_revNetMap}" "${_revStorMap}" \
+            "${_revPlan}" "${_revMig}" \
+            "${_revVmPrefix}" "${_revVmNs}" "${spokeToHubTargetNs}" \
             "${spokeKubeconfig}" "${KUBECONFIG}"
 
-        # After the spoke→hub migration the source VMIs are no longer Running on the spoke.
-        # Clean up their VM/DV/PVC objects so the spoke namespace is empty and the return
-        # leg can land the VMs there without "VM already exists" collisions.
         JStep "[spoke-round-trip] Post-leg-1: Cleanup source spoke VM resources" \
             CleanupDestinationStaleResources \
-                "${spokeKubeconfig}" "${MTV_HS_SPOKE_VM_PREFIX}" \
-                "${MTV_HS_SPOKE_VM_NAMESPACE}" "${vmCount}"
+                "${spokeKubeconfig}" "${_revVmPrefix}" \
+                "${_revVmNs}" "${vmCount}"
 
         # Leg 2: hub → spoke return (same VMs, now in spokeToHubTargetNs on hub)
         RunOneMigrationDirection "hub-to-spoke-return" \
-            "${MTV_HS_HUB_PROVIDER}" "${MTV_HS_SPOKE_PROVIDER}" \
-            "${MTV_HS_HUB_TO_SPOKE_NETWORK_MAP}" "${MTV_HS_HUB_TO_SPOKE_STORAGE_MAP}" \
-            "${MTV_HS_HUB_TO_SPOKE_PLAN}" "${MTV_HS_HUB_TO_SPOKE_MIGRATION}" \
-            "${MTV_HS_SPOKE_VM_PREFIX}" "${spokeToHubTargetNs}" "${hubToSpokeTargetNs}" \
+            "${_fwdSrcProv}" "${_fwdDstProv}" \
+            "${_fwdNetMap}" "${_fwdStorMap}" \
+            "${_fwdPlan}" "${_fwdMig}" \
+            "${_revVmPrefix}" "${spokeToHubTargetNs}" "${hubToSpokeTargetNs}" \
             "${KUBECONFIG}" "${spokeKubeconfig}"
+    fi
+
+    # Spoke-to-spoke: spoke-1 VMs → spoke-2 (single direction).
+    # Requires P2P_DEST_SPOKE_INDEX (or P2P_DEST_KUBECONFIG) to identify spoke-2.
+    # MTV management plane (MgmtOc / KUBECONFIG) remains the ACM hub regardless of topology.
+    if [[ "${cclmDirection}" == "spoke-to-spoke" ]]; then
+        RunOneMigrationDirection "spoke-to-spoke" \
+            "${_fwdSrcProv}" "${_fwdDstProv}" \
+            "${_fwdNetMap}" "${_fwdStorMap}" \
+            "${_fwdPlan}" "${_fwdMig}" \
+            "${_fwdVmPrefix}" "${_fwdVmNs}" "${hubToSpokeTargetNs}" \
+            "${spokeKubeconfig}" "${destKubeconfig}"
+    fi
+
+    # Spoke-round-trip-ss: spoke-1 VMs → spoke-2, cleanup spoke-1, then spoke-2 → spoke-1 return.
+    # Requires P2P_DEST_SPOKE_INDEX (or P2P_DEST_KUBECONFIG) to identify spoke-2.
+    if [[ "${cclmDirection}" == "spoke-round-trip-ss" ]]; then
+        # Leg 1: spoke-1 → spoke-2
+        RunOneMigrationDirection "spoke-to-spoke-fwd" \
+            "${_fwdSrcProv}" "${_fwdDstProv}" \
+            "${_fwdNetMap}" "${_fwdStorMap}" \
+            "${_fwdPlan}" "${_fwdMig}" \
+            "${_fwdVmPrefix}" "${_fwdVmNs}" "${hubToSpokeTargetNs}" \
+            "${spokeKubeconfig}" "${destKubeconfig}"
+
+        JStep "[spoke-round-trip-ss] Post-leg-1: Cleanup spoke-1 source VM resources" \
+            CleanupDestinationStaleResources \
+                "${spokeKubeconfig}" "${_fwdVmPrefix}" \
+                "${_fwdVmNs}" "${vmCount}"
+
+        # Leg 2: spoke-2 → spoke-1 return (same VMs, now in hubToSpokeTargetNs on spoke-2)
+        RunOneMigrationDirection "spoke-to-spoke-rev" \
+            "${_revSrcProv}" "${_revDstProv}" \
+            "${_revNetMap}" "${_revStorMap}" \
+            "${_revPlan}" "${_revMig}" \
+            "${_fwdVmPrefix}" "${hubToSpokeTargetNs}" "${spokeToHubTargetNs}" \
+            "${destKubeconfig}" "${spokeKubeconfig}"
     fi
 
     true
@@ -1011,8 +1152,8 @@ typeset cclmDirection="${P2P_MIGRATION_DIRECTION:-both}"
 WriteJunit
 
 if (( cclmStepRc != 0 )); then
-    DumpDiagnostics "${hubToSpokeTargetNs:-${MTV_HS_HUB_VM_NAMESPACE}}" \
-                    "${spokeToHubTargetNs:-${MTV_HS_SPOKE_VM_NAMESPACE}}"
+    DumpDiagnostics "${hubToSpokeTargetNs:-${_fwdVmNs:-${MTV_HS_HUB_VM_NAMESPACE}}}" \
+                    "${spokeToHubTargetNs:-${_revVmNs:-${MTV_HS_SPOKE_VM_NAMESPACE}}}"
     if [[ "${cclmDebugMode}" == "true" ]]; then
         : "WARNING: p2p-mtv-execute-hub-spoke-migration failed (rc=${cclmStepRc}); not failing job (debug mode)"
     else

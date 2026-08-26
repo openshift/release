@@ -117,12 +117,76 @@ ref:
   - name: MTV_HS_SPOKE_TO_HUB_TARGET_NAMESPACE
     default: ""
     documentation: Destination namespace on hub for spoke→hub migration. Empty uses MTV_HS_SPOKE_VM_NAMESPACE.
+  - name: MTV_SRC_PROVIDER
+    default: ""
+    documentation: |-
+      Topology-agnostic source provider name for the forward direction. When set, overrides
+      MTV_HS_HUB_PROVIDER. Use for spoke-spoke topologies to name the spoke-1 provider.
+  - name: MTV_DST_PROVIDER
+    default: ""
+    documentation: |-
+      Topology-agnostic destination provider name for the forward direction. When set, overrides
+      MTV_HS_SPOKE_PROVIDER. Use for spoke-spoke topologies to name the spoke-2 provider.
+  - name: MTV_FWD_NETWORK_MAP
+    default: ""
+    documentation: Forward-direction NetworkMap name. Overrides MTV_HS_HUB_TO_SPOKE_NETWORK_MAP when set.
+  - name: MTV_FWD_STORAGE_MAP
+    default: ""
+    documentation: Forward-direction StorageMap name. Overrides MTV_HS_HUB_TO_SPOKE_STORAGE_MAP when set.
+  - name: MTV_FWD_PLAN
+    default: ""
+    documentation: Forward-direction Plan name. Overrides MTV_HS_HUB_TO_SPOKE_PLAN when set.
+  - name: MTV_FWD_MIGRATION
+    default: ""
+    documentation: Forward-direction Migration name. Overrides MTV_HS_HUB_TO_SPOKE_MIGRATION when set.
+  - name: MTV_FWD_VM_PREFIX
+    default: ""
+    documentation: VM name prefix for the forward leg. Overrides MTV_HS_HUB_VM_PREFIX when set.
+  - name: MTV_FWD_VM_NAMESPACE
+    default: ""
+    documentation: Source namespace for the forward leg. Overrides MTV_HS_HUB_VM_NAMESPACE when set.
+  - name: MTV_REV_SRC_PROVIDER
+    default: ""
+    documentation: Reverse-direction source provider name. Overrides MTV_HS_SPOKE_PROVIDER when set.
+  - name: MTV_REV_DST_PROVIDER
+    default: ""
+    documentation: Reverse-direction destination provider name. Overrides MTV_HS_HUB_PROVIDER when set.
+  - name: MTV_REV_NETWORK_MAP
+    default: ""
+    documentation: Reverse-direction NetworkMap name. Overrides MTV_HS_SPOKE_TO_HUB_NETWORK_MAP when set.
+  - name: MTV_REV_STORAGE_MAP
+    default: ""
+    documentation: Reverse-direction StorageMap name. Overrides MTV_HS_SPOKE_TO_HUB_STORAGE_MAP when set.
+  - name: MTV_REV_PLAN
+    default: ""
+    documentation: Reverse-direction Plan name. Overrides MTV_HS_SPOKE_TO_HUB_PLAN when set.
+  - name: MTV_REV_MIGRATION
+    default: ""
+    documentation: Reverse-direction Migration name. Overrides MTV_HS_SPOKE_TO_HUB_MIGRATION when set.
+  - name: MTV_REV_VM_PREFIX
+    default: ""
+    documentation: VM name prefix for the reverse leg. Overrides MTV_HS_SPOKE_VM_PREFIX when set.
+  - name: MTV_REV_VM_NAMESPACE
+    default: ""
+    documentation: Source namespace for the reverse leg. Overrides MTV_HS_SPOKE_VM_NAMESPACE when set.
+  - name: P2P_DEST_KUBECONFIG
+    default: ""
+    documentation: |-
+      Explicit kubeconfig path for the destination cluster in spoke-spoke topologies.
+      When set, this kubeconfig is used as destKubeconfig for spoke-to-spoke and
+      spoke-round-trip-ss directions. Takes precedence over P2P_DEST_SPOKE_INDEX.
+  - name: P2P_DEST_SPOKE_INDEX
+    default: ""
+    documentation: |-
+      1-based SHARED_DIR kubeconfig index for the destination spoke cluster in spoke-spoke topologies.
+      Required for spoke-to-spoke and spoke-round-trip-ss directions when P2P_DEST_KUBECONFIG is not set.
+      Example: "2" resolves ${SHARED_DIR}/managed-cluster-kubeconfig-2.
   - name: MTV_HS_SPOKE_INDEX
     default: "1"
-    documentation: 1-based SHARED_DIR kubeconfig index for the spoke cluster.
+    documentation: 1-based SHARED_DIR kubeconfig index for the source spoke cluster.
   - name: MTV_HS_SPOKE_KUBECONFIG
     default: ""
-    documentation: Optional explicit kubeconfig path for the spoke cluster.
+    documentation: Optional explicit kubeconfig path for the source spoke cluster.
   - name: MTV_HS_PLAN_READY_TIMEOUT
     default: "15m"
     documentation: Timeout for Provider/Map/Plan Ready waits.
@@ -172,17 +236,21 @@ ref:
     default: "both"
     documentation: |-
       Controls which migration directions to execute:
-        both             – hub→spoke (hub-prefix VMs) then spoke→hub (spoke-prefix VMs);
-                           default backward-compatible bidirectional with separate VM sets.
-        hub-to-spoke     – only migrate hub-prefix VMs to the spoke (use before a spoke upgrade).
-        spoke-to-hub     – only migrate spoke-prefix VMs to the hub (use after a spoke upgrade).
-        spoke-round-trip – round-trip with a single VM set starting on the spoke:
-                             Leg 1: spoke-prefix VMs from spoke → hub (via spoke-to-hub maps/plan).
-                             Post-leg cleanup: stale spoke VM/DV/PVC objects removed from source spoke.
-                             Leg 2: same VMs from hub → spoke return (via hub-to-spoke maps/plan).
-                           Requires p2p-create-hub-spoke-test-vms with P2P_HS_CREATE_HUB_VMS=false
-                           (spoke VMs only; hub VMs are populated by leg 1, not pre-created).
-      The p2p-mtv-spoke-to-hub-migration wrapper ref hardcodes "spoke-to-hub" so it can be
+        both               – hub→spoke (hub-prefix VMs) then spoke→hub (spoke-prefix VMs);
+                             default backward-compatible bidirectional with separate VM sets.
+        hub-to-spoke       – only migrate hub-prefix VMs to the spoke (use before a spoke upgrade).
+        spoke-to-hub       – only migrate spoke-prefix VMs to the hub (use after a spoke upgrade).
+        spoke-round-trip   – hub↔spoke round-trip with a single VM set starting on the spoke:
+                               Leg 1: spoke-prefix VMs from spoke → hub.
+                               Post-leg-1: stale spoke VM/DV/PVC objects removed from source spoke.
+                               Leg 2: same VMs from hub → spoke return.
+                             Requires p2p-create-hub-spoke-test-vms with P2P_HS_CREATE_HUB_VMS=false.
+        spoke-to-spoke     – spoke-1 VMs → spoke-2 (single direction; requires P2P_DEST_SPOKE_INDEX
+                             or P2P_DEST_KUBECONFIG). MTV management plane is still the ACM hub.
+                             Set MTV_SRC_PROVIDER / MTV_DST_PROVIDER to name the spoke providers.
+        spoke-round-trip-ss – spoke↔spoke round-trip: spoke-1 → spoke-2, cleanup spoke-1, then
+                             spoke-2 → spoke-1 return. Requires P2P_DEST_SPOKE_INDEX or P2P_DEST_KUBECONFIG.
+      The p2p-mtv-spoke-to-hub-migration wrapper step hardcodes "spoke-to-hub" so it can be
       placed after spoke upgrade steps in a chain without conflicting with a prior
       hub-to-spoke invocation of this step.
   - name: P2P_CCLM_DEBUG_MODE
