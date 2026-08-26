@@ -176,6 +176,16 @@ if [[ -n "${OCM_FVT_EXTRA_ENVS:-}" ]]; then
   done <<< "${OCM_FVT_EXTRA_ENVS}"
 fi
 
+# Simple backplane credential export from cs-qe-credentials.
+if [[ "${OCM_FVT_BACKPLANE_CREDS:-false}" == "true" ]]; then
+  if [[ -f /usr/local/cs-qe-credentials/backplane_client_id ]]; then
+    echo "BACKPLANE_CLIENT_ID=$(cat /usr/local/cs-qe-credentials/backplane_client_id)" >> "${podman_env_file}"
+  fi
+  if [[ -f /usr/local/cs-qe-credentials/backplane_client_secret ]]; then
+    echo "BACKPLANE_CLIENT_SECRET=$(cat /usr/local/cs-qe-credentials/backplane_client_secret)" >> "${podman_env_file}"
+  fi
+fi
+
 osdfm_qe_creds_dir=/usr/local/osdfm-qe-credentials
 aao_kubeconfig_env=()
 # AAO kubeconfig: backplane (Prow) or mounted file (Tekton/Jenkins).
