@@ -252,8 +252,11 @@ function digest_mirror_entries() {
   local src
   for src in "${!digest_mirrors[@]}"; do
     printf '  - mirrors:\n    - %s\n    source: %s\n' "${digest_mirrors[$src]}" "${src}"
-    [[ "${1:-}" == "idms" ]] && printf '    mirrorSourcePolicy: NeverContactSource\n'
+    if [[ "${1:-}" == "idms" ]]; then
+      printf '    mirrorSourcePolicy: NeverContactSource\n'
+    fi
   done
+  return 0
 }
 
 if [[ "${family}" == "idms" ]]; then
