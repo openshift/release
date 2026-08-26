@@ -58,10 +58,11 @@ case "$ES_TYPE" in
         export JIRA_TOKEN JIRA_EMAIL JIRA_URL
         ORION_EXTRA_FLAGS+=" --jira-ack"
         if [[ "${JOB_TYPE}" == "periodic" ]] && [[ "${JOB_NAME}" == *"payload"* ]] && [[ -z "${PULL_NUMBER:-}" ]]; then
-            IS_PR_PAYLOAD=false
+            IS_PR_PAYLOAD=unknown
             if [[ -n "${BUILD_ID:-}" ]]; then
                 PROWJOB_URL="https://storage.googleapis.com/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}/prowjob.json"
                 if curl -fsSL --retry 3 "$PROWJOB_URL" -o /tmp/prowjob.json 2>/dev/null; then
+                    IS_PR_PAYLOAD=false
                     if jq -e '.metadata.labels["prow.k8s.io/refs.pull"]' /tmp/prowjob.json >/dev/null 2>&1; then
                         IS_PR_PAYLOAD=true
                     elif jq -e '.spec.extra_refs[]?.pulls[]?.number' /tmp/prowjob.json >/dev/null 2>&1; then
