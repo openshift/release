@@ -1,0 +1,39 @@
+ref:
+  as: rosa-hive-operator-install
+  from: rosa-aws-cli
+  grace_period: 5m
+  commands: rosa-hive-operator-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 15m0s
+  env:
+  - name: OPERATOR_NAME
+    documentation: Name of the operator being installed (e.g. certman-operator).
+  - name: BACKPLANE_CLUSTER_ID
+    documentation: OCM internal cluster ID of the hive cluster.
+  - name: BACKPLANE_ELEVATE_REASON
+    documentation: Trackable reason for elevated access (Jira key or PD URL).
+  - name: OCM_LOGIN_ENV
+    default: "production"
+    documentation: OCM environment where the hive cluster is registered.
+  - name: BACKPLANE_PROXY_URL
+    default: "http://squid.corp.redhat.com:3128"
+    documentation: Corp proxy for backplane access from the build farm.
+  - name: BACKPLANE_CLI_VERSION
+    default: "0.11.0"
+    documentation: ocm-backplane CLI version to install.
+  - name: OPERATOR_NAMESPACE
+    default: ""
+    documentation: Override operator namespace (default openshift-<OPERATOR_NAME>).
+  documentation: |-
+    Prepares a hive cluster for operator e2e testing by injecting CI
+    registry pull secrets via backplane elevation. This allows the
+    hive cluster to pull CI-built operator images from the build
+    cluster registry.
+
+    Saves an elevated kubeconfig to SHARED_DIR for downstream steps.
+
+    Requires capabilities: [intranet] and restrict_network_access: false
+    in the ci-operator config for backplane proxy access.

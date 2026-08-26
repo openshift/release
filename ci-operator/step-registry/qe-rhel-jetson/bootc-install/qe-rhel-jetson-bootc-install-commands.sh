@@ -51,7 +51,7 @@ python3 -c "
 import socket, sys
 host = '${JETSON_HOSTNAME}'
 port = 22
-print(f'Testing TCP {host}:{port} ...')
+print(f'Testing TCP target Jetson:{port} ...')
 s = socket.socket()
 s.settimeout(10)
 r = s.connect_ex((host, port))

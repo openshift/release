@@ -6,12 +6,20 @@ set -o pipefail
 
 collect_operator_logs() {
     local ns="${OPERATOR_NAMESPACE:-openshift-${OPERATOR_NAME}}"
-    if [[ -n "${ARTIFACT_DIR:-}" ]] && oc get namespace "${ns}" &>/dev/null; then
-        for deploy in $(oc get deployment -n "${ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
-            oc logs "deployment/${deploy}" -n "${ns}" --all-containers --tail=500 \
+    local kube_cmd
+    if command -v oc &>/dev/null; then
+        kube_cmd="oc"
+    elif command -v kubectl &>/dev/null; then
+        kube_cmd="kubectl"
+    else
+        return
+    fi
+    if [[ -n "${ARTIFACT_DIR:-}" ]] && ${kube_cmd} get namespace "${ns}" &>/dev/null; then
+        for deploy in $(${kube_cmd} get deployment -n "${ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
+            ${kube_cmd} logs "deployment/${deploy}" -n "${ns}" --all-containers --tail=500 \
                 > "${ARTIFACT_DIR}/${deploy}-logs.txt" 2>&1 || true
         done
-        oc get events -n "${ns}" --sort-by='.lastTimestamp' \
+        ${kube_cmd} get events -n "${ns}" --sort-by='.lastTimestamp' \
             > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
     fi
 }

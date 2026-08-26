@@ -41,6 +41,12 @@ images:
     to: kserve-router
   - dockerfile_path: kserve-module-controller.Dockerfile
     to: kserve-module-controller
+  - dockerfile_path: localmodel.Dockerfile
+    from: ubi_minimal
+    to: kserve-localmodel-controller
+  - dockerfile_path: localmodel-agent.Dockerfile
+    from: ubi_minimal
+    to: kserve-localmodelnode-agent
   - context_dir: python/
     dockerfile_path: storage-initializer.Dockerfile
     to: kserve-storage-initializer
@@ -393,8 +399,16 @@ tests:
         name: kserve-controller
       - env: LLMISVC_CONTROLLER_IMAGE
         name: llmisvc-controller
+      - env: KSERVE_AGENT_IMAGE
+        name: kserve-agent
+      - env: KSERVE_ROUTER_IMAGE
+        name: kserve-router
       - env: STORAGE_INITIALIZER_IMAGE
         name: kserve-storage-initializer
+      - env: LOCALMODEL_CONTROLLER_IMAGE
+        name: kserve-localmodel-controller
+      - env: LOCALMODELNODE_AGENT_IMAGE
+        name: kserve-localmodelnode-agent
       from: src
       resources:
         requests:

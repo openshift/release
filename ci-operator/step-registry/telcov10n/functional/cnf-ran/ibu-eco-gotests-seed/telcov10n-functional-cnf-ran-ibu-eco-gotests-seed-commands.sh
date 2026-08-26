@@ -142,9 +142,22 @@ scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   "${ARTIFACT_DIR}/junit_eco_gotests/" || true
 rm -f "${PROJECT_DIR}/temp_ssh_key"
 
-# Save junit XMLs to SHARED_DIR with junit_ prefix for ibu-report step
+# ibu-report sends polarion_* files to Report Portal (POLARION_REPORT_PATH)
+# and junit_* files to the Polarion converter (JUNIT_REPORT_PATH).
+echo "Store Polarion and junit reports for reporter step"
+for f in "${ARTIFACT_DIR}/junit_eco_gotests/"report_*.xml; do
+  if [[ -f "$f" ]]; then
+    filename=$(basename "$f")
+    echo "Copying polarion report: ${filename} -> polarion_ibu_seed_${filename}"
+    cp "$f" "${SHARED_DIR}/polarion_ibu_seed_${filename}"
+  fi
+done
 for f in "${ARTIFACT_DIR}/junit_eco_gotests/"*.xml; do
-  [[ -f "$f" ]] && cp "$f" "${SHARED_DIR}/junit_ibu_seed_$(basename "$f")"
+  if [[ -f "$f" ]]; then
+    filename=$(basename "$f")
+    echo "Copying junit report: ${filename} -> junit_ibu_seed_${filename}"
+    cp "$f" "${SHARED_DIR}/junit_ibu_seed_${filename}"
+  fi
 done
 
 echo ""

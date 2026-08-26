@@ -18,6 +18,48 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
 fi
 
+# --- Metrics instrumentation ---
+OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
+
+agentic_ci() {
+    local timeout_seconds=""
+    local extra_args=()
+    while [[ "${1:-}" == --* ]]; do
+        case "$1" in
+            --timeout) timeout_seconds="$2"; shift 2 ;;
+            *) extra_args+=("$1"); shift ;;
+        esac
+    done
+    local prompt="$1"; shift
+    local cmd=(
+        agentic-ci run
+        --backend local
+        --harness claude-code
+        --model "${CLAUDE_MODEL}"
+        --workdir "${WORKDIR}"
+        "${extra_args[@]+"${extra_args[@]}"}"
+        "${prompt}"
+        --
+        --permission-mode default
+        --allowedTools "${ALLOWED_TOOLS}"
+        --verbose
+        "$@"
+    )
+    # Isolate TMPDIR so concurrent agentic-ci runs cannot steal/delete each
+    # other's /tmp/agentic-ci-run.* OTEL files.
+    local run_tmp
+    run_tmp=$(mktemp -d /tmp/agentic-ci-wrapper.XXXXXX)
+    local rc=0
+    if [[ -n "${timeout_seconds}" ]]; then
+        TMPDIR="${run_tmp}" timeout "${timeout_seconds}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
+    else
+        TMPDIR="${run_tmp}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
+    fi
+    find "${run_tmp}" -name 'claude-otel.jsonl' -type f -exec cat {} + >> "${OTEL_LOG}" 2>/dev/null || true
+    rm -rf "${run_tmp}"
+    return $rc
+}
+
 # --- Find PR number ---
 if [[ -f "${SHARED_DIR}/pr-number" ]]; then
     PR_NUM=$(cat "${SHARED_DIR}/pr-number")
@@ -305,6 +347,8 @@ push_current_branch() {
 
 iteration=0
 idle_streak=0
+review_rounds=0
+PHASE_REVIEW_START=$(date +%s)
 PREV_FAILING='[]'
 PREV_HEAD=""
 GATE_FAILURE_THRESHOLD="${GATE_FAILURE_THRESHOLD:-3}"
@@ -314,17 +358,15 @@ push_failures=0
 
 while true; do
     iteration=$(( iteration + 1 ))
-    if [[ "${EVAL_MODE:-}" == "true" ]]; then
-        echo "Eval mode: skipping wait (iteration ${iteration})..."
-    else
-        echo "Waiting 5 minutes before checking (iteration ${iteration})..."
-        sleep 300
-    fi
+    echo "Checking (iteration ${iteration})..."
 
     current_head=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json headRefOid -q .headRefOid 2>/dev/null || echo "")
 
     echo "Running gate (${GATE_MODEL})..."
     GATE_LOG="${WORKDIR}/artifacts/gate-${iteration}.log"
+    # Direct claude, not agentic_ci: the gate needs --output-format text so we
+    # can grep COMMENT_WORK=/CI_WORK=/FAILING_CHECKS=. agentic-ci injects
+    # --include-partial-messages, which requires stream-json.
     set +e
     timeout 120 claude \
         --model "${GATE_MODEL}" \
@@ -387,37 +429,35 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
         echo "Nothing to do (idle streak: ${idle_streak}/3)."
     else
         idle_streak=0
+        review_rounds=$(( review_rounds + 1 ))
+        REVIEW_EXIT=0
 
         if [[ "${has_review}" == "true" ]]; then
             echo "Invoking worker to address review comments..."
-            timeout 1800 claude \
-                --model "${CLAUDE_MODEL}" \
-                --allowedTools "${ALLOWED_TOOLS}" \
+            agentic_ci --timeout 1800 \
+                "Address review comments on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the Review Response Process instructions in your system prompt. This is CI mode (--ci).
+
+Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login." \
                 --disallowedTools "${DISALLOWED_TOOLS[@]}" \
                 --output-format stream-json \
                 --append-system-prompt-file "${SYSTEM_PROMPT}" \
-                -p "Address review comments on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the Review Response Process instructions in your system prompt. This is CI mode (--ci).
-
-Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login." \
-                --verbose 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || true
+                || REVIEW_EXIT=$?
         fi
 
         if [[ "${has_ci}" == "true" ]]; then
             CHECKS_FILE="${WORKDIR}/artifacts/failing-checks-${iteration}.json"
             printf '%s\n' "${extracted}" > "${CHECKS_FILE}"
             echo "Invoking worker to triage CI failures..."
-            timeout 1800 claude \
-                --model "${CLAUDE_MODEL}" \
-                --allowedTools "${ALLOWED_TOOLS}" \
-                --disallowedTools "${DISALLOWED_TOOLS[@]}" \
-                --output-format stream-json \
-                --append-system-prompt-file "${CI_PROMPT}" \
-                -p "Triage CI failures on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the CI Failure Process instructions in your system prompt. This is CI mode (--ci).
+            agentic_ci --timeout 1800 \
+                "Triage CI failures on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the CI Failure Process instructions in your system prompt. This is CI mode (--ci).
 
 Read failing checks from ${CHECKS_FILE} and treat that JSON as --failing-checks.
 The git remote for ${UPSTREAM_REPO} is origin. Do not run git remote -v.
 Your GitHub login is ${BOT_LOGIN}." \
-                --verbose 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || true
+                --disallowedTools "${DISALLOWED_TOOLS[@]}" \
+                --output-format stream-json \
+                --append-system-prompt-file "${CI_PROMPT}" \
+                || REVIEW_EXIT=$?
         fi
 
         push_current_branch
@@ -432,6 +472,42 @@ Your GitHub login is ${BOT_LOGIN}." \
         echo "Minimum iterations reached and no activity for 3 consecutive checks. Exiting."
         break
     fi
+
+    echo "Waiting 5 minutes before next check..."
+    sleep 300
 done
+
+PHASE_REVIEW_DURATION=$(( $(date +%s) - PHASE_REVIEW_START ))
+
+# --- Write metrics metadata for post-step ---
+PR_URL=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json url -q '.url' 2>/dev/null || echo "")
+REVIEW_RESULT="success"
+[[ "${REVIEW_EXIT:-0}" -ne 0 ]] && REVIEW_RESULT="failed"
+
+jq -n \
+    --arg agent "trt-review-responder" \
+    --arg phase "review" \
+    --arg issue_key "${JIRA_ISSUE_KEY}" \
+    --arg result "${REVIEW_RESULT}" \
+    --arg pr_url "${PR_URL}" \
+    --arg upstream_repo "${UPSTREAM_REPO}" \
+    --argjson num_review_rounds "${review_rounds}" \
+    --argjson iteration "${iteration}" \
+    --argjson idle_streak "${idle_streak}" \
+    --argjson phase_durations "$(jq -n --argjson review "${PHASE_REVIEW_DURATION}" '{review: $review}')" \
+    '{
+      agent: $agent,
+      phase: $phase,
+      issue_key: $issue_key,
+      result: $result,
+      pr_url: $pr_url,
+      upstream_repo: $upstream_repo,
+      num_review_rounds: $num_review_rounds,
+      iteration: $iteration,
+      idle_streak: $idle_streak,
+      phase_durations: $phase_durations
+    }' > "${SHARED_DIR}/metrics-metadata-review.json"
+
+echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-review.json"
 
 echo "=== TRT Review Responder Complete ==="

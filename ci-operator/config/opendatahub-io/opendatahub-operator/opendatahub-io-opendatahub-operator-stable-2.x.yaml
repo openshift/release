@@ -30,7 +30,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -55,18 +55,24 @@ tests:
       RELEASE_VERSION: stable-2.x
     workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^\.[^/]+\.(yaml|yml)$|^(component-params-env|semgrep)\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: gcp-opendatahub
     dependencies:
       OO_BUNDLE: opendatahub-operator-bundle
     env:
-      COMPUTE_NODE_TYPE: n2-standard-8
       OO_INSTALL_NAMESPACE: openshift-operators
     pre:
-    - chain: ipi-gcp-pre
+    - ref: ipi-install-rbac
+    - ref: opendatahub-operator-e2e-cluster-preflight-health-check
     - ref: opendatahub-io-ci-rhoai-quay-pull-secret
     - ref: optional-operators-operator-sdk
     test:
@@ -80,7 +86,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: optional-operators-ci-operator-sdk-gcp
+    workflow: optional-operators-ci-operator-sdk-generic-claim
 zz_generated_metadata:
   branch: stable-2.x
   org: opendatahub-io

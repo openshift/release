@@ -10,6 +10,28 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
 }
 
+# Retry wrapper for oc commands to handle transient API/DNS failures.
+# Retries up to 5 times with a 10-second sleep between attempts.
+# Outputs command stdout on success; logs retries to stderr.
+# Usage: oc_with_retry get nodes --no-headers ...
+function oc_with_retry() {
+    local max_retries=5
+    local retry_wait=10
+    local attempt=1
+    local output=""
+    while [[ $attempt -le $max_retries ]]; do
+        if output=$(oc "$@"); then
+            echo "$output"
+            return 0
+        fi
+        echo "oc command failed (attempt $attempt/$max_retries), retrying in ${retry_wait}s..." >&2
+        sleep $retry_wait
+        attempt=$((attempt + 1))
+    done
+    echo "oc command failed after $max_retries attempts: oc $*" >&2
+    return 1
+}
+
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
 function record_cluster() {
@@ -49,15 +71,15 @@ function listNodeDetails() {
     # Get current machine pools and status of nodes
     log "$(date) - List infra nodes"
     echo "oc get nodes --no-headers -l node-role.kubernetes.io/infra | cat -n"
-    oc get nodes --no-headers -l node-role.kubernetes.io/infra | cat -n
+    oc_with_retry get nodes --no-headers -l node-role.kubernetes.io/infra | cat -n
     log "$(date) - List all worker nodes, excluding infra"
     echo "oc get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!= | cat -n"
-    oc get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!= | cat -n
+    oc_with_retry get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!= | cat -n
 
     # Get details of worker nodes not in Ready state
     log "$(date) - Worker nodes not in Ready state, if any"
-    for node in $(oc get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!= --output jsonpath="{.items[?(@.status.conditions[-1].type!='Ready')].metadata.name}"); do
-      oc describe node "$node"
+    for node in $(oc_with_retry get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!= --output jsonpath="{.items[?(@.status.conditions[-1].type!='Ready')].metadata.name}"); do
+      oc_with_retry describe node "$node"
     done
     log "$(date) - Finished printing details of all infra and worker nodes."
 }
@@ -68,15 +90,15 @@ function listMachineAndNodeDetails() {
     # Get current machinesets and machines
     log "$(date) - List of machinesets"
     echo "oc get machinesets -n openshift-machine-api"
-    oc get machinesets -n openshift-machine-api
+    oc_with_retry get machinesets -n openshift-machine-api
     log "$(date) - List of machines"
     echo "oc get machines -n openshift-machine-api | cat -n"
-    oc get machines -n openshift-machine-api | cat -n
+    oc_with_retry get machines -n openshift-machine-api | cat -n
 
     # Get details of worker machines not in Running state
     log "$(date) - Worker machines not in Running state, if any"
-    for machine in $(oc get machine  -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-type=worker,machine.openshift.io/cluster-api-machine-type!=infra  --output jsonpath="{.items[?(@.status.phase!='Running')].metadata.name}"); do
-      oc describe machine "$machine" -n openshift-machine-api
+    for machine in $(oc_with_retry get machine  -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-type=worker,machine.openshift.io/cluster-api-machine-type!=infra  --output jsonpath="{.items[?(@.status.phase!='Running')].metadata.name}"); do
+      oc_with_retry describe machine "$machine" -n openshift-machine-api
     done
     echo
 
@@ -88,7 +110,7 @@ function listMachineAndNodeDetails() {
 function listMachineConfigPoolDetails() {
     log "$(date) - List machine config pools"
     echo "oc get mcp"
-    oc get mcp
+    oc_with_retry get mcp
 }
 
 # List details of machinesets, machines and nodes depending on Classic Rosa or HCP cluster
@@ -257,7 +279,7 @@ waitForReady "$desired_compute_count" || ret=$?
 
 if [[ "$ret" == 0 ]]; then
     # Get count of worker only nodes in Ready state
-    node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+    node_count="$(oc_with_retry get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
     echo "Count of worker only nodes in Ready state: $node_count"
 
     # Check worker node count matches requested replica count
