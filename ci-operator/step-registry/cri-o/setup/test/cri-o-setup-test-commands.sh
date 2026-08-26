@@ -25,6 +25,11 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+if [ "${SAVE_IMAGE}" != "true" ]; then
+    echo "Ansible playbook succeeded, skipping image creation (SAVE_IMAGE=${SAVE_IMAGE})"
+    exit 0
+fi
+
 echo "Ansible playbook succeeded, creating base image..."
 currentDate=$(date +'%s')
 gcloud compute instances stop ${instance_name} --zone=${ZONE}
