@@ -1,6 +1,5 @@
 #!/bin/bash
-set -eux -o pipefail
-shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
 # ACS OPP Readiness Gate
@@ -35,7 +34,7 @@ function WaitFor () {
             return 0
         fi
         elapsed=$((elapsed + pollInterval))
-        if [[ ${elapsed} -ge ${timeout} ]]; then
+        if [[ "${elapsed}" -ge "${timeout}" ]]; then
             echo "[readiness] TIMEOUT after ${timeout}s waiting for: ${description}"
             return 1
         fi
@@ -46,7 +45,8 @@ function WaitFor () {
 }
 
 function JsonLength () {
-    python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('$1',[])))"
+    python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('$1',[])))" || return 1
+    true
 }
 
 # ---------------------------------------------------------------------------
@@ -55,13 +55,17 @@ function JsonLength () {
 function DiscoverCentralNs () {
     centralNs="$(oc get centrals.platform.stackrox.io --all-namespaces \
         -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
-        && [[ -n "${centralNs}" ]]
+        || return 1
+    [[ -n "${centralNs}" ]] || return 1
+    true
 }
 
 function DiscoverScNs () {
     scNs="$(oc get securedclusters.platform.stackrox.io --all-namespaces \
         -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
-        && [[ -n "${scNs}" ]]
+        || return 1
+    [[ -n "${scNs}" ]] || return 1
+    true
 }
 
 typeset centralNs=""
@@ -79,14 +83,13 @@ echo "[readiness] SecuredCluster namespace: ${scNs}"
 typeset centralUrl=""
 
 function CheckCentralRoute () {
-    oc get route central -n "${centralNs}" -o jsonpath='{.spec.host}' 2>/dev/null
+    centralUrl="$(oc get route central -n "${centralNs}" \
+        -o jsonpath='{.spec.host}' 2>/dev/null)" || return 1
+    [[ -n "${centralUrl}" ]] || return 1
+    true
 }
 
 WaitFor "Central route" CheckCentralRoute
-
-set +x
-centralUrl="$(oc get route central -n "${centralNs}" -o jsonpath='{.spec.host}')"
-set -x
 echo "[readiness] Central route discovered"
 
 # ---------------------------------------------------------------------------
@@ -94,10 +97,8 @@ echo "[readiness] Central route discovered"
 # ---------------------------------------------------------------------------
 typeset roxAdminPassword=""
 echo "[readiness] Extracting roxAdminPassword..."
-set +x
 roxAdminPassword="$(oc get secret -n "${centralNs}" central-htpasswd \
     -o jsonpath='{.data.password}' | base64 -d)"
-set -x
 
 if [[ -z "${roxAdminPassword}" ]]; then
     echo "[readiness] FATAL: could not extract roxAdminPassword"
@@ -109,13 +110,12 @@ echo "[readiness] roxAdminPassword extracted successfully"
 # Check 2: Central API health (authenticated v1/metadata)
 # ---------------------------------------------------------------------------
 function CheckCentralApi () {
-    set +x
     typeset httpCode=""
     httpCode="$(curl -sk -o /dev/null -w '%{http_code}' \
         -u "admin:${roxAdminPassword}" \
-        "https://${centralUrl}/v1/metadata" --max-time 10)" || { set -x; return 1; }
-    set -x
-    [[ "${httpCode}" == "200" ]]
+        "https://${centralUrl}/v1/metadata" --max-time 10)" || return 1
+    [[ "${httpCode}" == "200" ]] || return 1
+    true
 }
 
 WaitFor "Central API health (v1/metadata)" CheckCentralApi
@@ -124,13 +124,12 @@ WaitFor "Central API health (v1/metadata)" CheckCentralApi
 # Check 3: At least 1 secured cluster connected
 # ---------------------------------------------------------------------------
 function CheckClustersConnected () {
-    set +x
     typeset clusterCount=""
     clusterCount="$(curl -sk -u "admin:${roxAdminPassword}" \
         "https://${centralUrl}/v1/clusters" --max-time 10 \
-        | JsonLength clusters)" || { set -x; return 1; }
-    set -x
-    [[ "${clusterCount}" -ge 1 ]]
+        | JsonLength clusters)" || return 1
+    [[ "${clusterCount}" -ge 1 ]] || return 1
+    true
 }
 
 WaitFor "secured cluster connected (v1/clusters)" CheckClustersConnected
@@ -175,7 +174,8 @@ for pod in d.get('items',[]):
                 echo "${line%% *}:NotReady"
             fi
         done)"
-    [[ -z "${notReady}" ]]
+    [[ -z "${notReady}" ]] || return 1
+    true
 }
 
 WaitFor "sensor pods Running in ${scNs}" CheckSensorPods
@@ -184,26 +184,24 @@ WaitFor "sensor pods Running in ${scNs}" CheckSensorPods
 # Check 5: Default policies loaded (count > 80)
 # ---------------------------------------------------------------------------
 function CheckPoliciesLoaded () {
-    set +x
     typeset policyCount=""
     policyCount="$(curl -sk -u "admin:${roxAdminPassword}" \
         "https://${centralUrl}/v1/policies?query=" --max-time 10 \
-        | JsonLength policies)" || { set -x; return 1; }
-    set -x
+        | JsonLength policies)" || return 1
     echo "[readiness]   policy count: ${policyCount}"
-    [[ "${policyCount}" -gt 80 ]]
+    [[ "${policyCount}" -gt 80 ]] || return 1
+    true
 }
 
 WaitFor "default policies loaded (>80)" CheckPoliciesLoaded
 
 echo "[readiness] Writing connection details to SHARED_DIR..."
 
-set +x
 echo "${roxAdminPassword}" > "${SHARED_DIR}/ROX_ADMIN_PASSWORD"
 echo "${centralUrl}"       > "${SHARED_DIR}/CENTRAL_URL"
-set -x
 
 echo "${centralNs}"  > "${SHARED_DIR}/CENTRAL_NS"
 echo "${scNs}"       > "${SHARED_DIR}/SC_NS"
 
 echo "[readiness] All checks passed. ACS is ready for SMOKE tests."
+true
