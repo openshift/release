@@ -45,12 +45,17 @@ else
   echo "No mailpit_api in SHARED_DIR; email-dependent specs may skip or fail"
 fi
 
-PLAYWRIGHT_WORKDIR="/go/src/github.com/quay/quay/web"
-PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_GIT_REPO:-https://github.com/quay/quay.git}"
-
-# Gangway / rehearsal override wins over PLAYWRIGHT_GIT_BRANCH.
-if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_PLAYWRIGHT_GIT_BRANCH:-}" ]]; then
-  PLAYWRIGHT_GIT_BRANCH="${MULTISTAGE_PARAM_OVERRIDE_PLAYWRIGHT_GIT_BRANCH}"
+# The Playwright suite is cloned using PLAYWRIGHT_GIT_REPO and PLAYWRIGHT_GIT_BRANCH,
+# both supplied by the ci-operator config (steps.env). Neither has a default on
+# purpose: the tests must be deliberately version-matched to the deployed Quay
+# image's build ref, so we fail fast rather than silently run a mismatched suite.
+# PLAYWRIGHT_GIT_BRANCH may be a branch, tag, or commit SHA (clone handles each).
+PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_GIT_REPO:-}"
+PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_GIT_BRANCH:-}"
+if [[ -z "${PLAYWRIGHT_GIT_REPO}" || -z "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
+  echo "ERROR: PLAYWRIGHT_GIT_REPO and PLAYWRIGHT_GIT_BRANCH must both be set" >&2
+  echo "       (no defaults: the test suite must be pinned to the deployed image's build ref)" >&2
+  exit 1
 fi
 
 clone_playwright_sources() {
@@ -98,44 +103,34 @@ clone_playwright_sources() {
   rm -f "${archive}"
 }
 
-# Default: use tests and browsers baked into quay-playwright-runner (same git
-# ref as the image build). Clone only when PLAYWRIGHT_GIT_BRANCH is set.
-if [[ -n "${PLAYWRIGHT_GIT_BRANCH:-}" ]]; then
-  CLONE_DIR="/tmp/quay-playwright-src"
-  echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (branch ${PLAYWRIGHT_GIT_BRANCH})"
-  clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_BRANCH}" "${CLONE_DIR}"
-  PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
-  if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
-    echo "ERROR: cloned sources have no web/ directory at ${PLAYWRIGHT_WORKDIR}" >&2
-    exit 1
-  fi
+CLONE_DIR="/tmp/quay-playwright-src"
+echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (ref ${PLAYWRIGHT_GIT_BRANCH})"
+clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_BRANCH}" "${CLONE_DIR}"
+PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
+if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
+  echo "ERROR: cloned sources have no web/ directory at ${PLAYWRIGHT_WORKDIR}" >&2
+  exit 1
+fi
 
-  echo "Installing npm dependencies for Playwright branch ${PLAYWRIGHT_GIT_BRANCH}..."
-  pushd "${PLAYWRIGHT_WORKDIR}"
-  npm ci
+echo "Installing npm dependencies for Playwright ref ${PLAYWRIGHT_GIT_BRANCH}..."
+pushd "${PLAYWRIGHT_WORKDIR}"
+npm ci
 
-  # Image browsers live in /opt/playwright as root. Test pods cannot write there.
-  IMAGE_BROWSERS=/opt/playwright
-  if [[ -d "${IMAGE_BROWSERS}" && -w "${IMAGE_BROWSERS}" ]]; then
-    export PLAYWRIGHT_BROWSERS_PATH="${IMAGE_BROWSERS}"
-  else
-    export PLAYWRIGHT_BROWSERS_PATH=/tmp/playwright-browsers
-    mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
-    if [[ -d "${IMAGE_BROWSERS}" ]]; then
-      echo "Seeding writable browser cache from ${IMAGE_BROWSERS}..."
-      cp -a "${IMAGE_BROWSERS}/." "${PLAYWRIGHT_BROWSERS_PATH}/" || true
-    fi
-  fi
-  echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH}"
-  npx playwright install chromium
-  popd
+# Image browsers live in /opt/playwright as root. Test pods cannot write there.
+IMAGE_BROWSERS=/opt/playwright
+if [[ -d "${IMAGE_BROWSERS}" && -w "${IMAGE_BROWSERS}" ]]; then
+  export PLAYWRIGHT_BROWSERS_PATH="${IMAGE_BROWSERS}"
 else
-  echo "Using Playwright tests from image at ${PLAYWRIGHT_WORKDIR} (PLAYWRIGHT_GIT_BRANCH unset)"
-  if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
-    echo "ERROR: image is missing ${PLAYWRIGHT_WORKDIR}" >&2
-    exit 1
+  export PLAYWRIGHT_BROWSERS_PATH=/tmp/playwright-browsers
+  mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
+  if [[ -d "${IMAGE_BROWSERS}" ]]; then
+    echo "Seeding writable browser cache from ${IMAGE_BROWSERS}..."
+    cp -a "${IMAGE_BROWSERS}/." "${PLAYWRIGHT_BROWSERS_PATH}/" || true
   fi
 fi
+echo "PLAYWRIGHT_BROWSERS_PATH=${PLAYWRIGHT_BROWSERS_PATH}"
+npx playwright install chromium
+popd
 
 # Capture virtual-builder diagnostics from the TARGET cluster. Playwright build
 # specs only see the API build object (which stays "build-scheduled" with no
@@ -234,56 +229,20 @@ else
   echo "WARNING: Quay route did not reach stable DNS+HTTPS readiness in time; proceeding anyway" >&2
 fi
 
-# Tests excluded from the run. Beyond unsupported auth backends (OIDC/LDAP), this
-# quarantines tests tracking known product bugs and UI/version gaps that no Quay
-# config can fix. See E2E_FAILURE_REPORT.md in the repo root for the rationale.
-#
-# NOTE: the primary defense against version skew is version-matching the tests to
-# the deployed image's build commit via PLAYWRIGHT_GIT_BRANCH (set in the config to
-# the same source ref as the pinned catalog). When that clone succeeds, the skew
-# entries below simply do not exist in the checked-out suite and these grep-invert
-# fragments no-op. They remain only as a safety net for when the run falls back to
-# the image-baked tests (PLAYWRIGHT_GIT_BRANCH unset / clone failed).
-BASE_GREP_INVERT='@auth:OIDC|@auth:LDAP'
-
-# JS-regex fragments matched against the full Playwright test title.
-QUARANTINE=(
-  # Cosign .sig cascade on delete/retarget & autoprune — version skew: the cascade
-  # backend (data/model/oci/tag.py) and these specs both landed on redhat-3.18 in
-  # PROJQUAY-12551 (2026-08-07), AFTER the deployed catalog build (2026-07-30), so
-  # the deployed image lacks the feature. Version-matching the tests removes these;
-  # the fragments are a fallback for baked-HEAD runs. PROJQUAY-11682.
-  'deleting subject image tag cascades to cosign \.sig tag'
-  'deleting one alias keeps cosign \.sig while another alias remains'
-  'retargeting last alias cascades cosign \.sig for displaced digest'
-  'tag-count pruning excludes cosign \.sig tags and cascades on prune'
-  'creation-date pruning does not age-prune cosign \.sig tags'
-  # Quota-notification specs (org + user). NOT version skew: these specs and the
-  # quota/notif UI are byte-identical at the pinned test ref and at HEAD, so
-  # version-matching does not change them. They are brittle in the quay suite itself
-  # at this ref (confirmed in the 2091876334434258944 artifacts): non-exact text
-  # locators like getByText('Quota Warning') match two cells (the notification title
-  # "Slack Quota Warning" AND the event column) -> strict-mode violation, plus
-  # #entity-search-input renders a <div> not an <input> (locator.fill fails), plus
-  # duplicate rows left by imperfect test cleanup. All deterministic, no Quay config
-  # fixes them. Track upstream; drop fragments if/when the specs are hardened.
-  'create and delete namespace notification logs render descriptions'
-  'deleting quota removes all namespace notification configs'
-  'email notification fires on quota threshold crossing'
-  'can create a webhook notification, verify in list, test it, and delete it'
-  'can create an email notification'
-  'can create a Slack notification'
-  'can create a Quay notification with team recipient'
-  'Quay notification — submit disabled without recipient'
-  'API-created notification appears in UI list'
-  # Repositories list domainRoute link — duplicated /repository/ path. PROJQUAY-11202.
-  'tag link stays correct from /repository/\.\.\./testrepository\.\.\. path'
-)
-
-GREP_INVERT_DEFAULT="${BASE_GREP_INVERT}"
-for q in "${QUARANTINE[@]}"; do GREP_INVERT_DEFAULT="${GREP_INVERT_DEFAULT}|${q}"; done
-PLAYWRIGHT_GREP_INVERT="${PLAYWRIGHT_GREP_INVERT:-${GREP_INVERT_DEFAULT}}"
-echo "Excluding tests matching: ${PLAYWRIGHT_GREP_INVERT}"
+# Tests excluded from the run come entirely from PLAYWRIGHT_GREP_INVERT, set in the
+# ci-operator config (steps.env) for this test. Keeping the exclusion list in the
+# config rather than hardcoding it here lets each variant tune what it quarantines
+# without editing this shared step. The value is a JS regex matched against the full
+# Playwright test title; see E2E_FAILURE_REPORT.md in the repo root for the rationale
+# behind the current exclusions. When unset, the full suite runs.
+PLAYWRIGHT_GREP_INVERT="${PLAYWRIGHT_GREP_INVERT:-}"
+GREP_INVERT_ARGS=()
+if [[ -n "${PLAYWRIGHT_GREP_INVERT}" ]]; then
+  GREP_INVERT_ARGS=(--grep-invert "${PLAYWRIGHT_GREP_INVERT}")
+  echo "Excluding tests matching: ${PLAYWRIGHT_GREP_INVERT}"
+else
+  echo "No PLAYWRIGHT_GREP_INVERT set; running the full suite."
+fi
 
 # Playwright parallelism. The suite's playwright.config.ts uses `workers: CI ? 4`.
 # The @container tests each push a REAL image over the self-signed Quay route, and
@@ -295,10 +254,10 @@ echo "Excluding tests matching: ${PLAYWRIGHT_GREP_INVERT}"
 # --workers flag overrides the config value; override via PLAYWRIGHT_WORKERS if needed.
 PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-2}"
 
-echo "Running Playwright smoke tests from ${PLAYWRIGHT_WORKDIR} (branch ${PLAYWRIGHT_GIT_BRANCH:-image}, workers ${PLAYWRIGHT_WORKERS})..."
+echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_BRANCH}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
 npx playwright test \
-  --grep-invert "${PLAYWRIGHT_GREP_INVERT}" \
+  "${GREP_INVERT_ARGS[@]}" \
   --workers "${PLAYWRIGHT_WORKERS}" \
   --reporter=junit,html \
   2>&1 | tee "${ARTIFACT_DIR}/playwright-output.log"
