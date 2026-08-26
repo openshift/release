@@ -117,7 +117,6 @@ git submodule update --init --recursive
 
 script_path="${repo_root}/${SCRIPT_DIR}/${SCRIPT_NAME}"
 libs_path="${repo_root}/libs/__sources__.bash"
-manifest_dir="${repo_root}/${SCRIPT_DIR}/csi"
 
 echo "=== Cloned repository layout ==="
 find "${repo_root}" -maxdepth 3 \( -type f -o -type d \) | sort | head -200 || true
@@ -134,11 +133,54 @@ if [[ ! -f "${libs_path}" ]]; then
   exit 1
 fi
 
-if [[ ! -d "${manifest_dir}" ]]; then
-  echo "ERROR: ${manifest_dir} not found after clone"
-  echo "The cloned branch (${GIT_BRANCH}) is missing CSI manifests under ${SCRIPT_DIR}/csi/."
+# ocp-tools keeps CSI manifests at repo-root csi/, while csi-provisioner.sh
+# expects them beside the script under bash/csi/.
+manifest_dir="${CSI_PROVISIONER_MANIFEST_DIR:-}"
+if [[ -z "${manifest_dir}" ]]; then
+  if [[ -d "${repo_root}/csi" ]]; then
+    manifest_dir="${repo_root}/csi"
+  elif [[ -d "${repo_root}/${SCRIPT_DIR}/csi" ]]; then
+    manifest_dir="${repo_root}/${SCRIPT_DIR}/csi"
+  fi
+fi
+
+if [[ -z "${manifest_dir}" || ! -d "${manifest_dir}" ]]; then
+  echo "ERROR: CSI manifest directory not found"
+  echo "Checked: ${repo_root}/csi and ${repo_root}/${SCRIPT_DIR}/csi"
   exit 1
 fi
+
+script_csi_dir="${repo_root}/${SCRIPT_DIR}/csi"
+if [[ "${manifest_dir}" != "${script_csi_dir}" && ! -e "${script_csi_dir}" ]]; then
+  echo "Linking ${script_csi_dir} -> ${manifest_dir} for csi-provisioner.sh"
+  ln -sfn "${manifest_dir}" "${script_csi_dir}"
+fi
+
+required_manifests=(
+  namespace.yaml
+  external-provisioner-rbac.yaml
+  csi-driver-hostpath-provisioner.yaml
+  kubevirt-hostpath-security-constraints-csi.yaml
+  csi-sc.yaml
+  csi-driver/csi-kubevirt-hostpath-provisioner.yaml
+)
+
+echo "=== Pre-flight checks ==="
+echo "Script: ${script_path}"
+echo "Libs:   ${libs_path}"
+echo "CSI manifests: ${manifest_dir}"
+missing_manifests=()
+for manifest in "${required_manifests[@]}"; do
+  if [[ ! -f "${manifest_dir}/${manifest}" ]]; then
+    missing_manifests+=("${manifest}")
+  fi
+done
+if [[ ${#missing_manifests[@]} -gt 0 ]]; then
+  echo "ERROR: missing CSI manifest files under ${manifest_dir}:"
+  printf '  - %s\n' "${missing_manifests[@]}"
+  exit 1
+fi
+echo "All required CSI manifest files are present."
 
 chmod +x "${script_path}"
 echo "Running ${script_path} from repo root ${repo_root}..."
