@@ -20,7 +20,8 @@ Before notifying Slack or marking an issue processed, the workflow verifies that
 PR is open, belongs to the expected fork branch, targets the upstream default branch, and
 references the Jira issue.
 Claude installs the bundled `ai-helpers` marketplace from `/opt/ai-helpers` so core plugin
-installation does not require a second network clone.
+installation does not require a second network clone. Codex installs its required plugins from
+that local marketplace and does not require the separate Claude-only `prodsec-skills` install.
 
 ## Quick Start
 

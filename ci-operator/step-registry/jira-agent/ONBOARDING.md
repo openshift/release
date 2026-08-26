@@ -23,7 +23,8 @@ The workflow validates the created PR against the expected fork branch and Jira 
 sending Slack notification or adding the `agent-processed` label.
 For Claude Code runs, the core `ai-helpers` marketplace is installed from the helper image's
 local `/opt/ai-helpers` copy; the separate `prodsec-skills` marketplace still requires its
-configured source.
+configured source. Codex installs its required plugins from `/opt/ai-helpers` without that
+separate marketplace dependency.
 
 Your team creates a **thin workflow YAML** that sets team-specific env vars and references the generic step registry components. No bash scripting required.
 

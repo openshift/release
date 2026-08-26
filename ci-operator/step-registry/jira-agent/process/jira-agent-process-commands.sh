@@ -119,7 +119,7 @@ case "$AGENT_HARNESS" in
       exit 1
     fi
     codex plugin marketplace add /opt/ai-helpers
-    codex plugin marketplace add RedHatProductSecurity/prodsec-skills
+    # Codex installs these local sources directly and does not resolve Claude plugin dependencies.
     codex plugin add openshift-developer@ai-helpers
     codex plugin add prow-agent@ai-helpers
     ;;
