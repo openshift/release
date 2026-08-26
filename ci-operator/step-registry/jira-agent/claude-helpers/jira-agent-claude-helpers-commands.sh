@@ -441,8 +441,52 @@ build_pr_prompt() {
 # Outputs: prints the URL to stdout (empty string if not found)
 extract_pr_url() {
   local issue_key=$1
-  grep -o "https://github.com/${JIRA_AGENT_UPSTREAM_REPO}/pull/[0-9]*" \
-    "/tmp/claude-${issue_key}-pr.json" 2>/dev/null | head -1 || echo ""
+  if [ "$AGENT_HARNESS" = "codex" ]; then
+    jq -r 'select(.type == "item.completed" and .item.type == "agent_message") | .item.text // empty' \
+      "/tmp/claude-${issue_key}-pr.json" 2>/dev/null \
+      | grep -o "https://github.com/${JIRA_AGENT_UPSTREAM_REPO}/pull/[0-9]*" \
+      | tail -1 || true
+  else
+    grep -o "https://github.com/${JIRA_AGENT_UPSTREAM_REPO}/pull/[0-9]*" \
+      "/tmp/claude-${issue_key}-pr.json" 2>/dev/null | tail -1 || true
+  fi
+}
+
+# Validate that the extracted URL is the open PR created for this issue.
+# Arguments: <issue_key> <pr_url>
+# Requires: JIRA_AGENT_UPSTREAM_REPO, JIRA_AGENT_FORK_REPO, BRANCH_NAME, DEFAULT_BRANCH
+validate_pr_url() {
+  local issue_key=$1 pr_url=$2
+  local pr_num pr_data
+  pr_num="${pr_url##*/}"
+
+  if [[ ! "$pr_num" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: Invalid PR URL for ${issue_key}"
+    return 1
+  fi
+
+  if ! pr_data=$(gh api "repos/${JIRA_AGENT_UPSTREAM_REPO}/pulls/${pr_num}" 2>/dev/null); then
+    echo "ERROR: Unable to inspect PR ${pr_url} for ${issue_key}"
+    return 1
+  fi
+
+  if ! jq -e \
+    --arg issue_key "$issue_key" \
+    --arg expected_branch "$BRANCH_NAME" \
+    --arg expected_fork "$JIRA_AGENT_FORK_REPO" \
+    --arg expected_upstream "$JIRA_AGENT_UPSTREAM_REPO" \
+    --arg expected_base "$DEFAULT_BRANCH" \
+    '(
+      .state == "open"
+      and .head.ref == $expected_branch
+      and .head.repo.full_name == $expected_fork
+      and .base.ref == $expected_base
+      and .base.repo.full_name == $expected_upstream
+      and (((.title // "") + "\n" + (.body // "")) | contains($issue_key))
+    )' <<< "$pr_data" >/dev/null; then
+    echo "ERROR: PR ${pr_url} does not match the open ${issue_key} branch"
+    return 1
+  fi
 }
 
 # ── Pipeline ──────────────────────────────────────────────────────────────────
@@ -532,16 +576,18 @@ ${SECURITY_PROMPT} ${SUBAGENT_PROMPT}"
 
   if [ $PHASE_EXIT_CODE -eq 0 ]; then
     pr_url=$(extract_pr_url "$issue_key")
-    if [ -n "$pr_url" ]; then
+    if [ -n "$pr_url" ] && validate_pr_url "$issue_key" "$pr_url"; then
       echo "PR created: $pr_url"
       generate_autodl "$issue_key" "pr-creation" "success" "$pr_url" "$PHASE_SESSION_ID"
     else
-      echo "Phase 4 completed but no PR URL found in output"
+      echo "ERROR: Phase 4 completed without a valid open PR for $issue_key"
+      pr_url=""
+      PHASE_EXIT_CODE=1
     fi
   fi
 
-  # Always label after processing to prevent duplicate runs on next periodic
-  postprocess_jira_issue "$issue_key" "true"
+  # Only mark the issue processed after a successful pipeline or a no-change result.
+  postprocess_jira_issue "$issue_key" "$([ $PHASE_EXIT_CODE -eq 0 ] && echo true || echo false)"
 
   # Post-PR: append report link, notify Slack
   if [ -n "$pr_url" ]; then

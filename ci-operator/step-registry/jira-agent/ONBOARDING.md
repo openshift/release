@@ -19,6 +19,8 @@ Codex reports include token counts and wall-clock duration. Because Codex phase 
 include pricing, Codex cost is shown as unavailable; Claude phases retain native OTEL cost metrics.
 The default `CODEX_HOME` is `/workspace/jira-agent-codex-home`, a writable location that allows
 Codex to create its per-invocation helper aliases when Prow uses a random UID.
+The workflow validates the created PR against the expected fork branch and Jira issue before
+sending Slack notification or adding the `agent-processed` label.
 
 Your team creates a **thin workflow YAML** that sets team-specific env vars and references the generic step registry components. No bash scripting required.
 

@@ -16,6 +16,9 @@ not provide pricing in the phase stream, so reports mark cost as unavailable rat
 reporting a false zero; Claude phases continue to use native OTEL cost metrics.
 The workflow uses a writable `/workspace`-based `CODEX_HOME` by default so Codex can create
 its per-invocation helper aliases under Prow's random runtime UID.
+Before notifying Slack or marking an issue processed, the workflow verifies that the reported
+PR is open, belongs to the expected fork branch, targets the upstream default branch, and
+references the Jira issue.
 
 ## Quick Start
 
