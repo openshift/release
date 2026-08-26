@@ -6,6 +6,8 @@ set -euo pipefail
 #
 # Bastion-proven s390x workarounds applied in-Job before make:
 #   - Velocity MockServer echo (header-mirroring; Kuadrant/testsuite#952)
+#   - Explicit GET /get → 200 (Phase 1 egress; MockServer path /.* is not regex)
+#   - Egress OpenShift Route name egress-bk (avoid clash with session backend)
 #   - Authorino/OIDC dataplane-ready soft-wait patch
 #   - protobuf==6.32.1 pin (broken s390x upb ≥6.33.0)
 #   - CFSSL ensure (baked in Dockerfile.s390x; fallback download if missing)
@@ -166,6 +168,17 @@ cat > "${ECHO_EXPECTATION_FILE}" <<'EOF'
     "httpResponse": {
       "statusCode": 404
     }
+  },
+  {
+    "id": "get",
+    "httpRequest": {
+      "path": "/get"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "body": "OK"
+    },
+    "priority": 100
   },
   {
     "id": "echo",
@@ -615,6 +628,22 @@ else
 fi
 grep -n AUTH_DATAPLANE_READY_TIMEOUT testsuite/utils/constants.py || true
 grep -n wait_for_auth_dataplane testsuite/tests/singlecluster/authorino/conftest.py || true
+
+# Phase 1 egress: session backend already owns OpenShift Route blame(\"backend\")
+# without TLS. Reusing that name for the egress edge-TLS Route leaves it HTTP-only
+# after create->apply on AlreadyExists. Baked image still has blame(\"backend\").
+echo '=== Egress route name blame(backend) -> blame(egress-bk) ==='
+python3 - <<'PY' || true
+from pathlib import Path
+p = Path('testsuite/tests/singlecluster/egress/conftest.py')
+if p.exists():
+    t = p.read_text()
+    if 'blame(\"egress-bk\")' not in t and 'blame(\"backend\")' in t:
+        p.write_text(t.replace('blame(\"backend\")', 'blame(\"egress-bk\")', 1))
+        print('patched egress-bk')
+    else:
+        print('egress-bk already present or no backend name')
+PY
 
 # CFSSL: Dockerfile.s390x installs /usr/bin/cfssl; re-install if the baked image is older.
 echo '=== Ensuring cfssl is on PATH ==='
