@@ -238,9 +238,7 @@ spec:
           containerPort: 662
           protocol: UDP
         securityContext:
-          allowPrivilegeEscalation: false
           capabilities:
-            drop: ["ALL"]
             add:
             - DAC_READ_SEARCH
             - SYS_RESOURCE
