@@ -29,6 +29,22 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-whereabouts-reconciler
+  optional: true
+  run_if_changed: ^(Dockerfile\.openshift|entrypoint\.sh|hack/verify-whereabouts-reconciler\.sh)$
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      cli: latest
+      commands: bash hack/verify-whereabouts-reconciler.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: security
   optional: true
   steps:
