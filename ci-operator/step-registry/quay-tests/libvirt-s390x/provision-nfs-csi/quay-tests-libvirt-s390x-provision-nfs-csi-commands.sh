@@ -82,18 +82,38 @@ EOF
 fi
 chmod 0600 "${tmp_ssh_key}"
 
+export GIT_SSH_COMMAND="ssh -i ${tmp_ssh_key} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
+
+configure_git_ssh_urls() {
+  local git_url="$1"
+  local host
+
+  host="$(echo "${git_url}" | sed -nE 's#^(git@|https?://)([^/:]+).*#\2#p')"
+  if [[ -n "${host}" ]]; then
+    git config --global --add "url.git@${host}:".insteadOf "https://${host}/"
+    git config --global --add "url.git@${host}:".insteadOf "http://${host}/"
+  fi
+  # Submodule URLs in ocp-tools often use this host even when the parent uses SSH.
+  git config --global --add url.git@gitlab.cee.redhat.com:.insteadOf https://gitlab.cee.redhat.com/
+  git config --global --add url.git@github.ibm.com:.insteadOf https://github.ibm.com/
+}
+
 workdir="${ARTIFACT_DIR:-/tmp}/csi-provisioner-clone"
 rm -rf "${workdir}"
 mkdir -p "${workdir}"
 cd "${workdir}"
 
+configure_git_ssh_urls "${GIT_URL}"
+
 echo "Cloning ${GIT_URL} (branch ${GIT_BRANCH})..."
-GIT_SSH_COMMAND="ssh -i ${tmp_ssh_key} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
-  git clone --recurse-submodules -b "${GIT_BRANCH}" "${GIT_URL}" "${CLONE_DIR}"
+git clone -b "${GIT_BRANCH}" "${GIT_URL}" "${CLONE_DIR}"
 
 repo_root="${workdir}/${CLONE_DIR}"
 cd "${repo_root}"
-git submodule update --init --recursive || true
+
+echo "Initializing submodules over SSH (rewriting https:// URLs)..."
+git submodule sync --recursive
+git submodule update --init --recursive
 
 script_path="${repo_root}/${SCRIPT_DIR}/${SCRIPT_NAME}"
 libs_path="${repo_root}/libs/__sources__.bash"
