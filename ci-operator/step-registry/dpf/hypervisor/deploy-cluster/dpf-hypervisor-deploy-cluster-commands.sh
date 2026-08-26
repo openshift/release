@@ -147,24 +147,24 @@ echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hyp
 
 echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
 # Resolve the CI release payload to a pullspec the hypervisor can reach.
-# RELEASE_IMAGE_LATEST points to a build-cluster-internal registry
-# (registry.buildXX.ci.openshift.org) that the hypervisor cannot access. We
-# extract the version here (the CI pod has auth) and construct the equivalent
-# public CI registry URL (registry.ci.openshift.org/ocp/release:VERSION).
+# RELEASE_IMAGE_LATEST_FROM_BUILD_FARM points to the build-farm registry that
+# the CI pod can access without extra auth (declared as a dependency in the ref).
+# The hypervisor cannot reach CI-internal registries, so we extract the version
+# and construct the equivalent public CI registry URL.
 PAYLOAD_URL=""
-if [[ -n "${RELEASE_IMAGE_LATEST:-}" ]]; then
-  echo "Resolving RELEASE_IMAGE_LATEST to a public pullspec..."
-  _version=$(oc adm release info "${RELEASE_IMAGE_LATEST}" -o jsonpath='{.metadata.version}' 2>/dev/null || true)
-  if [[ -n "$_version" ]]; then
+if [[ -n "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM:-}" ]]; then
+  echo "Resolving RELEASE_IMAGE_LATEST_FROM_BUILD_FARM to a public pullspec..."
+  _version=$(oc adm release info "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}" --output=json | jq -r '.metadata.version')
+  if [[ -n "$_version" && "$_version" != "null" ]]; then
     PAYLOAD_URL="registry.ci.openshift.org/ocp/release:${_version}"
     echo "PAYLOAD_URL resolved (version: ${_version})"
   else
-    echo "ERROR: RELEASE_IMAGE_LATEST is set but could not resolve its version"
+    echo "ERROR: RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is set but could not resolve its version"
     exit 1
   fi
   unset _version
 else
-  echo "RELEASE_IMAGE_LATEST is not set, using .env defaults"
+  echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is not set, using .env defaults"
 fi
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
   cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
