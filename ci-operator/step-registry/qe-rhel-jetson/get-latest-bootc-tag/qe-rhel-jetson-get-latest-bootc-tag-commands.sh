@@ -14,22 +14,51 @@ IMAGE_PATH="${BOOTC_IMAGE_BASE#quay.io/}"
 
 echo "=== Fetching latest tag for ${BOOTC_IMAGE_BASE} ==="
 
-# Query Quay API for the most recent tag
+# Query Quay API for the most recent tag with pagination
 # API docs: https://docs.quay.io/api/swagger/#!/tag/listRepoTags
-QUAY_API_URL="https://quay.io/api/v1/repository/${IMAGE_PATH}/tag/?onlyActiveTags=true&limit=10"
+QUAY_API_BASE="https://quay.io/api/v1/repository/${IMAGE_PATH}/tag/?onlyActiveTags=true&limit=100"
 
-echo "Querying: ${QUAY_API_URL}"
+echo "Querying Quay API with pagination..."
 
-# Fetch tags and sort by last_modified to get the truly latest
-# Filter out metadata tags (.att, .sig, .sbom, .src, .dockerfile)
-# Prefer version tags matching pattern: X.Y.Z_kernel_datestamp or datestamp
-LATEST_TAG=$(curl --silent --fail "${QUAY_API_URL}" | \
-  jq -r '.tags | map(select(.name | test("\\.(att|sig|sbom|src|dockerfile)$") | not)) | sort_by(.last_modified) | reverse | .[0].name')
+# Fetch all tags with pagination support
+ALL_TAGS="[]"
+PAGE=1
+MAX_PAGES=10  # Safety limit to prevent infinite loops
+
+while [[ ${PAGE} -le ${MAX_PAGES} ]]; do
+  QUAY_API_URL="${QUAY_API_BASE}&page=${PAGE}"
+
+  RESPONSE=$(curl --silent --fail "${QUAY_API_URL}" || true)
+  if [[ -z "${RESPONSE}" ]]; then
+    echo "Failed to fetch page ${PAGE}, stopping pagination"
+    break
+  fi
+
+  PAGE_TAGS=$(echo "${RESPONSE}" | jq -r '.tags // []')
+  HAS_ADDITIONAL=$(echo "${RESPONSE}" | jq -r '.has_additional // false')
+
+  # Merge this page's tags with all collected tags
+  ALL_TAGS=$(echo "${ALL_TAGS}" "${PAGE_TAGS}" | jq -s 'add')
+
+  echo "Fetched page ${PAGE}, tags count: $(echo "${PAGE_TAGS}" | jq 'length')"
+
+  if [[ "${HAS_ADDITIONAL}" != "true" ]]; then
+    echo "No more pages to fetch"
+    break
+  fi
+
+  PAGE=$((PAGE + 1))
+done
+
+# Filter out metadata tags (.att, .sig, .sbom, .src, .dockerfile) and sort by last_modified
+LATEST_TAG=$(echo "${ALL_TAGS}" | \
+  jq -r 'map(select(.name | test("\\.(att|sig|sbom|src|dockerfile)$") | not)) | sort_by(.last_modified) | reverse | .[0].name')
 
 if [[ -z "${LATEST_TAG}" || "${LATEST_TAG}" == "null" ]]; then
   echo "ERROR: Failed to fetch latest tag from Quay API"
-  echo "Response was:"
-  curl --silent "${QUAY_API_URL}" | jq '.'
+  echo "Total tags fetched: $(echo "${ALL_TAGS}" | jq 'length')"
+  echo "Response sample:"
+  echo "${ALL_TAGS}" | jq '.[0:3]'
   exit 1
 fi
 

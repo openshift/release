@@ -15,6 +15,11 @@ fi
 if [[ -z "${BOOTC_IMAGE_TAG:-}" || "${BOOTC_IMAGE_TAG}" == "latest" ]]; then
   if [[ -f "${SHARED_DIR}/bootc_image_tag" ]]; then
     BOOTC_IMAGE_TAG=$(cat "${SHARED_DIR}/bootc_image_tag")
+    # Validate the tag is not empty or whitespace-only
+    if [[ -z "${BOOTC_IMAGE_TAG}" || "${BOOTC_IMAGE_TAG}" =~ ^[[:space:]]*$ ]]; then
+      echo "ERROR: bootc_image_tag from SHARED_DIR is empty or whitespace-only"
+      exit 1
+    fi
     echo "Using BOOTC_IMAGE_TAG from SHARED_DIR: ${BOOTC_IMAGE_TAG}"
   else
     echo "ERROR: BOOTC_IMAGE_TAG must be set (and not 'latest')"
