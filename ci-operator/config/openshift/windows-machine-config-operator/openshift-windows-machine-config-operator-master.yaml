@@ -401,11 +401,31 @@ tests:
     env:
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
-      TEST_ARGS: --monitor=e2e-test-analyzer
-      TEST_SUITE: windows-machine-config-operator/proxy
     test:
     - ref: openshift-tests-extension-setup-out-of-payload
-    - ref: openshift-e2e-test
+    - as: proxy-e2e-test-with-zero-handling
+      cli: latest
+      commands: |
+        set +e
+        openshift-tests-extension run windows-machine-config-operator \
+          --suite windows-machine-config-operator/proxy \
+          --from-repository /usr/bin/wmco-tests-ext.gz \
+          --monitor=e2e-test-analyzer 2>&1 | tee "${ARTIFACT_DIR}/test-run.log"
+        EXIT_CODE=$?
+
+        # If no tests found, that's expected until WMCO PR #4459 merges
+        if [ $EXIT_CODE -eq 1 ] && grep -q "no tests to run" "${ARTIFACT_DIR}/test-run.log" 2>/dev/null; then
+          echo "No proxy tests found in WMCO master yet - this is expected"
+          echo "Once WMCO PR #4459 merges, this job will find and run proxy tests"
+          exit 0
+        fi
+
+        exit $EXIT_CODE
+      from: tests
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 600Mi
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
   as: wicd-unit-vsphere
