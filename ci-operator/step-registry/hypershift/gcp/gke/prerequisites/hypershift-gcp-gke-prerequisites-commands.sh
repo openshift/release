@@ -9,21 +9,23 @@ set -euo pipefail
 
 set -x
 
+CURL_CMD="curl --fail --retry 3 --retry-all-errors --retry-delay 5 -sL"
+
 # ============================================================================
 # Step 1: Install CRDs
 # ============================================================================
 echo "Installing required CRDs..."
 
 # Prometheus operator CRDs (for monitoring resources)
-oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
-oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
-oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
+${CURL_CMD} https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml | oc apply -f -
+${CURL_CMD} https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml | oc apply -f -
+${CURL_CMD} https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml | oc apply -f -
 
 # OpenShift Route CRD (for hosted cluster ingress)
-oc apply -f https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c78274fd79c94a3f951f8d5ab2/route/v1/zz_generated.crd-manifests/routes.crd.yaml
+${CURL_CMD} https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c78274fd79c94a3f951f8d5ab2/route/v1/zz_generated.crd-manifests/routes.crd.yaml | oc apply -f -
 
 # DNSEndpoint CRD (for external-dns zone delegation)
-oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/v0.15.0/docs/contributing/crd-source/crd-manifest.yaml
+${CURL_CMD} https://raw.githubusercontent.com/kubernetes-sigs/external-dns/v0.15.0/docs/contributing/crd-source/crd-manifest.yaml | oc apply -f -
 
 # ============================================================================
 # Step 2: Install cert-manager
@@ -39,7 +41,7 @@ oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/v0.15
 # ============================================================================
 CERT_MANAGER_VERSION="v1.14.0"
 echo "Installing cert-manager ${CERT_MANAGER_VERSION}..."
-curl -sL "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml" \
+${CURL_CMD} "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml" \
   | sed 's/kube-system/cert-manager/g' \
   | oc apply -f -
 
