@@ -38,6 +38,18 @@ ref:
     default: "openshift-e2e-libvirt-test upi-install-libvirt"
     documentation: |-
       Space-separated inner step names to poll for finished.json.
+  - name: SYSTEM_PROMPT
+    default: |-
+      LIBVIRT CONTEXT:
+      - These jobs install OpenShift on IBM Z (s390x) or IBM Power (ppc64le) KVM guests via UPI libvirt.
+      - Workflows: openshift-e2e-libvirt-vpn, openshift-e2e-libvirt-vpn-fips, openshift-e2e-libvirt-upi, openshift-e2e-libvirt-upi-fips.
+      - Z uses cluster profile libvirt-s390x-vpn. Power uses libvirt-ppc64le-s2s.
+      - Install steps: upi-conf-libvirt, upi-install-libvirt. Test step: openshift-e2e-libvirt-test.
+      - Prefer evidence from junit, install logs, node journals, and MachineConfigs over speculation.
+    documentation: |-
+      Platform-specific context appended to the analyzer system prompt.
+      Override this in consuming workflows (for example PowerVC) instead of forking the step.
+      The script always prepends CI/runtime context (artifact dir, prow URL, credential restrictions).
   resources:
     requests:
       cpu: 100m
@@ -51,3 +63,4 @@ ref:
     Uses the existing CI Vertex service account; no per-user API key is required.
     Only runs when a listed test/install step failed. On success, exits early.
     Produces ARTIFACT_DIR/failure-analysis.md.
+    Other platforms can reuse this step by overriding SYSTEM_PROMPT and TEST_STEPS.

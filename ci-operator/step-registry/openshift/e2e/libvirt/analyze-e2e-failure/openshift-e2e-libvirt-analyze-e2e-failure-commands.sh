@@ -36,13 +36,14 @@ FAILURE_DETECTED=false
 FAILED_STEP=""
 MAX_WAIT=600
 POLL_INTERVAL=15
-WAITED=0
+START_TIME=${SECONDS}
 
-while [[ ${WAITED} -lt ${MAX_WAIT} ]]; do
+while (( (SECONDS - START_TIME) < MAX_WAIT )); do
   for STEP_NAME in ${TEST_STEPS}; do
-    FINISHED_JSON=$(curl -sL --connect-timeout 10 --max-time 20 "${ARTIFACTS_BASE}/${STEP_NAME}/finished.json" 2>/dev/null || true)
+    FINISHED_JSON=$(curl -sL --connect-timeout 10 --max-time 20 \
+      "${ARTIFACTS_BASE}/${STEP_NAME}/finished.json" 2>/dev/null || true)
     if echo "${FINISHED_JSON}" | jq -e '.passed == false' &>/dev/null; then
-      echo "Detected failure in ${STEP_NAME}/finished.json (waited ${WAITED}s)"
+      echo "Detected failure in ${STEP_NAME}/finished.json (elapsed $((SECONDS - START_TIME))s)"
       FAILURE_DETECTED=true
       FAILED_STEP="${STEP_NAME}"
       break 2
@@ -52,29 +53,26 @@ while [[ ${WAITED} -lt ${MAX_WAIT} ]]; do
   all_passed=true
   saw_any=false
   for STEP_NAME in ${TEST_STEPS}; do
-    FINISHED_JSON=$(curl -sL --connect-timeout 10 --max-time 20 "${ARTIFACTS_BASE}/${STEP_NAME}/finished.json" 2>/dev/null || true)
+    FINISHED_JSON=$(curl -sL --connect-timeout 10 --max-time 20 \
+      "${ARTIFACTS_BASE}/${STEP_NAME}/finished.json" 2>/dev/null || true)
     if echo "${FINISHED_JSON}" | jq -e '.passed == true' &>/dev/null; then
       saw_any=true
       continue
     fi
-    if echo "${FINISHED_JSON}" | jq -e '.passed == false' &>/dev/null; then
-      all_passed=false
-      break
-    fi
     all_passed=false
+    break
   done
   if [[ "${saw_any}" == "true" && "${all_passed}" == "true" ]]; then
     echo "Listed test steps passed — skipping analysis."
     exit 0
   fi
 
-  echo "  Waiting for artifacts... (${WAITED}s/${MAX_WAIT}s)"
+  echo "  Waiting for artifacts... ($((SECONDS - START_TIME))s/${MAX_WAIT}s)"
   sleep "${POLL_INTERVAL}"
-  WAITED=$((WAITED + POLL_INTERVAL))
 done
 
 if [[ "${FAILURE_DETECTED}" == "false" ]]; then
-  echo "Timed out waiting for failed-step artifacts after ${WAITED}s — skipping analysis."
+  echo "Timed out waiting for failed-step artifacts after $((SECONDS - START_TIME))s — skipping analysis."
   exit 0
 fi
 
@@ -86,31 +84,36 @@ fi
 echo "Claude Code CLI: $(claude --version 2>/dev/null || echo 'unknown')"
 echo "Failed step: ${FAILED_STEP}"
 
-SYSTEM_PROMPT="IMPORTANT CI CONTEXT:
+# Runtime CI context is always prepended. SYSTEM_PROMPT is the platform-specific
+# override (libvirt by default; PowerVC and others can set it on the step).
+CI_CONTEXT="IMPORTANT CI CONTEXT:
 - You are running inside the CI job itself as a post-step.
 - This step's artifact directory is: ${ARTIFACT_DIR}
 - Other steps' artifacts (build-log, JUnit, install, gather) are available via GCS at: ${PROW_JOB_URL}
-- You have network access to download artifacts from GCS using curl.
+- You may use curl only to download artifacts from this GCS job URL. Do not fetch unrelated URLs.
 - Write the final analysis report to: ${ARTIFACT_DIR}/failure-analysis.md
 - Use --fast mode (do NOT use AskUserQuestion).
 - Do NOT prompt for JIRA export — just write the markdown analysis.
+- NEVER read files under /var/run/
+- NEVER access credential or token files
+- ARCH is ${ARCH:-unknown}."
 
-LIBVIRT CONTEXT:
-- These jobs install OpenShift on IBM Z (s390x) or IBM Power (ppc64le) KVM guests via UPI libvirt.
-- Workflows: openshift-e2e-libvirt-vpn, openshift-e2e-libvirt-vpn-fips, openshift-e2e-libvirt-upi, openshift-e2e-libvirt-upi-fips.
-- Z uses cluster profile libvirt-s390x-vpn. Power uses libvirt-ppc64le-s2s.
-- Install steps: upi-conf-libvirt, upi-install-libvirt. Test step: openshift-e2e-libvirt-test.
-- ARCH is ${ARCH:-unknown}.
-- Prefer evidence from junit, install logs, node journals, and MachineConfigs over speculation."
+FULL_PROMPT="${CI_CONTEXT}
+
+${SYSTEM_PROMPT:-}"
 
 echo ""
 echo "Running Claude with /ci:prow-job-analysis skill..."
 echo ""
 
+# Bash is required so /ci:prow-job-analysis can curl GCS artifacts.
+# WebFetch is omitted to block a prompt-injection exfiltration path.
+# Disallowed Bash patterns block reads of the Vertex SA key.
 set +e
 timeout 1200 claude -p "/ci:prow-job-analysis ${PROW_JOB_URL} --fast" \
-  --append-system-prompt "${SYSTEM_PROMPT}" \
-  --allowedTools "Bash Read Write Edit Grep Glob WebFetch Skill" \
+  --append-system-prompt "${FULL_PROMPT}" \
+  --allowedTools "Bash Read Write Edit Grep Glob Skill" \
+  --disallowedTools "WebFetch Bash(cat*claude-code-service-account*) Bash(cat*/var/run/*) Bash(curl*google-token*) Bash(env*) Bash(printenv*)" \
   --max-turns 100 \
   --model "${CLAUDE_MODEL}" \
   --verbose \
