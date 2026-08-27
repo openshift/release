@@ -1,4 +1,8 @@
 base_images:
+  operator-registry:
+    name: "4.20"
+    namespace: ocp
+    tag: operator-registry
   operator-sdk:
     name: "4.19"
     namespace: origin
@@ -12,6 +16,54 @@ images:
   items:
   - dockerfile_path: Dockerfile
     to: koku-service-operator
+  - dockerfile_literal: |-
+      FROM src
+      USER root
+      RUN dnf install -y python3.11 python3.11-pip jq git && dnf clean all && \
+          alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 20
+      RUN python3 -m pip install --no-cache-dir \
+          'pytest>=7' 'pytest-timeout>=2' 'pytest-html>=4' \
+          'requests>=2.28' 'urllib3>=1.26' \
+          'python-jose[cryptography]>=3.3' 'cryptography>=41' \
+          'PyYAML>=6' 'kubernetes>=25' 'boto3>=1.28' 'koku-nise>=4'
+      RUN mkdir -p /home/e2e /tmp/e2e-reports && \
+          chown -R 65532:0 /home/e2e /tmp/e2e-reports && \
+          chmod -R g=u /home/e2e /tmp/e2e-reports
+      ENV HOME=/home/e2e
+      USER 65532
+    from: src
+    to: koku-service-operator-e2e
+  - dockerfile_literal: |-
+      FROM bundle AS bundle
+      FROM builder AS builder
+      USER 0
+      RUN mkdir -p /configs
+      COPY --from=bundle / /bundle
+      RUN opm render /bundle -o yaml > /tmp/bundle.yaml && \
+          { echo '---'; echo 'schema: olm.package'; echo 'name: koku-service-operator'; echo 'defaultChannel: beta'; } > /configs/index.yaml && \
+          cat /tmp/bundle.yaml >> /configs/index.yaml && \
+          printf '%s\n' '---' 'schema: olm.channel' 'package: koku-service-operator' 'name: beta' 'entries:' '- name: koku-service-operator.v0.0.1' >> /configs/index.yaml && \
+          opm validate /configs
+      FROM registry
+      USER 0
+      COPY --from=builder /configs /configs
+      RUN mkdir -p /tmp/cache && \
+          opm serve /configs --cache-dir=/tmp/cache --cache-only && \
+          chmod -R g=u /configs /tmp/cache
+      LABEL operators.operatorframework.io.index.configs.v1=/configs
+      USER 65532
+      EXPOSE 50051
+      ENTRYPOINT ["/bin/opm"]
+      CMD ["serve", "/configs", "--cache-dir=/tmp/cache", "--cache-enforce-integrity=false"]
+    from: operator-registry
+    inputs:
+      koku-service-operator-bundle:
+        as:
+        - bundle
+      operator-registry:
+        as:
+        - builder
+    to: koku-service-operator-catalog
 operator:
   bundles:
   - as: koku-service-operator-bundle
@@ -79,6 +131,433 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: generic-claim
+- always_run: false
+  as: e2e-pytest
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  optional: true
+  steps:
+    test:
+    - ref: project-koku-koso-sanitize
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/koso-sanitize.sh"
+        NS=cost-onprem
+        dump() {
+          mkdir -p "${ARTIFACT_DIR}"
+          _run_sanitized oc -n "${NS}" get csv -o custom-columns=NAME:.metadata.name,PHASE:.status.phase,REASON:.status.reason --no-headers > "${ARTIFACT_DIR}/csv-status.txt" || true
+          _run_sanitized oc -n "${NS}" logs deploy/koku-service-operator-controller-manager > "${ARTIFACT_DIR}/operator.log" || true
+          _run_sanitized oc -n "${NS}" logs -l olm.catalogSource=koku-service-operator --tail=200 > "${ARTIFACT_DIR}/catalog.log" || true
+          _run_sanitized oc -n "${NS}" get csv,og,catsrc,sub,ip,deploy,po,event -o yaml > "${ARTIFACT_DIR}/olm-resources.yaml" || true
+          _run_sanitized oc get csv -A -o yaml > "${ARTIFACT_DIR}/csv.yaml" || true
+          _run_sanitized oc -n "${NS}" get cmsc -o jsonpath='{range .items[*]}---{"\n"}name: {.metadata.name}{"\n"}namespace: {.metadata.namespace}{"\n"}created: {.metadata.creationTimestamp}{"\n"}conditions:{"\n"}{range .status.conditions[*]}  - type: {.type}{"\n"}    status: {.status}{"\n"}    reason: {.reason}{"\n"}    message: {.message}{"\n"}    lastTransitionTime: {.lastTransitionTime}{"\n"}{end}{"\n"}{end}' > "${ARTIFACT_DIR}/cmsc-status.txt" || true
+          _run_sanitized oc -n "${NS}" get events --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/events.txt" || true
+          _sanitize_shared_reports
+          _sanitize_tree
+        }
+        trap dump EXIT
+        echo "install: applying operator manifests"
+        _run_sanitized oc apply -f - <<EOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: ${NS}
+        ---
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: cost-onprem
+          namespace: ${NS}
+        spec: {}
+        ---
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          name: koku-service-operator
+          namespace: ${NS}
+        spec:
+          displayName: koku-service-operator (CI)
+          publisher: prow
+          sourceType: grpc
+          image: ${CATALOG_IMG}
+          grpcPodConfig:
+            securityContextConfig: restricted
+        ---
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: koku-service-operator
+          namespace: ${NS}
+        spec:
+          channel: beta
+          name: koku-service-operator
+          source: koku-service-operator
+          sourceNamespace: ${NS}
+          installPlanApproval: Automatic
+        EOF
+        echo "install: waiting for catalogsource"
+        _run_sanitized oc wait catalogsource/koku-service-operator -n "${NS}" \
+          --for=jsonpath='{.status.connectionState.lastObservedState}'=READY --timeout=10m
+        CSV=""
+        for _ in $(seq 1 60); do
+          _capture_sanitized CSV oc get subscription koku-service-operator -n "${NS}" -o jsonpath='{.status.installedCSV}' || true
+          echo "csv-wait status=pending"
+          [[ -n "${CSV}" ]] && break
+          sleep 10
+        done
+        if [[ -z "${CSV}" ]]; then
+          echo "csv-wait status=missing"
+          exit 1
+        fi
+        succeeded=0
+        phase=""
+        for _ in $(seq 1 60); do
+          _capture_sanitized phase oc get csv/"${CSV}" -n "${NS}" -o jsonpath='{.status.phase}' || true
+          if [[ "${phase}" == "Succeeded" ]]; then
+            echo "csv-wait status=succeeded"
+            succeeded=1
+            break
+          fi
+          if [[ "${phase}" == "Failed" ]]; then
+            echo "csv-wait status=failed"
+            _run_sanitized oc get csv/"${CSV}" -n "${NS}" -o jsonpath='{.status.message}{"\n"}' || true
+            exit 1
+          fi
+          echo "csv-wait status=pending"
+          sleep 10
+        done
+        if [[ "${succeeded}" != 1 ]]; then
+          echo "csv-wait status=timeout"
+          exit 1
+        fi
+        echo "install: waiting for controller deployment"
+        _run_sanitized oc wait deployment/koku-service-operator-controller-manager -n "${NS}" \
+          --for=condition=Available --timeout=5m
+      dependencies:
+      - env: CATALOG_IMG
+        name: koku-service-operator-catalog
+      from: koku-service-operator-e2e
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: stack
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/koso-sanitize.sh"
+        export KUBE_CONTEXT="$(kubectl config current-context)"
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export INFRA_NAMESPACE=cost-onprem-infra
+        export OPERATOR_NAMESPACE=cost-onprem
+        export SKIP_PYTEST=1
+        set +e
+        ./hack/ci/e2e.sh 2>&1 | _sanitize
+        pipe_status=("${PIPESTATUS[@]}")
+        set -e
+        if [[ "${pipe_status[1]:-1}" -ne 0 ]]; then
+          echo "redaction step failed; refusing to publish unsanitized output" >&2
+          exit 1
+        fi
+        rc=${pipe_status[0]}
+        mkdir -p "${ARTIFACT_DIR}"
+        _sanitize_tree test/pytest/reports tests/reports
+        _sanitize_shared_reports
+        _sanitize_tree
+        exit "${rc}"
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    - as: smoke
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/koso-sanitize.sh"
+        export KUBE_CONTEXT="$(kubectl config current-context)"
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export HELM_RELEASE_NAME=cost-onprem
+        set +e
+        ./scripts/run-pytest.sh --no-venv --no-ui --ignore=suites/ui -m smoke 2>&1 | _sanitize
+        pipe_status=("${PIPESTATUS[@]}")
+        set -e
+        if [[ "${pipe_status[1]:-1}" -ne 0 ]]; then
+          echo "redaction step failed; refusing to publish unsanitized output" >&2
+          exit 1
+        fi
+        rc=${pipe_status[0]}
+        mkdir -p "${ARTIFACT_DIR}"
+        _publish_sanitized test/pytest/reports/junit.xml "${ARTIFACT_DIR}/junit_smoke.xml"
+        _publish_sanitized test/pytest/reports/report.html "${ARTIFACT_DIR}/pytest_report.html"
+        _sanitize_tree test/pytest/reports tests/reports
+        _sanitize_shared_reports
+        _sanitize_tree
+        exit "${rc}"
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    - as: pytest
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/koso-sanitize.sh"
+        export KUBE_CONTEXT="$(kubectl config current-context)"
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export HELM_RELEASE_NAME=cost-onprem
+        set +e
+        ./scripts/run-pytest.sh --no-venv --no-ui --ignore=suites/ui 2>&1 | _sanitize
+        pipe_status=("${PIPESTATUS[@]}")
+        set -e
+        if [[ "${pipe_status[1]:-1}" -ne 0 ]]; then
+          echo "redaction step failed; refusing to publish unsanitized output" >&2
+          exit 1
+        fi
+        rc=${pipe_status[0]}
+        mkdir -p "${ARTIFACT_DIR}"
+        _publish_sanitized test/pytest/reports/junit.xml "${ARTIFACT_DIR}/junit_e2e.xml"
+        _publish_sanitized test/pytest/reports/report.html "${ARTIFACT_DIR}/pytest_report.html"
+        _sanitize_tree test/pytest/reports tests/reports
+        _sanitize_shared_reports
+        _sanitize_tree
+        exit "${rc}"
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    workflow: generic-claim
+- always_run: false
+  as: e2e-iqe
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  optional: true
+  steps:
+    test:
+    - ref: project-koku-koso-sanitize
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/koso-sanitize.sh"
+        NS=cost-onprem
+        dump() {
+          mkdir -p "${ARTIFACT_DIR}"
+          _run_sanitized oc -n "${NS}" get csv -o custom-columns=NAME:.metadata.name,PHASE:.status.phase,REASON:.status.reason --no-headers > "${ARTIFACT_DIR}/csv-status.txt" || true
+          _run_sanitized oc -n "${NS}" logs deploy/koku-service-operator-controller-manager > "${ARTIFACT_DIR}/operator.log" || true
+          _run_sanitized oc -n "${NS}" logs -l olm.catalogSource=koku-service-operator --tail=200 > "${ARTIFACT_DIR}/catalog.log" || true
+          _run_sanitized oc -n "${NS}" get csv,og,catsrc,sub,ip,deploy,po,event -o yaml > "${ARTIFACT_DIR}/olm-resources.yaml" || true
+          _run_sanitized oc get csv -A -o yaml > "${ARTIFACT_DIR}/csv.yaml" || true
+          _run_sanitized oc -n "${NS}" get cmsc -o jsonpath='{range .items[*]}---{"\n"}name: {.metadata.name}{"\n"}namespace: {.metadata.namespace}{"\n"}created: {.metadata.creationTimestamp}{"\n"}conditions:{"\n"}{range .status.conditions[*]}  - type: {.type}{"\n"}    status: {.status}{"\n"}    reason: {.reason}{"\n"}    message: {.message}{"\n"}    lastTransitionTime: {.lastTransitionTime}{"\n"}{end}{"\n"}{end}' > "${ARTIFACT_DIR}/cmsc-status.txt" || true
+          _run_sanitized oc -n "${NS}" get events --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/events.txt" || true
+          _sanitize_shared_reports
+          _sanitize_tree
+        }
+        trap dump EXIT
+        echo "install: applying operator manifests"
+        _run_sanitized oc apply -f - <<EOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: ${NS}
+        ---
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: cost-onprem
+          namespace: ${NS}
+        spec: {}
+        ---
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          name: koku-service-operator
+          namespace: ${NS}
+        spec:
+          displayName: koku-service-operator (CI)
+          publisher: prow
+          sourceType: grpc
+          image: ${CATALOG_IMG}
+          grpcPodConfig:
+            securityContextConfig: restricted
+        ---
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: koku-service-operator
+          namespace: ${NS}
+        spec:
+          channel: beta
+          name: koku-service-operator
+          source: koku-service-operator
+          sourceNamespace: ${NS}
+          installPlanApproval: Automatic
+        EOF
+        echo "install: waiting for catalogsource"
+        _run_sanitized oc wait catalogsource/koku-service-operator -n "${NS}" \
+          --for=jsonpath='{.status.connectionState.lastObservedState}'=READY --timeout=10m
+        CSV=""
+        for _ in $(seq 1 60); do
+          _capture_sanitized CSV oc get subscription koku-service-operator -n "${NS}" -o jsonpath='{.status.installedCSV}' || true
+          echo "csv-wait status=pending"
+          [[ -n "${CSV}" ]] && break
+          sleep 10
+        done
+        if [[ -z "${CSV}" ]]; then
+          echo "csv-wait status=missing"
+          exit 1
+        fi
+        succeeded=0
+        phase=""
+        for _ in $(seq 1 60); do
+          _capture_sanitized phase oc get csv/"${CSV}" -n "${NS}" -o jsonpath='{.status.phase}' || true
+          if [[ "${phase}" == "Succeeded" ]]; then
+            echo "csv-wait status=succeeded"
+            succeeded=1
+            break
+          fi
+          if [[ "${phase}" == "Failed" ]]; then
+            echo "csv-wait status=failed"
+            _run_sanitized oc get csv/"${CSV}" -n "${NS}" -o jsonpath='{.status.message}{"\n"}' || true
+            exit 1
+          fi
+          echo "csv-wait status=pending"
+          sleep 10
+        done
+        if [[ "${succeeded}" != 1 ]]; then
+          echo "csv-wait status=timeout"
+          exit 1
+        fi
+        echo "install: waiting for controller deployment"
+        _run_sanitized oc wait deployment/koku-service-operator-controller-manager -n "${NS}" \
+          --for=condition=Available --timeout=5m
+      dependencies:
+      - env: CATALOG_IMG
+        name: koku-service-operator-catalog
+      from: koku-service-operator-e2e
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: stack
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/koso-sanitize.sh"
+        export KUBE_CONTEXT="$(kubectl config current-context)"
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export INFRA_NAMESPACE=cost-onprem-infra
+        export OPERATOR_NAMESPACE=cost-onprem
+        export SKIP_PYTEST=1
+        set +e
+        ./hack/ci/e2e.sh 2>&1 | _sanitize
+        pipe_status=("${PIPESTATUS[@]}")
+        set -e
+        if [[ "${pipe_status[1]:-1}" -ne 0 ]]; then
+          echo "redaction step failed; refusing to publish unsanitized output" >&2
+          exit 1
+        fi
+        rc=${pipe_status[0]}
+        mkdir -p "${ARTIFACT_DIR}"
+        _sanitize_tree test/pytest/reports tests/reports
+        _sanitize_shared_reports
+        _sanitize_tree
+        exit "${rc}"
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    - as: smoke
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/koso-sanitize.sh"
+        export KUBE_CONTEXT="$(kubectl config current-context)"
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export HELM_RELEASE_NAME=cost-onprem
+        set +e
+        ./scripts/run-pytest.sh --no-venv --no-ui --ignore=suites/ui -m smoke 2>&1 | _sanitize
+        pipe_status=("${PIPESTATUS[@]}")
+        set -e
+        if [[ "${pipe_status[1]:-1}" -ne 0 ]]; then
+          echo "redaction step failed; refusing to publish unsanitized output" >&2
+          exit 1
+        fi
+        rc=${pipe_status[0]}
+        mkdir -p "${ARTIFACT_DIR}"
+        _publish_sanitized test/pytest/reports/junit.xml "${ARTIFACT_DIR}/junit_smoke.xml"
+        _publish_sanitized test/pytest/reports/report.html "${ARTIFACT_DIR}/pytest_report.html"
+        _sanitize_tree test/pytest/reports tests/reports
+        _sanitize_shared_reports
+        _sanitize_tree
+        exit "${rc}"
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    - as: iqe
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/koso-sanitize.sh"
+        export KUBE_CONTEXT="$(kubectl config current-context)"
+        export NAMESPACE=cost-onprem
+        export CR_NAME=cost-onprem
+        export HELM_RELEASE_NAME=cost-onprem
+        export IQE_TEST_RUN=True
+        set +e
+        ./scripts/run-iqe-tests.sh --profile smoke 2>&1 | _sanitize
+        pipe_status=("${PIPESTATUS[@]}")
+        set -e
+        if [[ "${pipe_status[1]:-1}" -ne 0 ]]; then
+          echo "redaction step failed; refusing to publish unsanitized output" >&2
+          exit 1
+        fi
+        rc=${pipe_status[0]}
+        mkdir -p "${ARTIFACT_DIR}"
+        _publish_sanitized tests/reports/iqe_junit.xml "${ARTIFACT_DIR}/junit_iqe.xml"
+        _publish_sanitized tests/reports/report.html "${ARTIFACT_DIR}/iqe_report.html"
+        _sanitize_tree test/pytest/reports tests/reports
+        _sanitize_shared_reports
+        _sanitize_tree
+        exit "${rc}"
+      from: koku-service-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
