@@ -6,9 +6,9 @@ Here is the list of steps and their explanation.
 
 Please refer to the `*-ref.yaml` file in their source code for the full list of parameters accepted by each step.
 
-### sandboxed-containers-operator-get-kata-rpm
+### sandboxed-containers-operator-update-kata-rpm
 
-The [sandboxed-containers-operator-get-kata-rpm](./get-kata-rpm/) step downloads the kata-containers rpm from Brew and copy it over the cluster worker nodes.
+The [sandboxed-containers-operator-update-kata-rpm](./update-kata-rpm/) step downloads the kata-containers rpm from Brew and copy it over the cluster worker nodes.
 
 This step run in a `upi-installer` container, therefore, the image should be referenced
 in the `base_images` section of the job's yaml, as for example:
@@ -244,7 +244,7 @@ base_images:
 
 ## Managing secrets
 
-There are some steps (e.g. sandboxed-containers-operator-get-kata-rpm) that require access to secrets. Our secrets are stored on Vault’s key-value engine at https://vault.ci.openshift.org/ under the `sandboxed-containers-operator/sandboxed-containers-operator-ci-secrets` path.
+There are some steps (e.g. sandboxed-containers-operator-update-kata-rpm) that require access to secrets. Our secrets are stored on Vault’s key-value engine at https://vault.ci.openshift.org/ under the `sandboxed-containers-operator/sandboxed-containers-operator-ci-secrets` path.
 
 In case you want to manage secrets on that path, first must log-in https://selfservice.vault.ci.openshift.org at least once, then ask @tbuskey, @ldoktor or @wainersm to add you in the list of members of the `sandboxed-containers-operator` collection. Please refer to https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/ for further information.
 
@@ -446,7 +446,7 @@ launch-nodes-readiness                                        0/2     Completed 
 launch-openshift-cluster-bot-rbac                             0/2     Completed   0          64m
 launch-openshift-extended-test                                2/2     Running     0          2m9s
 launch-sandboxed-containers-operator-env-cm                   0/2     Completed   0          2m16s
-launch-sandboxed-containers-operator-get-kata-rpm             0/2     Completed   0          4m36s
+launch-sandboxed-containers-operator-update-kata-rpm          0/2     Completed   0          4m36s
 launch-sandboxed-containers-operator-peerpods-param-cm        0/2     Completed   0          3m14s
 release-images-latest                                         0/2     Completed   0          68m
 release-images-latest-cli                                     0/1     Completed   0          69m
