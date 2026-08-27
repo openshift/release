@@ -36,6 +36,12 @@ images:
     from: cli
     optional: true
     to: cli-with-git
+  - dockerfile_literal: |
+      FROM this-is-ignored
+      RUN dnf install -y skopeo && dnf clean all
+    from: cli
+    optional: true
+    to: cli-with-skopeo
 releases:
   latest:
     candidate:
@@ -77,6 +83,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      IGNORE_SECONDARY_POLICIES: "true"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
@@ -104,10 +111,11 @@ tests:
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
     - chain: cucushift-installer-check-cluster-health
-    - ref: acm-tests-clc-create
+    - ref: acm-tests-clc-smoke
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
     - ref: interop-opp-odf-health
+    - ref: interop-opp-observability-odf
     - ref: interop-tests-opp-quay-smoke
     - ref: acm-tests-observability
 - as: interop-opp-vsphere
@@ -135,6 +143,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9323
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      IGNORE_SECONDARY_POLICIES: "true"
       OPENSHIFT_REQUIRED_CORES: "72"
       OPENSHIFT_REQUIRED_MEMORY: "288"
       OPERATORS: |
@@ -156,6 +165,7 @@ tests:
     - ref: acm-policies-openshift-plus
     - chain: cucushift-installer-check-cluster-health
     - ref: interop-opp-odf-health
+    - ref: interop-opp-observability-odf
     - ref: acm-tests-observability
     - ref: acm-opp-app
     workflow: acm-ipi-vsphere

@@ -1,6 +1,5 @@
 #!/bin/bash
-set -eux -o pipefail
-shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -8,10 +7,9 @@ fi
 
 echo "[smoke] Reading connection details from SHARED_DIR..."
 
-set +x
-CENTRAL_URL="$(cat "${SHARED_DIR}/CENTRAL_URL")"
+typeset centralUrl=''
+centralUrl="$(cat "${SHARED_DIR}/CENTRAL_URL")"
 ROX_ADMIN_PASSWORD="$(cat "${SHARED_DIR}/ROX_ADMIN_PASSWORD")"
-set -x
 
 echo "[smoke] Connection details loaded from SHARED_DIR"
 
@@ -36,9 +34,10 @@ chmod -R u+w /tmp/stackrox/qa-tests-backend/src/main/proto/scanner
 
 echo "[smoke] Materializing proto sources (replace symlinks with copies)..."
 cd /tmp/stackrox/qa-tests-backend/src/main/proto
+typeset target=''
 for link in api internalapi storage test tools; do
     if [[ -L "${link}" ]]; then
-        target="$(readlink -f "${link}")"
+        target=$(readlink -f "${link}")
         rm "${link}"
         cp -r "${target}" "${link}"
     fi
@@ -51,8 +50,7 @@ grep -q 'DEFAULT_CLUSTER_NAME = "local-cluster"' \
     /tmp/stackrox/qa-tests-backend/src/main/groovy/services/ClusterService.groovy \
     || { echo "[smoke] FATAL: DEFAULT_CLUSTER_NAME patch failed"; exit 1; }
 
-set +x
-export API_HOSTNAME="${CENTRAL_URL}"
+export API_HOSTNAME="${centralUrl}"
 export API_PORT="443"
 export ROX_USERNAME="admin"
 export ROX_ADMIN_PASSWORD
@@ -72,7 +70,6 @@ if [[ -f /tmp/vault/stackrox-stackrox-e2e-tests/GOOGLE_ARTIFACT_REGISTRY_SERVICE
     GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2="$(cat /tmp/vault/stackrox-stackrox-e2e-tests/GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2)"
     export GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2
 fi
-set -x
 
 cd /tmp/stackrox/qa-tests-backend
 
@@ -103,13 +100,4 @@ if [[ -d build/reports/tests/testSMOKE ]]; then
 fi
 
 echo "[smoke] Test run finished with exit code: ${testExit}"
-if [[ "${testExit}" -ne 0 ]] && [[ -d build/test-results/testSMOKE ]]; then
-    typeset total=""
-    total="$(find build/test-results/testSMOKE -name '*.xml' -exec grep -l 'testcase' {} \; | wc -l)"
-    if [[ "${total}" -gt 0 ]]; then
-        echo "[smoke] Tests executed and results captured; treating as informational (exit 0)."
-        echo "[smoke] Review JUnit XML in ARTIFACT_DIR for individual test failures."
-        exit 0
-    fi
-fi
 exit "${testExit}"
