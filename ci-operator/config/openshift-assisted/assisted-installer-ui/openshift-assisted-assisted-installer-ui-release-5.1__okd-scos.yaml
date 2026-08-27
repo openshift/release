@@ -1,0 +1,54 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.26-openshift-5.1:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.1
+  ocp_builder_rhel-9-openshift-nodejs-base-5.1.art:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-openshift-nodejs-base-5.1.art
+  origin_scos-5.1_base-stream9:
+    name: scos-5.1
+    namespace: origin
+    tag: base-stream9
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.1
+images:
+  items:
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: apps/assisted-disconnected-ui/Containerfile.ocp
+    from: origin_scos-5.1_base-stream9
+    inputs:
+      ocp_builder_rhel-9-golang-1.26-openshift-5.1:
+        as:
+        - proxy-build
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.0
+      ocp_builder_rhel-9-openshift-nodejs-base-5.1.art:
+        as:
+        - ui-build
+        - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-5.0
+    to: agent-installer-ui
+promotion:
+  to:
+  - name: scos-5.1
+    namespace: origin
+releases:
+  latest:
+    integration:
+      name: scos-5.1
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift-assisted
+  repo: assisted-installer-ui
+  variant: okd-scos

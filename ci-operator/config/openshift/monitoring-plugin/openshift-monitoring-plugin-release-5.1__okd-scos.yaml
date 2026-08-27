@@ -1,0 +1,54 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.26-openshift-5.1:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.1
+  ocp_builder_rhel-9-openshift-nodejs-base-5.1.art:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-openshift-nodejs-base-5.1.art
+  origin_scos-5.1_base-stream9:
+    name: scos-5.1
+    namespace: origin
+    tag: base-stream9
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.1
+images:
+  items:
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: Dockerfile
+    from: origin_scos-5.1_base-stream9
+    inputs:
+      ocp_builder_rhel-9-golang-1.26-openshift-5.1:
+        as:
+        - go-builder
+        - registry.access.redhat.com/ubi9/go-toolset:1.26
+      ocp_builder_rhel-9-openshift-nodejs-base-5.1.art:
+        as:
+        - web-builder
+        - registry.redhat.io/ubi9/nodejs-22:latest
+    to: monitoring-plugin
+promotion:
+  to:
+  - name: scos-5.1
+    namespace: origin
+releases:
+  latest:
+    integration:
+      name: scos-5.1
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift
+  repo: monitoring-plugin
+  variant: okd-scos

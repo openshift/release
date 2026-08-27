@@ -1,0 +1,56 @@
+base_images:
+  origin_scos-5.1_base-stream9:
+    name: scos-5.1
+    namespace: origin
+    tag: base-stream9
+  origin_scos-5.1_cli:
+    name: scos-5.1
+    namespace: origin
+    tag: cli
+  origin_scos-5.1_installer:
+    name: scos-5.1
+    namespace: origin
+    tag: installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.1
+images:
+  items:
+  - build_args:
+    - name: TAGS
+      value: scos
+    - name: DIRECT_DOWNLOAD
+      value: "true"
+    dockerfile_path: Dockerfile
+    from: origin_scos-5.1_base-stream9
+    inputs:
+      origin_scos-5.1_cli:
+        as:
+        - cli
+        - registry.ci.openshift.org/ocp/5.0:cli
+      origin_scos-5.1_installer:
+        as:
+        - builder
+        - registry.ci.openshift.org/ocp/5.0:installer
+    to: machine-os-images
+promotion:
+  to:
+  - name: scos-5.1
+    namespace: origin
+releases:
+  latest:
+    integration:
+      name: scos-5.1
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift
+  repo: machine-os-images
+  variant: okd-scos
