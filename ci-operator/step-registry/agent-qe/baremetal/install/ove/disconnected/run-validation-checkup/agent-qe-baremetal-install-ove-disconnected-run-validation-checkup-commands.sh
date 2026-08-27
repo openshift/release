@@ -171,7 +171,7 @@ if [[ -z "${RESULTS}" ]]; then
 fi
 
 echo "Results summary:"
-echo "${RESULTS}" | head -20
+echo "${RESULTS}"
 
 FAILED=$(echo "${RESULTS}" | grep -oE 'failed:[[:space:]]*[0-9]+' | grep -v 'failed:[[:space:]]*0' || true)
 if [[ -n "${FAILED}" ]]; then

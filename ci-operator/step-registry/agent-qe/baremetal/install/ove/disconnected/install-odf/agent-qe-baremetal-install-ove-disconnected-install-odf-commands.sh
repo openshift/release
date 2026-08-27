@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+if [[ -z "${ODF_SUBSCRIPTION_CHANNEL}" ]]; then
+    ocp_version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d '.' -f1,2)
+    ODF_SUBSCRIPTION_CHANNEL="stable-${ocp_version}"
+    echo "Auto-detected ODF subscription channel: ${ODF_SUBSCRIPTION_CHANNEL}"
+fi
+
 function gather_debug_info() {
     echo "============================================"
     echo "Gathering debug information to ARTIFACT_DIR"
@@ -276,6 +282,45 @@ EOF
 
 echo "Wait for StorageCluster to become Ready"
 oc wait StorageCluster/ocs-storagecluster -n openshift-storage --for=jsonpath='{.status.phase}'=Ready --timeout=1h
+
+echo "=== Waiting for all OSDs to come up ==="
+COUNTER=0
+while [ $COUNTER -lt 600 ]; do
+    OSD_UP=$(oc get cephcluster -n openshift-storage -o jsonpath='{.items[0].status.ceph.osd.storeCount}' 2>/dev/null || echo "0")
+    if [[ "${OSD_UP}" -ge 3 ]]; then
+        echo "All ${OSD_UP} OSDs are up"
+        break
+    fi
+    sleep 15
+    COUNTER=$((COUNTER + 15))
+    echo "Waiting ${COUNTER}s for OSDs (${OSD_UP:-0}/3 up)..."
+done
+if [[ "${OSD_UP}" -lt 3 ]]; then
+    echo "WARNING: Only ${OSD_UP}/3 OSDs up after timeout"
+    oc get cephcluster -n openshift-storage -o yaml || true
+fi
+
+echo "=== Waiting for Ceph health to stabilize ==="
+COUNTER=0
+while [ $COUNTER -lt 600 ]; do
+    HEALTH=$(oc get cephcluster -n openshift-storage -o jsonpath='{.items[0].status.ceph.health}' 2>/dev/null || echo "")
+    if [[ "${HEALTH}" == "HEALTH_OK" ]]; then
+        echo "Ceph cluster is HEALTH_OK"
+        break
+    fi
+    sleep 15
+    COUNTER=$((COUNTER + 15))
+    DETAILS=$(oc get cephcluster -n openshift-storage -o jsonpath='{.items[0].status.ceph.details}' 2>/dev/null || echo "")
+    echo "Waiting ${COUNTER}s for Ceph health (current: ${HEALTH:-unknown})..."
+    if [[ -n "${DETAILS}" ]]; then
+        echo "  Details: ${DETAILS}"
+    fi
+done
+if [[ "${HEALTH}" != "HEALTH_OK" ]]; then
+    echo "WARNING: Ceph health is ${HEALTH} (not HEALTH_OK) — proceeding anyway"
+    echo "Ceph status:"
+    oc get cephcluster -n openshift-storage -o jsonpath='{.items[0].status.ceph}' | jq . 2>/dev/null || true
+fi
 
 echo "ODF installation completed successfully!"
 

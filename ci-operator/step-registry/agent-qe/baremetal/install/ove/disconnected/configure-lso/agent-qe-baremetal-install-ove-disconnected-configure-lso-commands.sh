@@ -114,6 +114,76 @@ if [ $COUNTER -ge 600 ]; then
     exit 1
 fi
 
+echo "Creating LocalVolumeSet for OSD (physical block devices)..."
+cat <<EOF | oc apply -f -
+apiVersion: local.storage.openshift.io/v1alpha1
+kind: LocalVolumeSet
+metadata:
+  name: localvolumeset-osd
+  namespace: openshift-local-storage
+spec:
+  storageClassName: localblock-sc
+  volumeMode: Block
+  nodeSelector:
+    nodeSelectorTerms:
+      - matchExpressions:
+          - key: localstorage
+            operator: In
+            values:
+              - "enabled"
+  deviceInclusionSpec:
+    deviceTypes:
+      - disk
+    minSize: 100Gi
+EOF
+
+echo "Waiting for localblock-sc storage class to be created..."
+COUNTER=0
+while [ $COUNTER -lt 300 ]; do
+    if oc get storageclass localblock-sc &>/dev/null; then
+        echo "Storage class localblock-sc created successfully"
+        break
+    fi
+    sleep 5
+    COUNTER=$((COUNTER + 5))
+    echo "Waiting ${COUNTER}s for localblock-sc storage class..."
+done
+
+if [ $COUNTER -ge 300 ]; then
+    echo "ERROR: Storage class localblock-sc was not created within timeout"
+    oc get storageclass
+    oc get localvolumeset -n openshift-local-storage localvolumeset-osd -o yaml
+    exit 1
+fi
+
+echo "Waiting for 3 PVs with localblock-sc storage class to be created..."
+COUNTER=0
+while [ $COUNTER -lt 600 ]; do
+    PV_COUNT=$(oc get pv -o json | jq -r '[.items[] | select(.spec.storageClassName == "localblock-sc")] | length' 2>/dev/null || echo "0")
+    echo "Found ${PV_COUNT} PVs with localblock-sc storage class"
+
+    if [ "${PV_COUNT}" -ge 3 ]; then
+        echo "Required 3 PVs with localblock-sc storage class are available"
+        oc get pv -o wide | grep localblock-sc || true
+        break
+    fi
+
+    sleep 10
+    COUNTER=$((COUNTER + 10))
+    echo "Waiting ${COUNTER}s for PVs to be created (need 3, found ${PV_COUNT})..."
+done
+
+if [ $COUNTER -ge 600 ]; then
+    echo "ERROR: Required 3 PVs with localblock-sc storage class were not created within timeout"
+    echo "Current PV status:"
+    oc get pv -o wide
+    echo "LocalVolumeSet status:"
+    oc get localvolumeset -n openshift-local-storage localvolumeset-osd -o yaml
+    echo "Pod status in openshift-local-storage:"
+    oc get pods -n openshift-local-storage
+    exit 1
+fi
+
 echo "Local storage configuration completed successfully!"
 echo "Available storage classes:"
 oc get storageclass
