@@ -232,18 +232,50 @@ function check_catalog_source_status(){
 }
 
 
+# Resolve the FBC catalog index image to a pinned digest.
+# Precedence:
+#   1. An explicit MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE is used verbatim, so a
+#      specific build can still be hard-pinned for a debug run.
+#   2. Otherwise the floating tag (default :latest) on QUAY_INDEX_IMAGE_REPO is
+#      resolved to an immutable @sha256 digest, so each run tracks the newest nightly
+#      catalog while staying internally reproducible + logged.
+# The resolved reference is written to ${SHARED_DIR}/quay_index_image for traceability.
+function resolve_index_image () {
+  if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE}" ]]; then
+    echo "Using explicitly pinned index image: ${MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE}"
+  else
+    local ref="${QUAY_INDEX_IMAGE_REPO}:${QUAY_INDEX_IMAGE_TAG}"
+    echo "Resolving latest nightly catalog ${ref} to a digest..."
+    local digest=""
+    # The catalog repo is public, so no auth is needed for the resolve.
+    digest=$(oc image info --show-multiarch "${ref}" -o json 2>/dev/null \
+      | jq -r 'if type=="array" then .[0].listDigest else .digest end') || true
+    if [[ -z "${digest}" || "${digest}" == "null" ]]; then
+      echo "oc image info could not resolve ${ref}; trying skopeo..." >&2
+      if command -v skopeo >/dev/null 2>&1; then
+        digest=$(skopeo inspect --no-tags "docker://${ref}" 2>/dev/null | jq -r '.Digest // ""') || true
+      fi
+    fi
+    if [[ -z "${digest}" || "${digest}" == "null" ]]; then
+      echo "!!! Failed to resolve ${ref} to a digest" >&2
+      return 1
+    fi
+    MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE="${QUAY_INDEX_IMAGE_REPO}@${digest}"
+    echo "Resolved ${ref} -> ${MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE}"
+  fi
+  echo "${MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE}" > "${SHARED_DIR}/quay_index_image"
+}
+
 #"redhat-operators" is official catalog source for released build
-if [ $QUAY_OPERATOR_SOURCE == "redhat-operators" ]; then 
+if [ $QUAY_OPERATOR_SOURCE == "redhat-operators" ]; then
   echo "Installing Quay from released build"
-elif [ -z "$MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE" ]; then
-  echo "Installing from custom catalog source $QUAY_OPERATOR_SOURCE, but not provoide index image: $MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"
-  exit 1
 else #Install Quay operator with fbc image
+  resolve_index_image
   echo "Installing Quay from unreleased fbc image: $MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"
   update_pull_secret
   create_icsp
   create_catalog_source
   check_catalog_source_status
   wait_mcp_ready
-  
+
 fi

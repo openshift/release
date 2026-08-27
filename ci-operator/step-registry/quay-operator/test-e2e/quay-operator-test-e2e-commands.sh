@@ -45,17 +45,33 @@ else
   echo "No mailpit_api in SHARED_DIR; email-dependent specs may skip or fail"
 fi
 
-# The Playwright suite is cloned using PLAYWRIGHT_GIT_REPO and PLAYWRIGHT_GIT_BRANCH,
-# both supplied by the ci-operator config (steps.env). Neither has a default on
-# purpose: the tests must be deliberately version-matched to the deployed Quay
-# image's build ref, so we fail fast rather than silently run a mismatched suite.
-# PLAYWRIGHT_GIT_BRANCH may be a branch, tag, or commit SHA (clone handles each).
+# The Playwright suite is cloned from PLAYWRIGHT_GIT_REPO at a ref resolved in this
+# order (first match wins):
+#   1. PLAYWRIGHT_GIT_BRANCH        - explicit override from the ci-operator config.
+#   2. ${SHARED_DIR}/playwright_git_ref - commit auto-derived by the deploy step from
+#      the deployed Quay app image's source-commit label, so the suite is version-
+#      matched to the product with no manual upkeep.
+#   3. PLAYWRIGHT_GIT_FALLBACK_BRANCH - last-resort branch so the run still executes
+#      (with a warning) instead of hard-failing when nothing else is available.
+# PLAYWRIGHT_GIT_REPO stays required. The resolved ref may be a branch, tag, or commit
+# SHA; clone_playwright_sources handles each.
 PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_GIT_REPO:-}"
 PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_GIT_BRANCH:-}"
-if [[ -z "${PLAYWRIGHT_GIT_REPO}" || -z "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
-  echo "ERROR: PLAYWRIGHT_GIT_REPO and PLAYWRIGHT_GIT_BRANCH must both be set" >&2
-  echo "       (no defaults: the test suite must be pinned to the deployed image's build ref)" >&2
+PLAYWRIGHT_GIT_FALLBACK_BRANCH="${PLAYWRIGHT_GIT_FALLBACK_BRANCH:-redhat-3.18}"
+if [[ -z "${PLAYWRIGHT_GIT_REPO}" ]]; then
+  echo "ERROR: PLAYWRIGHT_GIT_REPO must be set" >&2
   exit 1
+fi
+if [[ -n "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
+  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_BRANCH}"
+  echo "Using explicitly configured Playwright ref: ${PLAYWRIGHT_GIT_REF}"
+elif [[ -s "${SHARED_DIR}/playwright_git_ref" ]]; then
+  PLAYWRIGHT_GIT_REF="$(cat "${SHARED_DIR}/playwright_git_ref")"
+  echo "Using Playwright ref auto-derived from the deployed image: ${PLAYWRIGHT_GIT_REF}"
+else
+  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
+  echo "WARNING: no explicit PLAYWRIGHT_GIT_BRANCH and no derived ref in SHARED_DIR;" >&2
+  echo "         falling back to branch ${PLAYWRIGHT_GIT_REF}" >&2
 fi
 
 clone_playwright_sources() {
@@ -104,15 +120,15 @@ clone_playwright_sources() {
 }
 
 CLONE_DIR="/tmp/quay-playwright-src"
-echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (ref ${PLAYWRIGHT_GIT_BRANCH})"
-clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_BRANCH}" "${CLONE_DIR}"
+echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (ref ${PLAYWRIGHT_GIT_REF})"
+clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"
 PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
 if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
   echo "ERROR: cloned sources have no web/ directory at ${PLAYWRIGHT_WORKDIR}" >&2
   exit 1
 fi
 
-echo "Installing npm dependencies for Playwright ref ${PLAYWRIGHT_GIT_BRANCH}..."
+echo "Installing npm dependencies for Playwright ref ${PLAYWRIGHT_GIT_REF}..."
 pushd "${PLAYWRIGHT_WORKDIR}"
 npm ci
 
@@ -254,7 +270,7 @@ fi
 # --workers flag overrides the config value; override via PLAYWRIGHT_WORKERS if needed.
 PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-2}"
 
-echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_BRANCH}, workers ${PLAYWRIGHT_WORKERS})..."
+echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_REF}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
 npx playwright test \
   "${GREP_INVERT_ARGS[@]}" \

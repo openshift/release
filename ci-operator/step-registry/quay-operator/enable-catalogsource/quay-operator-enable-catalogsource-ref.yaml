@@ -18,8 +18,26 @@ ref:
     mount_path: /var/run/konflux-quay-pull-auth
   env:
   - name: MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE
-    documentation: Quay KONFLUX FBC INDEX IMAGE
-    default: "quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-19@sha256:38bb11bb2c6a0b864efc8e528c5c8370a132f42208350b88546b2ab567cd0202"
+    default: ""
+    documentation: |-
+      Optional explicit override for the Quay KONFLUX FBC index image. When set
+      (e.g. a specific "…@sha256:…" digest) it is used verbatim, letting a run be
+      hard-pinned to a known build for debugging. When empty (the default), the
+      step resolves QUAY_INDEX_IMAGE_REPO:QUAY_INDEX_IMAGE_TAG to an immutable
+      digest instead, so the run tracks the newest nightly catalog automatically.
+  - name: QUAY_INDEX_IMAGE_REPO
+    default: "quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-18-v4-22"
+    documentation: |-
+      FBC catalog index image repository (no tag). Combined with
+      QUAY_INDEX_IMAGE_TAG and resolved to a pinned @sha256 digest at runtime
+      unless MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE is set. Naming convention:
+      stable-<quay-minor-dashed>-v<ocp-minor-dashed> (e.g. stable-3-18-v4-22).
+  - name: QUAY_INDEX_IMAGE_TAG
+    default: "latest"
+    documentation: |-
+      Floating tag on QUAY_INDEX_IMAGE_REPO to resolve to a digest (default
+      "latest", the newest nightly). Ignored when
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE is set.
   - name: QUAY_OPERATOR_SOURCE
     documentation: The Quay operator source, redhat-operators or fbc-operator-catalog
     default: "fbc-operator-catalog"
