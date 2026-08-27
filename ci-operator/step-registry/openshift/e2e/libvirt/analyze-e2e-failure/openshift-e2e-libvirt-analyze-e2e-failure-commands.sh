@@ -9,6 +9,8 @@ JOB_TYPE="${JOB_TYPE:-}"
 PULL_NUMBER="${PULL_NUMBER:-}"
 REPO_OWNER="${REPO_OWNER:-}"
 REPO_NAME="${REPO_NAME:-}"
+GCS_HTTPS="https://storage.googleapis.com/test-platform-results"
+MAX_ARTIFACT_BYTES=8388608
 
 if [[ -z "${TEST_NAME:-}" ]]; then
   if [[ "${JOB_NAME}" =~ (ocp-[^/]+)$ ]]; then
@@ -84,42 +86,112 @@ fi
 echo "Claude Code CLI: $(claude --version 2>/dev/null || echo 'unknown')"
 echo "Failed step: ${FAILED_STEP}"
 
+WORK_DIR=$(mktemp -d /tmp/libvirt-e2e-analysis.XXXXXX)
+cleanup() {
+  rm -rf "${WORK_DIR}"
+}
+trap cleanup EXIT
+
+# Wrapper-owned fetches only. Claude is not given Bash/WebFetch, so it cannot
+# read the Vertex SA key or exfiltrate it from untrusted artifacts.
+fetch_gcs() {
+  local object_name="$1"
+  local dest="$2"
+  shift 2
+  mkdir -p "$(dirname "${dest}")"
+  local code
+  code=$(curl -sL --connect-timeout 10 --max-time 60 "$@" \
+    -w '%{http_code}' -o "${dest}.tmp" "${GCS_HTTPS}/${object_name}" || echo "000")
+  if [[ "${code}" == "200" || "${code}" == "206" ]]; then
+    mv "${dest}.tmp" "${dest}"
+    echo "  fetched ${object_name} (${code})"
+    return 0
+  fi
+  rm -f "${dest}.tmp"
+  return 1
+}
+
+local_from_bucket() {
+  local object_name="$1"
+  echo "${WORK_DIR}/${object_name#${GCS_BUCKET_PATH}/}"
+}
+
+echo "Downloading a bounded artifact set for local analysis..."
+fetch_gcs "${GCS_BUCKET_PATH}/prowjob.json" "$(local_from_bucket "${GCS_BUCKET_PATH}/prowjob.json")" || true
+fetch_gcs "${GCS_BUCKET_PATH}/build-log.txt" "$(local_from_bucket "${GCS_BUCKET_PATH}/build-log.txt")" \
+  -H "Range: bytes=-2097152" || true
+fetch_gcs "${GCS_BUCKET_PATH}/artifacts/${TEST_NAME}/${FAILED_STEP}/finished.json" \
+  "$(local_from_bucket "${GCS_BUCKET_PATH}/artifacts/${TEST_NAME}/${FAILED_STEP}/finished.json")" || true
+fetch_gcs "${GCS_BUCKET_PATH}/artifacts/${TEST_NAME}/${FAILED_STEP}/build-log.txt" \
+  "$(local_from_bucket "${GCS_BUCKET_PATH}/artifacts/${TEST_NAME}/${FAILED_STEP}/build-log.txt")" \
+  -H "Range: bytes=-2097152" || true
+
+fetch_junit_prefix() {
+  local prefix="$1"
+  local encoded resp name dest
+  encoded=$(jq -nr --arg p "${prefix}" '$p|@uri')
+  resp=$(curl -sL --connect-timeout 10 --max-time 30 \
+    "https://storage.googleapis.com/storage/v1/b/test-platform-results/o?prefix=${encoded}&maxResults=50&fields=items(name,size)" \
+    || true)
+  while IFS= read -r name; do
+    [[ -z "${name}" ]] && continue
+    dest=$(local_from_bucket "${name}")
+    fetch_gcs "${name}" "${dest}" || true
+  done < <(echo "${resp}" | jq -r --argjson max "${MAX_ARTIFACT_BYTES}" '
+    .items[]?
+    | select((.size | tonumber) < $max)
+    | select(.name | test("junit.*\\.xml$|\\.xml$"))
+    | .name
+  ' | head -n 20 || true)
+}
+
+fetch_junit_prefix "${GCS_BUCKET_PATH}/artifacts/${TEST_NAME}/${FAILED_STEP}/artifacts/junit"
+fetch_junit_prefix "${GCS_BUCKET_PATH}/artifacts/${TEST_NAME}/${FAILED_STEP}/artifacts/"
+
+if [[ -z "$(find "${WORK_DIR}" -type f -print -quit 2>/dev/null)" ]]; then
+  echo "ERROR: no artifacts downloaded — skipping analysis."
+  exit 0
+fi
+
 # Runtime CI context is always prepended. SYSTEM_PROMPT is the platform-specific
 # override (libvirt by default; PowerVC and others can set it on the step).
 CI_CONTEXT="IMPORTANT CI CONTEXT:
 - You are running inside the CI job itself as a post-step.
-- This step's artifact directory is: ${ARTIFACT_DIR}
-- Other steps' artifacts (build-log, JUnit, install, gather) are available via GCS at: ${PROW_JOB_URL}
-- You may use curl only to download artifacts from this GCS job URL. Do not fetch unrelated URLs.
+- Analyze ONLY the local files under: ${WORK_DIR}
 - Write the final analysis report to: ${ARTIFACT_DIR}/failure-analysis.md
 - Use --fast mode (do NOT use AskUserQuestion).
 - Do NOT prompt for JIRA export — just write the markdown analysis.
+- Do NOT fetch URLs or use network tools.
 - NEVER read files under /var/run/
 - NEVER access credential or token files
-- ARCH is ${ARCH:-unknown}."
+- Failed step: ${FAILED_STEP}
+- ARCH is ${ARCH:-unknown}.
+- Prow job URL (reference only, do not fetch): ${PROW_JOB_URL}"
 
 FULL_PROMPT="${CI_CONTEXT}
 
 ${SYSTEM_PROMPT:-}"
 
 echo ""
-echo "Running Claude with /ci:prow-job-analysis skill..."
+echo "Running Claude against local artifacts (no Bash/WebFetch)..."
 echo ""
 
-# Bash is required so /ci:prow-job-analysis can curl GCS artifacts.
-# WebFetch is omitted to block a prompt-injection exfiltration path.
-# Disallowed Bash patterns block reads of the Vertex SA key.
+CLAUDE_JSON="${WORK_DIR}/claude-failure-analysis.json"
+CLAUDE_LOG="${WORK_DIR}/claude-failure-analysis.log"
+
+# Vertex auth stays mounted for the Claude CLI process. Agent tools cannot
+# reach it: Bash/WebFetch are denied and Read is blocked under /var/run/.
 set +e
-timeout 1200 claude -p "/ci:prow-job-analysis ${PROW_JOB_URL} --fast" \
+timeout 1200 claude -p "Analyze the failed OpenShift CI e2e job using only the local artifacts in ${WORK_DIR}. Write ${ARTIFACT_DIR}/failure-analysis.md." \
   --append-system-prompt "${FULL_PROMPT}" \
-  --allowedTools "Bash Read Write Edit Grep Glob Skill" \
-  --disallowedTools "WebFetch Bash(cat*claude-code-service-account*) Bash(cat*/var/run/*) Bash(curl*google-token*) Bash(env*) Bash(printenv*)" \
+  --allowedTools "Read Write Edit Grep Glob" \
+  --disallowedTools "Bash WebFetch Skill Read(/var/run/**) Read(/var/run/claude-code-service-account/**)" \
   --max-turns 100 \
   --model "${CLAUDE_MODEL}" \
   --verbose \
   --output-format stream-json \
-  > "${ARTIFACT_DIR}/claude-failure-analysis.json" \
-  2> "${ARTIFACT_DIR}/claude-failure-analysis.log"
+  > "${CLAUDE_JSON}" \
+  2> "${CLAUDE_LOG}"
 CLAUDE_EXIT=$?
 set -e
 
@@ -127,7 +199,7 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
   echo "Claude timed out — report may be incomplete"
 fi
 
-TOKENS_JSON=$(grep '"type":"result"' "${ARTIFACT_DIR}/claude-failure-analysis.json" 2>/dev/null \
+TOKENS_JSON=$(grep '"type":"result"' "${CLAUDE_JSON}" 2>/dev/null \
   | head -1 \
   | jq '{
       total_cost_usd: (.total_cost_usd // 0),
@@ -141,6 +213,17 @@ TOKENS_JSON=$(grep '"type":"result"' "${ARTIFACT_DIR}/claude-failure-analysis.js
   || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}')
 
 echo "${TOKENS_JSON}" > "${SHARED_DIR}/claude-failure-analysis-tokens.json" 2>/dev/null || true
+echo "${TOKENS_JSON}" > "${ARTIFACT_DIR}/claude-usage.json"
+
+if [[ -f "${ARTIFACT_DIR}/failure-analysis.md" ]]; then
+  sed -E \
+    -e 's/ya29\.[A-Za-z0-9._-]+/[REDACTED]/g' \
+    -e 's/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/[REDACTED]/g' \
+    -e 's/-----END [A-Z0-9 ]*PRIVATE KEY-----/[REDACTED]/g' \
+    -e 's/AIza[0-9A-Za-z_-]{20,}/[REDACTED]/g' \
+    "${ARTIFACT_DIR}/failure-analysis.md" > "${ARTIFACT_DIR}/failure-analysis.md.redacted"
+  mv "${ARTIFACT_DIR}/failure-analysis.md.redacted" "${ARTIFACT_DIR}/failure-analysis.md"
+fi
 
 echo ""
 echo "=== Failure Analysis Complete ==="
