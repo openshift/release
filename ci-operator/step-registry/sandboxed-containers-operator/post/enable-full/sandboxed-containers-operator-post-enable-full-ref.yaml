@@ -1,0 +1,23 @@
+ref:
+  as: sandboxed-containers-operator-post-enable-full
+  from: cli
+  commands: sandboxed-containers-operator-post-enable-full-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Gates the post-phase full openshift-extended-test run on the test-phase
+    smoke gate. Runs first in the sandboxed-containers-operator-post chain.
+
+    TEST_SCENARIOS is provided by the prowjob (config steps.env). This step
+    never sets a scenario value; it only decides whether the full run happens:
+
+    - Smoke marker ${SHARED_DIR}/osc-post-smoke-ok present: does nothing, so
+      openshift-extended-test runs the full TEST_SCENARIOS from the prowjob.
+    - Marker absent (a failed install/pre skips the test phase, or the smoke
+      gate itself failed): appends `export TEST_SCENARIOS=""` to
+      ${SHARED_DIR}/runtime_env. openshift-extended-test sources runtime_env
+      and, with an empty TEST_SCENARIOS, prints "there is no scenario" and
+      exits 0 without running any tests, so a broken cluster does not produce a
+      spurious post-phase failure.

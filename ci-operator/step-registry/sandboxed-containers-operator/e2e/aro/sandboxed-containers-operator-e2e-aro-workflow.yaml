@@ -1,9 +1,16 @@
 workflow:
   as: sandboxed-containers-operator-e2e-aro
   steps:
+    allow_best_effort_post_steps: true
     env:
       TEST_PARALLEL: 1
-      FORCE_SUCCESS_EXIT: yes
+      # The full openshift-extended-test run lives in the post phase and must
+      # exit non-zero on real test failure so it fails the job (RED). It
+      # self-skips when the test-phase smoke gate did not write the
+      # ${SHARED_DIR}/osc-post-smoke-ok marker: the post chain's enable-full step
+      # blanks TEST_SCENARIOS in that case, so a failed install/pre or smoke
+      # gate does not produce a spurious failure here.
+      FORCE_SUCCESS_EXIT: "no"
       MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
       MUST_GATHER_TIMEOUT: "35m"
       ENABLE_MUST_GATHER: "true"
@@ -20,7 +27,10 @@ workflow:
     - ref: ipi-install-rbac
     - ref: openshift-cluster-bot-rbac
     - chain: sandboxed-containers-operator-pre
+    test:
+    - ref: sandboxed-containers-operator-test
     post:
+    - chain: sandboxed-containers-operator-post
     - ref: cucushift-installer-wait
       timeout: 12h10m0s
       best_effort: true
@@ -28,8 +38,12 @@ workflow:
     - ref: sandboxed-containers-operator-gather-must-gather
     - ref: sandboxed-containers-operator-post
     - ref: aro-deprovision
-    test:
-    - ref: openshift-extended-test
   documentation: |-
-    This workflow run openshift-extented-test on an Azure cluster with
-    the sandboxed containers deployed.
+    This workflow runs sandboxed-containers-operator e2e tests on an
+    ARO cluster. The test phase runs a minimal smoke gate
+    (sandboxed-containers-operator-test); on success it
+    writes ${SHARED_DIR}/osc-post-smoke-ok. The full suites run in the post phase
+    (sandboxed-containers-operator-post chain), where every suite runs
+    regardless of the others and each fails the job on its own real failure.
+    Suites self-skip when the smoke gate did not pass, and individual suites are
+    skipped when TEST_<step>_ENABLE is "false".

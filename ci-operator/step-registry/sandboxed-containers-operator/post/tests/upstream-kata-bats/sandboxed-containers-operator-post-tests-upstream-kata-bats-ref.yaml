@@ -1,0 +1,53 @@
+ref:
+  as: sandboxed-containers-operator-post-tests-upstream-kata-bats
+  from_image:
+    namespace: openshift
+    name: release
+    tag: rhel-9-release-golang-1.26-openshift-4.23
+  cli: latest
+  commands: sandboxed-containers-operator-post-tests-upstream-kata-bats-commands.sh
+  timeout: 2h0m0s
+  env:
+  - name: TEST_UPSTREAM_KATA_BATS_ENABLE
+    default: ""
+    documentation: |-
+      Set to "false" to skip the upstream-kata-bats test step.
+      Any other value or unset means the step runs.
+  - name: TEST_UPSTREAM_KATA_BATS_REPO
+    default: "https://github.com/kata-containers/kata-containers"
+    documentation: |-
+      Git repository URL to clone for upstream kata BATS tests.
+  - name: TEST_UPSTREAM_KATA_BATS_BRANCH
+    default: "main"
+    documentation: |-
+      Git branch to checkout after cloning TEST_UPSTREAM_KATA_BATS_REPO.
+  - name: TEST_UPSTREAM_KATA_BATS_FULL_ENABLE
+    default: ""
+    documentation: |-
+      Set to "true" to run the full BATS test pass after smoke.
+      Any other value or unset means only smoke tests run.
+  - name: TEST_UPSTREAM_KATA_BATS_SMOKE_FILES
+    default: ""
+    documentation: |-
+      Space-separated list of .bats filenames for the smoke pass.
+      Paths are relative to tests/integration/kubernetes/.
+      If empty, a built-in default set is used.
+  - name: TEST_UPSTREAM_KATA_BATS_FULL_FILES
+    default: ""
+    documentation: |-
+      Space-separated list of .bats filenames for the full pass.
+      Paths are relative to tests/integration/kubernetes/.
+      If empty, the upstream K8S_TEST_SMALL_HOST_UNION set is used.
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+  documentation: |-
+    Runs upstream kata-containers BATS tests against an OpenShift cluster
+    with sandboxed-containers-operator installed. Clones the kata-containers
+    repo, installs bats if missing, then runs smoke tests. If
+    TEST_UPSTREAM_KATA_BATS_FULL_ENABLE is "true", also runs the full pass.
+    Uses from_image with Go toolchain (provides git); cli: latest provides oc/kubectl.
+    Assumes the operator and Kata runtime are already installed by the pre chain.

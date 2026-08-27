@@ -1,0 +1,25 @@
+chain:
+  as: sandboxed-containers-operator-post
+  steps:
+  - ref: sandboxed-containers-operator-post-enable-full
+  - ref: openshift-extended-test
+  - ref: sandboxed-containers-operator-post-tests-upstream-kata-bats
+  documentation: |-
+    Full sandboxed-containers-operator test suites, run in the POST phase so
+    every suite runs regardless of the others' outcomes and each fails the job
+    (RED) on its own real failure without blocking the rest.
+
+    Each suite self-skips when the test-phase smoke gate did not write
+    ${SHARED_DIR}/osc-post-smoke-ok, so a failed install/pre or a failed smoke gate
+    does not produce spurious suite failures:
+    - sandboxed-containers-operator-post-enable-full runs first: when the marker
+      is absent it blanks TEST_SCENARIOS via ${SHARED_DIR}/runtime_env, so the
+      unmodified openshift-extended-test sources it, sees an empty scenario list,
+      and exits 0 without running any tests. When the marker is present it does
+      nothing, so openshift-extended-test runs the full TEST_SCENARIOS provided
+      by the prowjob. FORCE_SUCCESS_EXIT=no makes a real test failure fail the
+      job.
+    - upstream-kata-bats checks the osc-post-smoke-ok marker directly.
+
+    The upstream-kata-bats suite can be disabled with
+    TEST_UPSTREAM_KATA_BATS_ENABLE=false.

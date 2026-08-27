@@ -1,0 +1,53 @@
+ref:
+  as: sandboxed-containers-operator-test
+  from: tests-private
+  cli: latest
+  grace_period: 10m
+  commands: sandboxed-containers-operator-test-commands.sh
+  timeout: 1h30m0s
+  credentials:
+    - namespace: test-credentials
+      name: tests-private-account
+      mount_path: /var/run/vault/tests-private-account
+  env:
+  - name: TEST_OPENSHIFT_EXTENDED_ENABLE
+    default: ""
+    documentation: |-
+      Set to "false" to skip the smoke gate entirely. When skipped, the gate
+      still writes the ${SHARED_DIR}/osc-post-smoke-ok marker so the post-phase
+      suites run. Any other value or unset means the gate runs.
+  - name: TEST_SMOKE_SCENARIOS
+    default: "sig-kata.*C00113"
+    documentation: |-
+      Scenario selector (a 'grep -E' pattern) for the minimal environment
+      smoke gate run in the test phase. Default is the OSC operator
+      installation case (C00113). Override per job, e.g. "sig-kata.*C00102"
+      for the deploy/delete a pod with kata runtime case. This is the smoke
+      gate's OWN variable and is independent of TEST_SCENARIOS (the full suite
+      run in the post phase).
+  - name: TEST_SMOKE_FILTERS
+    default: ""
+    documentation: |-
+      Optional extra 'grep -E' filters applied to the smoke case selection,
+      in the same "~Attr&;~Attr2&" form as TEST_FILTERS. Usually left empty.
+  - name: TEST_SMOKE_TIMEOUT
+    default: "60"
+    documentation: |-
+      Per-case execution timeout (minutes) for the smoke gate run.
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+  documentation: |-
+    Minimal environment smoke gate for sandboxed-containers-operator, run in
+    the test phase. It runs a single openshift-tests-private (OTP) scenario
+    (default C00113, the operator installation case) selected by its own
+    TEST_SMOKE_SCENARIOS variable.
+
+    On success it writes the flat marker ${SHARED_DIR}/osc-post-smoke-ok and exits 0.
+    On failure it exits non-zero, so the test phase is RED and the job fails.
+    The post-phase suites (full OTP, upstream-kata-bats) self-skip when the
+    marker is absent, so a failed install/pre or a failed smoke gate does not
+    produce spurious suite failures.
