@@ -14,6 +14,11 @@ set -euxo pipefail; shopt -s inherit_errexit
 ODF_NAMESPACE="${ODF_NAMESPACE:-openshift-storage}"
 NOOBAA_S3_TIMEOUT="${NOOBAA_S3_TIMEOUT:-30}"
 ODF_READY_TIMEOUT="${ODF_READY_TIMEOUT:-720}"
+typeset -ri MAX_ODF_READY_TIMEOUT=780
+if (( ODF_READY_TIMEOUT > MAX_ODF_READY_TIMEOUT )); then
+    printf '%s\n' "Warning: ODF_READY_TIMEOUT=${ODF_READY_TIMEOUT} exceeds maximum ${MAX_ODF_READY_TIMEOUT}s; clamping" >&2
+    ODF_READY_TIMEOUT="${MAX_ODF_READY_TIMEOUT}"
+fi
 
 typeset junitFile="${ARTIFACT_DIR}/junit_odf_health.xml"
 
@@ -498,12 +503,15 @@ function WaitForOdfReady () {
 
     typeset scPhase="" nbPhase=""
     while (( elapsed < timeout )); do
-        scPhase="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json 2>/dev/null | python3 -c "
+        typeset -i remaining=$(( timeout - elapsed ))
+        (( remaining < 1 )) && remaining=1
+
+        scPhase="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json --request-timeout="${remaining}s" 2>/dev/null | python3 -c "
 import sys,json; d=json.load(sys.stdin)
 print(d['items'][0]['status'].get('phase','') if d.get('items') else '')
 " 2>/dev/null)" || scPhase=""
 
-        nbPhase="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json 2>/dev/null | python3 -c "
+        nbPhase="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json --request-timeout="${remaining}s" 2>/dev/null | python3 -c "
 import sys,json; d=json.load(sys.stdin)
 print(d['items'][0]['status'].get('phase','') if d.get('items') else '')
 " 2>/dev/null)" || nbPhase=""
