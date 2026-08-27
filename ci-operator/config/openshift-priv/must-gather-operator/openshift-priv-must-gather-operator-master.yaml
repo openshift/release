@@ -15,6 +15,10 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 binary_build_commands: make go-build
 build_root:
   from_repository: true
@@ -277,6 +281,59 @@ tests:
   skip_if_only_changed: .*
   steps:
     workflow: must-gather-review-agent-trigger
+- always_run: false
+  as: tls-scanner
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: must-gather-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: must-gather-operator
+      OO_SECURITY_CONTEXT: restricted
+      SCAN_NAMESPACE: must-gather-operator
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 250Mi
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: tls-pqc-readiness
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: must-gather-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: must-gather-operator
+      OO_SECURITY_CONTEXT: restricted
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: must-gather-operator
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: master
   org: openshift-priv
