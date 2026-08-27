@@ -92,6 +92,7 @@ function check_clusteroperators() {
     return $tmp_ret
 }
 
+# @description Poll cluster operators until all pass health checks consecutively (3 in a row).
 function wait_clusteroperators_continous_success() {
     local try=0 continous_successful_check=0 passed_criteria=3 max_retries=40
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
@@ -117,6 +118,8 @@ function wait_clusteroperators_continous_success() {
     fi
 }
 
+# @description Verify all MachineConfigPools are healthy (not updating, not degraded).
+# @return 0 if healthy, 1 if updating/error, 2 if degraded.
 function check_mcp() {
     local updating_mcp unhealthy_mcp tmp_output
 
@@ -163,6 +166,8 @@ function check_mcp() {
     return 0
 }
 
+# @description Poll MachineConfigPools until all pass health checks consecutively.
+# Respects MAX_MCP_RETRIES env var for configurable timeout (default: 20 retries x 60s).
 function wait_mcp_continous_success() {
     local try=0 continous_successful_check=0 passed_criteria=5 max_retries=${MAX_MCP_RETRIES:-20} ret=0
     local continous_degraded_check=0 degraded_criteria=5
