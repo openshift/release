@@ -1,12 +1,13 @@
 #!/bin/bash
 #
-# Execute MTV cross-cluster live migration (CCLM) forward leg: spoke-1 → spoke-2.
+# Execute MTV cross-cluster live migration (CCLM) return leg: spoke-2 → spoke-1.
 #
-# Direction and plan names are controlled entirely by env vars set in the ref.yaml:
-#   MTV_SOURCE_PROVIDER=spoke-1, MTV_DESTINATION_PROVIDER=spoke-2
-#   MTV_SOURCE_SPOKE_INDEX=1, MTV_DEST_SPOKE_INDEX=2
+# Return-leg companion to p2p-mtv-execute-live-migration. Logic is identical;
+# the direction is controlled entirely by env vars set in the ref.yaml:
+#   MTV_SOURCE_PROVIDER=spoke-2, MTV_DESTINATION_PROVIDER=spoke-1
+#   MTV_SOURCE_SPOKE_INDEX=2, MTV_DEST_SPOKE_INDEX=1
 #
-# Logic is identical to p2p-mtv-execute-live-migration-return-commands.sh;
+# Logic is identical to p2p-mtv-execute-live-migration-commands.sh;
 # direction is controlled entirely by env vars set in the ref.yaml.
 #
 set -euxo pipefail; shopt -s inherit_errexit
@@ -839,8 +840,7 @@ WriteJunit
 if (( cclmStepRc != 0 )); then
     DumpDiagnostics
     if [[ "${cclmDebugMode}" == "true" ]]; then
-        printf 'WARNING: p2p-mtv-execute-live-migration%s failed (rc=%d); not failing job (debug mode)\n' \
-            "${migrationSuffix}" "${cclmStepRc}" >&2
+        printf 'WARNING: p2p-mtv-execute-live-migration%s failed (rc=%d); not failing job (debug mode)\n' "${migrationSuffix}" "${cclmStepRc}" >&2
     else
         exit "${cclmStepRc}"
     fi
