@@ -10,6 +10,23 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
 
+# For PrivateLink clusters the API server is not reachable directly; a preceding
+# step (rosa-cluster-credentials-backplane) writes proxy-conf.sh so oc / e2e.test
+# traffic is routed to the backplane endpoint through the corp proxy. This is a
+# no-op for public clusters, which do not create the file.
+if [[ -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  log "PrivateLink cluster detected, sourcing proxy configuration"
+  # shellcheck disable=SC1091
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+# When a kubeconfig has been provisioned in SHARED_DIR (e.g. via backplane for
+# PrivateLink clusters), hand it to the test binary directly.
+if [[ -s "${SHARED_DIR}/kubeconfig" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  log "Using provisioned kubeconfig at ${KUBECONFIG}"
+fi
+
 # Configure AWS
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
