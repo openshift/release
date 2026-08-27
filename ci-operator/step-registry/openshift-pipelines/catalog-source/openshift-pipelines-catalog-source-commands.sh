@@ -6,6 +6,52 @@ if [[ -z "${CATALOG_INDEX_IMAGE:-}" ]]; then
     exit 1
 fi
 
+echo "Creating ImageDigestMirrorSet for OpenShift Pipelines..."
+oc apply -f - <<EOF
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: pipelines-mirror
+spec:
+  imageDigestMirrors:
+  - source: registry.stage.redhat.io/openshift-pipelines
+    mirrors:
+    - quay.io/openshift-pipeline
+  - source: registry.redhat.io/openshift-pipelines
+    mirrors:
+    - quay.io/openshift-pipeline
+EOF
+
+echo "Waiting for MachineConfigPool to finish updating after IDMS apply..."
+for i in $(seq 1 60); do
+    UPDATING=$(oc --request-timeout=12s get mcp worker \
+        -o jsonpath='{.status.conditions[?(@.type=="Updating")].status}' 2>/dev/null || echo "Unknown")
+    DEGRADED=$(oc --request-timeout=12s get mcp worker \
+        -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}' 2>/dev/null || echo "Unknown")
+    UPDATED=$(oc --request-timeout=12s get mcp worker \
+        -o jsonpath='{.status.conditions[?(@.type=="Updated")].status}' 2>/dev/null || echo "Unknown")
+
+    if [[ "${DEGRADED}" == "True" ]]; then
+        echo "ERROR: MachineConfigPool 'worker' is Degraded"
+        oc --request-timeout=12s get mcp worker \
+            -o jsonpath='{.status.conditions[?(@.type=="Degraded")].message}' 2>/dev/null || true
+        echo ""
+        exit 1
+    fi
+
+    if [[ "${UPDATED}" == "True" && "${UPDATING}" == "False" ]]; then
+        echo "MachineConfigPool 'worker' is Updated after $((10*i)) seconds"
+        break
+    fi
+
+    if [[ $i -eq 60 ]]; then
+        echo "WARNING: MachineConfigPool not Updated within 10 minutes, proceeding anyway"
+        break
+    fi
+    echo "  MCP status: Updated=${UPDATED}, Updating=${UPDATING} - waiting... (attempt ${i}/60)"
+    sleep 10
+done
+
 echo "Creating CatalogSource '${CATALOG_SOURCE_NAME}' with index image: ${CATALOG_INDEX_IMAGE}"
 
 oc apply -f - <<EOF
