@@ -13,6 +13,7 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 ODF_NAMESPACE="${ODF_NAMESPACE:-openshift-storage}"
 NOOBAA_S3_TIMEOUT="${NOOBAA_S3_TIMEOUT:-30}"
+ODF_READY_TIMEOUT="${ODF_READY_TIMEOUT:-720}"
 
 typeset junitFile="${ARTIFACT_DIR}/junit_odf_health.xml"
 
@@ -485,6 +486,48 @@ print(d['items'][0].get('status',{}).get('ceph',{}).get('health','unknown') if d
 }
 
 # ---------------------------------------------------------------------------
+# Wait for ODF subsystems to reach Ready (handles vSphere slow convergence)
+# ---------------------------------------------------------------------------
+
+function WaitForOdfReady () {
+    typeset -i timeout="${ODF_READY_TIMEOUT}"
+    typeset -i elapsed=0
+    typeset -i pollInterval=15
+
+    : "Waiting up to ${timeout}s for StorageCluster and NooBaa to reach Ready..."
+
+    typeset scPhase="" nbPhase=""
+    while (( elapsed < timeout )); do
+        scPhase="$(oc get storagecluster -n "${ODF_NAMESPACE}" -o json 2>/dev/null | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+print(d['items'][0]['status'].get('phase','') if d.get('items') else '')
+" 2>/dev/null)" || scPhase=""
+
+        nbPhase="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json 2>/dev/null | python3 -c "
+import sys,json; d=json.load(sys.stdin)
+print(d['items'][0]['status'].get('phase','') if d.get('items') else '')
+" 2>/dev/null)" || nbPhase=""
+
+        if [[ "${scPhase}" == "Ready" && "${nbPhase}" == "Ready" ]]; then
+            : "ODF ready after ${elapsed}s (StorageCluster=Ready, NooBaa=Ready)"
+            return 0
+        fi
+
+        if [[ "${scPhase}" == "Ready" && -z "${nbPhase}" ]]; then
+            : "StorageCluster Ready, no NooBaa deployed (acceptable)"
+            return 0
+        fi
+
+        : "Waiting... StorageCluster=${scPhase:-unknown}, NooBaa=${nbPhase:-unknown} (${elapsed}/${timeout}s)"
+        sleep "${pollInterval}"
+        (( elapsed += pollInterval )) || true
+    done
+
+    : "ODF did not reach Ready within ${timeout}s (StorageCluster=${scPhase:-unknown}, NooBaa=${nbPhase:-unknown})"
+    return 1
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -544,6 +587,10 @@ function Main () {
         WriteJunit
         : "ODF Health Check: ALL SKIPPED (ODF not installed)"
         exit 0
+    fi
+
+    if ! WaitForOdfReady; then
+        : "ODF subsystems did not converge within ${ODF_READY_TIMEOUT}s; running checks to capture current state"
     fi
 
     CheckOdfCsv          || true
