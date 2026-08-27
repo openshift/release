@@ -67,7 +67,7 @@ spec:
         - --github-workers=30
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --job-config-path=/etc/jobs
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
@@ -106,6 +106,14 @@ spec:
           readOnly: true
         - name: service-account
           mountPath: /etc/service-account
+          readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: release
+          mountPath: /etc/jobs/release
           readOnly: true
         resources:
           requests:
@@ -152,3 +160,8 @@ spec:
       - name: service-account
         secret:
           secretName: gce-sa-credentials-gcs-crier-publisher
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs

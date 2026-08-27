@@ -138,7 +138,7 @@ spec:
         - --supplemental-prow-config-dir=/etc/config
         - --hmac-secret-file=/etc/github/hmac
         - --dry-run=false
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --job-config-path=/etc/jobs
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
@@ -190,6 +190,14 @@ spec:
           mountPath: /var/repo
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
+          readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: release
+          mountPath: /etc/jobs/release
           readOnly: true
         resources:
           requests:
@@ -251,3 +259,8 @@ spec:
           secretName: hook
       - name: tmp
         emptyDir: {}
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs

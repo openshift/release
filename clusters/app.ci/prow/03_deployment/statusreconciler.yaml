@@ -54,7 +54,7 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --job-config-path=/etc/jobs
         - --projected-token-file=/var/sa-token/token
         env:
         - name: GITHUB_APP_ID
@@ -76,6 +76,14 @@ spec:
           readOnly: true
         - name: release
           mountPath: /var/repo
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: release
+          mountPath: /etc/jobs/release
+          readOnly: true
         resources:
           requests:
             memory: "34Gi"
@@ -112,3 +120,8 @@ spec:
           name: config
       - name: release
         emptyDir: {}
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs

@@ -72,7 +72,7 @@ spec:
         - --dry-run=false
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --job-config-path=/etc/jobs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
@@ -108,6 +108,14 @@ spec:
           mountPath: /tmp
         - name: service-account
           mountPath: /etc/service-account
+          readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: release
+          mountPath: /etc/jobs/release
           readOnly: true
         resources:
           requests:
@@ -150,3 +158,8 @@ spec:
       - name: service-account
         secret:
           secretName: gce-sa-credentials-gcs-tide-publisher
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
