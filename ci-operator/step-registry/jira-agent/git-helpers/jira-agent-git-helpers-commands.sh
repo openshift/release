@@ -26,7 +26,8 @@ DEFAULT_BRANCH="${JIRA_AGENT_DEFAULT_BRANCH:-main}"
 
 _configure_git_credentials() {
   local token_variable="${1:-GITHUB_TOKEN}"
-  local helper="!f() { printf '%s\n' 'username=x-access-token'; printf '%s%s\n' 'pass' 'word=' \"\$(printenv ${token_variable})\"; }; f"
+  # Keep the protocol field and token in one printf argument; extra arguments repeat printf's format.
+  local helper="!f() { printf '%s\n' 'username=x-access-token'; printf '%s\n' \"pass\"\"word=\$(printenv ${token_variable})\"; }; f"
   git config --global credential.helper "$helper"
 }
 
