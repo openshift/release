@@ -38,19 +38,30 @@ process_inventory() {
   done > "${dest_file}"
 }
 
+# Temporary workaround: clone the fork so all fixes (ocp_operator_mirror stage
+# rewrite exclusions, new playbooks) are active. Copy collections from the
+# official image since the fork clone does not have them pre-installed.
+# TODO: remove once openshift-kni/eco-ci-cd contains these changes and the image
+# is rebuilt; then set ECO_CI_CD=/eco-ci-cd below instead.
+ECO_CI_CD="/tmp/eco-ci-cd-fork"
+echo "Cloning eco-ci-cd fork (cnf-ran-oran-4.22)"
+git clone --depth=1 --branch cnf-ran-oran-4.22 \
+  https://github.com/rdiazcam/eco-ci-cd.git "${ECO_CI_CD}"
+cp -r /eco-ci-cd/collections/. "${ECO_CI_CD}/collections/"
+
 echo "Processing common group_vars"
-mkdir -p /eco-ci-cd/inventories/ocp-deployment/group_vars
+mkdir -p "${ECO_CI_CD}/inventories/ocp-deployment/group_vars"
 
 find /var/group_variables/common/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
   echo "  group_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
+  process_inventory "$dir" "${ECO_CI_CD}/inventories/ocp-deployment/group_vars/$(basename "${dir}")"
 done
 
 echo "Copying host_vars from SHARED_DIR"
-mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
+mkdir -p "${ECO_CI_CD}/inventories/ocp-deployment/host_vars"
 
-cp "${SHARED_DIR}/bastion" /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
-cp "${SHARED_DIR}/master0" /eco-ci-cd/inventories/ocp-deployment/host_vars/master0
+cp "${SHARED_DIR}/bastion" "${ECO_CI_CD}/inventories/ocp-deployment/host_vars/bastion"
+cp "${SHARED_DIR}/master0" "${ECO_CI_CD}/inventories/ocp-deployment/host_vars/master0"
 
 if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
   CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
@@ -75,7 +86,7 @@ echo "VERSION_TAG=${VERSION_TAG}"
 HUB_OPERATORS=$(echo "${HUB_OPERATORS}" | sed "s/\${VERSION_TAG}/${VERSION_TAG}/g")
 echo "HUB_OPERATORS=${HUB_OPERATORS}"
 
-cd /eco-ci-cd/
+cd "${ECO_CI_CD}"
 
 echo "Deploying hub operators (VERSION=${VERSION}, VERSION_TAG=${VERSION_TAG})"
 
@@ -89,6 +100,16 @@ fi
 SKIP_REGISTRY_CLEANUP=""
 if [[ "$VERSION" == "4.14" ]]; then
   SKIP_REGISTRY_CLEANUP="ocp_operator_mirror_skip_internal_registry_cleanup=true"
+fi
+
+
+# Deploy Alertmanager before operator install so any operator whose pods need
+# it (e.g. o-cloud-manager alarms-server) can reach it on first start.
+if [[ "${CONFIGURE_ACM_OBSERVABILITY}" == "true" ]]; then
+  echo "Configuring ACM Observability (minimal Alertmanager for alarms-server)"
+  ansible-playbook playbooks/ran/hub-sno-configure-acm-observability.yml \
+    -i ./inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH}" -vv
 fi
 
 echo "Running deploy-ocp-operators"

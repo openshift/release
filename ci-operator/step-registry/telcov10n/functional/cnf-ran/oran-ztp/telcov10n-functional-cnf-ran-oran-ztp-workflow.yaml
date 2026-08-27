@@ -1,0 +1,28 @@
+workflow:
+  as: telcov10n-functional-cnf-ran-oran-ztp
+  documentation: |-
+    ZTP workflow for CNF RAN O-RAN testing:
+    1. Hub setup (kni-qe-129_hub-sno): deploy, configure, mirror operators
+
+    Same as the PTP GM ZTP workflow but without the spoke deploy and test
+    phases: the spoke is not deployed via ZTP and no gotests are run here.
+  steps:
+    pre:
+    # # Hub cluster setup
+    # - ref: telcov10n-functional-cnf-ran-hub-deploy
+    # - ref: telcov10n-functional-cnf-ran-hub-config
+    # # Special O-RAN setup: repoint ZTP ArgoCD apps at O-RAN templates and
+    # # bootstrap PKI/Keycloak/mock-smo/o2ims inventory (depends on hub-config
+    # # having extracted the ArgoCD artifacts and installed cert-manager, rhbk
+    # # and o-cloud-manager operators).
+    - ref: telcov10n-functional-cnf-ran-oran-setup
+    - ref: telcov10n-functional-cnf-ran-mirror-spoke-operators
+    test:
+    # Run eco-gotests O-RAN suites against the hub (features set via ECO_GOTESTS_FEATURES)
+    - ref: telcov10n-functional-cnf-ran-eco-gotests-oran
+    # # post:
+    # # - ref: telcov10n-functional-report
+    # # - ref: telcov10n-functional-cnf-ran-send-slack-notification
+    # # # Reports are verified on the bastion (not copied to the CI pod SHARED_DIR)
+    # # # to avoid the 1 MB Kubernetes secret size limit.
+    # # - ref: telcov10n-verify-junit-reports-bastion
