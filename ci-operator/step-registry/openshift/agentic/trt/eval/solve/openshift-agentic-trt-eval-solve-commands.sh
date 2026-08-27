@@ -79,6 +79,7 @@ for case_name in "${CASE_LIST[@]}"; do
         done
         cp "${REAL_SHARED_DIR}/gh-fork-token" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/gh-upstream-token" "${CASE_SHARED}/"
+        cp "${REAL_SHARED_DIR}/trt-telemetry.sh" "${CASE_SHARED}/"
 
         cp -r "${TEMPLATE_DIR}" "${CASE_WORKDIR}"
         cd "${CASE_WORKDIR}"

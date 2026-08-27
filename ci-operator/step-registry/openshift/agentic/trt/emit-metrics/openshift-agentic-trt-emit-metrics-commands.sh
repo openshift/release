@@ -6,9 +6,6 @@ set -o pipefail
 
 echo "=== TRT Metrics Emission ==="
 
-EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
-OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
-
 # Read metadata written by the main steps (jira-solver and/or review-responder)
 METADATA_FILES=("${SHARED_DIR}"/metrics-metadata-*.json)
 if [[ ! -e "${METADATA_FILES[0]}" ]]; then
@@ -19,10 +16,12 @@ fi
 echo "Found ${#METADATA_FILES[@]} metadata file(s)"
 
 # --- Session metrics (cost, tokens) for BigQuery claude_session_metrics table ---
-if [[ -f "${EXTRACT_METRICS}" ]] && [[ -f "${OTEL_LOG}" ]]; then
-    echo "Extracting session metrics..."
-    python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json" \
-        2>&1 || echo "Warning: Failed to extract session metrics"
+SESSION_METRICS="${SHARED_DIR}/claude-session-metrics-autodl.json"
+if [[ -f "${SESSION_METRICS}" ]]; then
+    echo "Copying pre-computed session metrics autodl..."
+    cp "${SESSION_METRICS}" "${ARTIFACT_DIR}/claude-session-metrics-autodl.json"
+else
+    echo "Warning: No pre-computed session metrics found in SHARED_DIR"
 fi
 
 # --- Domain autodl for BigQuery jira_agent table ---

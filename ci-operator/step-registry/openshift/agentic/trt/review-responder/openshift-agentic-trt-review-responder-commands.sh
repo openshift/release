@@ -19,46 +19,12 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
 fi
 
 # --- Metrics instrumentation ---
-OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
-
-agentic_ci() {
-    local timeout_seconds=""
-    local extra_args=()
-    while [[ "${1:-}" == --* ]]; do
-        case "$1" in
-            --timeout) timeout_seconds="$2"; shift 2 ;;
-            *) extra_args+=("$1"); shift ;;
-        esac
-    done
-    local prompt="$1"; shift
-    local cmd=(
-        agentic-ci run
-        --backend local
-        --harness claude-code
-        --model "${CLAUDE_MODEL}"
-        --workdir "${WORKDIR}"
-        "${extra_args[@]+"${extra_args[@]}"}"
-        "${prompt}"
-        --
-        --permission-mode default
-        --allowedTools "${ALLOWED_TOOLS}"
-        --verbose
-        "$@"
-    )
-    # Isolate TMPDIR so concurrent agentic-ci runs cannot steal/delete each
-    # other's /tmp/agentic-ci-run.* OTEL files.
-    local run_tmp
-    run_tmp=$(mktemp -d /tmp/agentic-ci-wrapper.XXXXXX)
-    local rc=0
-    if [[ -n "${timeout_seconds}" ]]; then
-        TMPDIR="${run_tmp}" timeout "${timeout_seconds}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
-    else
-        TMPDIR="${run_tmp}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
-    fi
-    find "${run_tmp}" -name 'claude-otel.jsonl' -type f -exec cat {} + >> "${OTEL_LOG}" 2>/dev/null || true
-    rm -rf "${run_tmp}"
-    return $rc
+[[ -f "${SHARED_DIR}/trt-telemetry.sh" ]] || {
+    echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — workflow init step must run first"
+    exit 1
 }
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/trt-telemetry.sh"
 
 # --- Find PR number ---
 if [[ -f "${SHARED_DIR}/pr-number" ]]; then
@@ -70,6 +36,7 @@ else
     PR_NUM=$(echo "${PR_JSON}" | jq -r '.[0].number // empty')
     if [[ -z "${PR_NUM}" ]]; then
         echo "No open PR found for ${JIRA_ISSUE_KEY}. Nothing to do."
+        finalize_session_metrics
         exit 0
     fi
     echo "Found PR #${PR_NUM}"
@@ -509,5 +476,7 @@ jq -n \
     }' > "${SHARED_DIR}/metrics-metadata-review.json"
 
 echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-review.json"
+
+finalize_session_metrics
 
 echo "=== TRT Review Responder Complete ==="
