@@ -73,27 +73,23 @@ for metadata_file in "${METADATA_FILES[@]}"; do
     ROWS=$(echo "${ROWS}" | jq --argjson row "${ROW}" '. + [$row]')
 done
 
-# Schema includes num_review_rounds (will be null for solver rows)
-SCHEMA='{
-  session_id: "string",
-  agent: "string",
-  phase: "string",
-  issue_key: "string",
-  pr_url: "string",
-  result: "string",
-  upstream_repo: "string",
-  num_review_rounds: "integer",
-  analyzed_at: "string",
-  job_name: "string",
-  build_id: "string"
-}'
-
 jq -n \
-    --argjson schema "${SCHEMA}" \
     --argjson rows "${ROWS}" \
     '{
       table_name: "jira_agent",
-      schema: $schema,
+      schema: {
+        session_id: "string",
+        agent: "string",
+        phase: "string",
+        issue_key: "string",
+        pr_url: "string",
+        result: "string",
+        upstream_repo: "string",
+        num_review_rounds: "integer",
+        analyzed_at: "string",
+        job_name: "string",
+        build_id: "string"
+      },
       schema_mapping: null,
       rows: $rows,
       chunk_size: 0,
