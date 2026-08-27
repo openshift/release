@@ -1,20 +1,26 @@
 base_images:
   base-rhel9:
-    name: "5.0"
+    name: builder
     namespace: ocp
-    tag: base-rhel9
-  cli-operator-sdk:
-    name: cli-operator-sdk
-    namespace: ocp
-    tag: v1.39.2
+    tag: rhel-9-enterprise-base-multi-openshift-4.19
 binary_build_commands: make go-build
 build_root:
   from_repository: true
 images:
   items:
-  - dockerfile_path: Dockerfile.openshift
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.openshift
     from: base-rhel9
     to: must-gather-operator
+  - additional_architectures:
+    - arm64
+    dockerfile_literal: |
+      FROM quay.io/operator-framework/operator-sdk:v1.39.2 as osdk
+      FROM src
+      COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+    from: src
+    to: cli-operator-sdk
 operator:
   bundles:
   - as: must-gather-operator-bundle
@@ -26,20 +32,19 @@ operator:
     with: pipeline:must-gather-operator
   - pullspec: quay.io/openshift/origin-must-gather:latest
     with: stable:must-gather
-promotion:
-  to:
-  - name: "5.0"
-    namespace: ocp
 releases:
   initial:
-    integration:
-      name: "5.0"
-      namespace: ocp
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.0"
   latest:
-    integration:
-      include_built_images: true
-      name: "5.0"
-      namespace: ocp
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -49,50 +54,15 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make e2e-binary-build
 tests:
-- as: verify-deps
+- as: e2e-hypershift-operator-weekly
+  cron: '@weekly'
   steps:
-    env:
-      CHECK_MOD_LIST: "true"
-    test:
-    - ref: go-verify-deps
-- as: coverage
-  commands: |
-    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make coverage
-  container:
-    from: src
-  secret:
-    mount_path: /tmp/secret
-    name: must-gather-operator-codecov-token
-- as: publish-coverage
-  commands: |
-    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make coverage
-  container:
-    from: src
-  postsubmit: true
-  secret:
-    mount_path: /tmp/secret
-    name: must-gather-operator-codecov-token
-- as: lint
-  commands: make lint
-  container:
-    from: src
-- as: test
-  commands: make test
-  container:
-    from: src
-- as: validate-boilerplate
-  commands: make validate
-  container:
-    from: src
-  optional: true
-- as: e2e-gcp-operator
-  steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: must-gather-operator-bundle
+      RELEASE_IMAGE_LATEST: release:latest
     env:
+      HYPERSHIFT_SKIP_VERSION_VALIDATION: "true"
       OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: must-gather-operator
     test:
@@ -120,61 +90,43 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-gcp
-- always_run: false
-  as: e2e-gcp-operator-rhcos10-fips
-  optional: true
+    workflow: optional-operators-ci-operator-sdk-hypershift
+- as: e2e-aws-operator-multi-weekly
+  cron: '@weekly'
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: must-gather-operator-bundle
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
-      FIPS_ENABLED: "true"
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: m6g.xlarge
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
       OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: must-gather-operator
-      OSSTREAM: rhel-10
-    test:
-    - as: install
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ipi-install-heterogeneous
+    - as: create-ns
       cli: latest
       commands: |
-        oc -n must-gather-operator rollout status deployment must-gather-operator
+        oc new-project must-gather-operator && echo "must-gather-operator" > "$SHARED_DIR"/operator-install-namespace.txt
       from: src
       resources:
         requests:
           cpu: 100m
-    - ref: fips-check-fips-or-die
-    - as: test
-      cli: latest
-      commands: |
-        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
-        make test-e2e
-      credentials:
-      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
-        name: case-management-creds
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-gcp
-- always_run: false
-  as: e2e-gcp-operator-rhcos10
-  optional: true
-  steps:
-    cluster_profile: openshift-org-gcp
-    dependencies:
-      OO_BUNDLE: must-gather-operator-bundle
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-      OO_INSTALL_MODE: AllNamespaces
-      OO_INSTALL_NAMESPACE: must-gather-operator
-      OSSTREAM: rhel-10
+    - ref: optional-operators-operator-sdk
     test:
-    - as: install
+    - as: verify-install
       cli: latest
       commands: |
         oc -n must-gather-operator rollout status deployment must-gather-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: must-gather-operator-bundle
       from: src
       resources:
         requests:
@@ -192,8 +144,9 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-gcp
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: release-5.0
   org: openshift
   repo: must-gather-operator
+  variant: multi
