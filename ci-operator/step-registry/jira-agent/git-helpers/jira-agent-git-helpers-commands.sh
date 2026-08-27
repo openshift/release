@@ -54,7 +54,7 @@ _github_curl() {
 # ── PAT mode ──────────────────────────────────────────────────────────────────
 
 # Load a classic PAT from the credential secret.
-# Sets: GITHUB_TOKEN_PAT
+# Sets: GITHUB_TOKEN_PAT, GITHUB_TOKEN, GH_TOKEN
 # Requires: JIRA_AGENT_PAT_KEY
 _load_pat_credentials() {
   echo "Loading GitHub PAT credentials..."
@@ -79,6 +79,7 @@ _load_pat_credentials() {
 
   # PAT mode uses a single token for everything (push + PR creation)
   export GITHUB_TOKEN="$GITHUB_TOKEN_PAT"
+  export GH_TOKEN="$GITHUB_TOKEN_PAT"
   _configure_git_credentials GITHUB_TOKEN
   echo "PAT configured for git and GitHub CLI"
 
@@ -263,7 +264,7 @@ load_github_app_credentials() {
 }
 
 # Generate initial GitHub App tokens and configure git credentials.
-# Sets: GITHUB_TOKEN_FORK, GITHUB_TOKEN_UPSTREAM, GITHUB_TOKEN (exported)
+# Sets: GITHUB_TOKEN_FORK, GITHUB_TOKEN_UPSTREAM, GITHUB_TOKEN, GH_TOKEN (exported)
 # Requires: INSTALLATION_ID_FORK, INSTALLATION_ID_UPSTREAM, generate_github_token()
 generate_and_configure_tokens() {
   echo "Generating GitHub App tokens..."
@@ -291,6 +292,7 @@ generate_and_configure_tokens() {
 
   _configure_git_credentials GITHUB_TOKEN_FORK
   export GITHUB_TOKEN="$GITHUB_TOKEN_UPSTREAM"
+  export GH_TOKEN="$GITHUB_TOKEN_UPSTREAM"
   echo "GitHub App tokens configured successfully"
 
   $_was_tracing && set -x || true
@@ -331,7 +333,7 @@ refresh_fork_token() {
   $_was_tracing && set -x || true
 }
 
-# Refresh the upstream GitHub App token and update GITHUB_TOKEN.
+# Refresh the upstream GitHub App token and update GitHub CLI/API credentials.
 # No-op in PAT mode.
 refresh_upstream_token() {
   if [ "${JIRA_AGENT_AUTH_MODE:-app}" = "pat" ]; then
@@ -345,6 +347,7 @@ refresh_upstream_token() {
     && [ -n "$_new_token" ] && [ "$_new_token" != "null" ]; then
     GITHUB_TOKEN_UPSTREAM="$_new_token"
     export GITHUB_TOKEN="$GITHUB_TOKEN_UPSTREAM"
+    export GH_TOKEN="$GITHUB_TOKEN_UPSTREAM"
     echo "Upstream token refreshed"
   else
     echo "ERROR: Failed to refresh GitHub App token for upstream — continuing with previous token"
