@@ -10,7 +10,7 @@ ref:
     requests:
       cpu: 100m
       memory: 200Mi
-  timeout: 35m0s
+  timeout: 45m0s
   env:
   - name: TOOLS_NAMESPACE
     default: "tools"
@@ -49,6 +49,16 @@ ref:
     documentation: |-
       Subscription name whose config.env receives OTEL_* for control-plane tracing.
       Use rhcl-operator for downstream RHCL 1.4.x from redhat-operators.
+  - name: VAULT_NAMESPACE
+    default: "tools-vault"
+    documentation: |-
+      Namespace for the egress credential-injection Vault (testsuite default
+      fetch_service_ip looks up Service vault here).
+  - name: VAULT_IMAGE
+    default: "quay.io/mtahoor/vault-oss:1.21.2-s390x"
+    documentation: |-
+      s390x Vault OSS image (hashicorp/vault has no s390x manifest). Dev-mode
+      server with root token; Kubernetes auth is enabled after the pod is Ready.
   documentation: |-
     Deploys the Kuadrant testsuite tooling (Keycloak, Mockserver and Jaeger) into
     the tools namespace on a provisioned s390x OCP cluster using s390x-compatible
@@ -65,6 +75,10 @@ ref:
     spec.observability.enable=true + tracing.defaultEndpoint (ServiceMonitors /
     dataplane tracing) and merges OTEL_* into the Kuadrant Subscription
     (control-plane tracing), matching the rhcl-mc1 reference cluster.
+
+    Also patches Authorino with a cluster-trust-bundle volume (egress credential
+    injection HTTPS to the Kubernetes API) and deploys Vault OSS in tools-vault
+    (dev mode, Kubernetes auth) for the four Vault credential-injection tests.
 
     Tools that the testsuite self-deploys per test (httpbin, spicedb, llm_sim) are
     not created here; only their images are referenced in the generated config.

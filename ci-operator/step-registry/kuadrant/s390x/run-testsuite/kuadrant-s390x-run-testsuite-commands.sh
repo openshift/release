@@ -8,6 +8,7 @@ set -euo pipefail
 #   - Velocity MockServer echo (header-mirroring; Kuadrant/testsuite#952)
 #   - Explicit GET /get → 200 (Phase 1 egress; MockServer path /.* is not regex)
 #   - Egress OpenShift Route name egress-bk (avoid clash with session backend)
+#   - Authorino cluster-trust-bundle + Vault tools-vault (Phase 2 credential injection)
 #   - Authorino/OIDC dataplane-ready soft-wait patch
 #   - protobuf==6.32.1 pin (broken s390x upb ≥6.33.0)
 #   - CFSSL ensure (baked in Dockerfile.s390x; fallback download if missing)
@@ -59,6 +60,15 @@ fi
 if [[ -z "${PROMETHEUS_URL}" ]]; then
   PROMETHEUS_URL="https://thanos-querier.openshift-monitoring.svc.cluster.local:9091"
   echo "WARNING: SHARED_DIR/prometheus-url missing; falling back to ${PROMETHEUS_URL}" >&2
+fi
+
+VAULT_URL="${VAULT_URL:-}"
+if [[ -f "${SHARED_DIR}/vault-url" ]]; then
+  VAULT_URL="$(tr -d '[:space:]' <"${SHARED_DIR}/vault-url")"
+fi
+if [[ -z "${VAULT_URL}" ]]; then
+  VAULT_URL="http://vault.tools-vault.svc.cluster.local:8200"
+  echo "WARNING: SHARED_DIR/vault-url missing; falling back to ${VAULT_URL}" >&2
 fi
 
 # In-cluster the testsuite reaches CoreDNS directly at its Service ClusterIP.
@@ -137,6 +147,9 @@ ${DNS_BLOCK}
     image: "${MOCKSERVER_IMAGE}"
     url: "${MOCKSERVER_URL}"
     # Using pre-deployed MockServer from tools namespace (configured with echo expectations)
+  vault:
+    url: "${VAULT_URL}"
+    token: "root"
   llm_sim:
     image: "${LLM_SIM_IMAGE}"
   spicedb:

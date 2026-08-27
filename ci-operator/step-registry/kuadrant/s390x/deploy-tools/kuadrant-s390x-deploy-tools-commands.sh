@@ -402,3 +402,149 @@ if oc get subscription "${KUADRANT_SUB}" -n "${KUADRANT_NS}" >/dev/null 2>&1; th
 else
   echo "WARNING: subscription ${KUADRANT_SUB} not found in ${KUADRANT_NS}; skipping OTEL env" >&2
 fi
+
+# ---------------------------------------------------------------------------
+# Phase 2 egress: Authorino must trust the cluster CA so metadata.http can
+# call https://kubernetes.default.svc (credential-injection-by-destination)
+# and so Vault Kubernetes auth TokenReviews work. Volume name is required
+# by testsuite/tests/singlecluster/egress/credentials_injection/conftest.py.
+# ---------------------------------------------------------------------------
+echo "=== Authorino cluster-trust-bundle (egress credential injection) ==="
+if oc get authorino authorino -n "${KUADRANT_NS}" >/dev/null 2>&1; then
+  AUTHORINO_POD="$(oc get pod -l authorino-resource=authorino -n "${KUADRANT_NS}" \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  if [[ -z "${AUTHORINO_POD}" ]]; then
+    echo "WARNING: no Authorino pod found in ${KUADRANT_NS}; skipping cluster-trust-bundle" >&2
+  else
+    oc exec "${AUTHORINO_POD}" -n "${KUADRANT_NS}" -- sh -c \
+      'cat /etc/ssl/certs/ca-bundle.crt /etc/ssl/certs/ca-certificates.crt /var/run/secrets/kubernetes.io/serviceaccount/ca.crt 2>/dev/null' \
+      > /tmp/authorino-ca-bundle.crt || true
+    if [[ ! -s /tmp/authorino-ca-bundle.crt ]]; then
+      echo "WARNING: could not read CA bundle from ${AUTHORINO_POD}" >&2
+    else
+      oc create configmap authorino-cluster-trust-ca-bundle -n "${KUADRANT_NS}" \
+        --from-file=ca-bundle.crt=/tmp/authorino-ca-bundle.crt \
+        --from-file=ca-certificates.crt=/tmp/authorino-ca-bundle.crt \
+        --dry-run=client -o yaml | oc apply -f -
+      oc patch authorino authorino -n "${KUADRANT_NS}" --type merge -p '{
+        "spec": {
+          "volumes": {
+            "items": [
+              {
+                "name": "cluster-trust-bundle",
+                "mountPath": "/etc/ssl/certs",
+                "configMaps": ["authorino-cluster-trust-ca-bundle"]
+              }
+            ]
+          }
+        }
+      }'
+      oc wait --for=condition=Ready pod -l authorino-resource=authorino \
+        -n "${KUADRANT_NS}" --timeout=180s || true
+      echo "Authorino cluster-trust-bundle applied"
+    fi
+  fi
+else
+  echo "WARNING: authorino/authorino not found in ${KUADRANT_NS}; skipping cluster-trust-bundle" >&2
+fi
+
+# ---------------------------------------------------------------------------
+# Phase 2 egress: Vault OSS in tools-vault (testsuite fetch_service_ip default).
+# Dev mode, root token, KV v2 at secret/, Kubernetes auth for AuthPolicy login.
+# Image must be s390x (hashicorp/vault has no s390x; use the OSS build).
+# ---------------------------------------------------------------------------
+VAULT_NS="${VAULT_NAMESPACE:-tools-vault}"
+VAULT_IMAGE="${VAULT_IMAGE:-quay.io/mtahoor/vault-oss:1.21.2-s390x}"
+VAULT_URL_FILE="${SHARED_DIR}/vault-url"
+
+echo "=== Vault OSS (${VAULT_IMAGE}) in ${VAULT_NS} ==="
+oc get ns "${VAULT_NS}" >/dev/null 2>&1 || oc create ns "${VAULT_NS}"
+oc -n "${VAULT_NS}" create sa vault --dry-run=client -o yaml | oc apply -f -
+oc adm policy add-scc-to-user anyuid -z vault -n "${VAULT_NS}"
+oc create clusterrolebinding kuadrant-vault-auth-delegator \
+  --clusterrole=system:auth-delegator \
+  --serviceaccount="${VAULT_NS}:vault" \
+  --dry-run=client -o yaml | oc apply -f -
+
+cat <<EOF | oc apply -n "${VAULT_NS}" -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault
+  labels:
+    app: vault
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault
+  template:
+    metadata:
+      labels:
+        app: vault
+    spec:
+      serviceAccountName: vault
+      nodeSelector:
+        kubernetes.io/arch: s390x
+      containers:
+      - name: vault
+        image: ${VAULT_IMAGE}
+        imagePullPolicy: Always
+        args:
+        - server
+        - -dev
+        - -dev-root-token-id=root
+        - -dev-listen-address=0.0.0.0:8200
+        env:
+        - name: VAULT_DEV_ROOT_TOKEN_ID
+          value: "root"
+        - name: VAULT_DEV_LISTEN_ADDRESS
+          value: "0.0.0.0:8200"
+        ports:
+        - containerPort: 8200
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /v1/sys/health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 24
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  labels:
+    app: vault
+spec:
+  selector:
+    app: vault
+  ports:
+  - name: http
+    port: 8200
+    targetPort: 8200
+EOF
+
+oc wait --for=condition=Available deployment/vault -n "${VAULT_NS}" --timeout=300s
+oc wait --for=condition=Ready pod -l app=vault -n "${VAULT_NS}" --timeout=300s
+
+echo "=== Enable Vault Kubernetes auth ==="
+# disable_iss_validation: OCP SA tokens use issuer https://kubernetes.default.svc
+oc exec -n "${VAULT_NS}" deploy/vault -- \
+  env VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root \
+  vault auth enable kubernetes || true
+oc exec -n "${VAULT_NS}" deploy/vault -- sh -c '
+  export VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root
+  vault write auth/kubernetes/config \
+    kubernetes_host="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}" \
+    kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+    token_reviewer_jwt=@/var/run/secrets/kubernetes.io/serviceaccount/token \
+    disable_iss_validation=true
+'
+oc exec -n "${VAULT_NS}" deploy/vault -- \
+  env VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault status || true
+
+VAULT_URL="http://vault.${VAULT_NS}.svc.cluster.local:8200"
+echo "${VAULT_URL}" > "${VAULT_URL_FILE}"
+echo "Vault URL for testsuite (in-cluster): ${VAULT_URL}"
