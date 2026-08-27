@@ -8,7 +8,7 @@ Please refer to the `*-ref.yaml` file in their source code for the full list of 
 
 ### sandboxed-containers-operator-update-kata-rpm
 
-The [sandboxed-containers-operator-update-kata-rpm](./update-kata-rpm/) step downloads the kata-containers rpm from Brew and copy it over the cluster worker nodes.
+When `INSTALL_KATA_RPM` is `true`, the [sandboxed-containers-operator-update-kata-rpm](./update-kata-rpm/) step downloads the kata-containers rpm from Brew, copies it to each worker node and installs it. If the target version is already installed on a node it is skipped. After installation CRI-O is restarted on the updated nodes. The step is a no-op when `INSTALL_KATA_RPM` is `false` (the default).
 
 This step run in a `upi-installer` container, therefore, the image should be referenced
 in the `base_images` section of the job's yaml, as for example:

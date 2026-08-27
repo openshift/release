@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Download and copy the kata containers RPM to /host/var/local/kata-containers.rpm
-# on each worker node. The RPM is going to be installed by the test automation code.
+# Download, copy and install the kata-containers RPM on each worker node.
 
 set -o nounset
 set -o errexit
@@ -44,7 +43,7 @@ if [ $err -ne 0 ]; then
     exit 2
 fi
 
-echo "upload RPM to workers: $(ls -lh kata-containers.rpm)"
+echo "Downloaded RPM: $(ls -lh kata-containers.rpm)"
 
 # checks for a bad URL
 if grep -q 'title.*404 Not Found' kata-containers.rpm && \
@@ -54,30 +53,64 @@ if grep -q 'title.*404 Not Found' kata-containers.rpm && \
     exit 3
 fi
 
+target_version=$(rpm -qp ./kata-containers.rpm)
 kata_rpm_md5sum=$(md5sum kata-containers.rpm | cut -d' ' -f1)
-# output the rpm version
-echo "upload RPM version: $(rpm -q ./kata-containers.rpm)"
-echo "upload RPM md5sum: ${kata_rpm_md5sum}"
+echo "Target RPM: ${target_version}"
+echo "RPM md5sum: ${kata_rpm_md5sum}"
 
-echo "Uploading RPM to workers and checking against the rpm md5sum"
-failed_nodes=""
 nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
 if [[ -z "${nodes}" ]]; then
 	echo "ERROR: workers not found"
 	exit 1
 fi
 
+skipped=0
+updated=0
+failed_nodes=""
+
 for node in $nodes;do
-    dd if=kata-containers.rpm| oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
-    output=$(oc debug -n default "${node}" -- bash -c "md5sum  /host/var/local/kata-containers.rpm | cut -d' ' -f1")
-    if [ "${output}" != "${kata_rpm_md5sum}" ]; then
-        failed_nodes="${node}:${output} ${failed_nodes}"
+    # Check installed version on this node
+    installed=""
+    installed=$(oc debug -n default "${node}" -- chroot /host rpm -q kata-containers 2>/dev/null) || true
+
+    if [ "${installed}" = "${target_version}" ]; then
+        echo "${node}: ${target_version} already installed, skipping"
+        skipped=$((skipped + 1))
+        continue
     fi
+
+    echo "${node}: installed=${installed:-none}, upgrading to ${target_version}"
+
+    # Copy the RPM to the node
+    dd if=kata-containers.rpm | oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
+
+    # Verify checksum
+    node_md5=$(oc debug -n default "${node}" -- bash -c "md5sum /host/var/local/kata-containers.rpm | cut -d' ' -f1")
+    if [ "${node_md5}" != "${kata_rpm_md5sum}" ]; then
+        echo "ERROR: checksum mismatch on ${node}: expected ${kata_rpm_md5sum}, got ${node_md5}"
+        failed_nodes="${node} ${failed_nodes}"
+        continue
+    fi
+
+    # Install the RPM
+    install_output=""
+    install_err=0
+    install_output=$(oc debug -n default "${node}" -- chroot /host bash -c \
+        "ostree admin unlock --hotfix && rpm -Uvh /var/local/kata-containers.rpm && rpm -q kata-containers && systemctl restart crio" 2>&1) || install_err=$?
+
+    if [ $install_err -ne 0 ]; then
+        echo "ERROR: install failed on ${node} (exit ${install_err}): ${install_output}"
+        failed_nodes="${node} ${failed_nodes}"
+        continue
+    fi
+
+    echo "${node}: installed successfully"
+    updated=$((updated + 1))
 done
 
-# check for failures
-if [ "${failed_nodes}" != "" ]; then
-    echo "calculated checksum: ${kata_rpm_md5sum}"
-    echo "ERROR: uploads failed on nodes ${failed_nodes}"
+if [ -n "${failed_nodes}" ]; then
+    echo "ERROR: failed on nodes: ${failed_nodes}"
     exit 4
 fi
+
+echo "Done: ${updated} node(s) updated, ${skipped} node(s) already up-to-date"
