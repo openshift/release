@@ -149,6 +149,25 @@ echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR
 # Pass the CI release payload (resolved by ci-operator from the releases.latest config)
 PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
 echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
+
+# Merge CI registry credentials into the pull secret so the hypervisor can
+# access the Prow-internal registry (registry.buildXX.ci.openshift.org).
+if [[ -n "${PAYLOAD_URL}" ]]; then
+  echo "Merging CI registry credentials into pull secret on hypervisor..."
+  PULL_SECRET_SRC="${CLUSTER_PROFILE_DIR}/openshift-pull-secret"
+  if [[ ! -f "${PULL_SECRET_SRC}" ]]; then
+    echo "ERROR: ${PULL_SECRET_SRC} not found"
+    exit 1
+  fi
+  cp "${PULL_SECRET_SRC}" /tmp/pull-secret.json
+  oc registry login --to=/tmp/pull-secret.json
+  # Read OPENSHIFT_PULL_SECRET path from the env.user file on the hypervisor
+  REMOTE_PULL_SECRET=$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -a; source ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}; echo \${OPENSHIFT_PULL_SECRET:-openshift_pull.json}")
+  scp -q ${SSH_OPTS} /tmp/pull-secret.json root@${REMOTE_HOST}:"${REMOTE_PULL_SECRET}"
+  echo "Pull secret with CI registry credentials copied to ${REMOTE_PULL_SECRET}"
+  rm -f /tmp/pull-secret.json
+fi
+
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
   cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
