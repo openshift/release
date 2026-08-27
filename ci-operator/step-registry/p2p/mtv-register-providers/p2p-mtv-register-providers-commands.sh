@@ -8,12 +8,17 @@ set -euxo pipefail; shopt -s inherit_errexit
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq
 
 if [[ -n "${SHARED_DIR}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    # Disable xtrace: proxy-conf.sh may set HTTP_PROXY with embedded credentials.
+    typeset _wasTracing=false
+    if [[ $- == *x* ]]; then _wasTracing=true; fi
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+    [[ "${_wasTracing}" == "true" ]] && set -x
 fi
 
 typeset -i spokeCount="${MTV_SPOKE_CLUSTER_COUNT}"
@@ -23,9 +28,11 @@ typeset -a managedClusterNamesArr=()
 typeset    tmpDir=""
 
 # Cleanup — remove temp kubeconfig/token files on EXIT (never persist credentials).
+# Subshell: no parent-context updates needed; xtrace restores automatically on subshell exit.
 Cleanup() {
-    set +x
-    [[ -n "${tmpDir}" && -d "${tmpDir}" ]] && rm -rf "${tmpDir}"
+    ( set +x
+        [[ -n "${tmpDir}" && -d "${tmpDir}" ]] && rm -rf "${tmpDir}"
+    true )
     true
 }
 trap Cleanup EXIT
