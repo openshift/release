@@ -100,10 +100,31 @@ tests:
     cluster_profile: platform-gcp
     workflow: gcp-hcp-e2e
 - as: generate-bin
-  commands: make terraform-init
-  container:
-    from: bin
   postsubmit: true
+  steps:
+    test:
+    - as: generate
+      commands: |
+        git config --global url."https://github.com/".insteadOf "git@github.com:"
+        git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$(cat /etc/github-private/oauth)"; }; f'
+        cat > "$HOME/.terraformrc" <<TFRC
+        credentials "app.terraform.io" {
+          token = "$(cat /etc/terraform-cloud/token)"
+        }
+        TFRC
+        make terraform-init
+      credentials:
+      - mount_path: /etc/github-private
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        namespace: ci
+      - mount_path: /etc/terraform-cloud
+        name: tfcloud-ci-secret
+        namespace: ci
+      from: bin
+      resources:
+        requests:
+          cpu: "8"
+          memory: 4Gi
 zz_generated_metadata:
   branch: main
   org: openshift-online
