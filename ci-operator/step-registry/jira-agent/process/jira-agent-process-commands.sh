@@ -408,3 +408,8 @@ echo "=== Processing Summary ==="
 echo "Processed: $PROCESSED_COUNT"
 echo "Failed: $FAILED_COUNT"
 echo "=========================="
+
+if [ "$FAILED_COUNT" -gt 0 ]; then
+  echo "ERROR: Jira Agent failed to complete $FAILED_COUNT issue(s)"
+  exit 1
+fi
