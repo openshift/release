@@ -427,7 +427,9 @@ EOF
 
     typeset s3Result=""
     typeset -i podWait=$(( NOOBAA_S3_TIMEOUT + 60 ))
+    set +x
     if echo "${podManifest}" | oc apply -f -; then
+        set -x
         if ! oc wait pod "${podName}" -n "${ODF_NAMESPACE}" \
             --for=jsonpath='{.status.phase}'=Succeeded \
             --timeout="${podWait}s" 2>/dev/null; then
@@ -436,6 +438,8 @@ EOF
             oc describe pod "${podName}" -n "${ODF_NAMESPACE}" || true
         fi
         s3Result="$(oc logs "${podName}" -n "${ODF_NAMESPACE}" 2>/dev/null || echo "")"
+    else
+        set -x
     fi
 
     oc delete pod "${podName}" -n "${ODF_NAMESPACE}" --ignore-not-found=true --wait=false 2>/dev/null || true
@@ -536,9 +540,10 @@ print(d['items'][0]['status'].get('phase','') if d.get('items') else '')
 }
 
 # ---------------------------------------------------------------------------
-# Main
+# Main: probe ODF installation, wait for readiness, run health checks
 # ---------------------------------------------------------------------------
 
+# Returns 0 if ODF/OCS CSV exists in ODF_NAMESPACE, 1 if absent, 2 on error.
 function CheckOdfInstalled () {
     if ! oc get namespace "${ODF_NAMESPACE}" >/dev/null 2>&1; then
         return 1
