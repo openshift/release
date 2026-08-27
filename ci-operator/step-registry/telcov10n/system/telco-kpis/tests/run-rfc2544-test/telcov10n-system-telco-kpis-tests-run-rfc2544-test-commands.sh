@@ -45,7 +45,7 @@ main() {
         -e max_latency_threshold="${MAX_LATENCY_THRESHOLD}" \
         -e tolerance_nines="${TOLERANCE_NINES}" \
         -e absolute_max_latency="${ABSOLUTE_MAX_LATENCY}" \
-        -e skip_rebuild_image="${SKIP_REBUILD_IMAGE}" \
+        -e force_pull_test_runner_image="${FORCE_PULL_TEST_RUNNER_IMAGE}" \
         ${DEBUG_FLAG} || rc=$?
 
     echo "RFC2544 test completed for ${SPOKE_CLUSTER} (rc=${rc})"

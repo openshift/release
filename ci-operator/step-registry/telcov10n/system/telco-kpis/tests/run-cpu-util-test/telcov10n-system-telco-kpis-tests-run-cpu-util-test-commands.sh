@@ -42,7 +42,7 @@ main() {
         -e spoke_kubeconfig="${SPOKE_KUBECONFIG}" \
         -e duration="${DURATION}" \
         -e baseline="${BASELINE}" \
-        -e skip_rebuild_image="${SKIP_REBUILD_IMAGE}" \
+        -e force_pull_test_runner_image="${FORCE_PULL_TEST_RUNNER_IMAGE}" \
         ${DEBUG_FLAG} || rc=$?
 
     echo "cpu_util test completed for ${SPOKE_CLUSTER} (rc=${rc})"
