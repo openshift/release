@@ -28,7 +28,7 @@ then
 fi
 
 # TODO: Remove once dev-install clouds have Python 3.13+ compatible CA certs (shiftstack/dev-install#238).
-yq --yaml-output --in-place ".clouds[\"${OS_CLOUD}\"].verify = false" "${SHARED_DIR}/clouds.yaml"
+yq -i ".clouds[\"${OS_CLOUD}\"].verify = false" "${SHARED_DIR}/clouds.yaml"
 
 set +e
 echo "DEBUG: Running liveliness check script..."
