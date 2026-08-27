@@ -6,9 +6,9 @@ set -o pipefail
 
 
 if [[ $TYPE == "sno" ]]; then
-  MCP_NAME=$(oc get mcp -l pools.operator.machineconfiguration.openshift.io/master= -o jsonpath='{.items[*].metadata.name}')
+  MCP_NAME=$(oc get mcp -l pools.operator.machineconfiguration.openshift.io/master= -o jsonpath='{.items[0].metadata.name}')
 else
-  MCP_NAME=$(oc get mcp -l pools.operator.machineconfiguration.openshift.io/worker= -o jsonpath='{.items[*].metadata.name}')
+  MCP_NAME=$(oc get mcp -l pools.operator.machineconfiguration.openshift.io/worker= -o jsonpath='{.items[0].metadata.name}')
 fi
 
 if [[ -z "$MCP_NAME" ]]; then
