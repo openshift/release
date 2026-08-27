@@ -68,6 +68,46 @@ List GKE test entries (`e2e-gke-*`) across RHDH release branches. Unlike AKS/EKS
 
 **Scripts**: `list-k8s-test-configs.sh --pattern <regex>`
 
+## Cost-Allocation Tagging
+
+All RHDH CI clusters provisioned on AWS or Azure must carry cost-allocation tags for [Cloudability](https://redhat.atlassian.net/browse/RHIDP-15938) billing attribution. When adding new test entries, cluster pools, or MAPT provisioning steps, always include the full set of tags appropriate to the provisioning method. Use existing entries as reference.
+
+### Required Tags
+
+| Tag | Cloudability Field | Allowed Values |
+|-----|--------------------|----------------|
+| `app-code` | Cost center | `rhdh-003` (always) |
+| `service-phase` | Cost center | `dev` (always) |
+| `cost-center` | Cost center | `726` (always) |
+| `scenario` | Scenario | `ocp-hive`, `ocp-fips-hive`, `ocp-disconnected-ipi`, `eks`, `aks` |
+| `origin` | Infrastructure | `ipi`, `hive`, `mapt` |
+| `architecture` | — | `x86_64`, `arm64` |
+| `cluster-type` | — | `ocp`, `k8s` |
+| `pipeline` | — | `openshift-ci` (always) |
+| `job-name` | — | `$JOB_NAME` (MAPT scripts only) |
+
+### Where Tags Go by Provisioning Method
+
+**Hive pool install-configs** (`clusters/hosted-mgmt/hive/pools/rhdh/*.yaml`):
+- YAML map under `platform.aws.userTags` inside the install-config Secret.
+- Must include `propagateUserTags: true`.
+- Do NOT add tags to `_clusterpool.yaml` files — those are Kubernetes labels for Hive/Prow pool matching, not AWS cost tags.
+- `job-name` cannot be set because the pool is shared across multiple jobs.
+
+**MAPT scripts** (`ci-operator/step-registry/redhat-developer/rhdh/{eks,aks}/mapt/create/*-commands.sh`):
+- Comma-separated `key=value` pairs in the `--tags` CLI argument.
+- Include `job-name=${JOB_NAME}` for dynamic per-job identification.
+
+**Disconnected IPI** (`USER_TAGS` in `ci-operator/config/redhat-developer/rhdh/redhat-developer-rhdh-*.yaml`):
+- Space-separated `key value` lines in the `USER_TAGS` multiline env var.
+- Must set `PROPAGATE_USER_TAGS: "yes"` alongside it.
+- Skip `job-name` — the value is static YAML and would break if jobs are renamed.
+
+### Out of Scope
+
+- **OSD-GCP**: Clusters are created via the OCM CLI in the RHDH repo (`.ci/pipelines/cluster/osd-gcp/`), not in openshift/release. Tagging requires OCM API changes.
+- **GKE**: Not AWS/Azure — uses separate GCP billing.
+
 ## New Release Branch Checklist
 
 When creating a new release branch (e.g., `release-1.11`):
