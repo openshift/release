@@ -97638,8 +97638,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -97647,10 +97651,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=claude-payload-agent
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -97686,6 +97686,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -97697,12 +97703,6 @@ periodics:
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -97711,6 +97711,15 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -97723,15 +97732,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build09
   cron: '@yearly'
@@ -97742,8 +97742,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -97751,10 +97755,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=claude-payload-agent
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -97791,6 +97791,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -97802,12 +97808,6 @@ periodics:
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -97816,6 +97816,15 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -97828,15 +97837,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build09
   cron: '@yearly'
@@ -97847,8 +97847,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -97856,10 +97860,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=claude-payload-agent
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -97896,6 +97896,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -97907,12 +97913,6 @@ periodics:
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -97921,6 +97921,15 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -97933,15 +97942,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build09
   cron: '@yearly'
@@ -97952,8 +97952,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -97961,10 +97965,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=claude-payload-agent
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -98002,6 +98002,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -98013,12 +98019,6 @@ periodics:
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -98027,6 +98027,15 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -98039,15 +98048,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -114313,8 +114313,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -114322,10 +114326,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -114377,6 +114377,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -114387,12 +114393,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -114407,6 +114407,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -114419,15 +114428,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   cron: 32 7 7 */12 *
@@ -122339,8 +122339,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -122348,10 +122352,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -122403,6 +122403,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -122413,12 +122419,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -122433,6 +122433,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -122445,15 +122454,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   cron: 43 10 */7,17 * *
@@ -130490,8 +130490,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -130499,10 +130503,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -130554,6 +130554,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -130564,12 +130570,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -130584,6 +130584,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -130596,15 +130605,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
@@ -139780,8 +139780,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -139789,10 +139793,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -139846,6 +139846,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -139856,12 +139862,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -139876,6 +139876,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -139888,15 +139897,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build09
   cron: '@yearly'
@@ -139907,8 +139907,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -139916,10 +139920,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-overall-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -139964,6 +139964,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -139974,12 +139980,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -139994,6 +139994,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -140006,15 +140015,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
@@ -149959,8 +149959,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -149968,10 +149972,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -150025,6 +150025,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -150035,12 +150041,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -150055,6 +150055,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -150067,15 +150076,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build09
   cron: '@yearly'
@@ -150086,8 +150086,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -150095,10 +150099,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-overall-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -150143,6 +150143,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -150153,12 +150159,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -150173,6 +150173,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -150185,15 +150194,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
@@ -162730,8 +162730,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -162739,10 +162743,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -162795,6 +162795,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -162805,12 +162811,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -162825,6 +162825,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -162837,15 +162846,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 23 * * *
@@ -163175,8 +163175,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -163184,10 +163188,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-overall-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -163232,6 +163232,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -163242,12 +163248,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -163262,6 +163262,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -163274,15 +163283,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 23 * * *
@@ -163497,8 +163497,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -163506,10 +163510,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-upgrade-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -163558,6 +163558,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -163568,12 +163574,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -163588,6 +163588,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -163600,15 +163609,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
@@ -176274,8 +176274,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -176283,10 +176287,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -176328,6 +176328,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -176338,12 +176344,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -176358,6 +176358,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -176370,15 +176379,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 21 * * *
@@ -176708,8 +176708,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -176717,10 +176721,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-overall-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -176765,6 +176765,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -176775,12 +176781,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -176795,6 +176795,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -176807,15 +176816,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 21 * * *
@@ -177030,8 +177030,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -177039,10 +177043,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-upgrade-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -177089,6 +177089,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -177099,12 +177105,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -177119,6 +177119,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -177131,15 +177140,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
@@ -195903,8 +195903,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -195912,10 +195916,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -195957,6 +195957,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -195967,12 +195973,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -195987,6 +195987,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -195999,15 +196008,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 19 * * *
@@ -196337,8 +196337,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -196346,10 +196350,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-overall-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -196394,6 +196394,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -196404,12 +196410,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -196424,6 +196424,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -196436,15 +196445,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 19 * * *
@@ -196659,8 +196659,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -196668,10 +196672,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-upgrade-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -196719,6 +196719,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -196729,12 +196735,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -196749,6 +196749,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -196761,15 +196770,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
@@ -215351,8 +215351,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -215360,10 +215364,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -215405,6 +215405,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -215415,12 +215421,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -215435,6 +215435,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -215447,15 +215456,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 17 * * *
@@ -215785,8 +215785,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -215794,10 +215798,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-overall-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -215842,6 +215842,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -215852,12 +215858,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -215872,6 +215872,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -215884,15 +215893,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 0 1 1 *
@@ -216107,8 +216107,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -216116,10 +216120,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-upgrade-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -216166,6 +216166,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -216176,12 +216182,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -216196,6 +216196,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -216208,15 +216217,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
@@ -236591,8 +236591,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -236600,10 +236604,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -236645,6 +236645,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -236655,12 +236661,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -236675,6 +236675,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -236687,15 +236696,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 15 * * *
@@ -237033,8 +237033,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -237042,10 +237046,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-overall-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -237090,6 +237090,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -237100,12 +237106,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -237120,6 +237120,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -237132,15 +237141,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 15 * * *
@@ -237371,8 +237371,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -237380,10 +237384,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-upgrade-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -237430,6 +237430,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -237440,12 +237446,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -237460,6 +237460,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -237472,15 +237481,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
@@ -260361,8 +260361,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -260370,10 +260374,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -260415,6 +260415,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -260425,12 +260431,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -260445,6 +260445,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -260457,15 +260466,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 13 * * *
@@ -260803,8 +260803,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -260812,10 +260816,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-overall-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -260860,6 +260860,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -260870,12 +260876,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -260890,6 +260890,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -260902,15 +260911,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 13 * * *
@@ -261141,8 +261141,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -261150,10 +261154,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-upgrade-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -261200,6 +261200,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -261210,12 +261216,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -261230,6 +261230,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -261242,15 +261251,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
@@ -270440,7 +270440,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-4.22-e2e-azure-custom-dns-techpreview
+  name: periodic-ci-openshift-release-main-nightly-4.22-e2e-azure-custom-dns
   spec:
     containers:
     - args:
@@ -270453,7 +270453,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-azure-custom-dns-techpreview
+      - --target=e2e-azure-custom-dns
       - --variant=nightly-4.22
       command:
       - ci-operator
@@ -291655,8 +291655,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -291664,10 +291668,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -291721,6 +291721,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -291731,12 +291737,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -291751,6 +291751,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -291763,15 +291772,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 13 * * *
@@ -292221,8 +292221,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -292230,10 +292234,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-overall-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -292280,6 +292280,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -292290,12 +292296,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -292310,6 +292310,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -292322,15 +292331,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 13 * * *
@@ -292664,8 +292664,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -292673,10 +292677,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-upgrade-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -292723,6 +292723,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -292733,12 +292739,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -292753,6 +292753,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -292765,15 +292774,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
@@ -296030,7 +296030,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.23"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-4.23-e2e-aws-custom-dns-techpreview
+  name: periodic-ci-openshift-release-main-nightly-4.23-e2e-aws-custom-dns
   spec:
     containers:
     - args:
@@ -296043,7 +296043,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-aws-custom-dns-techpreview
+      - --target=e2e-aws-custom-dns
       - --variant=nightly-4.23
       command:
       - ci-operator
@@ -301228,7 +301228,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.23"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-4.23-e2e-azure-custom-dns-techpreview
+  name: periodic-ci-openshift-release-main-nightly-4.23-e2e-azure-custom-dns
   spec:
     containers:
     - args:
@@ -301241,7 +301241,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-azure-custom-dns-techpreview
+      - --target=e2e-azure-custom-dns
       - --variant=nightly-4.23
       command:
       - ci-operator
@@ -339109,7 +339109,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.0-e2e-aws-custom-dns-techpreview
+  name: periodic-ci-openshift-release-main-nightly-5.0-e2e-aws-custom-dns
   spec:
     containers:
     - args:
@@ -339122,7 +339122,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-aws-custom-dns-techpreview
+      - --target=e2e-aws-custom-dns
       - --variant=nightly-5.0
       command:
       - ci-operator
@@ -345767,7 +345767,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.0-e2e-azure-custom-dns-techpreview
+  name: periodic-ci-openshift-release-main-nightly-5.0-e2e-azure-custom-dns
   spec:
     containers:
     - args:
@@ -345780,7 +345780,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-azure-custom-dns-techpreview
+      - --target=e2e-azure-custom-dns
       - --variant=nightly-5.0
       command:
       - ci-operator
@@ -367484,8 +367484,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -367493,10 +367497,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -367549,6 +367549,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -367559,12 +367565,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -367579,6 +367579,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -367591,15 +367600,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 13 * * *
@@ -368049,8 +368049,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -368058,10 +368062,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-overall-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -368108,6 +368108,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -368118,12 +368124,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -368138,6 +368138,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -368150,15 +368159,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 13 * * *
@@ -368492,8 +368492,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -368501,10 +368505,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-upgrade-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -368551,6 +368551,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -368561,12 +368567,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -368581,6 +368581,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -368593,15 +368602,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
@@ -372369,7 +372369,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-e2e-aws-custom-dns-techpreview
+  name: periodic-ci-openshift-release-main-nightly-5.1-e2e-aws-custom-dns
   spec:
     containers:
     - args:
@@ -372382,7 +372382,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-aws-custom-dns-techpreview
+      - --target=e2e-aws-custom-dns
       - --variant=nightly-5.1
       command:
       - ci-operator
@@ -378510,7 +378510,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "5.1"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-main-nightly-5.1-e2e-azure-custom-dns-techpreview
+  name: periodic-ci-openshift-release-main-nightly-5.1-e2e-azure-custom-dns
   spec:
     containers:
     - args:
@@ -378523,7 +378523,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-azure-custom-dns-techpreview
+      - --target=e2e-azure-custom-dns
       - --variant=nightly-5.1
       command:
       - ci-operator
@@ -400227,8 +400227,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -400236,10 +400240,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-install-analysis
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -400292,6 +400292,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -400302,12 +400308,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -400322,6 +400322,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -400334,15 +400343,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 13 * * *
@@ -400792,8 +400792,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -400801,10 +400805,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-overall-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -400851,6 +400851,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -400861,12 +400867,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -400881,6 +400881,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -400893,15 +400902,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build10
   cron: 0 13 * * *
@@ -401235,8 +401235,12 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --give-pr-author-access-to-namespace=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
@@ -401244,10 +401248,6 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
       - --target=release-payload-upgrade-analysis-all
-      - --enable-secrets-store-csi-driver=true
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -401294,6 +401294,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -401304,12 +401310,6 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -401324,6 +401324,15 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -401336,15 +401345,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
 - agent: kubernetes
   cluster: build03
   decorate: true
