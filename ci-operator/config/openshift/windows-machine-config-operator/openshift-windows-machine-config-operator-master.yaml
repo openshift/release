@@ -393,6 +393,7 @@ tests:
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
   as: vsphere-proxy-e2e-ote
+  optional: true
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
     cluster_profile: vsphere-elastic
@@ -402,15 +403,30 @@ tests:
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
     test:
+    - as: wmco-setup
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
     - ref: openshift-tests-extension-setup-out-of-payload
     - as: proxy-e2e-test-with-zero-handling
       cli: latest
       commands: |
         set +e
-        openshift-tests-extension run windows-machine-config-operator \
-          --suite windows-machine-config-operator/proxy \
-          --from-repository /usr/bin/wmco-tests-ext.gz \
-          --monitor=e2e-test-analyzer 2>&1 | tee "${ARTIFACT_DIR}/test-run.log"
+        openshift-tests run windows-machine-config-operator/proxy \
+          --provider vsphere \
+          --monitor=e2e-test-analyzer \
+          -o "${ARTIFACT_DIR}/e2e.log" \
+          --junit-dir "${ARTIFACT_DIR}/junit" 2>&1 | tee "${ARTIFACT_DIR}/test-run.log"
         EXIT_CODE=$?
 
         # If no tests found, that's expected until WMCO PR #4459 merges
