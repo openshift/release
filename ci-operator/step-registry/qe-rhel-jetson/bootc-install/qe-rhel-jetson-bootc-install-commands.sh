@@ -1,14 +1,26 @@
 #!/bin/bash
 set -euo pipefail
 
-if [[ -z "${BOOTC_IMAGE_BASE:-}" || -z "${BOOTC_IMAGE_TAG:-}" ]]; then
-  echo "ERROR: BOOTC_IMAGE_BASE and BOOTC_IMAGE_TAG must be set in the ci-operator config."
+if [[ -z "${BOOTC_IMAGE_BASE:-}" ]]; then
+  echo "ERROR: BOOTC_IMAGE_BASE must be set in the ci-operator config."
   echo "  Example:"
   echo "    steps:"
   echo "      env:"
   echo "        BOOTC_IMAGE_BASE: quay.io/redhat-user-workloads/jetpack-for-rhel-tenant/rhel-102-bootc"
   echo "        BOOTC_IMAGE_TAG: \"7.2_6.12.0-211.20.1_062526071550\""
   exit 1
+fi
+
+# Use BOOTC_IMAGE_TAG if set and not "latest", otherwise try to read from SHARED_DIR
+if [[ -z "${BOOTC_IMAGE_TAG:-}" || "${BOOTC_IMAGE_TAG}" == "latest" ]]; then
+  if [[ -f "${SHARED_DIR}/bootc_image_tag" ]]; then
+    BOOTC_IMAGE_TAG=$(cat "${SHARED_DIR}/bootc_image_tag")
+    echo "Using BOOTC_IMAGE_TAG from SHARED_DIR: ${BOOTC_IMAGE_TAG}"
+  else
+    echo "ERROR: BOOTC_IMAGE_TAG must be set (and not 'latest')"
+    echo "       or the qe-rhel-jetson-get-latest-bootc-tag step must run first to populate SHARED_DIR/bootc_image_tag"
+    exit 1
+  fi
 fi
 
 pip install --quiet ansible
