@@ -164,7 +164,7 @@ function check_mcp() {
 }
 
 function wait_mcp_continous_success() {
-    local try=0 continous_successful_check=0 passed_criteria=5 max_retries=20 ret=0
+    local try=0 continous_successful_check=0 passed_criteria=5 max_retries=${MAX_MCP_RETRIES:-20} ret=0
     local continous_degraded_check=0 degraded_criteria=5
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
