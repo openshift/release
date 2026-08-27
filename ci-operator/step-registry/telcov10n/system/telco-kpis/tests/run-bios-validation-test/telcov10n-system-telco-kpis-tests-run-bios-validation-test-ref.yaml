@@ -30,6 +30,8 @@ ref:
             "version": "",
             "lockdown_uri": "",
             "bios_profile_url": "",
+            "bios_profile_branch": "main",
+            "bios_profile_path": "dell/bios-profile.yaml",
             "apply_fixes": false,
             "reboot_after_apply": false,
             "debug": false
@@ -39,18 +41,24 @@ ref:
         JSON object for per-test configuration. The "bios_validation" key supports:
         skip (bool) - when true, skip this test entirely and exit 0;
         continue_on_fail (bool) - when true, failures exit 0 so the pipeline continues;
-        version (string) - OCP version used to auto-construct BIOS profile URL (overridden
-        by lockdown_uri when set);
+        version (string) - OCP version (used only for display; not needed for profile fetch);
         lockdown_uri (string) - lockdown JSON URL for resolving OCP version; takes precedence
         over version (uses resolve_ocp_version_from_lockdown with built-in caching);
-        bios_profile_url (string) - explicit BIOS profile URL (empty to auto-construct as
-        https://gitlab.cee.redhat.com/ocp-edge-qe/ztp-site-configs/-/raw/{spoke}-kpi-{version}/siteconfig/bios/kpi.profile);
+        bios_profile_url (string) - optional public URL (no auth); when set overrides branch/path;
+        bios_profile_branch (string) - branch in telcov10n/kpi repo (default: main);
+        bios_profile_path (string) - path under systems-pre-conditions/ (default: dell/bios-profile.yaml,
+        use supermicro-arm64/bios-profile.yaml for ARM64);
         apply_fixes (bool) - when true, applies BIOS setting fixes automatically;
         reboot_after_apply (bool) - when true, reboots nodes after applying BIOS fixes;
         debug (bool) - when true, enables Ansible -vvv verbose output.
         Values are exported as uppercase env vars, overriding ref.yaml defaults.
 
   credentials:
+    # GitLab token for telcov10n/kpi private repo (BIOS profiles, KPI targets)
+    - namespace: test-credentials
+      name: telcov10n-telco-kpis-reports-repo
+      mount_path: /var/reports-repo
+
     # Common group variables
     - namespace: test-credentials
       name: telcov10n-ansible-group-all
