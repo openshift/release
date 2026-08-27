@@ -201,9 +201,24 @@ export CSI_LIBVIRT_CI="true"
 echo "=== StorageClasses after csi-provisioner.sh ==="
 oc get storageclass -o wide
 
+CSI_STORAGE_CLASS="${CSI_PROVISIONER_STORAGE_CLASS:-crc-csi-hostpath-provisioner}"
+
 default_sc="$(oc get storageclass -o jsonpath='{range .items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")]}{.metadata.name}{"\n"}{end}' 2>/dev/null | head -1 || true)"
 if [[ -z "${default_sc}" ]]; then
-  echo "ERROR: csi-provisioner.sh finished but no default StorageClass was created"
+  if ! oc get storageclass "${CSI_STORAGE_CLASS}" >/dev/null 2>&1; then
+    echo "ERROR: StorageClass ${CSI_STORAGE_CLASS} not found after csi-provisioner.sh"
+    exit 1
+  fi
+  echo "No default StorageClass found; annotating ${CSI_STORAGE_CLASS} as default..."
+  for existing_default in $(oc get storageclass -o jsonpath='{range .items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")]}{.metadata.name}{" "}{end}' 2>/dev/null); do
+    oc annotate storageclass "${existing_default}" storageclass.kubernetes.io/is-default-class- >/dev/null 2>&1 || true
+  done
+  oc annotate storageclass "${CSI_STORAGE_CLASS}" storageclass.kubernetes.io/is-default-class=true --overwrite
+  default_sc="${CSI_STORAGE_CLASS}"
+fi
+
+if [[ -z "${default_sc}" ]]; then
+  echo "ERROR: failed to set a default StorageClass"
   exit 1
 fi
 
