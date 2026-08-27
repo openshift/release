@@ -259,6 +259,13 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
   log "Cluster status description: ${status_desc}"
   # Save install logs
   timeout 60 rosa logs install -c ${CLUSTER_ID} > "${ARTIFACT_DIR}/.install.log" || true
+  # Save Hive ClusterDeployment conditions for Classic clusters (not applicable to HyperShift)
+  if [[ "${HOSTED_CP}" != "true" ]]; then
+    log "Saving Hive ClusterDeployment..."
+    ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/resources/live" \
+      | jq '.resources.cluster_deployment' \
+      > "${ARTIFACT_DIR}/cluster-deployment.json" 2>/dev/null || true
+  fi
   exit 1
 fi
 
