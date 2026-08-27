@@ -78,6 +78,9 @@ EXTRA_VARS="release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true re
 if [ "${DISABLE_INSIGHTS}" = "true" ]; then
   EXTRA_VARS="${EXTRA_VARS} disable_insights=true"
 fi
+if [ -n "${EXTRA_VIRT_INSTALL_OPTIONS:-}" ]; then
+  EXTRA_VARS="${EXTRA_VARS} extra_virt_install_options=${EXTRA_VIRT_INSTALL_OPTIONS}"
+fi
 
 ansible-playbook ./playbooks/deploy-ocp-sno.yml \
   -i ./inventories/ocp-deployment/build-inventory.py \
