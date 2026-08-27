@@ -79,7 +79,15 @@ for node in $nodes;do
         continue
     fi
 
-    echo "${node}: installed=${installed:-none}, upgrading to ${target_version}"
+    # rpm -Uvh will fail if kata-containers was never installed because
+    # the dependencies won't exist on the system.
+    if [[ "${installed}" != kata-containers-* ]]; then
+        echo "ERROR: ${node}: kata-containers is not installed, cannot upgrade (ensure OSC operator is installed first)"
+        failed_nodes="${node} ${failed_nodes}"
+        continue
+    fi
+
+    echo "${node}: installed=${installed}, upgrading to ${target_version}"
 
     # Copy the RPM to the node
     dd if=kata-containers.rpm | oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
