@@ -2,13 +2,6 @@
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-# On disconnected/Internal-publish clusters the API is only reachable via the bastion
-# egress proxy. Sourcing proxy-conf.sh is a no-op on connected (e.g. bare-metal) jobs.
-if test -f "${SHARED_DIR}/proxy-conf.sh"; then
-  # shellcheck disable=SC1091
-  source "${SHARED_DIR}/proxy-conf.sh"
-fi
-
 # wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
 # time before we run our e2e tests.
 function check_clusteroperators_status() {
