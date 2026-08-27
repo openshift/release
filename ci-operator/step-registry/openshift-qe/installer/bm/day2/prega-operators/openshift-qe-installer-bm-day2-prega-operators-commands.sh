@@ -5,6 +5,13 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server.
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 PREGA_BUILD_SERVER_IP=$(cat ${CLUSTER_PROFILE_DIR}/prega_build_server)
 QUAY_ACCESS_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/prega_quay_auth_token)
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"

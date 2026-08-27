@@ -6,30 +6,22 @@ ref:
     tag: latest
   cli: latest
   commands: openshift-qe-installer-bm-day2-nmstate-commands.sh
-  credentials:
-    - namespace: test-credentials
-      name: brew-registry-pullsecret
-      mount_path: /var/run/brew-pullsecret
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
   env:
+    - name: OPERATOR_SOURCE_INDEX
+      default: "redhat-operators"
+      documentation: |-
+        Operator source index will be "redhat-operators" for GA builds and "prega-operator-index" for Dev builds (nightly)
     - name: NMSTATE_CHANNEL
       default: "stable"
       documentation: |-
-        Channel from which to install kubernetes-nmstate-operator from the ART operator index
-    - name: NMSTATE_CATALOG_VERSION
-      default: "4.22"
-      documentation: |-
-        ART operator index minor version. OCP 5.0 does not publish
-        iib-int-index-art-operators-5.0; 4.22 is the compatible operator stream.
-    - name: NMSTATE_CATALOG_IMAGE
-      default: ""
-      documentation: |-
-        CatalogSource image override. If empty, uses
-        quay.io/openshift-release-dev/ocp-release-nightly:iib-int-index-art-operators-<NMSTATE_CATALOG_VERSION>
+        Channel from which to install kubernetes-nmstate-operator
   documentation: |-
-    Install kubernetes-nmstate-operator from the ART operator index compatible with
-    the cluster (4.22 for OCP 5.0). Merges CI brew-registry-pullsecret and applies
-    a brew ICSP, then creates the NMState instance required by NNCP.
+    Install kubernetes-nmstate-operator from OperatorHub (redhat-operators or
+    prega-operator-index) and create the NMState instance required by
+    NodeNetworkConfigurationPolicy. For nightly clusters, run
+    openshift-qe-installer-bm-day2-prega-operators first and set
+    OPERATOR_SOURCE_INDEX=prega-operator-index.
