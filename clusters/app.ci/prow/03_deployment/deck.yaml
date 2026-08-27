@@ -135,7 +135,7 @@ objects:
           - --tide-url=http://tide/
           - --hook-url=http://hook-apps:8888/plugin-help
           - --oauth-url=/github-login
-          - --job-config-path=/var/repo/release/ci-operator/jobs
+          - --job-config-path=/etc/jobs
           - --spyglass=true
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
@@ -192,6 +192,14 @@ objects:
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
+          - name: combined-jobs
+            mountPath: /etc/jobs
+          - name: job-configs
+            mountPath: /etc/jobs/efs
+            readOnly: true
+          - name: release
+            mountPath: /etc/jobs/release
+            readOnly: true
           resources:
             requests:
               memory: "28Gi"
@@ -237,6 +245,11 @@ objects:
             secretName: cookie
         - name: release
           emptyDir: {}
+        - name: combined-jobs
+          emptyDir: {}
+        - name: job-configs
+          persistentVolumeClaim:
+            claimName: job-configs-nfs
         - name: build-farm-credentials
           secret:
             secretName: deck
@@ -393,7 +406,7 @@ objects:
           - --oauth-url=/github-login
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
-          - --job-config-path=/var/repo/release/ci-operator/jobs
+          - --job-config-path=/etc/jobs
           - --tide-url=http://tide/
           - --hook-url=http://hook-apps:8888/plugin-help
           - --hidden-only=true
@@ -455,6 +468,14 @@ objects:
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
+          - name: combined-jobs
+            mountPath: /etc/jobs
+          - name: job-configs
+            mountPath: /etc/jobs/efs
+            readOnly: true
+          - name: release
+            mountPath: /etc/jobs/release
+            readOnly: true
           resources:
             requests:
               memory: "20Gi"
@@ -488,6 +509,11 @@ objects:
             secretName: deck-internal-tls
         - name: release
           emptyDir: {}
+        - name: combined-jobs
+          emptyDir: {}
+        - name: job-configs
+          persistentVolumeClaim:
+            claimName: job-configs-nfs
         - name: build-farm-credentials
           secret:
             secretName: deck

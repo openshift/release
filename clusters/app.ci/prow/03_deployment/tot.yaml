@@ -91,7 +91,7 @@ spec:
         - --fallback=true
         - --fallback-bucket=http://gcsweb/gcs/test-platform-results
         - --storage=/storage/tot.json
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --job-config-path=/etc/jobs
         ports:
           - name: http
             containerPort: 8888
@@ -102,6 +102,14 @@ spec:
           mountPath: /etc/config
         - name: release
           mountPath: /var/repo
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: release
+          mountPath: /etc/jobs/release
+          readOnly: true
         resources:
           requests:
             memory: "18Gi"
@@ -143,3 +151,8 @@ spec:
           name: config
       - name: release
         emptyDir: {}
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
