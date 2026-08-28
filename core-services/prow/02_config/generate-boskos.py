@@ -6,7 +6,7 @@ import yaml
 
 CONFIG = {
     'ibmcloud-perfscale-quota-slice': {
-        'us-east': 30,
+        'us-south': 15,
     },
     'aws-us-east-1-quota-slice': {
         'us-east-1': 15,
