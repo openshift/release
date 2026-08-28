@@ -161,8 +161,10 @@ if [[ -n "${PAYLOAD_URL}" ]]; then
   fi
   cp "${PULL_SECRET_SRC}" /tmp/pull-secret.json
   oc registry login --to=/tmp/pull-secret.json
-  # Read OPENSHIFT_PULL_SECRET path from the env.user file on the hypervisor
-  REMOTE_PULL_SECRET=$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -a; source ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}; echo \${OPENSHIFT_PULL_SECRET:-openshift_pull.json}")
+  # Read OPENSHIFT_PULL_SECRET path from the env.user file on the hypervisor.
+  # Resolve relative paths (e.g. the default "openshift_pull.json") under the
+  # repo working directory so scp targets the right location.
+  REMOTE_PULL_SECRET=$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -a; source ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}; set +a; PS=\${OPENSHIFT_PULL_SECRET:-openshift_pull.json}; [[ \"\$PS\" = /* ]] && echo \"\$PS\" || echo \"${REMOTE_WORK_DIR}/openshift-dpf/\$PS\"")
   scp -q ${SSH_OPTS} /tmp/pull-secret.json root@${REMOTE_HOST}:"${REMOTE_PULL_SECRET}"
   echo "Pull secret with CI registry credentials copied to ${REMOTE_PULL_SECRET}"
   rm -f /tmp/pull-secret.json
