@@ -20,8 +20,15 @@ ${BINARY} info
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 echo "Running CBO test suite: ${TEST_SUITE}"
 
+# Serial/disruptive suites must not run concurrently. Parallel suites keep the
+# binary default so this step can also execute conformance/parallel tests.
+run_suite_args=()
+if [[ "${TEST_SUITE}" != *parallel* ]]; then
+    run_suite_args+=(-c 1)
+fi
+
 ret_value=0
-${BINARY} run-suite -c 1 --junit-path "${ARTIFACT_DIR}/junit.xml" "${TEST_SUITE}" || ret_value=$?
+${BINARY} run-suite "${run_suite_args[@]}" --junit-path "${ARTIFACT_DIR}/junit.xml" "${TEST_SUITE}" || ret_value=$?
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
 
