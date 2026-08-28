@@ -20,10 +20,12 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 echo 'Deprovisioning HAProxy'
 
 timeout -s 9 21m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${CLUSTER_NAME}" << 'EOF'
+  "${CLUSTER_NAME}" "${DISCONNECTED:-false}" "${ipv6_enabled:-false}" << 'EOF'
 set -euo pipefail
 
 CLUSTER_NAME="${1}"
+DISCONNECTED="${2}"
+ipv6_enabled="${3}"
 
 LOCK="/tmp/dhclient_lease.lock"
 LOCK_FD=201
@@ -53,29 +55,19 @@ for container_name in $(podman ps -a --format "{{.Names}}" | grep "haproxy-$CLUS
   # Only attempt release if a lease file exists and contains active records
   if [ -s "/var/builds/$CLUSTER_NAME/haproxy/dhclient.v4.lease" ] && \
      grep -q "lease {" "/var/builds/$CLUSTER_NAME/haproxy/dhclient.v4.lease"; then
-    echo "Releasing global IPv4 DHCP leases for eth1 and eth2..."
+    echo "Releasing global IPv4 DHCP leases for eth1..."
     nsenter -m -u -n -i -p -t "$pid" \
           /sbin/dhclient -r \
           -pf "/etc/haproxy/dhclient.v4.pid" \
           -lf "/etc/haproxy/dhclient.v4.lease" \
-          eth1 eth2 201>&-
+          eth1 201>&-
   else
     echo "No active IPv4 lease record found to release."
   fi
 
-  if [[ " ${devices[*]} " == *" eth2.br-int "* ]]; then
-    echo "Evaluating IPv6 DHCP lease status for eth2 in $container_name..."
-    if [ -s "/var/builds/$CLUSTER_NAME/haproxy/dhclient.eth2.v6.lease" ] && \
-       grep -q "lease6 {" "/var/builds/$CLUSTER_NAME/haproxy/dhclient.eth2.v6.lease"; then
-      echo "Releasing isolated IPv6 DHCP lease for eth2..."
-      nsenter -m -u -n -i -p -t "$pid" \
-        /sbin/dhclient -6 -r \
-        -pf "/etc/haproxy/dhclient.eth2.v6.pid" \
-        -lf "/etc/haproxy/dhclient.eth2.v6.lease" \
-        eth2 201>&-
-    else
-      echo "No active IPv6 lease record found to release."
-    fi
+  if [ "${DISCONNECTED}" != "true" ] && [ "${ipv6_enabled}" == "true" ]; then
+    echo "Flush the SLAAC IPv6 addresses manually from eth1 (since SLAAC has no release packet)"
+    nsenter -n -t "$pid" ip -6 addr flush dev eth1
   fi
 
   for dev in "${devices[@]}"; do
