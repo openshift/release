@@ -34,14 +34,7 @@ chain:
         sed -i \
           's/highWlLookupKey := types.NamespacedName{Name: workloadjob.GetWorkloadNameForJob(lowJob.Name, lowJob.UID)/highWlLookupKey := types.NamespacedName{Name: workloadjob.GetWorkloadNameForJob(highJob.Name, highJob.UID)/' \
           "${JOB_TEST}"
-        sed -i \
-          '/Checking that the high-priority workload is created and admitted/,/Should(gomega.Succeed())/ s/util\.Timeout,/util.LongTimeout,/' \
-          "${JOB_TEST}"
-        sed -i \
-          '/Checking that the low-priority workload is successfully preempted/,/Should(gomega.Succeed())/ s/util\.Timeout,/util.LongTimeout,/' \
-          "${JOB_TEST}"
         echo "=== Patched ${JOB_TEST} ==="
-        grep -n "highWlLookupKey\|high-priority workload is created\|successfully preempted\|LongTimeout" "${JOB_TEST}" || true
       else
         echo "WARNING: ${JOB_TEST} not found; skipping patch"
       fi
