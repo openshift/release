@@ -42,7 +42,7 @@ Say a CRD field is being added in lockstep across two repos: `migtools/oadp-non-
 
 To test them together: add to oadp-operator PR #789's description --
 
-```
+```text
 Depends-On: https://github.com/migtools/oadp-non-admin/pull/456
 ```
 
@@ -62,7 +62,7 @@ For each resolved candidate, one line is appended to `${SHARED_DIR}/depends-on-i
 ## Known limitations
 
 - **Unauthenticated GitHub API calls**: same as `openstack-k8s-operators-kuttl-commands.sh`, no token is used, so this is subject to GitHub's unauthenticated rate limit (60/hr per IP). Acceptable for now given the existing precedent; would need a credentialed step if this becomes a bottleneck.
-- **First real run still pending**: rehearsal only exercises the no-Depends-On (default) path, since no real PR carries the marker yet. The positive path needs a real pair of PRs referencing each other to verify end-to-end -- KDM's controller/plugin pair, or oadp-operator's own 17-candidate list against any one of its sibling repos.
+- **First real run still pending**: rehearsal only exercises the no-Depends-On (default) path, since no real PR carries the marker yet. The positive path needs a real pair of PRs to verify end-to-end -- one carrying a `Depends-On:` line, the other just existing as a normal open PR (no reciprocal marker needed, per the trigger semantics above) -- e.g. a KDM controller/plugin pair, or an oadp-operator PR against any one of its 17 sibling repos.
 
 ## Provenance
 
