@@ -547,11 +547,27 @@ verify_pods() {
 
     echo "Waiting for secrets-store-csi-driver-operator Deployment..."
     oc rollout status deployment/secrets-store-csi-driver-operator \
-        -n "${OPERATOR_NAMESPACE}" --timeout=300s
+        -n "${OPERATOR_NAMESPACE}" --timeout=600s
+
+    echo "Waiting for secrets-store-csi-driver DaemonSet to be created..."
+    for i in $(seq 1 60); do
+        if oc get daemonset secrets-store-csi-driver \
+            -n openshift-cluster-csi-drivers &>/dev/null; then
+            echo "  DaemonSet found."
+            break
+        fi
+        if [ "$i" -eq 60 ]; then
+            echo "ERROR: DaemonSet not created after 600s."
+            oc get pods -n openshift-cluster-csi-drivers
+            exit 1
+        fi
+        echo "  DaemonSet not yet created — waiting 10s... ($i/60)"
+        sleep 10
+    done
 
     echo "Waiting for secrets-store-csi-driver DaemonSet rollout..."
     oc rollout status daemonset/secrets-store-csi-driver \
-        -n "${OPERATOR_NAMESPACE}" --timeout=300s
+        -n "${OPERATOR_NAMESPACE}" --timeout=600s
 
     echo "All secrets-store pods are ready:"
     oc get pods -n "${OPERATOR_NAMESPACE}" | grep -i secrets

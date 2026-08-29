@@ -321,8 +321,8 @@ PYEOF
     echo "Patch complete."
 
     echo
-    echo "Increasing all timeout values to 300s..."
-    sed -i 's/--timeout=[0-9]\+[sm]/--timeout=300s/g' "${BATS_FULL_PATH}"
+    echo "Increasing all timeout values to 600s..."
+    sed -i 's/--timeout=[0-9]\+[sm]/--timeout=600s/g' "${BATS_FULL_PATH}"
     echo "Timeout values updated."
 }
 
