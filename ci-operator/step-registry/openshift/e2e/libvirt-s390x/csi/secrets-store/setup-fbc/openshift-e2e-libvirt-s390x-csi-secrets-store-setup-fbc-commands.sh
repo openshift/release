@@ -73,7 +73,7 @@ check_arch_and_deps() {
     echo "Checking required tools..."
 
     # Verify tools already present in cli image
-    for tool in oc podman curl tar; do
+    for tool in oc curl tar; do
         if ! command -v "${tool}" &>/dev/null; then
             echo "ERROR: Required tool '${tool}' not found in PATH."
             exit 1
