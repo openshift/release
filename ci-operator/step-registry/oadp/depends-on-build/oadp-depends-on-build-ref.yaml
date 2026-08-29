@@ -15,12 +15,20 @@ ref:
     documentation: The namespace the depended-on image(s) will be built into (via an OpenShift BuildConfig/ImageStream). Should match the namespace the operator under test is installed into, so the resulting ImageStreamTag is reachable by that namespace's Subscription/Deployment.
   - name: DEPENDS_ON_CANDIDATES
     documentation: |-
-      One line per sibling repo this job is willing to resolve a
+      One line per (repo, image) pair this job is willing to resolve a
       cross-repo dependency for, in the form:
-      `<org>/<name> <RELATED_IMAGE_ENV_VAR_NAME>`
-      (repo and env var name separated by whitespace). Plain text, not
-      JSON/YAML -- this image has no guaranteed `jq`, same reasoning as
-      this repo's other oadp/ steps.
+      `<org>/<name> <RELATED_IMAGE_ENV_VAR_NAME> [<dockerfile-path>]`
+      (whitespace-separated fields; plain text, not JSON/YAML -- this image
+      has no guaranteed `jq`, same reasoning as this repo's other oadp/
+      steps). `<dockerfile-path>` is optional and defaults to `Dockerfile`
+      at the repo root -- set it when a repo's own ci-operator config uses
+      something else (e.g. `Dockerfile.ubi`, `Containerfile`), matching its
+      `images.items[].dockerfile_path`.
+
+      The SAME `<org>/<name>` may appear on more than one line: a repo that
+      builds several images (e.g. one repo producing 3 separate
+      RELATED_IMAGE_* targets from 3 different Dockerfiles) gets its source
+      fetched once and built once per matching line.
 
       The triggering PR's own description is scanned for one or more
       `Depends-On: https://github.com/<org>/<name>/pull/<N>` lines
@@ -28,11 +36,13 @@ ref:
       matches a repo in this list is resolved: that PR's source is
       fetched, built as a container image inside the target test cluster,
       and one line is appended to `${SHARED_DIR}/depends-on-images.txt`
-      (`<RELATED_IMAGE_ENV_VAR_NAME> <pullspec>`) for a later step to apply.
+      (`<RELATED_IMAGE_ENV_VAR_NAME> <pullspec>`) per matching line, for a
+      later step to apply.
 
       A PR with no matching Depends-On line is a total no-op: no file is
       written, nothing downstream changes. Add more lines to test more
-      repos together in one job; this script does not change.
+      repos (or more images per repo) together in one job; this script
+      does not change.
   documentation: |-
     Generic N-candidate resolver for openshift/oadp-operator#2389 style
     cross-repo "test these unmerged PRs together" scenarios, following the
@@ -51,9 +61,12 @@ ref:
     MachineConfigPool rollout is needed, because the only consumer of the
     resulting image is that same cluster's own kubelet.
 
-    Currently consumed only by the 4 kubevirt-datamover-controller/-plugin
-    KDM e2e configs (each declaring exactly 1 candidate: its sibling
-    repo). Named/structured generically so a future job (e.g. an
-    oadp-operator job also wanting oadp-non-admin and/or
-    velero-plugin-for-aws in the mix) can declare more candidates without
-    any change here.
+    Consumed by the 4 kubevirt-datamover-controller/-plugin KDM e2e configs
+    (each declaring exactly 1 candidate: its sibling repo) and by
+    openshift-oadp-operator's own `e2e-test-aws` (oadp-dev, 5.0 variant),
+    which declares one candidate per RELATED_IMAGE_* it substitutes into
+    its bundle (see that config's `operator.substitutions` and
+    `config/manager/manager.yaml` in openshift/oadp-operator for the
+    authoritative repo/env-var/dockerfile mapping). Named/structured
+    generically so any future job can declare more candidates without any
+    change here.
