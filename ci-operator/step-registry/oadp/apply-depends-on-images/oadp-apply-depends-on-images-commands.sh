@@ -69,7 +69,12 @@ PATCH=$(printf '{"spec":{"config":{"env":[%s]}}}' "${JOINED}")
 oc patch subscription "${SUB}" -n "${OO_INSTALL_NAMESPACE}" --type merge -p "${PATCH}"
 
 echo "Waiting for Deployment ${OO_MANAGER_DEPLOYMENT} to observe:"
-echo "${ALL_ENV_LINES}"
+# Names only -- ALL_ENV_LINES' second field is an internal-cluster-registry
+# pullspec, which must not be echoed into CI logs (this repo's own
+# convention: don't log cluster URLs).
+while read -r ENV_NAME _; do
+    [[ -n "${ENV_NAME}" ]] && echo "  ${ENV_NAME}"
+done <<< "${ALL_ENV_LINES}"
 for _ in $(seq 1 60); do
     ALL_OK=true
     while read -r ENV_NAME ENV_VALUE; do
