@@ -69,15 +69,19 @@ echo "[$(date --utc +%FT%T.%3NZ)] Fetching PR description for ${REPO_OWNER}/${RE
 PR_JSON=$(curl -sf -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
   "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}")
 
-# No jq in this image (same reasoning as oadp-operator-sdk-bundle-image):
-# rather than isolate the JSON "body" field first, grep the raw response
-# directly for the pattern we actually care about. JSON string escaping
-# only touches quotes/backslashes/control characters, so a plain
-# "Depends-On: https://github.com/<org>/<repo>/pull/<N>" line inside the PR
-# body appears byte-for-byte in the raw response; no other field on a
-# single-PR API response (url, title, user, head, base, ...) can contain
-# that literal pattern, so this is safe without a full JSON parse.
-DEPENDS_ON_LINES=$(printf '%s' "${PR_JSON}" | grep -oiE 'depends-on:[^"\\]*https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+' || true)
+# Isolate just the JSON "body" field before scanning for Depends-On lines --
+# scanning the raw response risks a false match if the PR TITLE itself
+# happens to contain "Depends-On: <url>" text (titles are also present in
+# this response). No jq in this image (same reasoning as
+# oadp-operator-sdk-bundle-image), so extract the escaped body value with
+# grep -P instead of pulling in a full JSON parser for one field -- this
+# image already assumes GNU coreutils (the `date --utc` calls throughout
+# this script are GNU-only too), and GNU grep's PCRE support is standard on
+# the RHEL/UBI base this image is built from.
+PR_BODY_ESCAPED=$(printf '%s' "${PR_JSON}" | grep -Po '"body":"(\\.|[^"\\])*"' | head -1)
+PR_BODY_ESCAPED="${PR_BODY_ESCAPED#\"body\":\"}"
+PR_BODY_ESCAPED="${PR_BODY_ESCAPED%\"}"
+DEPENDS_ON_LINES=$(printf '%s' "${PR_BODY_ESCAPED}" | grep -oiE 'depends-on:[^"\\]*https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+' || true)
 
 if [[ -z "${DEPENDS_ON_LINES}" ]]; then
     echo "[$(date --utc +%FT%T.%3NZ)] No Depends-On lines found in PR description -- nothing to resolve"
@@ -181,7 +185,7 @@ while IFS= read -r line; do
             rm -rf "${SRC_DIR}"
             exit 1
         fi
-        echo "[$(date --utc +%FT%T.%3NZ)] ${DEP_REPO}#${DEP_PR} (${CAND_DOCKERFILE}) built as ${IMAGE_REF}, exposing via ${RELATED_ENV}"
+        echo "[$(date --utc +%FT%T.%3NZ)] ${DEP_REPO}#${DEP_PR} (${CAND_DOCKERFILE}) built, exposing via ${RELATED_ENV} (pullspec written to ${SHARED_DIR}/depends-on-images.txt, not logged -- internal cluster registry address)"
         echo "${RELATED_ENV} ${IMAGE_REF}" >> "${SHARED_DIR}/depends-on-images.txt"
         RESOLVED_ANY=true
     done <<< "${MATCHED_CANDIDATES}"
