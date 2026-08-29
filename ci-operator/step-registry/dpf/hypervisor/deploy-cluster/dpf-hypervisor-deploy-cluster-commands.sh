@@ -92,8 +92,8 @@ fi
 if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "openshift-dpf" ]]; then
   echo "PR job detected: checking out PR #${PULL_NUMBER} on the remote host"
   if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; \
-    git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER}; \
-    git checkout pr-${PULL_NUMBER}; \
+    git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER} && \
+    git checkout pr-${PULL_NUMBER} && \
     git rebase origin/${OPENSHIFT_DPF_BRANCH}"; then
     echo "Successfully checked out PR #${PULL_NUMBER}"
   else
@@ -108,8 +108,8 @@ echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
 # Temporary: fetch DPF PR #269 for cross-PR testing
 echo "Fetching openshift-dpf PR #269 for cross-PR testing..."
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; \
-  git fetch origin pull/269/head:pr-269; \
-  git checkout pr-269; \
+  git fetch origin pull/269/head:pr-269 && \
+  git checkout pr-269 && \
   git rebase origin/${OPENSHIFT_DPF_BRANCH}"; then
   echo "Successfully checked out openshift-dpf PR #269"
 else
