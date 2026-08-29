@@ -1,0 +1,59 @@
+ref:
+  as: oadp-depends-on-build
+  from_image:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
+  commands: oadp-depends-on-build-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+  env:
+  - name: OO_INSTALL_NAMESPACE
+    documentation: The namespace the depended-on image(s) will be built into (via an OpenShift BuildConfig/ImageStream). Should match the namespace the operator under test is installed into, so the resulting ImageStreamTag is reachable by that namespace's Subscription/Deployment.
+  - name: DEPENDS_ON_CANDIDATES
+    documentation: |-
+      One line per sibling repo this job is willing to resolve a
+      cross-repo dependency for, in the form:
+      `<org>/<name> <RELATED_IMAGE_ENV_VAR_NAME>`
+      (repo and env var name separated by whitespace). Plain text, not
+      JSON/YAML -- this image has no guaranteed `jq`, same reasoning as
+      this repo's other oadp/ steps.
+
+      The triggering PR's own description is scanned for one or more
+      `Depends-On: https://github.com/<org>/<name>/pull/<N>` lines
+      (Gerrit/Zuul convention, one per line). Any line whose `<org>/<name>`
+      matches a repo in this list is resolved: that PR's source is
+      fetched, built as a container image inside the target test cluster,
+      and one line is appended to `${SHARED_DIR}/depends-on-images.txt`
+      (`<RELATED_IMAGE_ENV_VAR_NAME> <pullspec>`) for a later step to apply.
+
+      A PR with no matching Depends-On line is a total no-op: no file is
+      written, nothing downstream changes. Add more lines to test more
+      repos together in one job; this script does not change.
+  documentation: |-
+    Generic N-candidate resolver for openshift/oadp-operator#2389 style
+    cross-repo "test these unmerged PRs together" scenarios, following the
+    Depends-On PR-description convention already used by
+    openstack-k8s-operators-kuttl-commands.sh. Unlike that step (which only
+    needs a source checkout), a resolved dependency here is built into a
+    real container image via `oc new-build --strategy=docker --binary` +
+    `oc start-build --from-dir=...` against the target test cluster, since
+    downstream consumers (e.g. a Kubernetes Subscription's
+    RELATED_IMAGE_* override) need an actual pullspec, not just source.
+
+    Building runs entirely inside the target cluster as a normal
+    OpenShift Build (buildah managed by OCP, nothing to install locally),
+    with output landing in that cluster's own internal registry as an
+    ImageStreamTag -- no external route, insecure-registry marking, or
+    MachineConfigPool rollout is needed, because the only consumer of the
+    resulting image is that same cluster's own kubelet.
+
+    Currently consumed only by the 4 kubevirt-datamover-controller/-plugin
+    KDM e2e configs (each declaring exactly 1 candidate: its sibling
+    repo). Named/structured generically so a future job (e.g. an
+    oadp-operator job also wanting oadp-non-admin and/or
+    velero-plugin-for-aws in the mix) can declare more candidates without
+    any change here.
