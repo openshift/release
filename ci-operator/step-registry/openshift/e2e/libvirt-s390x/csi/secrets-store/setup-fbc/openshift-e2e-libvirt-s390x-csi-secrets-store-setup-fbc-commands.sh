@@ -551,7 +551,7 @@ verify_pods() {
 
     echo "Waiting for secrets-store-csi-driver DaemonSet to be created..."
     for i in $(seq 1 60); do
-        if oc get daemonset secrets-store-csi-driver \
+        if oc get daemonset secrets-store-csi-driver-node \
             -n openshift-cluster-csi-drivers &>/dev/null; then
             echo "  DaemonSet found."
             break
@@ -566,7 +566,7 @@ verify_pods() {
     done
 
     echo "Waiting for secrets-store-csi-driver DaemonSet rollout..."
-    oc rollout status daemonset/secrets-store-csi-driver \
+    oc rollout status daemonset/secrets-store-csi-driver-node \
         -n "${OPERATOR_NAMESPACE}" --timeout=600s
 
     echo "All secrets-store pods are ready:"
