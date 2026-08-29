@@ -105,6 +105,18 @@ fi
 REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
 echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
 
+# Temporary: fetch DPF PR #269 for cross-PR testing
+echo "Fetching openshift-dpf PR #269 for cross-PR testing..."
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; \
+  git fetch origin pull/269/head:pr-269; \
+  git checkout pr-269; \
+  git rebase origin/${OPENSHIFT_DPF_BRANCH}"; then
+  echo "Successfully checked out openshift-dpf PR #269"
+else
+  echo "ERROR: Failed to checkout openshift-dpf PR #269"
+  exit 1
+fi
+
 echo "Checking if github repo branch was cloned successfully"
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
   env; \
