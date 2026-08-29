@@ -5,6 +5,7 @@
 - [Purpose](#purpose)
 - [Process](#process)
   - [Trigger semantics for a multi-repo PR author](#trigger-semantics-for-a-multi-repo-pr-author)
+  - [Worked example: oadp-operator depending on oadp-non-admin](#worked-example-oadp-operator-depending-on-oadp-non-admin)
   - [Environment Variables](#environment-variables)
   - [Output](#output)
 - [Known limitations](#known-limitations)
@@ -14,7 +15,10 @@
 
 Lets a CI job testing one repo's PR also pull in an unmerged PR from one or more sibling repos, via a `Depends-On:` line in the triggering PR's own description -- the same PR-description convention already used by `openstack-k8s-operators-kuttl-commands.sh`. Unlike that step (a plain source checkout), a resolved dependency here becomes a real pushed container image, because downstream needs an actual pullspec (e.g. a Kubernetes `Subscription`'s `RELATED_IMAGE_*` override).
 
-Written generically to cover the N-repo case tracked by [openshift/oadp-operator#2389](https://github.com/openshift/oadp-operator/issues/2389) ("test oadp-operator + kdm-controller + kdm-plugin + velero-plugin-for-aws etc. together"), but **currently only consumed by the 4 kubevirt-datamover-controller/-plugin (KDM) e2e configs** (`migtools/kubevirt-datamover-{controller,plugin}` × `oadp-dev`/`oadp-1.6`), each declaring exactly one candidate: its own sibling repo. See [openshift/oadp-operator#1832](https://github.com/openshift/oadp-operator/issues/1832) for the KDM e2e coverage this builds on.
+Written generically to cover the N-repo case tracked by [openshift/oadp-operator#2389](https://github.com/openshift/oadp-operator/issues/2389) ("test oadp-operator + kdm-controller + kdm-plugin + velero-plugin-for-aws etc. together"). Consumed by:
+
+- The 4 `migtools/kubevirt-datamover-{controller,plugin}` (KDM) e2e configs (`oadp-dev`/`oadp-1.6`), each declaring exactly one candidate: its own sibling repo. See [openshift/oadp-operator#1832](https://github.com/openshift/oadp-operator/issues/1832) for that coverage.
+- `openshift/oadp-operator`'s own `e2e-test-aws` (`oadp-dev`, 5.0 variant), declaring one candidate per `RELATED_IMAGE_*` its bundle substitutes -- see [`oadp-apply-depends-on-images`](../apply-depends-on-images/README.md) for how a resolved image actually takes effect there (an OLMv0 Subscription patch, with an explicit seam for future OLMv1/operator-controller support).
 
 ## Process
 
@@ -32,22 +36,33 @@ Building runs entirely inside the target cluster as a normal OpenShift `Build` (
 - **Editing it after the PR is already open works.** This step fetches the PR description live from the GitHub API every run, not a cached copy from PR-open time. Add/edit/remove the line, then `/test <job-name>` (or `/retest`, or push again) -- the very next run picks up whatever the description says at that moment.
 - **A later push to the *depended-on* PR does not auto-retrigger anything.** Only the triggering PR's own presubmit re-run (a new commit, `/retest`, or `/test <job-name>`) re-resolves, using whatever the depended-on PR's HEAD is at that moment.
 
+### Worked example: oadp-operator depending on oadp-non-admin
+
+Say a CRD field is being added in lockstep across two repos: `migtools/oadp-non-admin` PR #456 adds the field to its CRD, and a companion `openshift/oadp-operator` PR #789 updates the DPA-to-CRD sync logic to read it. Neither PR alone is fully testable -- the operator PR's new sync code has nothing to read without the CRD's new field, and the CRD PR alone has no consumer.
+
+To test them together: add to oadp-operator PR #789's description --
+
+```
+Depends-On: https://github.com/migtools/oadp-non-admin/pull/456
+```
+
+`oadp-operator`'s `e2e-test-aws` job then: builds oadp-operator PR #789 (as it always does, via ci-operator's own `OO_INDEX` dependency -- unrelated to Depends-On), notices the Depends-On line matches its `migtools/oadp-non-admin` candidate, builds oadp-non-admin PR #456's source as an image, and (via `oadp-apply-depends-on-images`) patches the Subscription so `RELATED_IMAGE_NON_ADMIN_CONTROLLER` points at that PR-built image instead of whatever the released bundle ships -- before `make test-e2e` runs. The oadp-non-admin PR #456 itself needs no changes.
+
 ### Environment Variables
 
 - `OO_INSTALL_NAMESPACE`
   - The namespace to build the depended-on image(s) into. Should match the namespace the operator under test is installed into.
 - `DEPENDS_ON_CANDIDATES`
-  - One line per sibling repo this job is willing to resolve, `<org>/<name> <RELATED_IMAGE_ENV_VAR_NAME>`. Plain text, not JSON -- this image has no guaranteed `jq` (same reasoning as `oadp-operator-sdk-bundle-image`). Add more lines to test more repos together in the same job; this script does not change.
+  - One line per `(repo, image)` pair this job is willing to resolve, `<org>/<name> <RELATED_IMAGE_ENV_VAR_NAME> [<dockerfile-path>]`. Plain text, not JSON -- this image has no guaranteed `jq` (same reasoning as `oadp-operator-sdk-bundle-image`). `<dockerfile-path>` is optional (defaults to `Dockerfile` at the repo root); set it when a repo's own ci-operator config builds with something else (`Dockerfile.ubi`, `Containerfile`, etc). The same repo may appear on more than one line -- a repo producing several images (e.g. `migtools/oadp-vm-file-restore`, which builds 3 separate `RELATED_IMAGE_*` targets from 3 different Dockerfiles) gets its source fetched once and built once per matching line. Add more lines to test more repos (or more images per repo) together in the same job; this script does not change.
 
 ### Output
 
-For each resolved candidate, one line is appended to `${SHARED_DIR}/depends-on-images.txt`: `<RELATED_IMAGE_ENV_VAR_NAME> <pullspec>`. A downstream step (e.g. this job's `set-related-image` test step) reads this file and folds each line into its own patch. The file does not exist at all when nothing was resolved.
+For each resolved candidate, one line is appended to `${SHARED_DIR}/depends-on-images.txt`: `<RELATED_IMAGE_ENV_VAR_NAME> <pullspec>`. A downstream step (e.g. `oadp-apply-depends-on-images`, or KDM's inline `set-related-image` test step) reads this file and folds each line into its own patch. The file does not exist at all when nothing was resolved.
 
 ## Known limitations
 
 - **Unauthenticated GitHub API calls**: same as `openstack-k8s-operators-kuttl-commands.sh`, no token is used, so this is subject to GitHub's unauthenticated rate limit (60/hr per IP). Acceptable for now given the existing precedent; would need a credentialed step if this becomes a bottleneck.
-- **No re-trigger on a later push to the depended-on PR**: this step resolves whatever the depended-on PR's HEAD is at the moment *this* job runs. A push to the sibling PR after this job started does not retrigger it -- the triggering PR's own presubmit re-run (any new push, or `/retest`) is what re-resolves.
-- **First real run still pending**: rehearsal only exercises the no-Depends-On (default) path, since no real KDM PR carries the marker yet. The positive path needs a real paired kdm-controller/kdm-plugin PR pair to verify end-to-end.
+- **First real run still pending**: rehearsal only exercises the no-Depends-On (default) path, since no real PR carries the marker yet. The positive path needs a real pair of PRs referencing each other to verify end-to-end -- KDM's controller/plugin pair, or oadp-operator's own 17-candidate list against any one of its sibling repos.
 
 ## Provenance
 

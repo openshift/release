@@ -88,77 +88,104 @@ echo "[$(date --utc +%FT%T.%3NZ)] Found Depends-On line(s):"
 echo "${DEPENDS_ON_LINES}"
 
 RESOLVED_ANY=false
-SEEN_REPOS=""
+SEEN_URLS=""
 
 while IFS= read -r line; do
     [[ -z "${line}" ]] && continue
     DEP_URL=$(printf '%s' "${line}" | grep -oE 'https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+')
+
+    # Dedup by exact URL (a PR body accidentally repeating the identical
+    # Depends-On line), NOT by repo -- one repo can legitimately match
+    # several DEPENDS_ON_CANDIDATES lines below (e.g. oadp-vm-file-restore
+    # builds 3 separate images from 3 different Dockerfiles in the same
+    # repo, each feeding a different RELATED_IMAGE_* var), and all of those
+    # must be built from this one PR checkout.
+    if [[ " ${SEEN_URLS} " == *" ${DEP_URL} "* ]]; then
+        echo "[$(date --utc +%FT%T.%3NZ)] ${DEP_URL} already processed from an earlier identical Depends-On line -- skipping duplicate"
+        continue
+    fi
+    SEEN_URLS="${SEEN_URLS} ${DEP_URL}"
+
     DEP_REPO=$(printf '%s' "${DEP_URL}" | sed -E 's#https://github\.com/([^/]+/[^/]+)/pull/[0-9]+#\1#')
     DEP_PR=$(printf '%s' "${DEP_URL}" | sed -E 's#.*/pull/([0-9]+)#\1#')
 
-    if [[ " ${SEEN_REPOS} " == *" ${DEP_REPO} "* ]]; then
-        echo "[$(date --utc +%FT%T.%3NZ)] ${DEP_REPO} already resolved from an earlier Depends-On line -- skipping duplicate"
-        continue
-    fi
-
-    RELATED_ENV=""
-    while read -r CAND_REPO CAND_ENV; do
-        [[ -z "${CAND_REPO}" ]] && continue
-        if [[ "${CAND_REPO}" == "${DEP_REPO}" ]]; then
-            RELATED_ENV="${CAND_ENV}"
-            break
-        fi
+    # Collect every DEPENDS_ON_CANDIDATES line naming this repo -- may be
+    # more than one (see comment above), so this does NOT stop at the
+    # first match.
+    MATCHED_CANDIDATES=""
+    while IFS= read -r CAND_LINE; do
+        [[ -z "${CAND_LINE}" ]] && continue
+        CAND_REPO=$(printf '%s' "${CAND_LINE}" | awk '{print $1}')
+        [[ "${CAND_REPO}" == "${DEP_REPO}" ]] && MATCHED_CANDIDATES="${MATCHED_CANDIDATES}${CAND_LINE}
+"
     done <<< "${DEPENDS_ON_CANDIDATES}"
 
-    if [[ -z "${RELATED_ENV}" ]]; then
+    if [[ -z "${MATCHED_CANDIDATES}" ]]; then
         echo "[$(date --utc +%FT%T.%3NZ)] Depends-On ${DEP_REPO}#${DEP_PR} found, but ${DEP_REPO} is not a configured candidate for this job -- skipping"
         continue
     fi
 
-    SEEN_REPOS="${SEEN_REPOS} ${DEP_REPO}"
-    echo "[$(date --utc +%FT%T.%3NZ)] Resolving ${DEP_REPO}#${DEP_PR} -> ${RELATED_ENV}"
-
+    echo "[$(date --utc +%FT%T.%3NZ)] Fetching ${DEP_REPO}#${DEP_PR} once for $(printf '%s' "${MATCHED_CANDIDATES}" | grep -c .) matching candidate(s)"
     SRC_DIR=$(mktemp -d)
     TARBALL_URL="https://github.com/${DEP_REPO}/archive/refs/pull/${DEP_PR}/head.tar.gz"
-    echo "[$(date --utc +%FT%T.%3NZ)] Fetching ${TARBALL_URL}"
     curl -sfL "${TARBALL_URL}" -o /tmp/depends-on-src.tar.gz
     tar xzf /tmp/depends-on-src.tar.gz -C "${SRC_DIR}" --strip-components=1
     rm -f /tmp/depends-on-src.tar.gz
 
-    # Build entirely inside the target test cluster: a normal OpenShift
-    # binary Build (buildah managed by OCP, nothing to install locally) that
-    # uploads SRC_DIR as its input and lands the result in this cluster's
-    # own internal registry as an ImageStreamTag. No external route,
-    # insecure-registry marking, or MachineConfigPool rollout needed --
-    # unlike oadp-operator-sdk-bundle-image's OO_MIRROR_TO_CLUSTER_REGISTRY
-    # dance, the only consumer of this image is this same cluster's own
-    # kubelet, which already trusts its own internal registry natively.
-    BUILD_NAME="depends-on-$(basename "${DEP_REPO}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-' '-')"
-    echo "[$(date --utc +%FT%T.%3NZ)] Creating BuildConfig/ImageStream ${BUILD_NAME} in ${OO_INSTALL_NAMESPACE}"
-    oc new-build --strategy=docker --binary --name="${BUILD_NAME}" -n "${OO_INSTALL_NAMESPACE}"
+    while IFS= read -r CAND_LINE; do
+        [[ -z "${CAND_LINE}" ]] && continue
+        # Third field is an optional Dockerfile path relative to the repo
+        # root, for a repo whose default build target isn't a plain
+        # "Dockerfile" (e.g. Dockerfile.ubi, Containerfile) -- mirrors that
+        # repo's own dockerfile_path in its ci-operator config. Defaults to
+        # "Dockerfile" when omitted.
+        read -r _ RELATED_ENV CAND_DOCKERFILE <<< "${CAND_LINE}"
+        CAND_DOCKERFILE="${CAND_DOCKERFILE:-Dockerfile}"
+        echo "[$(date --utc +%FT%T.%3NZ)] Resolving ${DEP_REPO}#${DEP_PR} (${CAND_DOCKERFILE}) -> ${RELATED_ENV}"
 
-    echo "[$(date --utc +%FT%T.%3NZ)] Starting binary build ${BUILD_NAME} from ${SRC_DIR}"
-    set +o errexit
-    oc start-build "${BUILD_NAME}" --from-dir="${SRC_DIR}" --follow --wait -n "${OO_INSTALL_NAMESPACE}"
-    BUILD_STATUS=$?
-    set -o errexit
+        # Build entirely inside the target test cluster: a normal
+        # OpenShift binary Build (buildah managed by OCP, nothing to
+        # install locally) that uploads SRC_DIR as its input and lands the
+        # result in this cluster's own internal registry as an
+        # ImageStreamTag. No external route, insecure-registry marking, or
+        # MachineConfigPool rollout needed -- unlike
+        # oadp-operator-sdk-bundle-image's OO_MIRROR_TO_CLUSTER_REGISTRY
+        # dance, the only consumer of this image is this same cluster's
+        # own kubelet, which already trusts its own internal registry
+        # natively.
+        BUILD_NAME="depends-on-$(printf '%s' "${RELATED_ENV}" | tr '[:upper:]_' '[:lower:]-' | tr -c 'a-z0-9-' '-')"
+        echo "[$(date --utc +%FT%T.%3NZ)] Creating BuildConfig/ImageStream ${BUILD_NAME} in ${OO_INSTALL_NAMESPACE}"
+        oc new-build --strategy=docker --binary --name="${BUILD_NAME}" -n "${OO_INSTALL_NAMESPACE}"
+        if [[ "${CAND_DOCKERFILE}" != "Dockerfile" ]]; then
+            oc patch bc/"${BUILD_NAME}" -n "${OO_INSTALL_NAMESPACE}" --type merge \
+              -p "{\"spec\":{\"strategy\":{\"dockerStrategy\":{\"dockerfilePath\":\"${CAND_DOCKERFILE}\"}}}}"
+        fi
+
+        echo "[$(date --utc +%FT%T.%3NZ)] Starting binary build ${BUILD_NAME} from ${SRC_DIR}"
+        set +o errexit
+        oc start-build "${BUILD_NAME}" --from-dir="${SRC_DIR}" --follow --wait -n "${OO_INSTALL_NAMESPACE}"
+        BUILD_STATUS=$?
+        set -o errexit
+
+        if [[ "${BUILD_STATUS}" -ne 0 ]]; then
+            echo "[$(date --utc +%FT%T.%3NZ)] Build ${BUILD_NAME} failed (exit ${BUILD_STATUS}) -- dumping diagnostics" >&2
+            oc get build,bc -n "${OO_INSTALL_NAMESPACE}" -l "buildconfig=${BUILD_NAME}" || true
+            oc logs "bc/${BUILD_NAME}" -n "${OO_INSTALL_NAMESPACE}" --all-containers || true
+            rm -rf "${SRC_DIR}"
+            exit "${BUILD_STATUS}"
+        fi
+
+        IMAGE_REF=$(oc get istag "${BUILD_NAME}:latest" -n "${OO_INSTALL_NAMESPACE}" -o jsonpath='{.image.dockerImageReference}')
+        if [[ -z "${IMAGE_REF}" ]]; then
+            echo "[$(date --utc +%FT%T.%3NZ)] Failed to resolve pullspec for ${BUILD_NAME}:latest" >&2
+            rm -rf "${SRC_DIR}"
+            exit 1
+        fi
+        echo "[$(date --utc +%FT%T.%3NZ)] ${DEP_REPO}#${DEP_PR} (${CAND_DOCKERFILE}) built as ${IMAGE_REF}, exposing via ${RELATED_ENV}"
+        echo "${RELATED_ENV} ${IMAGE_REF}" >> "${SHARED_DIR}/depends-on-images.txt"
+        RESOLVED_ANY=true
+    done <<< "${MATCHED_CANDIDATES}"
     rm -rf "${SRC_DIR}"
-
-    if [[ "${BUILD_STATUS}" -ne 0 ]]; then
-        echo "[$(date --utc +%FT%T.%3NZ)] Build ${BUILD_NAME} failed (exit ${BUILD_STATUS}) -- dumping diagnostics" >&2
-        oc get build,bc -n "${OO_INSTALL_NAMESPACE}" -l "buildconfig=${BUILD_NAME}" || true
-        oc logs "bc/${BUILD_NAME}" -n "${OO_INSTALL_NAMESPACE}" --all-containers || true
-        exit "${BUILD_STATUS}"
-    fi
-
-    IMAGE_REF=$(oc get istag "${BUILD_NAME}:latest" -n "${OO_INSTALL_NAMESPACE}" -o jsonpath='{.image.dockerImageReference}')
-    if [[ -z "${IMAGE_REF}" ]]; then
-        echo "[$(date --utc +%FT%T.%3NZ)] Failed to resolve pullspec for ${BUILD_NAME}:latest" >&2
-        exit 1
-    fi
-    echo "[$(date --utc +%FT%T.%3NZ)] ${DEP_REPO}#${DEP_PR} built as ${IMAGE_REF}, exposing via ${RELATED_ENV}"
-    echo "${RELATED_ENV} ${IMAGE_REF}" >> "${SHARED_DIR}/depends-on-images.txt"
-    RESOLVED_ANY=true
 done <<< "${DEPENDS_ON_LINES}"
 
 if [[ "${RESOLVED_ANY}" != "true" ]]; then

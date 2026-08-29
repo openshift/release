@@ -1,0 +1,45 @@
+ref:
+  as: oadp-apply-depends-on-images
+  from: cli
+  commands: oadp-apply-depends-on-images-commands.sh
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OO_INSTALL_NAMESPACE
+    documentation: The namespace the operator under test is installed into (same value passed to oadp-depends-on-build and to the install step, e.g. oadp-operator-sdk-bundle-image or optional-operators-subscribe).
+  - name: OLM_API_VERSION
+    documentation: |-
+      Which OLM API this cluster's operator install uses, so this step
+      knows how to apply the resolved images. Only `v0` is implemented
+      today (patches an OLMv0 Subscription's `spec.config.env`, the only
+      API this whole ecosystem uses as of this writing). `v1` is reserved
+      for operator-controller's ClusterExtension, which will eventually
+      replace OLMv0 across this ecosystem but uses a different
+      config-override shape -- setting it fails loudly with a clear
+      "not implemented" message rather than silently no-opping, so a
+      future OLMv1 migration cannot accidentally believe Depends-On
+      support carried over for free. See openshift/oadp-operator#2389.
+    default: v0
+  - name: OO_MANAGER_DEPLOYMENT
+    documentation: Name of the operator's own manager Deployment to wait on for the Subscription.spec.config.env override to roll out. Defaults to oadp-operator's own manager Deployment name.
+    default: openshift-adp-controller-manager
+  documentation: |-
+    Applies whatever `oadp-depends-on-build` resolved
+    (`${SHARED_DIR}/depends-on-images.txt`, see that ref) to the operator
+    already installed in this test cluster, so a Depends-On-resolved image
+    actually takes effect instead of just sitting in the internal
+    registry unused.
+
+    A total no-op (no Subscription lookup, no patch, nothing) when that
+    file doesn't exist or is empty -- the common case for any PR that
+    doesn't use Depends-On at all.
+
+    Deliberately separate from `oadp-depends-on-build`: that step only
+    builds images and is OLM-version-agnostic (it doesn't touch any
+    installed operator at all); this step is where OLM-API-specific
+    "make it take effect" logic lives, so a future OLMv1
+    (operator-controller ClusterExtension) implementation only touches
+    this one step, not the resolver.
