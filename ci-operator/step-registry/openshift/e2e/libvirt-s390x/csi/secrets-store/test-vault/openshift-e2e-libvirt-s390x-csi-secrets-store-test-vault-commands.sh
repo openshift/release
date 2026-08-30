@@ -68,13 +68,37 @@ check_arch_and_deps() {
     echo "Checking and installing required tools..."
 
     # Verify tools already present in cli image
-    for tool in oc curl tar git; do
+    for tool in oc curl tar; do
         if ! command -v "${tool}" &>/dev/null; then
             echo "ERROR: Required tool '${tool}' not found in PATH."
             exit 1
         fi
         echo "  [OK] ${tool}"
     done
+
+    # Install git to /tmp/bin if not present (extracted from CentOS Stream 9 RPM, amd64)
+    if ! command -v git &>/dev/null; then
+        echo "Installing git (amd64 — extracted from CentOS Stream 9 RPM)..."
+        GIT_RPM_VERSION="2.47.3-1.el9"
+        GIT_RPM_URL="https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/git-core-${GIT_RPM_VERSION}.x86_64.rpm"
+        GIT_EXTRACT_DIR="/tmp/git-rpm-extract"
+        mkdir -p "${GIT_EXTRACT_DIR}"
+        curl -fsSL "${GIT_RPM_URL}" -o /tmp/git-core.rpm || {
+            echo "ERROR: Failed to download git RPM from ${GIT_RPM_URL}."
+            exit 1
+        }
+        cd "${GIT_EXTRACT_DIR}"
+        rpm2cpio /tmp/git-core.rpm | cpio -idm --quiet
+        cd -
+        cp "${GIT_EXTRACT_DIR}/usr/bin/git" /tmp/bin/git
+        chmod +x /tmp/bin/git
+        # Point git at the extracted libexec helpers so subcommands work
+        export GIT_EXEC_PATH="${GIT_EXTRACT_DIR}/usr/libexec/git-core"
+        rm -f /tmp/git-core.rpm
+        echo "  [OK] git $(git --version)"
+    else
+        echo "  [OK] git $(git --version)"
+    fi
 
     # Install jq to /tmp/bin if not present
     if ! command -v jq &>/dev/null; then
@@ -111,9 +135,8 @@ check_arch_and_deps() {
     # Install helm to /tmp/bin if not present
     if ! command -v helm &>/dev/null; then
         echo "Installing helm (amd64 for build farm pod)..."
-        HELM_VERSION="3.16.4"
-        HELM_TARBALL="helm-v${HELM_VERSION}-linux-amd64.tar.gz"
-        HELM_URL="https://get.helm.sh/${HELM_TARBALL}"
+        HELM_VERSION="4.2.4"
+        HELM_URL="https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz"
         curl -fsSL "${HELM_URL}" -o /tmp/helm.tar.gz || {
             echo "ERROR: Failed to download helm from ${HELM_URL}."
             exit 1
