@@ -76,26 +76,15 @@ check_arch_and_deps() {
         echo "  [OK] ${tool}"
     done
 
-    # Install git to /tmp/bin if not present (extracted from CentOS Stream 9 RPM, amd64)
+    # Install git if not present — try dnf 
     if ! command -v git &>/dev/null; then
-        echo "Installing git (amd64 — extracted from CentOS Stream 9 RPM)..."
-        GIT_RPM_VERSION="2.47.3-1.el9"
-        GIT_RPM_URL="https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/git-core-${GIT_RPM_VERSION}.x86_64.rpm"
-        GIT_EXTRACT_DIR="/tmp/git-rpm-extract"
-        mkdir -p "${GIT_EXTRACT_DIR}"
-        curl -fsSL "${GIT_RPM_URL}" -o /tmp/git-core.rpm || {
-            echo "ERROR: Failed to download git RPM from ${GIT_RPM_URL}."
+        echo "git not found — attempting dnf install..."
+        if dnf install -y git &>/dev/null 2>&1; then
+            echo "  [OK] git $(git --version) (via dnf)"
+        else
+            echo "dnf unavailable or failed"
             exit 1
-        }
-        cd "${GIT_EXTRACT_DIR}"
-        rpm2cpio /tmp/git-core.rpm | cpio -idm --quiet
-        cd -
-        cp "${GIT_EXTRACT_DIR}/usr/bin/git" /tmp/bin/git
-        chmod +x /tmp/bin/git
-        # Point git at the extracted libexec helpers so subcommands work
-        export GIT_EXEC_PATH="${GIT_EXTRACT_DIR}/usr/libexec/git-core"
-        rm -f /tmp/git-core.rpm
-        echo "  [OK] git $(git --version)"
+        fi
     else
         echo "  [OK] git $(git --version)"
     fi
