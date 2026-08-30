@@ -67,27 +67,14 @@ check_arch_and_deps() {
     echo
     echo "Checking and installing required tools..."
 
-    # Verify tools already present in cli image
-    for tool in oc curl tar; do
+    # Verify tools already present in cli-with-git image
+    for tool in oc curl tar git; do
         if ! command -v "${tool}" &>/dev/null; then
             echo "ERROR: Required tool '${tool}' not found in PATH."
             exit 1
         fi
         echo "  [OK] ${tool}"
     done
-
-    # Install git if not present — try dnf 
-    if ! command -v git &>/dev/null; then
-        echo "git not found — attempting dnf install..."
-        if dnf install -y git &>/dev/null 2>&1; then
-            echo "  [OK] git $(git --version) (via dnf)"
-        else
-            echo "dnf unavailable or failed"
-            exit 1
-        fi
-    else
-        echo "  [OK] git $(git --version)"
-    fi
 
     # Install jq to /tmp/bin if not present
     if ! command -v jq &>/dev/null; then
