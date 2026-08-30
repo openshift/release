@@ -105,7 +105,7 @@ REGION="${LEASED_RESOURCE}"
 echo "Using region: ${REGION}"
 
 ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[0] | cut -d "/" -f9)
-MACHINE_TYPE="${BASTION_MACHINE_TYPE:-n2-standard-2}"
+MACHINE_TYPE="${BASTION_MACHINE_TYPE:-n4-standard-2}"
 
 #####################################
 ##########Create Bastion#############
@@ -122,6 +122,14 @@ CMD="gcloud compute instances create ${bastion_name} \
   --subnet=${CONTROL_PLANE_SUBNET} \
   --zone=${ZONE_0} \
   --tags=${bastion_name}"
+
+# N4-family instances only support hyperdisk-balanced boot disks; other
+# machine families keep the GCE default (Persistent Disk).
+case "${MACHINE_TYPE}" in
+  n4-*|n4a-*|n4d-*)
+    CMD="${CMD} --boot-disk-type=hyperdisk-balanced"
+    ;;
+esac
 
 if [ -n "${ATTACH_BASTION_SA}" ]; then
   CMD="${CMD} --service-account ${ATTACH_BASTION_SA} --scopes cloud-platform"
