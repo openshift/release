@@ -1,0 +1,79 @@
+ref:
+  as: openshift-qe-etcd-density-db-quota-pressure
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: ITERATIONS
+    default: "100"
+    documentation: |-
+      Number of iterations
+  - name: ITERATIONS_PER_NAMESPACE
+    default: "1"
+    documentation: |-
+      Number of iterations per namespace
+  - name: KB_CHUNKS
+    default: "8"
+    documentation: |-
+      Number of chunks for kube-burner
+  - name: KB_SIZE
+    default: "10"
+    documentation: |-
+      Size of each chunk in KB (10 or 100)
+  - name: KB_FLAGS
+    default: ""
+    documentation: |-
+      Additional flags for the kube-burner command. Reused across other kube-burner based workloads
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
+  - name: GC_METRICS
+    default: "false"
+    documentation: |-
+      Default is false, which means skip collecting metrics, you can set it to true to collect metrics.
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: USER_METADATA
+    default: ""
+    documentation: |-
+      Arbitrary metadata provided to the kube-burner workload in YAML format
+  - name: ADDITIONAL_PARAMS
+    default: '{}'
+    documentation: |-
+      JSON value to upload additonal metadata to the fingerprint
+  commands: openshift-qe-etcd-density-db-quota-pressure-commands.sh
+  timeout: 13h
+  credentials:
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the etcd-density db-quota-pressure workload to stress etcd storage quota with large CRD fills

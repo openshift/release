@@ -109,6 +109,64 @@ tests:
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
+- always_run: false
+  as: perfscale-etcd-db-quota-8gb-cd-v2-6nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
+      ENABLE_LOCAL_INDEX: "true"
+      GC: "false"
+      ITERATIONS: "8000"
+      ITERATIONS_PER_NAMESPACE: "1"
+      KB_CHUNKS: "8"
+      KB_SIZE: "100"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-etcd-density-db-quota-pressure
+    - ref: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: perfscale-etcd-db-quota-16gb-cd-v2-6nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
+      ENABLE_LOCAL_INDEX: "true"
+      ETCD_BACKEND_QUOTA_GIB: "16"
+      GC: "false"
+      ITERATIONS: "16000"
+      ITERATIONS_PER_NAMESPACE: "1"
+      KB_CHUNKS: "8"
+      KB_SIZE: "100"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-etcd-set-backend-quota
+    - ref: openshift-qe-etcd-density-db-quota-pressure
+    - ref: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: perfscale-etcd-annotation-churn-6nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      ENABLE_LOCAL_INDEX: "true"
+      ITERATIONS: "10"
+      PATCH_REPLICAS: "50"
+      PATCH_ROUNDS: "10"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-etcd-density-annotation-churn
+    workflow: openshift-qe-installer-aws
 zz_generated_metadata:
   branch: release-5.0
   org: openshift
