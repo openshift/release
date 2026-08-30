@@ -222,9 +222,23 @@ fi
 echo "Starting DPF deployment with 'make all'..."
 echo "Logs will be saved to: ${DEPLOYMENT_LOG}"
 
+# Temporary: install patched aicli with digest-based image support
+# (https://github.com/josecastillolema/aicli/tree/digest)
+# Remove this block once the upstream PR is merged.
+AICLI_VENV="/tmp/aicli-venv"
+echo "Installing patched aicli in venv on hypervisor..."
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "python3 -m venv ${AICLI_VENV} && \
+  ${AICLI_VENV}/bin/pip install -q git+https://github.com/josecastillolema/aicli.git@digest && \
+  ${AICLI_VENV}/bin/aicli --version"; then
+  echo "Patched aicli installed successfully"
+else
+  echo "ERROR: Failed to install patched aicli"
+  exit 1
+fi
 
 # Execute `make clean-all` on hypervisor with comprehensive logging
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
+  export PATH=${AICLI_VENV}/bin:\$PATH; \
   ls -ltr; \
   env; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
@@ -241,6 +255,7 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   echo "Execute make all on hypervisor with comprehensive logging"
 
   if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
+    export PATH=${AICLI_VENV}/bin:\$PATH; \
     cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
     mkdir -p ${REMOTE_LOGS_DIR} ; \
     make all 2>&1 | tee ${DEPLOYMENT_LOG}"; then
@@ -264,6 +279,10 @@ else
   echo "DPF pre-deployment clean-all failed, CLEAN_ALL_SUCCESS is set to: ${CLEAN_ALL_SUCCESS}"
   exit 1
 fi
+
+# Clean up patched aicli venv
+echo "Cleaning up patched aicli venv..."
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "rm -rf ${AICLI_VENV}" || true
 
 # To Do: add basic oc commands to verify make all step passed
 
