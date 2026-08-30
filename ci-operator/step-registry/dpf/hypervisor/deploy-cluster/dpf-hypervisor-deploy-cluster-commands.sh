@@ -229,7 +229,7 @@ AICLI_VENV="/tmp/aicli-venv"
 echo "Installing patched aicli in venv on hypervisor..."
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "python3 -m venv ${AICLI_VENV} && \
   ${AICLI_VENV}/bin/pip install -q git+https://github.com/josecastillolema/aicli.git@digest && \
-  ${AICLI_VENV}/bin/aicli --version"; then
+  ${AICLI_VENV}/bin/pip show aicli | grep -E 'Name|Version|Location'"; then
   echo "Patched aicli installed successfully"
 else
   echo "ERROR: Failed to install patched aicli"
