@@ -28,7 +28,7 @@ chain:
       source "${SHARED_DIR}/env"
 
       # TEMPORARY: libvirt-s390x only. Fix highWlLookupKey copy-paste (lowJob ->
-      # highJob) and give on-demand preemption waits 90s instead of 10s.
+      # highJob)
       JOB_TEST="upstream/kueue/src/test/e2e/singlecluster/baseline/job_test.go"
       if [[ -f "${JOB_TEST}" ]]; then
         sed -i \
@@ -37,21 +37,6 @@ chain:
         echo "=== Patched ${JOB_TEST} ==="
       else
         echo "WARNING: ${JOB_TEST} not found; skipping patch"
-      fi
-
-      # TEMPORARY debug: stop at first failure so controller logs still cover
-      # the failed spec, then dump logs (e2e namespaces are already deleted).
-      export GINKGO_ARGS="${GINKGO_ARGS:-} --fail-fast"
-      if ! make e2e-upstream-test; then
-        echo "=== TEMPORARY debug dump after upstream failure ==="
-        mkdir -p "${ARTIFACT_DIR}/kueue-debug-dump"
-        oc get pods -n openshift-kueue-operator -o wide || true
-        oc logs -n openshift-kueue-operator --all-containers --prefix=true --tail=5000 --since=20m \
-          -l control-plane=controller-manager 2>&1 | tee "${ARTIFACT_DIR}/kueue-debug-dump/controller.log" || true
-        oc logs -n openshift-kueue-operator deployment/openshift-kueue-operator --all-containers --prefix=true --tail=500 --since=20m 2>&1 | tee "${ARTIFACT_DIR}/kueue-debug-dump/operator.log" || true
-        oc get clusterqueue -o yaml 2>&1 | tee "${ARTIFACT_DIR}/kueue-debug-dump/clusterqueue.yaml" || true
-        oc get workloads.kueue.x-k8s.io -A -o yaml 2>&1 | tee "${ARTIFACT_DIR}/kueue-debug-dump/workloads.yaml" || true
-        exit 1
       fi
     from: kueue-operator-src
     resources:
