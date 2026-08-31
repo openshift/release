@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 echo "Creating openshift-local-storage namespace..."
 cat <<EOF | oc apply -f -
 apiVersion: v1
