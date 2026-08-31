@@ -36,7 +36,7 @@ main() {
         -i ./inventories/ocp-deployment/build-inventory.py \
         -e spoke_cluster="${SPOKE_CLUSTER}" \
         -e spoke_kubeconfig="${SPOKE_KUBECONFIG}" \
-        -e report_headline="${REPORT_HEADLINE:-}" \
+        -e report_headline="'${REPORT_HEADLINE:-}'" \
         ${DEBUG_FLAG}
 
     echo "Copy artifacts to ARTIFACT_DIR and SHARED_DIR"
