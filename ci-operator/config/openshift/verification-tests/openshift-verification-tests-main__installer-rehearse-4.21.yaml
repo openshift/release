@@ -114,13 +114,26 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-p1xz9gt/release:latest
       MULTI_NIC_IPI: "true"
-      SLEEP_DURATION: 24h
+      SLEEP_DURATION: 12h
     post:
     - ref: cucushift-installer-wait
     - chain: cucushift-installer-rehearse-vsphere-ipi-deprovision
     pre:
     - chain: cucushift-installer-rehearse-vsphere-ipi-provision
+- as: installer-rehearse-vsphere-multi-vcenter
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2026-08-10-225253
+      SLEEP_DURATION: 8h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-vsphere-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-vsphere-ipi-multi-vcenter-provision
 - as: installer-rehearse-azurestack
   cluster: build01
   cron: '@yearly'
