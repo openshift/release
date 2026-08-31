@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "=== GCP HCP HC Lifecycle Validation ==="
+echo ""
+
+# Verify gcphcpctl binary exists (built by gcp-hcp-build-gcphcpctl step)
+if [[ ! -f "${SHARED_DIR}/gcphcpctl" ]]; then
+  echo "ERROR: gcphcpctl binary not found at ${SHARED_DIR}/gcphcpctl"
+  echo "The gcp-hcp-build-gcphcpctl step must run before this step"
+  exit 1
+fi
+chmod +x "${SHARED_DIR}/gcphcpctl"
+
+# Verify required SHARED_DIR files exist
+for f in api-endpoint oidc-endpoint customer-project-id; do
+  if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
+    echo "ERROR: ${f} not found or empty in SHARED_DIR"
+    echo "The gcp-hcp-tf-provision step must write this file"
+    exit 1
+  fi
+done
+
+# Authenticate with WIF credential (gcphcpctl uses gcloud auth print-identity-token)
+if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
+  echo "Authenticating with WIF credential..."
+  gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet
+else
+  echo "WARNING: WIF credential not found, relying on existing gcloud auth"
+fi
+
+echo "Configuration:"
+echo "  API endpoint:       $(cat "${SHARED_DIR}/api-endpoint")"
+echo "  OIDC endpoint:      $(cat "${SHARED_DIR}/oidc-endpoint")"
+echo "  Customer project:   $(cat "${SHARED_DIR}/customer-project-id")"
+echo "  HC version:         ${HC_VERSION:-5.0.0-ec.6}"
+echo "  Channel group:      ${HC_CHANNEL_GROUP:-candidate}"
+echo ""
+
+# The Ginkgo test reads SHARED_DIR files directly via resolveConfig().
+# GCPHCPCTL_PATH is the only env var that must be set explicitly because
+# the binary is in SHARED_DIR (not on PATH).
+export GCPHCPCTL_PATH="${SHARED_DIR}/gcphcpctl"
+
+# Run Ginkgo v2 test binary
+echo "Running HC lifecycle validation tests..."
+/usr/bin/test-e2e \
+  --ginkgo.v \
+  --ginkgo.no-color \
+  --ginkgo.timeout=140m \
+  --ginkgo.junit-report="${ARTIFACT_DIR}/junit_hc_lifecycle.xml" \
+  --ginkgo.label-filter="hc-lifecycle"
+
+echo ""
+echo "HC lifecycle validation completed successfully"

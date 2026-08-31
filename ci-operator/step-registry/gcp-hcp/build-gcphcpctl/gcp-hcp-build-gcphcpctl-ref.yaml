@@ -1,0 +1,31 @@
+ref:
+  as: gcp-hcp-build-gcphcpctl
+  from_image:
+    namespace: ocp
+    name: builder
+    tag: rhel-9-golang-1.26-openshift-4.22
+  commands: gcp-hcp-build-gcphcpctl-commands.sh
+  env:
+  - name: GCPHCPCTL_REPO
+    default: "https://github.com/openshift-online/gcp-hcp-ctl.git"
+    documentation: "Git repository URL for the gcphcpctl CLI source code"
+  - name: GCPHCPCTL_REF
+    default: "main"
+    documentation: "Git ref (branch, tag, or commit SHA) to build from"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 10m0s
+  documentation: |-
+    Builds the gcphcpctl CLI from source and writes the binary to SHARED_DIR.
+
+    The CLI is used by gcp-hcp-verify-hc-lifecycle to create, verify, and
+    delete hosted clusters via the Gecko Platform API.
+
+    Environment variables:
+    - GCPHCPCTL_REPO: Git repository URL (default: openshift-online/gcp-hcp-ctl)
+    - GCPHCPCTL_REF: Git ref to build from (default: main)
+
+    Outputs to SHARED_DIR:
+    - gcphcpctl: Compiled CLI binary
