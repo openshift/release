@@ -761,10 +761,39 @@ def check_configs(data):
     configs_ok = True
 
     for config in data.configs:
+        # 1. Check each job configuration
         # check config for master and the release template - could also cover
         # release branches if this check proves useful.
         if config.branch == 'master' or config.branch == 'release-x.y':
             if not check_config(config, data):
+                configs_ok = False
+
+        # 1. Check the rox-ci-image tag
+        # Check master/release branch configs do not use the "latest" floating
+        # tag for the rox-ci-image (apollo-ci). The "latest" tag is a moving
+        # target and should only be used for validation, not for CI jobs.
+        # Rules:
+        #   allow -stable, not -latest, for master
+        #   no -stable or -latest tags for release branches
+        # > latest is OK for in-flight PRs, but the check should still fail, to prevent merging such PR
+        tag = config.build_root_tag
+        if config.branch == 'master':
+            if 'latest' in tag:
+                check_error(f"{config.short_filename}: master branch '{config.branch}' "
+                            f"must not use 'latest' build root tag '{tag}'. "
+                            f"Pin to 'stable' or a specific version (e.g. stackrox-ui-test-0.5.7).")
+        if config.branch.startswith('release-'):
+            if not tag:
+                break
+            if 'latest' in tag:
+                check_error(f"{config.short_filename}: release branch '{config.branch}' "
+                            f"must not use 'latest' build root tag '{tag}'. "
+                            f"Pin to a specific version (e.g. stackrox-ui-test-0.5.7).")
+                configs_ok = False
+            if 'stable' in tag:
+                check_error(f"{config.short_filename}: release branch '{config.branch}' "
+                            f"must not use 'stable' build root tag '{tag}'. "
+                            f"Pin to a specific version (e.g. stackrox-ui-test-0.5.7).")
                 configs_ok = False
 
     return configs_ok
