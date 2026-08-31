@@ -11,3 +11,5 @@ if [[ ! -d "${base_dir}" ]]; then
 fi
 
 find "${base_dir}/ci-operator/step-registry" -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
+shellcheck -S warning "${base_dir}/hack/test-azure-cli-retry.sh"
+bash "${base_dir}/hack/test-azure-cli-retry.sh"
