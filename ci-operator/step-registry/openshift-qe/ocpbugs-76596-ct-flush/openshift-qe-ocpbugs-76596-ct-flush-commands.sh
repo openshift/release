@@ -25,13 +25,12 @@ echo "=== Finding target worker node ==="
 TARGET_NODE=""
 BEST_FLOWS=0
 
-for pod in $(oc get pod -n openshift-ovn-kubernetes -l app=ovnkube-node \
-  -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-  node=$(oc get pod -n openshift-ovn-kubernetes "$pod" \
-    -o jsonpath='{.spec.nodeName}' 2>/dev/null)
-  role=$(oc get node "$node" \
-    -o jsonpath='{.metadata.labels.node-role\.kubernetes\.io/worker}' 2>/dev/null)
-  [ "$role" != "true" ] && continue
+for node in $(oc get nodes -l node-role.kubernetes.io/worker --no-headers \
+  -o custom-columns=NAME:.metadata.name 2>/dev/null); do
+  pod=$(oc get pod -n openshift-ovn-kubernetes -l app=ovnkube-node \
+    --field-selector "spec.nodeName=$node" \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+  [ -z "$pod" ] && continue
   flows=$(oc exec -n openshift-ovn-kubernetes "$pod" -c ovn-controller -- \
     bash -c 'ovs-ofctl dump-flows br-int | wc -l' 2>/dev/null || echo 0)
   echo "  $node: $flows flows"
@@ -174,15 +173,21 @@ for zone in 1001 1002 1003 1004; do
 done
 echo "Injection started in background (4 zones × ${CT_ENTRIES_PER_ZONE} entries)"
 
-# Wait for CT to reach target
+# Wait for CT to reach target (4 zones × CT_ENTRIES_PER_ZONE)
+CT_TARGET=$((CT_ENTRIES_PER_ZONE * 4))
 for i in $(seq 1 8); do
   sleep 15
   CT=$(oc exec -n openshift-ovn-kubernetes "$OVN_POD" -- \
     nsenter -t 1 -m -u -i -n -p -- \
     cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null)
-  echo "  t+$((i*15))s: $CT CT entries"
-  [ "${CT:-0}" -gt "$((CT_ENTRIES_PER_ZONE * 3))" ] && echo "CT target reached" && break
+  echo "  t+$((i*15))s: ${CT:-0} CT entries (target $CT_TARGET)"
+  [ "${CT:-0}" -ge "$CT_TARGET" ] && echo "CT target reached" && break
 done
+
+if [ "${CT:-0}" -lt "$((CT_TARGET * 70 / 100))" ]; then
+  echo "ERROR: Only ${CT:-0} CT entries injected, expected $CT_TARGET — aborting"
+  exit 1
+fi
 
 CT_AFTER=$(oc exec -n openshift-ovn-kubernetes "$OVN_POD" -- \
   nsenter -t 1 -m -u -i -n -p -- \
@@ -235,7 +240,7 @@ BEOF
 echo "Waiting for pods to be Running..."
 for i in $(seq 1 12); do
   sleep 30
-  RUNNING=$(oc get pods -n burst-test --no-headers 2>/dev/null | grep Running | wc -l)
+  RUNNING=$(oc get pods -n burst-test --no-headers 2>/dev/null | awk '/Running/{c++}END{print c+0}')
   echo "  t+$((i*30))s: $RUNNING pods Running"
   [ "$RUNNING" -ge "$((BURST_POD_COUNT * 80 / 100))" ] && break
 done
@@ -249,6 +254,11 @@ CT_BURST=$(oc exec -n openshift-ovn-kubernetes "$OVN_POD" -- \
 echo "CT during burst: $CT_BURST"
 echo "CT_burst=$CT_BURST" >> "$OUTDIR/info.txt"
 
+STALLS_BEFORE=$(oc exec -n openshift-ovn-kubernetes "$OVN_POD" -- \
+  nsenter -t 1 -m -u -i -n -p -- \
+  grep -c "Unreasonably long" /var/log/openvswitch/ovs-vswitchd.log 2>/dev/null || echo 0)
+echo "OVS stall baseline: $STALLS_BEFORE"
+
 oc delete pods -n burst-test --all --grace-period=0 2>/dev/null
 echo "${BURST_POD_COUNT} pods deleted simultaneously!"
 
@@ -261,10 +271,11 @@ FINAL_STALLS=0
 for i in $(seq 1 20); do
   sleep 30
   TIMEOUTS=$(oc get events -n burst-test 2>/dev/null | \
-    grep "timed out waiting for OVS" | wc -l)
-  STALLS=$(oc exec -n openshift-ovn-kubernetes "$OVN_POD" -- \
+    awk '/timed out waiting for OVS/{c++}END{print c+0}')
+  STALLS_RAW=$(oc exec -n openshift-ovn-kubernetes "$OVN_POD" -- \
     nsenter -t 1 -m -u -i -n -p -- \
     grep -c "Unreasonably long" /var/log/openvswitch/ovs-vswitchd.log 2>/dev/null || echo 0)
+  STALLS=$(( ${STALLS_RAW:-0} - ${STALLS_BEFORE:-0} ))
   echo "$(date -u +%H:%M:%S) timeouts=$TIMEOUTS stalls=$STALLS"
   FINAL_TIMEOUTS=$TIMEOUTS
   FINAL_STALLS=$STALLS
