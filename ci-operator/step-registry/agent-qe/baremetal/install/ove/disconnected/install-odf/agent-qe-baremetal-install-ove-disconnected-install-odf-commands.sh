@@ -1,6 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+if [[ -z "${ODF_SUBSCRIPTION_CHANNEL}" ]]; then
+    ocp_version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d '.' -f1,2)
+    ODF_SUBSCRIPTION_CHANNEL="stable-${ocp_version}"
+    echo "Auto-detected ODF subscription channel: ${ODF_SUBSCRIPTION_CHANNEL}"
+fi
+
 function gather_debug_info() {
     echo "============================================"
     echo "Gathering debug information to ARTIFACT_DIR"
@@ -144,38 +154,29 @@ fi
 echo "Waiting for StorageCluster CRD to be established..."
 oc wait crd storageclusters.ocs.openshift.io --for=condition=established --timeout=5m
 
-CEPH_IMAGE=""
-for csv in $(oc get csv -n openshift-storage -o jsonpath='{.items[*].metadata.name}'); do
-  CEPH_IMAGE=$(oc get csv "${csv}" -n openshift-storage -o json | \
-    jq -r '[.spec.relatedImages[]? | select(.image | test("rhceph.*rhel"))] | first | .image // empty')
-  if [[ -n "${CEPH_IMAGE}" ]]; then
-    break
-  fi
-done
-if [[ -z "${CEPH_IMAGE}" ]]; then
-  echo "ERROR: Could not find Ceph image in any CSV in openshift-storage"
-  echo "Available CSVs and their relatedImages:"
-  oc get csv -n openshift-storage -o json | jq -r '.items[].spec.relatedImages[]?.name' | sort -u | head -20
-  exit 1
+echo "=== Wiping stale Ceph signatures from OSD block devices ==="
+TOOLS_IMAGE=$(oc adm release info --image-for=tools 2>/dev/null || echo "")
+if [[ -z "${TOOLS_IMAGE}" ]]; then
+  TOOLS_IMAGE=$(oc adm release info --image-for=cli 2>/dev/null || echo "")
 fi
-echo "Ceph image for BlueStore label cleanup: ${CEPH_IMAGE}"
+echo "Using image for wipe pods: ${TOOLS_IMAGE}"
 
-echo "=== Wiping stale BlueStore labels from OSD block devices ==="
 OSD_PVS=$(oc get pv -o json | jq -r \
   '.items[] | select(.spec.storageClassName == "'"${OSD_STORAGE_CLASS}"'") | .metadata.name')
 
-if [[ -n "${OSD_PVS}" ]]; then
+if [[ -n "${OSD_PVS}" && -n "${TOOLS_IMAGE}" ]]; then
   IDX=0
   while IFS= read -r PV_NAME; do
-    NODE=$(oc get pv "${PV_NAME}" -o jsonpath='{.metadata.labels.kubernetes\.io/hostname}')
-    PVC_NAME="bluestore-zap-${IDX}"
-    echo "Cleaning BlueStore labels from PV ${PV_NAME} on ${NODE}..."
+    [[ -z "${PV_NAME}" ]] && continue
+    NODE=$(oc get pv "${PV_NAME}" -o jsonpath='{.metadata.labels.kubernetes\.io/hostname}' 2>/dev/null || echo "")
+    ZAP_NAME="osd-zap-${IDX}"
+    echo "  Wiping PV ${PV_NAME} on node ${NODE}..."
 
-    cat <<PVCEOF | oc apply -f -
+    cat <<ZEOF | oc apply -f -
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: ${PVC_NAME}
+  name: ${ZAP_NAME}
   namespace: openshift-storage
 spec:
   storageClassName: ${OSD_STORAGE_CLASS}
@@ -186,35 +187,30 @@ spec:
   resources:
     requests:
       storage: 100Gi
-PVCEOF
-
-    cat <<PODEOF | oc apply -f -
+---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ${PVC_NAME}
+  name: ${ZAP_NAME}
   namespace: openshift-storage
 spec:
   nodeSelector:
-    kubernetes.io/hostname: ${NODE}
+    kubernetes.io/hostname: "${NODE}"
   containers:
   - name: zap
-    image: ${CEPH_IMAGE}
-    command:
-    - bash
-    - -c
+    image: ${TOOLS_IMAGE}
+    command: ["bash", "-c"]
+    args:
     - |
-      for attempt in 1 2 3 4 5; do
-        LOC=\$(ceph-bluestore-tool show-label --dev /dev/osd-block 2>/dev/null | jq -r '.[].locations[0] // empty')
-        if [[ -z "\${LOC}" ]]; then
-          echo "Clean after \${attempt} attempt(s)"
-          break
-        fi
-        OFFSET=\$(printf '%d' "\${LOC}")
-        echo "Zeroing label at \${LOC} (byte \${OFFSET})..."
-        dd if=/dev/zero of=/dev/osd-block bs=4096 count=256 seek=\$(( OFFSET / 4096 )) conv=fsync 2>/dev/null
-      done
-      wipefs -af /dev/osd-block 2>/dev/null || true
+      echo "Wiping /dev/osd-block..."
+      wipefs -af /dev/osd-block 2>&1 || true
+      sgdisk --zap-all /dev/osd-block 2>&1 || true
+      dd if=/dev/zero of=/dev/osd-block bs=1M count=200 conv=fsync 2>/dev/null || true
+      SIZE_MB=\$(( \$(blockdev --getsize64 /dev/osd-block) / 1048576 ))
+      if [ \${SIZE_MB} -gt 400 ]; then
+        dd if=/dev/zero of=/dev/osd-block bs=1M count=200 seek=\$(( SIZE_MB - 200 )) conv=fsync 2>/dev/null || true
+      fi
+      echo "Wipe complete"
     securityContext:
       privileged: true
     volumeDevices:
@@ -223,19 +219,44 @@ spec:
   volumes:
   - name: data
     persistentVolumeClaim:
-      claimName: ${PVC_NAME}
+      claimName: ${ZAP_NAME}
   restartPolicy: Never
   terminationGracePeriodSeconds: 0
-PODEOF
+ZEOF
 
-    oc wait --for=jsonpath='{.status.phase}'=Succeeded \
-      "pod/${PVC_NAME}" -n openshift-storage --timeout=5m || \
-      echo "WARNING: zap pod for PV ${PV_NAME} did not succeed"
-    oc delete pod "${PVC_NAME}" -n openshift-storage --force --grace-period=0 2>/dev/null || true
-    oc delete pvc "${PVC_NAME}" -n openshift-storage 2>/dev/null || true
     IDX=$((IDX + 1))
   done <<< "${OSD_PVS}"
-  echo "BlueStore label cleanup complete"
+
+  echo "  Waiting for ${IDX} wipe pod(s) to complete..."
+  for i in $(seq 0 $((IDX - 1))); do
+    ZAP_NAME="osd-zap-${i}"
+    if oc wait --for=jsonpath='{.status.phase}'=Succeeded "pod/${ZAP_NAME}" -n openshift-storage --timeout=5m 2>/dev/null; then
+      echo "  ${ZAP_NAME}: succeeded"
+    else
+      echo "  WARNING: ${ZAP_NAME} did not succeed:"
+      oc logs "${ZAP_NAME}" -n openshift-storage 2>/dev/null || true
+      oc get pod "${ZAP_NAME}" -n openshift-storage -o jsonpath='{.status}' 2>/dev/null || true
+    fi
+    oc delete pod "${ZAP_NAME}" -n openshift-storage --force --grace-period=0 2>/dev/null || true
+    oc delete pvc "${ZAP_NAME}" -n openshift-storage --wait=false 2>/dev/null || true
+  done
+  echo "  Waiting for PVs to return to Available..."
+  sleep 10
+  COUNTER=0
+  while [ $COUNTER -lt 120 ]; do
+    AVAIL=$(oc get pv -o json | jq -r \
+      '[.items[] | select(.spec.storageClassName == "'"${OSD_STORAGE_CLASS}"'" and .status.phase == "Available")] | length')
+    if [[ "${AVAIL}" -ge "${IDX}" ]]; then
+      echo "  All ${AVAIL} OSD PVs are Available"
+      break
+    fi
+    sleep 5
+    COUNTER=$((COUNTER + 5))
+    echo "  Waiting ${COUNTER}s for PVs to become Available (${AVAIL}/${IDX})..."
+  done
+  echo "OSD disk wipe complete"
+else
+  echo "  No OSD PVs found or no image available — skipping wipe"
 fi
 
 echo "Creating StorageCluster..."
@@ -276,6 +297,45 @@ EOF
 
 echo "Wait for StorageCluster to become Ready"
 oc wait StorageCluster/ocs-storagecluster -n openshift-storage --for=jsonpath='{.status.phase}'=Ready --timeout=1h
+
+echo "=== Waiting for all OSDs to come up ==="
+COUNTER=0
+while [ $COUNTER -lt 600 ]; do
+    OSD_UP=$(oc get cephcluster -n openshift-storage -o jsonpath='{.items[0].status.ceph.osd.storeCount}' 2>/dev/null || echo "0")
+    if [[ "${OSD_UP}" -ge 3 ]]; then
+        echo "All ${OSD_UP} OSDs are up"
+        break
+    fi
+    sleep 15
+    COUNTER=$((COUNTER + 15))
+    echo "Waiting ${COUNTER}s for OSDs (${OSD_UP:-0}/3 up)..."
+done
+if [[ "${OSD_UP}" -lt 3 ]]; then
+    echo "WARNING: Only ${OSD_UP}/3 OSDs up after timeout"
+    oc get cephcluster -n openshift-storage -o yaml || true
+fi
+
+echo "=== Waiting for Ceph health to stabilize ==="
+COUNTER=0
+while [ $COUNTER -lt 600 ]; do
+    HEALTH=$(oc get cephcluster -n openshift-storage -o jsonpath='{.items[0].status.ceph.health}' 2>/dev/null || echo "")
+    if [[ "${HEALTH}" == "HEALTH_OK" ]]; then
+        echo "Ceph cluster is HEALTH_OK"
+        break
+    fi
+    sleep 15
+    COUNTER=$((COUNTER + 15))
+    DETAILS=$(oc get cephcluster -n openshift-storage -o jsonpath='{.items[0].status.ceph.details}' 2>/dev/null || echo "")
+    echo "Waiting ${COUNTER}s for Ceph health (current: ${HEALTH:-unknown})..."
+    if [[ -n "${DETAILS}" ]]; then
+        echo "  Details: ${DETAILS}"
+    fi
+done
+if [[ "${HEALTH}" != "HEALTH_OK" ]]; then
+    echo "WARNING: Ceph health is ${HEALTH} (not HEALTH_OK) — proceeding anyway"
+    echo "Ceph status:"
+    oc get cephcluster -n openshift-storage -o jsonpath='{.items[0].status.ceph}' | jq . 2>/dev/null || true
+fi
 
 echo "ODF installation completed successfully!"
 
