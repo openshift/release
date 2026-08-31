@@ -84,6 +84,21 @@ if [[ -n ${ETCD_STORAGE_CLASS} ]]; then
   COMMAND+=(--etcd-storage-class "${ETCD_STORAGE_CLASS}")
 fi
 
+# Ensure clouds.yaml references the CA cert so the hcp CLI can pick it up
+# and propagate it to the HostedCluster's cloud-provider config and CSI drivers.
+# The openstack-conf-clouds step copies osp-ca.crt to SHARED_DIR but the
+# cacert field in clouds.yaml may be empty.
+echo "Checking for CA cert at ${SHARED_DIR}/osp-ca.crt"
+if [ -f "${SHARED_DIR}/osp-ca.crt" ]; then
+  echo "CA cert found, updating cacert in clouds.yaml"
+  echo "clouds.yaml cacert before: $(grep cacert "${OS_CLIENT_CONFIG_FILE}")"
+  sed -i "s|cacert:.*|cacert: ${SHARED_DIR}/osp-ca.crt|" "${OS_CLIENT_CONFIG_FILE}"
+  echo "clouds.yaml cacert after:  $(grep cacert "${OS_CLIENT_CONFIG_FILE}")"
+else
+  echo "WARNING: No CA cert found at ${SHARED_DIR}/osp-ca.crt"
+  echo "clouds.yaml cacert: $(grep cacert "${OS_CLIENT_CONFIG_FILE}")"
+fi
+
 if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
   "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
   exit 0
