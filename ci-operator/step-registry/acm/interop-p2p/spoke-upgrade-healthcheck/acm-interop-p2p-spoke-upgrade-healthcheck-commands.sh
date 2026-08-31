@@ -197,49 +197,56 @@ function wait_clusteroperators_continous_success() {
 }
 
 function check_mcp() {
-    typeset updating_mcp unhealthy_mcp mcpUpdatingOutput mcpFullOutput unhealthy_mcp_names mcp_name
+    typeset updating_mcp unhealthy_mcp mcpFullOutput unhealthy_mcp_names mcp_name
 
-    mcpUpdatingOutput="$(oc get machineconfigpools \
-        -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status \
-        --no-headers 2>&1 || true)"
-    if [[ -n "${mcpUpdatingOutput}" ]]; then
-        updating_mcp=$(grep -v "False" <<< "${mcpUpdatingOutput}" || true)
-        if [[ -n "${updating_mcp}" ]]; then
-            : "Some mcp is updating"
-            echo "${updating_mcp}"
-            return 1
-        fi
-    else
-        : "Did not run 'oc get machineconfigpools' successfully"
-        return 1
-    fi
-
-    # Do not check UPDATED on purpose, because some paused mcp would not update itself until unpaused
+    # Single query evaluated in degraded-first order.
+    # Previously two separate queries were used: the Updating=True check (return 1) ran first,
+    # which reset continuousDegradedCheck=0 on every poll.  A node stuck with
+    # Updating=True AND DegradedMachineCount>0 never accumulated 5 consecutive degraded
+    # readings, so the fast-exit in wait_mcp_continous_success never fired and the step
+    # burned the full MCP timeout budget (4h on 6-node spokes).
+    # Fix: check DegradedMachineCount > 0 or DEGRADED=True BEFORE checking Updating=True
+    # so that a stuck node returns 2 (degraded) and the fast-exit accumulates correctly.
     mcpFullOutput="$(oc get machineconfigpools \
         -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount \
         --no-headers 2>&1 || true)"
-    if [[ -n "${mcpFullOutput}" ]]; then
-        unhealthy_mcp=$(grep -v "False.*False.*0" <<< "${mcpFullOutput}" || true)
-        if [[ -n "${unhealthy_mcp}" ]]; then
-            : "Detected unhealthy mcp"
-            echo "${unhealthy_mcp}"
-            : "Real-time detected unhealthy mcp"
-            oc get machineconfigpools -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
-            : "Real-time full mcp output"
-            oc get machineconfigpools
-            unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
-            : "Using oc describe to check status of unhealthy mcp"
-            while read -r mcp_name; do
-                [[ -n "${mcp_name}" ]] || continue
-                : "Name: ${mcp_name}"
-                oc describe mcp "${mcp_name}" || echo >&2 "oc describe mcp ${mcp_name} failed"
-            done <<< "${unhealthy_mcp_names}"
-            return 2
-        fi
-    else
+    if [[ -z "${mcpFullOutput}" ]]; then
         : "Did not run 'oc get machineconfigpools' successfully"
         return 1
     fi
+
+    # 1. Degraded check — takes priority over Updating.
+    #    Matches any MCP with DegradedMachineCount>0 (col 5) or DEGRADED=True (col 4).
+    #    A node stuck Updating=True AND DegradedMachineCount>0 hits this branch (return 2).
+    unhealthy_mcp=$(awk '$5 != "0" || $4 == "True"' <<< "${mcpFullOutput}" || true)
+    if [[ -n "${unhealthy_mcp}" ]]; then
+        : "Detected unhealthy mcp"
+        echo "${unhealthy_mcp}"
+        : "Real-time detected unhealthy mcp"
+        oc get machineconfigpools \
+            -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount \
+            | awk 'NR == 1 || $5 != "0" || $4 == "True"'
+        : "Real-time full mcp output"
+        oc get machineconfigpools
+        unhealthy_mcp_names=$(awk '{print $1}' <<< "${unhealthy_mcp}")
+        : "Using oc describe to check status of unhealthy mcp"
+        while read -r mcp_name; do
+            [[ -n "${mcp_name}" ]] || continue
+            : "Name: ${mcp_name}"
+            oc describe mcp "${mcp_name}" || echo >&2 "oc describe mcp ${mcp_name} failed"
+        done <<< "${unhealthy_mcp_names}"
+        return 2
+    fi
+
+    # 2. Do not check UPDATED on purpose, because some paused mcp would not update itself until unpaused.
+    #    No degraded machines — check if any MCP is still in the normal in-flight update.
+    updating_mcp=$(awk '$3 == "True"' <<< "${mcpFullOutput}" || true)
+    if [[ -n "${updating_mcp}" ]]; then
+        : "Some mcp is updating"
+        echo "${updating_mcp}"
+        return 1
+    fi
+
     return 0
 }
 
@@ -275,6 +282,7 @@ function wait_mcp_continous_success() {
             : "Some machines are degraded (${continuousDegradedCheck}/${degradedCriteria}), waiting (${SECONDS}/${wMax}s)"
             (( continuousDegradedCheck += 1 ))
             if (( continuousDegradedCheck >= degradedCriteria )); then
+                echo >&2 "MCP has been degraded for ${degradedCriteria} consecutive polls — fast-exit (node stuck, not transient)"
                 break
             fi
         fi

@@ -1,0 +1,44 @@
+ref:
+  as: acm-interop-p2p-spoke-enable-nested-virt
+  documentation: |-
+    Enable nested virtualization on ACM spoke cluster worker nodes (AWS).
+
+    AWS non-metal instances require explicit CpuOptions.NestedVirtualization enablement
+    because the OpenShift Machine API does not yet expose this field. Each worker node
+    is cordoned, drained, stopped, reconfigured (aws ec2 modify-instance-cpu-options),
+    restarted, and uncordoned sequentially.
+
+    Bare-metal instances (*.metal) have native KVM and are skipped automatically.
+    Unsupported instance families fail fast with an actionable error message.
+
+    Supported families (AWS, all commercial regions, June 2026):
+      c7i m7i r7i c8i m8i r8i x8i i7i
+
+    Reads:
+      SHARED_DIR/managed-cluster-kubeconfig — spoke admin kubeconfig (from acm-interop-p2p-cluster-install)
+      SHARED_DIR/managed-cluster-regions    — spoke AWS region, one per line (first line used)
+      ACM_SPOKE_WORKER_TYPE                 — spoke worker EC2 instance type
+      CLUSTER_PROFILE_DIR/.awscred         — AWS credentials
+
+    Run this step after acm-fetch-managed-clusters (so the spoke kubeconfig exists)
+    and before any CNV operator installation step.
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  commands: acm-interop-p2p-spoke-enable-nested-virt-commands.sh
+  timeout: 2h0m0s
+  grace_period: 10m
+  cli: latest
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: ACM_SPOKE_WORKER_TYPE
+    default: "m8i.8xlarge"
+    documentation: |-
+      AWS EC2 instance type for spoke worker nodes. Must be from a supported
+      nested-virtualization family (c7i, m7i, r7i, c8i, m8i, r8i, x8i, i7i) or
+      a *.metal instance (which is skipped as native KVM). Unsupported families
+      cause the step to fail fast with an error.
