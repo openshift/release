@@ -364,7 +364,103 @@ if [[ "${ASSIGNED_IP}" != "${EXPECTED_LB_IP}" ]]; then
   exit 1
 fi
 
-# --- Step 8: Wait for all ClusterOperators to be Available=True and Degraded=False ---
+# --- Step 8: Wait for console ClusterOperator, then pin test-apps to router node(s) ---
+echo "$(date) Waiting for console ClusterOperator to become Available"
+CONSOLE_MAX_WAIT=1800
+CONSOLE_INTERVAL=30
+CONSOLE_ELAPSED=0
+CONSOLE_AVAILABLE=""
+while [[ ${CONSOLE_ELAPSED} -lt ${CONSOLE_MAX_WAIT} ]]; do
+  CONSOLE_AVAILABLE=$(oc get co console --kubeconfig "${VIRT_KC}" \
+    -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)
+  if [[ "${CONSOLE_AVAILABLE}" == "True" ]]; then
+    echo "$(date) console ClusterOperator is Available"
+    break
+  fi
+  echo "$(date) console not yet Available (${CONSOLE_ELAPSED}s elapsed), status='${CONSOLE_AVAILABLE}'"
+  sleep ${CONSOLE_INTERVAL}
+  CONSOLE_ELAPSED=$((CONSOLE_ELAPSED + CONSOLE_INTERVAL))
+done
+if [[ "${CONSOLE_AVAILABLE}" != "True" ]]; then
+  echo "$(date) ERROR: console ClusterOperator did not become Available within ${CONSOLE_MAX_WAIT}s"
+  oc get co console --kubeconfig "${VIRT_KC}" -o yaml || true
+  exit 1
+fi
+
+# --- Step 9: LoadBalancer targeting router node(s) only ---
+# router-nodeport-default uses externalTrafficPolicy=Local, so NodePort only works on
+# nodes running router-default. Do not target all virt-launcher pods.
+echo "$(date) Resolving router worker node IP(s) for test-apps LoadBalancer"
+export KUBECONFIG="${SHARED_DIR}/infra-kubeconfig"
+
+ROUTER_NODES=$(oc --kubeconfig "${VIRT_KC}" get pods -n openshift-ingress \
+  -l ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default \
+  -o jsonpath='{range .items[*]}{.spec.nodeName}{"\n"}{end}' | sort -u)
+
+ROUTER_NODE_IPS=""
+for node in ${ROUTER_NODES}; do
+  ip=$(oc --kubeconfig "${VIRT_KC}" get node "${node}" \
+    -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+  echo "$(date) router-default on node ${node} -> ${ip}"
+  ROUTER_NODE_IPS="${ROUTER_NODE_IPS} ${ip}"
+done
+
+if [[ -z "${ROUTER_NODE_IPS// }" ]]; then
+  echo "$(date) ERROR: could not determine router node IP(s)"
+  exit 1
+fi
+
+# Service without selector (manual endpoints)
+oc apply -f - <<SVCEOF
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: test-apps
+  name: test-apps
+  namespace: ext-infra-vms-ns
+spec:
+  ports:
+  - name: https-443
+    port: 443
+    protocol: TCP
+    targetPort: ${HTTPS_PORT}
+  - name: http-80
+    port: 80
+    protocol: TCP
+    targetPort: ${HTTP_PORT}
+  type: LoadBalancer
+SVCEOF
+
+# Build Endpoints YAML for each router node IP
+ENDPOINT_ADDRESSES=""
+for ip in ${ROUTER_NODE_IPS}; do
+  ENDPOINT_ADDRESSES="${ENDPOINT_ADDRESSES}
+  - ip: ${ip}"
+done
+
+oc apply -f - <<EOF
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: test-apps
+  namespace: ext-infra-vms-ns
+subsets:
+- addresses:
+${ENDPOINT_ADDRESSES}
+  ports:
+  - name: https-443
+    port: ${HTTPS_PORT}
+  - name: http-80
+    port: ${HTTP_PORT}
+EOF
+
+# Remove auto-generated slices from any prior selector-based Service
+oc delete endpointslice -n ext-infra-vms-ns -l kubernetes.io/service-name=test-apps --ignore-not-found
+
+oc get svc,endpoints test-apps -n ext-infra-vms-ns -o wide
+
+# --- Step 10: Wait for all ClusterOperators to be Available=True and Degraded=False ---
 echo "$(date) Waiting for all ClusterOperators to be Available and not Degraded"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
