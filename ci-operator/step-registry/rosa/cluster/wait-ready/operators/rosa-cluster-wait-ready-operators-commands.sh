@@ -323,6 +323,7 @@ if [[ -z "${check_failed}" ]]; then
 fi
 
 degraded_warning_count=0
+degraded_check_warning=0
 
 if [[ -z "${check_failed}" ]]; then
   # --- Phase 3: Check Degraded=False (10 min) — advisory only --------------
@@ -333,6 +334,7 @@ if [[ -z "${check_failed}" ]]; then
   oc get clusteroperators > "${CO_DEGRADED_LOG}" 2>&1 || true
 
   if [[ -n "${check_failed}" ]]; then
+    degraded_check_warning=1
     log "WARNING: Phase 3 (Degraded=False) did not pass: ${check_failed}"
     log "WARNING: Degraded operators detected but this will not fail the step."
 
@@ -356,6 +358,8 @@ fi
 if [[ -z "${check_failed}" ]]; then
   if [[ "${degraded_warning_count}" -gt 0 ]]; then
     log "All cluster operators are Available and not Progressing (with ${degraded_warning_count} degraded warning(s))"
+  elif [[ "${degraded_check_warning}" -gt 0 ]]; then
+    log "All cluster operators are Available and not Progressing (Degraded check warning; state not confirmed)"
   else
     log "All cluster operators are Available, not Progressing, and not Degraded"
   fi
