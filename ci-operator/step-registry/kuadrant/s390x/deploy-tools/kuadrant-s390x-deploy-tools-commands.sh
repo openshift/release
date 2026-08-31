@@ -498,7 +498,10 @@ spec:
         - -dev
         - -dev-root-token-id=root
         - -dev-listen-address=0.0.0.0:8200
+        - -dev-no-store-token
         env:
+        - name: HOME
+          value: /tmp
         - name: VAULT_DEV_ROOT_TOKEN_ID
           value: "root"
         - name: VAULT_DEV_LISTEN_ADDRESS
