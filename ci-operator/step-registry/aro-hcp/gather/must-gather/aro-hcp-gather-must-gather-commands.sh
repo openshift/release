@@ -1,7 +1,5 @@
 #!/bin/bash
-set -o nounset
-set -o pipefail
-set -o xtrace
+set -euo pipefail
 
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
@@ -34,14 +32,14 @@ az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 MUST_GATHER_DIR="${ARTIFACT_DIR}/must-gather"
 mkdir -p "${MUST_GATHER_DIR}"
 
-# Errors from must-gather itself should not abort the step — collect whatever is available.
-set +o errexit
-
-hcpctl must-gather query \
+# hcpctl must-gather is best-effort: partial data is better than no data.
+if ! hcpctl must-gather query \
   --kusto "${KUSTO_NAME}" \
   --region "${KUSTO_REGION}" \
   --subscription-id "${INFRA_SUBSCRIPTION_ID}" \
-  --output-path "${MUST_GATHER_DIR}"
+  --output-path "${MUST_GATHER_DIR}"; then
+  echo "WARNING: hcpctl must-gather query failed, compressing partial output"
+fi
 
 echo "must-gather complete, compressing artifacts"
 tar -czf "${ARTIFACT_DIR}/must-gather.tar.gz" -C "${ARTIFACT_DIR}" must-gather/
