@@ -41,6 +41,12 @@ images:
     optional: true
     to: cli-with-git
   - dockerfile_literal: |
+      FROM this-is-ignored
+      RUN dnf install -y skopeo && dnf clean all
+    from: cli
+    optional: true
+    to: cli-with-skopeo
+  - dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/openjdk-17:1.21
       USER root
       RUN microdnf install -y git gzip && microdnf clean all
@@ -123,10 +129,11 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     - ref: stackrox-opp-readiness
     - ref: stackrox-opp-smoke
-    - ref: acm-tests-clc-create
+    - ref: acm-tests-clc-smoke
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
     - ref: interop-opp-odf-health
+    - ref: interop-opp-observability-odf
     - ref: interop-tests-opp-quay-smoke
     - ref: acm-tests-observability
 - as: interop-opp-vsphere
@@ -177,6 +184,7 @@ tests:
     - ref: acm-policies-openshift-plus
     - chain: cucushift-installer-check-cluster-health
     - ref: interop-opp-odf-health
+    - ref: interop-opp-observability-odf
     - ref: acm-tests-observability
     - ref: acm-opp-app
     workflow: acm-ipi-vsphere

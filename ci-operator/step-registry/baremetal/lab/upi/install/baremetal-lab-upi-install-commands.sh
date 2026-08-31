@@ -283,8 +283,6 @@ yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
-platform:
-  none: {}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled

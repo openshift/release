@@ -1,9 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
+# Use BOOTC_IMAGE if set, otherwise try to read from SHARED_DIR (set by get-latest-bootc-tag step)
 if [[ -z "${BOOTC_IMAGE:-}" ]]; then
-  echo "ERROR: BOOTC_IMAGE must be set (e.g. quay.io/redhat-user-workloads/jetpack-for-rhel-tenant/rhel-98-bootc:latest)"
-  exit 1
+  if [[ -f "${SHARED_DIR}/bootc_image_url" ]]; then
+    BOOTC_IMAGE=$(cat "${SHARED_DIR}/bootc_image_url")
+    # Validate the image URL is not empty or whitespace-only
+    if [[ -z "${BOOTC_IMAGE}" || "${BOOTC_IMAGE}" =~ ^[[:space:]]*$ ]]; then
+      echo "ERROR: bootc_image_url from SHARED_DIR is empty or whitespace-only"
+      exit 1
+    fi
+    echo "Using BOOTC_IMAGE from SHARED_DIR: ${BOOTC_IMAGE}"
+  else
+    echo "ERROR: BOOTC_IMAGE must be set (e.g. quay.io/redhat-user-workloads/jetpack-for-rhel-tenant/rhel-98-bootc:latest)"
+    echo "       or the qe-rhel-jetson-get-latest-bootc-tag step must run first to populate SHARED_DIR/bootc_image_url"
+    exit 1
+  fi
 fi
 
 pip install --quiet ansible

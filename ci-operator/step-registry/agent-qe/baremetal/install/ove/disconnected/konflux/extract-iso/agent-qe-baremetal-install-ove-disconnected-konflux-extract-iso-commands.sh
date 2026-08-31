@@ -10,18 +10,14 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 [ -z "${SNAPSHOT}" ] && { echo "\$SNAPSHOT is not filled. Failing."; exit 1; }
 
-yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-id.txt
-
-OVE_ISO_STORAGE_HOST=$(<"${SHARED_DIR}"/cluster_name).$(<"${CLUSTER_PROFILE_DIR}"/base_domain)
-HOST_ID=$(<"${SHARED_DIR}"/host-id.txt)
+OVE_ISO_STORAGE_HOST=$(<"${CLUSTER_PROFILE_DIR}/ove_iso_storage_host")
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
   -o 'TCPKeepAlive=yes'
   -o 'ServerAliveInterval=30'
   -o LogLevel=ERROR
-  -i "${CLUSTER_PROFILE_DIR}/ssh-key"
-  -p $((14000+"${HOST_ID}")))
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
@@ -30,4 +26,9 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 echo "Konflux snapshot ID: ${SNAPSHOT}"
 
-timeout -s 9 2h ssh "${SSHOPTS[@]}" root@access."${OVE_ISO_STORAGE_HOST}" extract_ove_iso.sh "${SNAPSHOT}" "${CLUSTER_NAME}.agent-ove.x86_64.iso"
+CONTAINER_NAME="haproxy-$(<"${SHARED_DIR}"/cluster_name)"
+
+timeout -s 9 2h ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" \
+  "nsenter -n -t \"\$(podman inspect -f '{{ .State.Pid }}' \"${CONTAINER_NAME}\")\" \
+   ssh -o StrictHostKeyChecking=no root@\"${OVE_ISO_STORAGE_HOST}\" extract_ove_iso.sh \
+    \"${SNAPSHOT}\" \"${CLUSTER_NAME}.agent-ove.x86_64.iso\""

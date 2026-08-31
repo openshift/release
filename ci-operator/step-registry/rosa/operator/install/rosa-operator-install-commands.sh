@@ -302,6 +302,24 @@ done
 
 log "${OPERATOR_NAME} installed and ready in ${OPERATOR_NAMESPACE}"
 
+# Wait for operator CRDs to be established before restoring CRs or
+# handing off to the e2e test step.  Without this gate the API server's
+# REST mapper may not yet serve the CRD kinds, causing NoKindMatchError
+# failures in downstream steps.
+if [[ -n "${OPERATOR_CRDS:-}" ]]; then
+    IFS=',' read -ra CRD_LIST <<< "${OPERATOR_CRDS}"
+    for crd in "${CRD_LIST[@]}"; do
+        crd=$(echo "${crd}" | xargs)
+        log "Waiting for CRD ${crd} to be established..."
+        if ! oc wait crd "${crd}" --for=condition=Established --timeout=60s; then
+            log "ERROR: CRD ${crd} not established after 60s"
+            oc get crd "${crd}" -o yaml 2>/dev/null || true
+            exit 1
+        fi
+    done
+    log "All operator CRDs established"
+fi
+
 # Restore backed-up CR instances that were deployed by SSS/MCC
 for backup in "${CR_BACKUP_DIR}"/*.yaml; do
     [[ -f "${backup}" ]] || continue

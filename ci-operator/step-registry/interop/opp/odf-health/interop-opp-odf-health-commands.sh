@@ -1,6 +1,5 @@
 #!/bin/bash
-set -euo pipefail
-shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
 # ODF Health Check (7-point gate)
@@ -53,9 +52,9 @@ function WriteJunit () {
     typeset r=""
     for r in "${tcResultsArr[@]}"; do
         if [[ "${r}" == "fail" ]]; then
-            (( failCount++ )) || true
+            (( ++failCount )) || true
         elif [[ "${r}" == "skip" ]]; then
-            (( skipCount++ )) || true
+            (( ++skipCount )) || true
         fi
     done
 
@@ -81,19 +80,21 @@ function WriteJunit () {
         echo "</testsuite>"
     } > "${junitFile}"
     : "JUnit XML written to ${junitFile}"
+    true
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329
 function CollectExitArtifacts () {
     : "Collecting ODF diagnostics..."
-    oc get csv -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/odf-csvs.yaml" || true
-    oc get storagecluster -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/storagecluster.yaml" || true
-    oc get cephcluster -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/cephcluster.yaml" || true
-    oc get noobaa -n "${ODF_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/noobaa.yaml" || true
-    oc get sc -o yaml > "${ARTIFACT_DIR}/storageclasses.yaml" || true
+    oc get csv -n "${ODF_NAMESPACE}" --ignore-not-found -o yaml > "${ARTIFACT_DIR}/odf-csvs.yaml" || true
+    oc get storagecluster -n "${ODF_NAMESPACE}" --ignore-not-found -o yaml > "${ARTIFACT_DIR}/storagecluster.yaml" || true
+    oc get cephcluster -n "${ODF_NAMESPACE}" --ignore-not-found -o yaml > "${ARTIFACT_DIR}/cephcluster.yaml" || true
+    oc get noobaa -n "${ODF_NAMESPACE}" --ignore-not-found -o yaml > "${ARTIFACT_DIR}/noobaa.yaml" || true
+    oc get sc --ignore-not-found -o yaml > "${ARTIFACT_DIR}/storageclasses.yaml" || true
+    true
 }
 
-trap CollectExitArtifacts EXIT
+trap '{( CollectExitArtifacts; true )}' EXIT
 
 # ---------------------------------------------------------------------------
 # Check 1: ODF Operator CSV in Succeeded phase
@@ -105,7 +106,7 @@ function CheckOdfCsv () {
     typeset csvPhase=""
     if ! csvPhase="$(oc get csv -n "${ODF_NAMESPACE}" -o json | python3 -c "
 import sys,json,re; d=json.load(sys.stdin)
-m=[i for i in d.get('items',[]) if re.match(r'^(odf-|ocs-)operator',i['metadata']['name'])]
+m=[i for i in d.get('items',[]) if re.match(r'^(odf-operator|ocs-operator)',i['metadata']['name'])]
 print((m[0].get('status',{}).get('phase','NotFound')) if m else 'NotFound')
 ")"; then
         AddResult "odf-csv-phase" "fail" "Failed to query ODF CSVs in ${ODF_NAMESPACE}"
@@ -222,7 +223,7 @@ function CheckPvcProvision () {
         typeset accessMode="${scModes[$idx]}"
         typeset testId="pvc-provision-${scName##*-}"
         typeset pvcName="odf-health-${scName##*-}-${RANDOM}"
-        typeset pvcYaml
+        typeset pvcYaml=""
         pvcYaml=$(cat <<EOF
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -297,7 +298,7 @@ print(d['items'][0]['status'].get('phase','NotFound') if d.get('items') else 'No
     : "NooBaa phase=Ready, creating OBC for S3 functional check..."
 
     typeset obcName="odf-health-obc-${RANDOM}"
-    typeset obcYaml
+    typeset obcYaml=""
     obcYaml=$(cat <<EOF
 apiVersion: objectbucket.io/v1alpha1
 kind: ObjectBucketClaim
@@ -424,7 +425,9 @@ EOF
         if ! oc wait pod "${podName}" -n "${ODF_NAMESPACE}" \
             --for=jsonpath='{.status.phase}'=Succeeded \
             --timeout="${podWait}s" 2>/dev/null; then
-            : "Pod did not succeed within ${podWait}s, checking logs anyway"
+            : "Pod did not succeed within ${podWait}s, collecting diagnostics"
+            oc get pod "${podName}" -n "${ODF_NAMESPACE}" -o yaml --ignore-not-found || true
+            oc describe pod "${podName}" -n "${ODF_NAMESPACE}" || true
         fi
         s3Result="$(oc logs "${podName}" -n "${ODF_NAMESPACE}" 2>/dev/null || echo "")"
     fi
@@ -485,6 +488,35 @@ print(d['items'][0].get('status',{}).get('ceph',{}).get('health','unknown') if d
 # Main
 # ---------------------------------------------------------------------------
 
+function CheckOdfInstalled () {
+    if ! oc get namespace "${ODF_NAMESPACE}" >/dev/null 2>&1; then
+        return 1
+    fi
+    typeset csvJson=""
+    typeset -i ocExit=0
+    csvJson="$(oc get csv -n "${ODF_NAMESPACE}" -o json 2>/dev/null)" || ocExit=$?
+    if (( ocExit != 0 )); then
+        printf '%s\n' "Error: oc get csv failed (exit ${ocExit}) in ${ODF_NAMESPACE}" >&2
+        return 2
+    fi
+    if [[ -z "${csvJson}" ]]; then
+        printf '%s\n' "Error: oc get csv returned empty output in ${ODF_NAMESPACE}" >&2
+        return 2
+    fi
+    typeset csvCount=""
+    if ! csvCount="$(printf '%s' "${csvJson}" | python3 -c "
+import sys,json,re; d=json.load(sys.stdin)
+print(len([i for i in d.get('items',[]) if re.match(r'^(odf-operator|ocs-operator)',i['metadata']['name'])]))
+")"; then
+        printf '%s\n' "Error: failed to parse CSV JSON from ${ODF_NAMESPACE}" >&2
+        return 2
+    fi
+    if [[ "${csvCount}" -gt 0 ]]; then
+        return 0
+    fi
+    return 1
+}
+
 function Main () {
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -493,6 +525,26 @@ function Main () {
     : "ODF Health Check (7-point gate) starting"
     : "Namespace: ${ODF_NAMESPACE}"
     : "Artifacts dir: ${ARTIFACT_DIR}"
+
+    typeset -i odfProbeResult=0
+    CheckOdfInstalled || odfProbeResult=$?
+    if (( odfProbeResult == 2 )); then
+        : "ODF Health Check: PROBE ERROR (cannot determine ODF state)"
+        exit 1
+    fi
+    if (( odfProbeResult == 1 )); then
+        typeset skipMsg="ODF is not installed (no ODF/OCS CSV in ${ODF_NAMESPACE})"
+        typeset -a checkNames=("odf-csv-phase" "storagecluster-ready" "cephcluster-health"
+            "storageclasses-available" "pvc-provision-rbd" "pvc-provision-cephfs"
+            "noobaa-s3-functional" "ceph-health-detail")
+        typeset name=""
+        for name in "${checkNames[@]}"; do
+            AddResult "${name}" "skip" "${skipMsg}"
+        done
+        WriteJunit
+        : "ODF Health Check: ALL SKIPPED (ODF not installed)"
+        exit 0
+    fi
 
     CheckOdfCsv          || true
     CheckStorageCluster  || true

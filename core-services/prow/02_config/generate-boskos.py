@@ -6,7 +6,7 @@ import yaml
 
 CONFIG = {
     'ibmcloud-perfscale-quota-slice': {
-        'us-east': 30,
+        'us-south': 15,
     },
     'aws-us-east-1-quota-slice': {
         'us-east-1': 15,
@@ -106,6 +106,9 @@ CONFIG = {
     'rosa-e2e-03-quota-slice': {
         'us-west-2': 5,
         'us-east-2': 5
+    },
+    'metal-nno-doca2-quota-slice': {
+        'metal-nno-doca2-rdu2': 1,
     },
     'metal-dpf-doca4-quota-slice': {
         'metal-dpf-doca4-rdu2': 1,
