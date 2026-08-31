@@ -422,10 +422,13 @@ if oc get authorino authorino -n "${KUADRANT_NS}" >/dev/null 2>&1; then
     if [[ ! -s /tmp/authorino-ca-bundle.crt ]]; then
       echo "WARNING: could not read CA bundle from ${AUTHORINO_POD}" >&2
     else
+      # oc apply stores the full YAML in last-applied-configuration (256KiB
+      # annotation limit). A RHEL ca-bundle duplicated as two keys overflowed
+      # that on this cluster. create does not write that annotation.
+      oc delete configmap authorino-cluster-trust-ca-bundle -n "${KUADRANT_NS}" --ignore-not-found
       oc create configmap authorino-cluster-trust-ca-bundle -n "${KUADRANT_NS}" \
         --from-file=ca-bundle.crt=/tmp/authorino-ca-bundle.crt \
-        --from-file=ca-certificates.crt=/tmp/authorino-ca-bundle.crt \
-        --dry-run=client -o yaml | oc apply -f -
+        --from-file=ca-certificates.crt=/tmp/authorino-ca-bundle.crt
       oc patch authorino authorino -n "${KUADRANT_NS}" --type merge -p '{
         "spec": {
           "volumes": {
