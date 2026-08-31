@@ -65,8 +65,20 @@ tests:
       HYPERSHIFT_SKIP_VERSION_VALIDATION: "true"
       OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: must-gather-operator
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-hostedcluster-create
+    - as: create-ns
+      cli: latest
+      commands: |
+        oc new-project must-gather-operator && echo "must-gather-operator" > "$SHARED_DIR"/operator-install-namespace.txt
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: optional-operators-operator-sdk
     test:
-    - as: install
+    - as: verify-install
       cli: latest
       commands: |
         oc -n must-gather-operator rollout status deployment must-gather-operator
