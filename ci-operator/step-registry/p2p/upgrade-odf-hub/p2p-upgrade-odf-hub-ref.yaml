@@ -1,0 +1,48 @@
+ref:
+  as: p2p-upgrade-odf-hub
+  from: cli
+  commands: p2p-upgrade-odf-hub-commands.sh
+  timeout: 2h0m0s
+  grace_period: 30m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Upgrade ODF on the ACM hub cluster to a new channel after an EUS OCP upgrade.
+
+    Patches the existing odf-operator Subscription channel to ODF_UPGRADE_TARGET_CHANNEL,
+    waits for OLM to detect the channel change and install the new CSV (Succeeded), then
+    waits for StorageCluster and NooBaa to return to Ready phase.
+
+    Intended for EUS scenarios (e.g. stable-4.20 → stable-4.22 after OCP 4.20→4.22 upgrade).
+    Run after all OCP upgrade steps (hub + spoke) have completed. Does not re-label nodes or
+    re-create the StorageCluster — those are preserved from the p2p-install-odf-hub step.
+
+    Writes diagnostics to ${ARTIFACT_DIR}/odf-hub-upgrade/ on completion (success and failure).
+    On failure, runs ocs-must-gather against the target ODF version.
+  env:
+  - name: ODF_UPGRADE_TARGET_CHANNEL
+    default: ""
+    documentation: |-
+      Target ODF operator Subscription channel (e.g. stable-4.22). Separate from
+      ODF_OPERATOR_CHANNEL (used by p2p-install-odf-hub for the initial install) so hub
+      install and upgrade channels can differ in the same CI config.
+  - name: ODF_INSTALL_NAMESPACE
+    default: "openshift-storage"
+    documentation: Namespace of the ODF operator and StorageCluster on the hub.
+  - name: ODF_STORAGE_CLUSTER_NAME
+    default: "ocs-storagecluster"
+    documentation: StorageCluster metadata.name on the hub.
+  - name: ODF_SUBSCRIPTION_NAME
+    default: "odf-operator"
+    documentation: ODF Subscription metadata.name.
+  - name: ODF_CSV_POLL_INTERVAL_SECONDS
+    default: "10"
+    documentation: Sleep between installedCSV change polls.
+  - name: ODF_CSV_POLL_TIMEOUT_SECONDS
+    default: "900"
+    documentation: Max seconds to wait for the new CSV to appear and reach Succeeded (15 min).
+  - name: ODF_STORAGECLUSTER_POLL_TIMEOUT_SECONDS
+    default: "5400"
+    documentation: Max seconds to wait for StorageCluster and NooBaa Ready post-upgrade (90 min).
