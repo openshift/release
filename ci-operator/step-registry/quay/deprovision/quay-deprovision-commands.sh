@@ -10,7 +10,7 @@ sleep 8s
 # has no credential source in the CI test pod: there is no IMDS role, so terraform
 # destroy fails with "No valid credential sources found" and the S3 bucket leaks in
 # the long-lived QE account. Export the static QE AWS credentials from the mounted
-# secret, mirroring quay-operator-deploy-aws-s3 which creates the bucket with them.
+# secret, mirroring quay-deploy-aws-s3 which creates the bucket with them.
 # Guarded so the gcp/azure branches are unaffected. Do not echo the key material.
 if [[ -f /var/run/quay-qe-aws-secret/access_key ]]; then
     AWS_ACCESS_KEY_ID=$(cat /var/run/quay-qe-aws-secret/access_key)

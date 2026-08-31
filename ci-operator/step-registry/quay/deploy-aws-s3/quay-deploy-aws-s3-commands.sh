@@ -354,7 +354,7 @@ if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 fi
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
-# quay-operator-provisioning-{tls,builder} steps have already written the
+# quay-provisioning-{tls,builder} steps have already written the
 # cert/key, build-cluster CA, and builder config to SHARED_DIR. Fold the builder
 # config into the bundle (after the extra-config merge, so it is not stripped) and
 # hand the operator the unmanaged cert material. Do not echo config_builder.yaml:
@@ -366,7 +366,7 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   for f in config_builder.yaml ssl.cert ssl.key build_cluster.crt; do
     if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
       echo "ERROR: ENABLE_BUILD_SUPPORT=true but ${SHARED_DIR}/${f} is missing." >&2
-      echo "       Ensure quay-operator-provisioning-tls and -builder ran first." >&2
+      echo "       Ensure quay-provisioning-tls and -builder ran first." >&2
       exit 1
     fi
   done
