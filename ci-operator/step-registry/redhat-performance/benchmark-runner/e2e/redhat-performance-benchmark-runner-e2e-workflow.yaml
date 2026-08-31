@@ -1,0 +1,19 @@
+workflow:
+  as: redhat-performance-benchmark-runner-e2e
+  steps:
+    pre:
+      - ref: redhat-performance-benchmark-runner-01-ocp-deploy
+      - ref: redhat-performance-benchmark-runner-02-operators-deploy
+    test:
+      - ref: redhat-performance-benchmark-runner-03-workloads
+    post:
+      - ref: redhat-performance-benchmark-runner-04-grafana
+      - ref: redhat-performance-benchmark-runner-05-backup
+  documentation: |-
+    Full end-to-end PerfCI pipeline for benchmark-runner.
+    Mirrors the Jenkins PerfCI stages 01-05:
+      pre:  01-OCP Deploy (JetLag) -> 02-Operators (CNV/LSO/ODF)
+      test: 03-Workloads (benchmark-runner)
+      post: 04-Grafana Dashboard Update -> 05-Backup & Report
+    Steps execute sequentially within each phase.
+    Cluster credentials pass from step 01 to step 03 via SHARED_DIR.
