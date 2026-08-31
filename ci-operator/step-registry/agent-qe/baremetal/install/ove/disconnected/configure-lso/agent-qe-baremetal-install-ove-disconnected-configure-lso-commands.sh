@@ -1,29 +1,62 @@
 #!/bin/bash
 set -euo pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 echo "Labeling all nodes with localstorage=enabled..."
 oc label nodes --all localstorage=enabled --overwrite
 
-echo "Creating MachineConfig for loop device..."
-cat <<EOF | oc apply -f -
+WORKER_COUNT=$(oc get nodes --selector='node-role.kubernetes.io/worker' --no-headers 2>/dev/null | wc -l)
+MASTER_COUNT=$(oc get nodes --selector='node-role.kubernetes.io/master' --no-headers 2>/dev/null | wc -l)
+echo "Cluster topology: ${MASTER_COUNT} masters, ${WORKER_COUNT} workers"
+
+create_machineconfig() {
+    local ROLE=$1
+    local MC_NAME="99-local-storage-loop-and-osd-${ROLE}"
+    echo "Creating MachineConfig ${MC_NAME} for ${ROLE} nodes..."
+    cat <<MCEOF | oc apply -f -
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
-  name: 99-local-storage-loop-and-osd
+  name: ${MC_NAME}
   labels:
-    machineconfiguration.openshift.io/role: master
+    machineconfiguration.openshift.io/role: ${ROLE}
 spec:
   config:
     ignition:
       version: 3.2.0
+    storage:
+      files:
+        - path: /usr/local/bin/wipe-osd-disks.sh
+          mode: 0755
+          overwrite: true
+          contents:
+            source: data:text/plain;charset=utf-8;base64,IyEvYmluL2Jhc2gKIyBXaXBlIGFsbCBub24tT1MgYmxvY2sgZGV2aWNlcyA+PSAxMDBHaUIgdG8gcmVtb3ZlIHN0YWxlIENlcGggQmx1ZVN0b3JlIG1ldGFkYXRhLgojIFJ1bnMgYXMgYSBzeXN0ZW1kIG9uZXNob3QgYmVmb3JlIEt1YmVybmV0ZXMgd29ya2xvYWRzIHRvdWNoIHRoZSBkaXNrcy4KTUlOX0JZVEVTPSQoKDEwMCAqIDEwMjQgKiAxMDI0ICogMTAyNCkpCldJUEVEPTAKZm9yIERFViBpbiAkKGxzYmxrIC1kcG5vIE5BTUUsVFlQRSxTSVpFIC0tYnl0ZXMgMj4vZGV2L251bGwgfCBhd2sgLXYgbWluPSIke01JTl9CWVRFU30iICckMiE9Imxvb3AiICYmICQyIT0icm9tIiAmJiAkMz49bWluIHtwcmludCAkMX0nKTsgZG8KICBNT1VOVFM9JChsc2JsayAtbm8gTU9VTlRQT0lOVCAiJHtERVZ9IiAyPi9kZXYvbnVsbCB8IGdyZXAgLXYgJ14kJyB8fCB0cnVlKQogIGlmIFsgLW4gIiR7TU9VTlRTfSIgXTsgdGhlbgogICAgZWNobyAid2lwZS1vc2QtZGlza3M6IFNraXBwaW5nICR7REVWfSAoaGFzIGFjdGl2ZSBtb3VudHMpIgogICAgY29udGludWUKICBmaQogIGVjaG8gIndpcGUtb3NkLWRpc2tzOiBXaXBpbmcgJHtERVZ9IgogIHdpcGVmcyAtYWYgIiR7REVWfSIgMj4mMSB8fCB0cnVlCiAgc2dkaXNrIC0temFwLWFsbCAiJHtERVZ9IiAyPiYxIHx8IHRydWUKICBkZCBpZj0vZGV2L3plcm8gb2Y9IiR7REVWfSIgYnM9MU0gY291bnQ9MjAwIGNvbnY9ZnN5bmMgMj4vZGV2L251bGwgfHwgdHJ1ZQogIERJU0tfTUI9JCgoICQoYmxvY2tkZXYgLS1nZXRzaXplNjQgIiR7REVWfSIpIC8gMTA0ODU3NiApKQogIGlmIFsgJHtESVNLX01CfSAtZ3QgNDAwIF07IHRoZW4KICAgIGRkIGlmPS9kZXYvemVybyBvZj0iJHtERVZ9IiBicz0xTSBjb3VudD0yMDAgc2Vlaz0kKCggRElTS19NQiAtIDIwMCApKSBjb252PWZzeW5jIDI+L2Rldi9udWxsIHx8IHRydWUKICBmaQogIHBhcnRwcm9iZSAiJHtERVZ9IiAyPi9kZXYvbnVsbCB8fCB0cnVlCiAgZWNobyAid2lwZS1vc2QtZGlza3M6ICR7REVWfSB3aXBlZCIKICBXSVBFRD0kKChXSVBFRCArIDEpKQpkb25lCnVkZXZhZG0gc2V0dGxlIC0tdGltZW91dD0zMCAyPi9kZXYvbnVsbCB8fCB0cnVlCmVjaG8gIndpcGUtb3NkLWRpc2tzOiAke1dJUEVEfSBkaXNrKHMpIHByb2Nlc3NlZCIK
     systemd:
       units:
+        - name: wipe-osd-disks.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Wipe stale Ceph/OSD signatures from secondary disks
+            After=local-fs.target
+            Before=loop10-mon.service kubelet.service
+
+            [Service]
+            Type=oneshot
+            ExecStart=/usr/local/bin/wipe-osd-disks.sh
+            RemainAfterExit=yes
+
+            [Install]
+            WantedBy=multi-user.target
         - name: loop10-mon.service
           enabled: true
           contents: |
             [Unit]
             Description=Create loop device for Ceph MON
-            After=local-fs.target
+            After=local-fs.target wipe-osd-disks.service
             Wants=local-fs.target
 
             [Service]
@@ -35,7 +68,14 @@ spec:
 
             [Install]
             WantedBy=multi-user.target
-EOF
+MCEOF
+}
+
+create_machineconfig master
+
+if [[ "${WORKER_COUNT}" -gt 0 ]]; then
+    create_machineconfig worker
+fi
 
 echo "Waiting for master MachineConfigPool to start updating..."
 oc wait mcp/master --for=condition=Updating --timeout=5m || true
@@ -43,7 +83,21 @@ oc wait mcp/master --for=condition=Updating --timeout=5m || true
 echo "Waiting for master MachineConfigPool to finish updating..."
 oc wait mcp/master --for=condition=Updated --timeout=1h
 
-echo "MachineConfig applied successfully. Creating LocalVolumeSets..."
+if [[ "${WORKER_COUNT}" -gt 0 ]]; then
+    echo "Waiting for worker MachineConfigPool to start updating..."
+    oc wait mcp/worker --for=condition=Updating --timeout=5m || true
+
+    echo "Waiting for worker MachineConfigPool to finish updating..."
+    oc wait mcp/worker --for=condition=Updated --timeout=1h
+fi
+
+echo "MachineConfig applied successfully."
+
+NODE_COUNT=$(oc get nodes --no-headers 2>/dev/null | wc -l)
+EXPECTED_MON_PVS=$((NODE_COUNT > 3 ? 3 : NODE_COUNT))
+echo "Expecting ${EXPECTED_MON_PVS} MON PVs (from ${NODE_COUNT} nodes, capped at 3)"
+
+echo "Creating LocalVolumeSets..."
 
 echo "Creating LocalVolumeSet for MON (loop10)..."
 cat <<EOF | oc apply -f -
@@ -86,15 +140,102 @@ if [ $COUNTER -ge 300 ]; then
     exit 1
 fi
 
-echo "Waiting for 3 PVs with localblock-mon storage class to be created..."
+echo "Waiting for ${EXPECTED_MON_PVS} PVs with localblock-mon storage class to be created..."
 COUNTER=0
 while [ $COUNTER -lt 600 ]; do
     PV_COUNT=$(oc get pv -o json | jq -r '[.items[] | select(.spec.storageClassName == "localblock-mon")] | length' 2>/dev/null || echo "0")
-    echo "Found ${PV_COUNT} PVs with localblock-mon storage class"
+
+    if [ "${PV_COUNT}" -ge "${EXPECTED_MON_PVS}" ]; then
+        echo "Required ${EXPECTED_MON_PVS} PVs with localblock-mon storage class are available (found ${PV_COUNT})"
+        oc get pv -o wide | grep localblock-mon || true
+        break
+    fi
+
+    sleep 10
+    COUNTER=$((COUNTER + 10))
+    if (( COUNTER % 60 == 0 )); then
+        echo "Waiting ${COUNTER}s for PVs (need ${EXPECTED_MON_PVS}, found ${PV_COUNT}). Checking loop devices on nodes:"
+        for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+            LOOP_DEV=$(oc debug "node/${NODE}" -- chroot /host ls -la /dev/loop10 2>/dev/null || echo "NOT FOUND")
+            echo "  ${NODE}: ${LOOP_DEV}"
+        done
+    else
+        echo "Waiting ${COUNTER}s for PVs to be created (need ${EXPECTED_MON_PVS}, found ${PV_COUNT})..."
+    fi
+done
+
+if [ $COUNTER -ge 600 ]; then
+    echo "ERROR: Required ${EXPECTED_MON_PVS} PVs with localblock-mon storage class were not created within timeout"
+    echo "Current PV status:"
+    oc get pv -o wide
+    echo "LocalVolumeSet status:"
+    oc get localvolumeset -n openshift-local-storage localvolumeset-mon -o yaml
+    echo "Pod status in openshift-local-storage:"
+    oc get pods -n openshift-local-storage
+    echo "Checking loop devices and service status on each node:"
+    for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+        echo "  === ${NODE} ==="
+        oc debug "node/${NODE}" -- chroot /host bash -c '
+            ls -la /dev/loop10 2>/dev/null || echo "  /dev/loop10 NOT FOUND"
+            losetup -a 2>/dev/null || echo "  losetup failed"
+            systemctl status loop10-mon.service 2>/dev/null | head -15 || echo "  loop10-mon.service not found"
+        ' 2>/dev/null || echo "  (oc debug failed)"
+    done
+    exit 1
+fi
+
+echo "Creating LocalVolumeSet for OSD (physical block devices)..."
+cat <<EOF | oc apply -f -
+apiVersion: local.storage.openshift.io/v1alpha1
+kind: LocalVolumeSet
+metadata:
+  name: localvolumeset-osd
+  namespace: openshift-local-storage
+spec:
+  storageClassName: localblock-sc
+  volumeMode: Block
+  nodeSelector:
+    nodeSelectorTerms:
+      - matchExpressions:
+          - key: localstorage
+            operator: In
+            values:
+              - "enabled"
+  deviceInclusionSpec:
+    deviceTypes:
+      - disk
+      - mpath
+    minSize: 100Gi
+EOF
+
+echo "Waiting for localblock-sc storage class to be created..."
+COUNTER=0
+while [ $COUNTER -lt 300 ]; do
+    if oc get storageclass localblock-sc &>/dev/null; then
+        echo "Storage class localblock-sc created successfully"
+        break
+    fi
+    sleep 5
+    COUNTER=$((COUNTER + 5))
+    echo "Waiting ${COUNTER}s for localblock-sc storage class..."
+done
+
+if [ $COUNTER -ge 300 ]; then
+    echo "ERROR: Storage class localblock-sc was not created within timeout"
+    oc get storageclass
+    oc get localvolumeset -n openshift-local-storage localvolumeset-osd -o yaml
+    exit 1
+fi
+
+echo "Waiting for 3 PVs with localblock-sc storage class to be created..."
+COUNTER=0
+while [ $COUNTER -lt 600 ]; do
+    PV_COUNT=$(oc get pv -o json | jq -r '[.items[] | select(.spec.storageClassName == "localblock-sc")] | length' 2>/dev/null || echo "0")
+    echo "Found ${PV_COUNT} PVs with localblock-sc storage class"
 
     if [ "${PV_COUNT}" -ge 3 ]; then
-        echo "Required 3 PVs with localblock-mon storage class are available"
-        oc get pv -o wide | grep localblock-mon || true
+        echo "Required 3 PVs with localblock-sc storage class are available"
+        oc get pv -o wide | grep localblock-sc || true
         break
     fi
 
@@ -104,11 +245,11 @@ while [ $COUNTER -lt 600 ]; do
 done
 
 if [ $COUNTER -ge 600 ]; then
-    echo "ERROR: Required 3 PVs with localblock-mon storage class were not created within timeout"
+    echo "ERROR: Required 3 PVs with localblock-sc storage class were not created within timeout"
     echo "Current PV status:"
     oc get pv -o wide
     echo "LocalVolumeSet status:"
-    oc get localvolumeset -n openshift-local-storage localvolumeset-mon -o yaml
+    oc get localvolumeset -n openshift-local-storage localvolumeset-osd -o yaml
     echo "Pod status in openshift-local-storage:"
     oc get pods -n openshift-local-storage
     exit 1
