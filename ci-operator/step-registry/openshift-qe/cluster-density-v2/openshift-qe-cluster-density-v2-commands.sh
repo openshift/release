@@ -54,6 +54,10 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
+BRANCH_URL="https://raw.githubusercontent.com/afcollins/kube-burner-ocp/metrics-aggregated-stats/cmd/config/metrics-profiles"
+curl -sS -o metrics-aggregated.yml "${BRANCH_URL}/metrics-aggregated.yml"
+curl -sS -o metrics-report.yml "${BRANCH_URL}/metrics-report.yml"
+
 current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
 
 # Use CDV2_ITERATION_MULTIPLIER if set, fall back to ITERATION_MULTIPLIER_ENV, default to 9
