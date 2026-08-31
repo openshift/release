@@ -1,0 +1,45 @@
+ref:
+  as: gcp-hcp-verify-hc-lifecycle
+  from: gcp-hcp-e2e-tests
+  commands: gcp-hcp-verify-hc-lifecycle-commands.sh
+  env:
+  - name: HC_VERSION
+    default: "5.0.0-ec.6"
+    documentation: "OpenShift version for the hosted cluster"
+  - name: HC_CHANNEL_GROUP
+    default: "candidate"
+    documentation: "Channel group for version resolution"
+  - name: HC_READY_TIMEOUT
+    default: "30m"
+    documentation: "Timeout for cluster to become ready"
+  - name: HC_DELETE_TIMEOUT
+    default: "20m"
+    documentation: "Timeout for cluster deletion to complete"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 150m0s
+  grace_period: 5m0s
+  documentation: |-
+    Runs the HC lifecycle Ginkgo v2 test that exercises the full hosted cluster
+    lifecycle via the gcphcpctl CLI against the Gecko Platform API.
+
+    Test flow: create cluster (--setup-infra) -> create nodepool -> wait for
+    ready -> login -> deploy workload -> verify -> delete -> destroy infra.
+
+    Depends on:
+    - gcp-hcp-build-gcphcpctl (must run first to build CLI binary)
+    - gcp-hcp-tf-provision (must write api-endpoint, oidc-endpoint, customer-project-id)
+    - hypershift-gcp-wif-auth (gcphcpctl uses gcloud for authentication)
+
+    Environment variables (optional):
+    - HC_VERSION: Cluster version (default: 5.0.0-ec.6)
+    - HC_CHANNEL_GROUP: Channel group (default: candidate)
+    - HC_READY_TIMEOUT: Ready timeout (default: 30m)
+    - HC_DELETE_TIMEOUT: Delete timeout (default: 20m)
+
+    Outputs:
+    - ${ARTIFACT_DIR}/junit_hc_lifecycle.xml: JUnit test results for Prow
+    - ${ARTIFACT_DIR}/cluster-status.json: Cluster state on failure
+    - ${ARTIFACT_DIR}/nodepool-status.json: Nodepool state on failure

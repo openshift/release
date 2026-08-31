@@ -5,16 +5,20 @@ workflow:
     - ref: hypershift-gcp-wif-auth
     - ref: gcp-hcp-tf-provision
     - ref: gcp-hcp-generate-kubeconfigs
+    - ref: gcp-hcp-build-gcphcpctl
     test:
     - ref: gcp-hcp-verify-argocd-sync
+    - ref: gcp-hcp-verify-hc-lifecycle
     post:
     - ref: gcp-hcp-cleanup-infrastructure
   documentation: |-
     E2E workflow for gcp-hcp-infra. Provisions full platform infrastructure
-    (region + management cluster) using Terraform Cloud ephemeral workspaces,
-    runs validation tests, and cleans up resources.
+    (region + management cluster + customer project) using Terraform Cloud
+    ephemeral workspaces, runs validation tests, and cleans up resources.
     
     Phase breakdown:
-    - Pre: Authenticate via WIF, provision infrastructure with terraform apply, generate kubeconfigs
-    - Test: Validate ArgoCD application sync on region and management clusters using Ginkgo v2 tests
-    - Post: Force-delete GCP projects and clear TFC workspace state (more reliable than terraform destroy)
+    - Pre: Authenticate via WIF, provision infrastructure with terraform apply,
+      generate kubeconfigs, build gcphcpctl CLI from source
+    - Test: Validate ArgoCD application sync, then run HC lifecycle test
+      (create cluster, verify, deploy workload, tear down)
+    - Post: Force-delete GCP projects and clear TFC workspace state
