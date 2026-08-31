@@ -327,9 +327,10 @@ jq -r '.management_cluster.value.project_id // empty' /tmp/tf-outputs.json > "${
 jq -r '.management_cluster.value.cluster_name // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-name"
 jq -r '.management_cluster.value.cluster_endpoint // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-endpoint"
 
-# HC lifecycle test outputs
-jq -r '.customer_project.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/customer-project-id"
-jq -r '.region.value.oidc_cdn_issuer_url // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/oidc-endpoint"
+# HC lifecycle test outputs (explicit top-level outputs from e2e template)
+jq -r '.customer_project_id.value // .customer_project.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/customer-project-id"
+jq -r '.oidc_endpoint.value // .region.value.oidc_cdn_issuer_url // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/oidc-endpoint"
+jq -r '.service.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/service-project-id"
 
 # Construct platform-api endpoint from terraform outputs
 # Hostname pattern: platform-api-{region}-{infra_id}.platform-ci.gcp-hcp.devshift.net
@@ -363,6 +364,9 @@ if [[ -s "${SHARED_DIR}/oidc-endpoint" ]]; then
 fi
 if [[ -s "${SHARED_DIR}/api-endpoint" ]]; then
   log "  API Endpoint:     $(<${SHARED_DIR}/api-endpoint)"
+fi
+if [[ -s "${SHARED_DIR}/service-project-id" ]]; then
+  log "  Service Project:  $(<${SHARED_DIR}/service-project-id)"
 fi
 log ""
 log "Outputs written to SHARED_DIR for downstream steps"

@@ -13,9 +13,6 @@ fi
 chmod +x "${SHARED_DIR}/gcphcpctl"
 
 # Verify required SHARED_DIR files exist
-# TODO(GCP-558): oidc-endpoint requires enable_oidc_cdn=true in the e2e
-# template (terraform/config/platform-ci/@e2e/main.tf). Until that is
-# flipped, this check will fail for ephemeral runs.
 for f in api-endpoint oidc-endpoint customer-project-id; do
   if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
     echo "ERROR: ${f} not found or empty in SHARED_DIR"
