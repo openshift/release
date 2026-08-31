@@ -54,7 +54,7 @@ typeset -i startTime=0
 startTime=$(date +%s)
 
 # Function to record test result
-RecordTestResult() {
+function RecordTestResult () {
     typeset testName="${1:-}"; (($#)) && shift
     typeset status="${1:-}"; (($#)) && shift
     typeset failureMessage="${1:-}"; (($#)) && shift
@@ -63,10 +63,11 @@ RecordTestResult() {
     testStatus["${testName}"]="${status}"
     testDuration["${testName}"]="${duration}"
     testFailureMsg["${testName}"]="${failureMessage}"
+    true
 }
 
 # Function to generate JUnit XML
-GenerateJunitXml() {
+function GenerateJunitXml () {
     typeset junitFile="${ARTIFACT_DIR}/junit_acm-opp-app.xml"
     typeset -i totalDuration=0
     totalDuration=$(( $(date +%s) - startTime ))
@@ -75,6 +76,7 @@ GenerateJunitXml() {
     typeset -i totalTests=${#allTestCasesArr[@]}
     typeset -i failedTests=0
     typeset -i skippedTests=0
+    typeset test=""
 
     for test in "${allTestCasesArr[@]}"; do
         if [ "${testStatus[${test}]}" = "failed" ]; then
@@ -123,12 +125,13 @@ EOF
 
     : "JUnit XML generated at: ${junitFile}"
     cat "${junitFile}"
+    true
 }
 
 ################################################################################
 # Test Case 1: Deploy OPP Application and Wait for Build/Deployment
 ################################################################################
-RunTestCase1() {
+function RunTestCase1 () {
     : "====== Test Case 1: Deploy OPP Application ======"
 
     # Download jq
@@ -143,12 +146,12 @@ RunTestCase1() {
     sleep 60
 
     # Verify e2e-opp namespace was created
-    oc get namespace e2e-opp >/dev/null || return 1
+    oc get namespace e2e-opp || return 1
 
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite
 
     # Check initial status
-    oc get policies -n policies | grep example || true
+    oc get policies -n policies | sed -n '/example/p'
     oc get build -n e2e-opp || true
     oc get po -n e2e-opp || true
     oc get deployment -n e2e-opp || true
@@ -176,7 +179,9 @@ RunTestCase1() {
 
             if [ "${buildStatus}" != "Complete" ]; then
                 : "=== Build Details ==="
+                oc get build "${latestBuild}" -n e2e-opp -o yaml --ignore-not-found || true
                 oc describe build "${latestBuild}" -n e2e-opp || true
+                oc get buildconfig httpd-example -n e2e-opp -o yaml --ignore-not-found || true
                 oc describe buildconfig httpd-example -n e2e-opp || true
             fi
         fi
@@ -186,13 +191,14 @@ RunTestCase1() {
 
         : "=== Deployment Status ==="
         oc get deployment -n e2e-opp || true
+        oc get deployment httpd-example -n e2e-opp -o yaml --ignore-not-found || true
         oc describe deployment httpd-example -n e2e-opp || true
 
         : "=== Pod Status ==="
         oc get po -n e2e-opp || true
 
         : "=== ImageStream Status ==="
-        oc get is -n e2e-opp httpd-example -o yaml | grep -A 10 "status:" || true
+        oc get is -n e2e-opp httpd-example -o yaml --ignore-not-found | awk '/status:/{n=11} n>0{print; n--}'
 
         : "=== Quay Integration Status ==="
         oc get quayintegration quay -o yaml || true
@@ -211,7 +217,7 @@ RunTestCase1() {
 
     # Collect final status
     oc get build,po,deployment -n e2e-opp || true
-    oc get is -n e2e-opp httpd-example -o yaml | grep -A 5 "status:" || true
+    oc get is -n e2e-opp httpd-example -o yaml --ignore-not-found | awk '/status:/{n=6} n>0{print; n--}'
 
     return 0
 }
@@ -219,7 +225,7 @@ RunTestCase1() {
 ################################################################################
 # Test Case 2: Test ACS Integration
 ################################################################################
-RunTestCase2() {
+function RunTestCase2 () {
     : "====== Test Case 2: Test ACS Integration ======"
     : "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
 
@@ -240,8 +246,8 @@ RunTestCase2() {
     typeset httpdImageJson="" imageId="" cves="" image=""
 
     : "Waiting for httpd-example image to appear in ACS (max $((retries * retryInterval))s)..."
-    typeset attempt=""
-    for attempt in $(seq 1 "${retries}"); do
+    typeset -i attempt=0
+    for ((attempt = 1; attempt <= retries; ++attempt)); do
         : "Attempt ${attempt}/${retries}: Querying ACS for httpd-example image..."
         # Disable xtrace to protect ACS password in curl arguments
         set +x
@@ -268,21 +274,22 @@ RunTestCase2() {
 # Test Execution Setup
 ################################################################################
 # Set trap to generate JUnit XML on exit (regardless of success or failure)
-trap GenerateJunitXml EXIT
+trap '{( GenerateJunitXml; true )}' EXIT
 
 if [ "${MAP_TESTS:-}" = "true" ]; then
     eval "$(
-        typeset -a _fURL=()
-        type -t wget 1>/dev/null && _fURL=(wget --timeout=30 -qO-) || _fURL=(curl --connect-timeout 10 --max-time 30 -fsSL)
-        "${_fURL[@]}" \
+        typeset -a fetchCmd=()
+        type -t wget 1>/dev/null && fetchCmd=(wget --timeout=30 -qO-) || fetchCmd=(curl --connect-timeout 10 --max-time 30 -fsSL)
+        "${fetchCmd[@]}" \
             https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
-    if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
-        trap '
+    if type -t ExitTrap--PostProcessPrep; then
+        trap '{(
             GenerateJunitXml
             LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
                 ExitTrap--PostProcessPrep junit--acm-opp-app.xml
-        ' EXIT
+            true
+        )}' EXIT
     else
         : "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping"
     fi
@@ -293,23 +300,57 @@ fi
 ################################################################################
 : "====== Pre-flight Check: QuayIntegration ======"
 
-if ! oc get quayintegration quay >/dev/null; then
-    : "ERROR: QuayIntegration 'quay' not found!"
+# Distinguish between "CRD not installed" (skip) and "CRD exists but CR
+# missing" (fail).  On OCP versions where the Quay Bridge Operator is not
+# available in the catalog the QuayIntegration CRD will be absent entirely;
+# that is an environment limitation, not a test failure.
+typeset apiOutput=""
+typeset -i apiRc=0
+apiOutput=$(oc api-resources --api-group=quay.redhat.com) || apiRc=$?
+
+if ((apiRc != 0)); then
+    : "WARNING: oc api-resources failed (rc=${apiRc}) - cannot determine CRD presence, falling through to CR check"
+elif ! grep -qi quayintegration <<< "${apiOutput}"; then
+    : "QuayIntegration CRD is not installed on this cluster."
+    : "Quay Bridge Operator is not available - skipping OPP app tests."
+
+    for test in "${allTestCasesArr[@]}"; do
+        testStatus["${test}"]="skipped"
+        testFailureMsg["${test}"]="QuayIntegration CRD not available - Quay Bridge Operator not installed"
+    done
+
+    exit 0
+fi
+
+typeset getOutput=""
+typeset -i getRc=0
+getOutput=$(oc get quayintegration quay --ignore-not-found -o name) || getRc=$?
+
+if ((getRc != 0)); then
+    : "WARNING: oc get quayintegration failed (rc=${getRc}) - cluster API error"
+    : "Marking all test cases as failed."
+
+    for test in "${allTestCasesArr[@]}"; do
+        testStatus["${test}"]="failed"
+        testFailureMsg["${test}"]="oc get quayintegration failed (rc=${getRc}) - cluster API error"
+    done
+
+    exit 0
+elif [[ -z "${getOutput}" ]]; then
+    : "ERROR: QuayIntegration CRD exists but CR 'quay' not found!"
     : "OPP bundle components are not properly configured."
     : "Cannot proceed with testing - marking all test cases as failed."
 
-    # Mark all tests as failed with specific message
     for test in "${allTestCasesArr[@]}"; do
         testStatus["${test}"]="failed"
-        testFailureMsg["${test}"]="QuayIntegration not found - OPP bundle not configured"
+        testFailureMsg["${test}"]="QuayIntegration CR 'quay' not found - OPP bundle not configured"
     done
 
-    # Exit immediately (EXIT trap will generate JUnit XML)
     exit 0
 fi
 
 : "QuayIntegration quay found"
-oc get quayintegration quay -o yaml || true
+oc get quayintegration quay -o yaml --ignore-not-found
 
 ################################################################################
 # Execute Test Cases
