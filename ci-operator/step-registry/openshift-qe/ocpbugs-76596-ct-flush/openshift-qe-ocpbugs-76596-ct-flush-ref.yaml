@@ -1,0 +1,61 @@
+ref:
+  as: openshift-qe-ocpbugs-76596-ct-flush
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-ocpbugs-76596-ct-flush-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: KB_PODS_PER_NODE
+    default: "200"
+    documentation: |-
+      Number of pods per node for kube-burner node-density-cni workload.
+      These pods trigger NXT_CT_FLUSH_ZONE on deletion.
+  - name: KB_CHURN_CYCLES
+    default: "20"
+    documentation: Number of kube-burner churn cycles.
+  - name: KB_CHURN_DELAY
+    default: "30s"
+    documentation: Delay between kube-burner churn cycles.
+  - name: KB_CHURN_PERCENT
+    default: "20"
+    documentation: Percentage of pods to churn per cycle.
+  - name: CT_ENTRIES_PER_ZONE
+    default: "125000"
+    documentation: |-
+      Number of fake conntrack entries to inject per zone (4 zones total = 500k).
+      Injected via pure Python3 netlink (ct_inject.py) - no binary required.
+  - name: CT_TIMEOUT_SECS
+    default: "7200"
+    documentation: Timeout in seconds for injected conntrack entries (2 hours).
+  - name: BURST_POD_COUNT
+    default: "200"
+    documentation: |-
+      Number of pods to delete simultaneously to trigger zone flush storm.
+      200 pods × 500k CT table = 80-87s OVS stalls → CNI timeouts.
+  - name: EXPECTED_STALLS
+    default: "10"
+    documentation: Minimum number of Unreasonably long OVS stalls expected.
+  - name: EXPECTED_TIMEOUTS
+    default: "1"
+    documentation: Minimum number of CNI timeouts expected. Set 0 to skip CNI timeout check.
+  documentation: |-
+    Reproduces OCPBUGS-76596 (NXT_CT_FLUSH_ZONE performance issue).
+
+    Root cause: RHEL 9 kernel lacks zone-filter in IPCTNL_MSG_CT_DELETE.
+    OVS must dump entire conntrack table per zone flush. With large CT tables
+    (500k entries), each flush takes 30-87 seconds, blocking the OVS main
+    thread and preventing ovn-installed from being set within the 120s CNI timeout.
+
+    Steps:
+    1. Deploy pods with network policies (kube-burner node-density-cni with churn)
+    2. Inject 500k fake conntrack entries via Python3 netlink (ct_inject.py)
+    3. Simultaneously delete BURST_POD_COUNT pods to trigger zone flush storm
+    4. Verify OVS stalls and CNI timeouts match expected thresholds
+
+    Fix: Linux kernel 6.8 (RHEL 10) adds zone-filter support - tracked in RHEL-247088.
