@@ -90,10 +90,14 @@ for node in $nodes;do
     echo "${node}: installed=${installed}, upgrading to ${target_version}"
 
     # Copy the RPM to the node
-    dd if=kata-containers.rpm | oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
+    if ! dd if=kata-containers.rpm | oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm; then
+        echo "ERROR: failed to copy RPM to ${node}"
+        failed_nodes="${node} ${failed_nodes}"
+        continue
+    fi
 
     # Verify checksum
-    node_md5=$(oc debug -n default "${node}" -- bash -c "md5sum /host/var/local/kata-containers.rpm | cut -d' ' -f1")
+    node_md5=$(oc debug -n default "${node}" -- bash -c "md5sum /host/var/local/kata-containers.rpm | cut -d' ' -f1") || true
     if [ "${node_md5}" != "${kata_rpm_md5sum}" ]; then
         echo "ERROR: checksum mismatch on ${node}: expected ${kata_rpm_md5sum}, got ${node_md5}"
         failed_nodes="${node} ${failed_nodes}"
