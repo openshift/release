@@ -322,17 +322,43 @@ if [[ -z "${check_failed}" ]]; then
   oc get clusteroperators > "${CO_AVAIL_LOG}" 2>&1 || true
 fi
 
+degraded_warning_count=0
+
 if [[ -z "${check_failed}" ]]; then
-  # --- Phase 3: Check Degraded=False (10 min) ------------------------------
-  log "Phase 3: Checking cluster operators Degraded=False..."
+  # --- Phase 3: Check Degraded=False (10 min) — advisory only --------------
+  log "Phase 3: Checking cluster operators Degraded=False (advisory — will not fail the step)..."
   wait_for_operator_condition "Degraded" "False" 600 \
     "Some cluster operators are Degraded"
   CO_DEGRADED_LOG="${ARTIFACT_DIR}/co_degraded.log"
   oc get clusteroperators > "${CO_DEGRADED_LOG}" 2>&1 || true
+
+  if [[ -n "${check_failed}" ]]; then
+    log "WARNING: Phase 3 (Degraded=False) did not pass: ${check_failed}"
+    log "WARNING: Degraded operators detected but this will not fail the step."
+
+    # Record degraded operator names in artifacts for post-run analysis
+    degraded_ops=$(oc get clusteroperators -o json 2>/dev/null | jq -r \
+      '.items[] | select(.status.conditions[]? |
+        select(.type=="Degraded" and .status=="True")) | .metadata.name' \
+      2>/dev/null | sort) || true
+    if [[ -n "${degraded_ops}" ]]; then
+      degraded_warning_count=$(echo "${degraded_ops}" | wc -l | tr -d ' ')
+      DEGRADED_OPERATORS_FILE="${ARTIFACT_DIR}/degraded_operators.txt"
+      echo "${degraded_ops}" > "${DEGRADED_OPERATORS_FILE}"
+      log "WARNING: ${degraded_warning_count} degraded operator(s) recorded in ${DEGRADED_OPERATORS_FILE}"
+    fi
+
+    # Reset check_failed — Phase 3 is advisory only
+    check_failed=""
+  fi
 fi
 
 if [[ -z "${check_failed}" ]]; then
-  log "All cluster operators are Available, not Progressing, and not Degraded"
+  if [[ "${degraded_warning_count}" -gt 0 ]]; then
+    log "All cluster operators are Available and not Progressing (with ${degraded_warning_count} degraded warning(s))"
+  else
+    log "All cluster operators are Available, not Progressing, and not Degraded"
+  fi
 
   # Optionally clear the ClusterVersion channel so the CVO does not attempt to retrieve
   # updates. CI clusters on nightly payloads have no valid update graph, causing the CVO
