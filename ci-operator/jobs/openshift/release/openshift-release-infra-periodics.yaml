@@ -3793,15 +3793,15 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build06
   cron: '@yearly'
   decorate: true
   labels:
     config-type: modern
     job-architecture: amd64
-    job-env: hypershift-hosted-powervs
+    job-env: hypershift-mce-power
     job-type: launch
-  name: release-openshift-origin-installer-launch-hypershift-powervs
+  name: release-openshift-origin-installer-launch-hypershift-mce-power
   spec:
     containers:
     - args:
@@ -3824,7 +3824,7 @@ periodics:
       - name: CLUSTER_DURATION
         value: "9000"
       - name: BRANCH
-        value: "4.14"
+        value: "4.22"
       - name: JOB_NAME_SAFE
         value: launch
       - name: NAMESPACE
@@ -3840,15 +3840,14 @@ periodics:
           tests:
           - as: launch
             steps:
-              cluster_profile: hypershift-powervs-cb
+              cluster_profile: openshift-org-aws
               env:
                 CLUSTER_DURATION: "$(CLUSTER_DURATION)"
-                PLATFORM: powervs
                 HYPERSHIFT_BASE_DOMAIN: hypershift.cis.ibm.net
-                HYPERSHIFT_NODE_COUNT: 2
-              workflow: hypershift-hostedcluster-workflow
-              test:
-              - ref: clusterbot-wait
+                HYPERSHIFT_NODE_COUNT: "2"
+                MCE_VERSION: "2.17"
+                CLUSTERS_NAMESPACE: "local-cluster"
+              workflow: hypershift-mce-power-clusterbot
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
@@ -3889,7 +3888,7 @@ periodics:
         secretName: ci-pull-credentials
     - name: cluster-profile
       secret:
-        secretName: cluster-secrets-hypershift-powervs-cb
+        secretName: cluster-secrets-openshift-org-aws
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
