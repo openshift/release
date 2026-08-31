@@ -46,6 +46,16 @@ else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi
 
+# Build platform section based on PLATFORM_TYPE
+if [ "${PLATFORM_TYPE:-none}" == "external" ]; then
+  PLATFORM_BLOCK="platform:
+  external:
+    platformName: \"${PLATFORM_NAME}\""
+else
+  PLATFORM_BLOCK="platform:
+  none: {}"
+fi
+
 # Default UPI installation
 echo "Create the install-config.yaml file..."
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
@@ -72,8 +82,7 @@ compute:
   hyperthreading: Enabled
   name: worker
   replicas: ${COMPUTE_COUNT}
-platform:
-  none: {}
+${PLATFORM_BLOCK}
 pullSecret: >
   $(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 sshKey: |
