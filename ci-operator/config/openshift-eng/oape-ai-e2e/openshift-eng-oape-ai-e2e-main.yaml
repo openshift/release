@@ -1,3 +1,8 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
 binary_build_commands: cd go-server && go install .
 build_root:
   image_stream_tag:
@@ -90,6 +95,17 @@ tests:
           cpu: "1"
           memory: 500Mi
       timeout: 2h30m0s
+- as: periodic-cve-agent
+  cron: 0 6 * * 1-5
+  steps:
+    env:
+      CVE_AGENT_ISSUE_KEY: "CM-1048"
+      CVE_AGENT_MAX_ISSUES: "1"
+    workflow: oape-cve-agent
+- as: periodic-cve-agent-ondemand
+  cron: '@yearly'
+  steps:
+    workflow: oape-cve-agent
 zz_generated_metadata:
   branch: main
   org: openshift-eng
