@@ -17,8 +17,12 @@ fi
 
 pushd /tmp
 
+# Disable tracing due to password handling
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
+$WAS_TRACING && set -x
 
 echo "Using LOCALNET_PORT=${LOCALNET_PORT} LOCALNET_BRIDGE=${LOCALNET_BRIDGE} LOCALNET=${LOCALNET}"
 
@@ -48,8 +52,19 @@ spec:
           state: present
 EOF
 
+dump_nncp() {
+  echo "=== NNCP ${NNCP_NAME} ==="
+  oc get nncp "${NNCP_NAME}" -o yaml || true
+  echo "=== NNCEs ==="
+  oc get nnce -o wide || true
+  oc get nnce -o yaml || true
+}
+
 echo "Waiting for NNCP ${NNCP_NAME} to become Available..."
-oc wait nncp/"${NNCP_NAME}" --for=condition=Available --timeout=10m
+if ! oc wait nncp/"${NNCP_NAME}" --for=condition=Available --timeout=10m; then
+  dump_nncp
+  exit 1
+fi
 oc get nncp "${NNCP_NAME}" -o yaml
 
 cleanup_nncp() {
@@ -76,7 +91,10 @@ spec:
           bridge: ${LOCALNET_BRIDGE}
           state: absent
 EOF
-  oc wait nncp/"${NNCP_NAME}" --for=condition=Available --timeout=10m
+  if ! oc wait nncp/"${NNCP_NAME}" --for=condition=Available --timeout=10m; then
+    dump_nncp
+    return 1
+  fi
   oc delete nncp/"${NNCP_NAME}" --ignore-not-found=true --wait=true
 }
 trap cleanup_nncp EXIT
@@ -98,8 +116,10 @@ if [ "${VM}" == "true" ]; then
   ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa
 fi
 
-# Only store the results from the full run versus the smoke test.
+# Disable tracing due to password handling
+set +x
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+$WAS_TRACING && set -x
 
 NETPERF_FILENAME="${NETPERF_FILENAME}" \
 VM="${VM}" \
