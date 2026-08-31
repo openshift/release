@@ -20,8 +20,45 @@ if [[ ! "${PROVISIONER_LAUNCH_TIMEOUT}" =~ ^[0-9]+$ ]]; then
 fi
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
+capture_diagnostics_on_crash() {
+    log "UNEXPECTED EXIT: Capturing diagnostics before crash..."
+    timeout 30 rosa describe cluster -c "${CLUSTER_ID}" -o json > "${ARTIFACT_DIR}/cluster-description.json" 2>&1 || true
+    timeout 60 rosa logs install -c "${CLUSTER_ID}" > "${ARTIFACT_DIR}/.install.log" 2>&1 || true
+    if [[ "${HOSTED_CP}" != "true" ]]; then
+        timeout 30 ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/resources/live" \
+            | jq '.resources.cluster_deployment' \
+            > "${ARTIFACT_DIR}/cluster-deployment.json" 2>/dev/null || true
+    fi
+    log "Diagnostics captured to ${ARTIFACT_DIR}/"
+}
+trap 'capture_diagnostics_on_crash' ERR
+
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
+}
+
+retry_cmd() {
+    local max_retries="${1:-3}"
+    local delay="${2:-10}"
+    shift 2 || shift $#
+    local attempt=1
+    local rc=0
+    local retry_out
+    retry_out=$(mktemp)
+    trap 'rm -f "${retry_out}"' RETURN
+    while (( attempt <= max_retries )); do
+        rc=0
+        "$@" > "${retry_out}" && { cat "${retry_out}"; return 0; } || rc=$?
+        if (( attempt == max_retries )); then
+            log "Command failed after ${max_retries} attempts: $*" >&2
+            return ${rc}
+        fi
+        log "Attempt ${attempt}/${max_retries} failed (exit ${rc}), retrying in ${delay}s..." >&2
+        sleep "${delay}"
+        delay=$(( delay * 2 ))
+        attempt=$(( attempt + 1 ))
+    done
+    return ${rc}
 }
 
 # Record Cluster Configurations
@@ -161,7 +198,7 @@ CLUSTER_PREVIOUS_STATE="claim"
 record_cluster "timers" "status" "claim"
 loop_count=0
 while true; do
-  rosa describe cluster -c "${CLUSTER_ID}" -o json > ${cluster_info_json}
+  retry_cmd 3 10 rosa describe cluster -c "${CLUSTER_ID}" -o json > "${cluster_info_json}"
   CLUSTER_STATE=$(cat ${cluster_info_json} | jq -r '.state')
   log "Cluster state: ${CLUSTER_STATE}"
   current_time=$(date +"%s")
@@ -193,7 +230,7 @@ while true; do
       loop_count=$((loop_count + 1))
       if (( loop_count % 5 == 0 )); then
         log "Checking install logs for fatal errors..."
-        install_log_output=$(timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
+        install_log_output=$(retry_cmd 3 10 timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
         fatal_pattern=$(echo "${install_log_output}" | grep -E "ProvisionFailed|failed to create|InvalidSubnet|LimitExceeded|QuotaExceeded|InsufficientFreeAddresses|UnauthorizedAccess" || true)
         if [[ -n "${fatal_pattern}" ]]; then
           log "ERROR: Fatal error detected in install logs:"
@@ -210,7 +247,7 @@ while true; do
           installing_elapsed=$(( current_time - dyn_start_time ))
 
           if [[ "${infra_id_check}" == "null" ]] && (( installing_elapsed >= PROVISIONER_LAUNCH_TIMEOUT )); then
-            install_log_check=$(timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
+            install_log_check=$(retry_cmd 3 10 timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
             if echo "${install_log_check}" | grep -q "waiting for installation to begin"; then
               log "FATAL: Hive provisioner never launched."
               log "  infra_id is null after $(( installing_elapsed / 60 )) minutes in 'installing' state."
@@ -224,7 +261,7 @@ while true; do
 
           # OCM state reconciliation detection: installer completed but OCM state stuck
           if [[ "${infra_id_check}" != "null" ]] && (( installing_elapsed >= PROVISIONER_LAUNCH_TIMEOUT )); then
-            install_log_check=$(timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
+            install_log_check=$(retry_cmd 3 10 timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
             if echo "${install_log_check}" | grep -Eiq 'install complete!|install completed successfully'; then
               log "FATAL: OCM state reconciliation failure detected."
               log "  infra_id is set (provisioner launched) but cluster is still in 'installing' state"
