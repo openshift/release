@@ -93,7 +93,6 @@ dashboard.new(
         legend_min=true,
         legend_sortDesc=true,
         min='0',
-        stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum by (${group_by}) (ephemeralcluster_count{konflux_cluster=~"${konflux_cluster}",konflux_tenant=~"${konflux_tenant}",cluster_profile=~"${cluster_profile}",workflow=~"${workflow}",phase=~"${phase}"})',
