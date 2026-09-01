@@ -5,24 +5,7 @@ build_root:
     tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
-  - dockerfile_literal: |
-      FROM src
-      RUN dnf module enable -y nodejs:22 && \
-          dnf install -y nodejs npm skopeo \
-          alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
-          libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
-          libxkbcommon libXfixes libXcursor libXext libXi libXtst \
-          libwayland-client && \
-          dnf clean all
-      RUN curl -fsSL "https://github.com/google/go-containerregistry/releases/download/v0.20.2/go-containerregistry_Linux_x86_64.tar.gz" \
-            | tar -xzf - -C /usr/local/bin crane && \
-          curl -fsSL -o /usr/local/bin/regctl "https://github.com/regclient/regclient/releases/download/v0.7.1/regctl-linux-amd64" && \
-          chmod +x /usr/local/bin/crane /usr/local/bin/regctl
-      WORKDIR /go/src/github.com/quay/quay/web
-      RUN npm ci
-      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
-      RUN npx playwright install chromium
-    from: src
+  - dockerfile_path: web/Containerfile.playwright
     to: quay-playwright-runner
 releases:
   latest:
