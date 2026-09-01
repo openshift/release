@@ -21,19 +21,26 @@ ref:
     default: "3"
     documentation: Patch worker MCP maxUnavailable to parallelize node rollout (default 3 nodes at a time)
   documentation: |-
-    Waits for all non-paused MachineConfigPools to reach a stable state
-    (not Updating, not Degraded, all nodes ready and schedulable). Patches
-    the worker MCP maxUnavailable to parallelize node rollout on large
-    clusters. Place before cucushift-installer-check-cluster-health in the
-    test chain to give large clusters time to finish MCP rollout after
-    operator installation.
+    Waits for all non-paused MachineConfigPools to reach a stable state,
+    then asserts all ClusterOperators are healthy and all nodes are Ready.
+    Replaces cucushift-installer-check-cluster-health as the pre-test
+    cluster validation gate for OPP interop jobs.
 
-    On timeout, classifies the failure mode:
+    After MCP convergence, runs a one-shot health gate:
+    - ClusterOperators: Available=True, Progressing=False, Degraded=False
+    - Nodes: all in Ready state
+    Fails if any check is unhealthy, preventing misleading downstream
+    test failures from degraded infrastructure.
+
+    Patches the worker MCP maxUnavailable to parallelize node rollout on
+    large clusters.
+
+    On MCP timeout, classifies the failure mode:
     - DEGRADED: Hard failure. One or more MCPs have Degraded=True, indicating
       a product interop issue where policies caused nodes to enter a bad state.
     - UPDATING (progressing): Non-blocking. Ready count is monotonically
       increasing but rollout was too slow for the timeout. Exits 0 and
-      defers to downstream health checks.
+      runs the health gate before continuing.
     - UPDATING (oscillating): Hard failure. Ready count is not progressing,
       suggesting nodes may be cycling due to conflicting configurations.
     - UNKNOWN: Hard failure. Could not determine MCP state at timeout.

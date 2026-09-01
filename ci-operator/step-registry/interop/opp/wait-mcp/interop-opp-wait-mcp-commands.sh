@@ -26,6 +26,77 @@ function IsReadyCountProgressing () {
     return 1
 }
 
+function AssertClusterHealthy () {
+    typeset -i failures=0
+
+    echo ""
+    echo "=== ClusterOperator health gate ==="
+    typeset coJson=""
+    if ! coJson="$(oc get clusteroperators -o json --request-timeout=30s 2>/dev/null)"; then
+        echo "WARNING: Failed to fetch ClusterOperators"
+        (( ++failures )) || true
+    else
+        typeset coIssues=""
+        coIssues="$(echo "${coJson}" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+issues = []
+for co in data.get('items', []):
+    name = co['metadata']['name']
+    conds = {c['type']: c['status'] for c in co.get('status', {}).get('conditions', [])}
+    avail = conds.get('Available', 'Unknown')
+    prog = conds.get('Progressing', 'Unknown')
+    deg = conds.get('Degraded', 'Unknown')
+    if avail != 'True' or prog != 'False' or deg != 'False':
+        issues.append(f'{name}: Available={avail} Progressing={prog} Degraded={deg}')
+if issues:
+    print('\n'.join(issues))
+" 2>/dev/null)" || coIssues="python parse error"
+        if [[ -n "${coIssues}" ]]; then
+            echo "UNHEALTHY ClusterOperators:"
+            echo "${coIssues}"
+            (( ++failures )) || true
+        else
+            echo "All ClusterOperators healthy (Available=True, Progressing=False, Degraded=False)"
+        fi
+    fi
+
+    echo ""
+    echo "=== Node readiness gate ==="
+    typeset notReady=""
+    notReady="$(oc get nodes -o json --request-timeout=30s 2>/dev/null | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+bad = []
+for node in data.get('items', []):
+    name = node['metadata']['name']
+    conds = {c['type']: c['status'] for c in node.get('status', {}).get('conditions', [])}
+    if conds.get('Ready') != 'True':
+        bad.append(name)
+if bad:
+    print('\n'.join(bad))
+" 2>/dev/null)" || notReady="failed to check"
+    if [[ -n "${notReady}" ]]; then
+        echo "NOT READY nodes:"
+        echo "${notReady}"
+        (( ++failures )) || true
+    else
+        echo "All nodes Ready"
+    fi
+
+    echo ""
+    if (( failures > 0 )); then
+        echo "CLUSTER HEALTH GATE FAILED: ${failures} check(s) failed"
+        echo "Degraded ClusterOperators or NotReady nodes will cascade into misleading test failures"
+        oc get clusteroperators 2>/dev/null || true
+        echo ""
+        oc get nodes -o wide 2>/dev/null || true
+        return 1
+    fi
+    echo "Cluster health gate passed"
+    return 0
+}
+
 function ClassifyMcpState () {
     typeset json="${1}"
     echo "${json}" | python3 -c "
@@ -122,7 +193,8 @@ else:
         echo "Clean poll ${consecutivePasses}/${consecutiveRequired} at ${elapsed}s: ${statusDetail}"
         if (( consecutivePasses >= consecutiveRequired )); then
             echo "MCPs stable after ${elapsed}s (${consecutiveRequired} consecutive clean polls)"
-            exit 0
+            AssertClusterHealthy
+            exit $?
         fi
     else
         if (( consecutivePasses > 0 )); then
@@ -161,8 +233,8 @@ case "${classification}" in
         if IsReadyCountProgressing; then
             echo "FAILURE CLASS: Infrastructure timeout (non-blocking)"
             echo "MCP rollout is healthy (Degraded=False, ready count increasing) but too slow for the ${mcpWaitTimeout}s timeout"
-            echo "Exiting with success — downstream health checks will validate remaining state"
-            exit 0
+            AssertClusterHealthy
+            exit $?
         else
             echo "FAILURE CLASS: Potential interop issue"
             echo "MCP is updating but ready count is not progressing — nodes may be cycling"
