@@ -38,6 +38,24 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
+- as: e2e-aws
+  optional: true
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: e2e
+      cli: latest
+      commands: bash test/openshift/e2e-commands.sh
+      dependencies:
+      - env: IMAGE_OPENSHIFT_MCP_SERVER
+        name: openshift-mcp-server
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: mcpchecker-eval-google
   optional: true
   steps:

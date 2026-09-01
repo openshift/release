@@ -82,6 +82,34 @@ trap cleanup EXIT
 
 mkdir -p "${HOME}"
 
+# OpenSSH in this pod needs a passwd row for the random CI UID and a default
+# identity so tests can SSH to the bastion host in SHARED_DIR.
+if [[ -n "${TEST_USE_PROVISIONED_BASTION-}" ]]; then
+    if [[ ! -s "${SHARED_DIR}/bastion_public_address" ]]; then
+        echo >&2 "TEST_USE_PROVISIONED_BASTION is set but ${SHARED_DIR}/bastion_public_address is missing"
+        exit 1
+    fi
+    if [[ ! -s "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ]]; then
+        echo >&2 "TEST_USE_PROVISIONED_BASTION is set but ${CLUSTER_PROFILE_DIR}/ssh-privatekey is missing"
+        exit 1
+    fi
+    if ! whoami &>/dev/null; then
+        if [[ ! -w /etc/passwd ]]; then
+            echo >&2 "Cannot register UID $(id -u): /etc/passwd is not writable"
+            exit 1
+        fi
+        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+        if ! whoami &>/dev/null; then
+            echo >&2 "Failed to register UID $(id -u) in /etc/passwd"
+            exit 1
+        fi
+    fi
+    mkdir -p "${HOME}/.ssh"
+    chmod 0700 "${HOME}/.ssh"
+    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" "${HOME}/.ssh/id_rsa"
+    chmod 0600 "${HOME}/.ssh/id_rsa"
+fi
+
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
 if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
