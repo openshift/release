@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+export PATH="/cli:${PATH}"
+
 echo "Checking access to SHARED_DIR ..."
 echo "Testing SHARED_DIR" > ${SHARED_DIR}/testing.txt
 ls -ltra ${SHARED_DIR}
@@ -204,31 +206,23 @@ fi
 # The DPF operator needs it to resolve OVN images for DPU service templates.
 if [[ -n "${PAYLOAD_URL}" ]]; then
   echo "Checking aarch64 release image availability for DPF operator..."
-  ssh ${SSH_OPTS} root@${REMOTE_HOST} "
-    cd ${REMOTE_WORK_DIR}/openshift-dpf
-    set -a; source .env; set +a
-    VERSION=\$(oc adm release info \"\${PAYLOAD_URL}\" --registry-config=\"\${OPENSHIFT_PULL_SECRET}\" -o jsonpath='{.metadata.version}' 2>/dev/null)
-    if [[ -z \"\$VERSION\" ]]; then
-      echo 'WARNING: Could not extract version from release image'
+  oc registry login --to=/tmp/ci-auth.json
+  VERSION=$(oc adm release info "${PAYLOAD_URL}" --registry-config=/tmp/ci-auth.json -o jsonpath='{.metadata.version}' 2>/dev/null || true)
+  if [[ -z "${VERSION}" ]]; then
+    echo "WARNING: Could not extract version from release image"
+  else
+    echo "Release version: ${VERSION}"
+    REPO=${PAYLOAD_URL%%@*}; REPO=${REPO%%:*}
+    AARCH64="${REPO}:${VERSION}-aarch64"
+    echo "Checking: ${AARCH64}"
+    if skopeo inspect --authfile=/tmp/ci-auth.json "docker://${AARCH64}" >/dev/null 2>&1; then
+      echo "aarch64 release image available"
     else
-      echo \"Release version: \$VERSION\"
-      REPO=\${PAYLOAD_URL%%@*}; REPO=\${REPO%%:*}
-      AARCH64=\"\${REPO}:\${VERSION}-aarch64\"
-      echo \"Checking: \$AARCH64\"
-      if skopeo inspect --authfile=\"\${OPENSHIFT_PULL_SECRET}\" \"docker://\$AARCH64\" >/dev/null 2>&1; then
-        echo \"aarch64 release image available\"
-      else
-        echo \"ERROR: aarch64 release image NOT available: \$AARCH64\"
-        echo \"The DPF operator needs this to create DPUServiceTemplates for DPU services.\"
-        echo \"DPUDeployment will not reach Ready without it.\"
-        exit 1
-      fi
+      echo "WARNING: aarch64 release image NOT available in CI registry: ${AARCH64}"
+      echo "The DPF operator will fall back to quay.io for aarch64 OVN image resolution."
     fi
-  "
-  if [[ $? -ne 0 ]]; then
-    echo "ERROR: aarch64 release image check failed"
-    exit 1
   fi
+  rm -f /tmp/ci-auth.json
 fi
 
 echo "Create logs dir on the remote host"
