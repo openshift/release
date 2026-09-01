@@ -266,6 +266,99 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
       | jq '.resources.cluster_deployment' \
       > "${ARTIFACT_DIR}/cluster-deployment.json" 2>/dev/null || true
   fi
+  # DNS diagnostics: when the failure involves DNS resolution errors ("no such host" or
+  # "dial tcp: lookup"), capture Route 53 record state and resolver output as artifacts.
+  # This helps triage DNS propagation / hosted-zone issues without needing to reproduce.
+  dns_pattern_found="no"
+  if [[ -f "${ARTIFACT_DIR}/.install.log" ]] && grep -qE "no such host|dial tcp: lookup" "${ARTIFACT_DIR}/.install.log" 2>/dev/null; then
+    dns_pattern_found="yes"
+  elif echo "${status_desc}" | grep -qE "no such host|dial tcp: lookup" 2>/dev/null; then
+    dns_pattern_found="yes"
+  fi
+  if [[ "${dns_pattern_found}" == "yes" ]]; then
+    log "DNS-related error detected, capturing DNS diagnostics..."
+    {
+      echo "=== DNS Diagnostics ==="
+      echo "Captured at: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+      echo "Cluster ID: ${CLUSTER_ID}"
+      echo ""
+
+      # Extract API URL and cluster DNS zone from the saved cluster description
+      api_url=$(jq -r '.api.url // empty' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || true)
+      cluster_name=$(jq -r '.name // empty' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || true)
+      base_domain=$(jq -r '.dns.base_domain // empty' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || true)
+
+      api_host=""
+      if [[ -n "${api_url}" ]]; then
+        api_host=$(echo "${api_url}" | sed -e 's|https\?://||' -e 's|:[0-9]*$||')
+        echo "API URL: ${api_url}"
+        echo "API hostname: ${api_host}"
+      else
+        echo "API URL not available in cluster description"
+      fi
+
+      cluster_zone=""
+      if [[ -n "${cluster_name}" && -n "${base_domain}" ]]; then
+        cluster_zone="${cluster_name}.${base_domain}"
+        echo "Cluster DNS zone: ${cluster_zone}"
+      fi
+      echo ""
+
+      # Resolve the API hostname via the default resolver (CoreDNS on the management cluster)
+      if [[ -n "${api_host}" ]]; then
+        echo "=== dig ${api_host} (default resolver) ==="
+        dig "${api_host}" 2>&1 || true
+        echo ""
+
+        # Look up authoritative nameservers for the cluster zone and query them directly
+        ns_zone="${cluster_zone:-$(echo "${api_host}" | cut -d. -f2-)}"
+        echo "=== Authoritative NS lookup for ${ns_zone} ==="
+        dig NS "${ns_zone}" +short 2>&1 || true
+        echo ""
+        auth_ns=$(dig NS "${ns_zone}" +short 2>/dev/null | head -1 || true)
+        if [[ -n "${auth_ns}" ]]; then
+          echo "=== dig @${auth_ns} ${api_host} (authoritative) ==="
+          dig "@${auth_ns}" "${api_host}" 2>&1 || true
+          echo ""
+        else
+          echo "No authoritative nameservers found for ${ns_zone}"
+          echo ""
+        fi
+      fi
+
+      # Route 53: dump the hosted-zone record sets for the cluster's DNS name
+      if aws sts get-caller-identity &>/dev/null; then
+        echo "=== Route 53 hosted zone records ==="
+        if [[ -n "${cluster_zone}" ]]; then
+          hz_json=$(aws route53 list-hosted-zones-by-name \
+            --dns-name "${cluster_zone}" \
+            --max-items 1 \
+            --output json 2>/dev/null || true)
+          hz_name=$(echo "${hz_json}" | jq -r '.HostedZones[0].Name // empty' 2>/dev/null || true)
+          hz_id=$(echo "${hz_json}" | jq -r '.HostedZones[0].Id // empty' 2>/dev/null | sed 's|/hostedzone/||' || true)
+          if [[ "${hz_name}" == "${cluster_zone}." ]]; then
+            echo "Hosted zone: ${hz_name} (ID: ${hz_id})"
+            aws route53 list-resource-record-sets \
+              --hosted-zone-id "${hz_id}" \
+              --output json 2>&1 || true
+          else
+            echo "No exact Route 53 hosted zone match for: ${cluster_zone} (closest: ${hz_name:-none})"
+          fi
+        else
+          echo "Cluster DNS zone not available, skipping Route 53 lookup"
+        fi
+        echo ""
+      else
+        echo "=== Route 53 ==="
+        echo "AWS credentials not available for Route 53 lookup"
+        echo ""
+      fi
+
+      echo "=== End DNS Diagnostics ==="
+      echo "Completed at: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    } > "${ARTIFACT_DIR}/dns-diagnostics.txt" 2>&1
+    log "DNS diagnostics saved to ${ARTIFACT_DIR}/dns-diagnostics.txt"
+  fi
   exit 1
 fi
 
