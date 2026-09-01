@@ -47,20 +47,20 @@ extract_helper "${scripts[0]}" >"${tmpdir}/retry-helper.sh"
 
 for script in "${scripts[@]:1}"; do
   extract_helper "${script}" >"${tmpdir}/candidate-helper.sh"
-  cmp -s "${tmpdir}/retry-helper.sh" "${tmpdir}/candidate-helper.sh" || fail "retry helper differs in ${script}"
+  git diff --no-index --exit-code --no-ext-diff --no-textconv --color=never -- "${tmpdir}/retry-helper.sh" "${tmpdir}/candidate-helper.sh" || fail "retry helper differs in ${script}"
 done
 
 extract_mutation_helper "${mutation_scripts[0]}" >"${tmpdir}/mutation-retry-helper.sh"
 [[ -s "${tmpdir}/mutation-retry-helper.sh" ]] || fail "mutation retry helper was not found"
 for script in "${mutation_scripts[@]:1}"; do
   extract_mutation_helper "${script}" >"${tmpdir}/candidate-mutation-helper.sh"
-  cmp -s "${tmpdir}/mutation-retry-helper.sh" "${tmpdir}/candidate-mutation-helper.sh" || fail "mutation retry helper differs in ${script}"
+  git diff --no-index --exit-code --no-ext-diff --no-textconv --color=never -- "${tmpdir}/mutation-retry-helper.sh" "${tmpdir}/candidate-mutation-helper.sh" || fail "mutation retry helper differs in ${script}"
 done
 
 extract_role_assignment_helper "${role_assignment_scripts[0]}" >"${tmpdir}/role-assignment-helper.sh"
 [[ -s "${tmpdir}/role-assignment-helper.sh" ]] || fail "role assignment helper was not found"
 extract_role_assignment_helper "${role_assignment_scripts[1]}" >"${tmpdir}/candidate-role-assignment-helper.sh"
-cmp -s "${tmpdir}/role-assignment-helper.sh" "${tmpdir}/candidate-role-assignment-helper.sh" || fail "role assignment helpers differ"
+git diff --no-index --exit-code --no-ext-diff --no-textconv --color=never -- "${tmpdir}/role-assignment-helper.sh" "${tmpdir}/candidate-role-assignment-helper.sh" || fail "role assignment helpers differ"
 
 # The helper is intentionally copied into each command script because ci-operator
 # executes each registry command as a standalone script in its step container.
