@@ -46,8 +46,22 @@ else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi
 
+INSTALL_PLATFORM="${INSTALL_PLATFORM:-none}"
+case "${INSTALL_PLATFORM}" in
+  none)
+    PLATFORM_BLOCK="none: {}"
+    ;;
+  external)
+    PLATFORM_BLOCK="external: {}"
+    ;;
+  *)
+    echo "Unsupported INSTALL_PLATFORM=${INSTALL_PLATFORM}; expected none or external"
+    exit 1
+    ;;
+esac
+
 # Default UPI installation
-echo "Create the install-config.yaml file..."
+echo "Create the install-config.yaml file with platform: ${INSTALL_PLATFORM}..."
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 apiVersion: v1
 baseDomain: "${BASE_DOMAIN}"
@@ -73,7 +87,7 @@ compute:
   name: worker
   replicas: ${COMPUTE_COUNT}
 platform:
-  none: {}
+  ${PLATFORM_BLOCK}
 pullSecret: >
   $(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 sshKey: |
