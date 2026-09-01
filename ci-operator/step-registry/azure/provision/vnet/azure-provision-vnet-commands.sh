@@ -179,6 +179,18 @@ controlPlaneSubnet="${VNET_BASE_NAME}-master-subnet"
 computeSubnet_prefix="${VNET_BASE_NAME}-worker-subnet"
 clusterSubnetSNG="${VNET_BASE_NAME}-nsg"
 
+# The first worker subnet has no numeric suffix (compatible with the UPI ARM template and with
+# the unsuffixed computeSubnet name written to customer_vnet_subnets.yaml / install-config);
+# subsequent subnets are suffixed -1, -2, ... Kept in one place so every loop stays consistent.
+compute_subnet_name() {
+    local i="$1"
+    if [[ "${i}" -eq 0 ]]; then
+        echo "${computeSubnet_prefix}"
+    else
+        echo "${computeSubnet_prefix}-${i}"
+    fi
+}
+
 # create vnet
 # vnet/subnet addressprefix are hardcoded in 01_vnet.json arm template
 # Use az CLI instead to create vnet/subnet with specified address prefix
@@ -219,15 +231,14 @@ run_command "az network vnet subnet create --name ${controlPlaneSubnet} --vnet-n
 readarray -t compute_ipv4_subnets < <(get_next_subnet ${AZURE_COMPUTE_SUBNET_PREFIX} $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1)))
 compute_ipv4_subnets=("${AZURE_COMPUTE_SUBNET_PREFIX}" "${compute_ipv4_subnets[@]}")
 for i in $(seq 0 $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1))); do
+    # Use the same subnet name on the IPv4 and dual-stack paths; only the address prefixes
+    # differ. (The dual-stack path previously always appended "-0", which did not match the
+    # unsuffixed first-subnet name this step records for install-config.)
+    computeSubnet_name="$(compute_subnet_name "${i}")"
     if [[ ${#compute_ipv6_subnets[@]} -eq 0 ]]; then
-        # compatible with UPI ARM template, the worker subnet name suffix is hardcoded as "-worker-subnet"
-        computeSubnet_name="${computeSubnet_prefix}-${i}"
-        if [[ $i -eq 0 ]]; then
-            computeSubnet_name="${computeSubnet_prefix}"
-        fi
         run_command "az network vnet subnet create --name ${computeSubnet_name} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${compute_ipv4_subnets[$i]} --network-security-group ${clusterSubnetSNG}"
     else
-        run_command "az network vnet subnet create --name ${computeSubnet_prefix}-${i} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${compute_ipv4_subnets[$i]} ${compute_ipv6_subnets[$i]} --network-security-group ${clusterSubnetSNG}"
+        run_command "az network vnet subnet create --name ${computeSubnet_name} --vnet-name ${vnet_name} -g ${RESOURCE_GROUP} --address-prefix ${compute_ipv4_subnets[$i]} ${compute_ipv6_subnets[$i]} --network-security-group ${clusterSubnetSNG}"
     fi
 done
 
@@ -284,11 +295,7 @@ platform:
       role: control-plane
 EOF
     for i in $(seq 0 $((AZURE_BYO_COMPUTE_SUBNETS_NUMBER - 1))); do
-        # compatible with UPI ARM template, the worker subnet name suffix is hardcoded as "-worker-subnet"
-        computeSubnet_name="${computeSubnet_prefix}-${i}"
-        if [[ $i -eq 0 ]]; then
-            computeSubnet_name="${computeSubnet_prefix}"
-        fi
+        computeSubnet_name="$(compute_subnet_name "${i}")"
         cat >> "${SHARED_DIR}/customer_vnet_subnets.yaml" <<EOF
     - name: ${computeSubnet_name}
       role: node
