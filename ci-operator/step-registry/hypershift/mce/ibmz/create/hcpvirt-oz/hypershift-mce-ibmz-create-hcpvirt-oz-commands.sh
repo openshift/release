@@ -33,6 +33,10 @@ set -x
 # Hosted cluster identity and namespace
 HC_NAME=hcpvirt-oz-ci
 HC_NS=hcpvirt-oz-ci-ns
+MGMT_HOST_IP=10.0.1.15
+echo "$(date) LPAR host IP: ${MGMT_HOST_IP}"
+
+mkdir -p /tmp/hc-manifests
 
 hcp create cluster kubevirt \
   --name ${HC_NAME} \
@@ -45,7 +49,52 @@ hcp create cluster kubevirt \
   --memory 16Gi \
   --cores 4 \
   --root-volume-size 60 \
-  --release-image ${OCP_IMAGE_MULTI}
+  --release-image ${OCP_IMAGE_MULTI} \
+  --render-sensitive --render > /tmp/hc-manifests/kubevirt-hc.yaml
+
+  echo "$(date) Rendered manifests to /tmp/hc-manifests/kubevirt-hc.yaml"
+cat /tmp/hc-manifests/kubevirt-hc.yaml
+
+# Patch the APIServer servicePublishingStrategy from LoadBalancer → NodePort
+# with the LPAR host IP so VMIs get the correct address baked into ignition.
+# The rendered manifest contains the HostedCluster object with spec.services[].
+# We use Python (available in dev-scripts image) to do an in-place YAML edit.
+python3 - <<PYEOF
+import yaml, sys
+
+with open('/tmp/hc-manifests/kubevirt-hc.yaml', 'r') as f:
+    docs = list(yaml.safe_load_all(f))
+
+mgmt_host_ip = "${MGMT_HOST_IP}"
+patched = False
+for doc in docs:
+    if doc and doc.get('kind') == 'HostedCluster':
+        for svc in doc.get('spec', {}).get('services', []):
+            if svc.get('service') == 'APIServer':
+                svc['servicePublishingStrategy'] = {
+                    'type': 'NodePort',
+                    'nodePort': {'address': mgmt_host_ip}
+                }
+                patched = True
+                print(f"Patched APIServer → NodePort address={mgmt_host_ip}", file=sys.stderr)
+                break
+
+if not patched:
+    print("WARNING: APIServer entry not found in spec.services — applying unpatched", file=sys.stderr)
+
+# Filter out None docs — yaml.safe_load_all produces a None entry for
+# the trailing '--- null' / empty document separator at end of file.
+docs = [d for d in docs if d is not None]
+
+with open('/tmp/hc-manifests/kubevirt-hc.yaml', 'w') as f:
+    yaml.dump_all(docs, f, default_flow_style=False)
+PYEOF
+
+echo "$(date) Patched manifest:"
+cat /tmp/hc-manifests/kubevirt-hc.yaml
+
+echo "$(date) Applying patched HostedCluster manifests"
+oc apply -f /tmp/hc-manifests/kubevirt-hc.yaml
 
 oc wait --timeout=45m --for=condition=Available --namespace=hcpvirt-oz-ci-ns hostedclusters.hypershift.openshift.io/hcpvirt-oz-ci
 echo "$(date) Kubevirt cluster is available"
@@ -69,6 +118,34 @@ VIRT_KC="${SHARED_DIR}/nested_kubeconfig"
 REQUIRED_NODES=2
 MAX_RETRIES=20
 
+# --- Wait for kube-apiserver NodePort ---
+# HyperShift assigns the NodePort asynchronously after the HostedCluster becomes
+# Available — retry until it appears rather than sampling once.
+NODEPORT=""
+for i in {1..30}; do
+  NODEPORT=$(oc get svc kube-apiserver -n "${HC_NS}-${HC_NAME}" \
+    -o jsonpath="{.spec.ports[?(@.port==6443)].nodePort}" 2>/dev/null || true)
+  [[ -n "${NODEPORT}" ]] && break
+  echo "$(date) kube-apiserver NodePort not ready yet, retrying... ($i/30)"
+  sleep 10
+done
+if [[ -z "${NODEPORT}" ]]; then
+  echo "$(date) ERROR: kube-apiserver NodePort never appeared — aborting"
+  oc get svc -n "${HC_NS}-${HC_NAME}" || true
+  exit 1
+fi
+echo "$(date) kube-apiserver NodePort: ${NODEPORT}"
+
+# --- Patch nested kubeconfig to use the reachable LPAR IP + NodePort ---
+# The kubeconfig written by 'hcp create kubeconfig' contains an internal cluster
+# address; replace it with the LPAR host IP that the CI runner pod can reach.
+# --insecure-skip-tls-verify is required because the kube-apiserver TLS cert is
+# issued for the cluster's internal DNS name, not for MGMT_HOST_IP.
+CLSTR_NAME=$(oc --kubeconfig "${VIRT_KC}" config view -o jsonpath='{.clusters[0].name}')
+oc --kubeconfig "${VIRT_KC}" config set-cluster "${CLSTR_NAME}" \
+  --server="https://${MGMT_HOST_IP}:${NODEPORT}" \
+  --insecure-skip-tls-verify=true
+echo "$(date) Patched nested_kubeconfig server → https://${MGMT_HOST_IP}:${NODEPORT}"
 
 # Restart MetalLB speaker daemonset once before the wait loop to trigger fresh ARP announcements
 # (needed on SNO management clusters where the speaker may not have announced the LB IP yet)
