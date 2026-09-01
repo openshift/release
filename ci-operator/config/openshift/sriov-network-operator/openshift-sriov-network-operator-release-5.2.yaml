@@ -31,6 +31,10 @@ base_images:
     name: "5.2"
     namespace: ocp
     tag: sriov-network-metrics-exporter
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -238,6 +242,62 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: telco5g-sriov
+- always_run: false
+  as: tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
+      OO_PACKAGE: sriov-network-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-sriov-network-operator
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - as: start-sriov-operator
+      cli: latest
+      commands: |
+        oc apply -f - <<EOF
+        apiVersion: sriovnetwork.openshift.io/v1
+        kind: SriovOperatorConfig
+        metadata:
+          name: default
+          namespace: openshift-sriov-network-operator
+        spec:
+          enableInjector: true
+          enableOperatorWebhook: true
+          featureGates:
+            metricsExporter: true
+          logLevel: 2
+        EOF
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - ref: tls-13
+    - as: wait-sriov-tls-restart
+      cli: latest
+      commands: |
+        echo "Waiting for SR-IOV components to restart after TLS profile change..."
+        oc rollout status daemonset network-resources-injector -n openshift-sriov-network-operator --timeout=300s
+        oc rollout status daemonset operator-webhook -n openshift-sriov-network-operator --timeout=300s
+        oc rollout status daemonset sriov-network-metrics-exporter -n openshift-sriov-network-operator --timeout=400s
+        echo "SR-IOV webhook, injector, and metrics exporter restarted with new TLS profile"
+        oc get ds -n openshift-sriov-network-operator
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
 - as: verify-deps
   steps:
     env:
