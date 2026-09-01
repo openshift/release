@@ -230,8 +230,20 @@ delete_role_assignments_once() {
 aks_cluster_absent() {
   local cluster="${1}"
   local resource_group="${2}"
+  local resource_group_exists
   local state
   local rc
+
+  if resource_group_exists="$(run_az_with_retry "AKS resource group lookup" az group exists --name "${resource_group}" --output tsv)"; then
+    :
+  else
+    rc=$?
+    return "${rc}"
+  fi
+  if [[ "${resource_group_exists}" == "false" ]]; then
+    AZURE_CLI_DESIRED_STATE=true
+    return 0
+  fi
 
   if state="$(run_az_with_retry "AKS cluster lookup" az aks list --resource-group "${resource_group}" --query "[?name=='${cluster}'].provisioningState | [0]" -o tsv)"; then
     :
