@@ -45,8 +45,6 @@ images:
       FROM registry.access.redhat.com/ubi9/nodejs-22:latest
       USER root
       RUN dnf install -y git && dnf clean all
-      WORKDIR /opt/app-root/src
-      COPY --chown=1001:0 . .
       USER 1001
     to: nodejs-22-src
 promotion:
@@ -90,41 +88,35 @@ tests:
 - as: lint
   commands: |
     set -euo pipefail
-    WORKDIR="$(mktemp -d)"
-    cp -R /opt/app-root/src/. "$WORKDIR/"
-    cd "$WORKDIR"
-    export HOME="$WORKDIR"
+    export HOME="$(pwd)"
     npm install -g npm@11.8.0
     npm ci
     npm run install:modules
     NODE_OPTIONS="--max-old-space-size=8192" npm run lint
   container:
+    clone: true
     from: nodejs-22-src
 - as: type-check
   commands: |
     set -euo pipefail
-    WORKDIR="$(mktemp -d)"
-    cp -R /opt/app-root/src/. "$WORKDIR/"
-    cd "$WORKDIR"
-    export HOME="$WORKDIR"
+    export HOME="$(pwd)"
     npm install -g npm@11.8.0
     npm ci
     npm run install:modules
     npm run type-check
   container:
+    clone: true
     from: nodejs-22-src
 - as: unit-tests
   commands: |
     set -euo pipefail
-    WORKDIR="$(mktemp -d)"
-    cp -R /opt/app-root/src/. "$WORKDIR/"
-    cd "$WORKDIR"
-    export HOME="$WORKDIR"
+    export HOME="$(pwd)"
     npm install -g npm@11.8.0
     npm ci
     npm run install:modules
     npm run test-unit
   container:
+    clone: true
     from: nodejs-22-src
 - as: odh-dashboard-image-mirror
   postsubmit: true
