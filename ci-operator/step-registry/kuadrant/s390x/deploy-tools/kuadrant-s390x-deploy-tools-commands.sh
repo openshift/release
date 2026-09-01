@@ -145,9 +145,12 @@ EOF
 $WAS_TRACING && set -x
 
 echo "--- Mockserver (with echo expectation for testsuite) ---"
-# Phase 1 egress hits GET /get. MockServer treats path /.* as an exact string,
-# not a regex, so the catch-all never matches /get (404). Explicit /get is required.
-# CI points mockserver.url at this tools Route, so Phase 1 uses this ConfigMap.
+# Phase 1 egress hits GET /get on this tools Route (mockserver.url). MockServer
+# treats path /.* as an exact string, not a regex, so the catch-all never
+# matches /get (404). Explicit /get is required here.
+# Body must be JSON (httpbin-shaped), not plaintext "OK": Authorino tests that
+# share this backend call response.json()["headers"]. Status 200 is enough for
+# egress authorization/ratelimit.
 cat <<EOF | oc apply -n "${TOOLS_NS}" -f -
 apiVersion: v1
 kind: ConfigMap
@@ -166,7 +169,14 @@ data:
         },
         "httpResponse": {
           "statusCode": 200,
-          "body": "OK"
+          "headers": {
+            "content-type": ["application/json"]
+          },
+          "body": {
+            "headers": {},
+            "method": "GET",
+            "url": "/get"
+          }
         }
       },
       {

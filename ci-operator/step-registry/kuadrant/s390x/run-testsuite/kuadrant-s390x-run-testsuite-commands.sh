@@ -6,7 +6,6 @@ set -euo pipefail
 #
 # Bastion-proven s390x workarounds applied in-Job before make:
 #   - Velocity MockServer echo (header-mirroring; Kuadrant/testsuite#952)
-#   - Explicit GET /get → 200 (Phase 1 egress; MockServer path /.* is not regex)
 #   - Egress OpenShift Route name egress-bk (avoid clash with session backend)
 #   - Authorino cluster-trust-bundle + Vault tools-vault (Phase 2 credential injection)
 #   - Authorino/OIDC dataplane-ready soft-wait patch
@@ -171,6 +170,13 @@ ECHO_EXPECTATION_FILE="${WORK_DIR}/echo_expectation.json"
 # Velocity echo that mirrors request headers (httpbin-style). Header values are
 # JSON-escaped so Authorino JsonResponse headers (e.g. "simple": "{\"data\":...}")
 # survive into response.json()["headers"] for extract_response().
+#
+# Do not add a higher-priority GET /get → plaintext "OK". Authorino response /
+# identity tests call client.get("/get") then response.json()["headers"].
+# A literal "OK" body caused JSONDecodeError on ~20 previously-passing tests
+# (rehearsal 2092567684859301888). Empty httpRequest {} matches /get and still
+# returns 200 for egress. The tools MockServer (deploy-tools) is the one that
+# needed an explicit /get path because its catch-all was the literal "/.*".
 cat > "${ECHO_EXPECTATION_FILE}" <<'EOF'
 [
   {
@@ -181,17 +187,6 @@ cat > "${ECHO_EXPECTATION_FILE}" <<'EOF'
     "httpResponse": {
       "statusCode": 404
     }
-  },
-  {
-    "id": "get",
-    "httpRequest": {
-      "path": "/get"
-    },
-    "httpResponse": {
-      "statusCode": 200,
-      "body": "OK"
-    },
-    "priority": 100
   },
   {
     "id": "echo",
