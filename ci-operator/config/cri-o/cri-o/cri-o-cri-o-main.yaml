@@ -1,4 +1,8 @@
 base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
   base-machine:
     name: centos
     namespace: openshift
@@ -58,6 +62,21 @@ images:
         as:
         - registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
     to: rhel-coreos-10
+  - dockerfile_literal: |
+      FROM base
+      RUN dnf install -y jq git openssl python3.11 && \
+          ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+          dnf clean all
+      RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > /tmp/google-cloud-sdk.tar.gz
+      RUN python3 --version
+      RUN mkdir -p /usr/local/gcloud \
+        && tar -C /usr/local/gcloud -xvf /tmp/google-cloud-sdk.tar.gz \
+        && rm -f /tmp/google-cloud-sdk.tar.gz
+      ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
+      WORKDIR /workdir
+      COPY . .
+    from: base
+    to: crio-crio-base-src
   skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|SECURITY_CONTACTS|PROJECT|LICENSE)$
 raw_steps:
 - rpm_image_injection_step:
@@ -79,6 +98,7 @@ resources:
       cpu: 100m
       memory: 4Gi
 rpm_build_commands: hack/build-rpms.sh
+test_binary_build_commands: "echo \"no test commands\" \n"
 tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|SECURITY_CONTACTS|PROJECT|LICENSE)$
@@ -107,6 +127,22 @@ tests:
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
+- as: setup
+  run_if_changed: ^contrib/
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      SAVE_IMAGE: "false"
+    workflow: cri-o-setup
+- as: setup-fedora
+  run_if_changed: ^contrib/
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      IMAGE_FAMILY: crio-setup-fedora
+      IMAGE_NAME: fedora-40-cloud-crio-ci
+      SAVE_IMAGE: "false"
+    workflow: cri-o-setup
 zz_generated_metadata:
   branch: main
   org: cri-o
