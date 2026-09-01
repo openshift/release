@@ -189,6 +189,25 @@ if [ "${CT:-0}" -lt "$((CT_TARGET * 70 / 100))" ]; then
   exit 1
 fi
 
+# Verify each injector completed successfully
+INJECT_FAIL=0
+for zone in 1001 1002 1003 1004; do
+  result=$(oc exec -n openshift-ovn-kubernetes "$OVN_POD" -c ovnkube-controller -- \
+    nsenter -t 1 -m -u -i -n -p -- \
+    cat /tmp/ct${zone}.log 2>/dev/null | tail -1 || echo "")
+  ok=$(echo "$result" | grep -oP 'ok=\K[0-9]+' || echo 0)
+  err=$(echo "$result" | grep -oP 'err=\K[0-9]+' || echo 0)
+  echo "  Zone $zone: ok=$ok err=$err"
+  if [ "${ok:-0}" -lt "$((CT_ENTRIES_PER_ZONE * 80 / 100))" ] || [ "${err:-0}" -gt "$((CT_ENTRIES_PER_ZONE * 10 / 100))" ]; then
+    echo "  WARN: Zone $zone injection below threshold"
+    INJECT_FAIL=1
+  fi
+done
+if [ "$INJECT_FAIL" -ne 0 ]; then
+  echo "ERROR: One or more CT injectors did not complete successfully — aborting"
+  exit 1
+fi
+
 CT_AFTER=$(oc exec -n openshift-ovn-kubernetes "$OVN_POD" -- \
   nsenter -t 1 -m -u -i -n -p -- \
   cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null)
@@ -245,6 +264,11 @@ for i in $(seq 1 12); do
   [ "$RUNNING" -ge "$((BURST_POD_COUNT * 80 / 100))" ] && break
 done
 
+if [ "$RUNNING" -lt "$((BURST_POD_COUNT * 80 / 100))" ]; then
+  echo "ERROR: Only $RUNNING of $BURST_POD_COUNT burst pods became Running — aborting"
+  exit 1
+fi
+
 # ── Step 6: Simultaneous burst deletion ──────────────────────────────────────
 echo ""
 echo "=== Step 6: BURST DELETION at $(date -u) ==="
@@ -259,6 +283,10 @@ STALLS_BEFORE=$(oc exec -n openshift-ovn-kubernetes "$OVN_POD" -- \
   grep -c "Unreasonably long" /var/log/openvswitch/ovs-vswitchd.log 2>/dev/null || echo 0)
 echo "OVS stall baseline: $STALLS_BEFORE"
 
+TIMEOUTS_BEFORE=$(oc get events -n burst-test 2>/dev/null | \
+  awk '/timed out waiting for OVS/{c++}END{print c+0}')
+echo "CNI timeout baseline: $TIMEOUTS_BEFORE"
+
 oc delete pods -n burst-test --all --grace-period=0 2>/dev/null
 echo "${BURST_POD_COUNT} pods deleted simultaneously!"
 
@@ -270,8 +298,9 @@ FINAL_STALLS=0
 
 for i in $(seq 1 20); do
   sleep 30
-  TIMEOUTS=$(oc get events -n burst-test 2>/dev/null | \
+  TIMEOUTS_RAW=$(oc get events -n burst-test 2>/dev/null | \
     awk '/timed out waiting for OVS/{c++}END{print c+0}')
+  TIMEOUTS=$(( ${TIMEOUTS_RAW:-0} - ${TIMEOUTS_BEFORE:-0} ))
   STALLS_RAW=$(oc exec -n openshift-ovn-kubernetes "$OVN_POD" -- \
     nsenter -t 1 -m -u -i -n -p -- \
     grep -c "Unreasonably long" /var/log/openvswitch/ovs-vswitchd.log 2>/dev/null || echo 0)
