@@ -1,0 +1,21 @@
+ref:
+  as: baremetalds-openperouter-e2e-iptables
+  from: dev-scripts
+  commands: baremetalds-openperouter-e2e-iptables-commands.sh
+  timeout: 300s
+  env:
+  - name: DEVSCRIPTS_CONFIG
+    default: ""
+    documentation: Dev-scripts config containing TOSWITCH*_NETWORK_SUBNET_V4/V6 vars
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Add firewalld REJECT (tcp-reset) rules on the dev-scripts host FORWARD and
+    OUTPUT chains for tcp/22 to the toswitch1/toswitch2 subnets. The installer's
+    bootstrap gather SSHes to every node NIC address; the routed, unreachable
+    toswitch IPv6 addresses otherwise stall the gather ~7min each. An immediate
+    RST turns each stall into an instant failure. Uses permanent firewalld rules
+    so they survive the `firewall-cmd --reload` that dev-scripts runs during
+    setup. Link-local (fe80::) attempts are on-link and cannot be handled here.
