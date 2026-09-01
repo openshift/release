@@ -35,20 +35,21 @@ else
     echo "No subscription-name file found at ${NAME_FILE} either, cannot resolve subscription ID"
     exit 1
   fi
-  SUBSCRIPTION_NAME=$(cat "${NAME_FILE}")
 
-  # Disable tracing while service-principal credentials are read and used so
-  # the client-secret is never echoed into CI logs.
+  # Disable tracing before the subscription name (and the service-principal
+  # credentials) are read, and keep it disabled through the az calls and
+  # error handling below so neither value is ever echoed into CI logs.
   set +o xtrace
+  SUBSCRIPTION_NAME=$(cat "${NAME_FILE}")
   AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
   AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
   AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
   az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
+  SUBSCRIPTION_ID=$(az account show --subscription "${SUBSCRIPTION_NAME}" --query id -o tsv)
   set -o xtrace
 
-  SUBSCRIPTION_ID=$(az account show --subscription "${SUBSCRIPTION_NAME}" --query id -o tsv)
   if [[ -z "${SUBSCRIPTION_ID}" ]]; then
-    echo "Failed to resolve subscription ID for subscription name ${SUBSCRIPTION_NAME}"
+    echo "Failed to resolve subscription ID for the configured subscription name"
     exit 1
   fi
 fi
