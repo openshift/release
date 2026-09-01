@@ -118,8 +118,11 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
     log "Pre-creating ServiceAccount ${SA_PRECREATE_NAME} in ${OPERATOR_NAMESPACE} with CI pull secret"
     oc create sa "${SA_PRECREATE_NAME}" -n "${OPERATOR_NAMESPACE}" \
         --dry-run=client -o yaml | oc apply -f -
+    # Use strategic-merge patch so this works whether or not the SA already
+    # has an imagePullSecrets array.  JSON Patch "add" to "/imagePullSecrets/-"
+    # fails when the array does not exist; strategic merge creates it.
     oc patch sa "${SA_PRECREATE_NAME}" -n "${OPERATOR_NAMESPACE}" \
-        --type json -p '[{"op":"add","path":"/imagePullSecrets/-","value":{"name":"ci-pull-secret"}}]' 2>/dev/null || true
+        --type strategic -p '{"imagePullSecrets":[{"name":"ci-pull-secret"}]}'
     log "ServiceAccount ${SA_PRECREATE_NAME} pre-patched with CI pull secret"
 else
     log "WARNING: Could not get CI registry credentials, PKO may fail to pull images"
@@ -349,7 +352,7 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
         log "Verifying API server serves ${CRD_PLURAL}.${CRD_GROUP}..."
         CRD_SERVED=""
         for i in $(seq 1 24); do
-            if oc get "${CRD_PLURAL}.${CRD_GROUP}" -A --no-headers 2>/dev/null; then
+            if oc get "${CRD_PLURAL}.${CRD_GROUP}" -A --no-headers --request-timeout=10s 2>/dev/null; then
                 CRD_SERVED=1
                 break
             fi
