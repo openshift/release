@@ -1,9 +1,28 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
   items:
   - dockerfile_path: build/Dockerfile
     to: aws-account-operator
+  - dockerfile_literal: |
+      FROM src AS builder
+      RUN CGO_ENABLED=0 GOFLAGS="-mod=mod" go test ./test/e2e -v -c --tags=osde2e -o /usr/local/bin/e2e.test
+      FROM rosa-aws-cli
+      COPY --from=builder /usr/local/bin/e2e.test /usr/local/bin/e2e.test
+    inputs:
+      rosa-aws-cli:
+        as:
+        - rosa-aws-cli
+      src:
+        as:
+        - src
+        - builder
+    to: operator-e2e
   - dockerfile_literal: |
       FROM src
       RUN PREK_VERSION="$(tr -d '[:space:]' < .prek-version 2>/dev/null || true)" \
@@ -12,6 +31,12 @@ images:
         | tar xzf - --strip-components=1 -C /usr/local/bin/ prek-x86_64-unknown-linux-gnu/prek
     from: src
     to: prek-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -98,6 +123,69 @@ tests:
           memory: 2Gi
       timeout: 2h0m0s
     workflow: generic-claim
+- as: hive-e2e
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:aws-account-operator
+    env:
+      BACKPLANE_CLUSTER_ID: 1g268u7pp694gj152nj16me4sv615lpv
+      BACKPLANE_ELEVATE_REASON: https://redhat.atlassian.net/browse/ROSAENG-65963
+      GINKGO_FOCUS: AWS Account Operator Hive
+      OPERATOR_NAME: aws-account-operator
+      OPERATOR_NAMESPACE: aws-account-operator
+    workflow: rosa-hive-e2e
+- as: hive-e2e-promotion-int
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  restrict_network_access: false
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:aws-account-operator
+    env:
+      BACKPLANE_CLUSTER_ID: 1g268u7pp694gj152nj16me4sv615lpv
+      BACKPLANE_ELEVATE_REASON: https://redhat.atlassian.net/browse/ROSAENG-65963
+      GINKGO_FOCUS: AWS Account Operator Hive
+      OPERATOR_NAME: aws-account-operator
+      OPERATOR_NAMESPACE: aws-account-operator
+    workflow: rosa-hive-e2e
+- as: hive-e2e-promotion-stage
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:green_jenkins_circle:{{else}}:red_jenkins_circle:{{end}}
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  restrict_network_access: false
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:aws-account-operator
+    env:
+      BACKPLANE_CLUSTER_ID: 1farlonnersks14ohfp155uoonupr9id
+      BACKPLANE_ELEVATE_REASON: https://redhat.atlassian.net/browse/ROSAENG-65963
+      GINKGO_FOCUS: AWS Account Operator Hive
+      OPERATOR_NAME: aws-account-operator
+      OPERATOR_NAMESPACE: aws-account-operator
+    workflow: rosa-hive-e2e
 zz_generated_metadata:
   branch: master
   org: openshift

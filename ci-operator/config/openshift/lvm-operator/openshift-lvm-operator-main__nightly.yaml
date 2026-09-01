@@ -74,6 +74,27 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
+- as: e2e-aws-sno-4disks-qe-integration-tests
+  cron: 0 8 * 7 5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_DISKS_COUNT: "4"
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      SKIP_QE_APP_REGISTRY: "true"
+    test:
+    - as: lvms-sno-integration-test
+      cli: latest
+      commands: |
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/sno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
 - as: e2e-aws-sno-arm-qe-integration-tests
   cron: 0 8 * 7 5
   steps:
@@ -111,6 +132,28 @@ tests:
       SKIP_QE_APP_REGISTRY: "true"
     test:
     - ref: tls-scanner-run
+    - as: lvms-mno-integration-test
+      cli: latest
+      commands: |
+        ./integration-test run-suite -c 1 --junit-path ${ARTIFACT_DIR}/junit_results.xml openshift/lvm-operator/test/integration/qe_tests/mno
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+- as: e2e-aws-mno-4disks-qe-integration-tests
+  cron: 0 8 * 7 5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      EXTRA_DISKS_COUNT: "4"
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      SKIP_QE_APP_REGISTRY: "true"
+    test:
     - as: lvms-mno-integration-test
       cli: latest
       commands: |

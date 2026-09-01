@@ -47,3 +47,8 @@ sleep "$wait_time"
 
 echo "Checking cluster installation progress by verifying all cluster operators are available and stable."
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=105m
+
+# Replicate https://github.com/openshift/release/blob/main/ci-operator/step-registry/baremetalds/devscripts/setup/baremetalds-devscripts-setup-commands.sh#L32
+# Add proxy config in this step and leave conformance test step untouched
+echo "Adding proxy-url in kubeconfig for e2e conformance tests"
+sed -i "/- cluster/ a\    proxy-url: ${proxy}" "${SHARED_DIR}"/kubeconfig

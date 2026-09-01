@@ -20,19 +20,19 @@ function run_command() {
 
 function run_command_with_retries()
 {
-    local try=0 cmd="$1" retries="${2:-}" ret=0
+    local try=0 cmd="$1" retries="${2:-}" ret=0 max
     [[ -z ${retries} ]] && max="20" || max=${retries}
     echo "Trying ${max} times max to run '${cmd}'"
 
     eval "${cmd}" || ret=$?
-    while [ X"${ret}" != X"0" ] && [ ${try} -lt ${max} ]; do
+    while [ "${ret}" != "0" ] && [ ${try} -lt "${max}" ]; do
         echo "'${cmd}' did not return success, waiting 60 sec....."
         sleep 60
         try=$((try + 1))
         ret=0
         eval "${cmd}" || ret=$?
     done
-    if [ ${try} -eq ${max} ]; then
+    if [ "${ret}" != "0" ]; then
         echo "Never succeed or Timeout"
         return 1
     fi
@@ -44,18 +44,106 @@ function wait_public_dns() {
     echo "Wait public DNS - $1 take effect"
     local try=0 retries=10
 
-    while [ X"$(dig +short $1)" == X"" ] && [ $try -lt $retries ]; do
+    while [ "$(dig +short "$1")" == "" ] && [ "$try" -lt "$retries" ]; do
         echo "$1 does not take effect yet on internet, waiting..."
         sleep 60
-        try=$(expr $try + 1)
+        try=$((try + 1))
     done
-    if [ X"$try" == X"$retries" ]; then
+    if [ "$(dig +short "$1")" == "" ]; then
         echo "!!!!!!!!!!"
         echo "Something wrong, pls check your dns provider"
         return 4
     fi
     return 0
 
+}
+
+# Find an unused CIDR of the requested family and prefix length.
+# mode=contained: fully inside the VNET prefixes, no overlap with existing subnets.
+# mode=expand: a private/ULA CIDR that does not overlap the VNET prefixes (caller
+#              must add it to the VNET before creating a subnet).
+# Prints the CIDR on stdout, or exits 1 if none fit.
+# usage:
+#   find_available_cidr contained ipv4 24 "${vnet_prefixes}" "${existing_subnets}"
+#   find_available_cidr expand ipv4 24 "${vnet_prefixes}" ""
+function find_available_cidr() {
+    local mode="$1"
+    local family="$2"
+    local prefixlen="$3"
+    local vnet_prefixes="$4"
+    local existing_prefixes="$5"
+
+    CIDR_MODE="${mode}" CIDR_FAMILY="${family}" CIDR_PREFIXLEN="${prefixlen}" \
+    VNET_PREFIXES="${vnet_prefixes}" EXISTING_PREFIXES="${existing_prefixes}" \
+    python3 <<'PY'
+import ipaddress
+import os
+import sys
+
+mode = os.environ["CIDR_MODE"]
+family = os.environ["CIDR_FAMILY"]
+prefixlen = int(os.environ["CIDR_PREFIXLEN"])
+version = 4 if family == "ipv4" else 6
+
+def parse_cidrs(raw):
+    cidrs = []
+    for token in raw.replace(",", " ").split():
+        token = token.strip()
+        if not token or token.lower() == "null":
+            continue
+        try:
+            cidrs.append(ipaddress.ip_network(token, strict=False))
+        except ValueError as exc:
+            print(f"Skipping invalid CIDR {token!r}: {exc}", file=sys.stderr)
+    return cidrs
+
+vnets = [n for n in parse_cidrs(os.environ.get("VNET_PREFIXES", "")) if n.version == version]
+existing = [n for n in parse_cidrs(os.environ.get("EXISTING_PREFIXES", "")) if n.version == version]
+
+def emit(candidate):
+    print(candidate.with_prefixlen)
+    sys.exit(0)
+
+if mode == "contained":
+    if not vnets:
+        print(f"ERROR: no IPv{version} prefixes in VNET address space", file=sys.stderr)
+        sys.exit(1)
+    for vnet in vnets:
+        if vnet.prefixlen > prefixlen:
+            print(f"Skipping {vnet}: too small to contain a /{prefixlen}", file=sys.stderr)
+            continue
+        for candidate in vnet.subnets(new_prefix=prefixlen):
+            if any(candidate.overlaps(other) for other in existing):
+                continue
+            emit(candidate)
+    print(f"ERROR: no unused IPv{version}/{prefixlen} remains inside the VNET", file=sys.stderr)
+    sys.exit(1)
+
+# mode == expand: pick a private/ULA block that does not overlap current VNET prefixes
+occupied = vnets
+if version == 4:
+    pools = [
+        ipaddress.ip_network("10.0.0.0/8"),
+        ipaddress.ip_network("172.16.0.0/12"),
+        ipaddress.ip_network("192.168.0.0/16"),
+    ]
+    for pool in pools:
+        if pool.prefixlen > prefixlen:
+            continue
+        for candidate in pool.subnets(new_prefix=prefixlen):
+            if any(candidate.overlaps(other) for other in occupied):
+                continue
+            emit(candidate)
+else:
+    for i in range(0, 65536):
+        candidate = ipaddress.ip_network(f"fd00:{i:x}::/{prefixlen}")
+        if any(candidate.overlaps(other) for other in occupied):
+            continue
+        emit(candidate)
+
+print(f"ERROR: no unused IPv{version}/{prefixlen} private/ULA range found", file=sys.stderr)
+sys.exit(1)
+PY
 }
 
 #####################################
@@ -78,7 +166,7 @@ if [ -z "${RESOURCE_GROUP}" ]; then
   if [ -f "${rg_file}" ]; then
     bastion_rg=$(cat "${rg_file}")
   elif [ -f "${metadata_file}" ]; then
-    bastion_rg="$(jq -r .infraID ${metadata_file})-rg"
+    bastion_rg="$(jq -r .infraID "${metadata_file}")-rg"
   else
     echo "Could not determine the resource group name!"
     exit 1
@@ -92,12 +180,12 @@ bastion_nsg=""
 if [ -z "${VNET_NAME}" ]; then
   vnet_file="${SHARED_DIR}/customer_vnet_subnets.yaml"
   if [ -f "${vnet_file}" ]; then
-    bastion_vnet_name=$(yq-go r ${vnet_file} 'platform.azure.virtualNetwork')
+    bastion_vnet_name=$(yq-go r "${vnet_file}" 'platform.azure.virtualNetwork')
   elif [ -f "${metadata_file}" ]; then
-    infra_id=$(jq -r .infraID ${SHARED_DIR}/metadata.json)
+    # Standard IPI case - get VNET name from infraID
+    infra_id=$(jq -r .infraID "${SHARED_DIR}/metadata.json")
     bastion_vnet_name="${infra_id}-vnet"
-    bastion_subnet="${infra_id}-master-subnet"    
-    bastion_nsg="${infra_id}-nsg"
+    # Do NOT set bastion_subnet or bastion_nsg here - let them be created below
   else
     echo "Could not determine the bastion vnet name!"
     exit 1
@@ -139,16 +227,16 @@ elif [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
         export REQUESTS_CA_BUNDLE=/tmp/ca.pem
     fi
     az cloud register \
-        -n ${cloud_name} \
+        -n "${cloud_name}" \
         --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
         --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
-    az cloud set --name ${cloud_name}
+    az cloud set --name "${cloud_name}"
     az cloud update --profile 2019-03-01-hybrid
 else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
-az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
+az account set --subscription "${AZURE_AUTH_SUBSCRIPTION_ID}"
 
 #####################################
 ##########Create Bastion#############
@@ -161,7 +249,7 @@ if [[ -z "${BASTION_BOOT_IMAGE}" ]]; then
     sa_name_prefix=$(echo "${NAMESPACE}" | sed "s/ci-op-//" | sed 's/[-_]//g')
     sa_name="${sa_name_prefix}${UNIQUE_HASH}basa"
     run_command_with_retries "az storage account create -g ${bastion_rg} --name ${sa_name} --kind Storage --sku Standard_LRS" "5"
-    account_key=$(az storage account keys list -g ${bastion_rg} --account-name ${sa_name} --query "[0].value" -o tsv)
+    account_key=$(az storage account keys list -g "${bastion_rg}" --account-name "${sa_name}" --query "[0].value" -o tsv)
 
     echo "Copy bastion vhd from public blob URI to the bastion Storage Account"
     storage_contnainer="${bastion_name}vhd"
@@ -170,9 +258,9 @@ if [[ -z "${BASTION_BOOT_IMAGE}" ]]; then
     run_command "az storage container create --name ${storage_contnainer} --account-name ${sa_name} --account-key ${account_key}" &&
     run_command "az storage blob copy start --account-name ${sa_name} --account-key ${account_key} --destination-blob ${vhd_name} --destination-container ${storage_contnainer} --source-uri '${bastion_source_vhd_uri}'" || exit 2
     bastion_url_expiry=$(date -u -d "10 hours" '+%Y-%m-%dT%H:%MZ')
-    bastion_url=$(az storage blob generate-sas -c ${storage_contnainer} -n ${vhd_name} --https-only --full-uri --permissions r --expiry ${bastion_url_expiry} --account-name ${sa_name} --account-key ${account_key} -o tsv)
+    bastion_url=$(az storage blob generate-sas -c "${storage_contnainer}" -n "${vhd_name}" --https-only --full-uri --permissions r --expiry "${bastion_url_expiry}" --account-name "${sa_name}" --account-key "${account_key}" -o tsv)
     try=0 retries=30 interval=60
-    while [ X"${status}" != X"success" ] && [ $try -lt $retries ]; do
+    while [ "${status}" != "success" ] && [ "$try" -lt "$retries" ]; do
         echo "check copy complete, ${try} try..."
         if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
             cmd="az storage blob show --container-name ${storage_contnainer} --name '${vhd_name}' --account-name ${sa_name} --account-key ${account_key} -o tsv --query properties.copy.status"
@@ -182,18 +270,18 @@ if [[ -z "${BASTION_BOOT_IMAGE}" ]]; then
         echo "Command: $cmd"
         status=$(eval "$cmd" || echo "pending")
         echo "Status: $status"
-        sleep $interval
-        try=$(expr $try + 1)
+        sleep "$interval"
+        try=$((try + 1))
     done
-    if [ X"$status" != X"success" ]; then
+    if [ "$status" != "success" ]; then
         echo  "Something wrong, copy timeout or failed!"
         exit 2
     fi
-    vhd_blob_url=$(az storage blob url --account-name ${sa_name} --account-key ${account_key} -c ${storage_contnainer} -n ${vhd_name} -o tsv)
+    vhd_blob_url=$(az storage blob url --account-name "${sa_name}" --account-key "${account_key}" -c "${storage_contnainer}" -n "${vhd_name}" -o tsv)
 
     echo "Deploy the bastion image from bastion vhd"
     run_command "az image create --resource-group ${bastion_rg} --name '${bastion_name}-image' --source ${vhd_blob_url} --os-type Linux --storage-sku Standard_LRS" || exit 2
-    bastion_image_id=$(az image show --resource-group ${bastion_rg} --name "${bastion_name}-image" | jq -r '.id')
+    bastion_image_id=$(az image show --resource-group "${bastion_rg}" --name "${bastion_name}-image" | jq -r '.id')
 else
     bastion_image_id=${BASTION_BOOT_IMAGE}
 fi
@@ -204,16 +292,59 @@ if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
     bastion_nsg="${bastion_name}-nsg" bastion_subnet="${bastion_name}Subnet"
     run_command "az network nsg create -g ${bastion_rg} -n ${bastion_nsg}"
     run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
-    #subnet cidr for int service is xx.xx.99.0/24, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
-    bastion_subnet_cidr=$(echo ${AZURE_VNET_ADDRESS_PREFIXES%/*} | awk -F'.' '{print $1"."$2".99.0/24"}')
+
+    echo "Querying VNET address prefixes from ${bastion_vnet_name}..."
+    vnet_address_prefixes=$(az network vnet show --resource-group "${bastion_rg}" --name "${bastion_vnet_name}" --query 'addressSpace.addressPrefixes' -o tsv)
+    if [[ -z "${vnet_address_prefixes}" ]]; then
+        echo "Falling back to AZURE_VNET_ADDRESS_PREFIXES / AZURE_VNET_IPV6_ADDRESS_PREFIXES"
+        vnet_address_prefixes="${AZURE_VNET_ADDRESS_PREFIXES} ${AZURE_VNET_IPV6_ADDRESS_PREFIXES:-}"
+    fi
+    if [[ -z "${vnet_address_prefixes// /}" ]]; then
+        echo "ERROR: Could not determine VNET address prefixes" && exit 1
+    fi
+    echo "VNET address prefixes: ${vnet_address_prefixes}"
+
+    echo "Querying existing subnet prefixes (addressPrefix and addressPrefixes)..."
+    existing_subnet_prefixes=$(az network vnet subnet list --resource-group "${bastion_rg}" --vnet-name "${bastion_vnet_name}" -o json \
+        | jq -r '.[] | ((.addressPrefixes // [])[]), (.addressPrefix // empty)' | awk 'NF && $0 != "null"' | sort -u)
+    echo "Existing subnet prefixes: ${existing_subnet_prefixes:-<none>}"
+
+    echo "Finding an unused IPv4 /24 fully contained in the VNET..."
+    bastion_subnet_cidr=$(find_available_cidr contained ipv4 24 "${vnet_address_prefixes}" "${existing_subnet_prefixes}") || true
+    if [[ -z "${bastion_subnet_cidr}" ]]; then
+        echo "Existing VNET address space is fully allocated; adding a new IPv4 prefix..."
+        bastion_subnet_cidr=$(find_available_cidr expand ipv4 24 "${vnet_address_prefixes}" "")
+        echo "Selected new VNET prefix: ${bastion_subnet_cidr}"
+        vnet_prefix_args=$(echo "${vnet_address_prefixes}" | tr '\n' ' ')
+        run_command_with_retries "az network vnet update --resource-group ${bastion_rg} --name ${bastion_vnet_name} --address-prefixes ${vnet_prefix_args} ${bastion_subnet_cidr}" "3" || {
+            echo "ERROR: failed to add address prefix ${bastion_subnet_cidr} to VNET ${bastion_vnet_name}"
+            exit 1
+        }
+        vnet_address_prefixes="${vnet_address_prefixes} ${bastion_subnet_cidr}"
+    fi
+    echo "Found available IPv4 subnet: ${bastion_subnet_cidr}"
+
     if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
         # for ash wwt, the parameter name get changed
         vnet_subnet_address_parameter="--address-prefix ${bastion_subnet_cidr}"
     else
         vnet_subnet_address_parameter="--address-prefixes ${bastion_subnet_cidr}"
     fi
-    if [[ "$IP_FAMILY" == *"DualStack"* ]]; then
-        bastion_subnet_cidr_ipv6=$(echo ${AZURE_VNET_IPV6_ADDRESS_PREFIXES%/*} | awk -F':' '{print $1":"$2":"$3":99::/64"}')
+    if [[ "${IP_FAMILY}" == *"DualStack"* ]]; then
+        echo "Finding an unused IPv6 /64 fully contained in the VNET..."
+        bastion_subnet_cidr_ipv6=$(find_available_cidr contained ipv6 64 "${vnet_address_prefixes}" "${existing_subnet_prefixes}") || true
+        if [[ -z "${bastion_subnet_cidr_ipv6}" ]]; then
+            echo "Existing VNET IPv6 address space is fully allocated; adding a new IPv6 prefix..."
+            bastion_subnet_cidr_ipv6=$(find_available_cidr expand ipv6 64 "${vnet_address_prefixes}" "")
+            echo "Selected new VNET IPv6 prefix: ${bastion_subnet_cidr_ipv6}"
+            vnet_prefix_args=$(echo "${vnet_address_prefixes}" | tr '\n' ' ')
+            run_command_with_retries "az network vnet update --resource-group ${bastion_rg} --name ${bastion_vnet_name} --address-prefixes ${vnet_prefix_args} ${bastion_subnet_cidr_ipv6}" "3" || {
+                echo "ERROR: failed to add address prefix ${bastion_subnet_cidr_ipv6} to VNET ${bastion_vnet_name}"
+                exit 1
+            }
+            vnet_address_prefixes="${vnet_address_prefixes} ${bastion_subnet_cidr_ipv6}"
+        fi
+        echo "Found available IPv6 subnet: ${bastion_subnet_cidr_ipv6}"
         vnet_subnet_address_parameter="${vnet_subnet_address_parameter} ${bastion_subnet_cidr_ipv6}"
     fi
     run_command "az network vnet subnet create -g ${bastion_rg} --vnet-name ${bastion_vnet_name} -n ${bastion_subnet} ${vnet_subnet_address_parameter} --network-security-group ${bastion_nsg}" || exit 2
@@ -221,6 +352,10 @@ else
     # bastion subnet and nsg already exist, create additional nsg rule
     run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
 fi
+
+# Explicit ICMP from the VNET so cluster nodes can reach the bastion. The TCP
+# allow rule above does not cover ICMP; do not rely only on default NSG rules.
+run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow-icmp' --priority 1001 --access Allow --protocol Icmp --source-address-prefixes VirtualNetwork --destination-address-prefixes '*' --destination-port-ranges '*'"
 
 echo "Create bastion vm"
 if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
@@ -348,12 +483,24 @@ if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
 }
 EOF
     arm_deployment_name="${bastion_name}-arm"
-    ign_b64="$(cat ${bastion_ignition_file} | base64 -w0)"
-    run_command "az deployment group create --resource-group ${bastion_rg} --name ${arm_deployment_name} --template-file '${bastion_vm_arm_template}' --parameters ignitionContent='${ign_b64}' --parameters vmName=${bastion_name} --parameters vnetName=${bastion_vnet_name} --parameters subnetName=${bastion_subnet} --parameters vmSize=Standard_DS1_v2 --parameters vmImageId=${bastion_image_id}"
+    echo "Creating bastion VM via ARM deployment; ignition content is omitted from logs"
+    ign_b64="$(base64 -w0 < "${bastion_ignition_file}")"
+    # --output none: default az JSON includes the ignition parameter
+    az deployment group create \
+        --resource-group "${bastion_rg}" \
+        --name "${arm_deployment_name}" \
+        --template-file "${bastion_vm_arm_template}" \
+        --parameters "ignitionContent=${ign_b64}" \
+        --parameters "vmName=${bastion_name}" \
+        --parameters "vnetName=${bastion_vnet_name}" \
+        --parameters "subnetName=${bastion_subnet}" \
+        --parameters "vmSize=Standard_DS1_v2" \
+        --parameters "vmImageId=${bastion_image_id}" \
+        --output none
 else
     run_command "az network public-ip create --resource-group ${bastion_rg} --name ${bastion_name}PublicIPv4 --sku Standard --version IPv4"
     run_command "az network nic create --resource-group ${bastion_rg} --name ${bastion_name}NIC --vnet-name ${bastion_vnet_name} --subnet ${bastion_subnet} --network-security-group ${bastion_nsg} --public-ip-address ${bastion_name}PublicIPv4"
-    if [[ "$IP_FAMILY" == *"DualStack"* ]]; then
+    if [[ "${IP_FAMILY}" == *"DualStack"* ]]; then
         run_command "az network public-ip create --resource-group ${bastion_rg} --name ${bastion_name}PublicIPv6 --sku Standard --version IPv6"
         run_command "az network nic ip-config create --resource-group ${bastion_rg} --name ${bastion_name}IPv6config --nic-name ${bastion_name}NIC --private-ip-address-version IPv6 --vnet-name ${bastion_vnet_name} --subnet ${bastion_subnet} --public-ip-address ${bastion_name}PublicIPv6"
     fi
@@ -367,7 +514,7 @@ if [ -f "${SHARED_DIR}/${bastion_name}_output.json" ]; then
     # directly get public IP from bastion vm creation output
     bastion_private_ip=$(jq -r ".privateIpAddress" "${SHARED_DIR}/${bastion_name}_output.json" | awk -F',' '{print $1}')
     bastion_public_ip=$(jq -r ".publicIpAddress" "${SHARED_DIR}/${bastion_name}_output.json" | awk -F',' '{print $1}')
-    if [[ "$IP_FAMILY" == *"DualStack"* ]]; then
+    if [[ "${IP_FAMILY}" == *"DualStack"* ]]; then
         #bastion_private_ipv6=$(jq -r ".privateIpAddress" "${SHARED_DIR}/${bastion_name}_output.json" | awk -F',' '{print $2}')
         bastion_public_ipv6=$(jq -r ".publicIpAddress" "${SHARED_DIR}/${bastion_name}_output.json" | awk -F',' '{print $2}')
     fi
@@ -379,7 +526,7 @@ else
     bastion_public_ip=$(jq -r ".[].virtualMachine.network.publicIpAddresses[].ipAddress" "${vm_ip_info_file}")
 fi
 
-if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; then
+if [ "${bastion_public_ip}" == "" ] || [ "${bastion_private_ip}" == "" ] ; then
     echo "Did not found public or internal IP!"
     exit 1
 fi
@@ -402,7 +549,7 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
     cmd="az network dns record-set a add-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip}"
     run_command "${cmd}" &&
     echo "az network dns record-set a remove-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip} || :" >>"${SHARED_DIR}/remove_resources_by_cli.sh"
-    
+
 #    wait_public_dns "${mirror_registry_dns}" || exit 2
     echo "Waiting for ${mirror_registry_dns} to be ready..." && sleep 120s
     # save mirror registry dns info
@@ -412,9 +559,9 @@ fi
 #####################################
 #########Save Bastion Info###########
 #####################################
-echo ${bastion_public_ip} > "${SHARED_DIR}/bastion_public_address"
-echo ${bastion_private_ip} > "${SHARED_DIR}/bastion_private_address"
-if [[ "$IP_FAMILY" == *"DualStack"* ]]; then
+echo "${bastion_public_ip}" > "${SHARED_DIR}/bastion_public_address"
+echo "${bastion_private_ip}" > "${SHARED_DIR}/bastion_private_address"
+if [[ "${IP_FAMILY}" == *"DualStack"* ]]; then
     echo "${bastion_public_ipv6}" > "${SHARED_DIR}/bastion_ipv6_address"
 fi
 echo "core" > "${SHARED_DIR}/bastion_ssh_user"

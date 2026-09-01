@@ -3,6 +3,12 @@ build_root:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.23
+images:
+  items:
+  - context_dir: test
+    dockerfile_path: Dockerfile.ci
+    from: src
+    to: gecko-golang-gcloud
 resources:
   '*':
     limits:
@@ -14,9 +20,13 @@ tests:
 - as: test
   commands: |
     unset GOFLAGS
+    gcloud beta emulators firestore start \
+      --host-port=127.0.0.1:8681 >"${ARTIFACT_DIR}/firestore-emulator.log" 2>&1 &
+    sleep 5
+    export FIRESTORE_EMULATOR_HOST=127.0.0.1:8681
     make test
   container:
-    from: src
+    from: gecko-golang-gcloud
 zz_generated_metadata:
   branch: main
   org: openshift-online

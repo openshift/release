@@ -1407,6 +1407,10 @@ secret_configs:
     namespace: ci
   - cluster_groups:
     - non_app_ci
+    name: cluster-secrets-metal-nno-doca2
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
     name: cluster-secrets-metal-dpf-doca4
     namespace: ci
   - cluster_groups:
@@ -2586,12 +2590,6 @@ secret_configs:
       - auth_field: token_image-puller_build04_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build04.ci.openshift.org
-    ssh-privatekey:
-      field: ssh-privatekey
-      item: openshift-ci-aws-credentials
-    ssh-publickey:
-      field: ssh-publickey
-      item: openshift-ci-aws-credentials
   to:
   - cluster_groups:
     - non_app_ci
@@ -2640,10 +2638,6 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-azure-confidential-qe
-    namespace: ci
-  - cluster_groups:
-    - non_app_ci
-    name: cluster-secrets-azure-perfscale-qe
     namespace: ci
   - cluster_groups:
     - non_app_ci
@@ -4334,14 +4328,6 @@ secret_configs:
     name: prowjob-dispatcher-control
     namespace: ci
 - from:
-    token:
-      field: token
-      item: prowjob-dispatcher-fallback-observer
-  to:
-  - cluster: app.ci
-    name: prowjob-dispatcher-fallback-observer
-    namespace: ci
-- from:
     app_id:
       field: app_id
       item: slack-credentials-dptp-bot
@@ -5451,6 +5437,48 @@ secret_configs:
     name: cluster-secrets-nutanix
     namespace: ci
 - from:
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+      - auth_field: token_image-puller_build04_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build04.ci.openshift.org
+    ssh-privatekey:
+      field: ssh-privatekey
+      item: openshift-ci-aws-credentials
+    ssh-publickey:
+      field: ssh-publickey
+      item: openshift-ci-aws-credentials
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-azure-perfscale-qe
+    namespace: ci
+- from:
     .awscred:
       field: .awscred
       item: openshift-ci-aws-credentials
@@ -5720,6 +5748,23 @@ secret_configs:
     namespace: ci
   - cluster: core-ci
     name: hypershift-operator-oidc-provider-s3-credentials
+    namespace: ci
+- from:
+    bucket:
+      field: bucket
+      item: hypershift-oidc-2
+    credentials:
+      field: credentials
+      item: hypershift-oidc-2
+    region:
+      field: region
+      item: hypershift-oidc-2
+  to:
+  - cluster: hosted-mgmt2
+    name: hypershift-operator-oidc-provider-s3-credentials
+    namespace: hypershift
+  - cluster: app.ci
+    name: hypershift-operator-oidc-provider-s3-credentials-2
     namespace: ci
 - from:
     .dockerconfigjson:
