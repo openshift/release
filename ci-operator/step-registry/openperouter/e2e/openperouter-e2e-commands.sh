@@ -9,16 +9,24 @@ echo "************ openperouter deploy-verify test ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-echo "### Copying openperouter PR source to remote host"
-OPENPEROUTER_SRC="/go/src/github.com/openperouter/openperouter"
-ssh "${SSHOPTS[@]}" "root@${IP}" "mkdir -p /root/openperouter"
-scp "${SSHOPTS[@]}" "${OPENPEROUTER_SRC}/Makefile" "root@${IP}:/root/openperouter/"
-scp "${SSHOPTS[@]}" -r "${OPENPEROUTER_SRC}/e2etests" "root@${IP}:/root/openperouter/"
+echo "### Cloning OpenPERouter E2E source to remote host"
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${OPENPEROUTER_REPO}" "${OPENPEROUTER_BRANCH}" << 'EOFSOURCE'
+set -euo pipefail
+repository="$1"
+branch="$2"
 
-echo "### Create OpenPERouter CR and verify deployment"
+rm -rf /root/openperouter
+git clone --depth 1 --branch "${branch}" "${repository}" /root/openperouter
+EOFSOURCE
+
+echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
 ssh "${SSHOPTS[@]}" "root@${IP}" bash -s << 'EOFDEPLOY'
 set -euo pipefail
-export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig
+source /root/dev-scripts/config_root.sh
+export KUBECONFIG="/root/dev-scripts/ocp/${CLUSTER_NAME}/auth/kubeconfig"
+
+CONFIG=/root/dev-scripts/config_root.sh \
+  /root/openperouter/openshift/e2e/setup_extra_networks.sh
 
 # Ensure namespace is privileged (router pods need host networking + nsenter)
 oc label --overwrite ns openshift-openperouter-system \
