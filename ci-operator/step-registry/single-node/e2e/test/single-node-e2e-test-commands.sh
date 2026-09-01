@@ -319,11 +319,15 @@ function suite() {
         done
     fi &&
 
-    # Limit serial suites unless max parallel tests is already specified in TEST_ARGS.
-    # Let non-serial suites determine parallelism from the cluster's worker count.
+    # Determine max parallel tests if not already specified in TEST_ARGS.
+    # Older test binaries do not derive parallelism from the cluster's worker count.
     MAX_PARALLEL_ARGS="" &&
-    if [[ ! "${TEST_ARGS:-}" =~ --max-parallel-tests && "${TEST_SUITE}" =~ serial ]]; then
-        MAX_PARALLEL_ARGS="--max-parallel-tests 1"
+    if [[ ! "${TEST_ARGS:-}" =~ --max-parallel-tests ]]; then
+        if [[ "${TEST_SUITE}" =~ serial ]]; then
+            MAX_PARALLEL_ARGS="--max-parallel-tests 1"
+        else
+            MAX_PARALLEL_ARGS="--max-parallel-tests 10"
+        fi
     fi &&
 
     set -x &&
