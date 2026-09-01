@@ -1,0 +1,20 @@
+ref:
+  as: tls-scanner-mirror
+  from: tests
+  commands: tls-scanner-mirror-commands.sh
+  dependencies:
+  - env: PULL_SPEC_TLS_SCANNER_TOOL
+    name: tls-scanner-tool
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 20m0s
+  grace_period: 2m0s
+  documentation: |-
+    Mirrors the tls-scanner-tool image from the build farm registry into the
+    dev-scripts local registry on the provisioning host, so that the scanner
+    pod can be pulled on disconnected clusters (e.g. baremetalds ipv6, which
+    has no IPv4 route to the build farm). Writes the mirrored pull spec to
+    ${SHARED_DIR}/tls-scanner-image, which tls-scanner-run picks up. No-op
+    on non-dev-scripts clusters.
