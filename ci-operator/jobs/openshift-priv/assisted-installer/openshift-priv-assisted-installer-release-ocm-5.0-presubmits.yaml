@@ -1,33 +1,45 @@
 presubmits:
-  openshift/openshift-mcp-server:
+  openshift-priv/assisted-installer:
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    context: ci/prow/e2e-aws
+    - ^release-ocm-5\.0$
+    - ^release-ocm-5\.0-
+    context: ci/prow/e2e-ai-operator-ztp
     decorate: true
     decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.ci
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-build
+      - Dockerfile.assisted-installer-controller
+    hidden: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-5.2-e2e-aws
+    name: pull-ci-openshift-priv-assisted-installer-release-ocm-5.0-e2e-ai-operator-ztp
     optional: true
-    rerun_command: /test e2e-aws
-    skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+    path_alias: github.com/openshift/assisted-installer
+    rerun_command: /test e2e-ai-operator-ztp
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=e2e-aws
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ai-operator-ztp
         command:
         - ci-operator
         env:
@@ -48,8 +60,14 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -68,6 +86,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -77,33 +98,40 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-ai-operator-ztp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build09
-    context: ci/prow/fips-image-scan-openshift-mcp-server
+    - ^release-ocm-5\.0$
+    - ^release-ocm-5\.0-
+    context: ci/prow/format-check
     decorate: true
     decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.ci
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-build
+      - Dockerfile.assisted-installer-controller
+    hidden: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-5.2-fips-image-scan-openshift-mcp-server
-    rerun_command: /test fips-image-scan-openshift-mcp-server
-    skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+    name: pull-ci-openshift-priv-assisted-installer-release-ocm-5.0-format-check
+    path_alias: github.com/openshift/assisted-installer
+    rerun_command: /test format-check
+    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=fips-image-scan-openshift-mcp-server
+        - --target=format-check
         command:
         - ci-operator
         env:
@@ -121,11 +149,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -138,12 +166,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -153,32 +175,39 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )fips-image-scan-openshift-mcp-server,?($|\s.*)
+    trigger: (?m)^/test( | .* )format-check,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build09
+    - ^release-ocm-5\.0$
+    - ^release-ocm-5\.0-
     context: ci/prow/images
     decorate: true
     decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.ci
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-build
+      - Dockerfile.assisted-installer-controller
+    hidden: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-5.2-images
+    name: pull-ci-openshift-priv-assisted-installer-release-ocm-5.0-images
+    path_alias: github.com/openshift/assisted-installer
     rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -190,6 +219,9 @@ presubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -213,27 +245,36 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build09
+    - ^release-ocm-5\.0$
+    - ^release-ocm-5\.0-
     context: ci/prow/lint
     decorate: true
     decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.ci
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-build
+      - Dockerfile.assisted-installer-controller
+    hidden: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-5.2-lint
+    name: pull-ci-openshift-priv-assisted-installer-release-ocm-5.0-lint
+    path_alias: github.com/openshift/assisted-installer
     rerun_command: /test lint
+    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=lint
         command:
@@ -255,6 +296,9 @@ presubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -280,53 +324,49 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build07
-    context: ci/prow/mcpchecker-eval-anthropic
+    - ^release-ocm-5\.0$
+    - ^release-ocm-5\.0-
+    context: ci/prow/mce-images
     decorate: true
     decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.ci
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-controller
+    hidden: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: mce
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-5.2-mcpchecker-eval-anthropic
-    optional: true
-    rerun_command: /test mcpchecker-eval-anthropic
+    name: pull-ci-openshift-priv-assisted-installer-release-ocm-5.0-mce-images
+    path_alias: github.com/openshift/assisted-installer
+    rerun_command: /test mce-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=mcpchecker-eval-anthropic
+        - --target=[images]
+        - --variant=mce
         command:
         - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
-        ports:
-        - containerPort: 8080
-          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -339,12 +379,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -354,112 +388,41 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )mcpchecker-eval-anthropic,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build07
-    context: ci/prow/mcpchecker-eval-google
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile.ci
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-5.2-mcpchecker-eval-google
-    optional: true
-    rerun_command: /test mcpchecker-eval-google
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --target=mcpchecker-eval-google
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )mcpchecker-eval-google,?($|\s.*)
+    trigger: (?m)^/test( | .* )mce-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build09
-    context: ci/prow/security
+    - ^release-ocm-5\.0$
+    - ^release-ocm-5\.0-
+    context: ci/prow/unit-test
     decorate: true
     decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.ci
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-build
+      - Dockerfile.assisted-installer-controller
+    hidden: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-5.2-security
-    optional: true
-    rerun_command: /test security
-    skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+    name: pull-ci-openshift-priv-assisted-installer-release-ocm-5.0-unit-test
+    path_alias: github.com/openshift/assisted-installer
+    rerun_command: /test unit-test
+    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=security
+        - --secret-dir=/secrets/assisted-installer-codecov-token
+        - --target=unit-test
         command:
         - ci-operator
         env:
@@ -477,11 +440,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
+        - mountPath: /secrets/assisted-installer-codecov-token
+          name: assisted-installer-codecov-token
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -494,12 +460,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
+      - name: assisted-installer-codecov-token
         secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
+          secretName: assisted-installer-codecov-token
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -509,69 +472,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )security,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build09
-    context: ci/prow/test
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile.ci
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-5.2-test
-    rerun_command: /test test
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=test
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit-test,?($|\s.*)
