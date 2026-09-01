@@ -132,6 +132,17 @@ images:
       RUN cd api && npm ci --legacy-peer-deps
     from: aro-hcp-e2e-tools
     to: aro-hcp-api-tools
+  - dockerfile_literal: |
+      FROM aro-hcp-e2e-tools
+      USER root
+      # Install amg Azure CLI extension
+      ENV AZURE_EXTENSION_DIR=/usr/local/lib/azure-cli-extensions
+      RUN az extension add --name amg --version 3.0.0 && \
+          az extension show --name amg --output none && \
+          chgrp -R 0 "${AZURE_EXTENSION_DIR}" && \
+          chmod -R g=u "${AZURE_EXTENSION_DIR}"
+    from: aro-hcp-e2e-tools
+    to: aro-hcp-grafana-tools
 promotion:
   to:
   - additional_images:
@@ -220,6 +231,13 @@ tests:
   steps:
     test:
     - ref: aro-hcp-observability-prometheus
+- as: grafana-preview
+  optional: true
+  run_if_changed: ^observability/grafana-dashboards/
+  steps:
+    test:
+    - ref: aro-hcp-github-app-auth
+    - ref: aro-hcp-grafana-preview
 - as: bicep-lint
   capabilities:
   - arm64
