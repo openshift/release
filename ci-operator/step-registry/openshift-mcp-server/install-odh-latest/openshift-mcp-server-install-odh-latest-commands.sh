@@ -42,5 +42,8 @@ fi
 
 oc wait "csv/${csv}" -n openshift-operators \
   --for=jsonpath='{.status.phase}'=Succeeded --timeout=20m
-oc get catalogsource/opendatahub-operator-latest -n openshift-marketplace -o yaml
-oc get "csv/${csv}" -n openshift-operators -o yaml
+{
+  oc get catalogsource/opendatahub-operator-latest -n openshift-marketplace -o yaml
+  printf '%s\n' '---'
+  oc get "csv/${csv}" -n openshift-operators -o yaml
+} > "${ARTIFACT_DIR}/opendatahub-operator-resources.yaml"

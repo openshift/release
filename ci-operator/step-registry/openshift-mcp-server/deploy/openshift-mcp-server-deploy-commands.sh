@@ -102,6 +102,10 @@ EOF
 oc wait mcpserver/ocp-mcp-server -n ocp-mcp-server \
   --for=condition=Ready --timeout=10m
 
-oc get datasciencecluster/default-dsc -o yaml
-oc get mcpserver/ocp-mcp-server -n ocp-mcp-server -o yaml
-oc get deployment/ocp-mcp-server -n ocp-mcp-server -o yaml
+{
+  oc get datasciencecluster/default-dsc -o yaml
+  printf '%s\n' '---'
+  oc get mcpserver/ocp-mcp-server -n ocp-mcp-server -o yaml
+  printf '%s\n' '---'
+  oc get deployment/ocp-mcp-server -n ocp-mcp-server -o yaml
+} > "${ARTIFACT_DIR}/openshift-mcp-server-resources.yaml"
