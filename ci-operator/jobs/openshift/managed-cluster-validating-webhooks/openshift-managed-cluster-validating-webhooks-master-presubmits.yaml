@@ -14,6 +14,7 @@ presubmits:
       - config/package/managed-cluster-validating-webhooks-package.Containerfile
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-managed-cluster-validating-webhooks-master-e2e-binary-build-success
     rerun_command: /test e2e-binary-build-success
@@ -79,6 +80,7 @@ presubmits:
       - config/package/managed-cluster-validating-webhooks-package.Containerfile
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-managed-cluster-validating-webhooks-master-images
     rerun_command: /test images
@@ -136,6 +138,7 @@ presubmits:
       - config/package/managed-cluster-validating-webhooks-package.Containerfile
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-managed-cluster-validating-webhooks-master-pr-check
     rerun_command: /test pr-check
@@ -203,6 +206,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: rosa-e2e-01
       ci.openshift.io/generator: prowgen
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-managed-cluster-validating-webhooks-master-rosa-sts-e2e
     optional: true
@@ -215,6 +219,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=rosa-sts-e2e
         command:
         - ci-operator
@@ -236,6 +241,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -256,6 +264,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
