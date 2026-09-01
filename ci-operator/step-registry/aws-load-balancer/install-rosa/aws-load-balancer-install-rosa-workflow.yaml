@@ -2,20 +2,23 @@ workflow:
   as: aws-load-balancer-install-rosa
   steps:
     env:
+      HOSTED_CP: "true"
+      ENABLE_BYOVPC: "true"
+      ZONES_COUNT: "1"
       COMPUTE_MACHINE_TYPE: "m5.xlarge"
-      MULTI_AZ: "true"
-      REPLICAS: "3"
-      ETCD_ENCRYPTION: "true"
+      MULTI_AZ: "false"
+      REPLICAS: "2"
+      ETCD_ENCRYPTION: "false"
       DISABLE_WORKLOAD_MONITORING: "false"
       OO_APPLY_RESOURCES: "false"
     pre:
-    - chain: rosa-aws-sts-provision
+    - chain: rosa-aws-sts-hcp-provision
     - ref: aws-load-balancer-pre-install
     - ref: aws-load-balancer-pre-install-rosa
     - ref: optional-operators-subscribe
     post:
     - ref: aws-load-balancer-must-gather-rosa
     - ref: aws-load-balancer-post-install-rosa
-    - chain: rosa-aws-sts-deprovision
+    - chain: rosa-aws-sts-hcp-deprovision
   documentation: |-
-    Installs a ROSA STS cluster on AWS and runs through the pre-requistes of the aws-load-balancer-operator to complete installation.
+    Installs a ROSA HCP cluster on AWS and runs through the pre-requisites of the aws-load-balancer-operator to complete installation.
