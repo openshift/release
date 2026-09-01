@@ -57,6 +57,11 @@ hcp create kubeconfig kubevirt --name "${HC_NAME}" --namespace "${HC_NS}" > "${S
 # Persist management cluster kubeconfig separately so conformance steps can reference it
 cp "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/mgmt_kubeconfig"
 
+# Allow time for the KubeVirt VMs to be scheduled and begin booting before polling nodes
+echo "$(date) Sleeping 20 minutes to allow KubeVirt VMs to boot before checking node readiness..."
+sleep 1200
+echo "$(date) Sleep complete, proceeding to node readiness check"
+
 # --- Step 3: Wait for KubeVirt worker VMs to boot and join the guest cluster as Ready nodes ---
 echo "$(date) Waiting for 2 worker nodes to join the guest cluster"
 
@@ -98,7 +103,17 @@ wait_for_nodes() {
     sleep 60
     retries=$((retries + 1))
   done
-  echo "$(date) ERROR: Timed out waiting for ${REQUIRED_NODES} nodes to be Ready"
+  echo "$(date) ERROR: Timed out waiting for ${REQUIRED_NODES} nodes to be Ready after ${MAX_RETRIES} retries"
+  echo "$(date) DEBUG: Final management cluster state:"
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  oc get no || true
+  oc get hc -A || true
+  oc describe hc -n ${HC_NS} ${HC_NAME} || true
+  oc get np -A || true
+  oc describe np -n ${HC_NS} || true
+  oc get po -n ${HC_NS}-${HC_NAME} || true
+  oc get vmi -A || true
+  oc describe vmi -A || true
   return 1
 }
 
