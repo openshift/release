@@ -11,6 +11,19 @@ export KUBECONFIG="${KUBECONFIG:-$SHARED_DIR/kubeconfig}"
 OUTDIR="${ARTIFACT_DIR}/ct-flush-repro"
 mkdir -p "$OUTDIR"
 
+KB_PID=""
+LOG_PID=""
+OVN_POD=""
+
+cleanup() {
+  [ -n "$LOG_PID" ] && kill "$LOG_PID" 2>/dev/null || true
+  [ -n "$KB_PID" ]  && kill "$KB_PID"  2>/dev/null || true
+  [ -n "$OVN_POD" ] && oc exec -n openshift-ovn-kubernetes "$OVN_POD" -- \
+    nsenter -t 1 -m -u -i -n -p -- \
+    ovs-appctl vlog/set vconn:file:info 2>/dev/null || true
+}
+trap cleanup EXIT
+
 echo "================================================================"
 echo " OCPBUGS-76596 NXT_CT_FLUSH_ZONE Reproduction Test"
 echo " Date: $(date -u)"
