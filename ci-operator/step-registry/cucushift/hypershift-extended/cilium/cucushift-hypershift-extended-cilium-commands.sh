@@ -33,7 +33,10 @@ fi
 
 mkdir -p /tmp/bin
 export PATH=/tmp/bin:$PATH
-curl --fail --retry 3 -sS -L "https://github.com/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz" | tar -xzC /tmp/bin/
+curl --fail --retry 3 -sS -L "https://github.com/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz" -o /tmp/cilium-linux-amd64.tar.gz
+curl --fail --retry 3 -sS -L "https://github.com/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz.sha256sum" -o /tmp/cilium-linux-amd64.tar.gz.sha256sum
+(cd /tmp && sha256sum --check cilium-linux-amd64.tar.gz.sha256sum)
+tar -xzC /tmp/bin/ -f /tmp/cilium-linux-amd64.tar.gz
 chmod +x /tmp/bin/cilium
 
 PODCIDR=$(oc get network cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
