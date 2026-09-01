@@ -2,8 +2,9 @@
 set -euo pipefail
 
 echo "=== Verifying cluster access ==="
-oc get co
+oc version
 oc get nodes -o wide
+oc get co
 oc get dpu -A
 oc get dpuservice -A
 oc get application -A
