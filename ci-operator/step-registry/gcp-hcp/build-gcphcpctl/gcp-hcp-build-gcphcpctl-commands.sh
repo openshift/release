@@ -18,6 +18,9 @@ git clone "${REPO}" gcp-hcp-ctl
 cd gcp-hcp-ctl
 git checkout "${REF}"
 
+echo "Syncing vendor directory..."
+go mod vendor
+
 echo "Building gcphcpctl..."
 make build
 
