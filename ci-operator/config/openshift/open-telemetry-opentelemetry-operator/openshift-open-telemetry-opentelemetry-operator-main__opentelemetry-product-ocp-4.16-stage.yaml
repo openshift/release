@@ -1,8 +1,12 @@
 base_images:
   cli:
-    name: "4.22"
+    name: "4.16"
     namespace: ocp
     tag: cli
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -18,7 +22,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.22"
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -42,19 +46,17 @@ tests:
     env:
       AGENT_SKILL: otel
       BASE_DOMAIN: devobscluster.devcluster.openshift.com
-      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1201677
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1201680
       MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH: rhosdt-3.11
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
             {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "opentelemetry-operator-system", "target_namespaces": "", "operator_group": "opentelemetry-operator-system"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.5", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.5", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""}
         ]
-      SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-otel/google*
-        tests/e2e-instrumentation/instrumentation-go tests/e2e-otel/azuremonitorlogs
+      SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-openshift/export-to-cluster-logging-lokistack
+        tests/e2e-otel/*aws* tests/e2e-openshift/kafka tests/e2e-otel/google* tests/e2e-targetallocator/targetallocator-prometheuscr
+        tests/e2e-instrumentation/instrumentation-go tests/e2e/httpRoute tests/e2e-otel/azuremonitorlogs
     post:
     - ref: openshift-observability-qe-agent
     test:
@@ -66,4 +68,4 @@ zz_generated_metadata:
   branch: main
   org: openshift
   repo: open-telemetry-opentelemetry-operator
-  variant: opentelemetry-product-ocp-4.22-stage
+  variant: opentelemetry-product-ocp-4.16-stage
