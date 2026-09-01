@@ -1,9 +1,6 @@
 #!/bin/bash
-set -o errexit
-set -o nounset
-set -o pipefail
-set -x
+set -euo pipefail
 
-bastion=$(cat "/secret/address")
+remote_host=$(<"${CLUSTER_PROFILE_DIR}/remote-host")
 
-ping -c 5 $bastion
+ping -c 5 "${remote_host}"
