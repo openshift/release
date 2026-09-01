@@ -32,8 +32,8 @@ OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-openshift-validation-webhook}"
 OPERATOR_DEPLOYMENT_NAME="${OPERATOR_DEPLOYMENT_NAME:-validation-webhook}"
 CLUSTER_PACKAGE_NAME="${CLUSTER_PACKAGE_NAME:-${OPERATOR_NAME}-e2e-test}"
 
-log "Installing ${OPERATOR_NAME} via PKO ClusterPackage (mcvw variant)"
-log "  ClusterPackage: ${CLUSTER_PACKAGE_NAME}"
+log "Installing ${OPERATOR_NAME} via PKO Package (mcvw variant)"
+log "  Package: ${CLUSTER_PACKAGE_NAME}"
 log "  PKO image: ${OPERATOR_PKO_IMAGE}"
 log "  Operator image: ${OPERATOR_IMAGE}"
 log "  Namespace: ${OPERATOR_NAMESPACE}"
@@ -82,43 +82,28 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
     log "CI pull secret added to operator namespace ${OPERATOR_NAMESPACE}"
 else
     log "WARNING: Could not get CI registry credentials, PKO may fail to pull images"
+    oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 fi
 
-# Remove existing ClusterPackage if present (safe on ephemeral clusters only)
-if oc get clusterpackage "${OPERATOR_NAME}" &>/dev/null; then
-    log "Removing existing ClusterPackage ${OPERATOR_NAME}"
-    oc delete clusterpackage "${OPERATOR_NAME}" --timeout=120s || true
-    for i in $(seq 1 24); do
-        RESULT=$(oc get clusterpackage "${OPERATOR_NAME}" --ignore-not-found -o name 2>&1) || true
-        if [[ -z "${RESULT}" ]]; then
-            break
-        fi
-        if [[ $i -eq 24 ]]; then
-            log "WARNING: ClusterPackage ${OPERATOR_NAME} still exists after 2 minutes, forcing removal"
-            oc patch clusterpackage "${OPERATOR_NAME}" --type merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
+# Remove any leftover e2e Package from a previous run on this lease cluster.
+# MCVW uses a namespaced Package (scopes: [Namespaced] in manifest.yaml),
+# not a ClusterPackage, so we clean up the Package resource in the namespace.
+if oc get package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+    log "Removing leftover e2e Package ${CLUSTER_PACKAGE_NAME}"
+    oc delete package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" --timeout=60s || true
+    for i in $(seq 1 12); do
+        RESULT=$(oc get package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" --ignore-not-found -o name 2>&1) || true
+        if [[ -z "${RESULT}" ]]; then break; fi
+        if [[ $i -eq 12 ]]; then
+            oc patch package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" \
+                --type merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
         fi
         sleep 5
     done
 fi
 
-if [[ "${CLUSTER_PACKAGE_NAME}" != "${OPERATOR_NAME}" ]]; then
-    RESULT=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" --ignore-not-found -o name 2>&1) || true
-    if [[ -n "${RESULT}" ]]; then
-        log "Removing leftover e2e ClusterPackage ${CLUSTER_PACKAGE_NAME}"
-        oc delete clusterpackage "${CLUSTER_PACKAGE_NAME}" --timeout=60s || true
-        for i in $(seq 1 12); do
-            RESULT=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" --ignore-not-found -o name 2>&1) || true
-            if [[ -z "${RESULT}" ]]; then break; fi
-            if [[ $i -eq 12 ]]; then
-                oc patch clusterpackage "${CLUSTER_PACKAGE_NAME}" --type merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
-            fi
-            sleep 5
-        done
-    fi
-fi
-
 # Fetch the cluster service CA. MCVW's PKO package requires serviceca in the
-# ClusterPackage config to populate the caBundle field in ValidatingWebhookConfigurations.
+# Package config to populate the caBundle field in ValidatingWebhookConfigurations.
 log "Fetching cluster service CA"
 SERVICE_CA=$(oc get configmap openshift-service-ca.crt -n openshift-config \
     -o jsonpath='{.data.service-ca\.crt}' 2>/dev/null | base64 -w0 2>/dev/null || \
@@ -131,23 +116,25 @@ if [[ -z "${SERVICE_CA}" ]]; then
 fi
 log "Service CA fetched (${#SERVICE_CA} bytes base64)"
 
-# Create the ClusterPackage CR with serviceca config
+# Create a namespaced Package CR. MCVW's manifest declares scopes: [Namespaced],
+# so we use Package (not ClusterPackage). The config schema only accepts
+# image and serviceca; namespace comes from the Package resource itself.
 cat <<EOF | oc apply -f -
 apiVersion: package-operator.run/v1alpha1
-kind: ClusterPackage
+kind: Package
 metadata:
   name: ${CLUSTER_PACKAGE_NAME}
+  namespace: ${OPERATOR_NAMESPACE}
   annotations:
     package-operator.run/collision-protection: None
 spec:
   image: ${OPERATOR_PKO_IMAGE}
   config:
     image: ${OPERATOR_IMAGE}
-    namespace: ${OPERATOR_NAMESPACE}
     serviceca: "${SERVICE_CA}"
 EOF
 
-# Save ClusterPackage name for the cleanup step
+# Save for the cleanup step
 if [[ -n "${SHARED_DIR:-}" ]]; then
     echo "${CLUSTER_PACKAGE_NAME}" > "${SHARED_DIR}/operator-e2e-clusterpackage"
     echo "${OPERATOR_NAMESPACE}" > "${SHARED_DIR}/operator-e2e-namespace"
@@ -161,8 +148,8 @@ for i in $(seq 1 30); do
     fi
     if [[ $i -eq 30 ]]; then
         log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} not found after 5 minutes"
-        oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o yaml || true
-        oc get clusterobjectset -o wide 2>/dev/null | grep "${OPERATOR_NAME}" || true
+        oc get package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml || true
+        oc get objectset -n "${OPERATOR_NAMESPACE}" 2>/dev/null | grep "${OPERATOR_NAME}" || true
         exit 1
     fi
     sleep 10
