@@ -393,15 +393,17 @@ TFRC
   else
     log "  Removing ${resource_count} resources..."
     # Bulk remove: modules + data sources in one call (~3 seconds)
-    /tmp/terraform -chdir="${tf_dir}" state rm \
-      module.customer_project \
-      module.management_cluster \
-      module.region \
-      data.terraform_remote_state.commons \
-      data.terraform_remote_state.global \
-      data.terraform_remote_state.platform_ci \
-      data.terraform_remote_state.service \
-      -no-color 2>&1 | tail -5 | tee -a "${LOG}" || true
+    # Discover top-level modules and data sources, then remove at module level
+    # for speed (~3s for 400+ resources vs minutes for individual removal).
+    local addresses
+    addresses=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>/dev/null | \
+      sed -n 's/^\(module\.[^.]*\)\..*/\1/p; s/^\(data\.[^.]*\.[^.]*\)$/\1/p' | \
+      sort -u)
+    if [[ -n "${addresses}" ]]; then
+      log "  Removing: ${addresses//$'\n'/, }"
+      echo "${addresses}" | xargs /tmp/terraform -chdir="${tf_dir}" state rm -no-color 2>&1 | \
+        tail -5 | tee -a "${LOG}" || true
+    fi
   fi
 
   # Safe-delete the workspace (should succeed with 0 resources)
