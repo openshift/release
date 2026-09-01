@@ -14,17 +14,28 @@ images:
     dockerfile_path: Dockerfile.local
     from: fleetshift-server
     to: fleetshift-server-local
-  skip_if_only_changed: ^fleetshift-ui/
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.web
+    to: fleetshift-web
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.fleetshift
+    from: fleetshift-server-local
+    inputs:
+      fleetshift-web:
+        as:
+        - quay.io/stolostron/fleetshift-web:latest
+    to: fleetshift
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: pr-image-mirror
+- as: pr-image-mirror-server
   capabilities:
   - arm64
-  skip_if_only_changed: ^fleetshift-ui/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: fleetshift-server
@@ -35,7 +46,6 @@ tests:
 - as: pr-image-mirror-local
   capabilities:
   - arm64
-  skip_if_only_changed: ^fleetshift-ui/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: fleetshift-server-local
@@ -43,11 +53,30 @@ tests:
       IMAGE_REPO: fleetshift-server-local
       REGISTRY_ORG: stolostron
     workflow: fleetshift-ci-image-mirror
-- as: pr-merge-image-mirror
+- as: pr-image-mirror-web
+  capabilities:
+  - arm64
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-web
+    env:
+      IMAGE_REPO: fleetshift-web
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+- as: pr-image-mirror-aio
+  capabilities:
+  - arm64
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift
+    env:
+      IMAGE_REPO: fleetshift
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+- as: pr-merge-image-mirror-server
   capabilities:
   - arm64
   postsubmit: true
-  skip_if_only_changed: ^fleetshift-ui/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: fleetshift-server
@@ -60,7 +89,6 @@ tests:
   capabilities:
   - arm64
   postsubmit: true
-  skip_if_only_changed: ^fleetshift-ui/
   steps:
     dependencies:
       SOURCE_IMAGE_REF: fleetshift-server-local
@@ -69,7 +97,31 @@ tests:
       IMAGE_REPO: fleetshift-server-local
       REGISTRY_ORG: stolostron
     workflow: fleetshift-ci-image-mirror
-- as: republish-latest
+- as: pr-merge-image-mirror-web
+  capabilities:
+  - arm64
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-web
+    env:
+      ALSO_TAG_LATEST: "true"
+      IMAGE_REPO: fleetshift-web
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+- as: pr-merge-image-mirror-aio
+  capabilities:
+  - arm64
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift
+    env:
+      ALSO_TAG_LATEST: "true"
+      IMAGE_REPO: fleetshift
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+- as: republish-server-latest
   capabilities:
   - arm64
   cron: 30 2,8,14,20 * * *
@@ -87,7 +139,7 @@ tests:
 - as: republish-local-latest
   capabilities:
   - arm64
-  cron: 0 3,9,15,21 * * *
+  cron: 30 2,8,14,20 * * *
   retry:
     attempts: 3
     interval: 1h
@@ -99,8 +151,37 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: fleetshift-ci-image-mirror
+- as: republish-web-latest
+  capabilities:
+  - arm64
+  cron: 30 2,8,14,20 * * *
+  retry:
+    attempts: 3
+    interval: 1h
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift-web
+    env:
+      IMAGE_REPO: fleetshift-web
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
+- as: republish-aio-latest
+  capabilities:
+  - arm64
+  cron: 30 2,8,14,20 * * *
+  retry:
+    attempts: 3
+    interval: 1h
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: fleetshift
+    env:
+      IMAGE_REPO: fleetshift
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: fleetshift-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: fleetshift
   repo: fleetshift-poc
-  variant: server
