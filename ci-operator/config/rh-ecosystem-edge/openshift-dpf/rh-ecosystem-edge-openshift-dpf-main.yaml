@@ -304,6 +304,35 @@ tests:
     - ref: dpf-setup-image-registry
     - ref: openshift-e2e-test
   timeout: 7h0m0s
+- always_run: false
+  as: scale
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca8
+    env:
+      HYPERSHIFT_MGMT_CLUSTER: "true"
+      ND_CNI_EXTRA_FLAGS: --selector node-role.kubernetes.io/worker-dpu=
+      POD_READY_THRESHOLD: 120000ms
+      PODS_PER_NODE: "60"
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: openshift-qe-node-density-cni
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
