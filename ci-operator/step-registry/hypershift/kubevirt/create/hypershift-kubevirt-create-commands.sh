@@ -249,30 +249,7 @@ if [[ "${CNI_PROVIDER}" == "cilium" ]]; then
     exit 1
   fi
 
-  DNS_CLUSTER_IP=$(oc get svc dns-default -n openshift-dns -o jsonpath='{.spec.clusterIP}')
-  DNS_PORT=$(oc get svc dns-default -n openshift-dns -o jsonpath='{.spec.ports[?(@.name=="dns")].port}')
-  DNS_TCP_PORT=$(oc get svc dns-default -n openshift-dns -o jsonpath='{.spec.ports[?(@.name=="dns-tcp")].port}')
-
   oc apply -f - <<EOF
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: virt-launcher-dns-clusterip
-  namespace: ${CONTROL_PLANE_NAMESPACE}
-spec:
-  endpointSelector:
-    matchLabels:
-      kubevirt.io: virt-launcher
-  egress:
-    - toCIDR:
-        - ${DNS_CLUSTER_IP}/32
-      toPorts:
-        - ports:
-            - port: "${DNS_PORT}"
-              protocol: UDP
-            - port: "${DNS_TCP_PORT}"
-              protocol: TCP
----
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
