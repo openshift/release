@@ -350,10 +350,8 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
         CRD_PLURAL=$(oc get crd "${crd}" -o jsonpath='{.spec.names.plural}')
         CRD_GROUP=$(oc get crd "${crd}" -o jsonpath='{.spec.group}')
         log "Verifying API server serves ${CRD_PLURAL}.${CRD_GROUP}..."
-        CRD_SERVED=""
         for i in $(seq 1 24); do
             if oc get "${CRD_PLURAL}.${CRD_GROUP}" -A --no-headers --request-timeout=10s 2>/dev/null; then
-                CRD_SERVED=1
                 break
             fi
             if [[ $i -eq 24 ]]; then
