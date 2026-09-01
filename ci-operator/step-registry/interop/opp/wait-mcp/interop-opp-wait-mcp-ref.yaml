@@ -1,0 +1,39 @@
+ref:
+  as: interop-opp-wait-mcp
+  from: cli
+  commands: interop-opp-wait-mcp-commands.sh
+  timeout: 4500s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  env:
+  - name: MCP_SETTLE_DELAY
+    default: "90"
+    documentation: Seconds to wait before first poll, allowing MachineConfig rendering to propagate
+  - name: MCP_WAIT_TIMEOUT
+    default: "3600"
+    documentation: Max seconds to wait for all non-paused MCPs to stabilize (default 60 min)
+  - name: MCP_CONSECUTIVE_CHECKS
+    default: "3"
+    documentation: Number of consecutive clean polls required before declaring stable
+  - name: MCP_MAX_UNAVAILABLE
+    default: "3"
+    documentation: Patch worker MCP maxUnavailable to parallelize node rollout (default 3 nodes at a time)
+  documentation: |-
+    Waits for all non-paused MachineConfigPools to reach a stable state
+    (not Updating, not Degraded, all nodes ready and schedulable). Patches
+    the worker MCP maxUnavailable to parallelize node rollout on large
+    clusters. Place before cucushift-installer-check-cluster-health in the
+    test chain to give large clusters time to finish MCP rollout after
+    operator installation.
+
+    On timeout, classifies the failure mode:
+    - DEGRADED: Hard failure. One or more MCPs have Degraded=True, indicating
+      a product interop issue where policies caused nodes to enter a bad state.
+    - UPDATING (progressing): Non-blocking. Ready count is monotonically
+      increasing but rollout was too slow for the timeout. Exits 0 and
+      defers to downstream health checks.
+    - UPDATING (oscillating): Hard failure. Ready count is not progressing,
+      suggesting nodes may be cycling due to conflicting configurations.
+    - UNKNOWN: Hard failure. Could not determine MCP state at timeout.
