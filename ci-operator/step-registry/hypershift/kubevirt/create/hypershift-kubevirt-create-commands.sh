@@ -289,7 +289,7 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: allow-ingress-from-host
+  name: allow-all-ingress
   namespace: ${CONTROL_PLANE_NAMESPACE}
 spec:
   endpointSelector: {}
