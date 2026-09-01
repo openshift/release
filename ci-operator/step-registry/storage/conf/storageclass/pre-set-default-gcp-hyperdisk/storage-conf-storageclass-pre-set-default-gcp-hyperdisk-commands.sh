@@ -3,6 +3,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+if [[ "${SET_DEFAULT_HYPERDISK_STORAGECLASS:-true}" != "true" ]]; then
+  echo "SET_DEFAULT_HYPERDISK_STORAGECLASS is not \"true\"; skipping default hyperdisk-balanced StorageClass and GCP PD CSI driver overrides."
+  exit 0
+fi
+
 cat << EOF > ${SHARED_DIR}/manifest_storageclass.yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
