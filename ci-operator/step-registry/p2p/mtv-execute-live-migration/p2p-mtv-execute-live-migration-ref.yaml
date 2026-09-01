@@ -31,6 +31,11 @@ ref:
     migrated VM from a peer virt-launcher pod on the destination spoke.  Probe failure
     is recorded in JUnit but does not fail the migration step (best-effort).
 
+    Data integrity check: when MTV_VM_DATA_INTEGRITY=true, reads back the cloud-init
+    marker file (/home/cloud-user/migration-marker.txt) from each destination VM via
+    QEMU Guest Agent and verifies its content equals the VM name.  Skipped gracefully
+    if virsh / QEMU GA is unavailable.  Failure recorded in JUnit; best-effort.
+
     Writes ${ARTIFACT_DIR}/mtv-live-migration-status.txt; diagnostics on failure under
     ${ARTIFACT_DIR}/mtv-live-migration-diagnostics/.
   env:
@@ -49,6 +54,14 @@ ref:
       virt-launcher compute container on the destination spoke.
       Failure is recorded in JUnit but does not block overall migration
       success (best-effort connectivity check).
+  - name: MTV_VM_DATA_INTEGRITY
+    default: "true"
+    documentation: |-
+      When true, verify that migration marker files written by cloud-init survive
+      migration intact.  Uses QEMU Guest Agent via the virt-launcher compute
+      container; gracefully skipped per VM if virsh / QEMU GA is unavailable
+      (e.g. cirros image type).  Failure recorded in JUnit; does not block
+      overall migration success (best-effort check).
   - name: MTV_NAMESPACE
     default: "openshift-mtv"
     documentation: Namespace where MTV Plan and Migration CRs live.
