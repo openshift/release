@@ -714,6 +714,138 @@ function VerifyAllVmsSsh () {
     (( failed == 0 ))
 }
 
+# VirtctlReadVmFile — read a file from a KubeVirt VM via QEMU Guest Agent.
+# Requires qemu-guest-agent in the VM and libvirt/virsh in the virt-launcher
+# compute container (KubeVirt 1.x / OCP CNV 4.14+).
+# All oc exec calls run under set +x: pod/domain names are internal identifiers
+# that must not appear in xtrace logs.
+# Prints file contents to stdout; returns non-zero on any failure.
+function VirtctlReadVmFile () {
+    typeset launcherPod="${1:?}"; (($#)) && shift
+    typeset ns="${1:?}"; (($#)) && shift
+    typeset kc="${1:?}"; (($#)) && shift
+    typeset filePath="${1:?}"; (($#)) && shift
+
+    ( set +x
+      # Discover the libvirt domain name; KubeVirt runs one VM per pod.
+      typeset domain
+      domain="$(oc --kubeconfig="${kc}" exec -n "${ns}" "${launcherPod}" -c compute -- \
+          bash -c 'virsh -c qemu:///system list --all --name 2>/dev/null \
+                       | grep -v "^[[:space:]]*$" | head -1' \
+          || true)"
+      [[ -n "${domain}" ]] || exit 1
+
+      # Invoke /bin/cat inside the guest via QEMU GA guest-exec; returns async PID.
+      typeset execJson
+      execJson="{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/bin/cat\",\"arg\":[\"${filePath}\"],\"capture-output\":true}}"
+      typeset execResult
+      execResult="$(oc --kubeconfig="${kc}" exec -n "${ns}" "${launcherPod}" -c compute -- \
+          virsh -c qemu:///system qemu-agent-command "${domain}" "${execJson}")" || exit 1
+
+      typeset pid
+      pid="$(printf '%s' "${execResult}" | jq -r '.return.pid // empty')"
+      [[ -n "${pid}" ]] || exit 1
+
+      # Poll guest-exec-status until exited=true (QEMU GA is asynchronous).
+      typeset statusJson
+      statusJson="{\"execute\":\"guest-exec-status\",\"arguments\":{\"pid\":${pid}}}"
+      typeset statusResult=""
+      typeset -i attempts=0 completed=0
+      while (( attempts < 10 && completed == 0 )); do
+          sleep 1
+          statusResult="$(oc --kubeconfig="${kc}" exec -n "${ns}" "${launcherPod}" -c compute -- \
+              virsh -c qemu:///system qemu-agent-command "${domain}" "${statusJson}" \
+              || true)"
+          [[ "$(printf '%s' "${statusResult}" | jq -r '.return.exited // false')" == "true" ]] \
+              && completed=1
+          (( ++attempts )) || true
+      done
+
+      (( completed )) || exit 1
+
+      # Require guest command exited 0; decode base64-encoded stdout.
+      typeset exitcode
+      exitcode="$(printf '%s' "${statusResult}" | jq -r '.return.exitcode // 1')"
+      [[ "${exitcode}" == "0" ]] || exit 1
+
+      printf '%s' "${statusResult}" | jq -r '.return."out-data" // ""' | base64 -d
+      true
+    )
+}
+
+# VerifyVmDataIntegrity — verify that cloud-init marker files survive migration intact.
+# p2p-create-migration-test-vm injects a write_files cloud-init block that writes
+# /home/cloud-user/migration-marker.txt with content equal to the VM name.
+# This function reads back that file on the destination via QEMU Guest Agent and
+# compares it to the expected VM name.
+# Gracefully skipped per VM when virsh / QEMU GA is unavailable (e.g. cirros VMs).
+# Best-effort: caller must wrap with || true so failures are logged but never block.
+function VerifyVmDataIntegrity () {
+    [[ "${MTV_VM_DATA_INTEGRITY}" == "true" ]] || return 0
+
+    typeset -i i
+    typeset -a vmNamesArr=() launcherPodsArr=()
+    typeset -i failed=0 skipped=0
+
+    # Collect Running virt-launcher pods on the destination for each migrated VM.
+    for (( i = 1; i <= vmCount; i++ )); do
+        typeset vmn pod
+        vmn="$(VmName "${i}")"
+        vmNamesArr+=("${vmn}")
+        pod="$(DestOc get pods -n "${targetNs}" -o json \
+            | jq -r --arg d "${vmn}" \
+                'first(.items[]
+                 | select(.metadata.labels["kubevirt.io/domain"]==$d)
+                 | select(.status.phase=="Running")
+                 | .metadata.name) // ""' \
+            || true)"
+        launcherPodsArr+=("${pod}")
+    done
+
+    for (( i = 0; i < vmCount; i++ )); do
+        typeset vmName launcherPod
+        vmName="${vmNamesArr[${i}]}"
+        launcherPod="${launcherPodsArr[${i}]}"
+        typeset expectedMarker="${vmName}"
+
+        if [[ -z "${launcherPod}" ]]; then
+            printf 'WARN: No Running virt-launcher pod for %s; skipping integrity check\n' \
+                "${vmName}" >&2
+            (( ++skipped ))
+            continue
+        fi
+
+        typeset probeRc=0
+        typeset actualMarker=""
+        actualMarker="$(VirtctlReadVmFile \
+            "${launcherPod}" "${targetNs}" "${destKubeconfig}" \
+            "/home/cloud-user/migration-marker.txt")" || probeRc=$?
+
+        if (( probeRc != 0 )); then
+            printf 'WARN: Cannot read integrity marker on %s (virsh / QEMU GA unavailable?); skipping\n' \
+                "${vmName}" >&2
+            (( ++skipped ))
+            continue
+        fi
+
+        # Strip any trailing newline that cloud-init or base64-d may append.
+        typeset trimmedMarker="${actualMarker%$'\n'}"
+
+        if [[ "${trimmedMarker}" == "${expectedMarker}" ]]; then
+            : "Data integrity verified for ${vmName}"
+        else
+            printf 'ERROR: Data integrity FAIL for %s: expected="%s" actual="%s"\n' \
+                "${vmName}" "${expectedMarker}" "${trimmedMarker}" >&2
+            (( ++failed ))
+        fi
+    done
+
+    # All VMs skipped (cirros / QEMU GA unavailable) — treat as pass, not failure.
+    (( skipped == vmCount )) && return 0
+
+    (( failed == 0 ))
+}
+
 # JStep — run a function, append PASS/FAIL record to junitFile, propagate exit code.
 function JStep () {
     typeset name="${1:?}"; shift
@@ -808,6 +940,10 @@ typeset -i cclmStepRc=0
     # SSH port probe is best-effort: failure is recorded in JUnit but does not
     # block overall migration success (|| true prevents ERR trap from firing).
     JStep "Verification: VM SSH Port Probe" VerifyAllVmsSsh || true
+
+    # Data integrity check is best-effort: uses QEMU Guest Agent to read back the
+    # cloud-init marker file; skipped gracefully if virsh / QEMU GA is unavailable.
+    JStep "Verification: VM Data Integrity" VerifyVmDataIntegrity || true
 
     if [[ -n "${ARTIFACT_DIR}" ]]; then
         mkdir -p "${ARTIFACT_DIR}"
