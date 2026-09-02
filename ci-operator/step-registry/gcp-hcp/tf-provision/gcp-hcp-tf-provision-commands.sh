@@ -115,6 +115,35 @@ fi
 
 log "Template rendered to: ${RENDERED_DIR}"
 
+# --- Write predictable project IDs to SHARED_DIR early ---
+# Project IDs are deterministic from RUN_ID and REGION. Write them now so
+# the cleanup step can find and delete projects even if terraform apply fails
+# partway through. Without this, a partial apply leaves orphaned GCP projects
+# that burn money until the 24h TFC auto-destroy fires.
+REGION_CODE=$(python3 -c "
+import yaml, sys
+regions = yaml.safe_load(open('${REPO_ROOT}/terraform/metadata/regions.yaml'))['regions']
+print(regions.get('${REGION}', ''))
+")
+if [[ -z "${REGION_CODE}" ]]; then
+  log "ERROR: Unknown region '${REGION}' — not found in metadata/regions.yaml"
+  exit 1
+fi
+
+REGION_PROJECT_ID="e2e-reg-${REGION_CODE}-${RUN_ID}"
+MC_PROJECT_ID="e2e-mgt-${REGION_CODE}-${RUN_ID}"
+
+echo "${REGION_PROJECT_ID}" > "${SHARED_DIR}/region-project-id"
+echo "${REGION_PROJECT_ID}-gke" > "${SHARED_DIR}/region-cluster-name"
+echo "${MC_PROJECT_ID}" > "${SHARED_DIR}/mc-project-id"
+echo "${MC_PROJECT_ID}-gke" > "${SHARED_DIR}/mc-cluster-name"
+echo "${WORKSPACE_NAME}" > "${SHARED_DIR}/workspace-name"
+echo "${RUN_ID}" > "${SHARED_DIR}/run-id"
+
+log "Early SHARED_DIR outputs written (for cleanup on failure):"
+log "  Region Project: ${REGION_PROJECT_ID}"
+log "  MC Project:     ${MC_PROJECT_ID}"
+
 # --- Configure Terraform ---
 
 cd "${RENDERED_DIR}"
@@ -339,11 +368,7 @@ if [[ -n "${INFRA_ID}" ]]; then
   echo "https://platform-api-${REGION}-${INFRA_ID}.platform-ci.gcp-hcp.devshift.net" > "${SHARED_DIR}/api-endpoint"
 fi
 
-# Save metadata for deprovision step
-echo "${WORKSPACE_NAME}" > "${SHARED_DIR}/workspace-name"
-echo "${RUN_ID}" > "${SHARED_DIR}/run-id"
-
-# Validate critical outputs were written
+# Validate critical outputs were written (early writes + terraform outputs)
 for output_file in region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id workspace-name run-id; do
   if [[ ! -s "${SHARED_DIR}/${output_file}" ]]; then
     log "ERROR: Output file ${output_file} is empty or missing"
