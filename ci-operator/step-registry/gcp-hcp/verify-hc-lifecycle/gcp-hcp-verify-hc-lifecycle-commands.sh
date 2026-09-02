@@ -4,13 +4,12 @@ set -euo pipefail
 echo "=== GCP HCP HC Lifecycle Validation ==="
 echo ""
 
-# Verify gcphcpctl binary exists (built by gcp-hcp-build-gcphcpctl step)
-if [[ ! -f "${SHARED_DIR}/gcphcpctl" ]]; then
-  echo "ERROR: gcphcpctl binary not found at ${SHARED_DIR}/gcphcpctl"
-  echo "The gcp-hcp-build-gcphcpctl step must run before this step"
+# Verify gcphcpctl binary exists (built into the gcp-hcp-e2e-tests image)
+if [[ ! -f "/usr/bin/gcphcpctl" ]]; then
+  echo "ERROR: gcphcpctl binary not found at /usr/bin/gcphcpctl"
+  echo "The gcp-hcp-e2e-tests image must include gcphcpctl"
   exit 1
 fi
-chmod +x "${SHARED_DIR}/gcphcpctl"
 
 # Verify required SHARED_DIR files exist
 for f in api-endpoint oidc-endpoint customer-project-id; do
@@ -40,7 +39,7 @@ echo ""
 # The Ginkgo test reads SHARED_DIR files directly via resolveConfig().
 # GCPHCPCTL_PATH is the only env var that must be set explicitly because
 # the binary is in SHARED_DIR (not on PATH).
-export GCPHCPCTL_PATH="${SHARED_DIR}/gcphcpctl"
+export GCPHCPCTL_PATH="/usr/bin/gcphcpctl"
 
 # Run Ginkgo v2 test binary
 echo "Running HC lifecycle validation tests..."
