@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/5.1-upgrade-from-stable-5.0-e2e-aws-ovn-upgrade
     decorate: true
     decoration_config:
@@ -94,7 +94,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/5.1-upgrade-from-stable-5.0-e2e-aws-ovn-upgrade-ipsec
     decorate: true
     decoration_config:
@@ -183,7 +183,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build04
+    cluster: build02
     context: ci/prow/5.1-upgrade-from-stable-5.0-e2e-gcp-ovn-rt-upgrade
     decorate: true
     decoration_config:
@@ -333,7 +333,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/cudn-density-single-ns-1000-24nodes
     decorate: true
     decoration_config:
@@ -420,7 +420,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/cudn-density-single-ns-800-24nodes
     decorate: true
     decoration_config:
@@ -507,7 +507,94 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
+    context: ci/prow/cudn-density-single-ns-800-24nodes-workaround
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.base
+      - Dockerfile.microshift
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-main-cudn-density-single-ns-800-24nodes-workaround
+    optional: true
+    rerun_command: /test cudn-density-single-ns-800-24nodes-workaround
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=cudn-density-single-ns-800-24nodes-workaround
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cudn-density-single-ns-800-24nodes-workaround,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
     context: ci/prow/cudn-incremental-1000-24nodes
     decorate: true
     decoration_config:
@@ -684,7 +771,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -770,7 +857,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-clusternetwork-cidr-expansion
     decorate: true
     decoration_config:
@@ -859,7 +946,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-edge-zones
     decorate: true
     decoration_config:
@@ -947,7 +1034,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-fdp-qe
     decorate: true
     decoration_config:
@@ -1123,7 +1210,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-local-gateway
     decorate: true
     decoration_config:
@@ -1211,7 +1298,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-local-to-shared-gateway-mode-migration
     decorate: true
     decoration_config:
@@ -1299,7 +1386,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-microshift
     decorate: true
     decoration_config:
@@ -1559,7 +1646,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-rhcos10-techpreview
     decorate: true
     decoration_config:
@@ -1648,7 +1735,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     decoration_config:
@@ -1734,7 +1821,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-serial-ipsec
     decorate: true
     decoration_config:
@@ -1910,7 +1997,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-shared-to-local-gateway-mode-migration
     decorate: true
     decoration_config:
@@ -1996,7 +2083,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-single-node-techpreview
     decorate: true
     decoration_config:
@@ -2083,7 +2170,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
     decoration_config:
@@ -2172,7 +2259,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     decoration_config:
@@ -2258,7 +2345,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade-ipsec
     decorate: true
     decoration_config:
@@ -2347,7 +2434,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade-local-gateway
     decorate: true
     decoration_config:
@@ -2435,7 +2522,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
     decoration_config:
@@ -2959,7 +3046,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     decoration_config:
@@ -3219,7 +3306,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     decoration_config:
@@ -4453,7 +4540,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-metal-ovn-fdp-qe-ipv6
     decorate: true
     decoration_config:
@@ -4541,7 +4628,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-openstack-ovn
     decorate: true
     decoration_config:
@@ -4628,7 +4715,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
     decoration_config:
@@ -5170,7 +5257,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/okd-scos-e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -5319,7 +5406,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build04
+    cluster: build02
     context: ci/prow/openshift-e2e-gcp-ovn-techpreview-upgrade
     decorate: true
     decoration_config:
@@ -5406,7 +5493,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/ovncore-perfscale-aws-ovn-large-cluster-density-v2
     decorate: true
     decoration_config:
@@ -5520,7 +5607,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/ovncore-perfscale-aws-ovn-large-node-density-cni
     decorate: true
     decoration_config:
@@ -5634,7 +5721,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
     decorate: true
     decoration_config:
@@ -5748,7 +5835,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-node-density-cni
     decorate: true
     decoration_config:
@@ -5862,7 +5949,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/ovncore-perfscale-aws-ovn-xxlarge-cluster-density-v2
     decorate: true
     decoration_config:
@@ -5977,7 +6064,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/ovncore-perfscale-aws-ovn-xxlarge-node-density-cni
     decorate: true
     decoration_config:
@@ -6092,7 +6179,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/perfscale-aws-ovn-medium-cluster-density-v2
     decorate: true
     decoration_config:
@@ -6179,7 +6266,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/perfscale-aws-ovn-small-cluster-density-v2
     decorate: true
     decoration_config:
@@ -6266,7 +6353,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/perfscale-aws-ovn-small-node-density-cni
     decorate: true
     decoration_config:
@@ -6353,7 +6440,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-churn-l3
     decorate: true
     decoration_config:
@@ -6440,7 +6527,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-l2
     decorate: true
     decoration_config:
@@ -6528,7 +6615,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-l3
     decorate: true
     decoration_config:
@@ -6616,7 +6703,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build09
     context: ci/prow/qe-perfscale-payload-control-plane-6nodes
     decorate: true
     decoration_config:
