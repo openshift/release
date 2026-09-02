@@ -41,6 +41,7 @@ tests:
   steps:
     cluster_profile: gcp-observability
     env:
+      AGENT_SKILL: tempo
       MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1204531
       MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH: rhosdt-3.11
       OPERATORS: |
@@ -54,6 +55,8 @@ tests:
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
       SKIP_TESTS: tests/e2e-openshift-object-stores/*
+    post:
+    - ref: openshift-observability-qe-agent
     test:
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
