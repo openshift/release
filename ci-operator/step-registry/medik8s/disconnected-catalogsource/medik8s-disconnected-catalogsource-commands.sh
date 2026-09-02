@@ -21,6 +21,10 @@ if [[ ! -s "${SHARED_DIR}/workload_image" ]]; then
 fi
 WORKLOAD_IMAGE=$(sed 's/:[^/]*$//' "${SHARED_DIR}/workload_image")
 declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation}"
+# Must-gather image used by the observability/must-gather e2e specs. It must be
+# mirrored here so the disconnected cluster can pull it; the oc-mirror IDMS then
+# transparently redirects the test's original ref to the mirror.
+declare MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-quay.io/medik8s/must-gather:latest}"
 
 collect_artifacts() {
     log "Collecting debug artifacts..."
@@ -147,6 +151,7 @@ kind: ImageSetConfiguration
 mirror:
   additionalImages:
   - name: ${WORKLOAD_IMAGE}:latest
+  - name: ${MUST_GATHER_IMAGE}
   operators:
   - catalog: ${fbc_image}
     packages:
