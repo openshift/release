@@ -39,4 +39,13 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
   export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi
 
-./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml" --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" --max-concurrency 100
+if [[ -n "${ARO_HCP_TEST_NAME:-}" ]]; then
+  # Focused single-spec mode: run exactly one test by its exact name.  run-test
+  # selects by name and writes JSON results to stdout (it has no --junit-path),
+  # so pass/fail is conveyed by the exit code and the JSON is captured in the
+  # build log.  ARO_HCP_SUITE_NAME is ignored in this mode.  Used by smoke jobs
+  # such as the weekly single OpenShift 5 install.
+  ./test/aro-hcp-tests run-test -n "${ARO_HCP_TEST_NAME}"
+else
+  ./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml" --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" --max-concurrency 100
+fi
