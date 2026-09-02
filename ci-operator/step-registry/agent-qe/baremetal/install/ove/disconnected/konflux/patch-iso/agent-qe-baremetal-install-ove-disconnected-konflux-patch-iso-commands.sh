@@ -8,10 +8,7 @@ set -o nounset
 # Trap to kill children processes
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 
-yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-id.txt
-
-OVE_ISO_STORAGE_HOST=$(<"${SHARED_DIR}"/cluster_name).$(<"${CLUSTER_PROFILE_DIR}"/base_domain)
-HOST_ID=$(<"${SHARED_DIR}"/host-id.txt)
+OVE_ISO_STORAGE_HOST=$(<"${CLUSTER_PROFILE_DIR}/ove_iso_storage_host")
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -19,10 +16,14 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'TCPKeepAlive=yes'
   -o 'ServerAliveInterval=30'
   -o LogLevel=ERROR
-  -i "${CLUSTER_PROFILE_DIR}/ssh-key"
-  -p $((14000+"${HOST_ID}")))
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 SSH_KEY=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" root@access."${OVE_ISO_STORAGE_HOST}" patch_ove_iso_ignition_file.sh "${CLUSTER_NAME}.agent-ove.x86_64.iso" "${SSH_KEY}"
+CONTAINER_NAME="haproxy-$(<"${SHARED_DIR}"/cluster_name)"
+
+timeout -s 9 10m ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" \
+  "nsenter -n -t \"\$(podman inspect -f '{{ .State.Pid }}' \"${CONTAINER_NAME}\")\" \
+   ssh -o StrictHostKeyChecking=no root@\"${OVE_ISO_STORAGE_HOST}\" patch_ove_iso_ignition_file.sh \
+    \"${CLUSTER_NAME}.agent-ove.x86_64.iso\" \"${SSH_KEY}\""

@@ -2,7 +2,7 @@ ref:
   as: p2p-mtv-execute-live-migration
   from: cli
   commands: p2p-mtv-execute-live-migration-commands.sh
-  timeout: 3h0m0s
+  timeout: 6h0m0s
   grace_period: 15m0s
   resources:
     requests:
@@ -24,9 +24,31 @@ ref:
     Spoke kubeconfigs default to SHARED_DIR/managed-cluster-kubeconfig-1 (source) and
     managed-cluster-kubeconfig-2 (destination).
 
+    When MTV_TEST_VM_COUNT>1, all VMs are included in a single MTV Plan and migrated
+    together.  Verification and SSH probing loop over all N VMs.
+
+    Post-migration SSH probe: when MTV_VM_SSH_VERIFY=true, TCP-probes port 22 on each
+    migrated VM from a peer virt-launcher pod on the destination spoke.  Probe failure
+    is recorded in JUnit but does not fail the migration step (best-effort).
+
     Writes ${ARTIFACT_DIR}/mtv-live-migration-status.txt; diagnostics on failure under
     ${ARTIFACT_DIR}/mtv-live-migration-diagnostics/.
   env:
+  - name: MTV_TEST_VM_COUNT
+    default: "1"
+    documentation: |-
+      Number of VMs to include in the MTV Plan and verify after migration.
+      When 1, behaves identically to the single-VM path (backward compat).
+      When greater than 1, VMs must be named test-vm-1 through test-vm-N
+      and must have been created by p2p-create-migration-test-vm with the
+      same CNV_TEST_VM_COUNT value.
+  - name: MTV_VM_SSH_VERIFY
+    default: "true"
+    documentation: |-
+      When true, probe SSH port 22 on each migrated VM from a peer
+      virt-launcher compute container on the destination spoke.
+      Failure is recorded in JUnit but does not block overall migration
+      success (best-effort connectivity check).
   - name: MTV_NAMESPACE
     default: "openshift-mtv"
     documentation: Namespace where MTV Plan and Migration CRs live.

@@ -128,6 +128,21 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
+- always_run: false
+  as: tls-scanner-vsphere
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "2"
+      SCANNER_MEMORY: 2Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-vsphere
 zz_generated_metadata:
   branch: release-5.1
   org: openshift

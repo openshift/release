@@ -1,0 +1,1 @@
+../wait-for-tls-pods/oran-o2ims-wait-for-tls-pods-commands.sh

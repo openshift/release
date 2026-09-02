@@ -30,12 +30,14 @@ images:
   - dockerfile_literal: |
       FROM nested-podman
       USER root
-      # Install Python and test dependencies; LocalStack runs as a Podman container
-      RUN dnf install -y --nodocs python3-pip && \
-          dnf clean all && \
-          pip3 install --no-cache-dir \
-          pytest boto3 requests awscli-local
+      # Install Python 3.11+ (ci-run.sh detects python3.11 automatically)
+      # LocalStack runs as a Podman container (nested-podman base required)
+      RUN dnf install -y --nodocs python3.11 python3.11-pip && \
+          dnf clean all
       COPY . /workspace/
+      # Install test dependencies from pyproject.toml (includes PyJWT, cryptography)
+      WORKDIR /workspace/rosa-boundary/tests/localstack
+      RUN python3.11 -m pip install --no-cache-dir .
     from: nested-podman
     inputs:
       src:
