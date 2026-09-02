@@ -120,11 +120,7 @@ log "Template rendered to: ${RENDERED_DIR}"
 # the cleanup step can find and delete projects even if terraform apply fails
 # partway through. Without this, a partial apply leaves orphaned GCP projects
 # that burn money until the 24h TFC auto-destroy fires.
-REGION_CODE=$(python3 -c "
-import yaml, sys
-regions = yaml.safe_load(open('${REPO_ROOT}/terraform/metadata/regions.yaml'))['regions']
-print(regions.get('${REGION}', ''))
-")
+REGION_CODE=$(grep "^  ${REGION}:" "${REPO_ROOT}/terraform/metadata/regions.yaml" | awk '{print $2}')
 if [[ -z "${REGION_CODE}" ]]; then
   log "ERROR: Unknown region '${REGION}' — not found in metadata/regions.yaml"
   exit 1
