@@ -2,8 +2,9 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -x
-oc config view
+# Do not enable `set -x`: these scripts read and export Elasticsearch
+# credentials (ES_USERNAME/ES_PASSWORD) and construct an authenticated
+# ES_SERVER URL; tracing would leak them into the CI logs.
 oc projects
 oc version
 pushd /tmp
@@ -24,11 +25,17 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
 export WORKLOAD="etcd-density db-quota-pressure"
+# Patch the indexing call in run.sh so the fingerprint records "db-quota-pressure"
+sed -i '/index\.sh/s|WORKLOAD="$WORKLOAD"|WORKLOAD="db-quota-pressure"|' run.sh
 
 # Variant-specific flags
 EXTRA_FLAGS="--iterations=${ITERATIONS} --iterations-per-namespace=${ITERATIONS_PER_NAMESPACE} --kb-chunks=${KB_CHUNKS} --kb-size=${KB_SIZE}"
-# Flags not handled by run.sh
-EXTRA_FLAGS+=" --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE}"
+# Flags not handled by run.sh.
+# --gc is driven by this step's own GC ref env, which defaults to false for
+# db-quota-pressure only (see the ref) so etcd stays under storage pressure
+# while co-scheduled workloads such as cluster-density-v2 keep their GC default.
+EXTRA_FLAGS+=" --gc=${GC} --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --metrics-profile=${METRICS_PROFILES}"
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
@@ -51,12 +58,4 @@ if [[ -d ${METRICS_FOLDER} ]]; then
     cp -r ${METRICS_FOLDER} "${ARTIFACT_DIR}/"
 fi
 
-if [[ "${RUN_EXIT_CODE}" -eq 2 ]]; then
-    echo "kube-burner returned exit code 2 (timeout)"
-    if /tmp/kube-burner-ocp cluster-health; then
-        echo "Cluster healthy. Ignoring timeout."
-        oc delete ns -l kube-burner.io/uuid
-        exit 0
-    fi
-fi
 exit ${RUN_EXIT_CODE}

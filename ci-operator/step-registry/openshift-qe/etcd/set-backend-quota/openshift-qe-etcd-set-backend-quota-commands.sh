@@ -4,6 +4,17 @@ set -o nounset
 set -o pipefail
 set -x
 
+# Validate the target quota up front: it must be an integer within the
+# supported 8-32 GiB range before we touch the cluster with `oc`.
+if ! [[ "${ETCD_BACKEND_QUOTA_GIB}" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: ETCD_BACKEND_QUOTA_GIB must be an integer, got '${ETCD_BACKEND_QUOTA_GIB}'." >&2
+    exit 1
+fi
+if (( ETCD_BACKEND_QUOTA_GIB < 8 || ETCD_BACKEND_QUOTA_GIB > 32 )); then
+    echo "ERROR: ETCD_BACKEND_QUOTA_GIB must be within 8-32 GiB, got '${ETCD_BACKEND_QUOTA_GIB}'." >&2
+    exit 1
+fi
+
 # The default OCP etcd backend quota is 8 GiB; nothing to do if we're staying there.
 # Keeping this a no-op at 8 lets the same step be reused (harmlessly) by the 8GB job.
 if [[ "${ETCD_BACKEND_QUOTA_GIB}" -eq 8 ]]; then
