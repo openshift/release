@@ -14,13 +14,21 @@ collect_operator_logs() {
         oc get events -n "${ns}" --sort-by='.lastTimestamp' \
             > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
     fi
-    # Capture PKO manager logs and events for debugging reconciliation issues
-    if [[ -n "${ARTIFACT_DIR:-}" ]] && oc get namespace openshift-package-operator &>/dev/null; then
-        oc logs deployment/package-operator-manager -n openshift-package-operator \
-            --all-containers --tail=200 \
-            > "${ARTIFACT_DIR}/pko-manager-logs.txt" 2>&1 || true
-        oc get events -n openshift-package-operator --sort-by='.lastTimestamp' \
-            > "${ARTIFACT_DIR}/pko-namespace-events.txt" 2>&1 || true
+    # Collect PKO diagnostics for debugging ClusterPackage reconciliation issues
+    if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+        local pko_ns="openshift-package-operator"
+        if oc get namespace "${pko_ns}" &>/dev/null; then
+            for deploy in $(oc get deployment -n "${pko_ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true); do
+                oc logs "deployment/${deploy}" -n "${pko_ns}" --all-containers --tail=500 \
+                    > "${ARTIFACT_DIR}/pko-${deploy}-logs.txt" 2>&1 || true
+            done
+            oc get events -n "${pko_ns}" --sort-by='.lastTimestamp' \
+                > "${ARTIFACT_DIR}/pko-namespace-events.txt" 2>&1 || true
+        fi
+        oc get clusterpackage "${CLUSTER_PACKAGE_NAME:-}" -o yaml \
+            > "${ARTIFACT_DIR}/clusterpackage-dump.yaml" 2>/dev/null || true
+        oc get clusterobjectset -o wide \
+            > "${ARTIFACT_DIR}/clusterobjectset-list.txt" 2>/dev/null || true
     fi
 }
 
@@ -105,42 +113,34 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
     oc rollout status deployment -n openshift-package-operator --timeout=120s 2>/dev/null || true
     log "PKO restarted with CI pull secret"
 
-    # Wait for PKO manager to be fully ready (informer caches synced).
-    # oc rollout status only confirms pods are Running; the manager's
-    # informers/watches may not yet be synced. If we create a ClusterPackage
-    # before sync completes, PKO never sees the create event.
-    log "Waiting for PKO manager readiness..."
-    PKO_READY=""
-    for i in $(seq 1 24); do
-        # Primary check: controller-runtime /readyz endpoint on the manager pod
-        PKO_POD=$(oc get pod -n openshift-package-operator \
-            -l app.kubernetes.io/name=package-operator \
-            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-        if [[ -n "${PKO_POD}" ]]; then
-            if oc exec "${PKO_POD}" -n openshift-package-operator -- \
-                wget -q --spider -T 2 http://localhost:8081/readyz 2>/dev/null; then
-                PKO_READY=1
+    # PKO readiness gate: after restart, wait for PKO controllers to be actively
+    # reconciling before creating a new ClusterPackage. If existing ClusterPackages
+    # are present, wait until at least one has a .status.phase (indicating the
+    # controllers are processing). Otherwise fall back to a brief stabilization sleep.
+    EXISTING_CPS=$(oc get clusterpackage --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true)
+    if [[ -n "${EXISTING_CPS}" ]]; then
+        log "Waiting for PKO controllers to reconcile existing ClusterPackages..."
+        PKO_READY=""
+        for i in $(seq 1 12); do
+            for cp in ${EXISTING_CPS}; do
+                PHASE=$(oc get clusterpackage "${cp}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+                if [[ -n "${PHASE}" ]]; then
+                    log "PKO is active: ClusterPackage ${cp} has phase=${PHASE}"
+                    PKO_READY=1
+                    break
+                fi
+            done
+            if [[ -n "${PKO_READY}" ]]; then
                 break
             fi
-        fi
-        # Fallback: deployment Available + pod Ready conditions
-        if oc wait deployment/package-operator-manager -n openshift-package-operator \
-            --for=condition=Available --timeout=1s 2>/dev/null; then
-            if oc wait pod -n openshift-package-operator \
-                -l app.kubernetes.io/name=package-operator \
-                --for=condition=Ready --timeout=1s 2>/dev/null; then
-                PKO_READY=1
-                break
+            if [[ $i -eq 12 ]]; then
+                log "WARNING: No existing ClusterPackage has a status.phase after 60s, proceeding anyway"
             fi
-        fi
-        sleep 5
-    done
-    if [[ -n "${PKO_READY}" ]]; then
-        # Brief grace period for informer cache sync after health check passes
-        log "PKO manager ready, waiting 10s for informer cache sync"
-        sleep 10
+            sleep 5
+        done
     else
-        log "WARNING: PKO readiness check timed out after 2 minutes, proceeding anyway"
+        log "No existing ClusterPackages found, waiting 15s for PKO controller stabilization"
+        sleep 15
     fi
 
     # Add CI pull secret to the operator namespace so operator pods can pull
@@ -319,24 +319,18 @@ for i in $(seq 1 30); do
     if oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
         break
     fi
-    # Check ClusterPackage status for early failure detection (image pull errors, etc.)
-    CP_STATUS=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" \
-        -o jsonpath='{.status.conditions[?(@.type=="Invalid")].status}' 2>/dev/null || true)
-    if [[ "${CP_STATUS}" == "True" ]]; then
-        CP_MSG=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" \
-            -o jsonpath='{.status.conditions[?(@.type=="Invalid")].message}' 2>/dev/null || true)
-        log "ERROR: ClusterPackage ${CLUSTER_PACKAGE_NAME} is Invalid: ${CP_MSG}"
-        oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o yaml || true
-        exit 1
-    fi
-    CP_UNPACK=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" \
-        -o jsonpath='{.status.conditions[?(@.type=="Unpacked")].status}' 2>/dev/null || true)
-    if [[ "${CP_UNPACK}" == "False" ]]; then
-        CP_MSG=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" \
-            -o jsonpath='{.status.conditions[?(@.type=="Unpacked")].message}' 2>/dev/null || true)
-        log "ERROR: ClusterPackage ${CLUSTER_PACKAGE_NAME} failed to unpack: ${CP_MSG}"
-        oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o yaml || true
-        exit 1
+    # Poll ClusterPackage status for progress and early error detection
+    CP_PHASE=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+    if [[ -n "${CP_PHASE}" ]]; then
+        log "  ClusterPackage ${CLUSTER_PACKAGE_NAME} phase: ${CP_PHASE} (attempt ${i}/30)"
+        if [[ "${CP_PHASE}" == "Invalid" || "${CP_PHASE}" == *"Error"* ]]; then
+            log "ERROR: ClusterPackage ${CLUSTER_PACKAGE_NAME} has terminal phase: ${CP_PHASE}"
+            oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o yaml 2>/dev/null || true
+            oc get clusterobjectset -o wide 2>/dev/null || true
+            exit 1
+        fi
+    else
+        log "  ClusterPackage ${CLUSTER_PACKAGE_NAME} phase: <not set> (attempt ${i}/30)"
     fi
     if [[ $i -eq 30 ]]; then
         log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} not found after 5 minutes"
