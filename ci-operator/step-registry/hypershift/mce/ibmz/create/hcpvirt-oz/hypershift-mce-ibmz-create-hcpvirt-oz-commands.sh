@@ -58,7 +58,7 @@ hcp create cluster kubevirt \
   --release-image ${OCP_IMAGE_MULTI} \
   --render-sensitive --render > /tmp/hc-manifests/kubevirt-hc.yaml
 
-  echo "$(date) Rendered manifests to /tmp/hc-manifests/kubevirt-hc.yaml"
+echo "$(date) Rendered manifests to /tmp/hc-manifests/kubevirt-hc.yaml"
 cat /tmp/hc-manifests/kubevirt-hc.yaml
 
 # Patch the APIServer servicePublishingStrategy from LoadBalancer → NodePort
