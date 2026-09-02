@@ -1,0 +1,27 @@
+ref:
+  as: hypershift-kubevirt-destroy
+  cli: latest
+  commands: hypershift-kubevirt-destroy-commands.sh
+  env:
+    - name: MCE_VERSION
+      default: ""
+      documentation: "version of the mce if installed. (\"\", 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10)"
+    - name: ATTACH_DEFAULT_NETWORK
+      default: ""
+      documentation: |-
+        Passed through from hypershift-kubevirt-create. When localnet-multi, destroy waits up
+        to 60 minutes instead of 30.
+    - name: HYPERSHIFT_KUBEVIRT_CLUSTER_DESTROY_TIMEOUT
+      default: ""
+      documentation: |-
+        Total seconds for cluster destroy (hcp destroy + wait for HostedCluster deletion).
+        Empty uses 1800s (30m), or 3600s (60m) when ATTACH_DEFAULT_NETWORK=localnet-multi.
+  from: hypershift-operator
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 75m0s
+  documentation: |-
+    Destroy a KubeVirt HostedCluster and wait until the HostedCluster CR is removed.
