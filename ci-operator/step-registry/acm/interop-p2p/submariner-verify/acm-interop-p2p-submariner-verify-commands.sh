@@ -55,14 +55,17 @@ InstallSubctl() {
     # Versioned releases (vX.Y.Z) must have a trusted digest; rolling branch
     # tags (release-X.Y) skip digest verification by design.
     typeset expectedSha=""
-    if [[ "${version}" =~ ^v[0-9] ]]; then
+    if [[ "${version}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         expectedSha="${_subctlDigests["${version}"]:-}"
         if [[ -z "${expectedSha}" ]]; then
             : "SUBMARINER_SUBCTL_VERSION=${version} is a versioned release but has no trusted SHA-256 in _subctlDigests; add its SHA-256 to proceed"
             false
         fi
+    elif [[ "${version}" =~ ^release-[0-9]+\.[0-9]+$ ]]; then
+        : "INFO: SUBMARINER_SUBCTL_VERSION=${version} is a rolling branch tag — SHA-256 verification skipped"
     else
-        : "INFO: SUBMARINER_SUBCTL_VERSION=${version} is a rolling branch tag — SHA-256 verification skipped (artifact rebuilt on every branch push)"
+        printf 'ERROR: SUBMARINER_SUBCTL_VERSION=%s is not a recognised format (use vX.Y.Z or release-X.Y)\n' "${version}" >&2
+        false
     fi
 
     typeset archiveName="subctl-${version}-linux-amd64.tar.xz"
