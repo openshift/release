@@ -32,11 +32,18 @@ az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 MUST_GATHER_DIR="${ARTIFACT_DIR}/must-gather"
 mkdir -p "${MUST_GATHER_DIR}"
 
+# Scope the query to the last 3 hours to cover the CI job window and avoid
+# hitting Kusto server limits. The default --limit -1 (unlimited) causes
+# server-side errors; 2000 rows per query is sufficient for a CI run.
+TIMESTAMP_MIN=$(date -u -d '3 hours ago' '+%Y-%m-%d %H:%M:%S')
+
 # hcpctl must-gather is best-effort: partial data is better than no data.
 if ! hcpctl must-gather query \
   --kusto "${KUSTO_NAME}" \
   --region "${KUSTO_REGION}" \
   --subscription-id "${INFRA_SUBSCRIPTION_ID}" \
+  --timestamp-min "${TIMESTAMP_MIN}" \
+  --limit 2000 \
   --output-path "${MUST_GATHER_DIR}"; then
   echo "WARNING: hcpctl must-gather query failed, compressing partial output"
 fi
