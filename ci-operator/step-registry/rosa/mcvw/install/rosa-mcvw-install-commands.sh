@@ -33,7 +33,6 @@ OPERATOR_DEPLOYMENT_NAME="${OPERATOR_DEPLOYMENT_NAME:-validation-webhook}"
 CLUSTER_PACKAGE_NAME="${CLUSTER_PACKAGE_NAME:-${OPERATOR_NAME}-e2e-test}"
 
 log "Installing ${OPERATOR_NAME} via PKO Package (mcvw variant)"
-log "  Package: ${CLUSTER_PACKAGE_NAME}"
 log "  PKO image: ${OPERATOR_PKO_IMAGE}"
 log "  Operator image: ${OPERATOR_IMAGE}"
 log "  Namespace: ${OPERATOR_NAMESPACE}"
@@ -85,23 +84,6 @@ else
     oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 fi
 
-# Remove any leftover e2e Package from a previous run on this lease cluster.
-# MCVW uses a namespaced Package (scopes: [Namespaced] in manifest.yaml),
-# not a ClusterPackage, so we clean up the Package resource in the namespace.
-if oc get package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
-    log "Removing leftover e2e Package ${CLUSTER_PACKAGE_NAME}"
-    oc delete package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" --timeout=60s || true
-    for i in $(seq 1 12); do
-        RESULT=$(oc get package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" --ignore-not-found -o name 2>&1) || true
-        if [[ -z "${RESULT}" ]]; then break; fi
-        if [[ $i -eq 12 ]]; then
-            oc patch package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" \
-                --type merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
-        fi
-        sleep 5
-    done
-fi
-
 # Fetch the cluster service CA. MCVW's PKO package requires serviceca in the
 # Package config to populate the caBundle field in ValidatingWebhookConfigurations.
 log "Fetching cluster service CA"
@@ -116,10 +98,34 @@ if [[ -z "${SERVICE_CA}" ]]; then
 fi
 log "Service CA fetched (${#SERVICE_CA} bytes base64)"
 
-# Create a namespaced Package CR. MCVW's manifest declares scopes: [Namespaced],
-# so we use Package (not ClusterPackage). The config schema only accepts
-# image and serviceca; namespace comes from the Package resource itself.
-cat <<EOF | oc apply -f -
+# MCVW is already deployed as a platform component on ROSA lease clusters.
+# Patch the existing Package to use the CI-built images instead of creating a
+# new conflicting Package. PKO refuses to adopt objects (webhook-cert ConfigMap,
+# etc.) that are already managed by another Package revision.
+log "Looking for existing Package in ${OPERATOR_NAMESPACE}"
+EXISTING_PACKAGE=$(oc get package -n "${OPERATOR_NAMESPACE}" \
+    --no-headers -o custom-columns=':metadata.name' 2>/dev/null | head -1 || true)
+
+if [[ -n "${EXISTING_PACKAGE}" ]]; then
+    log "Found existing Package '${EXISTING_PACKAGE}', patching to CI images"
+    ORIG_PKO_IMAGE=$(oc get package "${EXISTING_PACKAGE}" -n "${OPERATOR_NAMESPACE}" \
+        -o jsonpath='{.spec.image}')
+    ORIG_OP_IMAGE=$(oc get package "${EXISTING_PACKAGE}" -n "${OPERATOR_NAMESPACE}" \
+        -o jsonpath='{.spec.config.image}')
+    if [[ -n "${SHARED_DIR:-}" ]]; then
+        echo "${EXISTING_PACKAGE}" > "${SHARED_DIR}/operator-e2e-clusterpackage"
+        echo "${OPERATOR_NAMESPACE}" > "${SHARED_DIR}/operator-e2e-namespace"
+        echo "${ORIG_PKO_IMAGE}" > "${SHARED_DIR}/operator-e2e-orig-pko-image"
+        echo "${ORIG_OP_IMAGE}" > "${SHARED_DIR}/operator-e2e-orig-op-image"
+    fi
+    oc patch package "${EXISTING_PACKAGE}" -n "${OPERATOR_NAMESPACE}" \
+        --type merge -p \
+        "{\"spec\":{\"image\":\"${OPERATOR_PKO_IMAGE}\",\"config\":{\"image\":\"${OPERATOR_IMAGE}\",\"serviceca\":\"${SERVICE_CA}\"}}}"
+    CLUSTER_PACKAGE_NAME="${EXISTING_PACKAGE}"
+    log "Package '${EXISTING_PACKAGE}' patched to CI images"
+else
+    log "No existing Package found, creating new Package ${CLUSTER_PACKAGE_NAME}"
+    cat <<EOF | oc apply -f -
 apiVersion: package-operator.run/v1alpha1
 kind: Package
 metadata:
@@ -133,27 +139,11 @@ spec:
     image: ${OPERATOR_IMAGE}
     serviceca: "${SERVICE_CA}"
 EOF
-
-# Save for the cleanup step
-if [[ -n "${SHARED_DIR:-}" ]]; then
-    echo "${CLUSTER_PACKAGE_NAME}" > "${SHARED_DIR}/operator-e2e-clusterpackage"
-    echo "${OPERATOR_NAMESPACE}" > "${SHARED_DIR}/operator-e2e-namespace"
+    if [[ -n "${SHARED_DIR:-}" ]]; then
+        echo "${CLUSTER_PACKAGE_NAME}" > "${SHARED_DIR}/operator-e2e-clusterpackage"
+        echo "${OPERATOR_NAMESPACE}" > "${SHARED_DIR}/operator-e2e-namespace"
+    fi
 fi
-
-# Wait for PKO to reconcile and create the deployment
-log "Waiting for deployment ${OPERATOR_DEPLOYMENT_NAME} to exist..."
-for i in $(seq 1 30); do
-    if oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
-        break
-    fi
-    if [[ $i -eq 30 ]]; then
-        log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} not found after 5 minutes"
-        oc get package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml || true
-        oc get objectset -n "${OPERATOR_NAMESPACE}" 2>/dev/null | grep "${OPERATOR_NAME}" || true
-        exit 1
-    fi
-    sleep 10
-done
 
 SA_PATCHED=""
 log "Waiting for deployment ${OPERATOR_DEPLOYMENT_NAME} to be ready..."
@@ -184,8 +174,10 @@ for attempt in $(seq 1 30); do
         log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} not ready after 5 minutes"
         oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
         oc get pods -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
+        oc get package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
         exit 1
     fi
+    sleep 10
 done
 
 log "${OPERATOR_NAME} installed and ready in ${OPERATOR_NAMESPACE}"

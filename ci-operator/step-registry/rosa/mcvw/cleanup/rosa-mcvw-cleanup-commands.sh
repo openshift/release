@@ -21,7 +21,7 @@ if [[ -n "${SHARED_DIR:-}" ]]; then
 fi
 
 if [[ -z "${OPERATOR_NAMESPACE}" ]]; then
-    OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-openshift-validation-webhook}"
+    OPERATOR_NAMESPACE="openshift-validation-webhook"
 fi
 
 # Collect operator logs as artifacts before cleanup
@@ -39,6 +39,27 @@ fi
 
 if [[ -z "${PACKAGE_NAME}" ]]; then
     log "No Package to clean up"
+    exit 0
+fi
+
+# If we patched an existing production Package, restore its original images.
+# If we created a new Package, delete it.
+ORIG_PKO_IMAGE=$(cat "${SHARED_DIR}/operator-e2e-orig-pko-image" 2>/dev/null || true)
+ORIG_OP_IMAGE=$(cat "${SHARED_DIR}/operator-e2e-orig-op-image" 2>/dev/null || true)
+
+if [[ -n "${ORIG_PKO_IMAGE}" ]]; then
+    log "Restoring production images for Package '${PACKAGE_NAME}'"
+    if oc get package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+        PATCH="{\"spec\":{\"image\":\"${ORIG_PKO_IMAGE}\"}}"
+        if [[ -n "${ORIG_OP_IMAGE}" ]]; then
+            PATCH="{\"spec\":{\"image\":\"${ORIG_PKO_IMAGE}\",\"config\":{\"image\":\"${ORIG_OP_IMAGE}\"}}}"
+        fi
+        oc patch package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" \
+            --type merge -p "${PATCH}" 2>/dev/null || true
+        log "Package '${PACKAGE_NAME}' restored to production images"
+    else
+        log "Package '${PACKAGE_NAME}' no longer exists, nothing to restore"
+    fi
     exit 0
 fi
 
