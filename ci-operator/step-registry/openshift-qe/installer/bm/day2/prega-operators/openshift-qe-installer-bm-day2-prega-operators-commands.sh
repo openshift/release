@@ -88,11 +88,20 @@ if [ ${OCP_BUILD} == "dev" ]; then
     image: quay.io/prega/prega-operator-index:${OPERATOR_PREGA_VERSION}
     sourceType: grpc
     displayName: Openshift Pre-GA Operators
+    grpcPodConfig:
+      securityContextConfig: restricted
 EOF
 
   echo "Waiting for CatalogSource to be ready"
   sleep 300
-  kubectl wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY catalogsource/prega-operator-index -n openshift-marketplace --timeout=300s
+  if ! kubectl wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY catalogsource/prega-operator-index -n openshift-marketplace --timeout=300s; then
+    echo "CatalogSource prega-operator-index did not become READY"
+    oc get catalogsource prega-operator-index -n openshift-marketplace -o yaml || true
+    oc get pods -n openshift-marketplace -o wide || true
+    oc describe pods -n openshift-marketplace -l olm.catalogSource=prega-operator-index || true
+    oc get events -n openshift-marketplace --sort-by='.lastTimestamp' | tail -80 || true
+    exit 1
+  fi
   echo "CatalogSource is ready"
   oc get catalogsources.operators.coreos.com -n openshift-marketplace
   oc get packagemanifests.packages.operators.coreos.com
