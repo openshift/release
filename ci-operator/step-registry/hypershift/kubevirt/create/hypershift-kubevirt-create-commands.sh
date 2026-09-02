@@ -250,29 +250,31 @@ if [[ "${CNI_PROVIDER}" == "cilium" ]]; then
   fi
 
   oc apply -f - <<EOF
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
   name: virt-launcher-allow-all-egress
   namespace: ${CONTROL_PLANE_NAMESPACE}
 spec:
-  endpointSelector:
+  podSelector:
     matchLabels:
       kubevirt.io: virt-launcher
+  policyTypes:
+    - Egress
   egress:
-    - toEntities:
-        - all
+    - {}
 ---
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
   name: allow-all-ingress
   namespace: ${CONTROL_PLANE_NAMESPACE}
 spec:
-  endpointSelector: {}
+  podSelector: {}
+  policyTypes:
+    - Ingress
   ingress:
-    - fromEntities:
-        - all
+    - {}
 EOF
 
   echo "CiliumNetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
