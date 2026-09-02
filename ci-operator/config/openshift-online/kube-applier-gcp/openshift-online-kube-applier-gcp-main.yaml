@@ -21,10 +21,19 @@ tests:
     unset GOFLAGS
     gcloud beta emulators firestore start \
       --host-port=127.0.0.1:8681 >"${ARTIFACT_DIR}/firestore-emulator.log" 2>&1 &
+    EMULATOR_READY=false
     for i in $(seq 1 30); do
-      if curl -s -o /dev/null http://127.0.0.1:8681 2>/dev/null; then break; fi
+      if curl -s -o /dev/null http://127.0.0.1:8681 2>/dev/null; then
+        echo "Firestore emulator ready after ${i}s"
+        EMULATOR_READY=true
+        break
+      fi
       sleep 1
     done
+    if [ "$EMULATOR_READY" != "true" ]; then
+      echo "Firestore emulator did not start within 30s"
+      exit 1
+    fi
     export FIRESTORE_EMULATOR_HOST=127.0.0.1:8681
     make test
   container:
