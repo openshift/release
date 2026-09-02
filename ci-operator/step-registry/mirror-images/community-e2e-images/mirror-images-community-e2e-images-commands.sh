@@ -25,6 +25,23 @@ MIRROR_REPO="${MIRROR_REGISTRY_HOST}/${MIRROR_REGISTRY_PATH}"
 echo "Discovering community e2e test images required by this release via 'openshift-tests images'..."
 openshift-tests images --to-repository "${MIRROR_REPO}" | grep "${MIRROR_REPO}" >> "${SHARED_DIR}/mirror-images-list.yaml"
 
+# `openshift-tests images` does not include the current registry.k8s.io/pause
+# tags in its output (their layers aren't compressed, which quay.io's mirror
+# path used to compute the tool's output doesn't support). Since pause is the
+# pod sandbox/infra container used by virtually every pod, missing it breaks
+# almost every test in a disconnected cluster. Mirror the known versions
+# explicitly as a workaround, matching the same fallback used by
+# openstack-test-e2e-images.
+cat <<EOF >> "${SHARED_DIR}/mirror-images-list.yaml"
+registry.k8s.io/pause:3.9 ${MIRROR_REPO}:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
+registry.k8s.io/pause:3.9 ${MIRROR_REPO}:e2e-28-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
+registry.k8s.io/pause:3.10 ${MIRROR_REPO}:e2e-25-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY
+registry.k8s.io/pause:3.10 ${MIRROR_REPO}:e2e-27-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY
+registry.k8s.io/pause:3.10.1 ${MIRROR_REPO}:e2e-22-registry-k8s-io-pause-3-10-1-a6__nK-VRxiifU0Z
+registry.k8s.io/pause:3.10.1 ${MIRROR_REPO}:e2e-25-registry-k8s-io-pause-3-10-1-a6__nK-VRxiifU0Z
+registry.k8s.io/pause:3.10.2 ${MIRROR_REPO}:e2e-22-registry-k8s-io-pause-3-10-2-Xnr_kb1i4Z5Tu7vt
+EOF
+
 if [[ -n "${EXTRA_MIRROR_IMAGES}" ]]; then
     echo "Appending EXTRA_MIRROR_IMAGES entries:"
     echo "${EXTRA_MIRROR_IMAGES}"
