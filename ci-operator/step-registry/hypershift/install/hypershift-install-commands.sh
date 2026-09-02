@@ -211,7 +211,11 @@ case "${CLOUD_PROVIDER}" in
   # Older hypershift branches don't bundle the DNSEndpoint CRD (openshift/hypershift#9433).
   # Detect via the operator's own render output instead of branching on version,
   # so behavior always tracks what install would actually do.
-  if ! "${HCP_CLI}" install render --outputs=crds "${CMD_ARGS[@]}" 2>/dev/null | grep -q 'name: dnsendpoints.externaldns.k8s.io'; then
+  # Captured separately from the grep so a failed render (as opposed to a
+  # successful render simply missing the CRD) surfaces as a hard failure
+  # instead of silently falling through to the manual-apply branch.
+  RENDERED_CRDS="$("${HCP_CLI}" install render --outputs=crds "${CMD_ARGS[@]}")"
+  if ! echo "${RENDERED_CRDS}" | grep -q 'name: dnsendpoints.externaldns.k8s.io'; then
     echo "DNSEndpoint CRD not bundled by this hypershift version, installing manually..."
     # Pinned to the commit tagged v0.15.0 (immutable, unlike the mutable tag ref).
     oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/bf70e3f0acbfbf2fce0bc71a4ca2fd6850de4903/docs/contributing/crd-source/crd-manifest.yaml
