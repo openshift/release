@@ -386,6 +386,19 @@ if [ -f "${CHRONY_MASTER_YAML}" ]; then
   cp ${CHRONY_MASTER_YAML} "${INSTALL_DIR}/manifests"
 fi
 
+# Copy MTU MachineConfig manifests written by upi-conf-libvirt-commands.sh
+MTU_WORKER_YAML="${SHARED_DIR}/99-mtu-worker.yaml"
+if [[ -f "${MTU_WORKER_YAML}" ]]; then
+  echo "Saving ${MTU_WORKER_YAML} to the install manifests directory..."
+  cp "${MTU_WORKER_YAML}" "${INSTALL_DIR}/manifests/"
+fi
+
+MTU_MASTER_YAML="${SHARED_DIR}/99-mtu-master.yaml"
+if [[ -f "${MTU_MASTER_YAML}" ]]; then
+  echo "Saving ${MTU_MASTER_YAML} to the install manifests directory..."
+  cp "${MTU_MASTER_YAML}" "${INSTALL_DIR}/manifests/"
+fi
+
 # Check for the master mcp yaml config, and save it in the installation directory
 MCP_MASTER_YAML="${SHARED_DIR}/manifest_master.machineconfigpool.yaml"
 if [[ -f "${MCP_MASTER_YAML}" ]]; then

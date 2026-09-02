@@ -80,6 +80,65 @@ sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
 
+# Write MachineConfigs that set the primary interface MTU to 9000 (jumbo frames)
+# at node boot time, before any OVN-Kubernetes tunnels are created.
+# This avoids a post-install MCO rolling reboot entirely — nodes come up with
+# the correct MTU from first boot. The MachineConfig drops a NetworkManager
+# keyfile into /etc/NetworkManager/conf.d/ that forces MTU=9000 on enc1.
+# Both worker and master roles are covered so all 5 nodes get the setting.
+if [[ "${ARCH}" == "s390x" ]]; then
+  MTU_VALUE="${CLUSTER_MTU:-9000}"
+  NM_CONF_B64="$(base64 -w0 <<EOF
+[connection-enc1-mtu]
+match-device=interface-name:enc1
+ethernet.mtu=${MTU_VALUE}
+EOF
+)"
+  echo "Writing MTU=${MTU_VALUE} MachineConfig manifests for worker and master..."
+
+  cat > "${SHARED_DIR}/99-mtu-worker.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-mtu-worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,${NM_CONF_B64}
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/NetworkManager/conf.d/99-mtu.conf
+EOF
+
+  cat > "${SHARED_DIR}/99-mtu-master.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 99-mtu-master
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,${NM_CONF_B64}
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/NetworkManager/conf.d/99-mtu.conf
+EOF
+fi
+
 if [ ${FIPS_ENABLED} = "true" ]; then
 	echo "Adding 'fips: true' to the install config..."
 	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
