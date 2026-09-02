@@ -49,6 +49,8 @@ REGION_PROJECT=$(<"${SHARED_DIR}/region-project-id")
 REGION_CLUSTER=$(<"${SHARED_DIR}/region-cluster-name")
 MC_PROJECT=$(<"${SHARED_DIR}/mc-project-id")
 MC_CLUSTER=$(<"${SHARED_DIR}/mc-cluster-name")
+SERVICE_PROJECT=$(cat "${SHARED_DIR}/service-project-id" 2>/dev/null || echo "")
+CUSTOMER_PROJECT=$(cat "${SHARED_DIR}/customer-project-id" 2>/dev/null || echo "")
 REGION=${GCP_REGION:-us-central1}
 
 # Get project numbers
@@ -56,9 +58,15 @@ REGION_PROJECT_NUMBER=$(gcloud projects describe "${REGION_PROJECT}" --format='v
 MC_PROJECT_NUMBER=$(gcloud projects describe "${MC_PROJECT}" --format='value(projectNumber)' 2>/dev/null || echo "")
 
 log "Infrastructure to clean up:"
-log "  Region:  ${REGION_PROJECT} (#${REGION_PROJECT_NUMBER}) / ${REGION_CLUSTER}"
-log "  MC:      ${MC_PROJECT} (#${MC_PROJECT_NUMBER}) / ${MC_CLUSTER}"
-log "  Region:  ${REGION}"
+log "  Region:   ${REGION_PROJECT} (#${REGION_PROJECT_NUMBER}) / ${REGION_CLUSTER}"
+log "  MC:       ${MC_PROJECT} (#${MC_PROJECT_NUMBER}) / ${MC_CLUSTER}"
+if [[ -n "${SERVICE_PROJECT}" ]]; then
+  log "  Service:  ${SERVICE_PROJECT}"
+fi
+if [[ -n "${CUSTOMER_PROJECT}" ]]; then
+  log "  Customer: ${CUSTOMER_PROJECT}"
+fi
+log "  Region:   ${REGION}"
 log ""
 
 # Helper: build kubeconfig with fresh access token using Connect Gateway
@@ -492,12 +500,24 @@ delete_negs "${MC_PROJECT}" "MC" || true
 # Phase 4: Delete DNS records
 delete_dns_records "${REGION_PROJECT}" "Region" || true
 
+# Phase 4b: Delete Cloud Endpoints services (blocks project deletion)
+if [[ -n "${SERVICE_PROJECT}" ]]; then
+  log "--- Deleting Cloud Endpoints service in ${SERVICE_PROJECT} ---"
+  gcloud endpoints services delete "hcp-api.endpoints.${SERVICE_PROJECT}.cloud.goog"     --project="${SERVICE_PROJECT}" --quiet 2>/dev/null || true
+fi
+
 # Phase 5: Force-delete projects (this is the key difference from terraform destroy)
 log ""
 log "=== Force-deleting GCP projects ==="
 log "This bypasses terraform destroy for reliability — project deletion cascades to all resources"
 delete_project "${MC_PROJECT}" "MC"
 delete_project "${REGION_PROJECT}" "Region"
+if [[ -n "${SERVICE_PROJECT}" ]]; then
+  delete_project "${SERVICE_PROJECT}" "Service"
+fi
+if [[ -n "${CUSTOMER_PROJECT}" ]]; then
+  delete_project "${CUSTOMER_PROJECT}" "Customer"
+fi
 
 # Phase 6: Clear TFC workspace state
 log ""
@@ -505,5 +525,5 @@ clear_tfc_workspace
 
 log ""
 log "=== Cleanup complete ==="
-log "Projects ${REGION_PROJECT} and ${MC_PROJECT} are now in PENDING_DELETE state (30-day soft delete)"
+log "Projects are now in PENDING_DELETE state (30-day soft delete)"
 log "TFC workspace state has been cleared"

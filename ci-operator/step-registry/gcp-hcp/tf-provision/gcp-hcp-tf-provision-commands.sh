@@ -128,17 +128,20 @@ fi
 
 REGION_PROJECT_ID="e2e-reg-${REGION_CODE}-${RUN_ID}"
 MC_PROJECT_ID="e2e-mgt-${REGION_CODE}-${RUN_ID}"
+SERVICE_PROJECT_ID="e2e-svc-${REGION_CODE}-${RUN_ID}"
 
 echo "${REGION_PROJECT_ID}" > "${SHARED_DIR}/region-project-id"
 echo "${REGION_PROJECT_ID}-gke" > "${SHARED_DIR}/region-cluster-name"
 echo "${MC_PROJECT_ID}" > "${SHARED_DIR}/mc-project-id"
 echo "${MC_PROJECT_ID}-gke" > "${SHARED_DIR}/mc-cluster-name"
+echo "${SERVICE_PROJECT_ID}" > "${SHARED_DIR}/service-project-id"
 echo "${WORKSPACE_NAME}" > "${SHARED_DIR}/workspace-name"
 echo "${RUN_ID}" > "${SHARED_DIR}/run-id"
 
 log "Early SHARED_DIR outputs written (for cleanup on failure):"
-log "  Region Project: ${REGION_PROJECT_ID}"
-log "  MC Project:     ${MC_PROJECT_ID}"
+log "  Region Project:  ${REGION_PROJECT_ID}"
+log "  MC Project:      ${MC_PROJECT_ID}"
+log "  Service Project: ${SERVICE_PROJECT_ID}"
 
 # --- Configure Terraform ---
 
