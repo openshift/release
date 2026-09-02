@@ -1,0 +1,133 @@
+ref:
+  as: kuadrant-ppc64le-run-testsuite
+  from: kuadrant-testsuite
+  cli: latest
+  commands: kuadrant-ppc64le-run-testsuite-commands.sh
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+    limits:
+      memory: 8Gi
+  timeout: 8h0m0s
+  env:
+  - name: TESTSUITE_PPC64LE_IMAGE
+    default: "quay.io/vray_rh/rhcl-testsuite:stablev1-ppc64le"
+    documentation: |-
+      ppc64le-native Kuadrant testsuite image run as an in-cluster Job on a ppc64le
+      worker node. Running on the cluster network is what lets the test client
+      resolve *.COREDNS_ZONE (CoreDNS ClusterIP) and reach the Gateway MetalLB
+      IPs directly, unlike the amd64 build-farm step pod.
+  - name: TESTSUITE_RUN_AS_USER
+    default: "65532"
+    documentation: |-
+      UID/GID used for the in-cluster Job securityContext (runAsUser/runAsGroup/
+      fsGroup). Must match the image USER and file ownership so `make` can write
+      stamp files under WORKDIR. The step also grants anyuid to the namespace
+      default ServiceAccount so this explicit UID is allowed.
+  - name: PROTOBUF_PIN
+    default: "6.32.1"
+    documentation: |-
+      Exact protobuf version pinned in the Job via `poetry add` before make,
+      so poetry sync cannot upgrade to >=6.33.0 (broken ppc64le upb wheels;
+      protocolbuffers/protobuf#24103).
+  - name: TEST_RUNNER_NAMESPACE
+    default: "kuadrant-testrunner"
+    documentation: |-
+      Namespace created on the target cluster to host the test-runner Job, its
+      config Secret (dynaconf settings + admin kubeconfig) and resolver ConfigMap.
+  - name: PYTEST_FLAGS
+    default: "-n4"
+    documentation: |-
+      Extra pytest flags passed to make targets via the `flags` variable (e.g. "-n4"
+      for pytest-xdist workers on ppc64le). Pair with enough in-cluster Job CPU.
+      The step always appends --ignore=testsuite/tests/singlecluster/ui
+      (no Playwright in the ppc64le image).
+  - name: RUN_SMOKE
+    default: "true"
+    documentation: |-
+      When "true", run `make smoke` first. Enabled by default.
+  - name: RUN_AUTHORINO
+    default: "false"
+    documentation: |-
+      Optional. When "true", run `make authorino` after smoke. Default false.
+  - name: RUN_LIMITADOR
+    default: "false"
+    documentation: |-
+      Optional. When "true", run `make limitador`. Default false.
+  - name: RUN_DNSTLS
+    default: "false"
+    documentation: |-
+      Optional. When "true", run `make dnstls`. Default false.
+  - name: RUN_OBSERVABILITY
+    default: "false"
+    documentation: |-
+      Optional. When "true", run `make observability`. Default false.
+  - name: RUN_KUADRANT
+    default: "true"
+    documentation: |-
+      When "true", run `make kuadrant` (catch-all single-cluster suite; excludes
+      standalone_only, disruptive, ui). Enabled by default.
+  - name: HTTPBIN_IMAGE
+    default: "quay.io/vray_rh/rhcl_testsuite_dependencies:httpbin-ppc64le"
+    documentation: |-
+      httpbin image referenced in the generated testsuite config (deployed by the testsuite per test).
+  - name: GRPCBIN_IMAGE
+    default: "quay.io/mtahoor/grpcbin:ppc64le"
+    documentation: |-
+      grpcbin image referenced in the generated testsuite config (deployed by the testsuite per test).
+  - name: MOCKSERVER_IMAGE
+    default: "quay.io/vray_rh/rhcl_testsuite_dependencies:mockserver-ppc64le-fixed-v10"
+    documentation: |-
+      Mockserver image deployed by the testsuite per test (ppc64le). v10 is required
+      because the suite's echo expectations use Velocity (not GraalJS/JavaScript);
+      see Kuadrant/testsuite#952.
+  - name: LLM_SIM_IMAGE
+    default: "quay.io/vray_rh/rhcl_testsuite_dependencies:llm-d-inference-sim-ppc64le-v091-fixed"
+    documentation: |-
+      LLM simulator image referenced in the generated testsuite config.
+  - name: SPICEDB_IMAGE
+    default: "quay.io/vray_rh/rhcl_testsuite_dependencies:spicedb-ppc64le"
+    documentation: |-
+      SpiceDB image referenced in the generated testsuite config.
+  - name: DNS_PROVIDER_SECRET_NAME
+    default: "coredns-credentials"
+    documentation: |-
+      DNS provider Secret name written into control_plane.provider_secret in the config.
+  - name: COREDNS_ZONE
+    default: "k.example.com"
+    documentation: |-
+      CoreDNS zone for DNS resolution within the in-cluster Job (must match install-coredns).
+  - name: COREDNS_NAMESPACE
+    default: "kuadrant-coredns"
+    documentation: |-
+      Namespace where kuadrant-coredns is deployed (used to look up ClusterIP).
+  - name: TOOLS_NAMESPACE
+    default: "tools"
+    documentation: |-
+      Namespace where Keycloak/Mockserver/Jaeger were deployed by deploy-tools.
+  - name: KUADRANT_NAMESPACE
+    default: "kuadrant-system"
+    documentation: |-
+      Namespace where the Kuadrant operator and CR are installed.
+  - name: KEYCLOAK_ADMIN_USERNAME
+    default: "admin"
+    documentation: |-
+      Keycloak admin username (written into dynaconf secrets.yaml).
+  - name: KEYCLOAK_ADMIN_PASSWORD
+    default: "admin"
+    documentation: |-
+      Keycloak admin password (written into dynaconf secrets.yaml; masked in logs).
+  - name: CLUSTER_ISSUER_NAME
+    default: "selfsigned-cluster-issuer"
+    documentation: |-
+      Name of the cert-manager self-signed ClusterIssuer (must match install-operator).
+  documentation: |-
+    Runs the Kuadrant testsuite as an in-cluster Job on a ppc64le worker node using
+    a ppc64le-native testsuite image. The Job runs on the cluster network so it can
+    resolve *.COREDNS_ZONE via CoreDNS ClusterIP and reach MetalLB Gateway IPs
+    directly (unlike the amd64 build-farm step pod). Applies ppc64le-specific
+    workarounds in-Job: Velocity MockServer echo expectations, dataplane-ready patch,
+    protobuf pin, and cfssl installation. Collects JUnit XML via base64-encoded
+    markers in the Job log, with resilient log following to handle network drops.
