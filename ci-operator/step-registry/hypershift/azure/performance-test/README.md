@@ -56,7 +56,7 @@ Post Steps:
 ```
 
 ### Infrastructure
-- **Management Cluster**: Nested OpenShift cluster on Azure (Standard_D16s_v3)
+- **Management Cluster**: Nested OpenShift cluster on Azure (Standard_D16s_v5)
 - **Region**: centralus (configurable via `HYPERSHIFT_AZURE_LOCATION`)
 - **Storage**: managed-csi-premium-v2 for etcd
 - **Base Domain**: hcp-sm-azure.azure.devcluster.openshift.com
