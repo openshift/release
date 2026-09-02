@@ -24,14 +24,58 @@ done
 # - gcloud auth login: for gcloud CLI commands (access tokens)
 # - GOOGLE_APPLICATION_CREDENTIALS: for GCP Go SDK clients used by
 #   gcphcpctl --setup-infra (IAM, networking)
-# - CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT: WIF credentials can't
-#   generate identity tokens directly. Impersonating the e2e-hc-submitter
-#   SA lets gcloud produce identity tokens for the Gecko Platform API.
+# - A temporary e2e-hc-submitter key: WIF credentials can't generate identity
+#   tokens directly, so gcloud uses the submitter account for Platform API auth.
 if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
   echo "Authenticating with WIF credential..."
   gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet
   export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
-  export CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT="e2e-hc-submitter@gcp-hcp-platform-ci.iam.gserviceaccount.com"
+
+  E2E_HC_SUBMITTER_SA="e2e-hc-submitter@gcp-hcp-platform-ci.iam.gserviceaccount.com"
+  E2E_HC_SUBMITTER_KEY_DIR="$(mktemp -d)"
+  E2E_HC_SUBMITTER_KEY_FILE="${E2E_HC_SUBMITTER_KEY_DIR}/key.json"
+  E2E_HC_SUBMITTER_KEY_ID=""
+
+  cleanup_e2e_hc_submitter_key() {
+    local key_id="${E2E_HC_SUBMITTER_KEY_ID}"
+    if [[ -z "${key_id}" && -s "${E2E_HC_SUBMITTER_KEY_FILE}" ]]; then
+      key_id="$(jq -r '.private_key_id // empty' "${E2E_HC_SUBMITTER_KEY_FILE}")"
+    fi
+
+    if [[ -n "${key_id}" ]]; then
+      echo "Deleting temporary e2e HC submitter key..."
+      if gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet; then
+        if ! gcloud iam service-accounts keys delete "${key_id}" \
+          --iam-account="${E2E_HC_SUBMITTER_SA}" \
+          --quiet; then
+          echo "WARNING: Failed to delete temporary key ${key_id}"
+        fi
+      else
+        echo "WARNING: Failed to restore WIF authentication; temporary key ${key_id} was not deleted"
+      fi
+    fi
+
+    rm -f "${E2E_HC_SUBMITTER_KEY_FILE}"
+    rmdir "${E2E_HC_SUBMITTER_KEY_DIR}" 2>/dev/null || true
+  }
+  trap cleanup_e2e_hc_submitter_key EXIT
+
+  echo "Creating temporary key for ${E2E_HC_SUBMITTER_SA}..."
+  gcloud iam service-accounts keys create "${E2E_HC_SUBMITTER_KEY_FILE}" \
+    --iam-account="${E2E_HC_SUBMITTER_SA}" \
+    --quiet
+  E2E_HC_SUBMITTER_KEY_ID="$(jq -er '.private_key_id | select(type == "string" and length > 0)' "${E2E_HC_SUBMITTER_KEY_FILE}")"
+
+  echo "Activating ${E2E_HC_SUBMITTER_SA} for identity token authentication..."
+  gcloud auth activate-service-account "${E2E_HC_SUBMITTER_SA}" \
+    --key-file="${E2E_HC_SUBMITTER_KEY_FILE}" \
+    --quiet
+
+  if ! gcloud auth print-identity-token >/dev/null; then
+    echo "ERROR: Failed to generate an identity token for ${E2E_HC_SUBMITTER_SA}"
+    exit 1
+  fi
+  echo "Identity token authentication verified successfully"
 else
   echo "WARNING: WIF credential not found, relying on existing gcloud auth"
 fi
