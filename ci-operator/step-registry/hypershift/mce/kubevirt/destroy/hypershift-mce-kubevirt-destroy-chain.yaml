@@ -10,6 +10,13 @@ chain:
           source "${SHARED_DIR}/proxy-conf.sh"
         fi
 
+        DEBUG_WAIT_TIMEOUT="${DEBUG_WAIT_TIMEOUT:-0}"
+        if [[ -n "${DEBUG_WAIT_TIMEOUT}" && "${DEBUG_WAIT_TIMEOUT}" != "0" ]]; then
+          echo "Debug wait: sleeping for ${DEBUG_WAIT_TIMEOUT} seconds before cluster destroy..."
+          sleep "${DEBUG_WAIT_TIMEOUT}"
+          echo "Debug wait complete."
+        fi
+
         HYPERSHIFT_NAME=hcp
         arch=$(arch)
         if [ "$arch" == "x86_64" ]; then
@@ -46,3 +53,8 @@ chain:
         default: "local-cluster"
         documentation: |-
           Namespace of hosted control plane cluster
+      - name: DEBUG_WAIT_TIMEOUT
+        default: "0"
+        documentation: |-
+          Seconds to sleep before starting cluster destroy. Runs in the post phase so the
+          cluster remains available for debugging after pre or test step failures. Set to 0 to skip.

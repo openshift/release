@@ -9,6 +9,13 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+DEBUG_WAIT_TIMEOUT="${DEBUG_WAIT_TIMEOUT:-0}"
+if [[ -n "${DEBUG_WAIT_TIMEOUT}" && "${DEBUG_WAIT_TIMEOUT}" != "0" ]]; then
+  echo "Debug wait: sleeping for ${DEBUG_WAIT_TIMEOUT} seconds before cluster destroy..."
+  sleep "${DEBUG_WAIT_TIMEOUT}"
+  echo "Debug wait complete."
+fi
+
 MCE=${MCE_VERSION:-""}
 CLUSTER_NAME="$(echo -n "${PROW_JOB_ID}" | sha256sum | cut -c-20)"
 if [[ -n ${MCE} ]]; then

@@ -283,9 +283,66 @@ vmi_guest_agent_ready() {
   local vmi="$2"
   local ga_status
 
-  ga_status=$(oc get vmi -n "${multi_ns}" "${vmi}" \
-    -o jsonpath='{.status.conditions[?(@.type=="GuestAgentConnected")].status}' 2>/dev/null || true)
-  [[ "${ga_status}" == "True" ]]
+  # KubeVirt reports AgentConnected; older virtctl paths used GuestAgentConnected.
+  for ga_status in \
+    "$(oc get vmi -n "${multi_ns}" "${vmi}" \
+      -o jsonpath='{.status.conditions[?(@.type=="AgentConnected")].status}' 2>/dev/null || true)" \
+    "$(oc get vmi -n "${multi_ns}" "${vmi}" \
+      -o jsonpath='{.status.conditions[?(@.type=="GuestAgentConnected")].status}' 2>/dev/null || true)"; do
+    [[ "${ga_status}" == "True" ]] && return 0
+  done
+  return 1
+}
+
+wait_for_vmi_primary_ip() {
+  local multi_ns="$1"
+  local vmi="$2"
+  local attempt vmi_ip
+
+  for attempt in $(seq 1 60); do
+    vmi_ip=$(oc get vmi -n "${multi_ns}" "${vmi}" \
+      -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || true)
+    if [[ -n "${vmi_ip}" ]]; then
+      return 0
+    fi
+    sleep 5
+  done
+  echo "WARNING: Timed out waiting for primary localnet IP on VMI ${vmi}"
+  return 1
+}
+
+localnet_multi_label_namespace_privileged() {
+  local multi_ns="$1"
+
+  oc label namespace "${multi_ns}" \
+    pod-security.kubernetes.io/enforce=privileged \
+    pod-security.kubernetes.io/audit=privileged \
+    pod-security.kubernetes.io/warn=privileged \
+    security.openshift.io/scc.podSecurityLabelSync=false --overwrite 2>/dev/null || true
+}
+
+# SSH helper pods run in the HostedCluster namespace (local-cluster), not the HCP
+# namespace (local-cluster-<id>), which enforces restricted PodSecurity and blocks
+# dhcp-renew pods. The cluster SSH key secret already lives in CLUSTER_NAMESPACE_PREFIX.
+localnet_multi_ssh_pod_namespace() {
+  echo "${CLUSTER_NAMESPACE_PREFIX}"
+}
+
+localnet_multi_ssh_pod_image() {
+  echo "${LOCALNET_MULTI_SSH_POD_IMAGE:-registry.redhat.io/openshift4/ose-cli:latest}"
+}
+
+localnet_multi_ssh_pod_security_context() {
+  cat <<'EOF'
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+EOF
 }
 
 wait_for_vmi_guest_agent() {
@@ -348,13 +405,15 @@ verify_localnet_multi_vmi_default_route() {
 
   [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]] || return 0
 
-  if ! wait_for_vmi_guest_agent "${multi_ns}" "${vmi}"; then
+  inner_script="ip route show default 2>/dev/null || echo '(none)'; ip -6 addr show scope global 2>/dev/null || true"
+  if output=$(localnet_multi_route_output_via_ssh "${multi_ns}" "${vmi}" "${inner_script}"); then
+    :
+  elif wait_for_vmi_guest_agent "${multi_ns}" "${vmi}"; then
+    output=$(localnet_multi_guest_exec_output "${multi_ns}" "${vmi}" "${inner_script}") || return 1
+  else
     localnet_multi_log_check "${vmi}" "default_route=MISSING guest_agent=unavailable"
     return 1
   fi
-
-  inner_script="ip route show default 2>/dev/null || echo '(none)'; ip -6 addr show scope global 2>/dev/null || true"
-  output=$(localnet_multi_guest_exec_output "${multi_ns}" "${vmi}" "${inner_script}") || return 1
 
   if localnet_multi_output_has_default_route "${output}"; then
     if localnet_multi_output_has_ipv6_on_localnet "${output}"; then
@@ -512,6 +571,81 @@ wait_for_localnet_multi_vmis_running() {
   return 1
 }
 
+localnet_multi_route_output_via_ssh() {
+  local multi_ns="$1"
+  local vmi="$2"
+  local remote_script="$3"
+  local vmi_ip vmi_node check_pod
+
+  if ! prepare_localnet_multi_dhcp_renewal_secret "${multi_ns}"; then
+    return 1
+  fi
+  if ! wait_for_vmi_primary_ip "${multi_ns}" "${vmi}"; then
+    return 1
+  fi
+
+  vmi_ip=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
+  vmi_node=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.nodeName}' 2>/dev/null)
+  if [[ -z "${vmi_ip}" || -z "${vmi_node}" ]]; then
+    return 1
+  fi
+
+  check_pod="route-check-${vmi##*-}"
+  local ssh_ns
+  ssh_ns=$(localnet_multi_ssh_pod_namespace)
+  if ! cat <<ROUTE_CHECK_EOF | oc apply -f -; then
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${check_pod}
+  namespace: ${ssh_ns}
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: ${vmi_node}
+  restartPolicy: Never
+  volumes:
+  - name: ssh-key
+    secret:
+      secretName: ${CLUSTER_NAME}-ssh-key
+      defaultMode: 384
+  containers:
+  - name: check
+    image: $(localnet_multi_ssh_pod_image)
+$(localnet_multi_ssh_pod_security_context)
+    env:
+    - name: VMI_IP
+      value: "${vmi_ip}"
+    volumeMounts:
+    - name: ssh-key
+      mountPath: /ssh
+    command:
+    - sh
+    - -c
+    - |
+      if [ -f /ssh/id_rsa ]; then
+        cp /ssh/id_rsa /tmp/key
+      else
+        cp /ssh/id_ed25519 /tmp/key
+      fi
+      chmod 600 /tmp/key
+      ssh -i /tmp/key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o ConnectTimeout=15 "core@\${VMI_IP}" "${remote_script}"
+ROUTE_CHECK_EOF
+    return 1
+  fi
+  oc wait pod/"${check_pod}" -n "${ssh_ns}" \
+    --for=jsonpath='{.status.phase}'=Succeeded --timeout=180s 2>&1 || true
+  local output phase
+  phase=$(oc get pod "${check_pod}" -n "${ssh_ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+  output=$(oc logs "${check_pod}" -n "${ssh_ns}" 2>&1 || true)
+  oc delete pod "${check_pod}" -n "${ssh_ns}" --ignore-not-found 2>/dev/null || true
+  if [[ "${phase}" == "Succeeded" && -n "${output}" ]]; then
+    echo "${output}"
+    return 0
+  fi
+  return 1
+}
+
 prepare_localnet_multi_dhcp_renewal_secret() {
   local multi_ns="$1"
   local ssh_key_secret="${CLUSTER_NAME}-ssh-key"
@@ -521,7 +655,7 @@ prepare_localnet_multi_dhcp_renewal_secret() {
     return 1
   fi
 
-  oc label namespace "${multi_ns}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+  localnet_multi_label_namespace_privileged "${multi_ns}"
   oc get secret -n "${CLUSTER_NAMESPACE_PREFIX}" "${ssh_key_secret}" -o json \
     | python3 -c "import sys,json; s=json.load(sys.stdin); s['metadata']={'name':s['metadata']['name'],'namespace':'${multi_ns}'}; print(json.dumps(s))" \
     | oc apply -f - 2>/dev/null || true
@@ -534,6 +668,11 @@ renew_localnet_multi_dhcp_on_vmi_via_ssh() {
   local vmi="$3"
   local vmi_ip vmi_node renew_pod
 
+  if ! wait_for_vmi_primary_ip "${multi_ns}" "${vmi}"; then
+    echo "WARNING: Could not determine IP/node for VMI ${vmi}, skipping DHCP renewal"
+    return 1
+  fi
+
   vmi_ip=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
   vmi_node=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.nodeName}' 2>/dev/null)
   if [[ -z "${vmi_ip}" || -z "${vmi_node}" ]]; then
@@ -543,6 +682,8 @@ renew_localnet_multi_dhcp_on_vmi_via_ssh() {
 
   echo "Forcing DHCP renewal on VMI ${vmi} (${vmi_ip}) via SSH pod on ${vmi_node}..."
   renew_pod="dhcp-renew-${vmi##*-}"
+  local ssh_ns
+  ssh_ns=$(localnet_multi_ssh_pod_namespace)
   renew_devices=""
   for idx in $(seq "${network_count}" -1 1); do
     renew_devices="${renew_devices} enp${idx}s0"
@@ -551,12 +692,13 @@ renew_localnet_multi_dhcp_on_vmi_via_ssh() {
   # expand them in the outer shell before oc apply.
   # Use nmcli device reapply by interface name; initrd profiles are "Wired Connection"
   # (not "Wired connection N") so connection-name toggles are unreliable.
+  # Pod runs in CLUSTER_NAMESPACE_PREFIX (not the HCP namespace) to avoid restricted PSA.
   if ! cat <<RENEW_EOF | oc apply -f -; then
 apiVersion: v1
 kind: Pod
 metadata:
   name: ${renew_pod}
-  namespace: ${multi_ns}
+  namespace: ${ssh_ns}
 spec:
   nodeSelector:
     kubernetes.io/hostname: ${vmi_node}
@@ -568,7 +710,8 @@ spec:
       defaultMode: 384
   containers:
   - name: renew
-    image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    image: $(localnet_multi_ssh_pod_image)
+$(localnet_multi_ssh_pod_security_context)
     env:
     - name: VMI_IP
       value: "${vmi_ip}"
@@ -579,7 +722,6 @@ spec:
     - sh
     - -c
     - |
-      microdnf install -y openssh-clients 2>/dev/null
       if [ -f /ssh/id_rsa ]; then
         cp /ssh/id_rsa /tmp/key
       else
@@ -602,18 +744,18 @@ RENEW_EOF
     echo "WARNING: Failed to create DHCP renewal pod ${renew_pod} for ${vmi}"
     return 1
   fi
-  oc wait pod/"${renew_pod}" -n "${multi_ns}" \
+  oc wait pod/"${renew_pod}" -n "${ssh_ns}" \
     --for=jsonpath='{.status.phase}'=Succeeded --timeout=180s 2>&1 || true
   echo "--- DHCP renewal output for ${vmi} ---"
-  oc logs "${renew_pod}" -n "${multi_ns}" 2>&1 | tail -20
-  if ! oc logs "${renew_pod}" -n "${multi_ns}" 2>&1 | grep -q "via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"; then
+  oc logs "${renew_pod}" -n "${ssh_ns}" 2>&1 | tail -20
+  if ! oc logs "${renew_pod}" -n "${ssh_ns}" 2>&1 | grep -q "via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"; then
     echo "WARNING: VMI ${vmi} may still lack default route via ${LOCALNET_MULTI_PRIMARY_GATEWAY} after SSH renewal"
     localnet_multi_log_check "${vmi}" "default_route=MISSING renewal=ssh"
-    oc delete pod "${renew_pod}" -n "${multi_ns}" --ignore-not-found 2>/dev/null || true
+    oc delete pod "${renew_pod}" -n "${ssh_ns}" --ignore-not-found 2>/dev/null || true
     return 1
   fi
   localnet_multi_log_check "${vmi}" "default_route=OK renewal=ssh"
-  oc delete pod "${renew_pod}" -n "${multi_ns}" --ignore-not-found 2>/dev/null || true
+  oc delete pod "${renew_pod}" -n "${ssh_ns}" --ignore-not-found 2>/dev/null || true
   return 0
 }
 
@@ -622,11 +764,12 @@ renew_localnet_multi_dhcp_on_vmi() {
   local network_count="$2"
   local vmi="$3"
 
-  if renew_localnet_multi_dhcp_via_guest_exec "${multi_ns}" "${network_count}" "${vmi}"; then
+  # guest-exec is disabled on many KubeVirt installs; prefer SSH renewal pods.
+  if renew_localnet_multi_dhcp_on_vmi_via_ssh "${multi_ns}" "${network_count}" "${vmi}"; then
     return 0
   fi
-  echo "WARNING: guest-exec renewal failed for ${vmi}, falling back to SSH renewal pod"
-  renew_localnet_multi_dhcp_on_vmi_via_ssh "${multi_ns}" "${network_count}" "${vmi}"
+  echo "WARNING: SSH renewal failed for ${vmi}, falling back to guest-exec"
+  renew_localnet_multi_dhcp_via_guest_exec "${multi_ns}" "${network_count}" "${vmi}"
 }
 
 renew_localnet_multi_dhcp_for_running_vmis() {
@@ -765,7 +908,13 @@ then
 fi
 
 oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc apply -f -
+if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
+  localnet_multi_label_namespace_privileged "${CLUSTER_NAMESPACE_PREFIX}"
+fi
 oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
+  localnet_multi_label_namespace_privileged "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+fi
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
   if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
     # Model 3: Localnet — VMs connect directly to physical network via OVN localnet.
