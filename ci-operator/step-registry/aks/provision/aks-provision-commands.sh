@@ -69,6 +69,10 @@ AKS_CREATE_COMMAND=(
     --max-pods 250
 )
 
+if [[ -n "${AKS_SYSTEM_NODE_VM_SIZE:-}" ]]; then
+    AKS_CREATE_COMMAND+=(--node-vm-size "$AKS_SYSTEM_NODE_VM_SIZE")
+fi
+
 if [[ "${ENABLE_NAP:-}" == "true" ]]; then
     echo "NAP is enabled, adding --node-provisioning-mode Auto"
     AKS_CREATE_COMMAND+=(--node-provisioning-mode Auto)
@@ -214,13 +218,9 @@ spec:
           values:
             - "${NAP_SKU_CPU:-16}"
         - key: karpenter.azure.com/sku-version
-          operator: In
+          operator: Gte
           values:
-            - "2"
-            - "3"
-            - "4"
             - "5"
-            - "6"
 $(if [[ -n "$ZONE_VALUES" ]]; then
 cat <<ZONES
         - key: topology.kubernetes.io/zone
