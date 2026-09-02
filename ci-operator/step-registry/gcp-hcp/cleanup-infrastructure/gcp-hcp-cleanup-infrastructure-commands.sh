@@ -332,7 +332,18 @@ clear_tfc_workspace() {
   # and run 'terraform state rm' at the module level for speed (~3s for 400+ resources).
 
   # Install terraform (same version as .tool-versions)
-  local tf_version="1.15.8"
+  # Read terraform version from the TFC workspace to avoid version mismatch
+  # errors. The workspace was created by tf-provision with whatever version
+  # .tool-versions specifies — the cleanup must use the same version.
+  local tf_version
+  tf_version=$(curl -sS --max-time 10 \
+    --header "Authorization: Bearer ${tfc_token}" \
+    "https://app.terraform.io/api/v2/organizations/${tfc_org}/workspaces/${workspace_name}" 2>/dev/null | \
+    jq -r '.data.attributes["terraform-version"] // empty' 2>/dev/null || echo "")
+  if [[ -z "${tf_version}" ]]; then
+    tf_version="1.16.0"
+    log "  WARNING: Could not read workspace terraform version, using ${tf_version}"
+  fi
   log "  Installing terraform ${tf_version}..."
   if ! curl -fsSL --max-time 120 \
     "https://releases.hashicorp.com/terraform/${tf_version}/terraform_${tf_version}_linux_amd64.zip" \
