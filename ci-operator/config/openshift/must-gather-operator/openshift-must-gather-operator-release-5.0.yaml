@@ -121,6 +121,71 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-gcp
+- as: e2e-gcp-operator-art-fbc-weekly
+  cron: '@weekly'
+  steps:
+    cluster_profile: openshift-org-gcp
+    dependency_overrides:
+      OO_INDEX: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__5.0__ose-support-log-gather-rhel9-operator
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: must-gather-operator
+      OO_PACKAGE: support-log-gather-operator
+      OO_TARGET_NAMESPACES: '!all'
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: enable-qe-catalogsource
+    - as: setup-konflux-art-idms
+      cli: latest
+      commands: |
+        cat <<'EOF' | oc apply -f -
+        apiVersion: config.openshift.io/v1
+        kind: ImageDigestMirrorSet
+        metadata:
+          name: idms
+        spec:
+          imageDigestMirrors:
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift5/ose-support-log-gather-rhel9-operator
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift5/ose-support-log-gather-operator-bundle
+          - mirrors:
+            - quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+            source: registry.redhat.io/openshift5/ose-must-gather-rhel9
+        EOF
+        sleep 60
+        oc wait mcp/master --for condition=Updated --timeout=30m
+        oc wait mcp/worker --for condition=Updated --timeout=30m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: optional-operators-subscribe
+    test:
+    - as: verify-install
+      cli: latest
+      commands: |
+        oc -n must-gather-operator rollout status deployment must-gather-operator --timeout=15m
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-operator-rhcos10-fips
   optional: true
