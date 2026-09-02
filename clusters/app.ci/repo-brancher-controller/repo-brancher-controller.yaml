@@ -186,28 +186,6 @@ spec:
           name: release
       containers:
       - args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=main
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --max-failures=3
-        - --link=release
-        command:
-        - /git-sync
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        imagePullPolicy: Always
-        name: git-sync
-        resources:
-          requests:
-            cpu: 10m
-            memory: 100Mi
-          limits:
-            cpu: 500m
-            memory: 1Gi
-        volumeMounts:
-        - mountPath: /tmp/git-sync
-          name: release
-      - args:
         - --config-dir=/var/repo/release/ci-operator/config
         - --forwarding-config=/etc/repo-brancher-controller/config.yaml
         - --plugin-config-dir=/var/repo/release/core-services/prow/02_config
@@ -265,6 +243,28 @@ spec:
         - mountPath: /etc/repo-brancher-controller
           name: config
           readOnly: true
+      - args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        command:
+        - /git-sync
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        name: git-sync
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - mountPath: /tmp/git-sync
+          name: release
       volumes:
       - emptyDir: {}
         name: release
