@@ -20,10 +20,14 @@ for f in api-endpoint oidc-endpoint customer-project-id; do
   fi
 done
 
-# Authenticate with WIF credential (gcphcpctl uses gcloud auth print-identity-token)
+# Authenticate with WIF credential
+# - gcloud auth login: for gcloud CLI commands and identity tokens
+# - GOOGLE_APPLICATION_CREDENTIALS: for GCP Go SDK clients used by
+#   gcphcpctl --setup-infra (IAM, networking)
 if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
   echo "Authenticating with WIF credential..."
   gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet
+  export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 else
   echo "WARNING: WIF credential not found, relying on existing gcloud auth"
 fi
