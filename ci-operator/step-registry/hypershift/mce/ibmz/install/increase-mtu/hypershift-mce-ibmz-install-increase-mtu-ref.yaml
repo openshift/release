@@ -1,0 +1,44 @@
+ref:
+  as: hypershift-mce-ibmz-install-increase-mtu
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  timeout: 100m
+  env:
+  - name: INSTALL_KUBECONFIG
+    default: ""
+    documentation: |
+      Optional path to a kubeconfig to use for this step. When set, KUBECONFIG is
+      overridden to this value at the start of the script. Leave empty (default) to
+      use the ci-operator-injected KUBECONFIG (management cluster).
+  - name: MTU_OVERLAY_TO
+    default: "9000"
+    documentation: |
+      Target MTU for the cluster overlay network (OVN-Kubernetes tunnel MTU).
+      For OVN-Kubernetes this must be exactly 100 less than MTU_MACHINE_TO.
+      Defaults to 9000 (jumbo frames).
+  - name: MTU_MACHINE_TO
+    default: "9100"
+    documentation: |
+      Target MTU for the primary network interface on the underlying host.
+      For OVN-Kubernetes the overlay MTU (MTU_OVERLAY_TO) must be exactly
+      100 less than this value. Defaults to 9100.
+  - name: MCP_WAIT_TIMEOUT
+    default: "2700"
+    documentation: |
+      Maximum time in seconds to wait for each MachineConfigPool (worker and
+      master) to finish the rolling node reboot triggered by the MTU change.
+      Defaults to 2700s (45 minutes). Increase for larger clusters.
+  commands: hypershift-mce-ibmz-install-increase-mtu-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Increases the cluster network MTU to jumbo-frame size (9000/9100 by default)
+    on the management cluster before operator installation.
+    Patches Network.operator.openshift.io/cluster to trigger the MCO rolling
+    reboot, then waits for both the worker and master MachineConfigPools to
+    finish before returning. Must run after the management cluster is up and
+    before any operators (MCE, KubeVirt, MetalLB) are installed so that operator
+    pods start with the correct MTU already in effect.
