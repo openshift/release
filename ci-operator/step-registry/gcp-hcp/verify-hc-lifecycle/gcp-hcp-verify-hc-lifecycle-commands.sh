@@ -37,8 +37,7 @@ echo "  Channel group:      ${HC_CHANNEL_GROUP:-candidate}"
 echo ""
 
 # The Ginkgo test reads SHARED_DIR files directly via resolveConfig().
-# GCPHCPCTL_PATH is the only env var that must be set explicitly because
-# the binary is in SHARED_DIR (not on PATH).
+# GCPHCPCTL_PATH points to the binary baked into the test image.
 export GCPHCPCTL_PATH="/usr/bin/gcphcpctl"
 
 # Run Ginkgo v2 test binary
