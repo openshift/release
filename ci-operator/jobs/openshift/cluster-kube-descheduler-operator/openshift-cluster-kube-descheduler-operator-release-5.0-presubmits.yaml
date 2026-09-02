@@ -1,7 +1,7 @@
 presubmits:
   openshift/cluster-kube-descheduler-operator:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-5\.0$
     - ^release-5\.0-
@@ -83,9 +83,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-aws-operator|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^\.tekton/|^bundle\.Dockerfile$|\.md$|^(?:.*/)?(?:\.gitignore|LICENSE|OWNERS)$
     branches:
     - ^release-5\.0$
     - ^release-5\.0-
@@ -104,7 +106,6 @@ presubmits:
     name: pull-ci-openshift-cluster-kube-descheduler-operator-release-5.0-e2e-aws-operator-serial-ote
     optional: true
     rerun_command: /test e2e-aws-operator-serial-ote
-    skip_if_only_changed: ^\.tekton/|^bundle\.Dockerfile$|\.md$|^(?:.*/)?(?:\.gitignore|LICENSE|OWNERS)$
     spec:
       containers:
       - args:

@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   test-oadp-operator:
     name: oadp-operator-e2e-tests
     namespace: konveyor
@@ -38,13 +42,16 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      OADP_BRANCH: oadp-dev
       OO_BUNDLE: quay-proxy.ci.openshift.org/openshift/ci:konveyor_oadp-operator-bundle_oadp-dev
       OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_INSTALL_TIMEOUT_MINUTES: "25"
       OO_MIRROR_TO_CLUSTER_REGISTRY: "true"
       OO_PSA_ENFORCE_PRIVILEGED: "true"
+      TEST_NAME: virt-kdm-e2e-test-aws
     post:
+    - ref: oadp-analyze-e2e-failure
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre

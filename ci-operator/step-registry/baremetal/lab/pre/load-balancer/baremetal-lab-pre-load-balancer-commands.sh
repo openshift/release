@@ -10,10 +10,7 @@ MC=""
 APISRV=""
 INGRESS80=""
 INGRESS443=""
-SSH=""
-ACCESS=""
 IRI=""
-first_host=true
 echo "Filling the load balancer targets..."
 num_workers="$(yq e '[.[] | select(.name|test("worker-[0-9]"))]|length' "$SHARED_DIR/hosts.yaml")"
 # shellcheck disable=SC2154
@@ -61,33 +58,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       INGRESS443="$INGRESS443
       server $name-v6 [$ipv6]:443 check inter 1s"
     fi
-  fi
-
-  if $first_host; then
-    first_host=false
-    ACCESS="$ACCESS
-listen access-auxiliary
-    bind :::$((14000 + "$host"))
-    mode tcp
-    balance source
-    timeout tunnel 2h
-      server access-auxiliary 192.168.80.2:22 check inter 1s"
-  fi
-
-  # Add proxy mappings condition-based for host SSH connections
-  SSH="$SSH
-listen $name-ssh
-    bind :::$((13000 + "$host"))
-    mode tcp
-    balance source
-    timeout tunnel 5m"
-  if [ "${ipv4_enabled}" = "true" ]; then
-    SSH="$SSH
-      server $name $ip:22 check inter 1s"
-  fi
-  if [ "${ipv6_enabled}" = "true" ]; then
-    SSH="$SSH
-      server $name-v6 [$ipv6]:22 check inter 1s"
   fi
 
   # Add proxy mappings condition-based for IRI connections
@@ -153,8 +123,6 @@ listen ingress-router-443
     mode tcp
     balance source
 $INGRESS443
-$SSH
-$ACCESS
 listen iri-22625
     bind :::22625
     mode tcp

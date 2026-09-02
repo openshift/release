@@ -84,7 +84,6 @@ echo "Target hub inventory copied from SHARED_DIR and spoke inventory processed"
 
 # Target hub kubeconfig at the standard telcov10n path on the target bastion
 TARGET_HUB_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
-TARGET_VM_NAME="master-0.${TARGET_CLUSTER_NAME}"
 
 echo ""
 echo "=== Step 1: Prepare IBU target SNO and retrieve kubeconfig ==="
@@ -93,8 +92,7 @@ cd /eco-ci-cd
 ansible-playbook playbooks/ran/ibu-prepare-spoke-sno.yml \
   -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
   --extra-vars "hub_cluster=${TARGET_CLUSTER_NAME}" \
-  --extra-vars "spoke_cluster=${TARGET_SPOKE_SNO}" \
-  --extra-vars "seed_vm_name=${TARGET_VM_NAME}"
+  --extra-vars "spoke_cluster=${TARGET_SPOKE_SNO}"
 
 echo ""
 echo "=== Step 2: Run eco-gotests IBU upgrade suite ==="

@@ -25,3 +25,7 @@ platform:
     $([ "${ipv4_enabled:-false}" == "true" ] && echo "- $(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")")
     $([ "${ipv6_enabled:-false}" == "true" ] && echo "- $(yq ".ingress_vip_v6" "${SHARED_DIR}/vips.yaml")")
 EOF
+
+if [ "${LOAD_BALANCER_TYPE:-cluster-managed}" == "user-managed" ]; then
+  yq -i '.platform.baremetal.loadBalancer.type = "UserManaged"' "${SHARED_DIR}/vips_patch_install_config.yaml"
+fi

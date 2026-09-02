@@ -105,6 +105,25 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
         --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
         --dry-run=client -o yaml | oc apply -f -
     log "CI pull secret added to operator namespace ${OPERATOR_NAMESPACE}"
+
+    # Pre-create the operator ServiceAccount with the CI pull secret BEFORE
+    # creating the ClusterPackage. Without this, PKO creates a pod using the
+    # default (un-patched) SA, causing ErrImagePull. The pod then sits in
+    # image-pull-backoff for ~3 minutes until the SA patch + pod delete in the
+    # deployment wait loop below kicks in.  By pre-creating the SA with the
+    # pull secret already attached, the first pod PKO creates can pull
+    # immediately.  The existing SA patch code in the wait loop is kept as a
+    # fallback in case PKO uses a different SA name.
+    SA_PRECREATE_NAME="${OPERATOR_DEPLOYMENT_NAME:-${OPERATOR_NAME}}"
+    log "Pre-creating ServiceAccount ${SA_PRECREATE_NAME} in ${OPERATOR_NAMESPACE} with CI pull secret"
+    oc create sa "${SA_PRECREATE_NAME}" -n "${OPERATOR_NAMESPACE}" \
+        --dry-run=client -o yaml | oc apply -f -
+    # Use strategic-merge patch so this works whether or not the SA already
+    # has an imagePullSecrets array.  JSON Patch "add" to "/imagePullSecrets/-"
+    # fails when the array does not exist; strategic merge creates it.
+    oc patch sa "${SA_PRECREATE_NAME}" -n "${OPERATOR_NAMESPACE}" \
+        --type strategic -p '{"imagePullSecrets":[{"name":"ci-pull-secret"}]}'
+    log "ServiceAccount ${SA_PRECREATE_NAME} pre-patched with CI pull secret"
 else
     log "WARNING: Could not get CI registry credentials, PKO may fail to pull images"
 fi
@@ -318,6 +337,33 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
         fi
     done
     log "All operator CRDs established"
+
+    # Verify each CRD is actually served by the API server.
+    # condition=Established only means the CRD *object* has that status
+    # condition, but it does NOT guarantee the API server is serving the
+    # resource yet.  Without this check the operator (or e2e tests) can
+    # hit "the server could not find the requested resource" errors and
+    # never recover.  Poll `oc get <plural>.<group>` until the API
+    # server responds without error.
+    for crd in "${CRD_LIST[@]}"; do
+        crd=$(echo "${crd}" | xargs)
+        CRD_PLURAL=$(oc get crd "${crd}" -o jsonpath='{.spec.names.plural}')
+        CRD_GROUP=$(oc get crd "${crd}" -o jsonpath='{.spec.group}')
+        log "Verifying API server serves ${CRD_PLURAL}.${CRD_GROUP}..."
+        for i in $(seq 1 24); do
+            if oc get "${CRD_PLURAL}.${CRD_GROUP}" -A --no-headers --request-timeout=10s 2>/dev/null; then
+                break
+            fi
+            if [[ $i -eq 24 ]]; then
+                log "ERROR: CRD ${crd} established but API server not serving ${CRD_PLURAL}.${CRD_GROUP} after 120s"
+                oc get crd "${crd}" -o yaml 2>/dev/null || true
+                oc api-resources 2>/dev/null | grep -i "${CRD_PLURAL}" || true
+                exit 1
+            fi
+            sleep 5
+        done
+        log "CRD ${CRD_PLURAL}.${CRD_GROUP} is served by API server"
+    done
 fi
 
 # Restore backed-up CR instances that were deployed by SSS/MCC
