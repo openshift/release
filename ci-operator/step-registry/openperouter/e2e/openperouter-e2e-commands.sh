@@ -22,7 +22,9 @@ EOFSOURCE
 echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
 ssh "${SSHOPTS[@]}" "root@${IP}" bash -s << 'EOFDEPLOY'
 set -euo pipefail
-source /root/dev-scripts/config_root.sh
+cd /root/dev-scripts
+source common.sh
+source ocp_install_env.sh
 export KUBECONFIG="/root/dev-scripts/ocp/${CLUSTER_NAME}/auth/kubeconfig"
 
 CONFIG=/root/dev-scripts/config_root.sh \
