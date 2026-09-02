@@ -213,7 +213,8 @@ case "${CLOUD_PROVIDER}" in
   # so behavior always tracks what install would actually do.
   if ! "${HCP_CLI}" install render --outputs=crds "${CMD_ARGS[@]}" 2>/dev/null | grep -q 'name: dnsendpoints.externaldns.k8s.io'; then
     echo "DNSEndpoint CRD not bundled by this hypershift version, installing manually..."
-    oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/v0.15.0/docs/contributing/crd-source/crd-manifest.yaml
+    # Pinned to the commit tagged v0.15.0 (immutable, unlike the mutable tag ref).
+    oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/bf70e3f0acbfbf2fce0bc71a4ca2fd6850de4903/docs/contributing/crd-source/crd-manifest.yaml
   fi
 
   # Install HyperShift operator
