@@ -30,6 +30,11 @@ cp /tmp/.dockerconfigjson /tmp/pull-secret
 PULL_SECRET_FILE=/tmp/pull-secret
 set -x
 
+# Restrict virt VMs on compute nodes
+for node in compute-0 compute-1; do
+  oc label node "${node}" role=kubevirt --overwrite
+done
+oc get nodes -l role=kubevirt
 # Hosted cluster identity and namespace
 HC_NAME=hcpvirt-oz-ci
 HC_NS=hcpvirt-oz-ci-ns
@@ -49,6 +54,7 @@ hcp create cluster kubevirt \
   --memory 16Gi \
   --cores 4 \
   --root-volume-size 60 \
+  --vm-node-selector role=kubevirt \
   --release-image ${OCP_IMAGE_MULTI} \
   --render-sensitive --render > /tmp/hc-manifests/kubevirt-hc.yaml
 
@@ -96,42 +102,6 @@ cat /tmp/hc-manifests/kubevirt-hc.yaml
 echo "$(date) Applying patched HostedCluster manifests"
 oc apply -f /tmp/hc-manifests/kubevirt-hc.yaml
 
-# --- Pin KubeVirt VMs to compute-only nodes ---
-# Control-plane nodes in the libvirt UPI cluster also carry the 'worker' role and
-# have no NoSchedule taint, so without an anti-affinity rule the scheduler places
-# VMs on them.  A plain nodeSelector of 'worker' would still match control-plane
-# nodes (they have both master+worker labels).  Use a node affinity
-# requiredDuringScheduling NotIn rule to explicitly exclude master nodes.
-echo "$(date) Patching NodePool node affinity to exclude master nodes"
-oc patch nodepool "${HC_NAME}" -n "${HC_NS}" --type=merge -p '{
-  "spec": {
-    "platform": {
-      "kubevirt": {
-        "nodePlacement": {
-          "affinity": {
-            "nodeAffinity": {
-              "requiredDuringSchedulingIgnoredDuringExecution": {
-                "nodeSelectorTerms": [
-                  {
-                    "matchExpressions": [
-                      {
-                        "key": "node-role.kubernetes.io/master",
-                        "operator": "DoesNotExist"
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}'
-
-echo "$(date) Compute nodes available for VM scheduling:"
-oc get nodes -l '!node-role.kubernetes.io/master' -o name 2>/dev/null || true
 
 oc wait --timeout=45m --for=condition=Available --namespace=hcpvirt-oz-ci-ns hostedclusters.hypershift.openshift.io/hcpvirt-oz-ci
 echo "$(date) Kubevirt cluster is available"
