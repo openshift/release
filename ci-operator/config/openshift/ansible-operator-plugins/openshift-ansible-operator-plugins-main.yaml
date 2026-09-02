@@ -1,3 +1,8 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -145,6 +150,128 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: tls13-adherence
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      PQC_CHECK: "false"
+      SCAN_NAMESPACE: memcached-molecule-operator-system
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - as: deploy-operator
+      cli: latest
+      commands: |
+        mkdir -p /tmp/bin
+        ln -sf "$(command -v oc)" /tmp/bin/kubectl
+        export PATH="/tmp/bin:${PATH}"
+        cd testdata/memcached-molecule-operator
+        make deploy IMG="${IMAGE_FORMAT}"
+        oc wait --for=condition=Available --timeout=5m -n memcached-molecule-operator-system deployment/memcached-molecule-operator-controller-manager
+      dependencies:
+      - env: IMAGE_FORMAT
+        name: ansible-operator-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-gcp
+- as: tls13-adherence-periodic
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      PQC_CHECK: "false"
+      SCAN_NAMESPACE: memcached-molecule-operator-system
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - as: deploy-operator
+      cli: latest
+      commands: |
+        mkdir -p /tmp/bin
+        ln -sf "$(command -v oc)" /tmp/bin/kubectl
+        export PATH="/tmp/bin:${PATH}"
+        cd testdata/memcached-molecule-operator
+        make deploy IMG="${IMAGE_FORMAT}"
+        oc wait --for=condition=Available --timeout=5m -n memcached-molecule-operator-system deployment/memcached-molecule-operator-controller-manager
+      dependencies:
+      - env: IMAGE_FORMAT
+        name: ansible-operator-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-gcp
+- always_run: false
+  as: tls-pqc-readiness
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: memcached-molecule-operator-system
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+    test:
+    - as: deploy-operator
+      cli: latest
+      commands: |
+        mkdir -p /tmp/bin
+        ln -sf "$(command -v oc)" /tmp/bin/kubectl
+        export PATH="/tmp/bin:${PATH}"
+        cd testdata/memcached-molecule-operator
+        make deploy IMG="${IMAGE_FORMAT}"
+        oc wait --for=condition=Available --timeout=5m -n memcached-molecule-operator-system deployment/memcached-molecule-operator-controller-manager
+      dependencies:
+      - env: IMAGE_FORMAT
+        name: ansible-operator-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-gcp
+- as: tls-pqc-readiness-periodic
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: memcached-molecule-operator-system
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+    test:
+    - as: deploy-operator
+      cli: latest
+      commands: |
+        mkdir -p /tmp/bin
+        ln -sf "$(command -v oc)" /tmp/bin/kubectl
+        export PATH="/tmp/bin:${PATH}"
+        cd testdata/memcached-molecule-operator
+        make deploy IMG="${IMAGE_FORMAT}"
+        oc wait --for=condition=Available --timeout=5m -n memcached-molecule-operator-system deployment/memcached-molecule-operator-controller-manager
+      dependencies:
+      - env: IMAGE_FORMAT
+        name: ansible-operator-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-13
+    - ref: tls-scanner-run
     workflow: ipi-gcp
 - as: verify-deps
   steps:
