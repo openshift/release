@@ -62,6 +62,10 @@ EXTRA_FLAGS="--gc=$GC --gc-metrics=$GC_METRICS --pods-per-node=$PODS_PER_NODE --
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
+if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
+    EXTRA_FLAGS+=" --local-indexing"
+fi
+
 export EXTRA_FLAGS UUID
 
 set +o errexit
