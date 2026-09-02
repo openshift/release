@@ -8,11 +8,32 @@ repository_root="${1:-.}"
 repository_root="$(cd "${repository_root}" && pwd)"
 policy_dir="${repository_root}/ci-operator/model-policy"
 allowlist_file="${policy_dir}/authorized-paths.txt"
-restricted_model_pattern='claude-(opus-5([._-][[:alnum:]][[:alnum:]._-]*)?|fable-[[:alnum:]][[:alnum:]._-]*|mythos-[[:alnum:]][[:alnum:]._-]*)([^[:alnum:]_.-]|$)'
+
+# Add a model name or family prefix here when its use requires authorization.
+# The listed value and any versioned variant of it will be matched.
+models_requiring_authorization=(
+  "claude-opus-5"
+  "claude-fable"
+  "claude-mythos"
+)
+
 scan_paths=(
   "ci-operator/step-registry"
   "ci-operator/jobs"
 )
+
+model_alternatives=""
+for model in "${models_requiring_authorization[@]}"; do
+  if [[ ! "${model}" =~ ^[[:alnum:]_-]+$ ]]; then
+    echo "ERROR: Invalid model policy entry: ${model}" >&2
+    exit 1
+  fi
+  if [[ -n "${model_alternatives}" ]]; then
+    model_alternatives+="|"
+  fi
+  model_alternatives+="${model}"
+done
+restricted_model_pattern="(${model_alternatives})([._-][[:alnum:]][[:alnum:]._-]*)?([^[:alnum:]_.-]|$)"
 
 if [[ ! -f "${allowlist_file}" ]]; then
   echo "ERROR: Restricted model allowlist not found: ${allowlist_file}" >&2
