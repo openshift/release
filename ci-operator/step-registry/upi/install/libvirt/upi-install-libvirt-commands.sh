@@ -156,6 +156,23 @@ write_upi_domain_xml() {
 # Only create the storage pool if there isn't one already...
 if [[ $(${VIRSH} pool-list | grep ${POOL_NAME}) ]]; then
   echo "Storage pool ${POOL_NAME} already exists. Skipping..."
+  # On some hosts (e.g. libvirt-s390x-vpn-oz) the pool target directory may be
+  # absent or stale after a reboot: vol-create-as reports success but the file
+  # is never written, causing virsh start to fail with "path not accessible".
+  # pool-build creates the target dir if missing; pool-refresh re-syncs libvirt's
+  # volume list with the actual filesystem state.
+  if [[ "${POOL_REFRESH:-false}" == "true" ]]; then
+    # pool-build is rejected on an already-active pool. To ensure the backing
+    # directory exists on the hypervisor (e.g. after a reboot on vpn-oz hosts),
+    # temporarily stop the pool, rebuild it (creates the dir if missing), then
+    # restart and refresh so libvirt's volume list is in sync with the filesystem.
+    echo "Stopping pool '${POOL_NAME}' to rebuild backing directory..."
+    ${VIRSH} pool-destroy "${POOL_NAME}"
+    ${VIRSH} pool-build "${POOL_NAME}"
+    ${VIRSH} pool-start "${POOL_NAME}"
+    ${VIRSH} pool-refresh "${POOL_NAME}"
+    echo "Pool '${POOL_NAME}' rebuilt and refreshed successfully."
+  fi
 else
   if [[ $(${VIRSH} pool-list --all | grep ${POOL_NAME}) ]]; then
     echo "Storage pool ${POOL_NAME} already exists in inactive state. Deleting it.."
