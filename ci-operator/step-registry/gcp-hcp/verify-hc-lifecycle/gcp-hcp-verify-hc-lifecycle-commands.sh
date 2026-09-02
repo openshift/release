@@ -21,13 +21,17 @@ for f in api-endpoint oidc-endpoint customer-project-id; do
 done
 
 # Authenticate with WIF credential
-# - gcloud auth login: for gcloud CLI commands and identity tokens
+# - gcloud auth login: for gcloud CLI commands (access tokens)
 # - GOOGLE_APPLICATION_CREDENTIALS: for GCP Go SDK clients used by
 #   gcphcpctl --setup-infra (IAM, networking)
+# - CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT: WIF credentials can't
+#   generate identity tokens directly. Impersonating the e2e-hc-submitter
+#   SA lets gcloud produce identity tokens for the Gecko Platform API.
 if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
   echo "Authenticating with WIF credential..."
   gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet
   export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
+  export CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT="e2e-hc-submitter@gcp-hcp-platform-ci.iam.gserviceaccount.com"
 else
   echo "WARNING: WIF credential not found, relying on existing gcloud auth"
 fi
