@@ -62,6 +62,15 @@ def pytest_collection_modifyitems(items):
             test_name = ' '.join(parts[-1].split('_')[1:])
             file_path = parts[0]
             item._nodeid = f"{file_path}::[sig-telco-verification] {test_name.capitalize()}"
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    
+    if report.when == "call":
+        # Appends the time to the terminal line output for each test
+        report.nodeid = f"{report.nodeid} [{report.duration:.3f}s]"
 EOF-CONFTEST
 
   tc_file="/tmp/${JOB_NAME_SAFE}.py"
@@ -70,6 +79,12 @@ import os
 import time
 import requests
 import pytest
+
+def test_wait_beofre_starting_tests():
+    # adding additional time before checking operators
+    # do to falky checks
+    time.sleep(300)
+    assert True
 
 def test_spoke_cluster_operators_are_ready(bash):
     count = 0
