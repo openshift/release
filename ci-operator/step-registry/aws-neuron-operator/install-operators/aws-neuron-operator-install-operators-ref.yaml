@@ -8,7 +8,7 @@ ref:
     documentation: Neuron kernel module driver image (fetched from latest release if empty)
   - name: ECO_HWACCEL_NEURON_DRIVER_VERSION
     default: ""
-    documentation: Neuron driver version string (fetched from latest release if empty)
+    documentation: Neuron driver version string derived for tests and in-cluster builds; omitted from prebuilt-image DeviceConfigs
   - name: ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE
     default: ""
     documentation: Neuron device plugin image (fetched from latest release if empty)
@@ -24,6 +24,12 @@ ref:
   - name: ECO_HWACCEL_NEURON_IN_CLUSTER_BUILD
     default: ""
     documentation: Set to 'true' when driversImage is empty and the operator builds the driver image in-cluster via KMM
+  - name: ECO_HWACCEL_NEURON_DRA_DRIVER_IMAGE
+    default: ""
+    documentation: Neuron DRA driver image. When set, installs pinned DRA-capable KMM and Neuron operator versions
+  - name: ECO_HWACCEL_NEURON_DRA_UPGRADE_DRIVER_IMAGE
+    default: ""
+    documentation: Distinct target DRA driver image used by DRA upgrade tests
   resources:
     requests:
       cpu: 100m
@@ -31,6 +37,9 @@ ref:
   documentation: |-
     Installs AWS Neuron Operator and dependencies (NFD, KMM) on an
     already-provisioned ROSA HCP cluster.  Runs make cluster-operators
-    which orchestrates the full operator installation flow: OLM installs,
+    which orchestrates the full operator installation flow. DeviceConfig
+    values are downloaded from the latest Neuron operator GitHub release,
+    then the flow performs OLM installs,
     NodeFeatureDiscovery, NodeFeatureRule, DeviceConfig, and waits for
-    Neuron device resources.
+    Neuron device resources. When a DRA driver image is configured, it pins
+    KMM 2.7 and Neuron operator 1.3.0 and waits for ResourceSlices instead.
