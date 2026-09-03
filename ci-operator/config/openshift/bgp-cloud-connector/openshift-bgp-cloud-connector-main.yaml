@@ -308,6 +308,64 @@ tests:
 
         oc -n "${ns}" rollout status \
           deployment/openshift-cudn-bgp-routing-controller-manager --timeout=5m
+
+        # Everything above proves the role from AWS's side. It says nothing
+        # about the operator's own path -- CCO writing the secret, the SDK
+        # reading it, GetCallerIdentity succeeding -- because the operator
+        # asks for credentials only while reconciling a CUDNBgpConfig, and
+        # nothing creates one until the suite does.
+        #
+        # So drive it with a throwaway carrying a route server id that
+        # cannot exist. Credentials working is then proved by the failure
+        # moving on: CloudCredentialsInvalid means the role is wrong,
+        # anything else means AWS accepted us and discovery is what failed,
+        # which is the expected outcome for an id nobody minted.
+        oc apply -f - <<EOF
+        apiVersion: networking.openshift.io/v1alpha1
+        kind: CUDNBgpConfig
+        metadata:
+          name: cluster
+        spec:
+          platform: AWS
+          bgp:
+            localASN: 65001
+            livenessDetection: bgp-keepalive
+          routerNodeSelector:
+            bgp_router: "true"
+          aws:
+            region: ${region}
+            routeServerIDs:
+            - rs-00000000000000000
+        EOF
+
+        echo "waiting for the operator to get past credentials..."
+        deadline=$((SECONDS + 600))
+        reason=""
+        while (( SECONDS < deadline )); do
+          reason="$(oc get cudnbgpconfig cluster \
+            -o jsonpath='{.status.conditions[?(@.type=="CloudEndpointsDiscovered")].reason}' 2>/dev/null || true)"
+          case "${reason}" in
+            CloudCredentialsInvalid)
+              oc get cudnbgpconfig cluster -o yaml >&2
+              echo "the operator could not use the role; see the condition above" >&2
+              exit 1 ;;
+            ""|WaitingForCloudCredentials) ;;
+            *)
+              echo "credentials accepted; reason is now ${reason}"
+              break ;;
+          esac
+          sleep 10
+        done
+        if [[ -z "${reason}" || "${reason}" == WaitingForCloudCredentials ]]; then
+          oc get cudnbgpconfig cluster -o yaml >&2
+          oc -n "${ns}" logs deployment/openshift-cudn-bgp-routing-controller-manager --tail=50 >&2
+          echo "timed out before the operator resolved credentials" >&2
+          exit 1
+        fi
+
+        # The suite applies its own, from a profile naming a route server
+        # that exists.
+        oc delete cudnbgpconfig cluster --wait=false
       from: src
       resources:
         requests:
