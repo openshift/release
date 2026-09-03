@@ -241,6 +241,9 @@ if [[ -n "${VERIFY_KUBECONFIG}" ]] && [[ -f "${VERIFY_KUBECONFIG}" ]]; then
     -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null) || DEPLOYED_IMAGE="unavailable"
   POD_IMAGE_ID=$(oc --kubeconfig="${VERIFY_KUBECONFIG}" get pods -n hypershift -l app=operator \
     -o jsonpath='{.items[0].status.containerStatuses[0].imageID}' 2>/dev/null) || POD_IMAGE_ID="unavailable"
+  # Normalize empty oc output (exit 0 with no matching jsonpath result) to "unavailable".
+  [[ -z "${DEPLOYED_IMAGE}" ]] && DEPLOYED_IMAGE="unavailable"
+  [[ -z "${POD_IMAGE_ID}" ]] && POD_IMAGE_ID="unavailable"
 fi
 
 # Write a structured verification artifact for CI analysis and triage.
