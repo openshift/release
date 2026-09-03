@@ -304,9 +304,41 @@ tests:
         # not match fails here, named, rather than as an opaque
         # CloudCredentialsInvalid two steps later.
         token="$(oc -n "${ns}" create token "${sa}" --audience=openshift --duration=1h)"
-        aws sts assume-role-with-web-identity --role-arn "${arn}" \
-          --role-session-name verify --web-identity-token "${token}" \
-          --query 'AssumedRoleUser.Arn' --output text
+
+        # Retried because a role is not usable the instant it exists: IAM
+        # is eventually consistent and the first assume after a create
+        # comes back AccessDenied, which is indistinguishable from a
+        # trust policy that is simply wrong. Six attempts over a minute
+        # tells the two apart.
+        assumed=""
+        for attempt in $(seq 1 6); do
+          if assumed="$(aws sts assume-role-with-web-identity --role-arn "${arn}" \
+                --role-session-name verify --web-identity-token "${token}" \
+                --query 'AssumedRoleUser.Arn' --output text 2>&1)"; then
+            echo "assumed ${assumed} on attempt ${attempt}"
+            break
+          fi
+          echo "attempt ${attempt}: ${assumed}"
+          assumed=""
+          sleep 10
+        done
+
+        # Everything needed to tell which half is wrong, printed once,
+        # rather than left for whoever reads the failure to reconstruct.
+        # AccessDenied means the provider is registered and the condition
+        # did not match; InvalidIdentityToken means no provider for this
+        # issuer.
+        if [[ -z "${assumed}" ]]; then
+          echo "--- token claims ---" >&2
+          printf '%s' "${token}" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq . >&2 || true
+          echo "--- trust policy ---" >&2
+          aws iam get-role --role-name "${role}" \
+            --query 'Role.AssumeRolePolicyDocument' >&2 || true
+          echo "--- oidc providers in the account ---" >&2
+          aws iam list-open-id-connect-providers >&2 || true
+          echo "could not assume ${arn} with a token from this cluster" >&2
+          exit 1
+        fi
 
         # ROLEARN on the Subscription is what the console sets when the CSV
         # declares token-auth-aws. The operator then adds stsIAMRoleARN and
