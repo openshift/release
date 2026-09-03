@@ -626,10 +626,33 @@ tests:
     workflow: openshift-upgrade-gcp-heterogeneous
 - as: e2e-agent-ibmz-sno
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 57 18 13 1 *
   steps:
-    workflow: agent-ibmz-sno-e2e
+    cluster_profile: libvirt-s390x-vpn
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.15"
+      COMPUTE_COUNT: "0"
+      CONTROL_COUNT: "1"
+      INSTALLER_TYPE: agent
+      NODE_TUNING: "true"
+      USE_EXTERNAL_DNS: "true"
+      VOLUME_CAPACITY: 120G
+    test:
+    - as: verify-sno-cluster
+      commands: |
+        set -euo pipefail
+        oc wait node --all --for=condition=Ready=true --timeout=30m
+        oc wait --all=true clusteroperator --for=condition=Available=True --timeout=30m
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    workflow: openshift-e2e-libvirt-vpn
 zz_generated_metadata:
   branch: main
   org: openshift
