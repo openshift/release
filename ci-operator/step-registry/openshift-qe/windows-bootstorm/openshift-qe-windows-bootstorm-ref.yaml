@@ -1,0 +1,72 @@
+ref:
+  as: openshift-qe-windows-bootstorm
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-windows-bootstorm-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret/es
+  - namespace: test-credentials
+    name: benchmark-runner-perfci-config
+    mount_path: /secret/perfci
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      e2e-benchmarking tag to use (default = latest)
+  - name: KUBE_BURNER_VERSION
+    default: "1.12.2"
+    documentation: |-
+      kube-burner-ocp release tag to use
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Enable local indexing for artifacts
+  - name: BOOTSTORM_EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Additional flags passed to kube-burner-ocp windows-bootstorm
+  - name: VMS_PER_NODE
+    default: "37"
+    documentation: |-
+      Number of Windows VMs to create per worker node
+  - name: STORAGE_CLASS
+    default: "lvms-nvme"
+    documentation: |-
+      StorageClass for DataVolumes (lvms-nvme for LVMS, ocs-storagecluster-ceph-rbd-virtualization for ODF)
+  - name: ACCESS_MODE
+    default: "RWO"
+    documentation: |-
+      PVC access mode: RWO for LVMS, RWX for ODF
+  - name: EVICTION_STRATEGY
+    default: "None"
+    documentation: |-
+      VM eviction strategy: None for LVMS, LiveMigrate for ODF
+  - name: PER_NODE_DV
+    default: "true"
+    documentation: |-
+      Create one source DV per worker node (required for LVMS)
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      kube-burner indexing profile type
+  - name: WINDOWS_IMAGE_URL
+    default: ""
+    documentation: |-
+      Override Windows image URL (read from Vault secret windows_url if not set)
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path
+  documentation: >-
+    Runs the windows-bootstorm workload via kube-burner-ocp. Measures Windows VM
+    boot time at scale using LVMS (NVMe) or ODF storage backends.
+  timeout: 3h
