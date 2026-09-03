@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ovs-veth-filter
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ovs-veth-filter
+  namespace: ovs-veth-filter
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ovs-veth-filter
+  namespace: ovs-veth-filter
+spec:
+  selector:
+    matchLabels:
+      app: ovs-veth-filter
+  template:
+    metadata:
+      labels:
+        app: ovs-veth-filter
+    spec:
+      serviceAccountName: ovs-veth-filter
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-role.kubernetes.io/worker: ""
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: filter
+          image: image-registry.openshift-image-registry.svc:5000/ovs-veth-filter/ovs-veth-filter:latest
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          volumeMounts:
+            - name: bpffs
+              mountPath: /sys/fs/bpf
+            - name: kernel-btf
+              mountPath: /sys/kernel/btf
+              readOnly: true
+            - name: securityfs
+              mountPath: /sys/kernel/security
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 512Mi
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: bpffs
+          hostPath:
+            path: /sys/fs/bpf
+            type: Directory
+        - name: kernel-btf
+          hostPath:
+            path: /sys/kernel/btf
+            type: Directory
+        - name: securityfs
+          hostPath:
+            path: /sys/kernel/security
+            type: Directory
