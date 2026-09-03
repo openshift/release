@@ -30,12 +30,20 @@ images:
   - dockerfile_literal: |
       FROM nested-podman
       USER root
-      # Install Python and test dependencies; LocalStack runs as a Podman container
-      RUN dnf install -y --nodocs python3-pip && \
+      # Install Python 3.11 and make it default via symlinks
+      # (ci-run.sh on main branch still uses hardcoded python3 commands)
+      # TODO: Remove symlinks after rosa-boundary PR merges with python3.11 detection
+      RUN dnf install -y --nodocs python3.11 python3.11-pip && \
           dnf clean all && \
-          pip3 install --no-cache-dir \
-          pytest boto3 requests awscli-local
+          ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+          ln -sf /usr/bin/pip3.11 /usr/bin/pip3
+      # Create /home/user with correct permissions BEFORE copying files
+      # (nested-podman runs as UID 1000, needs writable home directory)
+      RUN mkdir -p /home/user/.config && chown -R 1000:1000 /home/user
       COPY . /workspace/
+      # Install test dependencies using uv (matches lambda-test-runner pattern)
+      WORKDIR /workspace/rosa-boundary/tests/localstack
+      RUN pip3 install uv && uv pip install --python python3.11 --system .
     from: nested-podman
     inputs:
       src:

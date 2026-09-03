@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/address-review-comments
     decorate: true
     decoration_config:
@@ -92,7 +92,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/agentic-qe-aws
     decorate: true
     decoration_config:
@@ -271,7 +271,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aks
     decorate: true
     decoration_config:
@@ -360,7 +360,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aks-5-0
     decorate: true
     decoration_config:
@@ -447,7 +447,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aks-managed-hsm
     decorate: true
     decoration_config:
@@ -535,7 +535,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aks-override
     decorate: true
     decoration_config:
@@ -623,7 +623,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aro-hcp
     decorate: true
     decoration_config:
@@ -889,7 +889,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aws-autonode
     decorate: true
     decoration_config:
@@ -977,7 +977,95 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
+    context: ci/prow/e2e-aws-autonode-standalone-ko
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.control-plane
+      - Dockerfile.e2e
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/cloud: hypershift-aws
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-hypershift-release-5.2-e2e-aws-autonode-standalone-ko
+    optional: true
+    rerun_command: /test e2e-aws-autonode-standalone-ko
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-autonode-standalone-ko
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-autonode-standalone-ko,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5\.2$
+    - ^release-5\.2-
+    cluster: build06
     context: ci/prow/e2e-aws-external-oidc-techpreview
     decorate: true
     decoration_config:
@@ -1065,7 +1153,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aws-major-version-upgrade
     decorate: true
     decoration_config:
@@ -1153,7 +1241,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aws-metrics
     decorate: true
     decoration_config:
@@ -1241,7 +1329,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aws-minimal
     decorate: true
     decoration_config:
@@ -1417,7 +1505,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-conformance-ccm
     decorate: true
     decoration_config:
@@ -1505,7 +1593,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aws-ovn-conformance-techpreview
     decorate: true
     decoration_config:
@@ -1593,7 +1681,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-aws-techpreview
     decorate: true
     decoration_config:
@@ -1770,7 +1858,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-azure-aks-external-oidc-techpreview
     decorate: true
     decoration_config:
@@ -1858,7 +1946,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-azure-aks-ovn-conformance
     decorate: true
     decoration_config:
@@ -1946,7 +2034,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-azure-aks-ovn-conformance-fips
     decorate: true
     decoration_config:
@@ -2034,7 +2122,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-azure-kubevirt-ovn
     decorate: true
     decoration_config:
@@ -2122,7 +2210,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-conformance
     decorate: true
     decoration_config:
@@ -2210,7 +2298,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-conformance-fips
     decorate: true
     decoration_config:
@@ -2475,7 +2563,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-kubevirt-azure-ovn
     decorate: true
     decoration_config:
@@ -2652,7 +2740,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-openstack-aws
     decorate: true
     decoration_config:
@@ -2741,7 +2829,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-openstack-aws-conformance
     decorate: true
     decoration_config:
@@ -2829,7 +2917,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-openstack-aws-csi-cinder
     decorate: true
     decoration_config:
@@ -2917,7 +3005,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-openstack-aws-csi-manila
     decorate: true
     decoration_config:
@@ -3005,7 +3093,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-openstack-aws-nfv
     decorate: true
     decoration_config:
@@ -3095,7 +3183,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-v2-aws
     decorate: true
     decoration_config:
@@ -3182,7 +3270,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-v2-aws-backuprestore
     decorate: true
     decoration_config:
@@ -3270,7 +3358,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-v2-aws-techpreview-osimagestream
     decorate: true
     decoration_config:
@@ -3360,7 +3448,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/e2e-v2-azure-self-managed
     decorate: true
     decoration_config:
@@ -3685,7 +3773,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -3771,7 +3859,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -3839,7 +3927,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -3908,7 +3996,7 @@ presubmits:
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
-    cluster: build02
+    cluster: build06
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:

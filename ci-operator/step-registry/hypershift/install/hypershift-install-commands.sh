@@ -67,6 +67,10 @@ if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --tech-preview-no-upgrade"
 fi
 
+if [ "${ENABLE_STANDALONE_KARPENTER_OPERATOR}" = "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --enable-standalone-karpenter-operator"
+fi
+
 if [ "${ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-defaulting-webhook=true"
 fi

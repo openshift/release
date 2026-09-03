@@ -35,13 +35,21 @@ if [ -f "test/e2e/${GCPPD}/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST}" ]; then
 fi
 
 if [ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ]; then
+    ocp_dir="test/e2e/${GCPPD}"
+    ocp_dest="${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}"
     if [ "${ENABLE_LONG_CSI_CERTIFICATION_TESTS}" = "true" ]; then
-        cp test/e2e/${GCPPD}/ocp-manifest-long.yaml ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
-    else
-        cp test/e2e/${GCPPD}/ocp-manifest.yaml ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+        if [ -f "${ocp_dir}/ocp-manifest-long.yaml" ]; then
+            cp "${ocp_dir}/ocp-manifest-long.yaml" "${ocp_dest}"
+        elif [ -f "${ocp_dir}/ocp-manifest.yaml" ]; then
+            cp "${ocp_dir}/ocp-manifest.yaml" "${ocp_dest}"
+        fi
+    elif [ -f "${ocp_dir}/ocp-manifest-long.yaml" ] && [ -f "${ocp_dir}/ocp-manifest.yaml" ]; then
+        cp "${ocp_dir}/ocp-manifest.yaml" "${ocp_dest}"
     fi
-    echo "Using OCP specific manifest ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}:"
-    cat ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+    if [ -f "${ocp_dest}" ]; then
+        echo "Using OCP specific manifest ${ocp_dest}:"
+        cat "${ocp_dest}"
+    fi
 fi
 
 # For debugging

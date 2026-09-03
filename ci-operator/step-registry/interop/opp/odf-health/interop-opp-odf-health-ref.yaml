@@ -3,7 +3,7 @@ ref:
   from: cli
   grace_period: 30s
   commands: interop-opp-odf-health-commands.sh
-  timeout: 8m
+  timeout: 18m
   env:
   - name: ODF_NAMESPACE
     default: "openshift-storage"
@@ -11,6 +11,14 @@ ref:
   - name: NOOBAA_S3_TIMEOUT
     default: "30"
     documentation: Timeout in seconds for the NooBaa S3 functional check pod
+  - name: ODF_READY_TIMEOUT
+    default: "720"
+    documentation: |-
+      Seconds to wait for StorageCluster and NooBaa to reach Ready before
+      running health checks. Accommodates platforms where ODF initialization
+      is slower (e.g., vSphere). On AWS the wait exits immediately; on vSphere
+      ODF typically needs 8-12 minutes. Must not exceed step timeout minus
+      300s to preserve headroom for the health checks themselves.
   resources:
     requests:
       cpu: 100m
@@ -22,4 +30,6 @@ ref:
     readiness with S3 functional check, and Ceph overall health.
     Replaces the former interop-tests-ocs-tests step which ran 28
     single-product acceptance tests with a 3h timeout.
-    Produces JUnit XML for Prow / Sippy / TestGrid consumption.
+    Waits for ODF subsystems to converge before checking (configurable
+    via ODF_READY_TIMEOUT), then produces JUnit XML for Prow / Sippy /
+    TestGrid consumption.

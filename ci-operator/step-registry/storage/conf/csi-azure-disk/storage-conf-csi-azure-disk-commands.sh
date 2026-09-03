@@ -13,13 +13,24 @@ if [ -d /go/src/github.com/openshift/csi-operator/ ]; then
     fi
 
     if [ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ]; then
+        # After csi-operator#596: ocp-manifest.yaml is standard, ocp-manifest-long.yaml is LUN stress.
+        # Older branches have only the combined ocp-manifest.yaml (LUN stress). Copy that on long
+        # jobs when the split is absent; copy the standard file on short jobs only when the split exists.
+        ocp_dir="test/e2e/azure-disk"
+        ocp_dest="${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}"
         if [ "${ENABLE_LONG_CSI_CERTIFICATION_TESTS}" = "true" ]; then
-            cp test/e2e/azure-disk/ocp-manifest-long.yaml ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
-        else
-            cp test/e2e/azure-disk/ocp-manifest.yaml ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+            if [ -f "${ocp_dir}/ocp-manifest-long.yaml" ]; then
+                cp "${ocp_dir}/ocp-manifest-long.yaml" "${ocp_dest}"
+            elif [ -f "${ocp_dir}/ocp-manifest.yaml" ]; then
+                cp "${ocp_dir}/ocp-manifest.yaml" "${ocp_dest}"
+            fi
+        elif [ -f "${ocp_dir}/ocp-manifest-long.yaml" ] && [ -f "${ocp_dir}/ocp-manifest.yaml" ]; then
+            cp "${ocp_dir}/ocp-manifest.yaml" "${ocp_dest}"
         fi
-        echo "Using OCP specific manifest ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}:"
-        cat ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+        if [ -f "${ocp_dest}" ]; then
+            echo "Using OCP specific manifest ${ocp_dest}:"
+            cat "${ocp_dest}"
+        fi
     fi
     if [ -f "test/e2e/azure-disk/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST}" ]; then
         echo "Copying ${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST} to ${SHARED_DIR}/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST}"

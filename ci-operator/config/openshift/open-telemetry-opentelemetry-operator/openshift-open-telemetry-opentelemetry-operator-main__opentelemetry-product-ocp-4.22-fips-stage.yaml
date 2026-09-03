@@ -48,9 +48,10 @@ tests:
   steps:
     cluster_profile: gcp-observability
     env:
+      AGENT_SKILL: otel
       FIPS_ENABLED: "true"
-      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1155558
-      MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH: rhosdt-3.10
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1201677
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH: rhosdt-3.11
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -62,8 +63,13 @@ tests:
         ]
       PQC_CHECK: "true"
       SCAN_NAMESPACE: opentelemetry-operator-system
+      SCANNER_CPU_LIMIT: "4"
+      SCANNER_CPU_REQUEST: 500m
       SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-otel/oidcauthextension
         tests/e2e-otel/google* tests/e2e/smoke-ports tests/e2e-instrumentation/instrumentation-go
+        tests/e2e-otel/azuremonitorlogs
+    post:
+    - ref: openshift-observability-qe-agent
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: install-operators
