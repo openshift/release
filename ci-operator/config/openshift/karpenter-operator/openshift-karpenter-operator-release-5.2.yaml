@@ -1,3 +1,12 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
 build_root:
   from_repository: true
   use_build_cache: true
@@ -65,6 +74,23 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-hypershift
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      ENABLE_STANDALONE_KARPENTER_OPERATOR: "true"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_PLAN: |
+        name: autonode-standalone-ko
+        platform: aws
+        testMatrix:
+          parallel:
+          - name: karpenter
+            variant: karpenter
+            labelFilter: karpenter
+    workflow: hypershift-aws-e2e-v2
 - as: verify
   commands: |
     export GOCACHE=/tmp/
