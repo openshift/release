@@ -26,10 +26,19 @@ ref:
       ODF typically needs 8-12 minutes. Must not exceed step timeout minus
       300s to preserve headroom for the health checks themselves.
     name: ODF_READY_TIMEOUT
+  - default: "60"
+    documentation: |-
+      Seconds to wait for PVCs and ObjectBucketClaims to reach Bound phase.
+      Budget: consumed 3x per run (2 PVC checks + 1 OBC check).
+      Ensure 3 * RESOURCE_BIND_TIMEOUT + ODF_READY_TIMEOUT + 150 < step timeout.
+      On AWS resources bind in seconds; on vSphere the NooBaa bucket
+      provisioner may need additional time after ODF reports Ready.
+      Override in ci-operator config for slower platforms. Max 300s (clamped).
+    name: RESOURCE_BIND_TIMEOUT
   from: cli
   grace_period: 30s
   resources:
     requests:
       cpu: 100m
       memory: 200Mi
-  timeout: 18m
+  timeout: 30m
