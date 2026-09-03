@@ -375,7 +375,11 @@ packet|equinix*)
         set_test_provider
 
         # Mirroring test images is supported only for versions greater than or equal to 4.8
-        mirror_test_images
+        # Skip image mirroring for ISO no-registry clusters — they have proxied
+        # internet access and can pull test images directly from upstream registries.
+        if [[ "${DS_AGENT_E2E_TEST_BOOT_MODE:-}" != "ISO_NO_REGISTRY" ]]; then
+            mirror_test_images
+        fi
 
         # On disconnected clusters, create an IDMS for core networking test
         # images (e.g. hello-sdn) so that pods referencing quay.io images by
