@@ -55,7 +55,36 @@ yq -r e -o=j -I=0 ".[0].host" "${SHARED_DIR}/hosts.yaml" >"${SHARED_DIR}"/host-i
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
-mkdir -p "${INSTALL_DIR}"
+mkdir -p "${INSTALL_DIR}/openshift"
+
+cat >>"${INSTALL_DIR}/openshift/98-encrypted-disk-luks-master.yaml" <<EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: master-tpm
+  labels:
+    machineconfiguration.openshift.io/role: master
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      luks:
+        - name: root
+          label: luks-root
+          device: /dev/disk/by-partlabel/root
+          clevis:
+            tpm2: true
+          options:
+            - --cipher
+            - aes-xts-plain64
+          wipeVolume: true
+      filesystems:
+        - device: /dev/mapper/root
+          format: xfs
+          wipeFilesystem: true
+          label: root
+EOF
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
