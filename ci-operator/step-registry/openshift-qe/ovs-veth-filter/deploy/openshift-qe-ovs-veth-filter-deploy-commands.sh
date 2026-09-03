@@ -67,3 +67,5 @@ for pod in $(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
 done
 
 oc get pods -n "${namespace}" -o wide
+oc wait pod -n "${namespace}" -l app=ovs-veth-filter \
+    --for=condition=Ready --timeout=2m

@@ -17,6 +17,10 @@ errors and non-veth messages fail open. This also hides those veth events from
 the OVS interface notifier sharing that socket, so pod networking health must
 be checked alongside CPU and route-table dump counts.
 
+Kubernetes readiness requires the current OVS target entry and pinned BPF link;
+if OVS disappears or its socket cannot be rediscovered, the entrypoint removes
+the readiness marker and the pod becomes NotReady until filtering is restored.
+
 The post-test step saves these artifacts before cluster teardown:
 
 - per-node BPF map counters (`bpf-stats-*.json`): target messages at key 0,

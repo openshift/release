@@ -28,6 +28,7 @@ spec:
         app: ovs-veth-filter
     spec:
       serviceAccountName: ovs-veth-filter
+      automountServiceAccountToken: false
       hostPID: true
       nodeSelector:
         kubernetes.io/os: linux
@@ -55,7 +56,15 @@ spec:
               cpu: 10m
               memory: 64Mi
             limits:
+              cpu: "1"
               memory: 512Mi
+          readinessProbe:
+            exec:
+              command:
+                - /opt/ovs-veth-filter/healthcheck.sh
+            periodSeconds: 2
+            timeoutSeconds: 1
+            failureThreshold: 1
       terminationGracePeriodSeconds: 10
       volumes:
         - name: bpffs

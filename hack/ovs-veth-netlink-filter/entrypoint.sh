@@ -5,6 +5,7 @@ source_dir=/opt/ovs-veth-filter
 run_dir=/run/ovs-veth-filter
 pin_dir=/sys/fs/bpf/ovs_veth_netlink_filter
 map_dir=$pin_dir/maps
+ready_file=$run_dir/ready
 current_portid=
 current_key=
 
@@ -27,6 +28,7 @@ portid_key()
 
 delete_key()
 {
+    rm -f "$ready_file"
     if [[ -n $current_key && -e $map_dir/target_portids ]]; then
         # shellcheck disable=SC2086
         bpftool map delete pinned "$map_dir/target_portids" \
@@ -96,6 +98,7 @@ while true; do
         delete_key
         current_portid=$portid
         current_key=$new_key
+        touch "$ready_file"
         echo "filtering veth link events for OVS netlink port ID $portid"
     fi
     sleep 5

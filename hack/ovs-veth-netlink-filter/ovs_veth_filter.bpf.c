@@ -191,6 +191,12 @@ int BPF_PROG(drop_ovs_veth_link_events, struct sock *sk,
         offset += align4(nlh.nlmsg_len);
     }
 
+    /* The last bounded iteration may have consumed the end of the skb. */
+    if (offset == skb_len && saw_veth) {
+        count_stat(STAT_DROPPED_VETH_MESSAGES);
+        return -EPERM;
+    }
+
     /* More messages than the verifier-bounded loop: fail open. */
     count_stat(STAT_PARSE_FAILURES);
     return 0;

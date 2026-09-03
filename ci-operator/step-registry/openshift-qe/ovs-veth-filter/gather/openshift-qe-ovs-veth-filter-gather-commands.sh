@@ -37,10 +37,16 @@ for pod in $(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
 done
 
 if [[ "${OVS_VETH_FILTER_CLEANUP}" == true ]]; then
+    cleanup_status=0
     oc delete daemonset ovs-veth-filter -n "${namespace}" \
-        --ignore-not-found --wait=true --timeout=5m
+        --ignore-not-found --wait=true --timeout=5m || cleanup_status=1
     oc adm policy remove-scc-from-user privileged \
-        -z ovs-veth-filter -n "${namespace}"
-    oc delete namespace "${namespace}" --ignore-not-found --wait=false
+        -z ovs-veth-filter -n "${namespace}" || cleanup_status=1
+    oc delete namespace "${namespace}" --ignore-not-found --wait=false || \
+        cleanup_status=1
+    if ((cleanup_status)); then
+        echo "failed to remove one or more privileged BPF resources" >&2
+        exit 1
+    fi
 fi
 exit 0
