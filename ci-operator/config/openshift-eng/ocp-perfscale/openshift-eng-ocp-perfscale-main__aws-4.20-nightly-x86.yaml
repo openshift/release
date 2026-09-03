@@ -99,6 +99,32 @@ tests:
     - ref: openshift-qe-ocpbugs-76596-ct-flush
     workflow: openshift-qe-installer-aws
   timeout: 3h0m0s
+- always_run: false
+  as: ocpbugs-76596-ct-flush-fixed-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BURST_POD_COUNT: "200"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      CT_ENTRIES_PER_ZONE: "125000"
+      EXPECTED_STALLS: "5"
+      EXPECTED_TIMEOUTS: "0"
+      KB_PODS_PER_NODE: "200"
+      KERNEL_RPM_BASE_URL: https://artifacts.internal.cki-project.org/arr-cki-prod-internal-artifacts/internal-artifacts/2805618071/build_x86_64/16205700033/artifacts
+      KERNEL_VERSION: 5.14.0-570.137.1.7193_2805617742.el9_6
+      MAX_PODS: "500"
+      OVS_RPM_BASE_URL: https://download.devel.redhat.com/brewroot/work/tasks/8175/71708175
+      OVS_VERSION: 3.5.2-73.el9fdp.rhel247088.1.1
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-set-max-pods
+    - ref: openshift-qe-ocpbugs-76596-ct-flush-install-fix
+    - ref: openshift-qe-ocpbugs-76596-ct-flush
+    workflow: openshift-qe-installer-aws
+  timeout: 4h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng

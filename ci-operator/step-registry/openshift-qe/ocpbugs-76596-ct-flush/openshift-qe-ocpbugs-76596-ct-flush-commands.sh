@@ -278,8 +278,13 @@ for i in $(seq 1 12); do
 done
 
 if [ "$RUNNING" -lt "$((BURST_POD_COUNT * 80 / 100))" ]; then
-  echo "ERROR: Only $RUNNING of $BURST_POD_COUNT burst pods became Running — aborting"
-  exit 1
+  echo "NOTE: Only $RUNNING of $BURST_POD_COUNT burst pods became Running."
+  echo "      On UNPATCHED clusters this is expected — pods fail to start due to OVS CT flush stalls."
+  echo "      Counting creation-phase CNI timeouts as evidence, then proceeding with burst deletion."
+  CREATION_TIMEOUTS=$(oc get events -n burst-test 2>/dev/null | \
+    awk '/timed out waiting for OVS/{c++}END{print c+0}')
+  echo "      CNI timeouts during creation: $CREATION_TIMEOUTS"
+  echo "creation_timeouts=$CREATION_TIMEOUTS" >> "$OUTDIR/info.txt"
 fi
 
 # ── Step 6: Simultaneous burst deletion ──────────────────────────────────────
