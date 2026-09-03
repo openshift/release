@@ -15,6 +15,13 @@ export PATH="/tmp/bin:${PATH}"
 mkdir -p /tmp/bin
 
 # --- Configuration ---
+# BRANCH may be injected by ci-operator from the job env; default to 5.0 if unset.
+BRANCH="${BRANCH:-5.0}"
+if [ -z "${BRANCH}" ]; then
+    echo "ERROR: BRANCH is not set and the default is empty. Cannot continue."
+    exit 1
+fi
+
 VAULT_CREDS_DIR="/etc/hypershift-agent-ibmz-credentials"
 
 # Vault license (just the license string, not a full YAML)
@@ -177,7 +184,10 @@ clone_repo() {
         git clone "${REPO_URL}" "${REPO_DIR}"
         cd "${REPO_DIR}"
         echo "Checking out branch for release ${BRANCH}..."
-        git checkout "release-${BRANCH}" || git checkout main
+        if ! git checkout "release-${BRANCH}"; then
+            echo "ERROR: Branch 'release-${BRANCH}' not found in ${REPO_URL}."
+            exit 1
+        fi
     fi
 
     echo "Repository ready at: ${REPO_DIR}"
