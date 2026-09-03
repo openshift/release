@@ -67,6 +67,7 @@ networking:
   networkType: OVNKubernetes
   serviceNetwork:
   - 172.30.0.0/16
+  clusterNetworkMTU: 8900
 compute:
 - architecture: "${ARCH}"
   hyperthreading: Enabled
@@ -79,30 +80,6 @@ pullSecret: >
 sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
-# Write a Network operator manifest to set the OVN-Kubernetes tunnel MTU at
-# install time. The installer injects this into the cluster before the network
-# operator starts, so OVN comes up with the correct MTU from day 1 — no
-# post-install migration or node reboot needed.
-# CLUSTER_MTU defaults to 9000 (jumbo frames on the OZ libvirt LPAR network).
-if [[ -n "${CLUSTER_MTU:-}" ]]; then
-  MTU_VALUE="${CLUSTER_MTU}"
-else
-  MTU_VALUE="9000"
-fi
-
-echo "Writing Network operator manifest with OVNKubernetes MTU=${MTU_VALUE}..."
-cat > "${SHARED_DIR}/manifest_cluster-network-03-mtu-config.yaml" << EOF
-apiVersion: operator.openshift.io/v1
-kind: Network
-metadata:
-  name: cluster
-spec:
-  defaultNetwork:
-    ovnKubernetesConfig:
-      mtu: ${MTU_VALUE}
-EOF
-
-
 if [ ${FIPS_ENABLED} = "true" ]; then
 	echo "Adding 'fips: true' to the install config..."
 	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
