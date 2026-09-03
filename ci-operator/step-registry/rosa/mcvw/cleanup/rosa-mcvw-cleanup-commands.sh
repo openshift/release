@@ -12,10 +12,12 @@ if [[ -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 fi
 
+MODE=""
 PACKAGE_NAME=""
 OPERATOR_NAMESPACE=""
 
 if [[ -n "${SHARED_DIR:-}" ]]; then
+    MODE=$(cat "${SHARED_DIR}/operator-e2e-mode" 2>/dev/null || true)
     PACKAGE_NAME=$(cat "${SHARED_DIR}/operator-e2e-clusterpackage" 2>/dev/null || true)
     OPERATOR_NAMESPACE=$(cat "${SHARED_DIR}/operator-e2e-namespace" 2>/dev/null || true)
 fi
@@ -23,6 +25,8 @@ fi
 if [[ -z "${OPERATOR_NAMESPACE}" ]]; then
     OPERATOR_NAMESPACE="openshift-validation-webhook"
 fi
+
+OPERATOR_DEPLOYMENT_NAME="${OPERATOR_DEPLOYMENT_NAME:-validation-webhook}"
 
 # Collect operator logs as artifacts before cleanup
 if [[ -n "${ARTIFACT_DIR:-}" ]]; then
@@ -37,52 +41,81 @@ if [[ -n "${ARTIFACT_DIR:-}" ]]; then
         > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
 fi
 
-if [[ -z "${PACKAGE_NAME}" ]]; then
-    log "No Package to clean up"
+if [[ -z "${MODE}" ]]; then
+    log "No install mode recorded, nothing to clean up"
     exit 0
 fi
 
-# If we patched an existing production Package, restore its original images.
-# If we created a new Package, delete it.
-ORIG_PKO_IMAGE=$(cat "${SHARED_DIR}/operator-e2e-orig-pko-image" 2>/dev/null || true)
-ORIG_OP_IMAGE=$(cat "${SHARED_DIR}/operator-e2e-orig-op-image" 2>/dev/null || true)
+log "Cleanup mode: ${MODE}"
 
-if [[ -n "${ORIG_PKO_IMAGE}" ]]; then
-    log "Restoring production images for Package '${PACKAGE_NAME}'"
-    if oc get package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+case "${MODE}" in
+clusterpackage-patch)
+    ORIG_PKO_IMAGE=$(cat "${SHARED_DIR}/operator-e2e-orig-pko-image" 2>/dev/null || true)
+    ORIG_OP_IMAGE=$(cat "${SHARED_DIR}/operator-e2e-orig-op-image" 2>/dev/null || true)
+    if [[ -n "${PACKAGE_NAME}" && -n "${ORIG_PKO_IMAGE}" ]]; then
+        log "Restoring ClusterPackage '${PACKAGE_NAME}' to production images"
+        PATCH="{\"spec\":{\"image\":\"${ORIG_PKO_IMAGE}\"}}"
+        if [[ -n "${ORIG_OP_IMAGE}" ]]; then
+            PATCH="{\"spec\":{\"image\":\"${ORIG_PKO_IMAGE}\",\"config\":{\"image\":\"${ORIG_OP_IMAGE}\"}}}"
+        fi
+        oc patch clusterpackage "${PACKAGE_NAME}" --type merge -p "${PATCH}" 2>/dev/null || true
+        log "ClusterPackage '${PACKAGE_NAME}' restored"
+    fi
+    ;;
+
+package-patch)
+    ORIG_PKO_IMAGE=$(cat "${SHARED_DIR}/operator-e2e-orig-pko-image" 2>/dev/null || true)
+    ORIG_OP_IMAGE=$(cat "${SHARED_DIR}/operator-e2e-orig-op-image" 2>/dev/null || true)
+    if [[ -n "${PACKAGE_NAME}" && -n "${ORIG_PKO_IMAGE}" ]]; then
+        log "Restoring Package '${PACKAGE_NAME}' to production images"
         PATCH="{\"spec\":{\"image\":\"${ORIG_PKO_IMAGE}\"}}"
         if [[ -n "${ORIG_OP_IMAGE}" ]]; then
             PATCH="{\"spec\":{\"image\":\"${ORIG_PKO_IMAGE}\",\"config\":{\"image\":\"${ORIG_OP_IMAGE}\"}}}"
         fi
         oc patch package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" \
             --type merge -p "${PATCH}" 2>/dev/null || true
-        log "Package '${PACKAGE_NAME}' restored to production images"
-    else
-        log "Package '${PACKAGE_NAME}' no longer exists, nothing to restore"
+        log "Package '${PACKAGE_NAME}' restored"
     fi
-    exit 0
-fi
+    ;;
 
-log "Cleaning up MCVW test Package ${PACKAGE_NAME} in ${OPERATOR_NAMESPACE}"
+deployment-direct)
+    CONTAINER_NAME=$(cat "${SHARED_DIR}/operator-e2e-container-name" 2>/dev/null || true)
+    ORIG_IMAGE=$(cat "${SHARED_DIR}/operator-e2e-orig-op-image" 2>/dev/null || true)
+    if [[ -n "${PACKAGE_NAME}" && -n "${ORIG_IMAGE}" && -n "${CONTAINER_NAME}" ]]; then
+        log "Restoring Deployment '${PACKAGE_NAME}' container image"
+        oc set image "deployment/${PACKAGE_NAME}" \
+            "${CONTAINER_NAME}=${ORIG_IMAGE}" \
+            -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
+        log "Deployment '${PACKAGE_NAME}' image restored"
+    fi
+    ;;
 
-if oc get package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
-    oc delete package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" --timeout=120s || true
-    for _i in $(seq 1 24); do
+package-create)
+    if [[ -z "${PACKAGE_NAME}" ]]; then
+        log "No Package name recorded, nothing to delete"
+        exit 0
+    fi
+    log "Deleting test Package '${PACKAGE_NAME}' in ${OPERATOR_NAMESPACE}"
+    if oc get package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+        oc delete package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" --timeout=120s || true
+        for _i in $(seq 1 24); do
+            RESULT=$(oc get package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" \
+                --ignore-not-found -o name 2>&1) || true
+            if [[ -z "${RESULT}" ]]; then break; fi
+            sleep 5
+        done
         RESULT=$(oc get package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" \
             --ignore-not-found -o name 2>&1) || true
-        if [[ -z "${RESULT}" ]]; then
-            break
+        if [[ -n "${RESULT}" ]]; then
+            log "WARNING: Package still exists, removing finalizers"
+            oc patch package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" \
+                --type merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
         fi
-        sleep 5
-    done
-    # Force-remove finalizers if still stuck
-    RESULT=$(oc get package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" \
-        --ignore-not-found -o name 2>&1) || true
-    if [[ -n "${RESULT}" ]]; then
-        log "WARNING: Package still exists, removing finalizers"
-        oc patch package "${PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" \
-            --type merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
     fi
-fi
+    log "Cleanup complete"
+    ;;
 
-log "Cleanup complete"
+*)
+    log "Unknown mode '${MODE}', skipping cleanup"
+    ;;
+esac
