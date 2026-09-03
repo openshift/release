@@ -1,3 +1,8 @@
+base_images:
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -21,10 +26,12 @@ resources:
 tests:
 - as: e2e-aws-openshift-platform-compliance
   steps:
-    cluster_profile: quay-aws
+    cluster_profile: aws-stackrox
     env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
+      BASE_DOMAIN: perfscale.rox.systems
       FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre-fips
     test:
     - as: test
       cli: latest
@@ -39,10 +46,12 @@ tests:
 - as: e2e-aws-openshift-node-compliance
   optional: true
   steps:
-    cluster_profile: quay-aws
+    cluster_profile: aws-stackrox
     env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
+      BASE_DOMAIN: perfscale.rox.systems
       FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre-fips
     test:
     - as: test
       cli: latest
@@ -56,9 +65,9 @@ tests:
     workflow: ipi-aws
 - as: e2e-aws-ocp4-cis
   steps:
-    cluster_profile: quay-aws
+    cluster_profile: aws-stackrox
     env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
+      BASE_DOMAIN: perfscale.rox.systems
     test:
     - as: test
       cli: latest
@@ -74,9 +83,9 @@ tests:
     workflow: ipi-aws
 - as: e2e-aws-ocp4-stig
   steps:
-    cluster_profile: quay-aws
+    cluster_profile: aws-stackrox
     env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
+      BASE_DOMAIN: perfscale.rox.systems
     test:
     - as: test
       cli: latest
@@ -92,9 +101,9 @@ tests:
     workflow: ipi-aws
 - as: e2e-aws-rhcos4-moderate
   steps:
-    cluster_profile: quay-aws
+    cluster_profile: aws-stackrox
     env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
+      BASE_DOMAIN: perfscale.rox.systems
     test:
     - as: test
       cli: latest
