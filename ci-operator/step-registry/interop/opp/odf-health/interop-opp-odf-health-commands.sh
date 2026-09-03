@@ -15,6 +15,13 @@ typeset ODF_NAMESPACE="${ODF_NAMESPACE:-openshift-storage}"
 typeset NOOBAA_S3_TIMEOUT="${NOOBAA_S3_TIMEOUT:-30}"
 typeset RESOURCE_BIND_TIMEOUT="${RESOURCE_BIND_TIMEOUT:-60}"
 typeset -ri maxResourceBindTimeout=300
+
+# Validate RESOURCE_BIND_TIMEOUT is a positive integer
+if ! [[ "${RESOURCE_BIND_TIMEOUT}" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "Error: RESOURCE_BIND_TIMEOUT must be a positive integer (got '${RESOURCE_BIND_TIMEOUT}')" >&2
+    exit 1
+fi
+
 if (( RESOURCE_BIND_TIMEOUT > maxResourceBindTimeout )); then
     printf '%s\n' "Warning: RESOURCE_BIND_TIMEOUT=${RESOURCE_BIND_TIMEOUT} exceeds maximum ${maxResourceBindTimeout}s; clamping" >&2
     RESOURCE_BIND_TIMEOUT="${maxResourceBindTimeout}"
@@ -24,7 +31,7 @@ if (( RESOURCE_BIND_TIMEOUT < 1 )); then
     exit 1
 fi
 typeset ODF_READY_TIMEOUT="${ODF_READY_TIMEOUT:-720}"
-typeset -ri maxOdfReadyTimeout=780
+typeset -ri maxOdfReadyTimeout=750
 if (( ODF_READY_TIMEOUT > maxOdfReadyTimeout )); then
     printf '%s\n' "Warning: ODF_READY_TIMEOUT=${ODF_READY_TIMEOUT} exceeds maximum ${maxOdfReadyTimeout}s; clamping" >&2
     ODF_READY_TIMEOUT="${maxOdfReadyTimeout}"
@@ -272,7 +279,8 @@ EOF
         typeset -i elapsed=0
         typeset phase=""
         while (( elapsed < maxWait )); do
-            phase="$(oc get pvc "${pvcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")"
+            typeset -i remaining=$(( maxWait - elapsed ))
+            phase="$(oc get pvc "${pvcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' --request-timeout="${remaining}s" 2>/dev/null || echo "")"
             if [[ "${phase}" == "Bound" ]]; then
                 break
             fi
@@ -343,7 +351,8 @@ EOF
     typeset -i elapsed=0
     typeset obcPhase=""
     while (( elapsed < maxWait )); do
-        obcPhase="$(oc get obc "${obcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")"
+        typeset -i remaining=$(( maxWait - elapsed ))
+        obcPhase="$(oc get obc "${obcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' --request-timeout="${remaining}s" 2>/dev/null || echo "")"
         if [[ "${obcPhase}" == "Bound" ]]; then
             break
         fi
