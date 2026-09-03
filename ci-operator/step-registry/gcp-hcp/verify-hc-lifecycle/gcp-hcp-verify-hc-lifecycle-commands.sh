@@ -36,10 +36,14 @@ if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
   E2E_HC_SUBMITTER_KEY_FILE="${E2E_HC_SUBMITTER_KEY_DIR}/key.json"
   E2E_HC_SUBMITTER_KEY_ID=""
 
+  extract_e2e_hc_submitter_key_id() {
+    sed -n 's/^[[:space:]]*"private_key_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*$/\1/p' "$1"
+  }
+
   cleanup_e2e_hc_submitter_key() {
     local key_id="${E2E_HC_SUBMITTER_KEY_ID}"
     if [[ -z "${key_id}" && -s "${E2E_HC_SUBMITTER_KEY_FILE}" ]]; then
-      key_id="$(jq -r '.private_key_id // empty' "${E2E_HC_SUBMITTER_KEY_FILE}")"
+      key_id="$(extract_e2e_hc_submitter_key_id "${E2E_HC_SUBMITTER_KEY_FILE}")"
     fi
 
     if [[ -n "${key_id}" ]]; then
@@ -64,7 +68,11 @@ if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
   gcloud iam service-accounts keys create "${E2E_HC_SUBMITTER_KEY_FILE}" \
     --iam-account="${E2E_HC_SUBMITTER_SA}" \
     --quiet
-  E2E_HC_SUBMITTER_KEY_ID="$(jq -er '.private_key_id | select(type == "string" and length > 0)' "${E2E_HC_SUBMITTER_KEY_FILE}")"
+  E2E_HC_SUBMITTER_KEY_ID="$(extract_e2e_hc_submitter_key_id "${E2E_HC_SUBMITTER_KEY_FILE}")"
+  if [[ -z "${E2E_HC_SUBMITTER_KEY_ID}" ]]; then
+    echo "ERROR: Could not determine the temporary key ID"
+    exit 1
+  fi
 
   echo "Activating ${E2E_HC_SUBMITTER_SA} for identity token authentication..."
   gcloud auth activate-service-account "${E2E_HC_SUBMITTER_SA}" \
