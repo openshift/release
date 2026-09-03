@@ -65,6 +65,8 @@ SpokeUpgradeFailureCleanup() {
 }
 trap SpokeUpgradeFailureCleanup EXIT
 
+# Resolve release image metadata (version, digest, image) from a pullspec.
+# Sets caller-scoped namerefs: _version, _digest, _image.
 ResolveReleaseImage() {
     typeset pullspec="${1:?}"; (($#)) && shift
     typeset -n _version="${1:?}"; (($#)) && shift
@@ -216,11 +218,15 @@ DumpSpokeUpgradeStatus() {
     true
 }
 
+# Upgrade the spoke cluster to a specific release pullspec.
+# Sets caller-scoped variable (arg 2) to the resolved hop version
+# so the trap handler can report which hop was in progress on failure.
 UpgradeSpokeToPullspec() {
     typeset pullspec="${1:?}"; (($#)) && shift
+    typeset -n _currentHopVersion="${1:?}"; (($#)) && shift    # ← nameref (MPEX-compliant)
     typeset hopVersion='' hopImage=''
     ResolveReleaseImage "${pullspec}" hopVersion hopImage
-    currentHopVersion="${hopVersion}"
+    _currentHopVersion="${hopVersion}"                         # ← writes via nameref
     : "Upgrading spoke ${spokeName} to ${hopVersion}"
     PatchAdminAcksForUpgrade "${spokeKubeconfig}"
     ApplySpokeUpgradeManifestWork "${spokeName}" "${ACM_MANIFESTWORK_NAME}" \
@@ -258,7 +264,7 @@ if [[ "${SPOKE_CLUSTER_UPGRADE_EUS}" == "true" ]]; then
     for hopPullspec in "${hopImages[@]}"; do
         hopPullspec="${hopPullspec//[[:space:]]/}"
         [[ -n "${hopPullspec}" ]]
-        UpgradeSpokeToPullspec "${hopPullspec}"
+        UpgradeSpokeToPullspec "${hopPullspec}" currentHopVersion
     done
     WaitMcpCondition "${spokeKubeconfig}" worker 'Updated=False' 30m
     SetWorkerMcpPaused "${spokeKubeconfig}" false
