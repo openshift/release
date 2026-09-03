@@ -14,21 +14,92 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 if [ "$CLUSTER_WIDE_PROXY" == "true" ] || [ "$DISCONNECTED" == "true" ]; then
+ # Build NO_PROXY for CI scripts using dynamic values only
+ NO_PROXY_SHELL="localhost,127.0.0.1,::1"
+
+ # Add auxiliary host (CI scripts SSH to it)
+ if [ -n "${AUX_HOST:-}" ]; then
+   NO_PROXY_SHELL="${NO_PROXY_SHELL},${AUX_HOST}"
+ fi
+
+ # Add internal lab networks (where aux host and BMC live)
+ if [ -n "${INTERNAL_NET_CIDR:-}" ]; then
+   NO_PROXY_SHELL="${NO_PROXY_SHELL},${INTERNAL_NET_CIDR}"
+ fi
+
+ if [ -n "${INTERNAL_NET_V6_CIDR:-}" ]; then
+   NO_PROXY_SHELL="${NO_PROXY_SHELL},${INTERNAL_NET_V6_CIDR}"
+ fi
+
+ # Add CI infrastructure (don't proxy CI registries and services)
+ NO_PROXY_SHELL="${NO_PROXY_SHELL},.ci.openshift.org"
+
  proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
  cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
  export HTTP_PROXY=${proxy}
  export HTTPS_PROXY=${proxy}
- export NO_PROXY="localhost,127.0.0.1"
+ export NO_PROXY="${NO_PROXY_SHELL}"
 
  export http_proxy=${proxy}
  export https_proxy=${proxy}
- export no_proxy="localhost,127.0.0.1"
+ export no_proxy="${NO_PROXY_SHELL}"
 EOF
+ echo "Created ${SHARED_DIR}/proxy-conf.sh with NO_PROXY=${NO_PROXY_SHELL}"
 fi
 
 if [ "${CLUSTER_WIDE_PROXY}" == "true" ]; then
   # ipi-conf-proxy will run only if a specific file is found, see step code
   cp "${CLUSTER_PROFILE_DIR}/proxy_private_url" "${SHARED_DIR}/proxy_private_url"
+fi
+
+
+# WORKAROUND: Installer doesn't auto-populate proxy.noProxy on ARM baremetal SNO BIP IPv6
+# Create a patch with noProxy CIDRs to be merged with install-config
+# Reference: https://github.com/openshift/release/pull/83261#issuecomment-XXXXX
+if [ "${CLUSTER_WIDE_PROXY}" == "true" ]; then
+  echo "Building noProxy list for baremetal SNO IPv6 proxy installation"
+
+  # Start with standard exclusions
+  NO_PROXY_LIST="localhost,127.0.0.1,::1,.cluster.local,.svc"
+
+  # Add IPv6 networking CIDRs (hardcoded for baremetal lab)
+  if [[ "${ipv6_enabled:-false}" == "true" ]]; then
+    # Cluster network CIDR (standard for IPv6 in baremetal lab)
+    NO_PROXY_LIST="${NO_PROXY_LIST},fd02::/48"
+
+    # Service network CIDR (standard for IPv6 in baremetal lab)
+    NO_PROXY_LIST="${NO_PROXY_LIST},fd03::/112"
+
+    # Machine network CIDR (from environment)
+    if [ -n "${INTERNAL_NET_V6_CIDR:-}" ]; then
+      NO_PROXY_LIST="${NO_PROXY_LIST},${INTERNAL_NET_V6_CIDR}"
+    fi
+  fi
+
+  # Add IPv4 networking CIDRs if dual-stack or IPv4-only
+  if [[ "${ipv4_enabled:-true}" == "true" ]]; then
+    NO_PROXY_LIST="${NO_PROXY_LIST},10.128.0.0/14,172.30.0.0/16"
+    if [ -n "${INTERNAL_NET_CIDR:-}" ]; then
+      NO_PROXY_LIST="${NO_PROXY_LIST},${INTERNAL_NET_CIDR}"
+    fi
+  fi
+
+  # Add cluster domain and API endpoints
+  BASE_DOMAIN="$(<"${CLUSTER_PROFILE_DIR}/base_domain")"
+  CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
+  NO_PROXY_LIST="${NO_PROXY_LIST},.${BASE_DOMAIN}"
+  NO_PROXY_LIST="${NO_PROXY_LIST},api.${CLUSTER_NAME}.${BASE_DOMAIN}"
+  NO_PROXY_LIST="${NO_PROXY_LIST},api-int.${CLUSTER_NAME}.${BASE_DOMAIN}"
+
+  echo "Configured noProxy list: ${NO_PROXY_LIST}"
+
+  # Create patch file to be merged with install-config
+  cat > "${SHARED_DIR}/noproxy_patch_install_config.yaml" <<EOF
+proxy:
+  noProxy: ${NO_PROXY_LIST}
+EOF
+
+  echo "Created ${SHARED_DIR}/noproxy_patch_install_config.yaml"
 fi
 
 if [ x"${DISCONNECTED}" != x"true" ]; then
