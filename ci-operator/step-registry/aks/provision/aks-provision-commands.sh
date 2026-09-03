@@ -217,10 +217,11 @@ spec:
           operator: In
           values:
             - "${NAP_SKU_CPU:-16}"
+        # AKS NAP supports Gt/Lt rather than Gte/Lte; Gt 4 selects v5+.
         - key: karpenter.azure.com/sku-version
-          operator: Gte
+          operator: Gt
           values:
-            - "5"
+            - "4"
 $(if [[ -n "$ZONE_VALUES" ]]; then
 cat <<ZONES
         - key: topology.kubernetes.io/zone
