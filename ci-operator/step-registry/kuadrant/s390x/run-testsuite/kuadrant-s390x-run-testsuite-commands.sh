@@ -9,6 +9,8 @@ set -euo pipefail
 #   - Egress OpenShift Route name egress-bk (avoid clash with session backend)
 #   - Authorino cluster-trust-bundle + Vault tools-vault (Phase 2 credential injection)
 #   - Authorino/OIDC dataplane-ready soft-wait patch
+#   - Authorino follow-ups: dinosaur /dinosaurs wait, Keycloak 26 UMA _id,
+#     MockServer cache settle, gateway/identical-hostname dataplane wait
 #   - protobuf==6.32.1 pin (broken s390x upb ≥6.33.0)
 #   - CFSSL ensure (baked in Dockerfile.s390x; fallback download if missing)
 #   - CoreDNS getaddrinfo plugin + UI ignore
@@ -422,6 +424,200 @@ index 26c6a71..4c9ad83 100644
 PATCH_EOF
 
 # ---------------------------------------------------------------------------
+# 2a3. Authorino s390x follow-ups (applied in-Job onto the baked testsuite).
+#     deny_email: first dinosaur test fail-opens because unauth /get is not a
+#       readiness signal (path-conditional AuthPolicy); poll /dinosaurs instead.
+#     UMA: Keycloak 26 resource_set?uri= returns objects; .body[0] is not an id.
+#     cache: Authorino metadata GET races MockServer 201 (test_cached 500).
+#     gateway / identical-hostnames: same wasm fail-open as deny_email.
+# ---------------------------------------------------------------------------
+AUTHORINO_FIXES_PY="${WORK_DIR}/authorino-s390x-fixes.py"
+cat > "${AUTHORINO_FIXES_PY}" <<'PY'
+"""Idempotent in-job patches for remaining Authorino s390x failures."""
+from pathlib import Path
+
+MARKER = "s390x-authorino-fix"
+
+
+def _write(path: Path, text: str, label: str) -> None:
+    path.write_text(text)
+    print(f"OK {label}")
+
+
+def patch_dinosaur() -> None:
+    path = Path("testsuite/tests/singlecluster/authorino/dinosaur/conftest.py")
+    if not path.exists():
+        print("SKIP dinosaur conftest missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: dinosaur" in text:
+        print("SKIP dinosaur already patched")
+        return
+    text += '''
+
+# s390x-authorino-fix: dinosaur
+@pytest.fixture(scope="module", autouse=True)
+def wait_for_auth_dataplane(commit, client):  # pylint: disable=unused-argument
+    """Poll the protected dinosaurs path until Authorino denies unauthenticated traffic.
+
+    The dinosaur AuthPolicy is path-conditional; unauthenticated GET /get is 200
+    even when wasm is ready, so skipping the default /get wait left the first
+    test (test_deny_email) hitting fail-open 200 instead of OPA 403.
+    """
+    import logging
+    import time
+
+    logger = logging.getLogger(__name__)
+    deadline = time.time() + 60
+    ready = False
+    while time.time() < deadline:
+        try:
+            if client.get("/anything/dinosaurs_mgmt/v1/dinosaurs").status_code in (401, 403):
+                ready = True
+                break
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+        time.sleep(1)
+    if not ready:
+        logger.warning(
+            "Dinosaur AuthPolicy dataplane not denying unauth /dinosaurs within 60s; continuing"
+        )
+'''
+    _write(path, text, "dinosaur dataplane wait")
+
+
+def patch_uma() -> None:
+    path = Path(
+        "testsuite/tests/singlecluster/authorino/authorization/opa/test_authorization_services.py"
+    )
+    if not path.exists():
+        print("SKIP uma test file missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: uma" in text:
+        print("SKIP uma already patched")
+        return
+    needle = "resource_id := http.send("
+    start = text.find(needle)
+    if start < 0:
+        print("WARN uma resource_id assignment not found")
+        return
+    end = text.find(".body[0]", start)
+    if end < 0:
+        print("WARN uma .body[0] not found")
+        return
+    end += len(".body[0]")
+    old = text[start:end]
+    new = (
+        old.replace("resource_id :=", "r :=", 1)
+        + "\n# "
+        + MARKER
+        + ": uma — Keycloak 26 returns resource objects, not id strings\n"
+        + "resource_id := r._id {{ is_object(r) }}\n"
+        + "resource_id := r {{ is_string(r) }}"
+    )
+    _write(path, text[:start] + new + text[end:], "uma resource_id")
+
+
+def patch_cache() -> None:
+    path = Path("testsuite/tests/singlecluster/authorino/caching/metadata/conftest.py")
+    if not path.exists():
+        print("SKIP cache conftest missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: cache" in text:
+        print("SKIP cache already patched")
+        return
+    old = "    return mockserver.create_template_expectation(module_label, mustache_template)\n"
+    new = (
+        "    created = mockserver.create_template_expectation(module_label, mustache_template)\n"
+        "    import time\n"
+        "    time.sleep(2)  # s390x-authorino-fix: cache — metadata GET races MockServer 201\n"
+        "    return created\n"
+    )
+    if old not in text:
+        print("WARN cache create_template_expectation return not found")
+        return
+    _write(path, text.replace(old, new, 1), "cache expectation settle")
+
+
+def patch_gateway() -> None:
+    path = Path("testsuite/tests/singlecluster/gateway/conftest.py")
+    if not path.exists():
+        print("SKIP gateway conftest missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: gateway" in text:
+        print("SKIP gateway already patched")
+        return
+    text += '''
+
+# s390x-authorino-fix: gateway
+@pytest.fixture(scope="module", autouse=True)
+def wait_for_auth_dataplane(commit, client):  # pylint: disable=unused-argument
+    """Wait until gateway-attached AuthPolicy denies unauthenticated /get."""
+    import logging
+    import time
+
+    logger = logging.getLogger(__name__)
+    deadline = time.time() + 60
+    ready = False
+    while time.time() < deadline:
+        try:
+            if client.get("/get").status_code in (401, 403):
+                ready = True
+                break
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+        time.sleep(1)
+    if not ready:
+        logger.warning("Gateway AuthPolicy dataplane not denying unauth /get within 60s; continuing")
+'''
+    _write(path, text, "gateway dataplane wait")
+
+
+def patch_identical_hostnames() -> None:
+    path = Path("testsuite/tests/singlecluster/identical_hostnames/auth/test_auth_on_routes.py")
+    if not path.exists():
+        print("SKIP identical_hostnames test missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: identical-hostnames" in text:
+        print("SKIP identical_hostnames already patched")
+        return
+    old = """    response = client.get("/anything/route1/get")
+    assert response.status_code == 200
+
+    response = client.get("/anything/route2/get")
+    assert response.status_code == 403
+"""
+    new = """    response = client.get("/anything/route1/get")
+    assert response.status_code == 200
+
+    # s390x-authorino-fix: identical-hostnames — deny-all on route2 fail-opens until wasm catches up
+    import time
+    deadline = time.time() + 60
+    response = client.get("/anything/route2/get")
+    while response.status_code != 403 and time.time() < deadline:
+        time.sleep(1)
+        response = client.get("/anything/route2/get")
+    assert response.status_code == 403
+"""
+    if old not in text:
+        print("WARN identical_hostnames asserts not found")
+        return
+    _write(path, text.replace(old, new, 1), "identical_hostnames route2 wait")
+
+
+if __name__ == "__main__":
+    patch_dinosaur()
+    patch_uma()
+    patch_cache()
+    patch_gateway()
+    patch_identical_hostnames()
+PY
+
+# ---------------------------------------------------------------------------
 # 2b. getaddrinfo plugin → mounted into the Job as a ConfigMap
 #    Redirects only *.COREDNS_ZONE lookups to CoreDNS ClusterIP:53.
 # ---------------------------------------------------------------------------
@@ -637,6 +833,9 @@ fi
 grep -n AUTH_DATAPLANE_READY_TIMEOUT testsuite/utils/constants.py || true
 grep -n wait_for_auth_dataplane testsuite/tests/singlecluster/authorino/conftest.py || true
 
+echo '=== Applying s390x Authorino follow-up patches ==='
+python3 /kuadrant-hook/authorino-s390x-fixes.py || true
+
 # Phase 1 egress: session backend already owns OpenShift Route blame(\"backend\")
 # without TLS. Reusing that name for the egress edge-TLS Route leaves it HTTP-only
 # after create->apply on AlreadyExists. Baked image still has blame(\"backend\").
@@ -800,6 +999,7 @@ oc -n "${TEST_RUNNER_NAMESPACE}" create configmap kuadrant-testrunner-hook \
   --from-file=kuadrant_coredns_resolve.py="${PLUGIN_FILE}" \
   --from-file=echo_expectation.json="${ECHO_EXPECTATION_FILE}" \
   --from-file=kuadrant-s390x-run-testsuite-dataplane-ready.patch="${DATAPLANE_PATCH_FILE}" \
+  --from-file=authorino-s390x-fixes.py="${AUTHORINO_FIXES_PY}" \
   --dry-run=client -o yaml | oc apply -f -
 
 JOB_FILE="${WORK_DIR}/job.yaml"
