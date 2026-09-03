@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 echo "Labeling all nodes with localstorage=enabled..."
 oc label nodes --all localstorage=enabled --overwrite
 
