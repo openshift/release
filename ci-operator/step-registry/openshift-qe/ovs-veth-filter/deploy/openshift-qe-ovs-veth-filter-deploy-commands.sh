@@ -29,6 +29,9 @@ fi
 oc start-build ovs-veth-filter --from-dir="${assets}" --follow --wait \
     -n "${namespace}"
 oc apply -f "${assets}/daemonset.yaml"
+image=$(oc get imagestreamtag ovs-veth-filter:latest -n "${namespace}" \
+    -o jsonpath='{.image.dockerImageReference}')
+oc set image daemonset/ovs-veth-filter "filter=${image}" -n "${namespace}"
 oc rollout status daemonset/ovs-veth-filter -n "${namespace}" --timeout=20m
 
 desired=$(oc get daemonset ovs-veth-filter -n "${namespace}" \
