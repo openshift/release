@@ -7,6 +7,10 @@ base_images:
     name: "4.18"
     namespace: origin
     tag: operator-sdk
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -56,6 +60,13 @@ tests:
     timeout: 3h0m0s
     version: "4.21"
   steps:
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: coo
+      SCANNER_CPU_LIMIT: "4"
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
     test:
     - as: install
       cli: latest
@@ -86,6 +97,7 @@ tests:
           memory: 400Mi
     - ref: rhobs-enable-ocp
     - ref: rhobs-obo-test-harness
+    - ref: tls-scanner-run
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
