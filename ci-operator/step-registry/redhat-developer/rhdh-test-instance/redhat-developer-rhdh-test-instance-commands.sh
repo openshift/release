@@ -71,7 +71,7 @@ on_error() {
 
 🚨 **RHDH deployment encountered an error**
 
-📊 [**View Logs**](https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/${URL_REPO}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/deploy/redhat-developer-rhdh-test-instance/build-log.txt) for details"
+📊 [**View Logs**](https://gcs.ci.openshift.org/gcs/test-platform-results/pr-logs/pull/${URL_REPO}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/deploy/redhat-developer-rhdh-test-instance/build-log.txt) for details"
     
 }
 
