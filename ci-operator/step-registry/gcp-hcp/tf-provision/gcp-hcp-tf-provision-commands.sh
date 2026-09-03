@@ -228,10 +228,10 @@ import_orphaned_firestore() {
   # Check for the Firestore 409 pattern.
   # TFC remote output splits the error across multiple lines with │ prefixes,
   # so we check for both strings independently rather than on a single line.
-  if ! echo "${output}" | grep -q "Database already exists"; then
+  if ! grep -q "Database already exists" <<<"${output}"; then
     return 1
   fi
-  if ! echo "${output}" | grep -q "google_firestore_database"; then
+  if ! grep -q "google_firestore_database" <<<"${output}"; then
     return 1
   fi
 
@@ -262,7 +262,7 @@ import_orphaned_firestore() {
     local import_id="projects/${mc_project}/databases/${db_name}"
 
     # Only import if the error mentions this specific database
-    if echo "${output}" | grep -q "google_firestore_database.${db_name}"; then
+    if grep -q "google_firestore_database.${db_name}" <<<"${output}"; then
       log "Importing ${address} <- ${import_id}"
       if terraform import -no-color "${address}" "${import_id}" 2>&1 | tee -a "${LOG}"; then
         log "Successfully imported ${db_name} database"
