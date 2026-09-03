@@ -239,3 +239,31 @@ echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+# Workaround for OCPBUGS-54574: Apply NetworkPolicies for virt-launcher
+if [[ "${CNI_PROVIDER}" == "cilium" ]]; then
+
+  oc apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-konnectivity-from-nodes
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: kube-apiserver
+      hypershift.openshift.io/control-plane-component: kube-apiserver
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 8091
+  policyTypes:
+    - Ingress
+EOF
+
+  echo "NetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
+fi

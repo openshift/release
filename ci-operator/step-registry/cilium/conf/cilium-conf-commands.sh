@@ -116,6 +116,7 @@ cilium install \
     --set tunnelPort="${TUNNEL_PORT}" \
     --set clusterHealthPort=9940 \
     --set socketLB.enabled=false \
+    --set policyCIDRMatchMode=nodes \
     > "${WORKDIR}/cilium-install-all.yaml"
 
 # Split the multi-document YAML into individual manifest files
