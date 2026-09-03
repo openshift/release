@@ -32,3 +32,24 @@ pinned BPF link; the post-test step then removes the SCC grant and namespace.
 
 The branch named by `OVS_VETH_FILTER_REF` must be pushed before requesting the
 CI rehearsal, because the target cluster builds these assets from that ref.
+
+## Live step rehearsal
+
+On 2026-09-03 the deploy and gather command files were run directly against an
+OpenShift `5.0.0-0.nightly-2026-08-31-084301` cluster. The test used the pushed
+branch as its clone source and the same binary OpenShift build used by CI.
+
+The rehearsal found and fixed two integration errors before submitting the CI
+job: an ImageStream-trigger race was avoided by pinning the DaemonSet to the
+new build digest, and OVS coverage collection was moved to the
+`ovn-controller` container. The corrected deploy step completed successfully
+on three workers, including image build, digest-pinned rollout, BPF attachment
+checks, and baseline coverage collection.
+
+Twenty probe pods were rolled to generate fresh veth events. The three worker
+counters ended at `72/72/0`, `60/60/0`, and `22/22/0` for
+target/dropped/parse-failure events. The exact gather step then produced BPF
+JSON, before/after OVS coverage, DaemonSet logs and resources, and Network
+ClusterOperator state. Cleanup was disabled for this rehearsal; its CI default
+remains enabled. After collection the filter was `3/3` Ready, probes were
+`20/20` Ready, and the Network ClusterOperator was Available and not Degraded.
