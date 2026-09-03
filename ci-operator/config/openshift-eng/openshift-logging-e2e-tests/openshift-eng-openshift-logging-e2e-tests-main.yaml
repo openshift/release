@@ -3,6 +3,13 @@ build_root:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM pipeline:src
+      RUN GONOSUMDB="*" GOFLAGS="" go mod download
+    from: src
+    to: src-with-deps
 resources:
   '*':
     requests:
@@ -13,7 +20,7 @@ tests:
   commands: HOME=/tmp make build
   container:
     clone: true
-    from: src
+    from: src-with-deps
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 zz_generated_metadata:
   branch: main
