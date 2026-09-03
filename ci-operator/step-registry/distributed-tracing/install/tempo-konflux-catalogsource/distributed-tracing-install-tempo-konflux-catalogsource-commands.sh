@@ -188,6 +188,8 @@ EOF
 		run "oc get pods -o wide -n openshift-marketplace"
 		run "oc -n openshift-marketplace get catalogsource $CATALOG_SOURCE -o yaml"
 		run "oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOG_SOURCE -o yaml"
+		run "oc -n openshift-marketplace logs -l olm.catalogSource=$CATALOG_SOURCE --tail=-1 --all-containers"
+		run "oc -n openshift-marketplace logs -l olm.catalogSource=$CATALOG_SOURCE --tail=-1 --all-containers --previous --ignore-errors"
 		node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource="$CATALOG_SOURCE" -o=jsonpath='{.items[0].spec.nodeName}')
 		run "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false \
       pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
