@@ -61,7 +61,7 @@ for pod in $(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
     node=$(oc get pod -n openshift-ovn-kubernetes "${pod}" \
         -o jsonpath='{.spec.nodeName}')
-    oc exec -n openshift-ovn-kubernetes "${pod}" -c ovnkube-node -- \
+    oc exec -n openshift-ovn-kubernetes "${pod}" -c ovn-controller -- \
         ovs-appctl -t ovs-vswitchd coverage/show \
         > "${baseline_dir}/ovs-coverage-${node}.txt"
 done
