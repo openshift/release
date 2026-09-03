@@ -145,39 +145,45 @@ EOF
     fi
 fi
 
-SA_PATCHED=""
-log "Waiting for deployment ${OPERATOR_DEPLOYMENT_NAME} to be ready..."
-for attempt in $(seq 1 30); do
-    if ! oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
-        sleep 10
-        continue
-    fi
-
-    if [[ -z "${SA_PATCHED}" ]] && oc get secret ci-pull-secret -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
-        SA_NAME=$(oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" \
-            -o jsonpath='{.spec.template.spec.serviceAccountName}' 2>/dev/null || echo "${OPERATOR_NAME}")
-        if oc get sa "${SA_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
-            oc patch sa "${SA_NAME}" -n "${OPERATOR_NAMESPACE}" \
-                --type json -p '[{"op":"add","path":"/imagePullSecrets/-","value":{"name":"ci-pull-secret"}}]' 2>/dev/null || true
-            log "CI pull secret added to ServiceAccount ${SA_NAME}"
-            oc delete pods -n "${OPERATOR_NAMESPACE}" -l app="${OPERATOR_DEPLOYMENT_NAME}" 2>/dev/null || true
-            SA_PATCHED=1
-        fi
-    fi
-
-    if oc wait deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" \
-        --for=condition=Available --timeout=30s 2>/dev/null; then
+# Wait for PKO to create the Deployment from the Package (up to 5 minutes)
+log "Waiting for deployment ${OPERATOR_DEPLOYMENT_NAME} to exist..."
+for i in $(seq 1 30); do
+    if oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+        log "Deployment exists"
         break
     fi
-
-    if [[ ${attempt} -eq 30 ]]; then
-        log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} not ready after 5 minutes"
-        oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
-        oc get pods -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
+    if [[ $i -eq 30 ]]; then
+        log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} not found after 5 minutes"
         oc get package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
+        oc get objectset -n "${OPERATOR_NAMESPACE}" 2>/dev/null | head -20 || true
         exit 1
     fi
     sleep 10
 done
+
+# Add CI pull secret to the deployment's SA so pods can pull from the CI registry.
+# Then trigger a rollout so the new pods pick up the SA change.
+if oc get secret ci-pull-secret -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+    SA_NAME=$(oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" \
+        -o jsonpath='{.spec.template.spec.serviceAccountName}' 2>/dev/null || echo "${OPERATOR_NAME}")
+    if oc get sa "${SA_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
+        oc patch sa "${SA_NAME}" -n "${OPERATOR_NAMESPACE}" \
+            --type json -p '[{"op":"add","path":"/imagePullSecrets/-","value":{"name":"ci-pull-secret"}}]' 2>/dev/null || true
+        log "CI pull secret added to ServiceAccount ${SA_NAME}"
+    fi
+    oc rollout restart deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
+fi
+
+# oc rollout status waits until all updated replicas are ready -- unlike
+# --for=condition=Available which can return true with 0 ready pods when
+# maxUnavailable covers all replicas.
+log "Waiting for ${OPERATOR_DEPLOYMENT_NAME} rollout to complete..."
+if ! oc rollout status deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" --timeout=10m; then
+    log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} did not roll out in time"
+    oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
+    oc get pods -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
+    oc get package "${CLUSTER_PACKAGE_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
+    exit 1
+fi
 
 log "${OPERATOR_NAME} installed and ready in ${OPERATOR_NAMESPACE}"
