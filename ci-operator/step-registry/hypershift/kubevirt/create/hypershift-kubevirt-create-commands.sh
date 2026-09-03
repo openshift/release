@@ -329,7 +329,7 @@ localnet_multi_ssh_pod_namespace() {
 }
 
 localnet_multi_ssh_pod_image() {
-  echo "${LOCALNET_MULTI_SSH_POD_IMAGE:-registry.redhat.io/openshift4/ose-cli:latest}"
+  echo "${LOCALNET_MULTI_SSH_POD_IMAGE:-registry.redhat.io/rhel9/support-tools:latest}"
 }
 
 localnet_multi_ssh_pod_security_context() {
@@ -339,7 +339,6 @@ localnet_multi_ssh_pod_security_context() {
       capabilities:
         drop:
         - ALL
-      runAsNonRoot: true
       seccompProfile:
         type: RuntimeDefault
 EOF
