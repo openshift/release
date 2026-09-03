@@ -26,6 +26,8 @@ set -euxo pipefail; shopt -s inherit_errexit
 # ── Constants ─────────────────────────────────────────────────────────────────
 typeset -r subctlBin="/tmp/bin/subctl"
 typeset -r brokerInfoFile="/tmp/broker-info.subm"
+[[ "${ACM_SPOKE_CLUSTER_COUNT}" =~ ^[1-9][0-9]*$ ]] \
+    || { : "ACM_SPOKE_CLUSTER_COUNT must be a positive decimal integer (got: '${ACM_SPOKE_CLUSTER_COUNT}')"; false; }
 typeset -i spokeCount="${ACM_SPOKE_CLUSTER_COUNT}"
 typeset remediateGlobalnet="${SUBMARINER_REMEDIATE_GLOBALNET}"
 typeset -i uninstallWaitSecs="${SUBMARINER_UNINSTALL_WAIT_SECS}"
@@ -269,6 +271,7 @@ JoinCluster() {
     true
 }
 
+
 # ── WaitForObjectToExist — poll until a Kubernetes resource exists ────────────
 WaitForObjectToExist() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
@@ -409,7 +412,7 @@ command -v curl 1>/dev/null
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq yq
 
 LoadSpokeConfig
