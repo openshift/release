@@ -23,16 +23,19 @@ the readiness marker and the pod becomes NotReady until filtering is restored.
 
 The post-test step saves these artifacts before cluster teardown:
 
-- per-node BPF map counters (`bpf-stats-*.json`): target messages at key 0,
-  dropped veth messages at key 1, and parse failures at key 2;
+- per-node BPF map counters (`bpf-stats-*.json`): target skbs at key 0,
+  dropped veth skbs at key 1, aggregate parse failures at key 2, paged skbs
+  at key 3, short link-kind attributes at key 4, batch overflows at key 5,
+  kernel read failures at key 6, and mixed/non-veth batches at key 7;
 - per-node OVS coverage before and after the CUDN workload;
 - DaemonSet resources and logs;
 - the Network ClusterOperator state.
 
-Healthy filtering has equal target and dropped counts, zero parse failures,
-normal pod/OVN health, and fewer `route_table_dump` increments than the
-unfiltered baseline. The DaemonSet termination trap removes its map entry and
-pinned BPF link; the post-test step then removes the SCC grant and namespace.
+A useful run has nonzero dropped counts, reason-specific counters explaining
+every significant fail-open population, normal pod/OVN health, and fewer
+`route_table_dump` increments than the unfiltered baseline. The DaemonSet
+termination trap removes its map entry and pinned BPF link; the post-test step
+then removes the SCC grant and namespace.
 
 The branch named by `OVS_VETH_FILTER_REF` must be pushed before requesting the
 CI rehearsal, because the target cluster builds these assets from that ref.

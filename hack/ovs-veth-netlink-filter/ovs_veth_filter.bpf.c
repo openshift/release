@@ -15,7 +15,7 @@
 #define IFLA_INFO_KIND 1
 
 #define EPERM 1
-#define MAX_NLMSGS 8
+#define MAX_NLMSGS 32
 #define MAX_ATTRS 64
 
 struct {
@@ -29,6 +29,11 @@ enum stat_index {
     STAT_TARGET_MESSAGES,
     STAT_DROPPED_VETH_MESSAGES,
     STAT_PARSE_FAILURES,
+    STAT_PAGED_SKB,
+    STAT_SHORT_KIND,
+    STAT_BATCH_OVERFLOW,
+    STAT_READ_FAILURE,
+    STAT_MIXED_BATCH,
     STAT_MAX,
 };
 
@@ -70,8 +75,11 @@ link_is_veth(const unsigned char *data, __u32 msg_offset, __u32 msg_len)
         if (offset == end) {
             return 0;
         }
-        if (offset > end || end - offset < sizeof(rta)
-            || bpf_probe_read_kernel(&rta, sizeof(rta), data + offset)) {
+        if (offset > end || end - offset < sizeof(rta)) {
+            return -1;
+        }
+        if (bpf_probe_read_kernel(&rta, sizeof(rta), data + offset)) {
+            count_stat(STAT_READ_FAILURE);
             return -1;
         }
         if (rta.rta_len < sizeof(rta) || rta.rta_len > end - offset) {
@@ -89,9 +97,12 @@ link_is_veth(const unsigned char *data, __u32 msg_offset, __u32 msg_len)
                     return 0;
                 }
                 if (nested > nested_end
-                    || nested_end - nested < sizeof(info)
-                    || bpf_probe_read_kernel(&info, sizeof(info),
-                                             data + nested)) {
+                    || nested_end - nested < sizeof(info)) {
+                    return -1;
+                }
+                if (bpf_probe_read_kernel(&info, sizeof(info),
+                                          data + nested)) {
+                    count_stat(STAT_READ_FAILURE);
                     return -1;
                 }
                 if (info.rta_len < sizeof(info)
@@ -99,17 +110,21 @@ link_is_veth(const unsigned char *data, __u32 msg_offset, __u32 msg_len)
                     return -1;
                 }
                 if (info.rta_type == IFLA_INFO_KIND) {
-                    char kind[5] = {};
+                    char kind[4];
+                    __u32 kind_len = info.rta_len - sizeof(info);
 
-                    if (info.rta_len < sizeof(info) + sizeof(kind)
-                        || bpf_probe_read_kernel(kind, sizeof(kind),
-                                                 data + nested
-                                                 + sizeof(info))) {
+                    if (kind_len < sizeof(kind)) {
+                        count_stat(STAT_SHORT_KIND);
+                        return 0;
+                    }
+                    if (bpf_probe_read_kernel(kind, sizeof(kind),
+                                              data + nested
+                                              + sizeof(info))) {
+                        count_stat(STAT_READ_FAILURE);
                         return -1;
                     }
                     return kind[0] == 'v' && kind[1] == 'e'
-                           && kind[2] == 't' && kind[3] == 'h'
-                           && kind[4] == '\0';
+                           && kind[2] == 't' && kind[3] == 'h';
                 }
                 nested += align4(info.rta_len);
             }
@@ -126,7 +141,7 @@ int BPF_PROG(drop_ovs_veth_link_events, struct sock *sk,
 {
     struct netlink_sock *nlk;
     const unsigned char *data;
-    __u32 portid, skb_len, offset = 0;
+    __u32 portid, skb_len, total_len, data_len, offset = 0;
     __u16 family;
     __u8 *enabled;
     bool saw_veth = false;
@@ -152,7 +167,20 @@ int BPF_PROG(drop_ovs_veth_link_events, struct sock *sk,
 
     count_stat(STAT_TARGET_MESSAGES);
     data = BPF_CORE_READ(skb, data);
-    skb_len = BPF_CORE_READ(skb, len);
+    total_len = BPF_CORE_READ(skb, len);
+    data_len = BPF_CORE_READ(skb, data_len);
+    if (data_len > total_len) {
+        count_stat(STAT_PARSE_FAILURES);
+        return 0;
+    }
+    skb_len = total_len - data_len;
+    if (data_len) {
+        /* The paged tail is not directly readable from skb->data.  Do not
+         * make a drop decision from only the visible linear prefix.
+         */
+        count_stat(STAT_PAGED_SKB);
+        return 0;
+    }
 
     /* A drop applies to the complete skb.  Fail open unless every contained
      * netlink message is a well-formed veth link notification.
@@ -168,15 +196,23 @@ int BPF_PROG(drop_ovs_veth_link_events, struct sock *sk,
             }
             return 0;
         }
-        if (offset > skb_len || skb_len - offset < sizeof(nlh)
-            || bpf_probe_read_kernel(&nlh, sizeof(nlh), data + offset)
-            || nlh.nlmsg_len < sizeof(nlh)
+        if (offset > skb_len || skb_len - offset < sizeof(nlh)) {
+            count_stat(STAT_PARSE_FAILURES);
+            return 0;
+        }
+        if (bpf_probe_read_kernel(&nlh, sizeof(nlh), data + offset)) {
+            count_stat(STAT_READ_FAILURE);
+            count_stat(STAT_PARSE_FAILURES);
+            return 0;
+        }
+        if (nlh.nlmsg_len < sizeof(nlh)
             || nlh.nlmsg_len > skb_len - offset) {
             count_stat(STAT_PARSE_FAILURES);
             return 0;
         }
         if (nlh.nlmsg_type != RTM_NEWLINK
             && nlh.nlmsg_type != RTM_DELLINK) {
+            count_stat(STAT_MIXED_BATCH);
             return 0;
         }
 
@@ -184,6 +220,8 @@ int BPF_PROG(drop_ovs_veth_link_events, struct sock *sk,
         if (is_veth != 1) {
             if (is_veth < 0) {
                 count_stat(STAT_PARSE_FAILURES);
+            } else {
+                count_stat(STAT_MIXED_BATCH);
             }
             return 0;
         }
@@ -198,6 +236,7 @@ int BPF_PROG(drop_ovs_veth_link_events, struct sock *sk,
     }
 
     /* More messages than the verifier-bounded loop: fail open. */
+    count_stat(STAT_BATCH_OVERFLOW);
     count_stat(STAT_PARSE_FAILURES);
     return 0;
 }

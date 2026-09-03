@@ -57,15 +57,14 @@ for pod in $(oc get pods -n "${namespace}" -l app=ovs-veth-filter \
     fi
 done
 
-baseline_dir="${SHARED_DIR}/ovs-veth-filter-baseline"
-mkdir -p "${baseline_dir}"
+echo "Collecting pre-workload OVS coverage baselines in ${SHARED_DIR}"
 for pod in $(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
     node=$(oc get pod -n openshift-ovn-kubernetes "${pod}" \
         -o jsonpath='{.spec.nodeName}')
     oc exec -n openshift-ovn-kubernetes "${pod}" -c ovn-controller -- \
         ovs-appctl -t ovs-vswitchd coverage/show \
-        > "${baseline_dir}/ovs-coverage-${node}.txt"
+        > "${SHARED_DIR}/ovs-coverage-baseline-${node}.txt"
 done
 
 oc get pods -n "${namespace}" -o wide

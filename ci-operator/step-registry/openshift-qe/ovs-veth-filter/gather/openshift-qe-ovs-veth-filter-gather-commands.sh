@@ -8,8 +8,17 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 namespace=ovs-veth-filter
 mkdir -p "${ARTIFACT_DIR}"
-cp -a "${SHARED_DIR}/ovs-veth-filter-baseline" \
-    "${ARTIFACT_DIR}/" 2>/dev/null
+echo "Copying pre-workload OVS coverage baselines to ${ARTIFACT_DIR}"
+baseline_count=0
+for baseline in "${SHARED_DIR}"/ovs-coverage-baseline-*.txt; do
+    [[ -e "${baseline}" ]] || continue
+    if cp "${baseline}" "${ARTIFACT_DIR}/"; then
+        baseline_count=$((baseline_count + 1))
+    else
+        echo "Failed to copy OVS baseline ${baseline}" >&2
+    fi
+done
+echo "Copied ${baseline_count} OVS coverage baseline files"
 
 oc get daemonset,pods,build,buildconfig -n "${namespace}" -o wide \
     > "${ARTIFACT_DIR}/ovs-veth-filter-resources.txt" 2>&1
