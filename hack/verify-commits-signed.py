@@ -19,7 +19,6 @@ import urllib.request
 
 API_BASE = os.environ.get("GITHUB_API_BASE", "https://api.github.com")
 PER_PAGE = 100
-SIGNING_DOCS = "https://docs.github.com/authentication/managing-commit-signature-verification/signing-commits"
 
 
 def github_request(url, token):
@@ -88,7 +87,7 @@ def main():
         print()
         print(f"{len(unsigned)} of {len(commits)} commits in this pull request are not signed with a")
         print("signature GitHub can verify. Sign your commits and force-push the branch:")
-        print(f"  {SIGNING_DOCS}")
+        print("  https://docs.github.com/authentication/managing-commit-signature-verification/signing-commits")
         print("An existing branch can be re-signed in place with:")
         print("  git rebase --exec 'git commit --amend --no-edit -S' main")
         return 1
