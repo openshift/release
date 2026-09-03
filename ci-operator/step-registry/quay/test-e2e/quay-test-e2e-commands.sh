@@ -28,6 +28,8 @@ $WAS_TRACING && set -x
 export PLAYWRIGHT_BASE_URL="${QUAY_ROUTE}"
 export REACT_QUAY_APP_API_URL="${QUAY_ROUTE}"
 export PLAYWRIGHT_JUNIT_OUTPUT_NAME="${ARTIFACT_DIR}/junit_playwright.xml"
+# results.json is a structured Prow artifact from the Playwright json reporter (ref quay/quay#7049)
+export PLAYWRIGHT_JSON_OUTPUT_NAME="${ARTIFACT_DIR}/results.json"
 export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 export QUAY_USERNAME
 export QUAY_PASSWORD
@@ -275,6 +277,6 @@ pushd "${PLAYWRIGHT_WORKDIR}"
 npx playwright test \
   "${GREP_INVERT_ARGS[@]}" \
   --workers "${PLAYWRIGHT_WORKERS}" \
-  --reporter=junit,html \
+  --reporter=junit,html,json \
   2>&1 | tee "${ARTIFACT_DIR}/playwright-output.log"
 popd
