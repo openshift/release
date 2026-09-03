@@ -7,9 +7,7 @@ export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
 AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
 OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/konveyor/hypershift-oadp-plugin:latest}"
 
-# TODO: This picks the "public" cluster by default. The hypershift-azure-create-selfmanaged-guests
-# creates a number of clusters which is baked into the create-guests binary from HyperShift.
-# We need to find a way tell the binary to create only a single cluster.
+# This needs to match the variant from the TEST_PLAN env var in the workflow
 CLUSTER_PREFIX="${CLUSTER_PREFIX:-public}"
 
 echo "Discovering the public self-managed-Azure guest cluster..."
