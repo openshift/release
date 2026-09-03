@@ -22,8 +22,10 @@ oc create serviceaccount ovs-veth-filter -n "${namespace}" \
 oc adm policy add-scc-to-user privileged \
     -z ovs-veth-filter -n "${namespace}"
 
-oc new-build --name=ovs-veth-filter --binary --strategy=docker \
-    -n "${namespace}"
+if ! oc get buildconfig ovs-veth-filter -n "${namespace}" >/dev/null 2>&1; then
+    oc new-build --name=ovs-veth-filter --binary --strategy=docker \
+        -n "${namespace}"
+fi
 oc start-build ovs-veth-filter --from-dir="${assets}" --follow --wait \
     -n "${namespace}"
 oc apply -f "${assets}/daemonset.yaml"
