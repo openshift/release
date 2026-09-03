@@ -19,7 +19,7 @@ else
   GCS_BUCKET_PATH="logs/${JOB_NAME}/${BUILD_ID}"
 fi
 
-GCSWEB_BASE="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+GCSWEB_BASE="https://gcs.ci.openshift.org/gcs/test-platform-results"
 PROW_JOB_URL="${GCSWEB_BASE}/${GCS_BUCKET_PATH}"
 ARTIFACTS_BASE="${GCSWEB_BASE}/${GCS_BUCKET_PATH}/artifacts/${TEST_NAME}"
 
