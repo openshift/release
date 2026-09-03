@@ -268,16 +268,112 @@ spec:
     managed: true
   - kind: route
     managed: true
+  overrides:
+    components:
+    - kind: deployment
+      name: quay-quay-app
+      managed: true
+      overrides:
+        spec:
+          template:
+            spec:
+              containers:
+              - name: quay-app
+                startupProbe:
+                  httpGet:
+                    path: /health/instance
+                    port: 8080
+                    scheme: HTTP
+                  failureThreshold: 30
+                  periodSeconds: 10
+                  timeoutSeconds: 10
 EOF
+
+sleep 10m
 
 for _ in {1..60}; do
   if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
     echo "Quay is in ready status" >&2
     oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
+    echo "Debugging Quay UI connectivity issue"
+
+    echo "=== DIAGNOSTIC: Quay deployment state ==="
+    quay_route=$(oc -n "${QUAY_NAMESPACE:-quay-enterprise}" get quayregistry quay -o jsonpath='{.status.registryEndpoint}') || true
+    echo "Registry endpoint: ${quay_route}"
+    oc -n "${QUAY_NAMESPACE:-quay-enterprise}" get quayregistry quay -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
+
+    echo ""
+    echo "--- Pods ---"
+    oc -n "${QUAY_NAMESPACE:-quay-enterprise}" get pods -o wide 2>&1 || true
+
+    echo ""
+    echo "--- Pod readiness detail ---"
+    oc -n "${QUAY_NAMESPACE:-quay-enterprise}" get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{range .status.containerStatuses[*]}{.name}={.ready}{" restarts="}{.restartCount}{" "}{end}{"\n"}{end}' 2>/dev/null || true
+
+    echo ""
+    echo "--- Quay app container logs (last 30 lines) ---"
+    oc -n "${QUAY_NAMESPACE:-quay-enterprise}" logs deployment/quay-quay-quay-app --tail=30 2>&1 || oc -n "${QUAY_NAMESPACE:-quay-enterprise}" logs -l quay-component=quay-app --tail=30 2>&1 || true
+
+    echo ""
+    echo "--- Routes ---"
+    oc -n "${QUAY_NAMESPACE:-quay-enterprise}" get routes -o wide 2>&1 || true
+
+    echo ""
+    echo "--- Route detail ---"
+    oc -n "${QUAY_NAMESPACE:-quay-enterprise}" get route -l quay-component=quay-app-route -o jsonpath='{range .items[*]}host={.spec.host} tls={.spec.tls.termination} admitted={.status.ingress[0].conditions[0].status}{"\n"}{end}' 2>/dev/null || true
+
+    echo ""
+    echo "--- Ingress controller pods ---"
+    oc -n openshift-ingress get pods -o wide 2>&1 || true
+
+    echo ""
+    echo "--- Ingress controller logs (last 15 lines) ---"
+    oc -n openshift-ingress logs deployment/router-default --tail=15 2>&1 || true
+
+    echo ""
+    echo "--- Endpoint connectivity test ---"
+    if [[ -n "${quay_route}" ]]; then
+        echo "Testing: curl -vk --max-time 30 ${quay_route}/health/instance"
+        curl -vk --max-time 30 "${quay_route}/health/instance" 2>&1 || true
+        echo ""
+        echo "Testing: curl -vk --max-time 30 ${quay_route}/api/v1/discovery"
+        curl -vk --max-time 30 "${quay_route}/api/v1/discovery" 2>&1 | head -20 || true
+    else
+        echo "WARNING: quay_route is empty — cannot test connectivity"
+    fi
+
+    # 1. Check if DNS resolves from the CI pod
+    echo "Checking DNS resolution..."
+    nslookup "$quay_route" || dig "$quay_route" +short
+
+    # 2. Check if the port is reachable (quick TCP test)
+    echo "Checking TCP connectivity on port 443..."
+    timeout 10 bash -c "echo > /dev/tcp/$quay_route/443" 2>&1 && echo "Port 443 reachable" || echo "Port 443 NOT reachable"
+
+    echo "=== END DIAGNOSTICS ==="
+    echo ""
+
+    echo "Sleeping 1h for debugging — connect now!"
+    sleep 1h
+
     quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
-    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
-         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    # Use oc exec for in-cluster API access (external route resolves to private
+    # PowerVS IPs unreachable from the CI build farm)
+    quay_pod=$(oc get pods -n quay-enterprise --field-selector=status.phase=Running -o name | grep quay-app | head -1)
+    if [[ -n "$quay_pod" ]]; then
+        echo "Initializing Quay user via in-cluster oc exec ($quay_pod)..."
+        oc exec -n quay-enterprise "$quay_pod" -- \
+          curl -sk -X POST https://$quay_route/api/v1/user/initialize \
+            --header 'Content-Type: application/json' \
+            --data '{ "username": "'"$QUAY_USERNAME"'", "password": "'"$QUAY_PASSWORD"'", \
+              "email": "'"$QUAY_EMAIL"'", "access_token": true }' \
+          | jq '.access_token' | tr -d '"' | tr -d '\n' \
+          > "$SHARED_DIR"/quay_oauth2_token || true
+    else
+        echo "ERROR: No running quay-app pod found for user initialization" >&2
+    fi
+
     archive_pod_info
     exit 0
   fi
