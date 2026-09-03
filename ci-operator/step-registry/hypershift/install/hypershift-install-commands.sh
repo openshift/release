@@ -217,3 +217,74 @@ case "${CLOUD_PROVIDER}" in
     ${EXTRA_ARGS}
     ;;
 esac
+
+# --- HyperShift Operator image verification ---
+# Persist the resolved operator image for downstream steps and CI artifact inspection.
+# Follows the pattern established by the MCE install step (hypershift/mce/install).
+echo "${OPERATOR_IMAGE}" > "${ARTIFACT_DIR}/hypershift-operator-image.txt"
+echo "${OPERATOR_IMAGE}" > "${SHARED_DIR}/hypershift-operator-image"
+
+# Query the actual deployed operator from the management cluster.
+# Prefer the explicit management_cluster_kubeconfig written by the nested-management-cluster
+# setup chain; fall back to the default KUBECONFIG (covers 2-tier root-management-cluster
+# workflows where management_cluster_kubeconfig does not exist).
+VERIFY_KUBECONFIG="${KUBECONFIG:-}"
+if [[ -f "${SHARED_DIR}/management_cluster_kubeconfig" ]]; then
+  VERIFY_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+fi
+
+DEPLOYED_IMAGE="unavailable"
+POD_IMAGE_ID="unavailable"
+
+if [[ -n "${VERIFY_KUBECONFIG}" ]] && [[ -f "${VERIFY_KUBECONFIG}" ]]; then
+  DEPLOYED_IMAGE=$(oc --kubeconfig="${VERIFY_KUBECONFIG}" get deployment -n hypershift operator \
+    -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null) || DEPLOYED_IMAGE="unavailable"
+  POD_IMAGE_ID=$(oc --kubeconfig="${VERIFY_KUBECONFIG}" get pods -n hypershift -l app=operator \
+    -o jsonpath='{.items[0].status.containerStatuses[0].imageID}' 2>/dev/null) || POD_IMAGE_ID="unavailable"
+fi
+
+# Write a structured verification artifact for CI analysis and triage.
+OVERRIDE_SUPPLIED="false"
+if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_SUPPLIED="true"
+fi
+
+cat > "${ARTIFACT_DIR}/hypershift-operator-image-verification.json" <<VERIFY_EOF
+{
+  "intended_image": "${OPERATOR_IMAGE}",
+  "deployed_image": "${DEPLOYED_IMAGE}",
+  "pod_image_id": "${POD_IMAGE_ID}",
+  "override_supplied": ${OVERRIDE_SUPPLIED}
+}
+VERIFY_EOF
+
+echo "INFO: HyperShift Operator image verification artifact written"
+echo "  Intended: ${OPERATOR_IMAGE}"
+echo "  Deployed: ${DEPLOYED_IMAGE}"
+echo "  Pod imageID: ${POD_IMAGE_ID}"
+
+# When an explicit override was supplied, verify the deployment converged to the
+# intended image by comparing immutable sha256 digests. A mismatch means the
+# operator rollout did not pick up the override — fail the step so the CI signal
+# is clear. This only fires on the opt-in override path; ordinary e2e jobs that
+# use the default pipeline image are unaffected.
+if [[ "${OVERRIDE_SUPPLIED}" == "true" ]] && [[ "${POD_IMAGE_ID}" != "unavailable" ]]; then
+  # Extract sha256 digest from the pod's imageID (e.g. docker-pullable://...@sha256:abc)
+  DEPLOYED_DIGEST="${POD_IMAGE_ID##*@}"
+  # Extract sha256 digest from the intended override image if it contains one
+  INTENDED_DIGEST="${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE##*@}"
+
+  if [[ "${INTENDED_DIGEST}" == sha256:* ]] && [[ "${DEPLOYED_DIGEST}" == sha256:* ]]; then
+    if [[ "${INTENDED_DIGEST}" != "${DEPLOYED_DIGEST}" ]]; then
+      echo "ERROR: HyperShift Operator image digest mismatch"
+      echo "  Intended: ${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
+      echo "  Intended digest: ${INTENDED_DIGEST}"
+      echo "  Deployed digest: ${DEPLOYED_DIGEST}"
+      echo "  Pod imageID: ${POD_IMAGE_ID}"
+      exit 1
+    else
+      echo "INFO: HyperShift Operator image digest verified"
+      echo "  Digest: ${DEPLOYED_DIGEST}"
+    fi
+  fi
+fi
