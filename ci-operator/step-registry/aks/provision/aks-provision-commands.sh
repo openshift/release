@@ -26,39 +26,42 @@ run_az_with_retry() {
 
     if "$@" >"${capture_dir}/stdout" 2>"${capture_dir}/stderr"; then
       cat "${capture_dir}/stdout"
-      cat "${capture_dir}/stderr" >&2
+      if [[ -s "${capture_dir}/stderr" ]]; then
+        printf 'Azure CLI %s completed with status 0; command diagnostics suppressed\n' "${operation}" >&2
+      fi
       rm -rf "${capture_dir}"
       return 0
     else
       rc=$?
     fi
 
-    # Do not allow partial output from a failed attempt to satisfy a caller's
-    # command substitution. Preserve it as diagnostic output instead.
-    cat "${capture_dir}/stdout" >&2
-    cat "${capture_dir}/stderr" >&2
+    # Keep failed output private: stdout must not satisfy a caller's command
+    # substitution, while stderr is used only for quiet retry classification.
 
     if ((rc >= 128 && rc <= 192)); then
+      printf 'Azure CLI %s ended with status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
     fi
 
     if ! grep -Eiq "${AZURE_CLI_TRANSIENT_ERROR_PATTERN}" "${capture_dir}/stderr"; then
+      printf 'Azure CLI %s failed with non-retryable status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
     fi
 
     if ((attempt >= max_attempts)); then
-      echo "Azure CLI ${operation} failed after ${max_attempts} attempts due to transient transport errors" >&2
+      printf 'Azure CLI %s failed after %d attempts with transient status %d\n' "${operation}" "${max_attempts}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
     fi
 
-    echo "Azure CLI ${operation} hit a transient transport error (attempt ${attempt}/${max_attempts}); retrying in ${delay}s" >&2
+    printf 'Azure CLI %s hit transient status %d (attempt %d/%d); retrying in %ds\n' "${operation}" "${rc}" "${attempt}" "${max_attempts}" "${delay}" >&2
     if sleep "${delay}"; then
       :
     else
       rc=$?
+      printf 'Azure CLI %s retry wait ended with status %d\n' "${operation}" "${rc}" >&2
       rm -rf "${capture_dir}"
       return "${rc}"
     fi
