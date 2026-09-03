@@ -19,6 +19,7 @@ rm -rf /root/openperouter
 git clone --depth 1 --branch "${branch}" "${repository}" /root/openperouter
 EOFSOURCE
 
+sleep 3h
 echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
 ssh "${SSHOPTS[@]}" "root@${IP}" bash -s << 'EOFDEPLOY'
 set -euo pipefail
