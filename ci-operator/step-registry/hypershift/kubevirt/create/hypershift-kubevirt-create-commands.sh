@@ -240,36 +240,40 @@ $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${C
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
-# Workaround for OCPBUGS-54574: Apply NetworkPolicies for virt-launcher
+# Workaround for OCPBUGS-54574: Apply CiliumNetworkPolicies for virt-launcher
+# pods on Cilium-managed management clusters.
 if [[ "${CNI_PROVIDER}" == "cilium" ]]; then
 
+  if ! oc get crd ciliumnetworkpolicies.cilium.io &>/dev/null; then
+    echo "CiliumNetworkPolicy CRD not found, aborting"
+    exit 1
+  fi
+
   oc apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
 metadata:
   name: virt-launcher-allow-all-egress
   namespace: ${CONTROL_PLANE_NAMESPACE}
 spec:
-  podSelector:
+  endpointSelector:
     matchLabels:
       kubevirt.io: virt-launcher
-  policyTypes:
-    - Egress
   egress:
-    - {}
+    - toEntities:
+        - all
 ---
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
 metadata:
   name: allow-all-ingress
   namespace: ${CONTROL_PLANE_NAMESPACE}
 spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
+  endpointSelector: {}
   ingress:
-    - {}
+    - fromEntities:
+        - all
 EOF
 
-  echo "NetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
+  echo "CiliumNetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
 fi
