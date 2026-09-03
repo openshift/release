@@ -36,9 +36,11 @@ for pod in $(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
         > "${ARTIFACT_DIR}/ovs-coverage-${node}.txt" 2>&1
 done
 
-oc delete daemonset ovs-veth-filter -n "${namespace}" \
-    --ignore-not-found --wait=true --timeout=5m
-oc adm policy remove-scc-from-user privileged \
-    -z ovs-veth-filter -n "${namespace}"
-oc delete namespace "${namespace}" --ignore-not-found --wait=false
+if [[ "${OVS_VETH_FILTER_CLEANUP}" == true ]]; then
+    oc delete daemonset ovs-veth-filter -n "${namespace}" \
+        --ignore-not-found --wait=true --timeout=5m
+    oc adm policy remove-scc-from-user privileged \
+        -z ovs-veth-filter -n "${namespace}"
+    oc delete namespace "${namespace}" --ignore-not-found --wait=false
+fi
 exit 0
