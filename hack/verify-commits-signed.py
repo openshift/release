@@ -30,6 +30,11 @@ def github_request(url, token):
         return json.load(response)
 
 
+def pr_commit_count(owner, repo, number, token):
+    url = f"{API_BASE}/repos/{owner}/{repo}/pulls/{number}"
+    return github_request(url, token)["commits"]
+
+
 def list_pr_commits(owner, repo, number, token):
     commits = []
     page = 1
@@ -60,9 +65,20 @@ def main():
         print("warning: no GitHub token available, using unauthenticated requests")
 
     try:
+        expected = pr_commit_count(owner, repo, number, token)
         commits = list_pr_commits(owner, repo, number, token)
     except urllib.error.HTTPError as e:
         print(f"error: GitHub API request failed: {e.code} {e.reason}")
+        return 1
+
+    # The pull request commits endpoint returns at most 250 commits, and a
+    # truncated last page is indistinguishable from the end of the list, so
+    # compare against the count the pull request itself reports and fail
+    # rather than pass a pull request we could not fully inspect.
+    if len(commits) < expected:
+        print(f"error: GitHub returned {len(commits)} of the {expected} commits in this pull")
+        print("request; the API lists at most 250. Reduce the number of commits (squash or")
+        print("rebase the branch) so every commit can be verified.")
         return 1
 
     report = []
