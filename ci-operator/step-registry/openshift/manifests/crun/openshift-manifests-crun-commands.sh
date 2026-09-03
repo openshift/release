@@ -11,8 +11,8 @@ default_runtime = "crun"
 runtime_root = "/run/crun"
 allowed_annotations = [
 	"io.containers.trace-syscall",
-	"io.kubernetes.cri-o.Devices",
-	"io.kubernetes.cri-o.LinkLogs",
+	"devices.crio.io",
+	"link-logs.crio.io",
 ]
 EOF
 
