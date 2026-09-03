@@ -67,10 +67,10 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{end}}'
+    report_template: '{{if eq .Status.State "success"}} :slack-green: *Quay stage FULL
+      performance* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}}
+      :failed: *Quay stage FULL performance* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> {{end}}'
   steps:
     cluster_profile: aws-quay-qe
     env:
@@ -89,6 +89,30 @@ tests:
     test:
     - ref: quay-tests-test-stage-performance
     - ref: openshift-qe-orion
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quayio-stage-load-smoke
+  cron: 5 0,8 * * 1-5
+  reporter_config:
+    channel: '#oncall-quay'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: *Quay stage SETUP
+      + PUSH/PULL smoke* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{else}} :failed: *Quay stage SETUP + PUSH/PULL smoke* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> {{end}}'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "5"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      CONCURRENCY: "1"
+      HITSIZE: "10"
+      PUSH_PULL_NUMBERS: "1"
+      TEST_PHASES: load
+    test:
+    - ref: quay-tests-test-stage-performance
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
