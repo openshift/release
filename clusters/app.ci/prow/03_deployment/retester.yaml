@@ -88,7 +88,7 @@ spec:
         - --github-graphql-endpoint=http://ghproxy/graphql
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --job-config-path=/etc/jobs
         - --cache-file=/cache/backoff
         - --cache-file-on-s3=true
         - --config-file=/etc/retester/_config.yaml
@@ -122,6 +122,14 @@ spec:
           mountPath: /var/repo
         - name: config
           mountPath: /etc/retester
+          readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: release
+          mountPath: /etc/jobs/release
           readOnly: true
         resources:
           requests:
@@ -159,3 +167,8 @@ spec:
       - name: config
         configMap:
           name: retester-config
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs

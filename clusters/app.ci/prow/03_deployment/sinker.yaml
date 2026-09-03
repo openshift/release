@@ -44,7 +44,7 @@ spec:
         args:
         - --config-path=/var/repo/release/core-services/prow/02_config/_config.yaml
         - --supplemental-prow-config-dir=/var/repo/release/core-services/prow/02_config
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --job-config-path=/etc/jobs
         - --projected-token-file=/var/sa-token/token
         - --kubeconfig-dir=/etc/build-farm-credentials
         - --kubeconfig-suffix=config
@@ -60,6 +60,14 @@ spec:
           readOnly: true
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
+          readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: release
+          mountPath: /etc/jobs/release
           readOnly: true
         resources:
           requests:
@@ -93,6 +101,11 @@ spec:
       - name: build-farm-credentials
         secret:
           secretName: sinker
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
 ---
 apiVersion: v1
 kind: Service
