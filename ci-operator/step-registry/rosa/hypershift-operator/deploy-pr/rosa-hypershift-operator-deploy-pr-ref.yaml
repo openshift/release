@@ -1,0 +1,27 @@
+ref:
+  as: rosa-hypershift-operator-deploy-pr
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-hypershift-operator-deploy-pr-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The OCM environment to log into. Supported values are [production, staging, integration].
+  - name: CLUSTER_SECTOR
+    default: ""
+    documentation: The OSDFM sector to look up the management cluster from.
+  - name: REGION
+    default: "us-west-2"
+    documentation: The AWS region to filter service clusters by.
+  dependencies:
+  - name: hypershift-operator
+    env: HYPERSHIFT_OPERATOR_IMAGE
+  documentation: |-
+    Deploys a CI-built HyperShift operator image to the management cluster in the
+    specified OSDFM sector. Uses the ci-operator pipeline image injected via
+    dependencies and creates a temporary pull secret on the MC to access the CI
+    registry. Saves the original HO image for restoration in post steps.
