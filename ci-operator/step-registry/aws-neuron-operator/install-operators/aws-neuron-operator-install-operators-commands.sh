@@ -50,7 +50,6 @@ mapping = {
     'ECO_HWACCEL_NEURON_SCHEDULER_EXTENSION_IMAGE': spec.get('schedulerExtensionImage', ''),
     'ECO_HWACCEL_NEURON_NODE_METRICS_IMAGE': spec.get('nodeMetricsImage', ''),
     'ECO_HWACCEL_NEURON_DRA_DRIVER_IMAGE': spec.get('draDriverImage', ''),
-    'ECO_HWACCEL_NEURON_DRA_UPGRADE_DRIVER_IMAGE': '',
 }
 
 optional_when_in_cluster = {
@@ -58,7 +57,6 @@ optional_when_in_cluster = {
 }
 dra_only = {
     'ECO_HWACCEL_NEURON_DRA_DRIVER_IMAGE',
-    'ECO_HWACCEL_NEURON_DRA_UPGRADE_DRIVER_IMAGE',
 }
 
 image_re = re.compile(r'^[a-zA-Z0-9._/:-]+(@sha256:[0-9a-fA-F]{64})?$')
