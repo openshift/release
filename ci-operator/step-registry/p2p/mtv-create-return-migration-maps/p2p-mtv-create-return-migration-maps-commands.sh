@@ -1,7 +1,16 @@
 #!/bin/bash
 #
-# Create MTV NetworkMap and StorageMap on the hub (CI step).
-# Requires registered MTV providers and ODF Available on both spokes.
+# Create MTV NetworkMap and StorageMap for the return migration leg (spoke-2 → spoke-1).
+#
+# Return-leg companion to p2p-mtv-create-migration-maps. Logic is identical;
+# the direction is controlled entirely by env vars set in the ref.yaml:
+#   MTV_SOURCE_PROVIDER=spoke-2, MTV_DESTINATION_PROVIDER=spoke-1
+#   MTV_NETWORK_MAP_NAME=spoke-network-map-return
+#   MTV_STORAGE_MAP_NAME=spoke-storage-map-return
+#
+# NOTE: This file is intentionally a standalone copy, not a thin wrapper that
+# sources p2p-mtv-create-migration-maps-commands.sh. In CI each step container
+# only receives its own commands script; sibling scripts are not available.
 #
 set -euxo pipefail; shopt -s inherit_errexit
 
@@ -134,5 +143,5 @@ WaitMapReady networkmap "${MTV_NETWORK_MAP_NAME}"
 WaitMapReady storagemap "${MTV_STORAGE_MAP_NAME}"
 
 oc get networkmap,storagemap -n "${MTV_NAMESPACE}" \
-    >> "${ARTIFACT_DIR}/mtv-migration-maps-status.txt"
+    >> "${ARTIFACT_DIR}/mtv-migration-maps-return-status.txt"
 true
