@@ -270,6 +270,9 @@ spec:
     managed: true
 EOF
 
+echo "Sleeping 2h for debugging — connect now!"
+sleep 2h
+
 for _ in {1..60}; do
   if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
     echo "Quay is in ready status" >&2
