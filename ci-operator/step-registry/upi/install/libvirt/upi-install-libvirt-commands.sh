@@ -386,14 +386,6 @@ if [ -f "${CHRONY_MASTER_YAML}" ]; then
   cp ${CHRONY_MASTER_YAML} "${INSTALL_DIR}/manifests"
 fi
 
-# Copy the Network MTU manifest written by upi-conf-libvirt-commands.sh into
-# the installer manifests dir so it is injected before the network operator starts.
-MTU_MANIFEST="${SHARED_DIR}/manifest_cluster-network-03-mtu-config.yaml"
-if [[ -f "${MTU_MANIFEST}" ]]; then
-  echo "Saving ${MTU_MANIFEST} to the install manifests directory..."
-  cp "${MTU_MANIFEST}" "${INSTALL_DIR}/manifests/"
-fi
-
 # Check for the master mcp yaml config, and save it in the installation directory
 MCP_MASTER_YAML="${SHARED_DIR}/manifest_master.machineconfigpool.yaml"
 if [[ -f "${MCP_MASTER_YAML}" ]]; then
