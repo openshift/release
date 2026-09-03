@@ -56,11 +56,6 @@ mapping = {
 optional_when_in_cluster = {
     'ECO_HWACCEL_NEURON_DRIVERS_IMAGE',
 }
-device_plugin_only = {
-    'ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE',
-    'ECO_HWACCEL_NEURON_SCHEDULER_IMAGE',
-    'ECO_HWACCEL_NEURON_SCHEDULER_EXTENSION_IMAGE',
-}
 dra_only = {
     'ECO_HWACCEL_NEURON_DRA_DRIVER_IMAGE',
     'ECO_HWACCEL_NEURON_DRA_UPGRADE_DRIVER_IMAGE',
@@ -77,7 +72,7 @@ with open(env_path, 'w') as ef:
             continue
         existing = os.environ.get(key, '')
         final = existing if existing else value
-        if (dra_mode and key in device_plugin_only) or (not dra_mode and key in dra_only):
+        if not dra_mode and key in dra_only:
             ef.write(f'export {key}=\n')
             print(f'  {key}= (not used in this allocation mode)')
             continue
