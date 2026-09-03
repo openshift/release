@@ -1,7 +1,7 @@
 # OVS veth netlink filter CI experiment
 
 This directory contains the temporary BPF LSM experiment used by the optional
-`aws-5.0-nightly-x86-cudn-incremental-1000-24nodes-bpf` job. It is diagnostic
+`aws-5.0-nightly-x86-cudn-density-single-ns-1000-24nodes-bpf` job. It is diagnostic
 code and is not intended for production deployment.
 
 The pre-test step clones the repository and ref configured by
