@@ -147,7 +147,7 @@ if [ "${ipv6_enabled}" == "true" ]; then
     fi
   else
     # Required for internal communication, uses a separate IP to avoid conflicts with VIPs or node IPs.
-    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${INTERNAL_API_IPV6/::1/::3}"/64 dev eth2
+    nsenter -t "$CONTAINER_PID" -n /sbin/ip addr add "${INTERNAL_API_IPV6/::1/::4}"/64 dev eth2
     echo "Skipping assignment of IPv6 VIPs to eth2 because the load balancer is cluster-managed."
   fi
 fi
@@ -272,3 +272,6 @@ EOF
 
 echo "Syncing back the external_vips.yaml file"
 scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/$(<"${SHARED_DIR}/cluster_name")/external_vips.yaml" "${SHARED_DIR}/"
+if [ "${MULTIPLE_MACHINE_NETWORK:-false}" = "true" ]; then
+  cp "$SHARED_DIR/external_vips.yaml" "$SHARED_DIR/vips.yaml"
+fi
