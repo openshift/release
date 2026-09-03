@@ -14,16 +14,37 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 if [ "$CLUSTER_WIDE_PROXY" == "true" ] || [ "$DISCONNECTED" == "true" ]; then
+ # Build NO_PROXY for CI scripts using dynamic values only
+ NO_PROXY_SHELL="localhost,127.0.0.1,::1"
+
+ # Add auxiliary host (CI scripts SSH to it)
+ if [ -n "${AUX_HOST:-}" ]; then
+   NO_PROXY_SHELL="${NO_PROXY_SHELL},${AUX_HOST}"
+ fi
+
+ # Add internal lab networks (where aux host and BMC live)
+ if [ -n "${INTERNAL_NET_CIDR:-}" ]; then
+   NO_PROXY_SHELL="${NO_PROXY_SHELL},${INTERNAL_NET_CIDR}"
+ fi
+
+ if [ -n "${INTERNAL_NET_V6_CIDR:-}" ]; then
+   NO_PROXY_SHELL="${NO_PROXY_SHELL},${INTERNAL_NET_V6_CIDR}"
+ fi
+
+ # Add CI infrastructure (don't proxy CI registries and services)
+ NO_PROXY_SHELL="${NO_PROXY_SHELL},.ci.openshift.org"
+
  proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
  cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
  export HTTP_PROXY=${proxy}
  export HTTPS_PROXY=${proxy}
- export NO_PROXY="localhost,127.0.0.1"
+ export NO_PROXY="${NO_PROXY_SHELL}"
 
  export http_proxy=${proxy}
  export https_proxy=${proxy}
- export no_proxy="localhost,127.0.0.1"
+ export no_proxy="${NO_PROXY_SHELL}"
 EOF
+ echo "Created ${SHARED_DIR}/proxy-conf.sh with NO_PROXY=${NO_PROXY_SHELL}"
 fi
 
 if [ "${CLUSTER_WIDE_PROXY}" == "true" ]; then
