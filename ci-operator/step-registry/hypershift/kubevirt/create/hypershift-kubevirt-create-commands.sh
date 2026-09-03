@@ -241,6 +241,13 @@ restrict_localnet_lsp_to_ipv4() {
   return 0
 }
 
+get_localnet_multi_launcher_pod_count() {
+  local multi_ns="$1"
+  oc get pods -n "${multi_ns}" -l kubevirt.io=virt-launcher \
+    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}' 2>/dev/null \
+    | wc -w
+}
+
 get_localnet_multi_launcher_nodes() {
   local multi_ns="$1"
   oc get pods -n "${multi_ns}" -l kubevirt.io=virt-launcher \
@@ -265,6 +272,57 @@ localnet_multi_launcher_nodes_have_ovn() {
   [[ ${missing} -eq 0 ]]
 }
 
+install_virtctl_if_missing() {
+  local virtctl_bin="${SHARED_DIR}/virtctl"
+  local arch arch_label url base_url hco_cr
+
+  if command -v virtctl >/dev/null 2>&1 || [[ -x /usr/bin/virtctl ]] || [[ -x "${virtctl_bin}" ]]; then
+    [[ -x "${virtctl_bin}" ]] && export PATH="${SHARED_DIR}:${PATH}"
+    return 0
+  fi
+
+  hco_cr="kubevirt-hyperconverged"
+  arch=$(uname -m)
+  case "${arch}" in
+    aarch64) arch_label="ARM 64" ;;
+    s390x)   arch_label="IBM Z" ;;
+    ppc64le) arch_label="Linux PPC64LE" ;;
+    *)       arch_label="${arch}" ;;
+  esac
+
+  url=$(oc get consoleclidownload "virtctl-clidownloads-${hco_cr}" \
+    -o=jsonpath="{.spec.links[?(@.text==\"Download virtctl for Linux for ${arch_label}\")].href}" 2>/dev/null || true)
+
+  if [[ -z "${url}" ]]; then
+    base_url=$(oc get ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}' 2>/dev/null || true)
+    if [[ -n "${base_url}" ]]; then
+      case "${arch}" in
+        aarch64) url="https://hyperconverged-cluster-cli-download-openshift-cnv.${base_url}/arm64/linux/virtctl.tar.gz" ;;
+        s390x)   url="https://hyperconverged-cluster-cli-download-openshift-cnv.${base_url}/s390x/linux/virtctl.tar.gz" ;;
+        ppc64le) url="https://hyperconverged-cluster-cli-download-openshift-cnv.${base_url}/ppc64le/linux/virtctl.tar.gz" ;;
+        *)       url="https://hyperconverged-cluster-cli-download-openshift-cnv.${base_url}/amd64/linux/virtctl.tar.gz" ;;
+      esac
+    fi
+  fi
+
+  if [[ -z "${url}" ]]; then
+    echo "WARNING: Could not determine virtctl download URL" >&2
+    return 1
+  fi
+
+  echo "Downloading virtctl from ${url}..."
+  if ! curl -fsSL "${url}" | tar zx -C "${SHARED_DIR}"; then
+    echo "WARNING: Failed to download/extract virtctl" >&2
+    return 1
+  fi
+  chmod +x "${virtctl_bin}" 2>/dev/null || true
+  if [[ -x "${virtctl_bin}" ]]; then
+    export PATH="${SHARED_DIR}:${PATH}"
+    return 0
+  fi
+  return 1
+}
+
 resolve_virtctl_cmd() {
   if command -v virtctl >/dev/null 2>&1; then
     echo "virtctl"
@@ -272,6 +330,10 @@ resolve_virtctl_cmd() {
   fi
   if [[ -x /usr/bin/virtctl ]]; then
     echo "/usr/bin/virtctl"
+    return 0
+  fi
+  if install_virtctl_if_missing && command -v virtctl >/dev/null 2>&1; then
+    echo "virtctl"
     return 0
   fi
   echo "WARNING: virtctl not found; guest-exec renewal unavailable" >&2
@@ -341,6 +403,15 @@ localnet_multi_ssh_pod_security_context() {
         - ALL
       seccompProfile:
         type: RuntimeDefault
+EOF
+}
+
+# SSH pods must use the host network to reach guest localnet IPs (e.g. 192.168.111.x).
+# Pods on the OVN overlay (10.129.x) cannot route to localnet bridge addresses.
+localnet_multi_ssh_pod_networking_spec() {
+  cat <<'EOF'
+  hostNetwork: true
+  dnsPolicy: ClusterFirstWithHostNet
 EOF
 }
 
@@ -601,6 +672,7 @@ metadata:
 spec:
   nodeSelector:
     kubernetes.io/hostname: ${vmi_node}
+$(localnet_multi_ssh_pod_networking_spec)
   restartPolicy: Never
   volumes:
   - name: ssh-key
@@ -665,11 +737,20 @@ renew_localnet_multi_dhcp_on_vmi_via_ssh() {
   local multi_ns="$1"
   local network_count="$2"
   local vmi="$3"
-  local vmi_ip vmi_node renew_pod
+  local vmi_ip vmi_node renew_pod inner_script output
 
   if ! wait_for_vmi_primary_ip "${multi_ns}" "${vmi}"; then
     echo "WARNING: Could not determine IP/node for VMI ${vmi}, skipping DHCP renewal"
     return 1
+  fi
+
+  inner_script="ip route show default 2>/dev/null || echo '(none)'"
+  if output=$(localnet_multi_route_output_via_ssh "${multi_ns}" "${vmi}" "${inner_script}"); then
+    if localnet_multi_output_has_default_route "${output}"; then
+      echo "VMI ${vmi} already has default route via ${LOCALNET_MULTI_PRIMARY_GATEWAY}, skipping SSH renewal"
+      localnet_multi_log_check "${vmi}" "default_route=OK renewal=skipped"
+      return 0
+    fi
   fi
 
   vmi_ip=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
@@ -701,6 +782,7 @@ metadata:
 spec:
   nodeSelector:
     kubernetes.io/hostname: ${vmi_node}
+$(localnet_multi_ssh_pod_networking_spec)
   restartPolicy: Never
   volumes:
   - name: ssh-key
@@ -1183,18 +1265,18 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   echo "Waiting for virt-launcher pods so we can configure OVN DHCP before VM first boot..."
   LAUNCHER_NODES=""
   for attempt in $(seq 1 120); do
+    LAUNCHER_POD_COUNT=$(get_localnet_multi_launcher_pod_count "${MULTI_NAMESPACE}")
     LAUNCHER_NODES=$(get_localnet_multi_launcher_nodes "${MULTI_NAMESPACE}")
-    LAUNCHER_COUNT=$(echo "${LAUNCHER_NODES}" | wc -w)
-    if [[ ${LAUNCHER_COUNT} -ge ${HYPERSHIFT_NODE_COUNT} ]]; then
-      echo "Found virt-launcher pods on ${LAUNCHER_COUNT} node(s) (attempt ${attempt})"
+    if [[ ${LAUNCHER_POD_COUNT} -ge ${HYPERSHIFT_NODE_COUNT} ]]; then
+      echo "Found ${LAUNCHER_POD_COUNT} virt-launcher pod(s) on node(s):${LAUNCHER_NODES} (attempt ${attempt})"
       break
     fi
-    echo "Waiting for virt-launcher pods... (${LAUNCHER_COUNT}/${HYPERSHIFT_NODE_COUNT} nodes, attempt ${attempt}/120)"
+    echo "Waiting for virt-launcher pods... (${LAUNCHER_POD_COUNT}/${HYPERSHIFT_NODE_COUNT} pods, attempt ${attempt}/120)"
     sleep 5
   done
 
-  if [[ -z "${LAUNCHER_NODES// }" ]]; then
-    echo "ERROR: No virt-launcher pods found after 10 minutes; cannot configure localnet-multi OVN DHCP" >&2
+  if [[ ${LAUNCHER_POD_COUNT:-0} -lt ${HYPERSHIFT_NODE_COUNT} ]]; then
+    echo "ERROR: Only ${LAUNCHER_POD_COUNT:-0}/${HYPERSHIFT_NODE_COUNT} virt-launcher pods after 10 minutes; cannot configure localnet-multi OVN DHCP" >&2
     exit 1
   fi
 
