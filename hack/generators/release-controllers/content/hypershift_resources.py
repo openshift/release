@@ -7,7 +7,7 @@ def _add_hypershift_rbac(gendoc):
         'kind': 'Role',
         'metadata': {
             'name': 'release-controller-modify',
-            'namespace': 'hypershift-operator'
+            'namespace': 'hypershift'
         },
         'rules': [
             {
@@ -48,7 +48,7 @@ def _add_hypershift_rbac(gendoc):
         'kind': 'RoleBinding',
         'metadata': {
             'name': 'release-controller-binding',
-            'namespace': 'hypershift-operator',
+            'namespace': 'hypershift',
         },
         'roleRef': {
             'apiGroup': 'rbac.authorization.k8s.io',
@@ -209,7 +209,7 @@ def _add_hypershift_resources(gendoc):
                             {
                                 "command": [
                                     "/usr/bin/release-controller",
-                                    "--release-namespace=hypershift-operator",
+                                    "--release-namespace=hypershift",
                                     "--prow-config=/etc/config/config.yaml",
                                     "--supplemental-prow-config-dir=/etc/config",
                                     "--job-config=/var/repo/release/ci-operator/jobs",
@@ -279,7 +279,7 @@ def _add_hypershift_resources(gendoc):
                             {
                                 "command": [
                                     "/usr/bin/release-controller-api",
-                                    "--release-namespace=hypershift-operator",
+                                    "--release-namespace=hypershift",
                                     "--prow-namespace=ci",
                                     "--job-namespace=ci-release",
                                     "--tools-image-stream-tag=release-controller-bootstrap:tools",
