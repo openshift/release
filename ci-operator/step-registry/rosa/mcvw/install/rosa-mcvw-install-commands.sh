@@ -115,6 +115,9 @@ EXISTING_PACKAGE=$(oc get package -n "${OPERATOR_NAMESPACE}" \
 EXISTING_DEPLOYMENT=$(oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" \
     -n "${OPERATOR_NAMESPACE}" --ignore-not-found -o name 2>/dev/null || true)
 
+EXISTING_DAEMONSET=$(oc get daemonset "${OPERATOR_DEPLOYMENT_NAME}" \
+    -n "${OPERATOR_NAMESPACE}" --ignore-not-found -o name 2>/dev/null || true)
+
 if [[ -n "${EXISTING_CLUSTERPACKAGE}" ]]; then
     # ---- Mode 1: Patch existing ClusterPackage (SSS -> PKO chain) ----
     log "Found existing ClusterPackage '${EXISTING_CLUSTERPACKAGE}', patching to CI images"
@@ -182,6 +185,29 @@ elif [[ -n "${EXISTING_DEPLOYMENT}" ]]; then
         "${CONTAINER_NAME}=${OPERATOR_IMAGE}" \
         -n "${OPERATOR_NAMESPACE}"
     log "Deployment image updated to CI build"
+
+elif [[ -n "${EXISTING_DAEMONSET}" ]]; then
+    # ---- Mode 3b: Direct DaemonSet image patch (classic ROSA STS via SSS, no PKO) ----
+    log "Found existing DaemonSet with no PKO package, patching image directly"
+
+    CONTAINER_NAME=$(oc get daemonset "${OPERATOR_DEPLOYMENT_NAME}" \
+        -n "${OPERATOR_NAMESPACE}" \
+        -o jsonpath='{.spec.template.spec.containers[0].name}')
+    ORIG_IMAGE=$(oc get daemonset "${OPERATOR_DEPLOYMENT_NAME}" \
+        -n "${OPERATOR_NAMESPACE}" \
+        -o jsonpath='{.spec.template.spec.containers[0].image}')
+
+    if [[ -n "${SHARED_DIR:-}" ]]; then
+        echo "daemonset-direct"         > "${SHARED_DIR}/operator-e2e-mode"
+        echo "${OPERATOR_DEPLOYMENT_NAME}" > "${SHARED_DIR}/operator-e2e-clusterpackage"
+        echo "${CONTAINER_NAME}"        > "${SHARED_DIR}/operator-e2e-container-name"
+        echo "${ORIG_IMAGE}"            > "${SHARED_DIR}/operator-e2e-orig-op-image"
+    fi
+
+    oc set image "daemonset/${OPERATOR_DEPLOYMENT_NAME}" \
+        "${CONTAINER_NAME}=${OPERATOR_IMAGE}" \
+        -n "${OPERATOR_NAMESPACE}"
+    log "DaemonSet image updated to CI build"
 
 else
     # ---- Mode 4: Create new namespaced Package (fresh cluster) ----
@@ -254,10 +280,18 @@ EOF
     done
 fi
 
-# Add CI pull secret to the deployment's SA, then trigger a rollout so the
-# new pods pick it up. Do this for all three modes.
+# Determine workload type for rollout. Read mode from SHARED_DIR if set.
+INSTALL_MODE=""
+[[ -n "${SHARED_DIR:-}" ]] && INSTALL_MODE=$(cat "${SHARED_DIR}/operator-e2e-mode" 2>/dev/null || true)
+
+WORKLOAD_TYPE="deployment"
+if [[ "${INSTALL_MODE}" == "daemonset-direct" ]]; then
+    WORKLOAD_TYPE="daemonset"
+fi
+
+# Add CI pull secret to the workload's SA so pods can pull CI images.
 if oc get secret ci-pull-secret -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
-    SA_NAME=$(oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" \
+    SA_NAME=$(oc get "${WORKLOAD_TYPE}/${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" \
         -o jsonpath='{.spec.template.spec.serviceAccountName}' 2>/dev/null || echo "${OPERATOR_NAME}")
     if oc get sa "${SA_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
         oc patch sa "${SA_NAME}" -n "${OPERATOR_NAMESPACE}" \
@@ -267,13 +301,13 @@ if oc get secret ci-pull-secret -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
 fi
 
 # oc rollout restart ensures pods pick up the SA change and the new image.
-oc rollout restart deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
+oc rollout restart "${WORKLOAD_TYPE}/${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
 
 # oc rollout status waits for all updated replicas to be ready.
 log "Waiting for ${OPERATOR_DEPLOYMENT_NAME} rollout to complete..."
-if ! oc rollout status deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" --timeout=10m; then
-    log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} did not roll out in time"
-    oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
+if ! oc rollout status "${WORKLOAD_TYPE}/${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" --timeout=10m; then
+    log "ERROR: ${WORKLOAD_TYPE^} ${OPERATOR_DEPLOYMENT_NAME} did not roll out in time"
+    oc get "${WORKLOAD_TYPE}/${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
     oc get pods -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
     exit 1
 fi

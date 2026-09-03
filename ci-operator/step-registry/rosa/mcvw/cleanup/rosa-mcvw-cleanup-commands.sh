@@ -35,7 +35,13 @@ if [[ -n "${ARTIFACT_DIR:-}" ]]; then
             -o custom-columns=':metadata.name' 2>/dev/null || true); do
         oc logs "deployment/${deploy}" -n "${OPERATOR_NAMESPACE}" --all-containers --tail=500 \
             > "${ARTIFACT_DIR}/${deploy}-logs.txt" 2>&1 || true
-        log "  Saved ${deploy} logs"
+        log "  Saved deployment/${deploy} logs"
+    done
+    for ds in $(oc get daemonset -n "${OPERATOR_NAMESPACE}" --no-headers \
+            -o custom-columns=':metadata.name' 2>/dev/null || true); do
+        oc logs "daemonset/${ds}" -n "${OPERATOR_NAMESPACE}" --all-containers --tail=500 \
+            > "${ARTIFACT_DIR}/${ds}-ds-logs.txt" 2>&1 || true
+        log "  Saved daemonset/${ds} logs"
     done
     oc get events -n "${OPERATOR_NAMESPACE}" --sort-by='.lastTimestamp' \
         > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
@@ -87,6 +93,18 @@ deployment-direct)
             "${CONTAINER_NAME}=${ORIG_IMAGE}" \
             -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
         log "Deployment '${PACKAGE_NAME}' image restored"
+    fi
+    ;;
+
+daemonset-direct)
+    CONTAINER_NAME=$(cat "${SHARED_DIR}/operator-e2e-container-name" 2>/dev/null || true)
+    ORIG_IMAGE=$(cat "${SHARED_DIR}/operator-e2e-orig-op-image" 2>/dev/null || true)
+    if [[ -n "${PACKAGE_NAME}" && -n "${ORIG_IMAGE}" && -n "${CONTAINER_NAME}" ]]; then
+        log "Restoring DaemonSet '${PACKAGE_NAME}' container image"
+        oc set image "daemonset/${PACKAGE_NAME}" \
+            "${CONTAINER_NAME}=${ORIG_IMAGE}" \
+            -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
+        log "DaemonSet '${PACKAGE_NAME}' image restored"
     fi
     ;;
 
