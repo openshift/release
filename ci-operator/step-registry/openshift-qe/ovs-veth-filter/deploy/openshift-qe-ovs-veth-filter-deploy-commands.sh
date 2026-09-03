@@ -1,7 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-source "${SHARED_DIR}/proxy-conf.sh"
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 namespace=ovs-veth-filter

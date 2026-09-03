@@ -1,7 +1,9 @@
 #!/bin/bash
 set +e
 
-source "${SHARED_DIR}/proxy-conf.sh"
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 namespace=ovs-veth-filter
@@ -36,12 +38,11 @@ for pod in $(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
         > "${ARTIFACT_DIR}/ovs-coverage-${node}.txt" 2>&1
 done
 
-if [[ "${OVS_VETH_FILTER_CLEANUP}" == true ]]; then
+if [[ "${OVS_VETH_FILTER_CLEANUP}" == true ]] && \
+   oc get namespace "${namespace}" >/dev/null 2>&1; then
     cleanup_status=0
     oc delete daemonset ovs-veth-filter -n "${namespace}" \
         --ignore-not-found --wait=true --timeout=5m || cleanup_status=1
-    oc adm policy remove-scc-from-user privileged \
-        -z ovs-veth-filter -n "${namespace}" || cleanup_status=1
     oc delete namespace "${namespace}" --ignore-not-found --wait=false || \
         cleanup_status=1
     if ((cleanup_status)); then
