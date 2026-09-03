@@ -108,7 +108,7 @@ check_arch_and_deps() {
             exit 1
         }
         tar -xzf /tmp/bats.tar.gz -C /tmp
-        bash /tmp/bats-core-${BATS_VERSION}/install.sh /tmp/bin
+        bash /tmp/bats-core-${BATS_VERSION}/install.sh /tmp
         rm -rf /tmp/bats.tar.gz /tmp/bats-core-${BATS_VERSION}
         echo "  [OK] bats $(bats --version)"
     else
