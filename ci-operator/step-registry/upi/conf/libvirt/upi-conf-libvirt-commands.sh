@@ -67,7 +67,6 @@ networking:
   networkType: OVNKubernetes
   serviceNetwork:
   - 172.30.0.0/16
-  clusterNetworkMTU: 8900
 compute:
 - architecture: "${ARCH}"
   hyperthreading: Enabled
@@ -80,6 +79,24 @@ pullSecret: >
 sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
+# Set OVN-Kubernetes tunnel MTU via a Network operator manifest injected at
+# install time.  clusterNetworkMTU in install-config is AWS-only and rejected
+# on platform:none clusters.  The installer copies manifests/ into the cluster
+# before the network operator starts, so OVN comes up with the right MTU from
+# day 1 — no post-install migration or node reboot needed.
+# 8900 = physical NIC MTU (9000 jumbo) minus ~100 bytes Geneve encap overhead.
+echo "Writing Network operator manifest with OVNKubernetes MTU=8900..."
+cat > "${SHARED_DIR}/manifest_cluster-network-03-mtu-config.yaml" << EOF
+apiVersion: operator.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  defaultNetwork:
+    ovnKubernetesConfig:
+      mtu: 8900
+EOF
+
 if [ ${FIPS_ENABLED} = "true" ]; then
 	echo "Adding 'fips: true' to the install config..."
 	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
