@@ -1,6 +1,10 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   upi-installer:
-    name: "4.22"
+    name: '4.22'
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -9,11 +13,11 @@ releases:
   initial:
     release:
       channel: stable
-      version: "4.21"
+      version: '4.21'
   latest:
     release:
       channel: stable
-      version: "4.22"
+      version: '4.22'
 resources:
   '*':
     requests:
@@ -34,9 +38,12 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: far-operator
       ECO_TEST_LABELS: tier:upgrade
-      OCP_VERSION: "422"
-      SKIP_IDMS: "true"
+      OCP_VERSION: '422'
+      SKIP_IDMS: 'true'
+      TEST_NAME: e2e-far-upgrade-presubmit-aws
+      TEST_STEPS: e2e-upgrade-test
     post:
+    - ref: medik8s-analyze-e2e-failure
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre-stableinitial
@@ -55,9 +62,12 @@ tests:
     - ref: medik8s-aws-credentials
     - as: e2e-upgrade-test
       cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+      commands: '[[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat
+        "${SHARED_DIR}/workload_image")
+
         make run-tests
+
+        '
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
@@ -79,9 +89,12 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_TEST_FEATURES: far-operator
       ECO_TEST_LABELS: tier:upgrade
-      OCP_VERSION: "422"
-      SKIP_IDMS: "true"
+      OCP_VERSION: '422'
+      SKIP_IDMS: 'true'
+      TEST_NAME: e2e-far-upgrade-aws
+      TEST_STEPS: e2e-upgrade-test
     post:
+    - ref: medik8s-analyze-e2e-failure
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre-stableinitial
@@ -100,9 +113,12 @@ tests:
     - ref: medik8s-aws-credentials
     - as: e2e-upgrade-test
       cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+      commands: '[[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat
+        "${SHARED_DIR}/workload_image")
+
         make run-tests
+
+        '
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS

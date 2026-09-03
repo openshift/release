@@ -1,10 +1,14 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   base:
     name: ubi
     namespace: ocp
-    tag: "9"
+    tag: '9'
   operator-sdk:
-    name: "4.17"
+    name: '4.17'
     namespace: origin
     tag: operator-sdk
   tls-scanner-tool:
@@ -33,7 +37,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.23"
+      version: '4.23'
 resources:
   '*':
     limits:
@@ -54,19 +58,28 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       INSTALL_NAMESPACE: nhc-install
+      TEST_NAME: openshift-e2e
+      TEST_STEPS: e2e-test
     test:
     - as: e2e-install
       cli: latest
-      commands: |
-        oc create namespace "$INSTALL_NAMESPACE"
+      commands: 'oc create namespace "$INSTALL_NAMESPACE"
+
 
         # workaround for OLM pod not running with restricted PSA
+
         oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+
         oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
+
         operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/self-node-remediation-operator-bundle:latest
+
         operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+
         oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-healthcheck-controller-manager
+
+        '
       dependencies:
       - env: OO_BUNDLE
         name: my-bundle
@@ -88,6 +101,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+    post:
+    - ref: medik8s-analyze-e2e-failure
 - as: tls-pqc-readiness
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -96,19 +111,27 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       INSTALL_NAMESPACE: nhc-install
-      PQC_CHECK: "true"
+      PQC_CHECK: 'true'
       SCAN_NAMESPACE: nhc-install
-      SCANNER_CPU: "2"
+      SCANNER_CPU: '2'
+      TEST_NAME: tls-pqc-readiness
+      TEST_STEPS: e2e-test
     test:
     - as: install-operator
       cli: latest
-      commands: |
-        oc create namespace "$INSTALL_NAMESPACE"
+      commands: 'oc create namespace "$INSTALL_NAMESPACE"
+
         oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+
         oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
         operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/self-node-remediation-operator-bundle:latest
+
         operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+
         oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-healthcheck-controller-manager
+
+        '
       dependencies:
       - env: OO_BUNDLE
         name: my-bundle
@@ -122,8 +145,10 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: ipi-aws
+    post:
+    - ref: medik8s-analyze-e2e-failure
 zz_generated_metadata:
   branch: release-0.12
   org: medik8s
   repo: node-healthcheck-operator
-  variant: "4.23"
+  variant: '4.23'

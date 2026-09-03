@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   tls-scanner-tool:
     name: tls-scanner
     namespace: tls-scanner
@@ -9,7 +13,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "5.0"
+      version: '5.0'
 resources:
   '*':
     requests:
@@ -23,19 +27,23 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       INSTALL_NAMESPACE: openshift-workload-availability
-      OCP_VERSION: "50"
+      OCP_VERSION: '50'
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation,storage-based-remediation
-      PQC_CHECK: "false"
+      PQC_CHECK: 'false'
       SCAN_NAMESPACE: openshift-workload-availability
-      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_ENABLE_TLS_ADHERENCE: 'true'
       TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+      TEST_NAME: tls13-adherence-all
+      TEST_STEPS: e2e-test
     test:
     - ref: medik8s-catalogsource
     - ref: medik8s-operator-subscribe
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: ipi-aws
+    post:
+    - ref: medik8s-analyze-e2e-failure
 - as: tls-pqc-readiness-all
   cron: 0 10 * * 3
   steps:
@@ -43,19 +51,23 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       INSTALL_NAMESPACE: openshift-workload-availability
-      OCP_VERSION: "50"
+      OCP_VERSION: '50'
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation,storage-based-remediation
-      PQC_CHECK: "true"
+      PQC_CHECK: 'true'
       SCAN_NAMESPACE: openshift-workload-availability
+      TEST_NAME: tls-pqc-readiness-all
+      TEST_STEPS: e2e-test
     test:
     - ref: medik8s-catalogsource
     - ref: medik8s-operator-subscribe
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: ipi-aws
+    post:
+    - ref: medik8s-analyze-e2e-failure
 zz_generated_metadata:
   branch: main
   org: medik8s
   repo: system-tests
-  variant: "5.0"
+  variant: '5.0'

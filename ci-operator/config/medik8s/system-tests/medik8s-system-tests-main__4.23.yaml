@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   tls-scanner-tool:
     name: tls-scanner
     namespace: tls-scanner
@@ -28,8 +32,12 @@ tests:
       OPERATORS: fence-agents-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation,storage-based-remediation
       PQC_CHECK: "false"
       SCAN_NAMESPACE: openshift-workload-availability
+      TEST_NAME: tls13-adherence-all
+      TEST_STEPS: tls-scanner-run
       TLS_13_ENABLE_TLS_ADHERENCE: "true"
       TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    post:
+    - ref: medik8s-analyze-e2e-failure
     test:
     - ref: medik8s-catalogsource
     - ref: medik8s-operator-subscribe
@@ -48,6 +56,10 @@ tests:
       OPERATORS: fence-agents-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation,storage-based-remediation
       PQC_CHECK: "true"
       SCAN_NAMESPACE: openshift-workload-availability
+      TEST_NAME: tls-pqc-readiness-all
+      TEST_STEPS: tls-scanner-run
+    post:
+    - ref: medik8s-analyze-e2e-failure
     test:
     - ref: medik8s-catalogsource
     - ref: medik8s-operator-subscribe

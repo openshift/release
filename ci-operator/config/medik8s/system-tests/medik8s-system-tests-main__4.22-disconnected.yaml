@@ -1,6 +1,10 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   upi-installer:
-    name: "4.22"
+    name: '4.22'
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -9,7 +13,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.22"
+      version: '4.22'
 resources:
   '*':
     requests:
@@ -28,12 +32,14 @@ tests:
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: far-operator
       ECO_TEST_LABELS: '!tier:upgrade'
-      ENABLE_IDMS: "yes"
-      EXTRACT_MANIFEST_INCLUDED: "true"
+      ENABLE_IDMS: 'yes'
+      EXTRACT_MANIFEST_INCLUDED: 'true'
       MEDIK8S_PACKAGES: fence-agents-remediation
-      OCP_VERSION: "422"
+      OCP_VERSION: '422'
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation
+      TEST_NAME: e2e-far-aws-disconnected
+      TEST_STEPS: e2e-test
     observers:
       enable:
       - observers-resource-watch
@@ -44,10 +50,13 @@ tests:
     - ref: medik8s-aws-credentials
     - as: e2e-test
       cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+      commands: '[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+
         make run-tests
+
+        '
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
@@ -58,6 +67,8 @@ tests:
           memory: 200Mi
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-disconnected
+    post:
+    - ref: medik8s-analyze-e2e-failure
 - as: e2e-far-weekly-aws-disconnected
   capabilities:
   - intranet
@@ -69,12 +80,14 @@ tests:
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: far-operator
       ECO_TEST_LABELS: '!tier:upgrade'
-      ENABLE_IDMS: "yes"
-      EXTRACT_MANIFEST_INCLUDED: "true"
+      ENABLE_IDMS: 'yes'
+      EXTRACT_MANIFEST_INCLUDED: 'true'
       MEDIK8S_PACKAGES: fence-agents-remediation
-      OCP_VERSION: "422"
+      OCP_VERSION: '422'
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation
+      TEST_NAME: e2e-far-weekly-aws-disconnected
+      TEST_STEPS: e2e-test
     observers:
       enable:
       - observers-resource-watch
@@ -85,10 +98,13 @@ tests:
     - ref: medik8s-aws-credentials
     - as: e2e-test
       cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+      commands: '[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+
         make run-tests
+
+        '
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
@@ -99,6 +115,8 @@ tests:
           memory: 200Mi
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-disconnected
+    post:
+    - ref: medik8s-analyze-e2e-failure
 - always_run: false
   as: e2e-snr-aws-disconnected
   capabilities:
@@ -110,13 +128,15 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: snr-operator
-      ECO_TEST_VERBOSE: "true"
-      ENABLE_IDMS: "yes"
-      EXTRACT_MANIFEST_INCLUDED: "true"
+      ECO_TEST_VERBOSE: 'true'
+      ENABLE_IDMS: 'yes'
+      EXTRACT_MANIFEST_INCLUDED: 'true'
       MEDIK8S_PACKAGES: self-node-remediation,node-healthcheck-operator
-      OCP_VERSION: "422"
+      OCP_VERSION: '422'
       OO_CHANNEL: stable
       OPERATORS: self-node-remediation,node-healthcheck-operator
+      TEST_NAME: e2e-snr-aws-disconnected
+      TEST_STEPS: e2e-test
     observers:
       enable:
       - observers-resource-watch
@@ -126,10 +146,13 @@ tests:
     - ref: medik8s-operator-subscribe
     - as: e2e-test
       cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+      commands: '[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+
         make run-tests
+
+        '
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
@@ -140,6 +163,8 @@ tests:
           memory: 200Mi
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-disconnected
+    post:
+    - ref: medik8s-analyze-e2e-failure
 - as: e2e-snr-weekly-aws-disconnected
   capabilities:
   - intranet
@@ -150,13 +175,15 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: snr-operator
-      ECO_TEST_VERBOSE: "true"
-      ENABLE_IDMS: "yes"
-      EXTRACT_MANIFEST_INCLUDED: "true"
+      ECO_TEST_VERBOSE: 'true'
+      ENABLE_IDMS: 'yes'
+      EXTRACT_MANIFEST_INCLUDED: 'true'
       MEDIK8S_PACKAGES: self-node-remediation,node-healthcheck-operator
-      OCP_VERSION: "422"
+      OCP_VERSION: '422'
       OO_CHANNEL: stable
       OPERATORS: self-node-remediation,node-healthcheck-operator
+      TEST_NAME: e2e-snr-weekly-aws-disconnected
+      TEST_STEPS: e2e-test
     observers:
       enable:
       - observers-resource-watch
@@ -166,10 +193,13 @@ tests:
     - ref: medik8s-operator-subscribe
     - as: e2e-test
       cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+      commands: '[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+
         make run-tests
+
+        '
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
@@ -180,6 +210,8 @@ tests:
           memory: 200Mi
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-disconnected
+    post:
+    - ref: medik8s-analyze-e2e-failure
 - always_run: false
   as: e2e-sbr-aws-disconnected-nfs
   capabilities:
@@ -192,14 +224,16 @@ tests:
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: sbr-operator
       ECO_TEST_LABELS: component:post-deploy
-      ENABLE_IDMS: "yes"
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      FBC_OCP_VERSION: "422"
+      ENABLE_IDMS: 'yes'
+      EXTRACT_MANIFEST_INCLUDED: 'true'
+      FBC_OCP_VERSION: '422'
       MEDIK8S_PACKAGES: storage-based-remediation
-      OCP_VERSION: "422"
+      OCP_VERSION: '422'
       OO_CHANNEL: stable
       OPERATORS: storage-based-remediation
       SBR_STORAGE_CLASS: nfs-sbr
+      TEST_NAME: e2e-sbr-aws-disconnected-nfs
+      TEST_STEPS: e2e-test
     observers:
       enable:
       - observers-resource-watch
@@ -210,11 +244,16 @@ tests:
     - ref: medik8s-sbr-nfs-bastion
     - as: e2e-test
       cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+      commands: '[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
-        [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat "${SHARED_DIR}/sbr_watchdog_debug_image")
+
+        [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat
+        "${SHARED_DIR}/sbr_watchdog_debug_image")
+
         make run-tests
+
+        '
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
@@ -226,6 +265,8 @@ tests:
           memory: 200Mi
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-disconnected
+    post:
+    - ref: medik8s-analyze-e2e-failure
 - as: e2e-sbr-weekly-aws-disconnected-nfs
   capabilities:
   - intranet
@@ -237,14 +278,16 @@ tests:
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: sbr-operator
       ECO_TEST_LABELS: component:post-deploy
-      ENABLE_IDMS: "yes"
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      FBC_OCP_VERSION: "422"
+      ENABLE_IDMS: 'yes'
+      EXTRACT_MANIFEST_INCLUDED: 'true'
+      FBC_OCP_VERSION: '422'
       MEDIK8S_PACKAGES: storage-based-remediation
-      OCP_VERSION: "422"
+      OCP_VERSION: '422'
       OO_CHANNEL: stable
       OPERATORS: storage-based-remediation
       SBR_STORAGE_CLASS: nfs-sbr
+      TEST_NAME: e2e-sbr-weekly-aws-disconnected-nfs
+      TEST_STEPS: e2e-test
     observers:
       enable:
       - observers-resource-watch
@@ -255,11 +298,16 @@ tests:
     - ref: medik8s-sbr-nfs-bastion
     - as: e2e-test
       cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+      commands: '[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
-        [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat "${SHARED_DIR}/sbr_watchdog_debug_image")
+
+        [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat
+        "${SHARED_DIR}/sbr_watchdog_debug_image")
+
         make run-tests
+
+        '
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
@@ -271,6 +319,8 @@ tests:
           memory: 200Mi
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-disconnected
+    post:
+    - ref: medik8s-analyze-e2e-failure
 - always_run: false
   as: e2e-nhc-aws-disconnected
   capabilities:
@@ -282,13 +332,15 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: nhc-operator
-      ECO_TEST_VERBOSE: "true"
-      ENABLE_IDMS: "yes"
-      EXTRACT_MANIFEST_INCLUDED: "true"
+      ECO_TEST_VERBOSE: 'true'
+      ENABLE_IDMS: 'yes'
+      EXTRACT_MANIFEST_INCLUDED: 'true'
       MEDIK8S_PACKAGES: node-healthcheck-operator,self-node-remediation
-      OCP_VERSION: "422"
+      OCP_VERSION: '422'
       OO_CHANNEL: stable
       OPERATORS: node-healthcheck-operator,self-node-remediation
+      TEST_NAME: e2e-nhc-aws-disconnected
+      TEST_STEPS: e2e-test
     observers:
       enable:
       - observers-resource-watch
@@ -298,10 +350,13 @@ tests:
     - ref: medik8s-operator-subscribe
     - as: e2e-test
       cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+      commands: '[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+
         make run-tests
+
+        '
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
@@ -312,6 +367,8 @@ tests:
           memory: 200Mi
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-disconnected
+    post:
+    - ref: medik8s-analyze-e2e-failure
 - as: e2e-nhc-weekly-aws-disconnected
   capabilities:
   - intranet
@@ -322,13 +379,15 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: nhc-operator
-      ECO_TEST_VERBOSE: "true"
-      ENABLE_IDMS: "yes"
-      EXTRACT_MANIFEST_INCLUDED: "true"
+      ECO_TEST_VERBOSE: 'true'
+      ENABLE_IDMS: 'yes'
+      EXTRACT_MANIFEST_INCLUDED: 'true'
       MEDIK8S_PACKAGES: node-healthcheck-operator,self-node-remediation
-      OCP_VERSION: "422"
+      OCP_VERSION: '422'
       OO_CHANNEL: stable
       OPERATORS: node-healthcheck-operator,self-node-remediation
+      TEST_NAME: e2e-nhc-weekly-aws-disconnected
+      TEST_STEPS: e2e-test
     observers:
       enable:
       - observers-resource-watch
@@ -338,10 +397,13 @@ tests:
     - ref: medik8s-operator-subscribe
     - as: e2e-test
       cli: latest
-      commands: |
-        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+      commands: '[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+
         make run-tests
+
+        '
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
@@ -352,6 +414,8 @@ tests:
           memory: 200Mi
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-disconnected
+    post:
+    - ref: medik8s-analyze-e2e-failure
 zz_generated_metadata:
   branch: main
   org: medik8s

@@ -1,8 +1,12 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "9"
+    tag: '9'
   tls-scanner-tool:
     name: tls-scanner
     namespace: tls-scanner
@@ -28,7 +32,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "5.0"
+      version: '5.0'
 resources:
   '*':
     requests:
@@ -49,17 +53,26 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       OPERATOR_NAMESPACE: self-node-remediation
       OPERATOR_RELEASED_VERSION: 0.12.0
+      TEST_NAME: openshift-e2e
+      TEST_STEPS: test-command
     test:
     - as: install-last-operator-version
       cli: latest
-      commands: |
-        make create-ns
+      commands: 'make create-ns
+
         # workaround for OLM pod not running with restricted PSA
+
         oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+
         oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
+
         # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
-        BUNDLE_IMG=quay.io/medik8s/self-node-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
+
+        BUNDLE_IMG=quay.io/medik8s/self-node-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION"
+        make bundle-run
+
+        '
       env:
       - name: OPERATOR_NAMESPACE
       - name: OPERATOR_RELEASED_VERSION
@@ -83,9 +96,11 @@ tests:
           memory: 200Mi
     - as: test-command
       cli: latest
-      commands: |
-        export SKIP_LOG_VERIFICATION="true" INSTALL_NAMESPACE="$OPERATOR_NAMESPACE"
+      commands: 'export SKIP_LOG_VERIFICATION="true" INSTALL_NAMESPACE="$OPERATOR_NAMESPACE"
+
         make e2e-test
+
+        '
       env:
       - name: OPERATOR_NAMESPACE
       from: src
@@ -94,6 +109,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+    post:
+    - ref: medik8s-analyze-e2e-failure
 - as: tls-pqc-readiness
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -102,17 +119,23 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       OPERATOR_NAMESPACE: self-node-remediation
-      PQC_CHECK: "true"
+      PQC_CHECK: 'true'
       SCAN_NAMESPACE: self-node-remediation
-      SCANNER_CPU: "2"
+      SCANNER_CPU: '2'
+      TEST_NAME: tls-pqc-readiness
+      TEST_STEPS: e2e-test
     test:
     - as: install-operator
       cli: latest
-      commands: |
-        make create-ns
+      commands: 'make create-ns
+
         oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+
         oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
         BUNDLE_IMG="$OO_BUNDLE" make bundle-run
+
+        '
       dependencies:
       - env: OO_BUNDLE
         name: self-node-remediation-bundle
@@ -126,8 +149,10 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: ipi-aws
+    post:
+    - ref: medik8s-analyze-e2e-failure
 zz_generated_metadata:
   branch: release-0.13
   org: medik8s
   repo: self-node-remediation
-  variant: "5.0"
+  variant: '5.0'
