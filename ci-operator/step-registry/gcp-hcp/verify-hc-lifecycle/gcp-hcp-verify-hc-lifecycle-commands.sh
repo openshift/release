@@ -75,9 +75,27 @@ if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
   fi
 
   echo "Activating ${E2E_HC_SUBMITTER_SA} for identity token authentication..."
-  gcloud auth activate-service-account "${E2E_HC_SUBMITTER_SA}" \
-    --key-file="${E2E_HC_SUBMITTER_KEY_FILE}" \
-    --quiet
+  MAX_KEY_ACTIVATION_ATTEMPTS=6
+  key_activated=false
+  for ((attempt = 1; attempt <= MAX_KEY_ACTIVATION_ATTEMPTS; attempt++)); do
+    if gcloud auth activate-service-account "${E2E_HC_SUBMITTER_SA}" \
+      --key-file="${E2E_HC_SUBMITTER_KEY_FILE}" \
+      --quiet; then
+      key_activated=true
+      break
+    fi
+
+    if (( attempt < MAX_KEY_ACTIVATION_ATTEMPTS )); then
+      wait_seconds=$((5 << (attempt - 1)))
+      echo "Key activation failed; retrying in ${wait_seconds}s (attempt ${attempt}/${MAX_KEY_ACTIVATION_ATTEMPTS})..."
+      sleep "${wait_seconds}"
+    fi
+  done
+
+  if [[ "${key_activated}" != true ]]; then
+    echo "ERROR: Failed to activate ${E2E_HC_SUBMITTER_SA} after ${MAX_KEY_ACTIVATION_ATTEMPTS} attempts"
+    exit 1
+  fi
 
   if ! gcloud auth print-identity-token >/dev/null; then
     echo "ERROR: Failed to generate an identity token for ${E2E_HC_SUBMITTER_SA}"
