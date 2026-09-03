@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-e2e-libvirt-vpn-sno
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt-sno
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+    test:
+    - ref: upi-libvirt-sno-wait
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+    env:
+      INSTALLER_TYPE: agent
+      CONTROL_COUNT: "1"
+      COMPUTE_COUNT: "0"
+  documentation: |-
+    Agent SNO on libvirt-s390x-vpn. Reuses the HA VPN install and cleanup
+    paths; only conf (agent-config / network.xml) is SNO-specific. Test is
+    the same install health check as agent-ibmz-sno-e2e, not conformance.
