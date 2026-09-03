@@ -1,0 +1,48 @@
+chain:
+  as: p2p-cclm-full-bidir-migration-test
+  steps:
+    # Phase 1: Spoke-to-spoke bi-directional CCLM migration
+    # ForkliftController + providers + forward and return spoke maps
+    - chain: p2p-mtv-bidir-mig-config
+    # Create test VMs on spoke-1, migrate spoke-1→spoke-2, then spoke-2→spoke-1
+    - chain: p2p-cclm-bidir-migration-test
+    # Phase 2: Hub-to-spoke bi-directional CCLM migration
+    # Create VMs on hub + spoke, create hub↔spoke maps, migrate hub→spoke then spoke→hub
+    - chain: p2p-cclm-hub-spoke-migration-test
+  documentation: |-
+    Full bi-directional CCLM migration test covering both spoke-to-spoke and
+    hub-to-spoke migration scenarios on the same 3-cluster topology (hub + 2 spokes).
+
+    Phase 1 — Spoke-to-spoke bi-directional migration:
+      Runs p2p-mtv-bidir-mig-config (ForkliftController + MTV providers + forward
+      and return NetworkMap/StorageMap for spoke-1↔spoke-2), then
+      p2p-cclm-bidir-migration-test (creates test VMs on spoke-1, migrates
+      spoke-1→spoke-2, then migrates back spoke-2→spoke-1).
+
+    Phase 2 — Hub-to-spoke bi-directional migration:
+      Runs p2p-cclm-hub-spoke-migration-test (creates VMs on hub and spoke-1,
+      creates hub↔spoke MTV maps, migrates hub→spoke-1, then spoke-1→hub).
+      Uses spoke-1 as the spoke endpoint; spoke-1 is already registered as an
+      MTV provider by Phase 1's p2p-mtv-register-providers step.
+
+    Required pre-steps (in order):
+      1. install-operators          — MTV operator on hub
+      2. acm-mch                    — ACM MultiClusterHub
+      3. acm-interop-p2p-cluster-install — provision 2 spoke clusters via ACM/Hive
+      4. acm-fetch-managed-clusters — write spoke kubeconfigs to SHARED_DIR
+      5. p2p-acm-cnv-install-policy — CNV on spokes via ACM ConfigurationPolicy
+      6. p2p-install-odf-hub        — ODF on hub (must precede CNV hub install)
+      7. p2p-install-cnv-hub        — CNV/KubeVirt on hub via direct OLM
+      8. p2p-install-odf-spokes     — ODF on spokes for RWX storage
+      9. acm-interop-p2p-submariner-install — Submariner hub↔spoke + spoke↔spoke
+     10. p2p-cnv-exchange-kubevirt-ca  — exchange KubeVirt CA for hub + 2 spokes
+                                         (CNV_EXCHANGE_KUBEVIRT_CA__INCLUDE_HUB=true,
+                                          CNV_EXCHANGE_KUBEVIRT_CA__SPOKE_COUNT=2)
+
+    Key environment variables:
+      Spoke-to-spoke:  MTV_TEST_VM_COUNT, MTV_SPOKE_CLUSTER_COUNT=2,
+                       MTV_PROVIDER_NAMES, MTV_VM_SSH_VERIFY
+      Hub-to-spoke:    MTV_HS_HUB_PROVIDER=host, MTV_HS_SPOKE_PROVIDER=spoke-1,
+                       MTV_HS_*_NETWORK_MAP, MTV_HS_*_STORAGE_MAP, MTV_HS_*_PLAN,
+                       P2P_HS_VM_COUNT, P2P_HS_VM_NAMESPACE, P2P_HS_*_VM_PREFIX,
+                       P2P_HS_HUB_STORAGE_CLASS, P2P_HS_SPOKE_STORAGE_CLASS

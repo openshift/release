@@ -8,43 +8,50 @@ set -euxo pipefail; shopt -s inherit_errexit
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq
 
 if [[ -n "${SHARED_DIR}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    # Disable xtrace: proxy-conf.sh may set HTTP_PROXY with embedded credentials.
+    [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+    [[ "${_wasTracing}" == "true" ]] && set -x
 fi
 
 
 
 # ValidateConfig — fail fast if storage map env vars are missing.
-ValidateConfig() {
+function ValidateConfig () {
     [[ -n "${MTV_SOURCE_STORAGE_NAME}" ]]    || { : "MTV_SOURCE_STORAGE_NAME is required";    false; }
     [[ -n "${MTV_DESTINATION_STORAGE_CLASS}" ]] || { : "MTV_DESTINATION_STORAGE_CLASS is required"; false; }
+    true
 }
 
 # RefreshProviderInventory — trigger MTV to re-scan spoke storage/network before map validation.
-RefreshProviderInventory() {
-    typeset providerName="${1:?}"
+function RefreshProviderInventory () {
+    typeset providerName="${1:?}"; (($#)) && shift
     typeset ts
 
     ts="$(date -u +%s)"
     oc annotate "provider/${providerName}" -n "${MTV_NAMESPACE}" \
         "forklift.konveyor.io/inventory-refresh=${ts}" --overwrite
+    true
 }
 
 # WaitProviderReady — ensure both providers finished inventory before creating maps.
-WaitProviderReady() {
-    typeset providerName="${1:?}"
+function WaitProviderReady () {
+    typeset providerName="${1:?}"; (($#)) && shift
 
     oc wait "provider/${providerName}" -n "${MTV_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_PROVIDER_READY_TIMEOUT}"
+    true
 }
 
 # ApplyNetworkMap — create pod→pod NetworkMap for CCLM cross-cluster pod networking.
 # Uses jq --arg to safely marshal values; avoids raw heredoc expansion of YAML-special chars.
-ApplyNetworkMap() {
+function ApplyNetworkMap () {
     jq -n \
         --arg name    "${MTV_NETWORK_MAP_NAME}" \
         --arg ns      "${MTV_NAMESPACE}" \
@@ -62,11 +69,12 @@ ApplyNetworkMap() {
                 }
             }
         }' | oc apply -f -
+    true
 }
 
 # ApplyStorageMap — map source ODF virt StorageClass to destination (RWX required for live migration).
 # Uses jq --arg to safely marshal values; avoids raw heredoc expansion of YAML-special chars.
-ApplyStorageMap() {
+function ApplyStorageMap () {
     jq -n \
         --arg name     "${MTV_STORAGE_MAP_NAME}" \
         --arg ns       "${MTV_NAMESPACE}" \
@@ -89,15 +97,17 @@ ApplyStorageMap() {
                 }
             }
         }' | oc apply -f -
+    true
 }
 
 # WaitMapReady — wait until MTV validates network/storage mapping against provider inventory.
-WaitMapReady() {
-    typeset kind="${1:?}"
-    typeset name="${2:?}"
+function WaitMapReady () {
+    typeset kind="${1:?}"; (($#)) && shift
+    typeset name="${1:?}"; (($#)) && shift
 
     oc wait "${kind}/${name}" -n "${MTV_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_MAP_READY_TIMEOUT}"
+    true
 }
 
 # --- Main ---
@@ -123,5 +133,5 @@ WaitMapReady networkmap "${MTV_NETWORK_MAP_NAME}"
 WaitMapReady storagemap "${MTV_STORAGE_MAP_NAME}"
 
 oc get networkmap,storagemap -n "${MTV_NAMESPACE}" \
-    > "${ARTIFACT_DIR}/mtv-migration-maps-status.txt"
+    >> "${ARTIFACT_DIR}/mtv-migration-maps-status.txt"
 true
