@@ -112,6 +112,29 @@ package-create)
                 --type merge -p '{"metadata":{"finalizers":[]}}' 2>/dev/null || true
         fi
     fi
+
+    # Restore the SSS-managed ConfigMap and Service we deleted during install.
+    # Wait up to 60s for PKO to finish GC-ing its owned resources first.
+    if [[ -s "${SHARED_DIR}/webhook-cert-cm.json" || -s "${SHARED_DIR}/validation-webhook-svc.json" ]]; then
+        log "Waiting for PKO to finish removing its owned resources"
+        for _i in $(seq 1 12); do
+            CM=$(oc get configmap webhook-cert -n "${OPERATOR_NAMESPACE}" \
+                --ignore-not-found -o name 2>/dev/null || true)
+            SVC=$(oc get service validation-webhook -n "${OPERATOR_NAMESPACE}" \
+                --ignore-not-found -o name 2>/dev/null || true)
+            if [[ -z "${CM}" && -z "${SVC}" ]]; then break; fi
+            sleep 5
+        done
+        log "Restoring SSS-managed resources"
+        if [[ -s "${SHARED_DIR}/webhook-cert-cm.json" ]]; then
+            oc apply -f "${SHARED_DIR}/webhook-cert-cm.json" 2>/dev/null || true
+            log "  ConfigMap webhook-cert restored"
+        fi
+        if [[ -s "${SHARED_DIR}/validation-webhook-svc.json" ]]; then
+            oc apply -f "${SHARED_DIR}/validation-webhook-svc.json" 2>/dev/null || true
+            log "  Service validation-webhook restored"
+        fi
+    fi
     log "Cleanup complete"
     ;;
 

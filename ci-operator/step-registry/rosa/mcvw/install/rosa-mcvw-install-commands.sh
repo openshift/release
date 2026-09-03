@@ -205,7 +205,19 @@ else
 
     # SSS creates webhook-cert ConfigMap and validation-webhook Service without
     # PKO owner refs. PKO refuses to adopt them even with collision-protection: None.
-    # Delete them so PKO can create them fresh.
+    # Save them for restoration in cleanup, then delete so PKO can create them fresh.
+    log "Saving SSS-managed resources for post-test restoration"
+    if [[ -n "${SHARED_DIR:-}" ]]; then
+        CM_JSON=$(oc get configmap webhook-cert -n "${OPERATOR_NAMESPACE}" -o json 2>/dev/null | \
+            jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.managedFields, .status)' \
+            2>/dev/null || true)
+        [[ -n "${CM_JSON}" ]] && echo "${CM_JSON}" > "${SHARED_DIR}/webhook-cert-cm.json"
+        SVC_JSON=$(oc get service validation-webhook -n "${OPERATOR_NAMESPACE}" -o json 2>/dev/null | \
+            jq 'del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.managedFields, .status, .spec.clusterIP, .spec.clusterIPs, .spec.ipFamilies, .spec.ipFamilyPolicy)' \
+            2>/dev/null || true)
+        [[ -n "${SVC_JSON}" ]] && echo "${SVC_JSON}" > "${SHARED_DIR}/validation-webhook-svc.json"
+        log "Resources saved to SHARED_DIR"
+    fi
     log "Removing SSS-managed resources that block PKO adoption"
     oc delete configmap webhook-cert -n "${OPERATOR_NAMESPACE}" --ignore-not-found 2>/dev/null || true
     oc delete service validation-webhook -n "${OPERATOR_NAMESPACE}" --ignore-not-found 2>/dev/null || true
