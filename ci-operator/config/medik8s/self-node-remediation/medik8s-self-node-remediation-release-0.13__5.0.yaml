@@ -2,7 +2,7 @@ base_images:
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "9"
+    tag: '9'
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -24,7 +24,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "5.0"
+      version: '5.0'
 resources:
   '*':
     requests:
@@ -48,14 +48,21 @@ tests:
     test:
     - as: install-last-operator-version
       cli: latest
-      commands: |
-        make create-ns
+      commands: 'make create-ns
+
         # workaround for OLM pod not running with restricted PSA
+
         oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+
         oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
+
         # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
-        BUNDLE_IMG=quay.io/medik8s/self-node-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
+
+        BUNDLE_IMG=quay.io/medik8s/self-node-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION"
+        make bundle-run
+
+        '
       env:
       - name: OPERATOR_NAMESPACE
       - name: OPERATOR_RELEASED_VERSION
@@ -79,9 +86,11 @@ tests:
           memory: 200Mi
     - as: test-command
       cli: latest
-      commands: |
-        export SKIP_LOG_VERIFICATION="true" INSTALL_NAMESPACE="$OPERATOR_NAMESPACE"
+      commands: 'export SKIP_LOG_VERIFICATION="true" INSTALL_NAMESPACE="$OPERATOR_NAMESPACE"
+
         make e2e-test
+
+        '
       env:
       - name: OPERATOR_NAMESPACE
       from: src
@@ -94,4 +103,4 @@ zz_generated_metadata:
   branch: release-0.13
   org: medik8s
   repo: self-node-remediation
-  variant: "5.0"
+  variant: '5.0'
