@@ -310,8 +310,8 @@ install_virtctl_if_missing() {
     return 1
   fi
 
-  echo "Downloading virtctl from ${url}..."
-  if ! curl -fsSL "${url}" | tar zx -C "${SHARED_DIR}"; then
+  echo "Downloading virtctl from ${url}..." >&2
+  if ! curl -kfsSL "${url}" | tar zx -C "${SHARED_DIR}"; then
     echo "WARNING: Failed to download/extract virtctl" >&2
     return 1
   fi
@@ -383,11 +383,11 @@ localnet_multi_label_namespace_privileged() {
     security.openshift.io/scc.podSecurityLabelSync=false --overwrite 2>/dev/null || true
 }
 
-# SSH helper pods run in the HostedCluster namespace (local-cluster), not the HCP
-# namespace (local-cluster-<id>), which enforces restricted PodSecurity and blocks
-# dhcp-renew pods. The cluster SSH key secret already lives in CLUSTER_NAMESPACE_PREFIX.
+# SSH helper pods run in the HCP namespace (local-cluster-<id>) alongside the localnet-1
+# NAD. Multus namespace isolation blocks cross-namespace NAD references from
+# local-cluster; the HCP namespace is labeled privileged for these pods.
 localnet_multi_ssh_pod_namespace() {
-  echo "${CLUSTER_NAMESPACE_PREFIX}"
+  echo "$1"
 }
 
 localnet_multi_ssh_pod_image() {
@@ -406,12 +406,12 @@ localnet_multi_ssh_pod_security_context() {
 EOF
 }
 
-# SSH pods must use the host network to reach guest localnet IPs (e.g. 192.168.111.x).
-# Pods on the OVN overlay (10.129.x) cannot route to localnet bridge addresses.
-localnet_multi_ssh_pod_networking_spec() {
+# SSH pods must attach to localnet-1 (primary NAD). hostNetwork cannot reach guest
+# br-ex IPs on OVN localnet; only pods on the same localnet L2 segment can SSH.
+localnet_multi_ssh_pod_metadata_annotations() {
   cat <<'EOF'
-  hostNetwork: true
-  dnsPolicy: ClusterFirstWithHostNet
+  annotations:
+    k8s.v1.cni.cncf.io/networks: localnet-1
 EOF
 }
 
@@ -662,17 +662,17 @@ localnet_multi_route_output_via_ssh() {
 
   check_pod="route-check-${vmi##*-}"
   local ssh_ns
-  ssh_ns=$(localnet_multi_ssh_pod_namespace)
+  ssh_ns=$(localnet_multi_ssh_pod_namespace "${multi_ns}")
   if ! cat <<ROUTE_CHECK_EOF | oc apply -f -; then
 apiVersion: v1
 kind: Pod
 metadata:
   name: ${check_pod}
   namespace: ${ssh_ns}
+$(localnet_multi_ssh_pod_metadata_annotations)
 spec:
   nodeSelector:
     kubernetes.io/hostname: ${vmi_node}
-$(localnet_multi_ssh_pod_networking_spec)
   restartPolicy: Never
   volumes:
   - name: ssh-key
@@ -763,7 +763,7 @@ renew_localnet_multi_dhcp_on_vmi_via_ssh() {
   echo "Forcing DHCP renewal on VMI ${vmi} (${vmi_ip}) via SSH pod on ${vmi_node}..."
   renew_pod="dhcp-renew-${vmi##*-}"
   local ssh_ns
-  ssh_ns=$(localnet_multi_ssh_pod_namespace)
+  ssh_ns=$(localnet_multi_ssh_pod_namespace "${multi_ns}")
   renew_devices=""
   for idx in $(seq "${network_count}" -1 1); do
     renew_devices="${renew_devices} enp${idx}s0"
@@ -772,17 +772,17 @@ renew_localnet_multi_dhcp_on_vmi_via_ssh() {
   # expand them in the outer shell before oc apply.
   # Use nmcli device reapply by interface name; initrd profiles are "Wired Connection"
   # (not "Wired connection N") so connection-name toggles are unreliable.
-  # Pod runs in CLUSTER_NAMESPACE_PREFIX (not the HCP namespace) to avoid restricted PSA.
+  # Pod runs in the HCP namespace (multi_ns) with localnet-1 multus attachment.
   if ! cat <<RENEW_EOF | oc apply -f -; then
 apiVersion: v1
 kind: Pod
 metadata:
   name: ${renew_pod}
   namespace: ${ssh_ns}
+$(localnet_multi_ssh_pod_metadata_annotations)
 spec:
   nodeSelector:
     kubernetes.io/hostname: ${vmi_node}
-$(localnet_multi_ssh_pod_networking_spec)
   restartPolicy: Never
   volumes:
   - name: ssh-key
