@@ -50,6 +50,13 @@ run_tls_scan() {
     SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
   fi
 
+  # A profile sweep scans the same cluster once per profile, so give each pass
+  # its own artifact directory instead of letting the later one overwrite the
+  # earlier one's results.
+  if [[ -n "${TLS_SCANNER_PROFILE_LABEL:-}" ]]; then
+    SCANNER_ARTIFACT_DIR="${SCANNER_ARTIFACT_DIR}/${TLS_SCANNER_PROFILE_LABEL}"
+  fi
+
   echo "TLS scanner target: ${TLS_SCANNER_CLUSTER_LABEL:-default} cluster"
   echo "KUBECONFIG: ${KUBECONFIG:-<unset>}"
   if [[ -n "${SCAN_NAMESPACE:-}" ]]; then
@@ -260,12 +267,18 @@ EOF
   oc cp "${NAMESPACE}/tls-scanner:/results/." "${SCANNER_ARTIFACT_DIR}/" || echo "Warning: Failed to copy some artifacts"
 
   if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
+      # Spyglass reads every junit_*.xml in ARTIFACT_DIR, so each sweep pass
+      # needs a distinct name for its results to survive the next pass.
+      local profile_suffix=""
+      if [[ -n "${TLS_SCANNER_PROFILE_LABEL:-}" ]]; then
+        profile_suffix="_${TLS_SCANNER_PROFILE_LABEL}"
+      fi
       if [[ "${PQC_CHECK:-false}" == "true" && -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ]]; then
-        junit_artifact="${ARTIFACT_DIR}/junit_pqc_scan_${TLS_SCANNER_CLUSTER_LABEL}.xml"
+        junit_artifact="${ARTIFACT_DIR}/junit_pqc_scan_${TLS_SCANNER_CLUSTER_LABEL}${profile_suffix}.xml"
       elif [[ -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ]]; then
-        junit_artifact="${ARTIFACT_DIR}/junit_tls_scan_${TLS_SCANNER_CLUSTER_LABEL}.xml"
+        junit_artifact="${ARTIFACT_DIR}/junit_tls_scan_${TLS_SCANNER_CLUSTER_LABEL}${profile_suffix}.xml"
       else
-        junit_artifact="${ARTIFACT_DIR}/junit_tls_scan.xml"
+        junit_artifact="${ARTIFACT_DIR}/junit_tls_scan${profile_suffix}.xml"
       fi
       cp "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" "${junit_artifact}"
       echo "JUnit results copied to ${junit_artifact} for Spyglass"
@@ -329,6 +342,89 @@ EOF
   # variables NAMESPACE/OWNS_NAMESPACE would be unbound at that point).
   trap - EXIT
 }
+
+# Point apiservers/cluster at one TLS profile and wait for the cluster to
+# settle. Carries TLS_SCANNER_TLS_ADHERENCE along with the patch: a merge patch
+# would not clear spec.tlsAdherence, but restating it keeps the sweep honest
+# when the field was never set in the first place.
+set_tls_profile() {
+  local profile="$1"
+  local lower="${profile,,}"
+
+  if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+    export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  fi
+
+  # The cli image has no jq, so build the patch by hand.
+  local patch
+  if [[ -n "${TLS_SCANNER_TLS_ADHERENCE:-}" ]]; then
+    patch="{\"spec\":{\"tlsSecurityProfile\":{\"type\":\"${profile}\",\"${lower}\":{}},\"tlsAdherence\":\"${TLS_SCANNER_TLS_ADHERENCE}\"}}"
+  else
+    patch="{\"spec\":{\"tlsSecurityProfile\":{\"type\":\"${profile}\",\"${lower}\":{}}}}"
+  fi
+
+  echo "Setting TLS profile to ${profile}${TLS_SCANNER_TLS_ADHERENCE:+ (tlsAdherence: ${TLS_SCANNER_TLS_ADHERENCE})}"
+  oc patch apiservers/cluster --type=merge -p "${patch}"
+
+  # Changing the profile rolls the API servers and everything that follows
+  # them; scanning before that finishes measures the old configuration.
+  oc adm wait-for-stable-cluster --timeout=3h
+
+  local observed
+  observed="$(oc get apiserver/cluster -o jsonpath='{.spec.tlsSecurityProfile.type}')"
+  if [[ "${observed}" != "${profile}" ]]; then
+    echo "Error: TLS Security Profile is '${observed}', expected '${profile}'"
+    return 1
+  fi
+  if [[ -n "${TLS_SCANNER_TLS_ADHERENCE:-}" ]]; then
+    local adherence
+    adherence="$(oc get apiserver/cluster -o jsonpath='{.spec.tlsAdherence}')"
+    if [[ "${adherence}" != "${TLS_SCANNER_TLS_ADHERENCE}" ]]; then
+      echo "Error: tlsAdherence is '${adherence}', expected '${TLS_SCANNER_TLS_ADHERENCE}'"
+      return 1
+    fi
+  fi
+}
+
+if [[ -n "${TLS_SCANNER_PROFILE_SWEEP:-}" ]]; then
+  if [[ "${TLS_SCANNER_RUN_HYPERSHIFT:-false}" == "true" ]]; then
+    echo "TLS_SCANNER_PROFILE_SWEEP cannot be combined with TLS_SCANNER_RUN_HYPERSHIFT:"
+    echo "a hosted cluster's TLS profile comes from its HostedCluster, not apiservers/cluster."
+    exit 1
+  fi
+
+  IFS=',' read -r -a SWEEP_PROFILES <<< "${TLS_SCANNER_PROFILE_SWEEP// /}"
+
+  # Validate the whole list before touching the cluster, so a typo in the last
+  # entry fails now rather than after an hour of scanning.
+  for profile in "${SWEEP_PROFILES[@]}"; do
+    case "${profile}" in
+    Old|Intermediate|Modern) ;;
+    *)
+      echo "Invalid TLS_SCANNER_PROFILE_SWEEP entry '${profile}' (expected Old, Intermediate or Modern)"
+      exit 1
+      ;;
+    esac
+  done
+
+  OVERALL_EXIT_CODE=0
+  for profile in "${SWEEP_PROFILES[@]}"; do
+    echo "=== TLS scanner: ${profile} profile pass ==="
+    # A profile we cannot apply is an infrastructure failure, not a finding:
+    # scanning the cluster in an unknown state would report against the wrong
+    # expectation, so stop the sweep here.
+    set_tls_profile "${profile}"
+    (
+      export TLS_SCANNER_PROFILE_LABEL="${profile,,}"
+      export TLS_PROFILE_TYPE="${profile}"
+      run_tls_scan
+    ) || OVERALL_EXIT_CODE=1
+    echo "=== TLS scanner: ${profile} profile pass complete ==="
+  done
+
+  echo "=== TLS scanner profile sweep complete (${TLS_SCANNER_PROFILE_SWEEP}) ==="
+  exit "${OVERALL_EXIT_CODE}"
+fi
 
 if [[ "${TLS_SCANNER_RUN_HYPERSHIFT:-false}" == "true" ]]; then
   OVERALL_EXIT_CODE=0
