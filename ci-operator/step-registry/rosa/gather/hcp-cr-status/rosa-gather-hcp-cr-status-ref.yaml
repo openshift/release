@@ -1,0 +1,44 @@
+ref:
+  as: rosa-gather-hcp-cr-status
+  best_effort: true
+  from_image:
+    namespace: ci
+    name: rosa-aws-cli
+    tag: latest
+  commands: rosa-gather-hcp-cr-status-commands.sh
+  grace_period: 30s
+  timeout: 10m0s
+  credentials:
+  - namespace: ci
+    name: cs-qe-credentials
+    mount_path: /usr/local/cs-qe-credentials
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "integration"
+    documentation: |-
+      OCM environment the cluster lives in. Backplane logs into this environment.
+      Supported values are [production, staging, integration].
+  - name: BACKPLANE_PROXY_URL
+    default: "http://squid.corp.redhat.com:3128"
+    documentation: |-
+      Corp proxy used to reach the backplane API from the build farm.
+  - name: BACKPLANE_ELEVATE_REASON
+    default: "https://issues.redhat.com/browse/ROSAENG-62717"
+    documentation: Audit reason passed to ocm-backplane elevate.
+  - name: BACKPLANE_CLI_VERSION
+    default: "0.12.0"
+    documentation: ocm-backplane CLI version to install.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  documentation: |-
+    Gathers HyperShift Custom Resource statuses from the management cluster via
+    ocm-backplane. Connects to the MC using OCM credentials from
+    cs-qe-credentials, elevates with backplane-cluster-admin, and dumps key CR
+    statuses to ${ARTIFACT_DIR}/cr-status/:
+    - HostedClusters, HostedControlPlanes, NodePools (HyperShift)
+    - Machines, MachineDeployments, MachineHealthChecks (CAPI)
+    - Backups, Restores, VolumeSnapshots (Velero)
+    - Nodes and CSRs from the guest cluster (if kubeconfig is available)
+    Runs as a best-effort post step; partial failures do not block the job.
