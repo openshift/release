@@ -1,3 +1,12 @@
+base_images:
+  cli:
+    name: "4.18"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   image_stream_tag:
     name: builder
@@ -37,6 +46,121 @@ tests:
     make test
   container:
     from: src
+- always_run: false
+  as: olm-install
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  postsubmit: true
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        BUNDLE_IMG="quay.io/redhat-user-workloads/hyperfleet-tenant/hyperfleet/hyperfleet-operator-bundle:${BUNDLE_TAG}"
+        echo "Installing operator from bundle: ${BUNDLE_IMG}"
+        operator-sdk run bundle -n hyperfleet-operator-olm "${BUNDLE_IMG}" --timeout 10m0s
+      env:
+      - default: latest
+        name: BUNDLE_TAG
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: verify
+      cli: latest
+      commands: |
+        echo "Verifying operator installation..."
+        oc get csv -n hyperfleet-operator-olm
+        oc get pods -n hyperfleet-operator-olm
+        oc wait csv -n hyperfleet-operator-olm -l operators.coreos.com/hyperfleet-operator.hyperfleet-operator="" --for=jsonpath='{.status.phase}'=Succeeded --timeout=5m
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- always_run: false
+  as: manifest-install
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  postsubmit: true
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        export HOME=/tmp
+        export GOCACHE=/tmp/go-build
+        export GOMODCACHE=/tmp/go-mod
+
+        echo "=== Manifest-based install of hyperfleet-operator ==="
+        echo "Operator image: ${OPERATOR_IMG}"
+
+        make build-deployer-override-img IMG="${OPERATOR_IMG}"
+
+        echo "Creating namespace ${DEPLOY_NAMESPACE}..."
+        oc create namespace "${DEPLOY_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+
+        echo "Applying manifests..."
+        oc apply -f dist/install.yaml
+
+        echo "Manifests applied successfully"
+      env:
+      - default: quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-operator:latest
+        name: OPERATOR_IMG
+      - default: hyperfleet-system
+        name: DEPLOY_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: verify
+      cli: latest
+      commands: |
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        echo "=== Verifying manifest-based installation ==="
+
+        echo "Checking CRD was installed..."
+        oc get crd hyperfleetconfigs.hyperfleet.redhat.com
+        oc wait --for=condition=Established --timeout=1m \
+          crd/hyperfleetconfigs.hyperfleet.redhat.com
+
+        echo "Waiting for deployment to be available..."
+        oc wait --for=condition=Available --timeout=5m \
+          deployment/hyperfleet-operator-controller-manager \
+          -n "${DEPLOY_NAMESPACE}"
+
+        echo "Deployments:"
+        oc get deployments -n "${DEPLOY_NAMESPACE}"
+
+        echo "Pods:"
+        oc get pods -n "${DEPLOY_NAMESPACE}"
+
+        echo "Manifest-based install verification complete!"
+      env:
+      - default: hyperfleet-system
+        name: DEPLOY_NAMESPACE
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet
