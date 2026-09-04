@@ -28,6 +28,9 @@ The post-test step saves these artifacts before cluster teardown:
   at key 3, short link-kind attributes at key 4, batch overflows at key 5,
   kernel read failures at key 6, and mixed/non-veth batches at key 7;
 - per-node OVS coverage before and after the CUDN workload;
+- bounded `ovs-vswitchd` perf recordings, metadata, logs, compact symbol
+  reports, and compressed symbolized callchains from four zone-spread workers
+  (`ovs-perf-*`);
 - DaemonSet resources and logs;
 - the Network ClusterOperator state.
 
@@ -39,6 +42,19 @@ then removes the SCC grant and namespace.
 
 The branch named by `OVS_VETH_FILTER_REF` must be pushed before requesting the
 CI rehearsal, because the target cluster builds these assets from that ref.
+
+The profiler sidecar uses the same privileged, host-PID DaemonSet as the BPF
+filter. The deploy step chooses one worker per availability zone before filling
+the remaining slots in node-name order. On those workers it records the host-
+visible `ovs-vswitchd` with the software `cpu-clock` event at 19 Hz for at most
+45 minutes. DWARF call graphs use a 2 KiB stack snapshot, which was sufficient
+to resolve OVS and kernel netlink stacks in a loaded cluster rehearsal without
+the much larger artifacts produced by the default 8 KiB snapshot. The gather
+step interrupts any recording still active after an early workload failure,
+waits for `perf.data` finalization, renders a compact report while the target
+process namespace is available, and uploads the report, gzip-compressed
+`perf script` output, and raw data. The symbolized script remains directly
+usable with FlameGraph tooling after the short-lived cluster is gone.
 
 ## Live step rehearsal
 

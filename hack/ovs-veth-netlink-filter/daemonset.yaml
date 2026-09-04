@@ -65,6 +65,31 @@ spec:
             periodSeconds: 2
             timeoutSeconds: 1
             failureThreshold: 1
+        - name: profiler
+          image: image-registry.openshift-image-registry.svc:5000/ovs-veth-filter/ovs-veth-filter:latest
+          imagePullPolicy: Always
+          command:
+            - /opt/ovs-veth-filter/perf-profile.sh
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: OVS_PERF_NODES
+              value: ""
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          volumeMounts:
+            - name: perf-output
+              mountPath: /var/tmp/ovs-veth-filter-perf
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
       terminationGracePeriodSeconds: 10
       volumes:
         - name: bpffs
@@ -79,3 +104,7 @@ spec:
           hostPath:
             path: /sys/kernel/security
             type: Directory
+        - name: perf-output
+          hostPath:
+            path: /var/tmp/ovs-veth-filter-perf
+            type: DirectoryOrCreate

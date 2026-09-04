@@ -33,7 +33,58 @@ oc start-build ovs-veth-filter --from-dir="${assets}" --follow --wait \
 oc apply -f "${assets}/daemonset.yaml"
 image=$(oc get imagestreamtag ovs-veth-filter:latest -n "${namespace}" \
     -o jsonpath='{.image.dockerImageReference}')
-oc set image daemonset/ovs-veth-filter "filter=${image}" -n "${namespace}"
+oc set image daemonset/ovs-veth-filter \
+    "filter=${image}" "profiler=${image}" -n "${namespace}"
+
+if [[ ! ${OVS_PERF_NODE_COUNT} =~ ^[1-9][0-9]*$ ]]; then
+    echo "OVS_PERF_NODE_COUNT must be a positive integer" >&2
+    exit 1
+fi
+
+# Select one worker per zone first, then fill any remaining slots in stable
+# node-name order.  This spreads the four profiles without adding node labels.
+mapfile -t worker_rows < <(oc get nodes \
+    -l 'node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=' \
+    -o go-template='{{range .items}}{{.metadata.name}}{{"\t"}}{{index .metadata.labels "topology.kubernetes.io/zone"}}{{"\n"}}{{end}}' \
+    | sort)
+declare -a perf_nodes=()
+declare -A selected_nodes=()
+declare -A selected_zones=()
+for row in "${worker_rows[@]}"; do
+    IFS=$'\t' read -r node zone <<< "${row}"
+    if [[ -z ${selected_zones[${zone}]+x} ]]; then
+        perf_nodes+=("${node}")
+        selected_nodes["${node}"]=1
+        selected_zones["${zone}"]=1
+        if ((${#perf_nodes[@]} == OVS_PERF_NODE_COUNT)); then
+            break
+        fi
+    fi
+done
+if ((${#perf_nodes[@]} < OVS_PERF_NODE_COUNT)); then
+    for row in "${worker_rows[@]}"; do
+        IFS=$'\t' read -r node _ <<< "${row}"
+        [[ -n ${selected_nodes[${node}]+x} ]] && continue
+        perf_nodes+=("${node}")
+        selected_nodes["${node}"]=1
+        if ((${#perf_nodes[@]} == OVS_PERF_NODE_COUNT)); then
+            break
+        fi
+    done
+fi
+if ((${#perf_nodes[@]} == 0)); then
+    echo "No workers available for perf profiling" >&2
+    exit 1
+fi
+perf_nodes_csv=$(IFS=,; echo "${perf_nodes[*]}")
+printf '%s\n' "${perf_nodes[@]}" > "${SHARED_DIR}/ovs-perf-profile-nodes.txt"
+echo "Profiling ovs-vswitchd on ${#perf_nodes[@]} workers: ${perf_nodes_csv}"
+oc set env daemonset/ovs-veth-filter -n "${namespace}" \
+    --containers=profiler \
+    "OVS_PERF_NODES=${perf_nodes_csv}" \
+    "OVS_PERF_DURATION_SECONDS=${OVS_PERF_DURATION_SECONDS}" \
+    "OVS_PERF_FREQUENCY=${OVS_PERF_FREQUENCY}" \
+    "OVS_PERF_STACK_BYTES=${OVS_PERF_STACK_BYTES}"
 oc rollout status daemonset/ovs-veth-filter -n "${namespace}" --timeout=20m
 
 desired=$(oc get daemonset ovs-veth-filter -n "${namespace}" \
@@ -49,12 +100,25 @@ sleep "${OVS_VETH_FILTER_SETTLE_SECONDS}"
 
 for pod in $(oc get pods -n "${namespace}" -l app=ovs-veth-filter \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
-    if ! oc logs -n "${namespace}" "${pod}" | \
+    if ! oc logs -n "${namespace}" "${pod}" -c filter | \
         grep -q 'filtering veth link events for OVS netlink port ID'; then
         echo "BPF filter did not attach to the OVS route socket in ${pod}" >&2
-        oc logs -n "${namespace}" "${pod}" >&2 || true
+        oc logs -n "${namespace}" "${pod}" -c filter >&2 || true
         exit 1
     fi
+done
+
+for node in "${perf_nodes[@]}"; do
+    pod=$(oc get pods -n "${namespace}" -l app=ovs-veth-filter \
+        --field-selector="spec.nodeName=${node}" \
+        -o jsonpath='{.items[0].metadata.name}')
+    if ! oc exec -n "${namespace}" "${pod}" -c profiler -- \
+        test -s /run/ovs-veth-filter/perf.pid; then
+        echo "perf did not remain active on selected worker ${node}" >&2
+        oc logs -n "${namespace}" "${pod}" -c profiler >&2 || true
+        exit 1
+    fi
+    echo "Verified active ovs-vswitchd perf recording on ${node}"
 done
 
 echo "Collecting pre-workload OVS coverage baselines in ${SHARED_DIR}"
