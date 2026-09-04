@@ -6,7 +6,7 @@ set -o errexit
 set -o pipefail
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.4.8"
+readonly POWERVC_TOOL_VERSION="v2.4.9"
 readonly YQ_VERSION="v4.53.6"
 readonly MAX_DESTROY_ATTEMPTS=3
 readonly SECRETS_DIR="/var/run/powervc-ipi-cicd-secrets/powervc-creds"
@@ -151,6 +151,99 @@ function download_tool_w_sha() {
 }
 
 #######################################
+# Download a mikefarah/yq release asset, verify its SHA256 checksum, and install
+# it at the requested path.
+#
+# Defined as a subshell function (parenthesised body) so its cd/trap/local
+# changes are isolated and the temporary download directory is always removed by
+# the EXIT trap when the subshell returns.
+#
+# Arguments:
+#   $1 - yq release version tag (required, e.g. v4.53.6).
+#   $2 - (optional) release asset name. Defaults to yq_linux_amd64.
+#   $3 - (optional) destination path for the installed binary. Defaults to yq.
+# Returns:
+#   0 on success; 1 if a download fails, the checksum file is malformed, or
+#   verification fails.
+# Side Effects:
+#   Creates the parent directory of the destination path if it does not exist.
+#   Writes the verified binary (mode 0755) to the destination path.
+#######################################
+download_yq() (
+	local version="${1:?Usage: download_yq <version> [asset] [output]}"
+	local asset="${2:-yq_linux_amd64}"
+	local output="${3:-yq}"
+	local base_url="https://github.com/mikefarah/yq/releases/download/${version}"
+	local tmpdir expected actual sha256_col
+
+	tmpdir="$(mktemp -d)"
+	# This EXIT trap requires the parenthesised (subshell) function body above:
+	# in a subshell it is trap-local and fires on return, cleaning tmpdir. With a
+	# brace body it would instead REPLACE the script-level EXIT trap, and since
+	# tmpdir is local, the script would fail at exit with "tmpdir: unbound
+	# variable" under `set -o nounset`. Do not switch to `{ }`.
+	trap 'rm -rf -- "$tmpdir"' EXIT
+
+	# All downloads are wrapped in explicit retry_command checks; curl itself
+	# does not use --retry.
+	if ! retry_command 3 5 "Download ${asset}" \
+		curl --fail --silent --show-error --location \
+			--connect-timeout 30 --max-time 120 \
+			--output "$tmpdir/$asset" "$base_url/$asset"; then
+		log_error "Could not download ${base_url}/${asset}"
+		return 1
+	fi
+
+	if ! retry_command 3 5 "Download checksums" \
+		curl --fail --silent --show-error --location \
+			--connect-timeout 30 --max-time 120 \
+			--output "$tmpdir/checksums" "$base_url/checksums"; then
+		log_error "Could not download ${base_url}/checksums"
+		return 1
+	fi
+
+	if ! retry_command 3 5 "Download checksums_hashes_order" \
+		curl --fail --silent --show-error --location \
+			--connect-timeout 30 --max-time 120 \
+			--output "$tmpdir/checksums_hashes_order" "$base_url/checksums_hashes_order"; then
+		log_error "Could not download ${base_url}/checksums_hashes_order"
+		return 1
+	fi
+
+	# Determine which 1-based line number SHA-256 occupies in the hash order
+	# file, then add 1 because the checksums file prepends the filename as $1.
+	sha256_col="$(grep -n '^SHA-256$' "$tmpdir/checksums_hashes_order" | cut -d: -f1)"
+	if [[ -z "${sha256_col}" ]]; then
+		log_error "Could not locate SHA-256 in checksums_hashes_order"
+		return 1
+	fi
+	(( sha256_col += 1 ))
+
+	expected="$(awk -v asset="${asset}" -v col="${sha256_col}" \
+		'$1 == asset { print $col }' "$tmpdir/checksums" \
+		| tr '[:upper:]' '[:lower:]')"
+
+	if [[ ! "$expected" =~ ^[0-9a-f]{64}$ ]]; then
+		log_error "Could not extract SHA-256 checksum for ${asset} from checksums file"
+		return 1
+	fi
+
+	actual="$(sha256sum -- "$tmpdir/$asset" | awk '{ print $1 }')"
+
+	if [[ "$actual" != "$expected" ]]; then
+		log_error "Checksum verification FAILED for ${asset}"
+		log_error "Expected: ${expected} Actual: ${actual}"
+		return 1
+	fi
+
+	mkdir -p -- "$(dirname -- "${output}")"
+	chmod 0755 "$tmpdir/$asset"
+	mv -- "$tmpdir/$asset" "$output"
+
+	log_info "Checksum OK: ${output}"
+)
+
+#######################################
 # Install required tools for PowerVC operations
 # Downloads and configures PowerVC-Tool, yq, and OpenStack credentials
 # Globals:
@@ -204,10 +297,9 @@ function install_required_tools() {
 		log_info "Installing yq-v4 version ${YQ_VERSION}"
 		local yq_arch
 		yq_arch=$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')
-		local yq_url="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${yq_arch}"
 
-		if ! download_tool_w_sha "${yq_url}" "${tmp_bin_dir}/yq-v4" "yq-v4 ${YQ_VERSION}" "false"; then
-			log_error "Could not download ${yq_url}"
+		if ! download_yq "${YQ_VERSION}" "yq_linux_${yq_arch}" "${tmp_bin_dir}/yq-v4"; then
+			log_error "Could not download yq-v4 version ${YQ_VERSION}"
 			return 1
 		fi
 	else
