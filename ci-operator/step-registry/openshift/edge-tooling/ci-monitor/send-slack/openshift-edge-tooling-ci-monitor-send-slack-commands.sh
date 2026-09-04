@@ -19,7 +19,7 @@ fi
 # Build URLs
 # ---------------------------------------------------------------------------
 JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
-GCS_BASE="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+GCS_BASE="https://gcs.ci.openshift.org/gcs/test-platform-results"
 DASHBOARD_URL="${GCS_BASE}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/ocp-ci-monitor/openshift-edge-tooling-ci-monitor/artifacts/edge-ci-monitor-summary.html"
 
 # ---------------------------------------------------------------------------

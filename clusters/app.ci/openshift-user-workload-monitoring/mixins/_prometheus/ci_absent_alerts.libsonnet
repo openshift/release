@@ -17,7 +17,7 @@
               message: 'The service %s has been down for 5 minutes.' % name,
             },
           }
-          for name in ['deck', 'deck-internal', 'qe-private-deck', 'hook-apps', "pod-scaler-ui", 'pj-rehearse-plugin']
+          for name in ['deck', 'deck-internal', 'qe-private-deck', 'hook-apps', 'pj-rehearse-plugin']
         ]+[
           {
             alert: '%s-Singleton-Down' % name,
@@ -32,7 +32,7 @@
               message: 'The service %s has been down for 10 minutes.' % name,
             },
           }
-          for name in ["crier", 'ghproxy', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", "pod-scaler-producer", 'retester']
+          for name in ["crier", 'ghproxy', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", 'retester']
         ],
       },
     ],

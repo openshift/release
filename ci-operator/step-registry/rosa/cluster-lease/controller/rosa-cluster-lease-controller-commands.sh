@@ -845,7 +845,12 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
     CLUSTER_TYPE=$(echo "${CM}" | jq -r '.metadata.labels["rosa-cluster-lease/type"] // "classic-sts"')
     ocm_ensure_env "${CLUSTER_OCM_ENV}"
 
-    delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}"
+    ocm_check_cluster "${CLUSTER_ID}" "${CLUSTER_OCM_ENV}"
+    if [[ "${OCM_CHECK_RESULT}" == "not-found" ]]; then
+        log "${CM_NAME}: cluster already deleted from OCM, skipping delete_cluster"
+    else
+        delete_cluster "${CLUSTER_ID}" "${CLUSTER_TYPE}" || log "WARNING: delete_cluster failed for ${CM_NAME}, removing ConfigMap anyway"
+    fi
 
     # Remove the ConfigMap (next reconcile will provision a replacement)
     lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" || true
@@ -965,6 +970,25 @@ done
 # ---------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------
+echo "" >> "${REPORT}"
+echo "=== Cluster Inventory ===" >> "${REPORT}"
+FINAL_CMS=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/managed=true" -o json 2>/dev/null || echo '{"items":[]}')
+FINAL_COUNT=$(echo "${FINAL_CMS}" | jq '.items | length')
+for i in $(seq 0 $((FINAL_COUNT - 1))); do
+    F_CM=$(echo "${FINAL_CMS}" | jq ".items[${i}]")
+    F_NAME=$(echo "${F_CM}" | jq -r '.metadata.name')
+    F_STATUS=$(echo "${F_CM}" | jq -r '.metadata.labels["rosa-cluster-lease/status"] // "unknown"')
+    F_ENV=$(echo "${F_CM}" | jq -r '.metadata.labels["rosa-cluster-lease/env"] // ""')
+    F_TYPE=$(echo "${F_CM}" | jq -r '.metadata.labels["rosa-cluster-lease/type"] // ""')
+    F_OPS=$(echo "${F_CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/operators"] // ""')
+    F_HOLDER=$(echo "${F_CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/holder"] // ""')
+    F_BUILD=$(echo "${F_CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/build-id"] // ""')
+    F_ACQ=$(echo "${F_CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/acquired-at"] // ""')
+    printf "  %-40s status=%-12s env=%-10s type=%s\n" "${F_NAME}" "${F_STATUS}" "${F_ENV}" "${F_TYPE}" >> "${REPORT}"
+    [[ -n "${F_OPS}" ]] && echo "    operators: ${F_OPS}" >> "${REPORT}"
+    [[ -n "${F_HOLDER}" ]] && echo "    holder: ${F_HOLDER} build=${F_BUILD} acquired=${F_ACQ}" >> "${REPORT}"
+done
+
 echo "" >> "${REPORT}"
 echo "Summary: ${HEALTHY} healthy, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered" >> "${REPORT}"
 

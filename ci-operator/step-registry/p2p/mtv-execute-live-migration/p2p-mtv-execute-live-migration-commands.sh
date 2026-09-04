@@ -1,12 +1,13 @@
 #!/bin/bash
 #
-# Execute MTV cross-cluster live migration (CCLM) from source spoke to destination spoke on the hub.
+# Execute MTV cross-cluster live migration (CCLM) forward leg: spoke-1 → spoke-2.
 #
-# When MTV_TEST_VM_COUNT=1 behaves identically to the original single-VM path.
-# When MTV_TEST_VM_COUNT>1 all VMs (test-vm-1 … test-vm-N) are migrated in a single
-# MTV Plan.  All VMs are verified Running on the destination.  Port 22 is probed on
-# each migrated VM when MTV_VM_SSH_VERIFY=true (best-effort; failure is recorded in
-# JUnit but does not block migration success).
+# Direction and plan names are controlled entirely by env vars set in the ref.yaml:
+#   MTV_SOURCE_PROVIDER=spoke-1, MTV_DESTINATION_PROVIDER=spoke-2
+#   MTV_SOURCE_SPOKE_INDEX=1, MTV_DEST_SPOKE_INDEX=2
+#
+# Logic is identical to p2p-mtv-execute-live-migration-return-commands.sh;
+# direction is controlled entirely by env vars set in the ref.yaml.
 #
 set -euxo pipefail; shopt -s inherit_errexit
 
@@ -17,12 +18,13 @@ eval "$(
 )"; EnsureReqs jq
 
 if [[ -n "${SHARED_DIR}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
-    typeset _wasTracingProxy=false
-    [[ $- == *x* ]] && _wasTracingProxy=true
+    # Disable xtrace: proxy-conf.sh may set HTTP_PROXY with embedded credentials.
+    typeset _wasTracing=''
+    [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
     set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
-    [[ "${_wasTracingProxy}" == "true" ]] && set -x
+    [[ "${_wasTracing}" == "true" ]] && set -x
 fi
 
 [[ -n "${KUBECONFIG}" ]]
@@ -36,12 +38,18 @@ typeset -i syncPhaseStartedAt=0
 typeset -i vmCount="${MTV_TEST_VM_COUNT}"
 typeset cclmDebugMode="${P2P_CCLM_DEBUG_MODE}"
 typeset vmSshVerify="${MTV_VM_SSH_VERIFY}"
+# Suffix applied to all artifact names (status file, diag dir, JUnit XML, JUnit suite name).
+# Empty string for the forward leg; "-return" for the return leg.
+typeset migrationSuffix="${MTV_MIGRATION_SUFFIX}"
+# When true, clean up stale VM/DV/PVC on the destination before Plan creation.
+# Required for the return leg (destination may still hold the pre-forward-migration VM).
+typeset cleanupDestBeforeMigration="${MTV_CLEANUP_DEST_BEFORE_MIGRATION}"
 
 (( vmCount >= 1 )) \
     || { printf 'ERROR: MTV_TEST_VM_COUNT must be a positive integer (got: %s)\n' "${MTV_TEST_VM_COUNT}" >&2; false; }
 
 # Temp file accumulating tab-separated JUnit records (PASS/FAIL/WARN\tname\telapsed\t[msg]).
-typeset -r junitFile="${TMPDIR:-/tmp}/cclm-junit-$$.tsv"
+typeset -r junitFile="${TMPDIR:-/tmp}/cclm${migrationSuffix}-junit-$$.tsv"
 
 typeset sourceKubeconfig="${MTV_SOURCE_SPOKE_KUBECONFIG}"
 typeset destKubeconfig="${MTV_DEST_SPOKE_KUBECONFIG}"
@@ -92,8 +100,14 @@ function ResolveSpokeKubeconfigs () {
     [[ -r "${sourceKubeconfig}" ]]
 
     if [[ -z "${destKubeconfig}" ]]; then
-        [[ -r "${SHARED_DIR}/managed-cluster-kubeconfig-${destSpokeIndex}" ]]
-        destKubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig-${destSpokeIndex}"
+        if [[ -r "${SHARED_DIR}/managed-cluster-kubeconfig-${destSpokeIndex}" ]]; then
+            destKubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig-${destSpokeIndex}"
+        elif (( destSpokeIndex == 1 )) && [[ -r "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
+            destKubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig"
+        else
+            printf 'ERROR: Destination spoke kubeconfig not found for index %d\n' "${destSpokeIndex}" >&2
+            false
+        fi
     fi
     [[ -r "${destKubeconfig}" ]]
 }
@@ -101,7 +115,7 @@ function ResolveSpokeKubeconfigs () {
 # DumpDiagnostics — write MTV and VM state to ARTIFACT_DIR on failure.
 function DumpDiagnostics () {
     [[ -n "${ARTIFACT_DIR}" ]] || return 0
-    diagDir="${ARTIFACT_DIR}/mtv-live-migration-diagnostics"
+    diagDir="${ARTIFACT_DIR}/mtv-live-migration${migrationSuffix}-diagnostics"
     mkdir -p "${diagDir}"
     HubOc get plan,migration,networkmap,storagemap,provider -n "${MTV_NAMESPACE}" \
         > "${diagDir}/hub-mtv-resources.txt" 2>&1 || true
@@ -120,10 +134,14 @@ function DumpDiagnostics () {
             -n "${MTV_TEST_VM_NAMESPACE}" -o wide > "${diagDir}/source-vm-${vn}.txt" 2>&1 || true
         DestOc get "virtualmachine/${vn}" "virtualmachineinstance/${vn}" \
             -n "${targetNs}" -o wide > "${diagDir}/dest-vm-${vn}.txt" 2>&1 || true
-        SourceOc get vmim -n "${MTV_TEST_VM_NAMESPACE}" -o yaml \
-            > "${diagDir}/source-vmim-${vn}.yaml" 2>&1 || true
-        DestOc get vmim -n "${targetNs}" -o yaml \
-            > "${diagDir}/dest-vmim-${vn}.yaml" 2>&1 || true
+        SourceOc get vmim -n "${MTV_TEST_VM_NAMESPACE}" -o json 2>/dev/null \
+            | jq 'del(.items[].metadata.annotations,
+                      .items[].metadata.managedFields)' \
+            > "${diagDir}/source-vmim-${vn}.yaml" || true
+        DestOc get vmim -n "${targetNs}" -o json 2>/dev/null \
+            | jq 'del(.items[].metadata.annotations,
+                      .items[].metadata.managedFields)' \
+            > "${diagDir}/dest-vmim-${vn}.yaml" || true
     done
     DestOc get datavolume,pvc,pods -n "${targetNs}" \
         > "${diagDir}/dest-storage.txt" 2>&1 || true
@@ -168,7 +186,7 @@ function PreflightSourceVm () {
 
     for (( i = 1; i <= vmCount; i++ )); do
         vmName="$(VmName "${i}")"
-        SourceOc get "virtualmachine/${vmName}" -n "${MTV_TEST_VM_NAMESPACE}" 1>/dev/null
+        SourceOc get "virtualmachine/${vmName}" -n "${MTV_TEST_VM_NAMESPACE}"
 
         phase="$(SourceOc get "virtualmachineinstance/${vmName}" -n "${MTV_TEST_VM_NAMESPACE}" \
             -o jsonpath='{.status.phase}' || true)"
@@ -241,7 +259,7 @@ function HasDecentralizedLiveMigrationGate () {
 
     oc --kubeconfig="${kc}" get kubevirt "${MTV_KUBEVIRT_NAME}" -n "${MTV_CNV_NAMESPACE}" -o json \
         | jq -e '.spec.configuration.developerConfiguration.featureGates // [] | contains(["DecentralizedLiveMigration"])' \
-        > /dev/null
+        1>&2
 }
 
 # EnsureDecentralizedLiveMigrationGate — enable CCLM via HCO featureGates.
@@ -306,20 +324,6 @@ function PreflightCclm () {
     HasDecentralizedLiveMigrationGate "${destKubeconfig}"
 }
 
-# GetSyncControllerPodIp — first Running virt-synchronization-controller pod IP.
-function GetSyncControllerPodIp () {
-    typeset kc="${1:?}"; (($#)) && shift
-
-    oc --kubeconfig="${kc}" get pods -n "${MTV_CNV_NAMESPACE}" -o json \
-        | jq -r 'first(
-            .items[]
-            | select(.metadata.name | startswith("virt-synchronization-controller"))
-            | select(.status.phase == "Running")
-            | select((.status.podIP // "") != "")
-            | .status.podIP
-        )'
-}
-
 # WaitForSyncControllerReady — CCLM requires sync controller on both spokes.
 function WaitForSyncControllerReady () {
     typeset kc="${1:?}"; (($#)) && shift
@@ -341,7 +345,7 @@ function PreflightSubmarinerNoGlobalnet () {
     typeset kc="${1:?}"; (($#)) && shift
 
     ! oc --kubeconfig="${kc}" get daemonset submariner-globalnet \
-        -n submariner-operator 1>/dev/null
+        -n submariner-operator
 }
 
 # MaybePreflightSubmarinerNoGlobalnet — both spokes must not run Globalnet.
@@ -350,73 +354,6 @@ function MaybePreflightSubmarinerNoGlobalnet () {
 
     PreflightSubmarinerNoGlobalnet "${sourceKubeconfig}"
     PreflightSubmarinerNoGlobalnet "${destKubeconfig}"
-}
-
-# GetSourceVirtLauncherPod — virt-launcher pod for a given VM on source spoke.
-# Filters for Running phase and no deletionTimestamp to avoid Terminating/Pending pods.
-function GetSourceVirtLauncherPod () {
-    typeset vmName="${1:?}"; (($#)) && shift
-    typeset podName
-
-    podName="$(SourceOc get pods -n "${MTV_TEST_VM_NAMESPACE}" -o json \
-        | jq -r --arg name "${vmName}" \
-            'first(.items[]
-             | select(.metadata.labels["kubevirt.io/domain"]==$name)
-             | select(.status.phase=="Running")
-             | select(.metadata.deletionTimestamp==null)
-             | .metadata.name) // ""' \
-        || true)"
-    [[ -n "${podName}" ]] && printf '%s' "${podName}" && return 0
-
-    podName="$(SourceOc get pods -n "${MTV_TEST_VM_NAMESPACE}" -o json \
-        | jq -r --arg name "${vmName}" \
-            'first(.items[]
-             | select(.metadata.name | startswith("virt-launcher-" + $name))
-             | select(.status.phase=="Running")
-             | select(.metadata.deletionTimestamp==null)
-             | .metadata.name) // ""' \
-        || true)"
-    [[ -n "${podName}" ]] && printf '%s' "${podName}"
-}
-
-# ProbeCclmSyncPortFromPod — TCP probe from an existing pod to sync IP:port.
-function ProbeCclmSyncPortFromPod () {
-    typeset kc="${1:?}"; (($#)) && shift
-    typeset ns="${1:?}"; (($#)) && shift
-    typeset podName="${1:?}"; (($#)) && shift
-    typeset destIp="${1:?}"; (($#)) && shift
-    typeset -i attempt=0 maxAttempts="${MTV_CCLM_SYNC_PROBE_RETRIES}" retrySecs=10
-
-    while (( attempt < maxAttempts )); do
-        if oc --kubeconfig="${kc}" exec -n "${ns}" "${podName}" -c compute -- \
-               timeout "${MTV_CCLM_SYNC_PROBE_TIMEOUT}" bash -c "echo >/dev/tcp/${destIp}/${MTV_CCLM_SYNC_PORT}"; then
-            return 0
-        fi
-        (( attempt++ )) || true
-        if (( attempt < maxAttempts )); then
-            : "Sync port probe attempt ${attempt}/${maxAttempts} failed; retrying in ${retrySecs}s"
-            sleep "${retrySecs}"
-        fi
-    done
-    return 1
-}
-
-# PreflightCclmSyncConnectivity — source must reach dest sync-controller :8443.
-# Uses the first VM's virt-launcher as the cluster-level connectivity anchor.
-function PreflightCclmSyncConnectivity () {
-    typeset destSyncIp srcLauncherPod
-
-    [[ "${MTV_PLAN_TYPE}" != "live" ]] && return 0
-    [[ "${MTV_CCLM_SYNC_PROBE}" != "true" ]] && return 0
-
-    destSyncIp="$(GetSyncControllerPodIp "${destKubeconfig}")"
-    [[ -n "${destSyncIp}" ]]
-
-    srcLauncherPod="$(GetSourceVirtLauncherPod "$(VmName 1)")"
-    [[ -n "${srcLauncherPod}" ]]
-
-    ProbeCclmSyncPortFromPod \
-        "${sourceKubeconfig}" "${MTV_TEST_VM_NAMESPACE}" "${srcLauncherPod}" "${destSyncIp}"
 }
 
 # MigrationPipelinePhase — read one pipeline step phase for a VM from Migration status.
@@ -432,6 +369,7 @@ function MigrationPipelinePhase () {
         '.status.vms[]? | select(.name == $vm) | .pipeline[]? | select(.name == $step) | .phase' \
         <<<"${migJson}" | head -1)"
     [[ -n "${phase}" && "${phase}" != "null" ]] && printf '%s' "${phase}"
+    true
 }
 
 # VmimPhase — read VirtualMachineInstanceMigration phase for a specific VM on a spoke.
@@ -505,6 +443,29 @@ function RefreshProvidersForLivePlan () {
         --for=condition=Ready --timeout="${MTV_PROVIDER_INVENTORY_REFRESH_WAIT}"
 }
 
+# CleanupDestinationStaleResources — remove stale VM/DV/PVC artifacts on the destination.
+# Required before a return-leg Plan when the destination may still hold the original
+# pre-migration VMs (MTV leaves them in Stopped state after the forward migration).
+# --ignore-not-found=true handles the "already gone" case; real delete failures
+# (e.g. timeout) are propagated so the caller can decide whether to abort.
+function CleanupDestinationStaleResources () {
+    typeset -i i
+    typeset vmName dvName
+
+    for (( i = 1; i <= vmCount; i++ )); do
+        vmName="$(VmName "${i}")"
+        dvName="${vmName}-rootdisk"
+
+        DestOc delete "virtualmachine/${vmName}" -n "${targetNs}" \
+            --ignore-not-found=true --timeout=2m
+        DestOc delete "datavolume/${dvName}" -n "${targetNs}" \
+            --ignore-not-found=true --timeout=2m
+        DestOc delete "pvc/${dvName}" -n "${targetNs}" \
+            --ignore-not-found=true --timeout=2m
+    done
+    true
+}
+
 # ApplyPlan — create or update MTV Plan CR including all VMs via jq marshalling.
 function ApplyPlan () {
     typeset -i i
@@ -562,19 +523,22 @@ function WaitPlanReady () {
 
 # ApplyMigration — create Migration CR referencing the Plan.
 function ApplyMigration () {
-    {
+    # jq marshalling avoids raw heredoc expansion of YAML-special chars,
+    # consistent with ApplyNetworkMap / ApplyStorageMap / ApplyPlan.
+    jq -cn \
+        --arg migName  "${MTV_MIGRATION_NAME}" \
+        --arg ns       "${MTV_NAMESPACE}" \
+        --arg planName "${MTV_PLAN_NAME}" \
+        '{
+            "apiVersion": "forklift.konveyor.io/v1beta1",
+            "kind": "Migration",
+            "metadata": {"name": $migName, "namespace": $ns},
+            "spec": {"plan": {"name": $planName, "namespace": $ns}}
+        }' \
+    | {
         HubOc create -f - --dry-run=client -o yaml --save-config
-    } <<EOF | HubOc apply -f -
-apiVersion: forklift.konveyor.io/v1beta1
-kind: Migration
-metadata:
-  name: ${MTV_MIGRATION_NAME}
-  namespace: ${MTV_NAMESPACE}
-spec:
-  plan:
-    name: ${MTV_PLAN_NAME}
-    namespace: ${MTV_NAMESPACE}
-EOF
+      } \
+    | HubOc apply -f -
 }
 
 # ParseOcWaitDurationSeconds — convert oc wait duration (e.g. 2h, 15m) to seconds.
@@ -645,6 +609,40 @@ function VerifyMigration () {
         [[ "${destPhase}" == "Running" ]] \
             || { : "VMI ${vmName} not Running on destination (phase=${destPhase})"; false; }
     done
+}
+
+# VerifyDestVmsRunStrategy — destination VMs must have runStrategy=Always after migration.
+# Guards against OCPBUGS-101771 where Forklift leaves runStrategy=Halted, silently breaking
+# VM auto-restart (the migrated VM will not recover from a pod crash without manual start).
+function VerifyDestVmsRunStrategy () {
+    typeset -i i
+    typeset vmName strategy
+
+    for (( i = 1; i <= vmCount; i++ )); do
+        vmName="$(VmName "${i}")"
+        strategy="$(DestOc get "virtualmachine/${vmName}" -n "${targetNs}" \
+            -o jsonpath='{.spec.runStrategy}' || true)"
+        [[ "${strategy}" == "Always" ]] \
+            || { : "VM ${vmName} runStrategy='${strategy}', expected 'Always' (OCPBUGS-101771)"; false; }
+    done
+    true
+}
+
+# VerifySourceVmimNotFailed — source VMIMs must not be in Failed phase after migration.
+# Guards against OCPBUGS-99403 where a mid-migration QEMU socket disruption causes the
+# guest to crash on source while Forklift reports Succeeded based on target-side status only.
+# An absent VMIM (phase="") means it was cleaned up after success — that is expected.
+function VerifySourceVmimNotFailed () {
+    typeset -i i
+    typeset vmName srcVmimPhase
+
+    for (( i = 1; i <= vmCount; i++ )); do
+        vmName="$(VmName "${i}")"
+        srcVmimPhase="$(VmimPhase "${sourceKubeconfig}" "${MTV_TEST_VM_NAMESPACE}" "${vmName}")"
+        [[ "${srcVmimPhase}" != "Failed" ]] \
+            || { : "Source VMIM for ${vmName} is Failed — false-positive migration (OCPBUGS-99403)"; false; }
+    done
+    true
 }
 
 # VerifyAllVmsSsh — probe SSH port 22 on each migrated VM via a peer virt-launcher.
@@ -723,8 +721,8 @@ function JStep () {
     if (( rc == 0 )); then
         printf 'PASS\t%s\t%d\t\n' "${name}" "${elapsed}" >> "${junitFile}"
     else
-        printf 'FAIL\t%s\t%d\tFailed (rc=%d); see diagnostics in mtv-live-migration-diagnostics/\n' \
-            "${name}" "${elapsed}" "${rc}" >> "${junitFile}"
+        printf 'FAIL\t%s\t%d\tFailed (rc=%d); see diagnostics in mtv-live-migration%s-diagnostics/\n' \
+            "${name}" "${elapsed}" "${rc}" "${migrationSuffix}" >> "${junitFile}"
     fi
     return "${rc}"
 }
@@ -745,7 +743,7 @@ function WriteJunit () {
     [[ -n "${ARTIFACT_DIR}" ]] || return 0
     [[ -f "${junitFile}" ]] || return 0
 
-    typeset xmlFile="${ARTIFACT_DIR}/junit_cclm_live_migration.xml"
+    typeset xmlFile="${ARTIFACT_DIR}/junit_cclm_live_migration${migrationSuffix//-/_}.xml"
     mkdir -p "${ARTIFACT_DIR}"
 
     typeset -i total=0 failures=0 totalTime=0
@@ -759,12 +757,12 @@ function WriteJunit () {
 
     {
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
-        printf '<testsuite name="cclm-live-migration" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
-            "${total}" "${failures}" "${totalTime}"
+        printf '<testsuite name="cclm-live-migration%s" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
+            "${migrationSuffix}" "${total}" "${failures}" "${totalTime}"
         while IFS=$'\t' read -r status name elapsed failMsg; do
             typeset escapedName; escapedName="$(XmlEscape "${name}")"
-            printf '  <testcase name="%s" classname="cclm-live-migration" time="%d">\n' \
-                "${escapedName}" "${elapsed}"
+            printf '  <testcase name="%s" classname="cclm-live-migration%s" time="%d">\n' \
+                "${escapedName}" "${migrationSuffix}" "${elapsed}"
             if [[ "${status}" == "FAIL" ]]; then
                 typeset escapedMsg; escapedMsg="$(XmlEscape "${failMsg}")"
                 printf '    <failure message="%s">%s</failure>\n' \
@@ -797,13 +795,16 @@ typeset -i cclmStepRc=0
     JStep "Preflight: Submariner No Globalnet"           MaybePreflightSubmarinerNoGlobalnet
     JStep "Preflight: Provider Inventory Refresh"        RefreshProvidersForLivePlan
     JStep "Preflight: Source VMs Running"                PreflightSourceVm
-    JStep "Preflight: CCLM Sync Port Reachable"         PreflightCclmSyncConnectivity
     JStep "Preflight: VM Storage Classes Mapped"         PreflightVmStorageMapped
+    [[ "${cleanupDestBeforeMigration}" == "true" ]] && \
+        JStep "Pre-migration: Cleanup stale destination resources" CleanupDestinationStaleResources
     JStep "Migration: Apply Plan"                        ApplyPlan
     JStep "Migration: Plan Ready"                        WaitPlanReady
     JStep "Migration: Apply Migration"                   ApplyMigration
     JStep "Migration: Succeeded"                         WaitMigrationSucceeded
     JStep "Verification: Destination VMIs Running"       VerifyMigration
+    JStep "Verification: Destination VM runStrategy"     VerifyDestVmsRunStrategy
+    JStep "Verification: Source VMIM Not Failed"         VerifySourceVmimNotFailed
 
     # SSH port probe is best-effort: failure is recorded in JUnit but does not
     # block overall migration success (|| true prevents ERR trap from firing).
@@ -827,7 +828,7 @@ typeset -i cclmStepRc=0
                 DestOc get "virtualmachine/${vn}" "virtualmachineinstance/${vn}" \
                     -n "${targetNs}" -o wide || true
             done
-        } > "${ARTIFACT_DIR}/mtv-live-migration-status.txt"
+        } > "${ARTIFACT_DIR}/mtv-live-migration${migrationSuffix}-status.txt"
     fi
     true
 ) || cclmStepRc=$?
@@ -838,7 +839,8 @@ WriteJunit
 if (( cclmStepRc != 0 )); then
     DumpDiagnostics
     if [[ "${cclmDebugMode}" == "true" ]]; then
-        printf 'WARNING: p2p-mtv-execute-live-migration failed (rc=%d); not failing job (debug mode)\n' "${cclmStepRc}" >&2
+        printf 'WARNING: p2p-mtv-execute-live-migration%s failed (rc=%d); not failing job (debug mode)\n' \
+            "${migrationSuffix}" "${cclmStepRc}" >&2
     else
         exit "${cclmStepRc}"
     fi

@@ -160,29 +160,6 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - always_run: false
-  as: e2e-aws-pre-release-ossm
-  optional: true
-  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: openshift-org-aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export TOKEN=$(cat /var/run/nid-ossm-token/secrets/konflux-cluster-token)
-        export AUTHBREW=$(cat /var/run/nid-ossm-token/secrets/brew-secret)
-        export AUTHSTAGE=$(cat /var/run/nid-ossm-token/secrets/stage-secret)
-        make test-pre-release-ossm
-      credentials:
-      - mount_path: /var/run/nid-ossm-token/secrets
-        name: secrets
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- always_run: false
   as: e2e-aws-gatewayapi-conformance
   optional: true
   steps:
