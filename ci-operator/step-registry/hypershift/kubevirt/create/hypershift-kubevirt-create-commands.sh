@@ -11,6 +11,7 @@ if [[ -n ${MCE} ]] ; then
 else
     CLUSTER_NAMESPACE_PREFIX=clusters
 fi
+CONTROL_PLANE_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     # shellcheck source=/dev/null
@@ -134,14 +135,14 @@ then
 fi
 
 oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc apply -f -
-oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+oc create ns "${CONTROL_PLANE_NAMESPACE}"
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
   oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: macvlan-bridge-whereabouts
-  namespace: ${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}
+  namespace: ${CONTROL_PLANE_NAMESPACE}
 spec:
   config: '{
       "cniVersion": "0.3.1",
@@ -238,3 +239,126 @@ echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+# Workaround for OCPBUGS-54574: Apply CiliumNetworkPolicies for virt-launcher
+# pods on Cilium-managed management clusters.
+if [[ "${CNI_PROVIDER}" == "cilium" ]]; then
+
+  if ! oc get crd ciliumnetworkpolicies.cilium.io &>/dev/null; then
+    echo "CiliumNetworkPolicy CRD not found, aborting"
+    exit 1
+  fi
+
+  oc apply -f - <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: virt-launcher-ingress
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s:kubevirt.io: virt-launcher
+  ingress:
+    - fromEntities:
+        - all
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: virt-launcher-egress
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s:kubevirt.io: virt-launcher
+  egress:
+    # In pure Kubernetes semantics, 0.0.0.0/0 excluding the Pod and Service CIDRs would include 192.168.111.4. However, Cilium classifies this peer as the
+    # host identity. CIDR/ipBlock rules do not match Cilium-managed host/node identities by default, and this cluster has policy-cidr-match-mode unset.
+    # Cilium documents this limitation.
+    - toEntities:
+        - world
+        - host
+    # Same-namespace selected pods.
+    - toEndpoints:
+        - matchLabels:
+            k8s:kubevirt.io: virt-launcher
+        - matchLabels:
+            k8s:hypershift.openshift.io/control-plane-component: kube-apiserver
+        - matchLabels:
+            k8s:hypershift.openshift.io/control-plane-component: oauth-openshift
+        - matchLabels:
+            k8s:app: ignition-server-proxy
+    # Cross-namespace selected pods.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: openshift-ingress
+            k8s:ingresscontroller.operator.openshift.io/deployment-ingresscontroller: default
+    - toServices:
+        - k8sService:
+            serviceName: dns-default
+            namespace: openshift-dns
+---
+# The hosted agents use the management OpenShift route, which terminates at the management router and forwards to the HCP
+# kube-apiserver on port 8091. The HCP kas policy only permits 6443. Although the namespace-based ingress policy is intended to cover routers, the
+# management routers are host-networked, so their traffic may arrive as node/host traffic and not match that namespace selector
+# If this policy is not applied, the konnectivity-agent pods in kube-system namespace on hosted cluster do not start.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-konnectivity-from-hosts
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s:app: kube-apiserver
+      k8s:hypershift.openshift.io/control-plane-component: kube-apiserver
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "8091"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-routers-to-ignition
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s:app: ignition-server-proxy
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+        - health
+      toPorts:
+        - ports:
+            - port: "8443"
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-routers-to-oauth
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s:app: oauth-openshift
+  ingress:
+  - fromEntities:
+    - host
+    - remote-node
+    - health
+    toPorts:
+    - ports:
+      - port: "6443"
+        protocol: TCP
+EOF
+
+  echo "CiliumNetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
+fi
