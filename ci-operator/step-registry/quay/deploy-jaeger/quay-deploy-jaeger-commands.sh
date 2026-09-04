@@ -120,7 +120,7 @@ spec:
             cpu: 100m
             memory: 256Mi
           limits:
-            memory: 1Gi
+            memory: 4Gi
         volumeMounts:
         - name: jaeger-config
           mountPath: /etc/jaeger
@@ -156,7 +156,9 @@ if ! oc rollout status deployment/jaeger -n "${QUAY_NS}" --timeout=5m; then
   fail "Jaeger did not roll out"
 fi
 
-echo "true" > "${SHARED_DIR}/jaeger_deployed"
+# Record the deploy time (epoch seconds) so the gather step can bound its trace
+# export to windows starting here instead of exporting the whole store at once.
+date +%s > "${SHARED_DIR}/jaeger_deployed"
 cp "${SHARED_DIR}/jaeger_deployed" "${ARTIFACT_DIR}/jaeger_deployed" || true
 echo "Jaeger ready. In-cluster OTLP endpoint: http://jaeger.${QUAY_NS}.svc.cluster.local:4318/v1/traces"
 

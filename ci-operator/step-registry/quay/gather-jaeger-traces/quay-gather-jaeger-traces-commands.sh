@@ -9,8 +9,8 @@ set -o pipefail
 
 QUAY_NS="${QUAYNAMESPACE:-quay-enterprise}"
 SHARED_DIR="${SHARED_DIR:-/tmp/shared}"
-JAEGER_LOOKBACK="${JAEGER_LOOKBACK:-6h}"
-JAEGER_TRACE_LIMIT="${JAEGER_TRACE_LIMIT:-50000}"
+JAEGER_TRACE_LIMIT="${JAEGER_TRACE_LIMIT:-5000}"
+JAEGER_WINDOW="${JAEGER_WINDOW:-5m}"
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 OUT="${ARTIFACT_DIR}/jaeger-traces"
 mkdir -p "${OUT}"
@@ -41,16 +41,62 @@ if [[ "${READY}" != "true" ]]; then
   exit 0
 fi
 
-curl -sf --connect-timeout 5 --max-time 300 "http://127.0.0.1:16686/api/traces?service=quay&limit=${JAEGER_TRACE_LIMIT}&lookback=${JAEGER_LOOKBACK}" \
-  -o "${OUT}/traces.json" || true
-
-if [[ -s "${OUT}/traces.json" ]] && jq -e '.data' "${OUT}/traces.json" >/dev/null 2>&1; then
-  TRACE_COUNT=$(jq '.data | length' "${OUT}/traces.json" 2>/dev/null || echo "?")
-  SPAN_COUNT=$(jq '[.data[].spans | length] | add // 0' "${OUT}/traces.json" 2>/dev/null || echo "?")
-  echo "Collected ${TRACE_COUNT} traces / ${SPAN_COUNT} spans for service quay"
-  gzip -f "${OUT}/traces.json" || true
-else
-  echo "WARNING: no usable traces collected; keeping whatever was written for debugging" >&2
+# Export the collected traces in time windows rather than one request. A single
+# /api/traces?limit=50000 serialized the whole in-memory store into one response
+# and OOM-killed Jaeger (deploy limit hit, curl dropped with zero bytes). Instead
+# bound each query with start/end (MICROSECONDS since epoch): step from the
+# recorded Jaeger deploy time to now in JAEGER_WINDOW slices, limit per window.
+# Record each window's HTTP status and keep its per-window .response file on a
+# non-2xx so a failed query stays debuggable next run.
+NOW=$(date +%s)
+START=$(cat "${SHARED_DIR}/jaeger_deployed" 2>/dev/null || echo "")
+if ! [[ "${START}" =~ ^[0-9]+$ ]]; then
+  # Older deploy step wrote "true"; fall back to a one-hour lookback window.
+  START=$((NOW - 3600))
 fi
+
+# Parse JAEGER_WINDOW into seconds, accepting a plain number or an h/m/s suffix.
+# Validate the numeric part before any arithmetic so a bad value can't abort the
+# step under nounset; fall back to 5m.
+WNUM="${JAEGER_WINDOW%[hms]}"
+WUNIT="${JAEGER_WINDOW#"${WNUM}"}"
+if [[ "${WNUM}" =~ ^[0-9]+$ ]]; then
+  case "${WUNIT}" in
+    h) WINDOW_SECS=$(( WNUM * 3600 )) ;;
+    m) WINDOW_SECS=$(( WNUM * 60 )) ;;
+    *) WINDOW_SECS=$(( WNUM )) ;;
+  esac
+else
+  WINDOW_SECS=300
+fi
+[[ "${WINDOW_SECS}" -gt 0 ]] || WINDOW_SECS=300
+
+TOTAL_TRACES=0
+TOTAL_SPANS=0
+IDX=0
+WS="${START}"
+while [[ "${WS}" -lt "${NOW}" ]]; do
+  WE=$(( WS + WINDOW_SECS ))
+  [[ "${WE}" -gt "${NOW}" ]] && WE="${NOW}"
+  IDX=$(( IDX + 1 ))
+  RESP="${OUT}/traces-${IDX}.response"
+  HTTP_CODE=$(curl -s --connect-timeout 5 --max-time 120 \
+    "http://127.0.0.1:16686/api/traces?service=quay&limit=${JAEGER_TRACE_LIMIT}&start=$(( WS * 1000000 ))&end=$(( WE * 1000000 ))" \
+    -o "${RESP}" -w '%{http_code}' 2>/dev/null || echo "000")
+  if [[ "${HTTP_CODE}" == 2* ]] && jq -e '.data' "${RESP}" >/dev/null 2>&1; then
+    TC=$(jq '.data | length' "${RESP}" 2>/dev/null || echo 0)
+    SC=$(jq '[.data[].spans | length] | add // 0' "${RESP}" 2>/dev/null || echo 0)
+    mv "${RESP}" "${OUT}/traces-${IDX}.json"
+    TOTAL_TRACES=$(( TOTAL_TRACES + TC ))
+    TOTAL_SPANS=$(( TOTAL_SPANS + SC ))
+    echo "window ${IDX}: HTTP ${HTTP_CODE}, ${TC} traces"
+  else
+    echo "WARNING: window ${IDX}: HTTP ${HTTP_CODE}; response kept at ${RESP} for debugging" >&2
+  fi
+  WS="${WE}"
+done
+
+echo "Collected ${TOTAL_TRACES} traces / ${TOTAL_SPANS} spans for service quay across ${IDX} windows"
+gzip -f "${OUT}"/traces-*.json 2>/dev/null || true
 
 exit 0

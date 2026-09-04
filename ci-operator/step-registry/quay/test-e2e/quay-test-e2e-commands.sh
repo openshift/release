@@ -287,9 +287,14 @@ function copyArtifacts {
     local report_base="${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}/quay-test-e2e/artifacts"
     cat > "${ARTIFACT_DIR}/custom-link-playwright-report.html" << EOF || true
 <html>
-<head><title>Playwright report</title></head>
+<head>
+<title>Playwright report</title>
+<style>
+a { display:inline-block; padding:5px 20px; margin:10px; border:2px solid #4E9AF1; border-radius:1em; text-decoration:none; color:#FFFFFF !important; background-color:#4E9AF1; }
+</style>
+</head>
 <body>
-<a href="${report_base}/index.html">Playwright HTML report</a>
+<a target="_blank" href="${report_base}/index.html">Playwright HTML report</a>
 </body>
 </html>
 EOF
