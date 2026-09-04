@@ -106,6 +106,58 @@ else
   echo "WARNING: WIF credential not found, relying on existing gcloud auth"
 fi
 
+# The Ginkgo binary reads these values from SHARED_DIR, but the standalone
+# gcphcpctl readiness probe uses the CLI's environment-based configuration.
+export GCPHCPCTL_API_ENDPOINT="$(cat "${SHARED_DIR}/api-endpoint")"
+export GCPHCPCTL_PROJECT="$(cat "${SHARED_DIR}/customer-project-id")"
+
+# Wait for the authenticated Gecko API path to be ready before starting the
+# lifecycle test. ArgoCD sync only confirms that manifests were applied; it
+# does not guarantee that the API gateway/backend can serve requests yet.
+wait_for_gcphcp_api() {
+  local max_attempts="${GCPHCPCTL_API_MAX_ATTEMPTS:-40}"
+  local wait_seconds="${GCPHCPCTL_API_WAIT_SECONDS:-30}"
+  local attempt=1
+  local output=""
+
+  echo ""
+  echo "=== Waiting for authenticated gcphcpctl API readiness ==="
+  echo "Polling cluster list (up to ${max_attempts} attempts, ${wait_seconds}s apart)..."
+
+  while (( attempt <= max_attempts )); do
+    if output="$(gcphcpctl cluster list 2>&1)"; then
+      echo "✓ gcphcpctl API is ready (attempt ${attempt})"
+      if [[ -n "${output}" ]]; then
+        echo "${output}"
+      fi
+      return 0
+    fi
+
+    echo "⚠ gcphcpctl API is not ready yet (attempt ${attempt}/${max_attempts})"
+    if [[ -n "${output}" ]]; then
+      echo "${output}"
+    fi
+
+    if (( attempt == max_attempts )); then
+      echo "ERROR: gcphcpctl API did not become ready after ${max_attempts} attempts"
+      return 1
+    fi
+
+    sleep "${wait_seconds}"
+    ((attempt++))
+  done
+}
+
+if ! wait_for_gcphcp_api; then
+  echo ""
+  echo "=== gcphcpctl API readiness diagnostics ==="
+  echo "API endpoint: $(cat "${SHARED_DIR}/api-endpoint")"
+  echo "Customer project: $(cat "${SHARED_DIR}/customer-project-id")"
+  echo "DNS lookup:"
+  getent hosts "$(sed -E 's#https?://([^/]+)/?.*#\1#' "${SHARED_DIR}/api-endpoint")" || true
+  exit 1
+fi
+
 echo "Configuration:"
 echo "  API endpoint:       $(cat "${SHARED_DIR}/api-endpoint")"
 echo "  OIDC endpoint:      $(cat "${SHARED_DIR}/oidc-endpoint")"
