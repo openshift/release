@@ -3,15 +3,16 @@
 set -euo pipefail
 
 INDEX_IMAGE="${MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE:-${INDEX_IMAGE:-}}"
-CATALOGSOURCE_NAME="${CATALOGSOURCE_NAME:-cs-custom}"
-CATALOGSOURCE_DISPLAY_NAME="${CATALOGSOURCE_DISPLAY_NAME:-Custom Operators Catalog}"
-PACKAGE_NAME="${PACKAGE_NAME:-}"
-DISABLE_REDHAT_OPERATORS="${DISABLE_REDHAT_OPERATORS:-true}"
 
 if [[ -z "${INDEX_IMAGE}" ]]; then
   echo "INDEX_IMAGE is not set; leaving default redhat-operators catalog in place."
   exit 0
 fi
+
+CATALOGSOURCE_NAME="${CATALOGSOURCE_NAME:-cs-custom}"
+CATALOGSOURCE_DISPLAY_NAME="${CATALOGSOURCE_DISPLAY_NAME:-Custom Operators Catalog}"
+PACKAGE_NAME="${PACKAGE_NAME:-}"
+DISABLE_REDHAT_OPERATORS="${DISABLE_REDHAT_OPERATORS:-true}"
 
 echo "Using custom index image: ${INDEX_IMAGE}"
 echo "CatalogSource name: ${CATALOGSOURCE_NAME}"
