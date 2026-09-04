@@ -166,6 +166,7 @@ for pod in d.get('items',[]):
 
     typeset podConditions=""
     podConditions="$(oc get pods -n "${scNs}" -l app=sensor \
+        --field-selector=status.phase=Running \
         -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[*]}{.type}={.status}{" "}{end}{"\n"}{end}' 2>/dev/null)" || return 1
     typeset notReady=""
     notReady="$(echo "${podConditions}" | while IFS= read -r line; do
