@@ -68,9 +68,15 @@ missing=()
 while IFS= read -r -d '' script; do
   rel="${script#"${registry_dir}/"}"
 
-  # Consider only non-comment lines so a commented-out example never trips the
-  # check (and never falsely satisfies it).
-  code="$(grep -vE '^[[:space:]]*#' "${script}" || true)"
+  # Normalize the script before matching:
+  #  - drop full-line comments so a commented-out example neither trips nor
+  #    falsely satisfies the check;
+  #  - join shell line-continuations so a billable call split across lines
+  #    (e.g. `agentic-ci \`<newline>`run ...`) is still detected. Without this,
+  #    a line-by-line grep would miss it and let an uninstrumented job pass.
+  code="$(grep -vE '^[[:space:]]*#' "${script}" \
+    | awk '{ line=$0; while (line ~ /\\$/) { sub(/\\$/,"",line); if ((getline nxt)<=0) break; line=line " " nxt } print line }' \
+    || true)"
 
   grep -qE "${BILLABLE_RE}" <<<"${code}" || continue
 

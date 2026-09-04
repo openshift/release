@@ -119,7 +119,7 @@ run_claude_metered() {
     --verbose \
     --output-format stream-json \
     "$@" \
-    > "${raw}" 2>>"${ARTIFACT_DIR}/claude-agentic-ci.log" || rc=$?
+    > "${raw}" 2> >(tee -a "${ARTIFACT_DIR}/claude-agentic-ci.log" >&2) || rc=$?
   grep '^{' "${raw}" > "${out_file}" || true
   rm -f "${raw}"
   local f

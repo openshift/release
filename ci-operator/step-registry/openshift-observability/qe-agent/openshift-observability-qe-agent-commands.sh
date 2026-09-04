@@ -135,7 +135,9 @@ fi
 # fields (ttft, per-tool breakdown, skills, subagents) are left at defaults.
 # Schema matches ai-helpers extract_metrics.py's claude_session_metrics table.
 # ---------------------------------------------------------------------------
-if [[ -s "${ARTIFACT_DIR}/qe-agent-usage.json" ]] && command -v jq &>/dev/null; then
+if ! command -v jq &>/dev/null; then
+  echo "WARNING: jq is unavailable; cannot emit claude-session-metrics-autodl.json — this step's Vertex spend will be missing from the cost dashboards"
+elif [[ -s "${ARTIFACT_DIR}/qe-agent-usage.json" ]]; then
   _ANALYZED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   jq --arg analyzed_at "${_ANALYZED_AT}" \
      --arg fallback_model "${CLAUDE_MODEL:-claude-opus-4-6}" \
