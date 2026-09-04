@@ -109,38 +109,55 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
         --type json -p '[{"op":"add","path":"/imagePullSecrets/-","value":{"name":"ci-pull-secret"}}]' 2>/dev/null || true
     log "CI pull secret added to PKO namespace"
 
+    # Record baseline timestamp before restart so we can verify post-restart reconciliation
+    PKO_RESTART_BASELINE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    log "Recording PKO restart baseline timestamp: ${PKO_RESTART_BASELINE}"
+
     oc rollout restart deployment -n openshift-package-operator 2>/dev/null || true
     oc rollout status deployment -n openshift-package-operator --timeout=120s 2>/dev/null || true
     log "PKO restarted with CI pull secret"
 
-    # PKO readiness gate: after restart, wait for PKO controllers to be actively
-    # reconciling before creating a new ClusterPackage. If existing ClusterPackages
-    # are present, wait until at least one has a .status.phase (indicating the
-    # controllers are processing). Otherwise fall back to a brief stabilization sleep.
+    # PKO readiness gate: verify PKO controllers are actively reconciling
+    # post-restart by checking that at least one existing ClusterPackage has
+    # a condition lastTransitionTime newer than our pre-restart baseline.
+    # This proves controllers are processing, not just showing stale state.
     EXISTING_CPS=$(oc get clusterpackage --no-headers -o custom-columns=':metadata.name' 2>/dev/null || true)
-    if [[ -n "${EXISTING_CPS}" ]]; then
-        log "Waiting for PKO controllers to reconcile existing ClusterPackages..."
+    BASELINE_EPOCH=$(date -d "${PKO_RESTART_BASELINE}" +%s 2>/dev/null || true)
+    if [[ -n "${EXISTING_CPS}" && -n "${BASELINE_EPOCH}" ]]; then
+        log "Waiting for PKO to reconcile post-restart (baseline: ${PKO_RESTART_BASELINE})..."
         PKO_READY=""
         for i in $(seq 1 12); do
             for cp in ${EXISTING_CPS}; do
-                PHASE=$(oc get clusterpackage "${cp}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
-                if [[ -n "${PHASE}" ]]; then
-                    log "PKO is active: ClusterPackage ${cp} has phase=${PHASE}"
-                    PKO_READY=1
-                    break
-                fi
+                # Get all lastTransitionTime values from status conditions
+                TIMESTAMPS=$(oc get clusterpackage "${cp}" \
+                    -o jsonpath='{.status.conditions[*].lastTransitionTime}' 2>/dev/null || true)
+                for ts in ${TIMESTAMPS}; do
+                    TS_EPOCH=$(date -d "${ts}" +%s 2>/dev/null || true)
+                    if [[ -n "${TS_EPOCH}" && "${TS_EPOCH}" -gt "${BASELINE_EPOCH}" ]]; then
+                        log "PKO is active post-restart: ClusterPackage ${cp} has condition updated at ${ts} (after baseline ${PKO_RESTART_BASELINE})"
+                        PKO_READY=1
+                        break 2
+                    fi
+                done
             done
             if [[ -n "${PKO_READY}" ]]; then
                 break
             fi
-            if [[ $i -eq 12 ]]; then
-                log "WARNING: No existing ClusterPackage has a status.phase after 60s, proceeding anyway"
-            fi
+            log "  PKO readiness check attempt ${i}/12: no post-restart condition timestamps yet"
             sleep 5
         done
+        if [[ -z "${PKO_READY}" ]]; then
+            log "ERROR: PKO readiness could not be verified — no ClusterPackage condition was updated after restart baseline ${PKO_RESTART_BASELINE}"
+            log "ERROR: PKO controllers may not be reconciling. Check PKO pod logs for errors."
+            for cp in ${EXISTING_CPS}; do
+                oc get clusterpackage "${cp}" -o yaml 2>/dev/null || true
+            done
+            exit 1
+        fi
     else
-        log "No existing ClusterPackages found, waiting 15s for PKO controller stabilization"
-        sleep 15
+        log "ERROR: PKO readiness could not be verified — no existing ClusterPackages found to validate post-restart reconciliation"
+        log "ERROR: At least one ClusterPackage must exist on the cluster for the readiness gate to confirm PKO is operational"
+        exit 1
     fi
 
     # Add CI pull secret to the operator namespace so operator pods can pull
