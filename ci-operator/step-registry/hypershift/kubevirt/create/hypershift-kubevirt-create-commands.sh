@@ -136,7 +136,35 @@ fi
 oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc apply -f -
 oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
-  oc apply -f - <<EOF
+  if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
+    # Model 3: Localnet — VMs connect directly to physical network via OVN localnet.
+    # The NAD config "name" must match an existing OVN bridge-mapping on the nodes.
+    # OVN-Kubernetes automatically creates "physnet:br-ex" on all nodes, so we use
+    # "physnet" as the network name to reuse that default mapping (no NNCP needed).
+    # The "subnets" field enables OVN-managed IPAM so VMs get IPs automatically.
+    # attach-default-network=true keeps the pod network for control plane traffic
+    # (ignition, API server, konnectivity) while the localnet interface provides
+    # direct L2 connectivity for data plane features like EgressIP.
+    oc apply -f - <<EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: localnet-network
+  namespace: ${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "physnet",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network",
+      "subnets": "192.168.223.0/24"
+  }'
+EOF
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network"
+  else
+    # Existing macvlan path
+    oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
@@ -155,10 +183,11 @@ spec:
       }
   }'
 EOF
-  if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
-  else
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
+      EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    else
+      EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    fi
   fi
 fi
 
@@ -236,5 +265,156 @@ echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
+
+# OVN-Kubernetes assigns IPs to localnet ports via IPAM but does not create
+# DHCP_Options entries, so the VMs never receive the assigned IP via DHCP.
+# This block creates DHCP options in each per-node nbdb and attaches them to
+# the localnet logical switch ports so that OVN's built-in DHCP responder
+# hands out the IPs to the VMs.
+if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
+  LOCALNET_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  LOCALNET_SUBNET="192.168.223.0/24"
+
+  echo "Waiting for VMIs to be running..."
+  for _ in $(seq 1 60); do
+    RUNNING_COUNT=$(oc get vmi -n "${LOCALNET_NAMESPACE}" --no-headers 2>/dev/null \
+      | grep -c Running || true)
+    if [[ "${RUNNING_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+      echo "All ${RUNNING_COUNT} VMIs are running"
+      break
+    fi
+    echo "Waiting for VMIs... (${RUNNING_COUNT}/${HYPERSHIFT_NODE_COUNT} running)"
+    sleep 10
+  done
+
+  echo "Configuring OVN DHCP for localnet interfaces..."
+  for VMI in $(oc get vmi -n "${LOCALNET_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}'); do
+    NODE=$(oc get vmi -n "${LOCALNET_NAMESPACE}" "${VMI}" -o jsonpath='{.status.nodeName}')
+    OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
+
+    LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl --columns=name --bare find Logical_Switch_Port \
+      "external_ids:k8s.ovn.org/topology=localnet" 2>/dev/null)
+
+    if [[ -z "${LSP_NAME}" ]]; then
+      echo "WARNING: No localnet LSP found on node ${NODE} for VMI ${VMI}"
+      continue
+    fi
+
+    DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl create DHCP_Options cidr="${LOCALNET_SUBNET}" \
+      options='"lease_time"="3500" "router"="192.168.223.1" "server_id"="192.168.223.1" "server_mac"="c0:ff:ee:00:00:01"' \
+      2>/dev/null)
+
+    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl lsp-set-dhcpv4-options "${LSP_NAME}" "${DHCP_UUID}" 2>/dev/null
+
+    # Clear port security on the VM's localnet port so EgressIP-SNATed packets
+    # can exit the management cluster's OVN. Without this, OVN drops packets
+    # whose source IP is the EgressIP (not the VM's assigned localnet IP).
+    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c nbdb -- \
+      ovn-nbctl clear Logical_Switch_Port "${LSP_NAME}" port_security 2>/dev/null
+
+    echo "Configured DHCP and cleared port security for VMI ${VMI} on node ${NODE}"
+  done
+  echo "OVN DHCP and port security configuration complete for localnet interfaces"
+
+  # Enable IP forwarding on enp2s0 (the secondary/localnet NIC) inside each
+  # hosted cluster VM. OVN multi-NIC EgressIP uses iptables SNAT to change the
+  # source IP on enp2s0, but the de-SNATed return traffic needs to be forwarded
+  # from enp2s0 back to ovn-k8s-mp0. Without forwarding enabled on enp2s0,
+  # these return packets are silently dropped by the kernel.
+  # OVN-Kubernetes only enables forwarding on interfaces it manages (br-ex,
+  # ovn-k8s-mp0) but not on the secondary NIC.
+  NESTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+  if [[ -f "${NESTED_KUBECONFIG}" ]]; then
+    echo "Waiting for OVN node pods to be ready in hosted cluster..."
+    for _ in $(seq 1 60); do
+      OVN_READY_COUNT=$(KUBECONFIG="${NESTED_KUBECONFIG}" oc get pods -n openshift-ovn-kubernetes \
+        -l app=ovnkube-node --no-headers 2>/dev/null | grep -c Running || true)
+      if [[ "${OVN_READY_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+        echo "All ${OVN_READY_COUNT} OVN node pods are running"
+        break
+      fi
+      echo "Waiting for OVN node pods... (${OVN_READY_COUNT}/${HYPERSHIFT_NODE_COUNT} running)"
+      sleep 10
+    done
+
+    echo "Enabling IP forwarding on enp2s0 for all hosted cluster nodes..."
+    for OVN_NODE_POD in $(KUBECONFIG="${NESTED_KUBECONFIG}" oc get pods -n openshift-ovn-kubernetes \
+      -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+      KUBECONFIG="${NESTED_KUBECONFIG}" oc exec -n openshift-ovn-kubernetes "${OVN_NODE_POD}" \
+        -c ovnkube-controller -- sysctl -w net.ipv4.conf.enp2s0.forwarding=1 2>/dev/null || true
+      echo "Enabled enp2s0 forwarding on ${OVN_NODE_POD}"
+    done
+    echo "IP forwarding configuration complete for hosted cluster nodes"
+  else
+    echo "WARNING: Nested kubeconfig not found at ${NESTED_KUBECONFIG}, skipping enp2s0 forwarding setup"
+  fi
+
+  # Deploy ip-echo on the management cluster with localnet NAD for EgressIP
+  # source-IP verification. The ip-echo pod gets a localnet IP that is NOT in the
+  # hosted cluster's OVN node address set, so EgressIP reroute + SNAT applies
+  # to traffic going to it. Without this, traffic to hosted cluster node IPs
+  # (including localnet IPs) is exempted from EgressIP by OVN priority 102 policy.
+  #
+  # The ip-echo pod is deployed in a dedicated namespace (not the HyperShift
+  # control plane namespace) to prevent HyperShift's control plane operator from
+  # garbage-collecting it during namespace reconciliation.
+  IPECHO_NAMESPACE="egressip-ipecho-${CLUSTER_NAME}"
+  echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE}..."
+  oc create namespace "${IPECHO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+  oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+
+  # Create a localnet NAD in the ip-echo namespace (same config as the hosted cluster namespace)
+  oc apply -f - <<IPECHO_NAD_EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: localnet-network
+  namespace: ${IPECHO_NAMESPACE}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "physnet",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "${IPECHO_NAMESPACE}/localnet-network",
+      "subnets": "192.168.223.0/24"
+  }'
+IPECHO_NAD_EOF
+
+  oc apply -f - <<IPECHO_EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: egressip-ipecho
+  namespace: ${IPECHO_NAMESPACE}
+  annotations:
+    k8s.v1.cni.cncf.io/networks: localnet-network
+spec:
+  containers:
+  - name: ip-echo
+    image: quay.io/openshifttest/ip-echo:1.2.0
+    ports:
+    - containerPort: 80
+      protocol: TCP
+    securityContext:
+      runAsUser: 0
+  restartPolicy: Always
+  tolerations:
+  - operator: Exists
+IPECHO_EOF
+
+  echo "Waiting for ip-echo pod to be ready..."
+  oc wait --for=condition=Ready pod/egressip-ipecho -n "${IPECHO_NAMESPACE}" --timeout=120s
+
+  IPECHO_LOCALNET_IP=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" \
+    -o jsonpath='{.metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}' | \
+    python3 -c "import sys,json; nets=json.loads(sys.stdin.read()); [print(n['ips'][0]) for n in nets if 'localnet' in n.get('name','')]")
+  echo "ip-echo localnet IP: ${IPECHO_LOCALNET_IP}:80"
+  echo "${IPECHO_LOCALNET_IP}:80" > "${SHARED_DIR}/kubevirt_ipecho_url"
+fi
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
