@@ -1,0 +1,29 @@
+ref:
+  as: aro-hcp-github-app-auth
+  from: src
+  commands: aro-hcp-github-app-auth-commands.sh
+  best_effort: true
+  timeout: 5m0s
+  grace_period: 30s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+    - namespace: test-credentials
+      name: aro-hcp-robot
+      mount_path: /var/run/aro-hcp-robot
+  env:
+  - name: GITHUB_APP_ID_PATH
+    default: /var/run/aro-hcp-robot/appid
+    documentation: |-
+      File holding the aro-hcp-robot GitHub App ID. Used to mint a short-lived
+      installation token so a downstream step can post a PR comment.
+  - name: GITHUB_APP_KEY_PATH
+    default: /var/run/aro-hcp-robot/cert
+    documentation: |-
+      File holding the aro-hcp-robot GitHub App private key (PEM). Used to mint a
+      short-lived installation token so a downstream step can post a PR comment.
+  documentation: |-
+    Mint a short-lived aro-hcp-robot GitHub App installation token and write it to
+    ${SHARED_DIR}/github-token for a downstream step to post a PR comment.
