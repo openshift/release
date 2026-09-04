@@ -253,12 +253,8 @@ spec:
   podSelector:
     matchLabels:
       app: kube-apiserver
-      hypershift.openshift.io/control-plane-component: kube-apiserver
   ingress:
-    - from:
-        - ipBlock:
-            cidr: 0.0.0.0/0
-      ports:
+    - ports:
         - protocol: TCP
           port: 8091
   policyTypes:
