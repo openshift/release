@@ -39,10 +39,11 @@ Design decisions that follow from that intent:
 
 **Scope** is deliberately limited to `ci-operator/**/sandboxed-containers-operator/`.
 
-`skeleton` / `skeleton2` are the reference implementation of a suite step: `skeleton`
-echoes its `TEST_SKELETON_ENABLE` value and (when enabled) exits with a failure to
-prove non-blocking; `skeleton2` runs after it and always succeeds. They are DEMOs and
-disabled by default (see below) — real suites replace them following the same pattern.
+`skeleton` is a DEMO suite: it echoes its `TEST_SKELETON_ENABLE` value and (when
+enabled) exits with a failure to prove non-blocking. It is disabled by default
+(see below). `osc` is a real suite — it runs the OSC golang (Ginkgo v2) e2e tests
+from `openshift/sandboxed-containers-operator` `test/e2e`. New suites follow the
+same pattern; see `AGENTS.md` for the authoring recipe.
 
 ## Why POST (and not `test:`)
 
@@ -70,9 +71,9 @@ testsuites/
 ├── skeleton/                                              (DEMO suite -- fails on purpose)
 │   ├── ...-skeleton-ref.yaml
 │   └── ...-skeleton-commands.sh
-└── skeleton2/                                             (DEMO suite -- always succeeds)
-    ├── ...-skeleton2-ref.yaml
-    └── ...-skeleton2-commands.sh
+└── osc/                                                   (REAL suite -- golang e2e tests)
+    ├── ...-osc-ref.yaml
+    └── ...-osc-commands.sh
 ```
 
 ## Enable convention
@@ -85,23 +86,23 @@ Each suite is gated by `TEST_<STEP_NAME>_ENABLE`, **skip-by-default**:
 Every suite writes a JUnit file to `${ARTIFACT_DIR}/junit_<name>.xml` in **both**
 the run and skip paths, so Prow always ingests a result.
 
-## The `skeleton` / `skeleton2` steps are a DEMO — disabled by default
+## Suites in the chain
 
-`skeleton` and `skeleton2` are **demonstration** suites, not real tests. They exist
-to prove the non-blocking wiring end-to-end and to serve as a copy-paste template
-for real suites. They are **disabled by default** (`TEST_SKELETON_ENABLE` and
-`TEST_SKELETON2_ENABLE` default to `"false"` in their refs), so in normal jobs they
-just log the value and exit 0.
-
-| Step        | When enabled (`..._ENABLE=true`)                                   | JUnit                    |
+| Step        | What it does                                                      | JUnit                    |
 |-------------|-------------------------------------------------------------------|--------------------------|
-| `skeleton`  | **Deliberately fails** (exit 1) to show a failing suite is non-blocking | `<failure>` in `junit_skeleton.xml` |
-| `skeleton2` | **Always succeeds** (exit 0); runs after `skeleton`                | passing `junit_skeleton2.xml` |
+| `skeleton`  | **DEMO.** When enabled, deliberately fails (exit 1) to show a failing suite is non-blocking. Disabled by default. | `<failure>` in `junit_skeleton.xml` |
+| `osc`       | **REAL.** When enabled, runs the OSC golang (Ginkgo v2) e2e tests (`go test` over `test/e2e`) and publishes their JUnit. Disabled by default. | `junit_osc.xml` (or `junit_osc_skip.xml` when skipped) |
 
-Enabling both on a job demonstrates the key behaviour: `skeleton` fails, yet
-`skeleton2` still runs and passes, and the post phase continues through must-gather
-and deprovision. Because they are demos, do **not** enable them on production
-periodics (enabling `skeleton` makes that job red every run by design).
+`skeleton` is a **demonstration** suite, not a real test — it proves the
+non-blocking wiring end-to-end and serves as a template. It is **disabled by
+default** (`TEST_SKELETON_ENABLE` defaults to `"false"`), so in normal jobs it just
+logs the value and exits 0. Do **not** enable it on production periodics (enabling
+it makes that job red every run by design).
+
+`osc` is a real suite (`TESTS_OSC_ENABLE` defaults to `"false"`). Enable it on a
+job by setting `TESTS_OSC_ENABLE: "true"` in that job's `steps.env`; because it
+uses `from: src`, every consuming config must declare a `build_root` (see the config
+AGENTS.md graph-build note).
 
 ## Wiring into a workflow
 
