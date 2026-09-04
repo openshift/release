@@ -368,7 +368,7 @@ if [[ -n "${INFRA_ID}" ]]; then
 fi
 
 # Validate critical outputs were written (early writes + terraform outputs)
-for output_file in region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id workspace-name run-id; do
+for output_file in region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id api-endpoint oidc-endpoint workspace-name run-id; do
   if [[ ! -s "${SHARED_DIR}/${output_file}" ]]; then
     log "ERROR: Output file ${output_file} is empty or missing"
     exit 1

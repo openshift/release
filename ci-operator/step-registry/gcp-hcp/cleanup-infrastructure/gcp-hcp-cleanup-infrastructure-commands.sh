@@ -39,6 +39,23 @@ if [[ ! -f "${SHARED_DIR}/wif-cred.json" ]]; then
 fi
 gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet
 
+# A lifecycle step may be interrupted before its EXIT trap can remove the
+# temporary submitter key. Retry the deletion here as a second cleanup line of
+# defense; the key ID contains no credential material.
+E2E_HC_SUBMITTER_KEY_ID_FILE="${SHARED_DIR}/e2e-hc-submitter-key-id"
+E2E_HC_SUBMITTER_SA="e2e-hc-submitter@gcp-hcp-platform-ci.iam.gserviceaccount.com"
+if [[ -s "${E2E_HC_SUBMITTER_KEY_ID_FILE}" ]]; then
+  E2E_HC_SUBMITTER_KEY_ID="$(<"${E2E_HC_SUBMITTER_KEY_ID_FILE}")"
+  if gcloud iam service-accounts keys delete "${E2E_HC_SUBMITTER_KEY_ID}" \
+    --iam-account="${E2E_HC_SUBMITTER_SA}" \
+    --quiet; then
+    rm -f "${E2E_HC_SUBMITTER_KEY_ID_FILE}"
+    log "Removed leaked temporary e2e HC submitter key ${E2E_HC_SUBMITTER_KEY_ID}"
+  else
+    log "WARNING: Could not remove temporary e2e HC submitter key ${E2E_HC_SUBMITTER_KEY_ID}"
+  fi
+fi
+
 # Read infrastructure info from SHARED_DIR
 if [[ ! -f "${SHARED_DIR}/region-project-id" ]]; then
   log "No region-project-id in SHARED_DIR — provision didn't complete, nothing to clean up"
@@ -412,11 +429,15 @@ TFRC
   else
     log "  Removing ${resource_count} resources..."
     # Bulk remove: modules + data sources in one call (~3 seconds)
-    # Discover top-level modules and data sources, then remove at module level
-    # for speed (~3s for 400+ resources vs minutes for individual removal).
+    # Discover top-level modules, data sources, and resources, then remove at
+    # the highest address level for speed (~3s for 400+ resources vs minutes
+    # for individual removal).
     local addresses
     addresses=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>/dev/null | \
-      sed -n 's/^\(module\.[^.]*\)\..*/\1/p; s/^\(data\.[^.]*\.[^.]*\)$/\1/p' | \
+      sed -E \
+        -e 's/^(module\.[^.]+)\..*/\1/p' \
+        -e 's/^(data\.[^.]+\.[^.]+)(\[.*\])?$/\1/p' \
+        -e 's/^([^.[:space:]]+\.[^.[:space:]]+)(\[.*\])?$/\1/p' | \
       sort -u)
     if [[ -n "${addresses}" ]]; then
       log "  Removing: ${addresses//$'\n'/, }"
@@ -514,7 +535,7 @@ delete_dns_records "${REGION_PROJECT}" "Region" || true
 # Phase 4b: Delete Cloud Endpoints services (blocks project deletion)
 if [[ -n "${SERVICE_PROJECT}" ]]; then
   log "--- Deleting Cloud Endpoints service in ${SERVICE_PROJECT} ---"
-  gcloud endpoints services delete "hcp-api.endpoints.${SERVICE_PROJECT}.cloud.goog"     --project="${SERVICE_PROJECT}" --quiet 2>/dev/null || true
+  gcloud endpoints services delete "hcp-api.endpoints.${SERVICE_PROJECT}.cloud.goog" --project="${SERVICE_PROJECT}" --quiet 2>/dev/null || true
 fi
 
 # Phase 5: Force-delete projects (this is the key difference from terraform destroy)

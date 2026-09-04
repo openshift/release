@@ -34,6 +34,7 @@ if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
   E2E_HC_SUBMITTER_SA="e2e-hc-submitter@gcp-hcp-platform-ci.iam.gserviceaccount.com"
   E2E_HC_SUBMITTER_KEY_DIR="$(mktemp -d)"
   E2E_HC_SUBMITTER_KEY_FILE="${E2E_HC_SUBMITTER_KEY_DIR}/key.json"
+  E2E_HC_SUBMITTER_KEY_ID_FILE="${SHARED_DIR}/e2e-hc-submitter-key-id"
   E2E_HC_SUBMITTER_KEY_ID=""
 
   extract_e2e_hc_submitter_key_id() {
@@ -48,14 +49,31 @@ if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
 
     if [[ -n "${key_id}" ]]; then
       echo "Deleting temporary e2e HC submitter key..."
-      if gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet; then
-        if ! gcloud iam service-accounts keys delete "${key_id}" \
-          --iam-account="${E2E_HC_SUBMITTER_SA}" \
-          --quiet; then
-          echo "WARNING: Failed to delete temporary key ${key_id}"
+      local max_delete_attempts=5
+      local delete_attempt=1
+      local key_deleted=false
+
+      while (( delete_attempt <= max_delete_attempts )); do
+        if gcloud auth login --cred-file="${SHARED_DIR}/wif-cred.json" --quiet && \
+          gcloud iam service-accounts keys delete "${key_id}" \
+            --iam-account="${E2E_HC_SUBMITTER_SA}" \
+            --quiet; then
+          key_deleted=true
+          break
         fi
+
+        if (( delete_attempt < max_delete_attempts )); then
+          local wait_seconds=$((5 << (delete_attempt - 1)))
+          echo "Key deletion failed; retrying in ${wait_seconds}s (attempt ${delete_attempt}/${max_delete_attempts})..."
+          sleep "${wait_seconds}"
+        fi
+        ((delete_attempt++))
+      done
+
+      if [[ "${key_deleted}" != true ]]; then
+        echo "WARNING: Failed to restore WIF authentication or delete temporary key ${key_id} after ${max_delete_attempts} attempts"
       else
-        echo "WARNING: Failed to restore WIF authentication; temporary key ${key_id} was not deleted"
+        rm -f "${E2E_HC_SUBMITTER_KEY_ID_FILE}"
       fi
     fi
 
@@ -65,14 +83,21 @@ if [[ -f "${SHARED_DIR}/wif-cred.json" ]]; then
   trap cleanup_e2e_hc_submitter_key EXIT
 
   echo "Creating temporary key for ${E2E_HC_SUBMITTER_SA}..."
-  gcloud iam service-accounts keys create "${E2E_HC_SUBMITTER_KEY_FILE}" \
-    --iam-account="${E2E_HC_SUBMITTER_SA}" \
-    --quiet
+  (
+    umask 077
+    gcloud iam service-accounts keys create "${E2E_HC_SUBMITTER_KEY_FILE}" \
+      --iam-account="${E2E_HC_SUBMITTER_SA}" \
+      --quiet
+  )
+  chmod 600 "${E2E_HC_SUBMITTER_KEY_FILE}"
   E2E_HC_SUBMITTER_KEY_ID="$(extract_e2e_hc_submitter_key_id "${E2E_HC_SUBMITTER_KEY_FILE}")"
   if [[ -z "${E2E_HC_SUBMITTER_KEY_ID}" ]]; then
     echo "ERROR: Could not determine the temporary key ID"
     exit 1
   fi
+  # Leave the key ID in SHARED_DIR so the cleanup step can remove the key if
+  # this step is interrupted before its EXIT trap runs successfully.
+  (umask 077 && printf '%s\n' "${E2E_HC_SUBMITTER_KEY_ID}" > "${E2E_HC_SUBMITTER_KEY_ID_FILE}")
 
   echo "Activating ${E2E_HC_SUBMITTER_SA} for identity token authentication..."
   MAX_KEY_ACTIVATION_ATTEMPTS=6
