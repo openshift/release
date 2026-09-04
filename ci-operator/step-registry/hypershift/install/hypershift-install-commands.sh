@@ -255,11 +255,15 @@ if [[ -n "${VERIFY_KUBECONFIG}" ]] && [[ -f "${VERIFY_KUBECONFIG}" ]]; then
   # a sidecar when container ordering varies.
   DEPLOYED_IMAGE=$(oc --kubeconfig="${VERIFY_KUBECONFIG}" get deployment -n hypershift operator \
     -o jsonpath='{.spec.template.spec.containers[?(@.name=="operator")].image}' 2>/dev/null) || DEPLOYED_IMAGE="unavailable"
-  # Restrict to Running pods so Pending or terminating pods are never selected,
-  # and read the "operator" container's imageID by name.
+  # Select the newest Running operator pod by creation time and read the "operator"
+  # container's imageID by name. During a deployment rollout the newest Running pod
+  # belongs to the current ReplicaSet revision; sorting by creationTimestamp avoids
+  # reading a stale imageID from an old-revision pod that has not yet terminated.
+  # Pending, completed, or terminating pods are excluded by the phase filter.
   POD_IMAGE_ID=$(oc --kubeconfig="${VERIFY_KUBECONFIG}" get pods -n hypershift -l app=operator \
-    --field-selector=status.phase=Running \
-    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="operator")].imageID}' 2>/dev/null) || POD_IMAGE_ID="unavailable"
+    --field-selector=status.phase=Running --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{range .items[*]}{.status.containerStatuses[?(@.name=="operator")].imageID}{"\n"}{end}' 2>/dev/null \
+    | tail -1) || POD_IMAGE_ID="unavailable"
   # Normalize empty oc output (exit 0 with no matching jsonpath result) to "unavailable".
   [[ -z "${DEPLOYED_IMAGE}" ]] && DEPLOYED_IMAGE="unavailable"
   [[ -z "${POD_IMAGE_ID}" ]] && POD_IMAGE_ID="unavailable"
