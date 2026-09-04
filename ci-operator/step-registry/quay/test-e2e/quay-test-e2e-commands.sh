@@ -184,6 +184,34 @@ function copyArtifacts {
       mv "${file}" "${ARTIFACT_DIR}/junit_$(basename "${file}")"
     fi
   done
+  # Playwright records each skip reason as <property name="skip" value="..."> but
+  # leaves the <skipped> element empty. Prow's junit lens shows a skip reason only
+  # from the skipped element's message attribute, so copy the property value there.
+  # python3 is not in the ubi9 nodejs-minimal runner image, so this uses awk.
+  # Best-effort: never fail the EXIT trap.
+  for xml in "${ARTIFACT_DIR}"/junit_*.xml; do
+    [[ -f "${xml}" ]] || continue
+    awk '
+      /<testcase/ { hasskip = 0; skipval = "" }
+      /<property name="skip" value="/ {
+        v = $0
+        sub(/^.*<property name="skip" value="/, "", v)
+        sub(/">[ \t]*$/, "", v)
+        hasskip = 1
+        skipval = v
+      }
+      /^[ \t]*<skipped>[ \t]*$/ {
+        if (hasskip) {
+          match($0, /^[ \t]*/)
+          indent = substr($0, 1, RLENGTH)
+          print indent "<skipped message=\"" skipval "\">"
+          hasskip = 0
+          next
+        }
+      }
+      { print }
+    ' "${xml}" > "${xml}.tmp" && mv "${xml}.tmp" "${xml}" || rm -f "${xml}.tmp"
+  done || true
   cp -r "${src}"/playwright-report/* "${ARTIFACT_DIR}/" 2>/dev/null || true
   gatherBuilderDiagnostics || true
 }
