@@ -791,6 +791,46 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         continue
     fi
 
+    # RBAC smoke test: verify dedicated-admins group permissions are propagated.
+    # This catches broken rbac-permissions-operator before clusters are leased,
+    # preventing e2e test timeouts waiting for permissions that never arrive.
+    RBAC_KUBECONFIG=$(mktemp)
+    trap 'rm -f "${RBAC_KUBECONFIG}"' EXIT
+    RBAC_CHECK_FAILED=false
+    if ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" 2>/dev/null \
+        | jq -r '.kubeconfig // empty' > "${RBAC_KUBECONFIG}" 2>/dev/null \
+        && [[ -s "${RBAC_KUBECONFIG}" ]]; then
+        RBAC_RESULT=$(oc auth can-i create configmaps \
+            --as=dedicated-admin-check --as-group=dedicated-admins \
+            -n default \
+            --request-timeout=30s \
+            --kubeconfig="${RBAC_KUBECONFIG}" 2>&1) || true
+        if [[ "${RBAC_RESULT}" == "no" ]]; then
+            log "UNHEALTHY: ${CM_NAME} RBAC check failed - dedicated-admins cannot create configmaps"
+            RBAC_CHECK_FAILED=true
+        elif [[ "${RBAC_RESULT}" != "yes" ]]; then
+            log "WARNING: ${CM_NAME} RBAC check inconclusive (connectivity issue?), skipping"
+        fi
+    else
+        log "WARNING: ${CM_NAME} could not retrieve cluster kubeconfig for RBAC check, skipping"
+    fi
+    rm -f "${RBAC_KUBECONFIG}"
+    trap - EXIT
+
+    if [[ "${RBAC_CHECK_FAILED}" == "true" ]]; then
+        if [[ "${STATUS}" != "error" ]] && ! dry_run_guard "Would mark ${CM_NAME} as error (RBAC)"; then
+            lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                "metadata": {
+                    "labels": { "rosa-cluster-lease/status": "error" },
+                    "annotations": { "rosa-cluster-lease/error-reason": "RBAC: dedicated-admins permissions not functional", "rosa-cluster-lease/error-at": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'" }
+                }
+            }' || true
+        fi
+        UNHEALTHY=$((UNHEALTHY + 1))
+        echo "UNHEALTHY: ${CM_NAME} (RBAC: dedicated-admins broken)" >> "${REPORT}"
+        continue
+    fi
+
     # Restore clusters that recovered from error
     if [[ "${STATUS}" == "error" ]]; then
         log "RESTORED: ${CM_NAME} is healthy again"
