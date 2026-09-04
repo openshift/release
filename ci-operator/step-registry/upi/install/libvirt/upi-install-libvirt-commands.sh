@@ -177,6 +177,25 @@ cp ${SHARED_DIR}/install-config.yaml ${INSTALL_DIR}
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
   cp ${SHARED_DIR}/agent-config.yaml ${INSTALL_DIR}
+
+  # Inject chrony MachineConfigs into ${INSTALL_DIR}/openshift/ BEFORE calling
+  # agent create pxe-files. The agent installer loads extra manifests from
+  # ${INSTALL_DIR}/openshift/ when building the PXE boot image; files placed
+  # after pxe-files (or in cluster-manifests/) are never baked in.
+  # These YAML files are written to ${SHARED_DIR} by the upi-conf-libvirt step
+  # only when ARCH=ppc64le or ARCH=s390x, so this is a no-op on other arches.
+  mkdir -p "${INSTALL_DIR}/openshift"
+  CHRONY_WORKER_YAML="${SHARED_DIR}/99-chrony-worker.yaml"
+  if [ -f "${CHRONY_WORKER_YAML}" ]; then
+    echo "Injecting ${CHRONY_WORKER_YAML} into agent openshift manifests..."
+    cp "${CHRONY_WORKER_YAML}" "${INSTALL_DIR}/openshift/"
+  fi
+  CHRONY_MASTER_YAML="${SHARED_DIR}/99-chrony-master.yaml"
+  if [ -f "${CHRONY_MASTER_YAML}" ]; then
+    echo "Injecting ${CHRONY_MASTER_YAML} into agent openshift manifests..."
+    cp "${CHRONY_MASTER_YAML}" "${INSTALL_DIR}/openshift/"
+  fi
+
   ${OCPINSTALL} --dir ${INSTALL_DIR} agent create pxe-files
   save_credentials
 
@@ -282,10 +301,6 @@ EOF
         --pool ${HTTPD_POOL_NAME} \
         --file ${BOOT_ARTIFACTS_LOCAL_DIR}/${ROOTFS_NAME}
   fi
-
-  # Generate manifests for cluster modifications
-  echo "Generating manifests..."
-  ${OCPINSTALL} --dir "${INSTALL_DIR}" agent create cluster-manifests
 
 else
   RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
