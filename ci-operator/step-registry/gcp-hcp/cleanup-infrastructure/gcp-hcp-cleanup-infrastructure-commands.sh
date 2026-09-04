@@ -492,7 +492,8 @@ TFRC
 REGION_KC=""
 MC_KC=""
 cleanup_kubeconfigs() {
-  rm -f "${REGION_KC}" "${MC_KC}"
+  [[ -z "${REGION_KC}" ]] || rm -f "${REGION_KC}"
+  [[ -z "${MC_KC}" ]] || rm -f "${MC_KC}"
 }
 trap cleanup_kubeconfigs EXIT
 REGION_KC="$(mktemp "${TMPDIR:-/tmp}/gcp-hcp-region-kubeconfig.XXXXXX")"
