@@ -463,6 +463,20 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- as: periodic-oape-review-handler
+  cron: '@yearly'
+  steps:
+    env:
+      REHEARSAL_TARGET_REPO: zero-trust-workload-identity-manager
+      REHEARSAL_TARGET_PR: "167"
+    test:
+    - ref: oape-review-handler
+- always_run: false
+  as: oape-review-handler
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: oape-review-handler-trigger
 zz_generated_metadata:
   branch: main
   org: openshift

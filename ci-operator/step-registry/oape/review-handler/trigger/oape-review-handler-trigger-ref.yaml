@@ -1,0 +1,31 @@
+ref:
+  as: oape-review-handler-trigger
+  from: claude-ai-helpers
+  commands: oape-review-handler-trigger-commands.sh
+  env:
+  - name: GANGWAY_API
+    default: "https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
+    documentation: |-
+      Gangway API endpoint for triggering periodic jobs.
+  - name: OAPE_REVIEW_HANDLER_UPSTREAM_REPO
+    default: ""
+    documentation: |-
+      Upstream owner/repo for posting PR comments (e.g. openshift/must-gather-operator).
+      Auto-derived from REPO_OWNER/REPO_NAME when unset.
+  - name: REVIEW_AGENT_PAT_KEY
+    default: "gh-pat"
+    documentation: |-
+      Key name in the credential secret for the GitHub PAT used to post PR comments.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  documentation: |-
+    Trigger step for the OAPE review-handler. Instead of running the agent inline
+    (which aborts the presubmit when it pushes), this step triggers the periodic
+    oape-review-handler job via Gangway and posts a comment on the PR with a link
+    to the triggered job.
