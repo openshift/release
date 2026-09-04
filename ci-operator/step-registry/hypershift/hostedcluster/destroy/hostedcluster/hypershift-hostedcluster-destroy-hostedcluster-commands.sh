@@ -19,12 +19,6 @@ if [[ "${PLATFORM}" == "aws" ]]; then
     AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
     DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
   fi
-elif [[ "${PLATFORM}" == "powervs" ]]; then
-  export IBMCLOUD_CREDENTIALS="${CLUSTER_PROFILE_DIR}/.powervscred"
-  if [[ ! -f "${IBMCLOUD_CREDENTIALS}" ]]; then
-      echo "PowerVS credentials file ${IBMCLOUD_CREDENTIALS} not found"
-      exit 1
-  fi
 else
   echo "Unsupported platform. Cluster deletion failed."
   exit 1
@@ -74,52 +68,6 @@ if [[ "${PLATFORM}" == "aws" ]]; then
      break
    else
      echo 'Failed to delete the cluster, retrying...'
-   fi
-  done
-  set -e
-elif [[ "${PLATFORM}" == "powervs" ]]; then
-  if [[ -z "${POWERVS_GUID}" ]]; then
-    POWERVS_GUID=$(jq -r '.cloudInstanceID' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-  fi
-  if [[ -z "${POWERVS_VPC}" ]]; then
-    POWERVS_VPC=$(jq -r '.vpc' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-  fi
-  if [[ -z "${POWERVS_TRANSIT_GATEWAY}" ]]; then
-      POWERVS_TRANSIT_GATEWAY=$(jq -r '.transitGateway' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-  fi
-  if [[ -z "${TRANSIT_GATEWAY_LOCATION}" ]]; then
-      TRANSIT_GATEWAY_LOCATION=$(jq -r '.transitGatewayLocation' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-  fi
-  if [[ -z "${POWERVS_REGION}" ]]; then
-    POWERVS_REGION=$(jq -r '.region' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-  fi
-  if [[ -z "${POWERVS_ZONE}" ]]; then
-    POWERVS_ZONE=$(jq -r '.zone' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-  fi
-  if [[ -z "${POWERVS_VPC_REGION}" ]]; then
-    POWERVS_VPC_REGION=$(jq -r '.vpcRegion' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-  fi
-  if [[ -z "${POWERVS_RESOURCE_GROUP}" ]]; then
-      POWERVS_RESOURCE_GROUP=$(jq -r '.resourceGroupName' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-  fi
-  set +e
-  for _ in {1..10}; do
-   bin/hypershift destroy cluster powervs \
-     --name ${CLUSTER_NAME} \
-     --infra-id ${INFRA_ID} \
-     --region ${POWERVS_REGION} \
-     --zone ${POWERVS_ZONE} \
-     --vpc-region ${POWERVS_VPC_REGION} \
-     --resource-group ${POWERVS_RESOURCE_GROUP} \
-     --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
-     --cloud-instance-id ${POWERVS_GUID} \
-     --vpc ${POWERVS_VPC} \
-     --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
-     --transit-gateway-location ${TRANSIT_GATEWAY_LOCATION}
-   if [ $? == 0 ]; then
-      break
-   else
-      echo 'Failed to delete the cluster, retrying...'
    fi
   done
   set -e

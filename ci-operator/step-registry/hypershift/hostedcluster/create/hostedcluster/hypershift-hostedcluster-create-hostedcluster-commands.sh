@@ -53,14 +53,8 @@ if [[ "${PLATFORM}" == "aws" ]]; then
     echo "AWS credentials file ${AWS_GUEST_INFRA_CREDENTIALS_FILE} not found"
     exit 1
   fi
-elif [[ "${PLATFORM}" == "powervs" ]]; then
-  export IBMCLOUD_CREDENTIALS="${CLUSTER_PROFILE_DIR}/.powervscred"
-  if [[ ! -f "${IBMCLOUD_CREDENTIALS}" ]]; then
-      echo "PowerVS credentials file ${IBMCLOUD_CREDENTIALS} not found"
-      exit 1
-  fi
 else
-  echo "Currently only AWS and PowerVS platforms are supported"
+  echo "Currently only AWS platform is supported"
   exit 1
 fi
 
@@ -166,58 +160,6 @@ case "${PLATFORM}" in
       ARGS+=( --feature-set "${GUEST_FEATURE_SET}")
     fi
 
-    ;;
-  "powervs")
-    if [[ -z "${POWERVS_GUID}" ]]; then
-      POWERVS_GUID=$(jq -r '.cloudInstanceID' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-    fi
-    if [[ -z "${POWERVS_VPC}" ]]; then
-      POWERVS_VPC=$(jq -r '.vpc' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-    fi
-    if [[ -z "${POWERVS_TRANSIT_GATEWAY}" ]]; then
-      POWERVS_TRANSIT_GATEWAY=$(jq -r '.transitGateway' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-    fi
-    if [[ -z "${TRANSIT_GATEWAY_LOCATION}" ]]; then
-          TRANSIT_GATEWAY_LOCATION=$(jq -r '.transitGatewayLocation' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-    fi
-    if [[ -z "${POWERVS_REGION}" ]]; then
-      POWERVS_REGION=$(jq -r '.region' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-    fi
-    if [[ -z "${POWERVS_ZONE}" ]]; then
-      POWERVS_ZONE=$(jq -r '.zone' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-    fi
-    if [[ -z "${POWERVS_VPC_REGION}" ]]; then
-      POWERVS_VPC_REGION=$(jq -r '.vpcRegion' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-    fi
-    if [[ -z "${POWERVS_RESOURCE_GROUP}" ]]; then
-      POWERVS_RESOURCE_GROUP=$(jq -r '.resourceGroupName' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-    fi
-    if [[ -z "${POWERVS_PROC_TYPE}" ]]; then
-      POWERVS_PROC_TYPE=$(jq -r '.procType' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-    fi
-    if [[ -z "${POWERVS_PROCESSORS}" ]]; then
-      POWERVS_PROCESSORS=$(jq -r '.processors' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-    fi
-    if [[ -z "${POWERVS_SYS_TYPE}" ]]; then
-      POWERVS_SYS_TYPE=$(jq -r '.sysType' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
-    fi
-
-    ARGS+=( \
-      --region "${POWERVS_REGION}" \
-      --zone "${POWERVS_ZONE}" \
-      --resource-group "${POWERVS_RESOURCE_GROUP}" \
-      --pull-secret /etc/registry-pull-credentials/.dockerconfigjson \
-      --olm-catalog-placement guest \
-      --vpc-region "${POWERVS_VPC_REGION}" \
-      --proc-type "${POWERVS_PROC_TYPE}" \
-      --sys-type "${POWERVS_SYS_TYPE}" \
-      --processors "${POWERVS_PROCESSORS}" \
-      --cloud-instance-id "${POWERVS_GUID}" \
-      --vpc "${POWERVS_VPC}" \
-      --transit-gateway "${POWERVS_TRANSIT_GATEWAY}" \
-      --transit-gateway-location "${TRANSIT_GATEWAY_LOCATION}" \
-      --debug
-    )
     ;;
   *)
     echo "Unsupported platform: ${PLATFORM}"
