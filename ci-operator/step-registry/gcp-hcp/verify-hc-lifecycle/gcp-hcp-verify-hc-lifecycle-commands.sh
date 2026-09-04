@@ -138,8 +138,9 @@ fi
 
 # The Ginkgo binary reads these values from SHARED_DIR, but the standalone
 # gcphcpctl readiness probe uses the CLI's environment-based configuration.
-export GCPHCPCTL_API_ENDPOINT="$(cat "${SHARED_DIR}/api-endpoint")"
-export GCPHCPCTL_PROJECT="$(cat "${SHARED_DIR}/customer-project-id")"
+GCPHCPCTL_API_ENDPOINT="$(cat "${SHARED_DIR}/api-endpoint")"
+GCPHCPCTL_PROJECT="$(cat "${SHARED_DIR}/customer-project-id")"
+export GCPHCPCTL_API_ENDPOINT GCPHCPCTL_PROJECT
 
 # Wait for the authenticated Gecko API path to be ready before starting the
 # lifecycle test. ArgoCD sync only confirms that manifests were applied; it
