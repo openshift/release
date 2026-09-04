@@ -42,7 +42,9 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      DEPENDS_ON_CANDIDATES: migtools/kubevirt-datamover-plugin RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN
+      DEPENDS_ON_CANDIDATES: |-
+        migtools/kubevirt-datamover-plugin RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN
+        openshift/oadp-operator MANAGER_IMAGE
       OADP_BRANCH: oadp-dev
       OO_BUNDLE: quay-proxy.ci.openshift.org/openshift/ci:konveyor_oadp-operator-bundle_oadp-dev
       OO_INSTALL_MODE: OwnNamespace
@@ -93,11 +95,35 @@ tests:
         # above (per a Depends-On: line in this PR's description, e.g.
         # naming an unmerged kubevirt-datamover-plugin PR) is folded in from
         # its manifest file, if present -- see openshift/oadp-operator#2389.
+        #
+        # A resolved openshift/oadp-operator dependency is special-cased
+        # below: oadp-operator's own manager image isn't a RELATED_IMAGE_*
+        # in this job's context (it's the operator itself, not a component
+        # it deploys), so it can't go through the Subscription.spec.config.env
+        # override like everything else here. It's flagged with the sentinel
+        # name MANAGER_IMAGE (not a real RELATED_IMAGE_* var) and patched
+        # directly onto the Deployment's own container image further down
+        # instead. This only covers reconcile-logic-level oadp-operator PRs
+        # (e.g. how it builds this Deployment's spec) -- an oadp-operator PR
+        # that changes RBAC/CSV/CRD manifests needs an alternate bundle
+        # install, which this does not attempt.
         ALL_ENV_LINES="RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER ${KDM_CONTROLLER_IMAGE}"
         if [ -s "${SHARED_DIR}/depends-on-images.txt" ]; then
           ALL_ENV_LINES="${ALL_ENV_LINES}
         $(cat "${SHARED_DIR}/depends-on-images.txt")"
         fi
+        MANAGER_IMAGE_VALUE=""
+        SUBSCRIPTION_ENV_LINES=""
+        while read -r ENV_NAME ENV_VALUE; do
+          [ -z "${ENV_NAME}" ] && continue
+          if [ "${ENV_NAME}" = "MANAGER_IMAGE" ]; then
+            MANAGER_IMAGE_VALUE="${ENV_VALUE}"
+          else
+            SUBSCRIPTION_ENV_LINES="${SUBSCRIPTION_ENV_LINES}
+        ${ENV_NAME} ${ENV_VALUE}"
+          fi
+        done <<< "${ALL_ENV_LINES}"
+        ALL_ENV_LINES="${SUBSCRIPTION_ENV_LINES}"
         ENTRIES=()
         while read -r ENV_NAME ENV_VALUE; do
           [ -z "${ENV_NAME}" ] && continue
@@ -128,6 +154,11 @@ tests:
           exit 1
         fi
         oc rollout status deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" --timeout=180s
+        if [ -n "${MANAGER_IMAGE_VALUE}" ]; then
+          echo "Depends-On resolved an oadp-operator PR -- patching the manager Deployment's own container image directly (not a RELATED_IMAGE_* env var, since oadp-operator itself isn't a related-image in this job's context)"
+          oc set image "deployment/openshift-adp-controller-manager" "manager=${MANAGER_IMAGE_VALUE}" -n "${OO_INSTALL_NAMESPACE}"
+          oc rollout status deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" --timeout=180s
+        fi
       dependencies:
       - env: KDM_CONTROLLER_IMAGE
         name: kubevirt-datamover-controller
