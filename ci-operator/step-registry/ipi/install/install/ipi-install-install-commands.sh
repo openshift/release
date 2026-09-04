@@ -634,8 +634,8 @@ function inject_spot_instance_config() {
   local mtype=${2}
 
   if ! get_yq; then
-    echo "WARNING: yq is unavailable; skipping the optional ${mtype} spot instance configuration" >&2
-    return 0
+    echo "ERROR: yq is unavailable; cannot configure requested ${mtype} spot instances" >&2
+    return 1
   fi
 
   # Find manifest files
