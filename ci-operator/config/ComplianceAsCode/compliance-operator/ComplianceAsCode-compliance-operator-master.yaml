@@ -60,7 +60,7 @@ releases:
       namespace: ocp
   latest-4-22:
     integration:
-      name: "4.17"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -139,9 +139,25 @@ tests:
       PQC_CHECK: "true"
       SCAN_NAMESPACE: openshift-compliance
       SCANNER_NAMESPACE: openshift-compliance
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-install-install-cli-4-22
+    - ref: ipi-install-times-collection
+    - ref: nodes-readiness
+    - ref: multiarch-validate-nodes
+    - ref: openshift-tests-extension-admission-crd-install
+    - ref: tls-13
     test:
     - as: test
-      cli: latest
+      cli: latest-4-22
       commands: make e2e-deployment
       dependencies:
       - env: IMAGE_FROM_CI
@@ -155,7 +171,6 @@ tests:
         requests:
           cpu: 100m
     - ref: tls-scanner-run
-    workflow: openshift-e2e-aws-ovn-tls-13
 - always_run: false
   as: e2e-aws-scan-config
   optional: true
