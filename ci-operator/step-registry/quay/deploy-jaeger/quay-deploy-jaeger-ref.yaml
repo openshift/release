@@ -1,0 +1,39 @@
+ref:
+  as: quay-deploy-jaeger
+  cli: latest
+  from_image:
+    name: quay-test-omr
+    namespace: ci
+    tag: latest
+  commands: quay-deploy-jaeger-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  grace_period: 10m0s
+  documentation: |-
+    Deploy a Jaeger all-in-one instance into the Quay namespace to receive OTLP
+    traces that Quay emits when FEATURE_OTEL_TRACING is enabled. Creates a
+    Deployment and a Service exposing the OTLP HTTP receiver (4318) and the query
+    UI/API (16686), using in-memory storage. On success writes
+    ${SHARED_DIR}/jaeger_deployed so the post-run gather step knows to collect.
+    This is best-effort: if Jaeger fails to roll out the step logs diagnostics,
+    warns, and exits 0 so the e2e run continues without traces.
+  env:
+  - name: QUAYNAMESPACE
+    default: "quay-enterprise"
+    documentation: Namespace where Quay (and Jaeger) are deployed.
+  - name: JAEGER_IMAGE
+    default: "quay.io/jaegertracing/jaeger:2.20.0"
+    documentation: |-
+      Jaeger container image. Pinned to a 2.x tag on quay.io/jaegertracing/jaeger;
+      the 1.x line is end-of-life (v1.76.0 was the last 1.x release and the v1
+      all-in-one image is gone as of 2.14.0). Jaeger 2.x is the OpenTelemetry
+      Collector based distribution: it is driven by a config file (mounted here as
+      a ConfigMap) rather than env vars/flags, and still serves the OTLP HTTP
+      receiver on 4318 and the query UI/API on 16686.
+  - name: JAEGER_MAX_TRACES
+    default: "50000"
+    documentation: |-
+      Cap on traces retained in Jaeger's in-memory store (jaeger_storage memory
+      backend max_traces, applied via the config file).
