@@ -40,6 +40,8 @@ sed -i '/index\.sh/s|WORKLOAD="$WORKLOAD"|WORKLOAD="batch-churn"|' run.sh
 EXTRA_FLAGS="-c ${BATCH_CHURN_CONFIG}"
 EXTRA_FLAGS+=" --iterations=${ITERATIONS}"
 EXTRA_FLAGS+=" --churn-cycles=${CHURN_CYCLES}"
+EXTRA_FLAGS+=" --churn-percent=${CHURN_PERCENT}"
+EXTRA_FLAGS+=" --churn-duration=${CHURN_DURATION}"
 EXTRA_FLAGS+=" --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE}"
 EXTRA_FLAGS+=" --metrics-profile=${METRICS_PROFILES}"
 EXTRA_FLAGS+=" --set DEPLOYMENT_COUNT=${DEPLOYMENT_COUNT}"
