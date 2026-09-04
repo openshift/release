@@ -16,6 +16,19 @@ ref:
     default: ""
     documentation: |-
       The index image URL. For example: quay.io/openshift-qe-optional-operators/ocp4-index:v4.17
+      When unset, the index defaults to
+      quay.io/openshift-qe-optional-operators/aosqe-index:v<kube_major>.<kube_minor>,
+      derived from the cluster's Kubernetes version. Set this to pin a specific index,
+      for example when the version-derived tag is unavailable upstream.
+      On C2S/SC2S clusters the index is re-published under the canonical aosqe
+      catalog, so any registry works. On other disconnected clusters the catalogsource
+      pulls the override directly and it must live in a registry fronted by the mirror
+      proxy: quay.io/openshifttest, quay.io/openshift-qe-optional-operators,
+      quay.io/olmqe, registry.redhat.io, brew.registry.redhat.io,
+      registry.stage.redhat.io or registry-proxy.engineering.redhat.com.
+      Any other value (for example a ci-operator pipeline pullspec) is not proxied;
+      the step logs a warning and falls back to the version-derived index, which is
+      the behaviour it had before this override was honored.
   - name: CATALOGSOURCE_NAME
     default: qe-app-registry
     documentation: |-
