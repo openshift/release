@@ -276,9 +276,17 @@ with open(path, 'r') as f:
 # Patch 1: Insert vault-license secret creation before "# install the vault provider"
 license_secret_creation = f'''  # Create vault-license secret from license string
   oc create namespace vault || true
-  oc create secret generic vault-license \\
-    --from-file=license={creds_dir}/vault-license \\
-    -n vault --dry-run=client -o yaml | oc apply -f -
+  cat <<YAML_EOF > /tmp/vault-license.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-license
+  namespace: vault
+type: Opaque
+data:
+  license: $(cat {creds_dir}/vault-license | tr -d '[:space:]')
+YAML_EOF
+  oc apply -f /tmp/vault-license.yaml
   
 '''
 vault_comment = '  # install the vault provider using the helm charts'
