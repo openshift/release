@@ -537,6 +537,25 @@ tests:
         export CR_NAME=cost-onprem
         export HELM_RELEASE_NAME=cost-onprem
         export IQE_TEST_RUN=True
+        # Provision the IQE image pull secret from the insights-qe quay robot
+        # (mirrors insights-onprem/cost-onprem-chart e2e). run-iqe-tests.sh detects
+        # and reuses a pre-existing iqe-pull-secret, so that script needs no change.
+        # Fail-closed: no secret material is written to stdout/stderr.
+        SECRETS_DIR="/tmp/secrets/ci"
+        if [[ -f "${SECRETS_DIR}/username" && -f "${SECRETS_DIR}/password" ]]; then
+          echo "iqe: provisioning quay pull secret for the private IQE image"
+          if oc create secret docker-registry iqe-pull-secret -n "${NAMESPACE}" \
+               --docker-server=quay.io \
+               --docker-username="$(cat "${SECRETS_DIR}/username")" \
+               --docker-password="$(cat "${SECRETS_DIR}/password")" \
+               --dry-run=client -o yaml | oc apply -f - >/dev/null 2>&1; then
+            echo "iqe: quay pull secret ready"
+          else
+            echo "iqe: WARNING - failed to create quay pull secret; image pull may fail" >&2
+          fi
+        else
+          echo "iqe: WARNING - quay creds not mounted at ${SECRETS_DIR}; image pull will fail" >&2
+        fi
         set +e
         ./scripts/run-iqe-tests.sh --profile smoke 2>&1 | _sanitize
         pipe_status=("${PIPESTATUS[@]}")
@@ -553,6 +572,10 @@ tests:
         _sanitize_shared_reports
         _sanitize_tree
         exit "${rc}"
+      credentials:
+      - mount_path: /tmp/secrets/ci
+        name: insights-qe-secrets
+        namespace: test-credentials
       from: koku-service-operator-e2e
       resources:
         requests:

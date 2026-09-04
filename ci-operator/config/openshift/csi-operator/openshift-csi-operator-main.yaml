@@ -601,6 +601,36 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --disable-monitor=service-type-load-balancer-availability
     workflow: openshift-e2e-aws-csi
+- always_run: false
+  as: tls-scanner-gcp-pd
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-gcp-csi
+- always_run: false
+  as: tls-scanner-azure
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-azure-csi
 zz_generated_metadata:
   branch: main
   org: openshift

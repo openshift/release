@@ -104,6 +104,10 @@ make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
 SKIP_CERT_VERIFICATION=true \
 FRONTEND_ADDRESS="${FRONTEND_ADDRESS}" \
 CUSTOMER_SUBSCRIPTION="${CUSTOMER_SUBSCRIPTION}" \
+ARO_HCP_CONFIG_FILE="config/config.yaml" \
+ARO_HCP_CONFIG_FILE_OVERRIDE="${OVERRIDE_CONFIG_FILE}" \
+CLOUD="public" \
+REGION="${LOCATION}" \
   ./test/aro-hcp-tests run-suite upgrade/in-place \
   --junit-path="${ARTIFACT_DIR}/junit.xml" \
   --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" \

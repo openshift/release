@@ -41,20 +41,23 @@ tests:
   steps:
     cluster_profile: gcp-observability
     env:
-      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1155557
-      MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH: rhosdt-3.10
+      AGENT_SKILL: otel
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1203874
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH: rhosdt-3.11
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1201019
       OPERATORS: |
         [
-            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
             {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "opentelemetry-operator-system", "target_namespaces": "", "operator_group": "opentelemetry-operator-system"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.4", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.4", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""}
         ]
       SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-otel/google*
-        tests/e2e-instrumentation/instrumentation-go
+        tests/e2e-instrumentation/instrumentation-go tests/e2e-otel/azuremonitorlogs
+        tests/e2e-openshift/export-to-cluster-logging-lokistack
+    post:
+    - ref: openshift-observability-qe-agent
     test:
+    - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-stage

@@ -43,7 +43,8 @@ make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
 make e2e-local/run -o test/aro-hcp-tests \
   FRONTEND_ADDRESS="${FRONTEND_ADDRESS}" \
   ADMIN_API_ADDRESS="${ADMIN_API_ADDRESS}" \
-  SKIP_CERT_VERIFICATION=true
+  SKIP_CERT_VERIFICATION=true \
+  ARO_HCP_CLOUD="public"
 
 # the make target produces a junit.xml in ARTIFACT_DIR.  We want to copy to SHARED_DIR so we can create
 # direct debugging links for the individual tests that failed. Gzip it due to 3mb SHARED_DIR limit.

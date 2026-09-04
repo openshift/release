@@ -1,10 +1,45 @@
+base_images:
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.26-openshift-4.23
+images:
+  items:
+  - dockerfile_path: build/Dockerfile
+    to: managed-cluster-validating-webhooks
+  - context_dir: config/package
+    dockerfile_path: managed-cluster-validating-webhooks-package.Containerfile
+    to: operator-pko
+  - dockerfile_literal: |
+      FROM src
+      RUN CGO_ENABLED=0 GOFLAGS="-mod=mod" go test ./test/e2e -v -c --tags=osde2e -o /usr/local/bin/e2e.test
+    from: src
+    to: operator-e2e
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
 resources:
   '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  managed-cluster-validating-webhooks:
+    limits:
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -18,6 +53,77 @@ tests:
     make e2e-binary-build
   container:
     from: src
+- as: rosa-sts-e2e
+  optional: true
+  run_if_changed: ^(test/e2e/.*|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: rosa-e2e-01
+    dependencies:
+      OPERATOR_IMAGE: pipeline:managed-cluster-validating-webhooks
+      OPERATOR_PKO_IMAGE: pipeline:operator-pko
+    env:
+      GINKGO_FOCUS: Managed Cluster Validating Webhooks
+      OPERATOR_DEPLOYMENT_NAME: validation-webhook
+      OPERATOR_NAME: managed-cluster-validating-webhooks
+      OPERATOR_NAMESPACE: openshift-validation-webhook
+    post:
+    - ref: rosa-mcvw-cleanup
+    - ref: rosa-cluster-lease-checkin
+    pre:
+    - ref: rosa-cluster-lease-checkout
+    - ref: rosa-mcvw-install
+    test:
+    - ref: rosa-operator-e2e
+- as: rosa-sts-e2e-promotion-int
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      GINKGO_FOCUS: Managed Cluster Validating Webhooks
+      LEASE_ENV: integration
+      OPERATOR_NAME: managed-cluster-validating-webhooks
+      OPERATOR_NAMESPACE: openshift-validation-webhook
+    post:
+    - ref: rosa-cluster-lease-checkin
+    pre:
+    - ref: rosa-cluster-lease-checkout
+    test:
+    - ref: rosa-operator-e2e
+- as: rosa-sts-e2e-promotion-stage
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <!subteam^S0B7Q6G7XQR> <@U0AKNPBBVT7> {{- end}}'
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      GINKGO_FOCUS: Managed Cluster Validating Webhooks
+      LEASE_ENV: staging
+      OPERATOR_NAME: managed-cluster-validating-webhooks
+      OPERATOR_NAMESPACE: openshift-validation-webhook
+    post:
+    - ref: rosa-cluster-lease-checkin
+    pre:
+    - ref: rosa-cluster-lease-checkout
+    test:
+    - ref: rosa-operator-e2e
 zz_generated_metadata:
   branch: master
   org: openshift

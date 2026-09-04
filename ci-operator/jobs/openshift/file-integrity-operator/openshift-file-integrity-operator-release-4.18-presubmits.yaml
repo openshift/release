@@ -57,7 +57,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )ci-index-file-integrity-operator-bundle,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
@@ -138,9 +138,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-aws|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(config|bundle)
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
@@ -158,7 +160,6 @@ presubmits:
     name: pull-ci-openshift-file-integrity-operator-release-4.18-e2e-bundle-aws
     optional: true
     rerun_command: /test e2e-bundle-aws
-    run_if_changed: ^(config|bundle)
     spec:
       containers:
       - args:
@@ -226,6 +227,8 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-bundle-aws,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^(config|bundle)
     branches:
     - ^release-4\.18$
     - ^release-4\.18-
@@ -243,7 +246,6 @@ presubmits:
     name: pull-ci-openshift-file-integrity-operator-release-4.18-e2e-bundle-aws-upgrade
     optional: true
     rerun_command: /test e2e-bundle-aws-upgrade
-    run_if_changed: ^(config|bundle)
     spec:
       containers:
       - args:

@@ -1,7 +1,7 @@
 presubmits:
   openshift-priv/secondary-scheduler-operator:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
@@ -85,9 +85,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-aws-operator|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^\.tekton/|^bundle\.Dockerfile$|\.md$|^(?:.*/)?(?:\.gitignore|LICENSE|OWNERS)$
     branches:
     - ^release-5\.2$
     - ^release-5\.2-
@@ -111,7 +113,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/secondary-scheduler-operator
     rerun_command: /test e2e-aws-operator-serial-ote
-    skip_if_only_changed: ^\.tekton/|^bundle\.Dockerfile$|\.md$|^(?:.*/)?(?:\.gitignore|LICENSE|OWNERS)$
     spec:
       containers:
       - args:

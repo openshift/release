@@ -14,6 +14,14 @@ collect_operator_logs() {
         oc get events -n "${ns}" --sort-by='.lastTimestamp' \
             > "${ARTIFACT_DIR}/operator-namespace-events.txt" 2>&1 || true
     fi
+    # Capture PKO manager logs and events for debugging reconciliation issues
+    if [[ -n "${ARTIFACT_DIR:-}" ]] && oc get namespace openshift-package-operator &>/dev/null; then
+        oc logs deployment/package-operator-manager -n openshift-package-operator \
+            --all-containers --tail=200 \
+            > "${ARTIFACT_DIR}/pko-manager-logs.txt" 2>&1 || true
+        oc get events -n openshift-package-operator --sort-by='.lastTimestamp' \
+            > "${ARTIFACT_DIR}/pko-namespace-events.txt" 2>&1 || true
+    fi
 }
 
 trap 'collect_operator_logs; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM EXIT
@@ -97,6 +105,44 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
     oc rollout status deployment -n openshift-package-operator --timeout=120s 2>/dev/null || true
     log "PKO restarted with CI pull secret"
 
+    # Wait for PKO manager to be fully ready (informer caches synced).
+    # oc rollout status only confirms pods are Running; the manager's
+    # informers/watches may not yet be synced. If we create a ClusterPackage
+    # before sync completes, PKO never sees the create event.
+    log "Waiting for PKO manager readiness..."
+    PKO_READY=""
+    for i in $(seq 1 24); do
+        # Primary check: controller-runtime /readyz endpoint on the manager pod
+        PKO_POD=$(oc get pod -n openshift-package-operator \
+            -l app.kubernetes.io/name=package-operator \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+        if [[ -n "${PKO_POD}" ]]; then
+            if oc exec "${PKO_POD}" -n openshift-package-operator -- \
+                wget -q --spider -T 2 http://localhost:8081/readyz 2>/dev/null; then
+                PKO_READY=1
+                break
+            fi
+        fi
+        # Fallback: deployment Available + pod Ready conditions
+        if oc wait deployment/package-operator-manager -n openshift-package-operator \
+            --for=condition=Available --timeout=1s 2>/dev/null; then
+            if oc wait pod -n openshift-package-operator \
+                -l app.kubernetes.io/name=package-operator \
+                --for=condition=Ready --timeout=1s 2>/dev/null; then
+                PKO_READY=1
+                break
+            fi
+        fi
+        sleep 5
+    done
+    if [[ -n "${PKO_READY}" ]]; then
+        # Brief grace period for informer cache sync after health check passes
+        log "PKO manager ready, waiting 10s for informer cache sync"
+        sleep 10
+    else
+        log "WARNING: PKO readiness check timed out after 2 minutes, proceeding anyway"
+    fi
+
     # Add CI pull secret to the operator namespace so operator pods can pull
     # CI-built images without waiting for MCO to propagate the global secret.
     oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
@@ -105,6 +151,25 @@ if [[ -s /tmp/ci-registry-creds.json ]]; then
         --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
         --dry-run=client -o yaml | oc apply -f -
     log "CI pull secret added to operator namespace ${OPERATOR_NAMESPACE}"
+
+    # Pre-create the operator ServiceAccount with the CI pull secret BEFORE
+    # creating the ClusterPackage. Without this, PKO creates a pod using the
+    # default (un-patched) SA, causing ErrImagePull. The pod then sits in
+    # image-pull-backoff for ~3 minutes until the SA patch + pod delete in the
+    # deployment wait loop below kicks in.  By pre-creating the SA with the
+    # pull secret already attached, the first pod PKO creates can pull
+    # immediately.  The existing SA patch code in the wait loop is kept as a
+    # fallback in case PKO uses a different SA name.
+    SA_PRECREATE_NAME="${OPERATOR_DEPLOYMENT_NAME:-${OPERATOR_NAME}}"
+    log "Pre-creating ServiceAccount ${SA_PRECREATE_NAME} in ${OPERATOR_NAMESPACE} with CI pull secret"
+    oc create sa "${SA_PRECREATE_NAME}" -n "${OPERATOR_NAMESPACE}" \
+        --dry-run=client -o yaml | oc apply -f -
+    # Use strategic-merge patch so this works whether or not the SA already
+    # has an imagePullSecrets array.  JSON Patch "add" to "/imagePullSecrets/-"
+    # fails when the array does not exist; strategic merge creates it.
+    oc patch sa "${SA_PRECREATE_NAME}" -n "${OPERATOR_NAMESPACE}" \
+        --type strategic -p '{"imagePullSecrets":[{"name":"ci-pull-secret"}]}'
+    log "ServiceAccount ${SA_PRECREATE_NAME} pre-patched with CI pull secret"
 else
     log "WARNING: Could not get CI registry credentials, PKO may fail to pull images"
 fi
@@ -254,6 +319,25 @@ for i in $(seq 1 30); do
     if oc get deployment "${OPERATOR_DEPLOYMENT_NAME}" -n "${OPERATOR_NAMESPACE}" &>/dev/null; then
         break
     fi
+    # Check ClusterPackage status for early failure detection (image pull errors, etc.)
+    CP_STATUS=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" \
+        -o jsonpath='{.status.conditions[?(@.type=="Invalid")].status}' 2>/dev/null || true)
+    if [[ "${CP_STATUS}" == "True" ]]; then
+        CP_MSG=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" \
+            -o jsonpath='{.status.conditions[?(@.type=="Invalid")].message}' 2>/dev/null || true)
+        log "ERROR: ClusterPackage ${CLUSTER_PACKAGE_NAME} is Invalid: ${CP_MSG}"
+        oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o yaml || true
+        exit 1
+    fi
+    CP_UNPACK=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" \
+        -o jsonpath='{.status.conditions[?(@.type=="Unpacked")].status}' 2>/dev/null || true)
+    if [[ "${CP_UNPACK}" == "False" ]]; then
+        CP_MSG=$(oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" \
+            -o jsonpath='{.status.conditions[?(@.type=="Unpacked")].message}' 2>/dev/null || true)
+        log "ERROR: ClusterPackage ${CLUSTER_PACKAGE_NAME} failed to unpack: ${CP_MSG}"
+        oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o yaml || true
+        exit 1
+    fi
     if [[ $i -eq 30 ]]; then
         log "ERROR: Deployment ${OPERATOR_DEPLOYMENT_NAME} not found after 5 minutes"
         oc get clusterpackage "${CLUSTER_PACKAGE_NAME}" -o yaml || true
@@ -318,6 +402,33 @@ if [[ -n "${OPERATOR_CRDS:-}" ]]; then
         fi
     done
     log "All operator CRDs established"
+
+    # Verify each CRD is actually served by the API server.
+    # condition=Established only means the CRD *object* has that status
+    # condition, but it does NOT guarantee the API server is serving the
+    # resource yet.  Without this check the operator (or e2e tests) can
+    # hit "the server could not find the requested resource" errors and
+    # never recover.  Poll `oc get <plural>.<group>` until the API
+    # server responds without error.
+    for crd in "${CRD_LIST[@]}"; do
+        crd=$(echo "${crd}" | xargs)
+        CRD_PLURAL=$(oc get crd "${crd}" -o jsonpath='{.spec.names.plural}')
+        CRD_GROUP=$(oc get crd "${crd}" -o jsonpath='{.spec.group}')
+        log "Verifying API server serves ${CRD_PLURAL}.${CRD_GROUP}..."
+        for i in $(seq 1 24); do
+            if oc get "${CRD_PLURAL}.${CRD_GROUP}" -A --no-headers --request-timeout=10s 2>/dev/null; then
+                break
+            fi
+            if [[ $i -eq 24 ]]; then
+                log "ERROR: CRD ${crd} established but API server not serving ${CRD_PLURAL}.${CRD_GROUP} after 120s"
+                oc get crd "${crd}" -o yaml 2>/dev/null || true
+                oc api-resources 2>/dev/null | grep -i "${CRD_PLURAL}" || true
+                exit 1
+            fi
+            sleep 5
+        done
+        log "CRD ${CRD_PLURAL}.${CRD_GROUP} is served by API server"
+    done
 fi
 
 # Restore backed-up CR instances that were deployed by SSS/MCC
