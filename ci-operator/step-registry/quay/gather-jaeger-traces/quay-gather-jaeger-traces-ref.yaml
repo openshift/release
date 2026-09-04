@@ -1,0 +1,30 @@
+ref:
+  as: quay-gather-jaeger-traces
+  cli: latest
+  from_image:
+    name: quay-test-omr
+    namespace: ci
+    tag: latest
+  commands: quay-gather-jaeger-traces-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 15m0s
+  grace_period: 10m0s
+  documentation: |-
+    Collect Quay's OTLP traces from the in-cluster Jaeger deployed by
+    quay-deploy-jaeger. Runs in post so it gathers on both pass and fail. Skips
+    cleanly if Jaeger was never deployed. Port-forwards the query API, saves the
+    service list and traces for service "quay" to ${ARTIFACT_DIR}/jaeger-traces,
+    and gzips a non-empty trace dump. Best-effort throughout: always exits 0.
+  env:
+  - name: QUAYNAMESPACE
+    default: "quay-enterprise"
+    documentation: Namespace where Quay (and Jaeger) are deployed.
+  - name: JAEGER_LOOKBACK
+    default: "6h"
+    documentation: Lookback window passed to the Jaeger query API.
+  - name: JAEGER_TRACE_LIMIT
+    default: "50000"
+    documentation: Maximum number of traces requested from the Jaeger query API.
