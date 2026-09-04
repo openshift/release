@@ -17,6 +17,7 @@ workflow:
       - ref: aro-hcp-gather-observability
       - ref: aro-hcp-gather-snapshot
       - ref: aro-hcp-deprovision-environment
+      - ref: aro-hcp-deprovision-cleanup-sweeper
       - ref: aro-hcp-lease-release
   documentation: |-
     Runs ARO HCP e2e tests with PR-built hypershift images in an isolated
@@ -43,9 +44,11 @@ workflow:
     5. Run ARO HCP e2e tests (aro-hcp-test-local). The CPO override is
        passed as an ARM resource tag on cluster creation, gated by the
        FeatureExperimentalReleaseFeatures subscription AFEC.
-    6. Gather test results, tear down the environment, and release
-       Boskos leases (aro-hcp-deprovision-environment,
-       aro-hcp-lease-release)
+    6. Gather test results, tear down the environment, purge the role
+       assignments the environment's AKS cluster left behind on the shared
+       dev ACR/Key Vault (aro-hcp-deprovision-environment,
+       aro-hcp-deprovision-cleanup-sweeper), and release Boskos leases
+       (aro-hcp-lease-release)
 
     Each PR gets its own isolated environment, so concurrent runs do not
     interfere with each other.
