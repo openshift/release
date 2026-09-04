@@ -1,8 +1,34 @@
+base_images:
+  ocp_ubi-minimal_9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+  openshift_release_rhel-9-release-golang-1.26-openshift-5.0:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.26-openshift-5.0
+images:
+  items:
+  - dockerfile_path: Dockerfile.utils.rhel9
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-9-release-golang-1.26-openshift-5.0:
+        as:
+        - $GO_BUILDER
+    to: func-util
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+releases:
+  latest:
+    integration:
+      name: "4.22"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -21,6 +47,34 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        hack/openshift/cluster-prepare.sh
+        hack/openshift/e2e.sh
+      dependencies:
+      - env: FUNC_UTILS_IMG
+        name: func-util
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1h30m0s
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
