@@ -11,6 +11,10 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: release
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   image_stream_tag:
     name: builder
@@ -55,10 +59,9 @@ releases:
       name: "4.17"
       namespace: ocp
   latest-4-22:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.22"
+    integration:
+      name: "4.22"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -124,18 +127,37 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- always_run: false
-  as: e2e-aws-deployment
-  optional: true
+- as: e2e-aws-deployment
+  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
   steps:
     cluster_profile: aws-stackrox
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-22
     env:
       BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-compliance
+      SCANNER_NAMESPACE: openshift-compliance
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-install-install-cli-4-22
+    - ref: ipi-install-times-collection
+    - ref: nodes-readiness
+    - ref: multiarch-validate-nodes
+    - ref: openshift-tests-extension-admission-crd-install
+    - ref: tls-13
     test:
     - as: test
-      cli: latest
+      cli: latest-4-22
       commands: make e2e-deployment
       dependencies:
       - env: IMAGE_FROM_CI
@@ -148,7 +170,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    - ref: tls-scanner-run
 - always_run: false
   as: e2e-aws-scan-config
   optional: true
