@@ -291,6 +291,22 @@ spec:
           port: 9090
   policyTypes:
     - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allows-ingress-to-oauth-openshift
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: oauth-openshift
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 6443
+  policyTypes:
+    - Ingress
 EOF
 
   echo "NetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
