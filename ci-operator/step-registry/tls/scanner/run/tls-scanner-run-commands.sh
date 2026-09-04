@@ -368,7 +368,9 @@ set_tls_profile() {
 
   # Changing the profile rolls the API servers and everything that follows
   # them; scanning before that finishes measures the old configuration.
-  oc adm wait-for-stable-cluster --timeout=3h
+  # Bounded well under the step timeout: a sweep is at most three passes (one
+  # per valid profile), and each pass needs room to scan after it stabilizes.
+  oc adm wait-for-stable-cluster --timeout=45m
 
   local observed
   observed="$(oc get apiserver/cluster -o jsonpath='{.spec.tlsSecurityProfile.type}')"
@@ -396,7 +398,10 @@ if [[ -n "${TLS_SCANNER_PROFILE_SWEEP:-}" ]]; then
   IFS=',' read -r -a SWEEP_PROFILES <<< "${TLS_SCANNER_PROFILE_SWEEP// /}"
 
   # Validate the whole list before touching the cluster, so a typo in the last
-  # entry fails now rather than after an hour of scanning.
+  # entry fails now rather than after an hour of scanning. Rejecting repeats
+  # also bounds the sweep at one pass per valid profile, i.e. three, which is
+  # what the per-pass stabilization budget above is sized against.
+  SWEEP_SEEN=""
   for profile in "${SWEEP_PROFILES[@]}"; do
     case "${profile}" in
     Old|Intermediate|Modern) ;;
@@ -405,6 +410,12 @@ if [[ -n "${TLS_SCANNER_PROFILE_SWEEP:-}" ]]; then
       exit 1
       ;;
     esac
+    if [[ " ${SWEEP_SEEN} " == *" ${profile} "* ]]; then
+      echo "Repeated TLS_SCANNER_PROFILE_SWEEP entry '${profile}': each profile can be scanned"
+      echo "at most once, so that the sweep fits the step timeout."
+      exit 1
+    fi
+    SWEEP_SEEN="${SWEEP_SEEN} ${profile}"
   done
 
   OVERALL_EXIT_CODE=0
