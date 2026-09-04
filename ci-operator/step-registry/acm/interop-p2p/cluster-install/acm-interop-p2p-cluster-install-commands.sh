@@ -732,62 +732,47 @@ ExtractClusterCredentials() {
     true
 }
 
-#=====================
-# Function: DisableClusterImagePolicySignatureEnforcement
-#=====================
-# Patches the spoke's ClusterVersion to mark the 'openshift'
-# ClusterImagePolicy as unmanaged, preventing Sigstore signature
-# enforcement on unsigned nightly images.
-#
-# Nightly builds are intentionally not Sigstore-signed by ART.
-# Starting with 4.21 the 'openshift' ClusterImagePolicy requires
-# Sigstore signatures on quay.io/openshift-release-dev/ocp-v4.0-art-dev
-# payload images. Without this patch, spoke upgrades to nightly builds
-# fail with "A signature was required, but no signature exists".
-# See OCPBUGS-114622.
-#
-# Arguments:
-#   $1 - kubeconfig: Path to the spoke cluster kubeconfig
-#   $2 - clusterName: Name of the spoke cluster (for logging)
-#
+# Marks the 'openshift' ClusterImagePolicy unmanaged on the spoke ClusterVersion
+# so CVO does not revert it during upgrade (unsigned nightlies, OCPBUGS-114622).
+# No-op when the policy is absent or does not enforce ocp-v4.0-art-dev.
 DisableClusterImagePolicySignatureEnforcement() {
     typeset kubeconfig="${1:?}"; (($#)) && shift
     typeset clusterName="${1:?}"; (($#)) && shift
+    typeset cipJson='' currentOverrides='' newOverrides='' patchPayload=''
+
+    cipJson="$(oc --kubeconfig="${kubeconfig}" get clusterimagepolicy openshift \
+        --ignore-not-found -o json)"
+    if [[ -z "${cipJson}" ]]; then
+        : "Spoke ${clusterName}: no openshift ClusterImagePolicy found — skipping"
+        return 0
+    fi
+    if ! jq -e '.spec.scopes[]? | select(contains("ocp-v4.0-art-dev"))' \
+            <<<"${cipJson}" >/dev/null; then
+        : "Spoke ${clusterName}: ClusterImagePolicy does not enforce ocp-v4.0-art-dev — skipping"
+        return 0
+    fi
 
     : "Disabling ClusterImagePolicy signature enforcement on spoke ${clusterName}"
-
-    typeset currentOverrides
     currentOverrides="$(oc --kubeconfig="${kubeconfig}" get clusterversion version -o json |
         jq -c '.spec.overrides // []')"
-
-    typeset newOverrides
-    newOverrides="$(jq -c '. + [{
-        "group":     "config.openshift.io",
-        "kind":      "ClusterImagePolicy",
-        "name":      "openshift",
-        "namespace": "",
-        "unmanaged": true
-    }]' <<<"${currentOverrides}")"
-
-    # Build the patch payload in a variable assignment so jq failure
-    # propagates via errexit (command substitution in a command argument
-    # does not propagate errors even with inherit_errexit).
-    typeset patchPayload
+    if jq -e '.[] | select(.kind=="ClusterImagePolicy" and .unmanaged==true)' \
+            <<<"${currentOverrides}" >/dev/null; then
+        : "ClusterImagePolicy already unmanaged on ${clusterName}"
+        return 0
+    fi
+    newOverrides="$(jq -c \
+        '. + [{"group":"config.openshift.io","kind":"ClusterImagePolicy","name":"openshift","namespace":"","unmanaged":true}]' \
+        <<<"${currentOverrides}")"
     patchPayload="$(jq -cn --argjson overrides "${newOverrides}" \
         '{"spec":{"overrides":$overrides}}')"
-
     oc --kubeconfig="${kubeconfig}" patch clusterversion version --type merge \
         -p "${patchPayload}" 1>/dev/null
-
-    # Verify the override was applied.
-    typeset appliedUnmanaged
-    appliedUnmanaged="$(oc --kubeconfig="${kubeconfig}" get clusterversion version \
-        -o jsonpath='{.spec.overrides[?(@.kind=="ClusterImagePolicy")].unmanaged}')"
-    if [[ "${appliedUnmanaged}" != *"true"* ]]; then
+    if ! jq -e '.spec.overrides[] | select(.kind=="ClusterImagePolicy" and .unmanaged==true)' \
+            <<<"$(oc --kubeconfig="${kubeconfig}" get clusterversion version -o json)" \
+            >/dev/null; then
         : "Failed to verify CVO override for ClusterImagePolicy on spoke ${clusterName}"
         return 1
     fi
-
     : "ClusterImagePolicy signature enforcement disabled on spoke ${clusterName}"
     true
 }
@@ -795,10 +780,11 @@ DisableClusterImagePolicySignatureEnforcement() {
 #=====================
 # Main execution: Create all clusters
 #=====================
-# The installation process has three phases:
+# The installation process has four phases:
 # 1. Create resources - Sets up all K8s resources for each cluster
 # 2. Wait for provisioning - Monitors ClusterDeployment status
 # 3. Extract credentials - Retrieves kubeconfig and metadata
+# 4. Disable image policy (optional) - Marks ClusterImagePolicy as unmanaged for nightly upgrades
 
 : "=========================================="
 : "Starting creation of ${ACM_SPOKE_CLUSTER_COUNT} spoke cluster(s)"
@@ -833,9 +819,17 @@ for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     ExtractClusterCredentials "${clusterNamesArr[i]}" "${idx}"
 done
 
-# Phase 4: Disable ClusterImagePolicy signature enforcement on spokes
-# Only needed when installing with unsigned nightly images.
-if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}" == "true" ]]; then
+# Create symlinks for backward compatibility with single-cluster workflows
+# This allows existing steps that expect 'managed-cluster-kubeconfig' to work
+ln -sf "managed-cluster-kubeconfig-1" "${SHARED_DIR}/managed-cluster-kubeconfig"
+ln -sf "managed-cluster-metadata-1.json" "${SHARED_DIR}/managed-cluster-metadata.json"
+
+# Phase 4: Disable ClusterImagePolicy signature enforcement on spokes (opt-in).
+# Required when provisioning spokes with unsigned nightly images so that upgrade
+# to a nightly target does not fail with Sigstore "signature required" errors on
+# worker nodes. Controlled by OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY.
+if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY}" == "true" ]]; then
+    : "Phase 4: Disabling ClusterImagePolicy signature enforcement on all spokes"
     for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
         idx=$((i + 1))
         DisableClusterImagePolicySignatureEnforcement \
@@ -843,11 +837,6 @@ if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}" == "true" ]]; t
             "${clusterNamesArr[i]}"
     done
 fi
-
-# Create symlinks for backward compatibility with single-cluster workflows
-# This allows existing steps that expect 'managed-cluster-kubeconfig' to work
-ln -sf "managed-cluster-kubeconfig-1" "${SHARED_DIR}/managed-cluster-kubeconfig"
-ln -sf "managed-cluster-metadata-1.json" "${SHARED_DIR}/managed-cluster-metadata.json"
 
 # Print summary of created resources
 : "=========================================="
