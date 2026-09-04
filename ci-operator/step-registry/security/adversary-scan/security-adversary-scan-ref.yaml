@@ -5,7 +5,7 @@ ref:
   credentials:
   - namespace: test-credentials
     name: sa-claude-openshift-ci
-    mount_path: /var/run/claude-code-service-account
+    mount_path: /var/run/claude-code-service-accoun
   env:
   - name: ADVERSARY_SCAN_MODE
     default: "merge-ref-scan"
@@ -32,6 +32,15 @@ ref:
   - name: GOOGLE_APPLICATION_CREDENTIALS
     default: "/var/run/claude-code-service-account/google-token"
     documentation: "Path to GCP service account credentials for Vertex AI authentication."
+  - name: GITHUB_PAT_PATH
+    default: "/var/run/claude-code-service-account/gh-pat"
+    documentation: |-
+      Path to a file containing a GitHub PAT for an account with
+      openshift-online org membership, used to authenticate
+      `claude plugin marketplace add`/`install` agains
+      openshift-online/rosa-claude-plugins (which requires org membership
+      to read). Expected as an additional key (`gh-pat`) in the existing
+      sa-claude-openshift-ci secret — see ONBOARDING.md for how to add it.
   resources:
     requests:
       cpu: 1000m
@@ -40,9 +49,10 @@ ref:
   grace_period: 1m0s
   documentation: |-
     Runs the adversary security scanner (from rosa-claude-plugins/security)
-    against the repo source code. Covers 17 security domains: SAST, IaC,
-    containers, K8s, CI/CD, secrets, supply chain, web, API, auth, database,
-    mobile, cloud, performance, git, agent/skill, and critical workflows.
+    against the repo source code. It covers many security domains, including:
+    SAST, IaC, containers, K8s, CI/CD, secrets, supply chain, web, API, auth,
+    database, mobile, cloud, performance, git, agent/skill, and critical
+    workflows.
 
     Three scan modes are available via ADVERSARY_SCAN_MODE:
       merge-ref-scan  Scans the merge branch / test merge.

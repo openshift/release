@@ -6,6 +6,9 @@
 #   ADVERSARY_SCAN_MODE  -- merge-ref-scan, full-scan, or groundwork
 #   CLAUDE_MODEL         -- Claude model for the scan
 #   MAX_TURNS            -- max conversation turns
+#   GITHUB_PAT_PATH      -- file containing a GitHub PAT with openshift-online
+#                           org membership (required to install the plugin
+#                           from rosa-claude-plugins — see ONBOARDING.md)
 #
 # Provided by ci-operator:
 #   ARTIFACT_DIR         -- directory for test artifacts (JUnit, logs)
@@ -38,6 +41,39 @@ trap copy_artifacts EXIT TERM INT
 # Git HTTPS workaround — CI containers lack SSH host keys
 # -----------------------------------------------------------------------
 git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+# -----------------------------------------------------------------------
+# Configure GitHub credentials for marketplace access
+#
+# rosa-claude-plugins requires openshift-online org membership to read,
+# so an authenticated identity is required here — see ONBOARDING.md for
+# how to provision GITHUB_PAT_PATH's underlying secret.
+# -----------------------------------------------------------------------
+echo ""
+echo "=== Loading GitHub credentials ==="
+
+if [ ! -f "$GITHUB_PAT_PATH" ]; then
+    echo "ERROR: GitHub PAT not found at ${GITHUB_PAT_PATH}"
+    echo "See ONBOARDING.md — this step requires a GitHub PAT with openshift-online org membership."
+    exit 1
+fi
+
+# Disable tracing for credential handling
+[[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
+set +x
+
+GITHUB_TOKEN=$(cat "$GITHUB_PAT_PATH")
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo "ERROR: GitHub PAT file is empty: ${GITHUB_PAT_PATH}"
+    $_was_tracing && set -x || true
+    exit 1
+fi
+
+git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN}; }; f"
+export GITHUB_TOKEN
+echo "GitHub credentials configured."
+
+$_was_tracing && set -x || true
 
 # -----------------------------------------------------------------------
 # Install the adversary skill from rosa-claude-plugins marketplace
@@ -96,6 +132,7 @@ timeout 10200 claude \
     --model "${CLAUDE_MODEL}" \
     --output-format stream-json \
     --max-turns "${MAX_TURNS}" \
+    --allowedTools "Read Grep Glob Bash(git diff *) Bash(git log *) Bash(git rev-parse *) Bash(git status *) Bash(find . *) Bash(bash scripts/*) Bash(python3 scripts/*) Bash(wc *) Bash(sort *) WebSearch" \
     -p "${PROMPT}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/adversary-scan.log" || EXIT_CODE=$?
 
@@ -123,8 +160,6 @@ LOW=${LOW}
 SCAN_MODE=${ADVERSARY_SCAN_MODE}
 SCAN_DURATION=${SCAN_DURATION}
 EOF
-
-touch "${SHARED_DIR}/adversary-scan-completed"
 
 # -----------------------------------------------------------------------
 # Write JUnit XML for Prow reporting
@@ -155,5 +190,11 @@ if [[ "${EXIT_CODE}" -ne 0 ]]; then
     echo "Adversary scan failed."
     exit 1
 fi
+
+# Written last, only on success — the notify step treats its absence as
+# "scan did not complete" and skips sending a notification. Writing it
+# earlier would let a timeout/crash produce a false green "no findings"
+# message even though the log was truncated and Prow shows the job red.
+touch "${SHARED_DIR}/adversary-scan-completed"
 
 echo "Adversary scan complete."
