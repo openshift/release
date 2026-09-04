@@ -17,6 +17,14 @@
         "required": true
       },
       {
+        "name": "CHAI_BOT_WEBHOOK_URL",
+        "required": true
+      },
+      {
+        "name": "CHAI_BOT_WEBHOOK_TOKEN",
+        "required": true
+      },
+      {
         "description": "monitoring namespace",
         "name": "MONITORING_NAMESPACE",
         "value": "openshift-user-workload-monitoring"

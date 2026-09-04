@@ -71,10 +71,22 @@ EOF
 
 echo "Created cluster CSI driver object"
 
-if [ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ] && [ "${ENABLE_LONG_CSI_CERTIFICATION_TESTS}" = "true" ]; then
-    cp /usr/share/aws-efs-csi-driver/ocp-manifest.yaml  ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
-    echo "Using OCP specific manifest ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}:"
-    cat ${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}
+if [ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ]; then
+    ocp_dir="/usr/share/aws-efs-csi-driver"
+    ocp_dest="${SHARED_DIR}/${TEST_OCP_CSI_DRIVER_MANIFEST}"
+    if [ "${ENABLE_LONG_CSI_CERTIFICATION_TESTS}" = "true" ]; then
+        if [ -f "${ocp_dir}/ocp-manifest-long.yaml" ]; then
+            cp "${ocp_dir}/ocp-manifest-long.yaml" "${ocp_dest}"
+        elif [ -f "${ocp_dir}/ocp-manifest.yaml" ]; then
+            cp "${ocp_dir}/ocp-manifest.yaml" "${ocp_dest}"
+        fi
+    elif [ -f "${ocp_dir}/ocp-manifest-long.yaml" ] && [ -f "${ocp_dir}/ocp-manifest.yaml" ]; then
+        cp "${ocp_dir}/ocp-manifest.yaml" "${ocp_dest}"
+    fi
+    if [ -f "${ocp_dest}" ]; then
+        echo "Using OCP specific manifest ${ocp_dest}:"
+        cat "${ocp_dest}"
+    fi
 fi
 
 # For debugging

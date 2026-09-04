@@ -94,6 +94,24 @@ tests:
   container:
     from: oc-mirror-tests
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^v1/)
+- always_run: false
+  as: e2e-aws-oc-mirror-ote
+  optional: true
+  skip_if_only_changed: ^v1/|^docs/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: oc-mirror
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/oc-mirror-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: oc-mirror
+      TEST_SUITE: oc-mirror/conformance/serial
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift

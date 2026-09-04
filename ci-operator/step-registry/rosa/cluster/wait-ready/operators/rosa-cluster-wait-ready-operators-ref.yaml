@@ -13,10 +13,22 @@ ref:
       Clear spec.channel on ClusterVersion after operators are ready. Set to "true"
       for conformance jobs on nightly payloads to prevent CannotRetrieveUpdatesSRE
       from firing (the CVO cannot retrieve updates for pre-release versions).
+  - name: OPERATOR_STALL_TIMEOUT
+    default: "1800"
+    documentation: |-
+      Seconds to wait before failing early when the same set of not-ready cluster
+      operators shows no progress (stall detection). Default is 1800 (30 minutes).
+  - name: OPERATOR_POLL_INTERVAL
+    default: "120"
+    documentation: |-
+      Seconds between polling iterations when checking cluster operator conditions.
+      Default is 120 (2 minutes).
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
   documentation: |-
     Wait for all cluster operators to finish progressing, verify they are Available and not Degraded
-    in a rosa cluster.
+    in a ROSA cluster. Uses a polling loop (instead of a blocking oc wait) with real-time operator
+    status logging, stall detection, per-operator pod diagnostics on degraded operators, periodic
+    artifact snapshots, and early exit on deterministic CrashLoopBackOff failures.

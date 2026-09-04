@@ -133,40 +133,66 @@ for stream in d.get('data',{}).get('result',[]):
         query_loki "{k8s_namespace_name=~\"ocm-${OCM_LOGIN_ENV}-${CLUSTER_ID}-.*\"}" \
           "${RHOBS_LOG_DIR}/hcp-guest-cluster.txt" 50000
 
-        # 2. HyperShift operator logs filtered for this cluster
+        # 2-4. OVN-K / CNCC / EgressIP logs (parallelized to stay within step timeout)
+        echo "  Collecting OVN-K, CNCC, and EgressIP logs in parallel..."
+        query_loki "{k8s_namespace_name=~\"ocm-${OCM_LOGIN_ENV}-${CLUSTER_ID}-.*\", k8s_container_name=~\"ovnkube-controller.*\"}" \
+          "${RHOBS_LOG_DIR}/ovnkube-controller.txt" 10000 &
+        query_loki "{k8s_namespace_name=~\"ocm-${OCM_LOGIN_ENV}-${CLUSTER_ID}-.*\", k8s_container_name=~\"cloud-network-config-controller.*\"}" \
+          "${RHOBS_LOG_DIR}/cloud-network-config-controller.txt" 5000 &
+        query_loki "{k8s_namespace_name=~\"ocm-${OCM_LOGIN_ENV}-${CLUSTER_ID}-.*\"} |~ \"(?i)egressip|egress[._-]?ip|egressnode|EgressIPAM\"" \
+          "${RHOBS_LOG_DIR}/egressip-filtered.txt" 5000 &
+        wait
+
+        # 5. HyperShift operator logs filtered for this cluster
         echo "  Collecting HyperShift operator logs (this cluster)..."
         query_loki "{k8s_namespace_name=\"hypershift\"} |= \"${CLUSTER_ID}\"" \
           "${RHOBS_LOG_DIR}/hypershift-operator.txt" 10000
 
-        # 3. HyperShift operator (all logs)
+        # 6. HyperShift operator (all logs)
         echo "  Collecting HyperShift operator logs (all)..."
         query_loki "{k8s_namespace_name=\"hypershift\"}" \
           "${RHOBS_LOG_DIR}/hypershift-operator-all.txt" 10000
 
-        # 4. MCO logs
+        # 7. MCO logs
         echo "  Collecting MCO logs..."
         query_loki "{k8s_namespace_name=\"openshift-machine-config-operator\"}" \
           "${RHOBS_LOG_DIR}/mco.txt" 5000
 
-        # 5. ACM logs
+        # 8. ACM logs
         echo "  Collecting ACM logs..."
         query_loki "{k8s_namespace_name=\"open-cluster-management-agent-addon\"}" \
           "${RHOBS_LOG_DIR}/acm.txt" 5000
 
-        # 6. cert-manager logs
+        # 9. cert-manager logs
         echo "  Collecting cert-manager logs..."
         query_loki "{k8s_namespace_name=\"cert-manager\"}" \
           "${RHOBS_LOG_DIR}/cert-manager.txt" 5000
 
-        # 7. Route Monitor Operator logs
+        # 10. Route Monitor Operator logs
         echo "  Collecting Route Monitor Operator logs..."
         query_loki "{k8s_namespace_name=\"openshift-route-monitor-operator\"}" \
           "${RHOBS_LOG_DIR}/route-monitor-operator-logs.txt" 5000
 
-        # 8. AWS VPCE Operator logs
+        # 11. AWS VPCE Operator logs
         echo "  Collecting AWS VPCE Operator logs..."
         query_loki "{k8s_namespace_name=\"openshift-aws-vpce-operator\"}" \
           "${RHOBS_LOG_DIR}/aws-vpce-operator-logs.txt" 5000
+
+        # 12. Cluster-side EgressIP diagnostic state (requires guest cluster kubeconfig)
+        if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+          echo "  Collecting cluster-side EgressIP state (guest cluster)..."
+          oc --kubeconfig="${SHARED_DIR}/kubeconfig" get egressips -o yaml \
+            > "${RHOBS_LOG_DIR}/egressip-cluster-state.txt" 2>&1 || true
+
+          oc --kubeconfig="${SHARED_DIR}/kubeconfig" get nodes -l k8s.ovn.org/egress-assignable -o json 2>/dev/null | \
+            jq '.items[] | {name: .metadata.name, annotations: {ifaddr: .metadata.annotations["k8s.ovn.org/node-primary-ifaddr"], ipconfig: .metadata.annotations["cloud.network.openshift.io/egress-ipconfig"]}}' \
+            > "${RHOBS_LOG_DIR}/egressip-node-annotations.json" 2>&1 || true
+
+          oc --kubeconfig="${SHARED_DIR}/kubeconfig" get events --field-selector reason=EgressIPAssignmentError --sort-by=.lastTimestamp -A \
+            > "${RHOBS_LOG_DIR}/egressip-events.txt" 2>&1 || true
+        else
+          echo "  Skipping cluster-side EgressIP state collection (no guest cluster kubeconfig at ${SHARED_DIR}/kubeconfig)"
+        fi
       }
 
       if [[ "${NO_CLUSTER_ID}" == "true" ]]; then

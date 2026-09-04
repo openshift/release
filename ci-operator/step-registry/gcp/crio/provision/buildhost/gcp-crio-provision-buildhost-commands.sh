@@ -76,7 +76,12 @@ if ! gcloud auth list | grep -E "\*\s+${sa_email}"; then
 	gcloud config set project "${GOOGLE_PROJECT_ID}"
 fi
 
-REGION="${LEASED_RESOURCE}"
+# TODO: temporary workaround for GCP us-central1 capacity exhaustion
+if [[ -f "${SHARED_DIR}/actual_region" ]]; then
+	REGION=$(cat "${SHARED_DIR}/actual_region")
+else
+	REGION="${LEASED_RESOURCE}"
+fi
 echo "Using region: ${REGION}"
 
 VPC_CONFIG="${SHARED_DIR}/customer_vpc_subnets.yaml"

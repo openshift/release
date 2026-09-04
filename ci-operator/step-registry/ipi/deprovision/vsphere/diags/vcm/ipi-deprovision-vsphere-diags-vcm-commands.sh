@@ -43,11 +43,16 @@ fi
 
 
 
-curl -kv "https://api-int.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com:6443" > ${ARTIFACT_DIR}/cluster-cert.txt
+for prefix in api api-int; do
+  API_HOSTNAME="${prefix}.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com"
+  echo "$(date -u --rfc-3339=seconds) - collecting certificate for ${API_HOSTNAME}"
 
-echo | \
-    openssl s_client -servername api-int.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com -connect api-int.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com:6443 2>/dev/null | \
-    openssl x509 -text
+  curl -kv "https://${API_HOSTNAME}:6443" &> "${ARTIFACT_DIR}/cluster-cert-${prefix}.txt"
+
+  echo | \
+      openssl s_client -servername "${API_HOSTNAME}" -connect "${API_HOSTNAME}:6443" 2>/dev/null | \
+      openssl x509 -text
+done
 
 function collect_sosreport {
   ADDRESS=$1

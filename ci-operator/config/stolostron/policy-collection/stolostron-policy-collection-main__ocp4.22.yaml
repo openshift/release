@@ -41,6 +41,12 @@ images:
     optional: true
     to: cli-with-git
   - dockerfile_literal: |
+      FROM this-is-ignored
+      RUN dnf install -y skopeo && dnf clean all
+    from: cli
+    optional: true
+    to: cli-with-skopeo
+  - dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/openjdk-17:1.21
       USER root
       RUN microdnf install -y git gzip && microdnf clean all
@@ -82,10 +88,9 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
-      DR__RP__CR_COMP_NAME: lp-interop--OPP
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-aws-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
@@ -106,7 +111,6 @@ tests:
     - ref: acm-tests-clc-destroy
     - ref: gather-aws-console
     - chain: ipi-deprovision
-    - ref: mpiit-data-router-reporter
     - ref: firewatch-report-issues
     pre:
     - ref: ipi-conf
@@ -120,13 +124,14 @@ tests:
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
-    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-opp-wait-mcp
     - ref: stackrox-opp-readiness
     - ref: stackrox-opp-smoke
-    - ref: acm-tests-clc-create
+    - ref: acm-tests-clc-smoke
     - ref: acm-fetch-managed-clusters
     - ref: acm-opp-app
     - ref: interop-opp-odf-health
+    - ref: interop-opp-observability-odf
     - ref: interop-tests-opp-quay-smoke
     - ref: acm-tests-observability
 - as: interop-opp-vsphere
@@ -147,7 +152,7 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: vsphere-connected-2
     env:
-      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_REPLICAS: "3"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","opp-vsphere-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
@@ -168,15 +173,15 @@ tests:
     - ref: acm-must-gather
     - ref: mce-must-gather
     - chain: ipi-vsphere-post
-    - ref: mpiit-data-router-reporter
     - ref: firewatch-report-issues
     test:
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
-    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-opp-wait-mcp
     - ref: interop-opp-odf-health
+    - ref: interop-opp-observability-odf
     - ref: acm-tests-observability
     - ref: acm-opp-app
     workflow: acm-ipi-vsphere

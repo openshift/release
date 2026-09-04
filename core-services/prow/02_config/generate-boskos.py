@@ -6,7 +6,7 @@ import yaml
 
 CONFIG = {
     'ibmcloud-perfscale-quota-slice': {
-        'us-east': 30,
+        'us-south': 15,
     },
     'aws-us-east-1-quota-slice': {
         'us-east-1': 15,
@@ -106,6 +106,9 @@ CONFIG = {
     'rosa-e2e-03-quota-slice': {
         'us-west-2': 5,
         'us-east-2': 5
+    },
+    'metal-nno-doca2-quota-slice': {
+        'metal-nno-doca2-rdu2': 1,
     },
     'metal-dpf-doca4-quota-slice': {
         'metal-dpf-doca4-rdu2': 1,
@@ -392,27 +395,6 @@ CONFIG = {
     },
     'gcp-sustaining-autorelease-412-quota-slice': {
         'us-east1': 60,
-    },
-    'gcp-quota-slice': {
-        'us-central1': 35,
-        'us-east1': 35,
-        'us-east4': 5,
-        'us-west1': 5,
-    },
-    'gcp-3-quota-slice': {
-        'us-central1': 35,
-        'us-east1': 35,
-        'us-east4': 35,
-        'us-west1': 35,
-    },
-    'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-central1': 35,
-        'us-east1': 35,
-        'us-east4': 35,
-        'us-west1': 35,
-    },
-    'gcp-arm64-quota-slice': {
-        'us-central1': 30,
     },
     'gcp-opendatahub-quota-slice': {
         'us-central1': 30,
@@ -905,19 +887,50 @@ CLUSTER_PROFILE_SETS_CONFIG = {
     'openshift-org-gcp': {
         'gcp': {
             'install': 50,
-            'quota': CONFIG['gcp-quota-slice'],
-        },
-        'gcp-arm64': {
-            'install': 20,
-            'quota': CONFIG['gcp-arm64-quota-slice'],
+            'quota': {
+                'us-central1': 30,
+                'us-east1': 35,
+                'us-east4': 5,
+                'us-west1': 5,
+            },
         },
         'gcp-openshift-gce-devel-ci-2': {
             'install': 50,
-            'quota': CONFIG['gcp-openshift-gce-devel-ci-2-quota-slice'],
+            'quota': {
+                'us-central1': 35,
+                'us-east1': 35,
+                'us-east4': 35,
+                'us-west1': 35,
+            },
         },
         'gcp-3': {
             'install': 50,
-            'quota': CONFIG['gcp-3-quota-slice'],
+            'quota': {
+                'us-central1': 35,
+                'us-east1': 35,
+                'us-east4': 35,
+                'us-west1': 35,
+            },
+        },
+    },
+    'openshift-org-gcp-arm64': {
+        'gcp': {
+            'install': 50,
+            'quota': {
+                'us-central1': 35,
+            },
+        },
+        'gcp-openshift-gce-devel-ci-2': {
+            'install': 50,
+            'quota': {
+                'us-central1': 20,
+            },
+        },
+        'gcp-3': {
+            'install': 50,
+            'quota': {
+                'us-central1': 20,
+            },
         },
     },
 }
@@ -937,7 +950,7 @@ def cluster_profile_set_resources(clusterProfileSets):
             if not 'quota' in profileData:
                 continue
             for region, regionCount in sorted(profileData['quota'].items()):
-                cps_resource['names'].extend([f'{profile}--{region}--quota-slice-{counter+i:0>{width}}' for i in range(regionCount)])
+                cps_resource['names'].extend([f'{profile}--{region}--{profileSet}-quota-slice-{counter+i:0>{width}}' for i in range(regionCount)])
                 counter += regionCount
 
         yield cps_resource

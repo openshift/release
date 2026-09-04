@@ -11,6 +11,18 @@ base_images:
     name: "5.1"
     namespace: ocp
     tag: custom-metrics-autoscaler-adapter
+  operand-http-addon-interceptor:
+    name: "5.1"
+    namespace: ocp
+    tag: custom-metrics-autoscaler-http-add-on-interceptor
+  operand-http-addon-operator:
+    name: "5.1"
+    namespace: ocp
+    tag: custom-metrics-autoscaler-http-add-on-operator
+  operand-http-addon-scaler:
+    name: "5.1"
+    namespace: ocp
+    tag: custom-metrics-autoscaler-http-add-on-scaler
   operand-webhook:
     name: "5.1"
     namespace: ocp
@@ -53,6 +65,12 @@ operator:
     with: pipeline:operand-adapter
   - pullspec: CMA_OPERAND_PLACEHOLDER_3
     with: pipeline:operand-webhook
+  - pullspec: CMA_OPERAND_PLACEHOLDER_4
+    with: pipeline:operand-http-addon-interceptor
+  - pullspec: CMA_OPERAND_PLACEHOLDER_5
+    with: pipeline:operand-http-addon-operator
+  - pullspec: CMA_OPERAND_PLACEHOLDER_6
+    with: pipeline:operand-http-addon-scaler
 promotion:
   to:
   - disabled: true
@@ -101,8 +119,9 @@ tests:
     env:
       PROJECT_NAME: custom-metrics-autoscaler-operator
     workflow: openshift-ci-security
-- as: cma-e2e-aws-ovn
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: cma-e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -123,11 +142,14 @@ tests:
     - ref: keda-e2e-cma-apply-kc
     - ref: keda-e2e-setup
     - ref: keda-e2e-run
+    - ref: http-addon-e2e-setup
+    - ref: http-addon-e2e-run
     - ref: tls-scanner-run
     - ref: keda-e2e-clean
     - ref: keda-e2e-cma-teardown
-- as: cma-e2e-gcp-ovn
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: cma-e2e-gcp-ovn
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     post:
@@ -136,9 +158,10 @@ tests:
     - chain: ipi-gcp-pre
     test:
     - chain: keda-e2e-cma
-- as: cma-e2e-upgrade-aws
+- always_run: false
+  as: cma-e2e-upgrade-aws
   optional: true
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-aws
     post:

@@ -68,7 +68,7 @@ save_status_data_router_failed() {
 
 # Constructs the artifacts URL based on CI job context
 get_artifacts_url() {
-  local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+  local artifacts_base_url="https://gcs.ci.openshift.org/gcs/test-platform-results"
   local artifacts_complete_url
 
   if [ -n "${PULL_NUMBER:-}" ]; then

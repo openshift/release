@@ -30,6 +30,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--servicemesh-operator__e2e-lpinterop.xml
+    ' EXIT
+fi
+
 # Function to pre-pull container images on all OCP nodes
 # Usage: prepull_image_on_nodes <image-name>
 # Example: prepull_image_on_nodes "ztunnel"

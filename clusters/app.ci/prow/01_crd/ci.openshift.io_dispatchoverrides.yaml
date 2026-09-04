@@ -89,10 +89,6 @@ spec:
               expiresAt:
                 format: date-time
                 type: string
-              fallbackConfirmed:
-                type: boolean
-              fallbackProtected:
-                type: boolean
               id:
                 minLength: 1
                 type: string
@@ -151,7 +147,6 @@ spec:
             - cluster
             - createdBy
             - expiresAt
-            - fallbackProtected
             - id
             - idempotencyKey
             - kind
@@ -173,8 +168,7 @@ spec:
                 self.startsAt == oldSelf.startsAt && self.expiresAt == oldSelf.expiresAt
                 && self.createdBy == oldSelf.createdBy && self.sourceChannelID ==
                 oldSelf.sourceChannelID && self.reason == oldSelf.reason && self.requiredApprovals
-                == oldSelf.requiredApprovals && self.fallbackProtected == oldSelf.fallbackProtected
-                && self.idempotencyKey == oldSelf.idempotencyKey
+                == oldSelf.requiredApprovals && self.idempotencyKey == oldSelf.idempotencyKey
             - message: override scope is immutable
               rule: has(self.scope) == has(oldSelf.scope) && (!has(self.scope) ||
                 self.scope == oldSelf.scope)
@@ -187,9 +181,6 @@ spec:
             - message: approvals may only be appended
               rule: '!has(oldSelf.approvals) || (has(self.approvals) && oldSelf.approvals.all(a,
                 self.approvals.exists(b, b.userID == a.userID && b.at == a.at)))'
-            - message: fallback confirmation cannot be withdrawn
-              rule: '!has(oldSelf.fallbackConfirmed) || !oldSelf.fallbackConfirmed
-                || (has(self.fallbackConfirmed) && self.fallbackConfirmed)'
             - message: revokedAt and a non-empty revokedBy must be set together
               rule: has(self.revokedAt) == has(self.revokedBy) && (!has(self.revokedBy)
                 || size(self.revokedBy) > 0)
@@ -200,11 +191,6 @@ spec:
             - message: Slack thread binding cannot be changed
               rule: '!has(oldSelf.slackThreadTS) || (has(self.slackThreadTS) && self.slackThreadTS
                 == oldSelf.slackThreadTS)'
-            - message: drain overrides require two approvals
-              rule: self.kind != 'Drain' || self.requiredApprovals == 2
-            - message: an unprotected drain requires explicit fallback confirmation
-              rule: self.kind != 'Drain' || self.fallbackProtected || (has(self.fallbackConfirmed)
-                && self.fallbackConfirmed)
           status:
             description: DispatchOverrideStatus is the observed override and publication
               state.
@@ -268,8 +254,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
-              fallbackProtected:
-                type: boolean
               history:
                 items:
                   description: DispatchAuditEvent records a durable state transition

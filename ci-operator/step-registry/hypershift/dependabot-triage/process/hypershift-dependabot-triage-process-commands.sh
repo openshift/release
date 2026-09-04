@@ -557,9 +557,9 @@ PR_NUM=$(echo "$NEW_PR_URL" | grep -o '[0-9]*$' || true)
 if [ -n "$PR_NUM" ] && [ -n "${BUILD_ID:-}" ] && [ -n "${JOB_NAME:-}" ]; then
   REPORT_URL=""
   if [ "${JOB_TYPE:-}" = "periodic" ]; then
-    REPORT_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}/artifacts/dependabot-triage/hypershift-dependabot-triage-report/artifacts/dependabot-triage-report.html"
+    REPORT_URL="https://gcs.ci.openshift.org/gcs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}/artifacts/dependabot-triage/hypershift-dependabot-triage-report/artifacts/dependabot-triage-report.html"
   else
-    REPORT_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_release/${PULL_NUMBER:-0}/${JOB_NAME}/${BUILD_ID}/artifacts/dependabot-triage/hypershift-dependabot-triage-report/artifacts/dependabot-triage-report.html"
+    REPORT_URL="https://gcs.ci.openshift.org/gcs/test-platform-results/pr-logs/pull/openshift_release/${PULL_NUMBER:-0}/${JOB_NAME}/${BUILD_ID}/artifacts/dependabot-triage/hypershift-dependabot-triage-report/artifacts/dependabot-triage-report.html"
   fi
   echo "Appending report link to PR #${PR_NUM} description..."
   CURRENT_BODY=$(gh pr view "$PR_NUM" --repo openshift/hypershift --json body -q .body 2>/dev/null || echo "")

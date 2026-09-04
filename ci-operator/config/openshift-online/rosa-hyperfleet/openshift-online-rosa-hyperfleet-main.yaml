@@ -71,6 +71,23 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: nightly-stage
+  cron: 0 4 * * *
+  steps:
+    test:
+    - as: e2e
+      commands: |-
+        export AWS_CONFIG_FILE=/var/run/rosa-credentials/aws_config
+        ./ci/e2e-tests.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-hyperfleet-stage-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - always_run: false
   as: on-demand-e2e
   steps:
