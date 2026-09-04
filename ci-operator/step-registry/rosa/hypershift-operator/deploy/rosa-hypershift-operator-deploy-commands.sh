@@ -61,6 +61,15 @@ ocm get "/api/clusters_mgmt/v1/clusters/${MC_CLUSTER_ID}/credentials" | jq -r .k
 echo "${MC_NAME}" > "${SHARED_DIR}/mc-cluster-name"
 echo "${MC_CLUSTER_ID}" > "${SHARED_DIR}/mc-cluster-id"
 
+# Check if the MC is locked by a PR test job
+EXISTING_LOCK=$(KUBECONFIG="${MC_KUBECONFIG}" oc get configmap ho-deploy-lock -n hypershift -o jsonpath='{.data.job}' 2>/dev/null || true)
+if [[ -n "${EXISTING_LOCK}" ]]; then
+  LOCK_TIME=$(KUBECONFIG="${MC_KUBECONFIG}" oc get configmap ho-deploy-lock -n hypershift -o jsonpath='{.data.acquired}' 2>/dev/null || echo "unknown")
+  echo "MC is locked by a PR test job: ${EXISTING_LOCK} (acquired: ${LOCK_TIME})"
+  echo "Skipping HO deployment to avoid conflicting with the PR test."
+  exit 0
+fi
+
 # Resolve the latest HO image from the RHTAP build pipeline (quay.io)
 HO_REPO="quay.io/acm-d/rhtap-hypershift-operator"
 echo "Looking up latest HO image from ${HO_REPO}..."
