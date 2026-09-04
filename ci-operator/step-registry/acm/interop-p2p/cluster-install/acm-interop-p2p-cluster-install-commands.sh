@@ -732,13 +732,70 @@ ExtractClusterCredentials() {
     true
 }
 
+# DisableClusterImagePolicySignatureEnforcement marks the 'openshift' ClusterImagePolicy
+# as unmanaged in the spoke's ClusterVersion via a CVO override. This prevents CVO from
+# managing the policy during upgrade, allowing unsigned nightly images to be pulled by MCD
+# on worker nodes. Required for OCP 4.21+ clusters targeting nightly builds (OCPBUGS-114622).
+function DisableClusterImagePolicySignatureEnforcement() {
+    typeset kubeconfig="${1:?kubeconfig path required}"
+    typeset clusterName="${2:?cluster name required}"
+
+    # Check if the 'openshift' ClusterImagePolicy exists on the spoke.
+    # --ignore-not-found returns empty on 404 while propagating other API errors.
+    typeset cipScopes
+    cipScopes="$(oc --kubeconfig="${kubeconfig}" get clusterimagepolicy openshift \
+        --ignore-not-found -o jsonpath='{.spec.scopes}')"
+
+    if [[ -z "${cipScopes}" ]]; then
+        : "Spoke ${clusterName}: no openshift ClusterImagePolicy found — skipping"
+        return 0
+    fi
+
+    # Only act when ocp-v4.0-art-dev is actually enforced; otherwise this is a no-op.
+    if ! jq -e 'any(.[]; contains("ocp-v4.0-art-dev"))' <<< "${cipScopes}" >/dev/null; then
+        : "Spoke ${clusterName}: ClusterImagePolicy does not enforce ocp-v4.0-art-dev — skipping"
+        return 0
+    fi
+
+    : "Spoke ${clusterName}: Disabling ClusterImagePolicy signature enforcement for nightly upgrade"
+
+    # Read current CVO overrides; default to empty JSON array when unset.
+    typeset currentOverrides
+    currentOverrides="$(oc --kubeconfig="${kubeconfig}" get clusterversion version \
+        -o jsonpath='{.spec.overrides}')"
+    [[ -z "${currentOverrides}" ]] && currentOverrides='[]'
+
+    # Append an unmanaged entry for the openshift ClusterImagePolicy.
+    typeset newOverrides
+    newOverrides="$(jq -c '. + [{"group":"config.openshift.io","kind":"ClusterImagePolicy","name":"openshift","namespace":"","unmanaged":true}]' \
+        <<< "${currentOverrides}")"
+
+    oc --kubeconfig="${kubeconfig}" patch clusterversion version --type merge \
+        -p "$(jq -cn --argjson overrides "${newOverrides}" '{"spec":{"overrides":$overrides}}')" \
+        1>/dev/null
+
+    # Verify the unmanaged override was applied before returning.
+    typeset appliedOverrides
+    appliedOverrides="$(oc --kubeconfig="${kubeconfig}" get clusterversion version \
+        -o jsonpath='{.spec.overrides}')"
+
+    if ! jq -e 'any(.[]; .kind == "ClusterImagePolicy" and .name == "openshift" and .unmanaged == true)' \
+        <<< "${appliedOverrides}" >/dev/null; then
+        : "Failed to verify ClusterImagePolicy unmanaged override on spoke ${clusterName}"
+        return 1
+    fi
+
+    : "ClusterImagePolicy signature enforcement disabled on spoke ${clusterName}"
+}
+
 #=====================
 # Main execution: Create all clusters
 #=====================
-# The installation process has three phases:
+# The installation process has four phases:
 # 1. Create resources - Sets up all K8s resources for each cluster
 # 2. Wait for provisioning - Monitors ClusterDeployment status
 # 3. Extract credentials - Retrieves kubeconfig and metadata
+# 4. Disable image policy (optional) - Marks ClusterImagePolicy as unmanaged for nightly upgrades
 
 : "=========================================="
 : "Starting creation of ${ACM_SPOKE_CLUSTER_COUNT} spoke cluster(s)"
@@ -777,6 +834,20 @@ done
 # This allows existing steps that expect 'managed-cluster-kubeconfig' to work
 ln -sf "managed-cluster-kubeconfig-1" "${SHARED_DIR}/managed-cluster-kubeconfig"
 ln -sf "managed-cluster-metadata-1.json" "${SHARED_DIR}/managed-cluster-metadata.json"
+
+# Phase 4: Disable ClusterImagePolicy signature enforcement on spokes (opt-in).
+# Required when provisioning spokes with unsigned nightly images so that upgrade
+# to a nightly target does not fail with Sigstore "signature required" errors on
+# worker nodes. Controlled by OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY.
+if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}" == "true" ]]; then
+    : "Phase 4: Disabling ClusterImagePolicy signature enforcement on all spokes"
+    for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
+        idx=$((i + 1))
+        DisableClusterImagePolicySignatureEnforcement \
+            "${SHARED_DIR}/managed-cluster-kubeconfig-${idx}" \
+            "${clusterNamesArr[i]}"
+    done
+fi
 
 # Print summary of created resources
 : "=========================================="

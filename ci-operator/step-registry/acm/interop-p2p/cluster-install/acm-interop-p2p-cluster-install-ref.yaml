@@ -68,6 +68,14 @@ ref:
       Batch files:
         SHARED_DIR/managed-cluster-names   - one name per line
         SHARED_DIR/managed-cluster-regions - one region per line
+  - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+    default: ""
+    documentation: |-
+      When set to "true", marks the 'openshift' ClusterImagePolicy as unmanaged
+      in each spoke's ClusterVersion immediately after Hive provisioning.
+      Required when targeting unsigned nightly builds that are not
+      Sigstore-signed (OCPBUGS-114622). No-op when the policy is absent or
+      does not enforce ocp-v4.0-art-dev signatures.
   documentation: |-
     Provisions one or more ACM spoke clusters using Hive ClusterDeployment.
 
@@ -78,6 +86,9 @@ ref:
                              Provisioned=True; fast-fails on ProvisionStopped=True.
       3. Extract creds     — decodes admin kubeconfig and metadata from Hive secrets
                              and writes them to SHARED_DIR.
+      4. Disable image policy (optional) — when OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true,
+                             marks the 'openshift' ClusterImagePolicy as unmanaged via CVO override
+                             so unsigned nightly images can be pulled during upgrade (OCPBUGS-114622).
 
     Networking: each spoke is assigned non-overlapping pod/VPC/service CIDRs
     derived from its 1-based index so multi-spoke Submariner setups do not conflict
@@ -94,7 +105,9 @@ ref:
       ACM_SPOKE_NETWORK_TYPE            - OCP network plugin (default: OVNKubernetes)
       ACM_SPOKE_INSTALL_TIMEOUT_MINUTES - per-cluster provisioning timeout (default: 150)
       ACM_SPOKE_CLUSTER_INITIAL_VERSION - OCP minor version for ClusterImageSet
-      ACM_SPOKE_CLUSTER_COUNT           - number of spoke clusters (default: 1, max: 3)
+      ACM_SPOKE_CLUSTER_COUNT                            - number of spoke clusters (default: 1, max: 3)
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY - when "true", marks 'openshift' ClusterImagePolicy
+                                                            as unmanaged post-provisioning (OCPBUGS-114622)
       MANAGED_CLUSTER_LEASED_RESOURCE   - space-separated AWS regions (one per cluster)
       SHARED_DIR                        - cross-step shared directory
       CLUSTER_PROFILE_DIR               - cluster profile with AWS creds and SSH keys
