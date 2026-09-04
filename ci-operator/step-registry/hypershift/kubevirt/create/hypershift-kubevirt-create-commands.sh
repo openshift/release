@@ -321,6 +321,24 @@ spec:
         - ports:
             - port: "8091"
               protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-routers-to-ignition
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s:app: ignition-server-proxy
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+        - health
+      toPorts:
+        - ports:
+            - port: "8443"
 EOF
 
   echo "CiliumNetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
