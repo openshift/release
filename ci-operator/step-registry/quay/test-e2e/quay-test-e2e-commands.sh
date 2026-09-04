@@ -212,6 +212,63 @@ function copyArtifacts {
       { print }
     ' "${xml}" > "${xml}.tmp" && mv "${xml}.tmp" "${xml}" || rm -f "${xml}.tmp"
   done || true
+  # A passing testcase with a -retry<N>/ ATTACHMENT in <system-out> was retried; Prow's
+  # junit lens flags flaky only when a name+classname has both a passed and a failed entry,
+  # so tag it flaky and emit a matching failed twin. Idempotent; awk only.
+  for xml in "${ARTIFACT_DIR}"/junit_*.xml; do
+    [[ -f "${xml}" ]] || continue
+    awk '
+      /<testcase/ && !buffering {
+        buffering = 1; n = 0
+        isretry = 0; hasfailure = 0; hasflaky = 0; hasprops = 0; inserted = 0
+        insysout = 0; tag = ""; tagdone = 0; tagendidx = 0
+      }
+      buffering {
+        buf[n++] = $0
+        if (!tagdone) { tag = (tag == "" ? $0 : tag " " $0); if ($0 ~ />/) { tagdone = 1; tagendidx = n - 1 } }
+        if ($0 ~ /<system-out/) insysout = 1
+        if (insysout && $0 ~ /\[\[ATTACHMENT\|.*-retry[0-9]+\//) isretry = 1
+        if ($0 ~ /<\/system-out>/) insysout = 0
+        if ($0 ~ /<failure/ || $0 ~ /<error/) hasfailure = 1
+        if ($0 ~ /<property name="flaky"/) hasflaky = 1
+        if ($0 ~ /<properties>/) hasprops = 1
+        if ($0 ~ /<\/testcase>/) {
+          addflaky = (isretry && !hasfailure && !hasflaky)
+          if (addflaky && hasprops) {
+            for (i = 0; i < n; i++) {
+              if (!inserted && buf[i] ~ /<\/properties>/) {
+                print "<property name=\"flaky\" value=\"true\"/>"
+                inserted = 1
+              }
+              print buf[i]
+            }
+          } else if (addflaky) {
+            for (i = 0; i <= tagendidx; i++) print buf[i]
+            print "<properties>"
+            print "<property name=\"flaky\" value=\"true\"/>"
+            print "</properties>"
+            for (i = tagendidx + 1; i < n; i++) print buf[i]
+          } else {
+            for (i = 0; i < n; i++) print buf[i]
+          }
+          if (addflaky) {
+            name = ""; cls = ""
+            if (match(tag, /[ \t]name="[^"]*"/)) {
+              name = substr(tag, RSTART, RLENGTH); sub(/^[ \t]name="/, "", name); sub(/"$/, "", name)
+            }
+            if (match(tag, /[ \t]classname="[^"]*"/)) {
+              cls = substr(tag, RSTART, RLENGTH); sub(/^[ \t]classname="/, "", cls); sub(/"$/, "", cls)
+            }
+            if (name != "" && cls != "")
+              print "<testcase name=\"" name "\" classname=\"" cls "\" time=\"0\"><failure message=\"flaky: passed on retry\"></failure></testcase>"
+          }
+          buffering = 0
+        }
+        next
+      }
+      { print }
+    ' "${xml}" > "${xml}.tmp" && mv "${xml}.tmp" "${xml}" || rm -f "${xml}.tmp"
+  done || true
   cp -r "${src}"/playwright-report/* "${ARTIFACT_DIR}/" 2>/dev/null || true
   gatherBuilderDiagnostics || true
 }
