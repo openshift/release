@@ -339,6 +339,25 @@ spec:
       toPorts:
         - ports:
             - port: "8443"
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-routers-to-oauth
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s:app: oauth-openshift
+  ingress:
+  - fromEntities:
+    - host
+    - remote-node
+    - health
+    toPorts:
+    - ports:
+      - port: "6443"
+        protocol: TCP
 EOF
 
   echo "CiliumNetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
