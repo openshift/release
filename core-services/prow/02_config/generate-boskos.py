@@ -490,7 +490,7 @@ CONFIG = {
         'default': 30,
     },
     'hypershift-aks-quota-slice': {
-        'default': 20,
+        'default': 10,
     },
     'hypershift-azure-quota-slice': {
         'default': 20,
