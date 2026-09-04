@@ -259,6 +259,38 @@ spec:
           port: 8091
   policyTypes:
     - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-ignition-server-proxy
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: ignition-server-proxy
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allows-ingress-to-ignition-server
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: ignition-server
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 9090
+  policyTypes:
+    - Ingress
 EOF
 
   echo "NetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
