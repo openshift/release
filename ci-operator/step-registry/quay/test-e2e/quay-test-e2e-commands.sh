@@ -393,6 +393,6 @@ pushd "${PLAYWRIGHT_WORKDIR}"
 npx playwright test \
   "${GREP_INVERT_ARGS[@]}" \
   --workers "${PLAYWRIGHT_WORKERS}" \
-  --reporter=junit,html,json \
+  --reporter=list,junit,html,json \
   2>&1 | tee "${ARTIFACT_DIR}/playwright-output.log"
 popd
