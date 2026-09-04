@@ -6,106 +6,6 @@ presubmits:
     - ^release-4\.22$
     - ^release-4\.22-
     cluster: build09
-    context: ci/prow/conformance
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - Containerfile
-      timeout: 7h0m0s
-    labels:
-      capability/intranet: intranet
-      ci-operator.openshift.io/cloud: external
-      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-conformance
-    reporter_config:
-      slack:
-        channel: '#wg-nvidia-dpf-ci'
-        job_states_to_report:
-        - success
-        - failure
-        - error
-        - aborted
-        report_template: |-
-          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
-          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
-          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
-          {{- if eq .Status.State "aborted" }}
-            The job was aborted, check for orphaned cloud resources.
-          {{- end }}
-    rerun_command: /test conformance
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=conformance
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(conformance|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.22$
-    - ^release-4\.22-
-    cluster: build09
     context: ci/prow/conformance-doca4
     decorate: true
     decoration_config:
@@ -206,19 +106,19 @@ presubmits:
     - ^release-4\.22$
     - ^release-4\.22-
     cluster: build09
-    context: ci/prow/deploy-cluster
+    context: ci/prow/conformance-doca8
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Containerfile
-      timeout: 6h0m0s
+      timeout: 7h0m0s
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: external
       ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-deploy-cluster
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-conformance-doca8
     reporter_config:
       slack:
         channel: '#wg-nvidia-dpf-ci'
@@ -234,7 +134,7 @@ presubmits:
           {{- if eq .Status.State "aborted" }}
             The job was aborted, check for orphaned cloud resources.
           {{- end }}
-    rerun_command: /test deploy-cluster
+    rerun_command: /test conformance-doca8
     spec:
       containers:
       - args:
@@ -243,7 +143,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=deploy-cluster
+        - --target=conformance-doca8
         command:
         - ci-operator
         env:
@@ -299,7 +199,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(deploy-cluster|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(conformance-doca8|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -401,6 +301,106 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(deploy-cluster-doca4|remaining-required),?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.22$
+    - ^release-4\.22-
+    cluster: build09
+    context: ci/prow/deploy-cluster-doca8
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+      timeout: 6h0m0s
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-deploy-cluster-doca8
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test deploy-cluster-doca8
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=deploy-cluster-doca8
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(deploy-cluster-doca8|remaining-required),?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.22$
@@ -462,107 +462,7 @@ presubmits:
     - ^release-4\.22$
     - ^release-4\.22-
     cluster: build09
-    context: ci/prow/network-tests
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - Containerfile
-      timeout: 2h0m0s
-    labels:
-      capability/intranet: intranet
-      ci-operator.openshift.io/cloud: external
-      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-network-tests
-    reporter_config:
-      slack:
-        channel: '#wg-nvidia-dpf-ci'
-        job_states_to_report:
-        - success
-        - failure
-        - error
-        - aborted
-        report_template: |-
-          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
-          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
-          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
-          {{- if eq .Status.State "aborted" }}
-            The job was aborted, check for orphaned cloud resources.
-          {{- end }}
-    rerun_command: /test network-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=network-tests
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(network-tests|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.22$
-    - ^release-4\.22-
-    cluster: build09
-    context: ci/prow/network-tests-doca4
+    context: ci/prow/network-doca4
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -574,7 +474,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-network-tests-doca4
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-network-doca4
     reporter_config:
       slack:
         channel: '#wg-nvidia-dpf-ci'
@@ -590,7 +490,7 @@ presubmits:
           {{- if eq .Status.State "aborted" }}
             The job was aborted, check for orphaned cloud resources.
           {{- end }}
-    rerun_command: /test network-tests-doca4
+    rerun_command: /test network-doca4
     spec:
       containers:
       - args:
@@ -599,7 +499,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=network-tests-doca4
+        - --target=network-doca4
         command:
         - ci-operator
         env:
@@ -655,14 +555,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(network-tests-doca4|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(network-doca4|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
     cluster: build09
-    context: ci/prow/sanity
+    context: ci/prow/network-doca8
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -674,7 +574,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-sanity
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-network-doca8
     reporter_config:
       slack:
         channel: '#wg-nvidia-dpf-ci'
@@ -690,7 +590,7 @@ presubmits:
           {{- if eq .Status.State "aborted" }}
             The job was aborted, check for orphaned cloud resources.
           {{- end }}
-    rerun_command: /test sanity
+    rerun_command: /test network-doca8
     spec:
       containers:
       - args:
@@ -699,7 +599,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=sanity
+        - --target=network-doca8
         command:
         - ci-operator
         env:
@@ -755,7 +655,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(sanity|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(network-doca8|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -862,18 +762,19 @@ presubmits:
     - ^release-4\.22$
     - ^release-4\.22-
     cluster: build09
-    context: ci/prow/scale
+    context: ci/prow/sanity-doca8
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Containerfile
+      timeout: 2h0m0s
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: external
       ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-scale
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-sanity-doca8
     reporter_config:
       slack:
         channel: '#wg-nvidia-dpf-ci'
@@ -889,7 +790,7 @@ presubmits:
           {{- if eq .Status.State "aborted" }}
             The job was aborted, check for orphaned cloud resources.
           {{- end }}
-    rerun_command: /test scale
+    rerun_command: /test sanity-doca8
     spec:
       containers:
       - args:
@@ -898,7 +799,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=scale
+        - --target=sanity-doca8
         command:
         - ci-operator
         env:
@@ -954,7 +855,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(scale|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(sanity-doca8|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1054,3 +955,102 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(scale-doca4|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.22$
+    - ^release-4\.22-
+    cluster: build09
+    context: ci/prow/scale-doca8
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - Containerfile
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: external
+      ci-operator.openshift.io/cloud-cluster-profile: metal-dpf-doca8
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-openshift-dpf-release-4.22-scale-doca8
+    reporter_config:
+      slack:
+        channel: '#wg-nvidia-dpf-ci'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        - aborted
+        report_template: |-
+          {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+          {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+          {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+          {{- if eq .Status.State "aborted" }}
+            The job was aborted, check for orphaned cloud resources.
+          {{- end }}
+    rerun_command: /test scale-doca8
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=scale-doca8
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(scale-doca8|remaining-required),?($|\s.*)
