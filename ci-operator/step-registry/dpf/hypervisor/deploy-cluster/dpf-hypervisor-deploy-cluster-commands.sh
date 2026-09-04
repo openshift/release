@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+export PATH="/cli:${PATH}"
+
 echo "Checking access to SHARED_DIR ..."
 echo "Testing SHARED_DIR" > ${SHARED_DIR}/testing.txt
 ls -ltra ${SHARED_DIR}
@@ -92,8 +94,8 @@ fi
 if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "openshift-dpf" ]]; then
   echo "PR job detected: checking out PR #${PULL_NUMBER} on the remote host"
   if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; \
-    git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER}; \
-    git checkout pr-${PULL_NUMBER}; \
+    git fetch origin pull/${PULL_NUMBER}/head:pr-${PULL_NUMBER} && \
+    git checkout pr-${PULL_NUMBER} && \
     git rebase origin/${OPENSHIFT_DPF_BRANCH}"; then
     echo "Successfully checked out PR #${PULL_NUMBER}"
   else
@@ -104,6 +106,18 @@ fi
 
 REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
 echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
+
+# Temporary: fetch DPF PR #269 for cross-PR testing
+echo "Fetching openshift-dpf PR #269 for cross-PR testing..."
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; \
+  git fetch origin pull/269/head:pr-269 && \
+  git checkout pr-269 && \
+  git rebase origin/${OPENSHIFT_DPF_BRANCH}"; then
+  echo "Successfully checked out openshift-dpf PR #269"
+else
+  echo "ERROR: Failed to checkout openshift-dpf PR #269"
+  exit 1
+fi
 
 echo "Checking if github repo branch was cloned successfully"
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
@@ -149,6 +163,27 @@ echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR
 # Pass the CI release payload (resolved by ci-operator from the releases.latest config)
 PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
 echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
+
+# Merge CI registry credentials into the pull secret so the hypervisor can
+# access the Prow-internal registry (registry.buildXX.ci.openshift.org).
+if [[ -n "${PAYLOAD_URL}" ]]; then
+  echo "Merging CI registry credentials into pull secret on hypervisor..."
+  PULL_SECRET_SRC="${CLUSTER_PROFILE_DIR}/openshift-pull-secret"
+  if [[ ! -f "${PULL_SECRET_SRC}" ]]; then
+    echo "ERROR: ${PULL_SECRET_SRC} not found"
+    exit 1
+  fi
+  cp "${PULL_SECRET_SRC}" /tmp/pull-secret.json
+  oc registry login --to=/tmp/pull-secret.json
+  # Read OPENSHIFT_PULL_SECRET path from the env.user file on the hypervisor.
+  # Resolve relative paths (e.g. the default "openshift_pull.json") under the
+  # repo working directory so scp targets the right location.
+  REMOTE_PULL_SECRET=$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -ea; source ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}; set +a; PS=\${OPENSHIFT_PULL_SECRET:-openshift_pull.json}; [[ \"\$PS\" = /* ]] && echo \"\$PS\" || echo \"${REMOTE_WORK_DIR}/openshift-dpf/\$PS\"")
+  scp -q ${SSH_OPTS} /tmp/pull-secret.json root@${REMOTE_HOST}:"${REMOTE_PULL_SECRET}"
+  echo "Pull secret with CI registry credentials copied to ${REMOTE_PULL_SECRET}"
+  rm -f /tmp/pull-secret.json
+fi
+
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
   cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
@@ -165,6 +200,29 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
 else
   echo "ERROR: Failed to generate .env file from sourced env.user_${CLUSTER_NAME} file"
   exit 1
+fi
+
+# Check if the aarch64 release image exists in the CI registry.
+# The DPF operator needs it to resolve OVN images for DPU service templates.
+if [[ -n "${PAYLOAD_URL}" ]]; then
+  echo "Checking aarch64 release image availability for DPF operator..."
+  oc registry login --to=/tmp/ci-auth.json
+  VERSION=$(oc adm release info "${PAYLOAD_URL}" --registry-config=/tmp/ci-auth.json -o jsonpath='{.metadata.version}' 2>/dev/null || true)
+  if [[ -z "${VERSION}" ]]; then
+    echo "WARNING: Could not extract version from release image"
+  else
+    echo "Release version: ${VERSION}"
+    REPO=${PAYLOAD_URL%%@*}; REPO=${REPO%%:*}
+    AARCH64="${REPO}:${VERSION}-aarch64"
+    echo "Checking: ${AARCH64}"
+    if skopeo inspect --authfile=/tmp/ci-auth.json "docker://${AARCH64}" >/dev/null 2>&1; then
+      echo "aarch64 release image available"
+    else
+      echo "WARNING: aarch64 release image NOT available in CI registry: ${AARCH64}"
+      echo "The DPF operator will fall back to quay.io for aarch64 OVN image resolution."
+    fi
+  fi
+  rm -f /tmp/ci-auth.json
 fi
 
 echo "Create logs dir on the remote host"
@@ -189,9 +247,23 @@ fi
 echo "Starting DPF deployment with 'make all'..."
 echo "Logs will be saved to: ${DEPLOYMENT_LOG}"
 
+# Temporary: install patched aicli with digest-based image support
+# (https://github.com/josecastillolema/aicli/tree/digest)
+# Remove this block once the upstream PR is merged.
+AICLI_VENV="/tmp/aicli-venv"
+echo "Installing patched aicli in venv on hypervisor..."
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "python3 -m venv ${AICLI_VENV} && \
+  ${AICLI_VENV}/bin/pip install -q git+https://github.com/josecastillolema/aicli.git@digest && \
+  ${AICLI_VENV}/bin/pip show aicli | grep -E 'Name|Version|Location'"; then
+  echo "Patched aicli installed successfully"
+else
+  echo "ERROR: Failed to install patched aicli"
+  exit 1
+fi
 
 # Execute `make clean-all` on hypervisor with comprehensive logging
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
+  export PATH=${AICLI_VENV}/bin:\$PATH; \
   ls -ltr; \
   env; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
@@ -208,6 +280,7 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   echo "Execute make all on hypervisor with comprehensive logging"
 
   if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
+    export PATH=${AICLI_VENV}/bin:\$PATH; \
     cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
     mkdir -p ${REMOTE_LOGS_DIR} ; \
     make all 2>&1 | tee ${DEPLOYMENT_LOG}"; then
@@ -231,6 +304,10 @@ else
   echo "DPF pre-deployment clean-all failed, CLEAN_ALL_SUCCESS is set to: ${CLEAN_ALL_SUCCESS}"
   exit 1
 fi
+
+# Clean up patched aicli venv
+echo "Cleaning up patched aicli venv..."
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "rm -rf ${AICLI_VENV}" || true
 
 # To Do: add basic oc commands to verify make all step passed
 
