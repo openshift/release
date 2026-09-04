@@ -32,12 +32,25 @@ ref:
       documentation: |-
         When "true", cloud-prepare failures are logged but do not fail the job.
         Used for iterative debugging of gateway node provisioning.
+    - name: SUBMARINER_VERIFY_HUB_SPOKE
+      default: "false"
+      documentation: |-
+        When "true", also prepare the hub cluster as a Submariner gateway participant
+        (in addition to all spokes). Required for hub-spoke CCLM: the hub needs its
+        own gateway MachineSet and a gateway-labeled node so broker-join can join the
+        hub to the Submariner broker with --label-gateway=false.
+        Hub metadata is read from SHARED_DIR/metadata.json (written by the IPI installer).
+        Set to "false" for spoke-to-spoke topologies where the hub is management-only.
   documentation: |-
     Step 1 of 3 in the Submariner installation chain.
 
     Installs subctl locally (not SHARED_DIR), prepares AWS security groups on
     each spoke cluster using 'subctl cloud prepare aws' with dedicated gateway
     nodes (default --gateways 1), and opens required IPsec/NAT-T firewall ports.
+
+    When SUBMARINER_VERIFY_HUB_SPOKE=true, also runs 'subctl cloud prepare aws'
+    on the hub cluster (using KUBECONFIG and SHARED_DIR/metadata.json) so the hub
+    gets a gateway MachineSet and gateway-labeled node required for hub-spoke CCLM.
 
     AWS credentials are loaded from CLUSTER_PROFILE_DIR into ~/.aws/
     and removed from disk via a trap on EXIT. They are never written
@@ -46,5 +59,6 @@ ref:
     Env vars consumed:
       ACM_SPOKE_CLUSTER_COUNT          - number of spoke clusters (default: 2)
       SUBMARINER_GATEWAY_WAIT_TIMEOUT  - gateway node wait timeout in seconds (default: 600)
+      SUBMARINER_VERIFY_HUB_SPOKE      - also prepare hub gateway (default: false)
       SHARED_DIR                       - shared artifact directory
       CLUSTER_PROFILE_DIR              - directory containing .awscred
