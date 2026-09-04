@@ -28,6 +28,11 @@ operator:
 prowgen:
   private: true
 releases:
+  candidate:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
   initial:
     integration:
       name: "4.22"
@@ -207,6 +212,44 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- always_run: false
+  as: perfscale-e2e-operator
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:candidate
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ZONES_COUNT: "3"
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace zero-trust-workload-identity-manager
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n zero-trust-workload-identity-manager "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n zero-trust-workload-identity-manager deployment zero-trust-workload-identity-manager-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: zero-trust-workload-identity-manager-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h0m0s
+    workflow: openshift-qe-installer-aws
+  timeout: 4h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-priv
