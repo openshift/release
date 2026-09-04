@@ -1,0 +1,36 @@
+ref:
+  as: sandboxed-containers-operator-install-operator-bundle
+  from: cli
+  commands: sandboxed-containers-operator-install-operator-bundle-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  dependencies:
+  - name: ci-index
+    env: FBC_IMAGE
+  env:
+  - name: CATALOG_NAME
+    default: "osc-ci-catalog"
+    documentation: |-
+      Name of the ClusterCatalog created from FBC_IMAGE.
+  - name: PACKAGE_NAME
+    default: "sandboxed-containers-operator"
+    documentation: |-
+      OLM package name for the operator inside the catalog.
+  - name: OSC_NAMESPACE
+    default: "openshift-sandboxed-containers-operator"
+    documentation: |-
+      The namespace where the sandboxed containers operator will be installed.
+  documentation: |-
+    Install the sandboxed-containers-operator via OLM v1 (ClusterExtension).
+
+    Creates a ClusterCatalog from the FBC_IMAGE, sets up the installer
+    ServiceAccount with the granular RBAC from openshift/sandboxed-containers-
+    operator PR 2762 (config/olmv1/), and creates a ClusterExtension targeting
+    the stable channel. Waits for both the ClusterExtension Installed condition
+    and the controller-manager deployment to become Available.
+
+    Callers must set FBC_IMAGE to a catalog image containing the operator bundle.
+    The downstream-candidate CI configs already use Konflux-built FBC images at
+    quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc for this purpose.
