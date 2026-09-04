@@ -108,6 +108,15 @@ ansible-playbook playbooks/ran/hub-sno-configure-acm.yml \
   -i ./inventories/ocp-deployment/build-inventory.py \
   --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION" -vv
 
+# Deploy ACM Observability AFTER MCH is Running: MCH deploys the observability
+# operator which creates the MultiClusterObservability CRD (needed to apply the CR).
+if [[ "${CONFIGURE_ACM_OBSERVABILITY}" == "true" ]]; then
+  echo "Configuring ACM Observability (real MCO stack via MinIO + MultiClusterObservability)"
+  ansible-playbook playbooks/ran/hub-sno-configure-acm-observability.yml \
+    -i ./inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH}" -vv
+fi
+
 echo "Configuring kustomize plugin"
 ansible-playbook playbooks/ran/hub-sno-configure-kustomize-plugin.yml \
   -i ./inventories/ocp-deployment/build-inventory.py \
