@@ -165,43 +165,55 @@ fi
 #=====================
 # Resolve cluster image set (once for all clusters)
 #=====================
-# Find the latest ClusterImageSet matching the target OCP version
-# ClusterImageSets are named like: img4.14.0-x86_64, img4.14.1-x86_64, etc.
+# Default: latest ACM/Hive ClusterImageSet matching ACM_SPOKE_CLUSTER_INITIAL_VERSION
+# (names like img4.14.0-x86_64). When OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+# is true, install from the hub payload instead so the spoke is the same unsigned
+# nightly as the hub (catalog image sets are signed GA and fail rpm-ostree rebase
+# onto nightlies). Hive does not pass that installer env into the spoke install.
 if [[ -z "${ACM_SPOKE_CLUSTER_INITIAL_VERSION}" ]]; then
     : "ACM_SPOKE_CLUSTER_INITIAL_VERSION must be set (e.g. 4.20)"
     exit 1
 fi
 : "Resolving cluster image set for version '${ACM_SPOKE_CLUSTER_INITIAL_VERSION}'"
 typeset clusterImagesetName
-# jq select avoids grep's non-zero exit on no match; sort -V preserves version ordering.
-clusterImagesetName="$(
-    oc get clusterimagesets.hive.openshift.io -o json |
-    jq -r --arg prefix "img${ACM_SPOKE_CLUSTER_INITIAL_VERSION}." \
-        '.items[].metadata.name | select(startswith($prefix))' |
-    sort -V |
-    tail -n 1
-)"
-
-if [[ -z "${clusterImagesetName}" ]]; then
-    : "No cluster image set found for version '${ACM_SPOKE_CLUSTER_INITIAL_VERSION}'"
-    exit 1
-fi
-
-# Double-check that the ClusterImageSet resource exists
-if ! oc get clusterimageset "${clusterImagesetName}" 1>/dev/null; then
-    : "ClusterImageSet '${clusterImagesetName}' not found or not accessible"
-    exit 1
+typeset ocpReleaseImage=""
+if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY}" == "true" ]]; then
+    ocpReleaseImage="$(oc get clusterversion version -o jsonpath='{.status.desired.image}')"
+    [[ -n "${ocpReleaseImage}" ]]
+    clusterImagesetName="img-eus-from-hub-${ACM_SPOKE_CLUSTER_INITIAL_VERSION}"
+    oc apply -f - <<EOF
+apiVersion: hive.openshift.io/v1
+kind: ClusterImageSet
+metadata:
+  name: ${clusterImagesetName}
+spec:
+  releaseImage: ${ocpReleaseImage}
+EOF
+    : "Using hub payload ClusterImageSet ${clusterImagesetName}"
+else
+    # jq select avoids grep's non-zero exit on no match; sort -V preserves version ordering.
+    clusterImagesetName="$(
+        oc get clusterimagesets.hive.openshift.io -o json |
+        jq -r --arg prefix "img${ACM_SPOKE_CLUSTER_INITIAL_VERSION}." \
+            '.items[].metadata.name | select(startswith($prefix))' |
+        sort -V |
+        tail -n 1
+    )"
+    if [[ -z "${clusterImagesetName}" ]]; then
+        : "No cluster image set found for version '${ACM_SPOKE_CLUSTER_INITIAL_VERSION}'"
+        exit 1
+    fi
+    if ! oc get clusterimageset "${clusterImagesetName}" 1>/dev/null; then
+        : "ClusterImageSet '${clusterImagesetName}' not found or not accessible"
+        exit 1
+    fi
+    ocpReleaseImage="$(
+        oc get clusterimageset "${clusterImagesetName}" \
+            -o jsonpath='{.spec.releaseImage}' || true
+    )"
 fi
 
 : "Using cluster image set: ${clusterImagesetName}"
-
-# Log the release image URL for debugging purposes
-typeset ocpReleaseImage
-ocpReleaseImage="$(
-    oc get clusterimageset "${clusterImagesetName}" \
-        -o jsonpath='{.spec.releaseImage}' || true
-)"
-
 if [[ -n "${ocpReleaseImage}" ]]; then
     : "Cluster image set release image: ${ocpReleaseImage}"
 fi
@@ -732,6 +744,34 @@ ExtractClusterCredentials() {
     true
 }
 
+# Hive's spoke installer does not receive OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY.
+# On 4.20 the installer also does not apply the CVO ignore (that landed in 4.21+);
+# openshift-e2e-test upgrade-paused patches ClusterVersion the same way for 4.20.
+DisableClusterImagePolicySignatureEnforcement() {
+    typeset kubeconfig="${1:?}"; (($#)) && shift
+    typeset clusterName="${1:?}"; (($#)) && shift
+    typeset currentOverrides='' newOverrides='' unmanaged=''
+    : "Disabling ClusterImagePolicy signature enforcement on ${clusterName}"
+    currentOverrides="$(oc --kubeconfig="${kubeconfig}" get clusterversion version -o json |
+        jq -c '.spec.overrides // []')"
+    if jq -e '.[] | select(.kind=="ClusterImagePolicy" and .unmanaged==true)' \
+            <<<"${currentOverrides}" >/dev/null; then
+        : "ClusterImagePolicy already unmanaged on ${clusterName}"
+        return 0
+    fi
+    newOverrides="$(jq -c \
+        '. + [{"group":"config.openshift.io","kind":"ClusterImagePolicy","name":"openshift","namespace":"","unmanaged":true}]' \
+        <<<"${currentOverrides}")"
+    oc --kubeconfig="${kubeconfig}" patch clusterversion version --type merge \
+        -p "$(jq -cn --argjson overrides "${newOverrides}" '{"spec":{"overrides":$overrides}}')"
+    unmanaged="$(oc --kubeconfig="${kubeconfig}" get clusterversion version \
+        -o jsonpath='{.spec.overrides[?(@.kind=="ClusterImagePolicy")].unmanaged}')"
+    [[ "${unmanaged}" == *true* ]]
+    oc --kubeconfig="${kubeconfig}" get clusterversion version -o jsonpath='{.spec.overrides}' \
+        > "${ARTIFACT_DIR}/spoke-${clusterName}-clusterversion-overrides.json"
+    true
+}
+
 #=====================
 # Main execution: Create all clusters
 #=====================
@@ -771,6 +811,10 @@ done
 for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     idx=$((i + 1))
     ExtractClusterCredentials "${clusterNamesArr[i]}" "${idx}"
+    if [[ "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY}" == "true" ]]; then
+        DisableClusterImagePolicySignatureEnforcement \
+            "${SHARED_DIR}/managed-cluster-kubeconfig-${idx}" "${clusterNamesArr[i]}"
+    fi
 done
 
 # Create symlinks for backward compatibility with single-cluster workflows

@@ -1,0 +1,24 @@
+ref:
+  as: acm-interop-p2p-disable-cluster-image-policy
+  from: cli
+  commands: acm-interop-p2p-disable-cluster-image-policy-commands.sh
+  grace_period: 10m
+  timeout: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+    default: ""
+    documentation: |-
+      When "true", mark ClusterImagePolicy unmanaged on the hub ClusterVersion
+      so CVO and rpm-ostree can pull unsigned nightlies. Required on 4.20
+      because the installer cvoignore for this policy landed in 4.21+. Empty
+      (default) skips the patch. Run after ipi-install and before
+      cucushift-installer-check-cluster-image-policy.
+  documentation: |-
+    Patches hub ClusterVersion to set ClusterImagePolicy unmanaged when
+    OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY is true. Matches
+    openshift-e2e-test upgrade-paused on 4.20. Writes
+    hub-clusterversion-overrides.json to ARTIFACT_DIR.
