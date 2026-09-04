@@ -270,6 +270,32 @@ function copyArtifacts {
     ' "${xml}" > "${xml}.tmp" && mv "${xml}.tmp" "${xml}" || rm -f "${xml}.tmp"
   done || true
   cp -r "${src}"/playwright-report/* "${ARTIFACT_DIR}/" 2>/dev/null || true
+  # Prow's html lens renders any artifact matching custom-link-*.html inline near
+  # the top of the Spyglass job page. The Playwright HTML report copied above only
+  # shows up buried in the artifact tree, so surface a direct link to it. Compose
+  # the GCS URL the same way hypershift-analyze-e2e-failure does. Only write the
+  # link when index.html actually landed so it is never dead; default every CI var
+  # with :- so a missing var in a local run cannot abort this EXIT trap.
+  if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
+    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results"
+    local gcs_path
+    if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
+      gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"
+    else
+      gcs_path="logs/${JOB_NAME:-}/${BUILD_ID:-}"
+    fi
+    local report_base="${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}/quay-test-e2e/artifacts"
+    cat > "${ARTIFACT_DIR}/custom-link-playwright-report.html" << EOF || true
+<html>
+<head><title>Playwright report</title></head>
+<body>
+<a href="${report_base}/index.html">Playwright HTML report</a>
+</body>
+</html>
+EOF
+  else
+    echo "No index.html in ${ARTIFACT_DIR}; skipping custom-link-playwright-report.html"
+  fi
   gatherBuilderDiagnostics || true
 }
 trap copyArtifacts EXIT
