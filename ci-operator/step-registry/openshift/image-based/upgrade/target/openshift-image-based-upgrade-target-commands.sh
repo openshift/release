@@ -70,7 +70,12 @@ export LCA_GIT_REPO="https://github.com/openshift-kni/lifecycle-agent"
 export LCA_GIT_BRANCH="${LCA_GIT_BRANCH:-main}"
 export SEED_VERSION="${SEED_VERSION}"
 export IP_STACK="${IP_STACK}"
-export UPGRADE_TIMEOUT="60m"
+# Dual-stack operations require more time for both IPv4 and IPv6 convergence
+if [[ "${IP_STACK}" == "v4v6" || "${IP_STACK}" == "v6v4" ]]; then
+  export UPGRADE_TIMEOUT="${UPGRADE_TIMEOUT:-90m}"
+else
+  export UPGRADE_TIMEOUT="${UPGRADE_TIMEOUT:-60m}"
+fi
 export REGISTRY_AUTH_FILE="${PULL_SECRET_FILE}"
 # Default capacity is 140GB and disk pressure is observed, which leads to pods
 # pending, both during installation and e2e tests.
