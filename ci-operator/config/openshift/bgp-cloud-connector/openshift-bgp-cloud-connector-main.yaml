@@ -1,8 +1,16 @@
 base_images:
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
   operator-sdk:
     name: "4.17"
     namespace: origin
     tag: operator-sdk
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -162,6 +170,260 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- always_run: false
+  as: e2e-rosa-operator
+  optional: true
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-west-2
+      REPLICAS: "3"
+      ZONES_COUNT: "3"
+    test:
+    - ref: ipi-install-rbac
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-cudn-bgp-routing --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either way.
+        operator-sdk run bundle -n openshift-cudn-bgp-routing --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        # Available, not Ready: with no credentials yet the operator runs
+        # and reports WaitingForCloudCredentials, which is the state the
+        # next step resolves.
+        oc -n openshift-cudn-bgp-routing wait --for=condition=Available \
+          deployment/openshift-cudn-bgp-routing-controller-manager --timeout=5m
+        oc -n openshift-cudn-bgp-routing get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: credentials
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # The operator federates: it presents a bound ServiceAccount token
+        # and AWS exchanges it for credentials. That needs an IAM role
+        # whose trust policy names this cluster's issuer and this
+        # ServiceAccount, and nothing in the cluster can create one --
+        # creating a role needs the AWS permissions we are trying to
+        # obtain. So it happens here, with the cluster profile's
+        # credentials, which have IAM: rosa create oidc-provider used them.
+        #
+        # After the install, not before, because the ServiceAccount the
+        # trust policy names does not exist until the CSV is applied.
+        export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        PATH="$(hack/aws/ensure-cli.sh)":"${PATH}"
+        export PATH
+
+        region="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.aws.region}')"
+        export AWS_REGION="${region}" AWS_DEFAULT_REGION="${region}"
+
+        account="$(aws sts get-caller-identity --query Account --output text)"
+        issuer="$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}' | sed 's|^https://||')"
+        infra="$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')"
+
+        ns=openshift-cudn-bgp-routing
+        sa=openshift-cudn-bgp-routing-controller-manager
+        role="cudn-bgp-operator-${infra}"
+
+        # aud as well as sub: without it a token minted for any other
+        # audience would be spendable here.
+        cat >/tmp/trust.json <<EOF
+        {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"Federated": "arn:aws:iam::${account}:oidc-provider/${issuer}"},
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {"StringEquals": {
+              "${issuer}:sub": "system:serviceaccount:${ns}:${sa}",
+              "${issuer}:aud": "openshift"
+            }}
+          }]
+        }
+        EOF
+
+        # policyActions in internal/platform/aws/credentials.go, which is
+        # also what the operator asks for in its own CredentialsRequest.
+        # sts:GetCallerIdentity is absent deliberately: it needs no
+        # permission, so granting it would say nothing.
+        cat >/tmp/policy.json <<'EOF'
+        {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Resource": "*",
+            "Action": [
+              "ec2:DescribeRouteServers",
+              "ec2:DescribeRouteServerEndpoints",
+              "ec2:DescribeRouteServerPeers",
+              "ec2:DescribeSubnets",
+              "ec2:DescribeInstances",
+              "ec2:CreateRouteServerPeer",
+              "ec2:DeleteRouteServerPeer",
+              "ec2:CreateTags",
+              "ec2:ModifyNetworkInterfaceAttribute"
+            ]
+          }]
+        }
+        EOF
+
+        aws iam create-role --role-name "${role}" \
+          --assume-role-policy-document file:///tmp/trust.json >/dev/null
+        aws iam put-role-policy --role-name "${role}" \
+          --policy-name "${role}" --policy-document file:///tmp/policy.json
+
+        arn="arn:aws:iam::${account}:role/${role}"
+        echo "${arn}" >"${SHARED_DIR}/cudn-bgp-operator-role-arn"
+
+        # Prove the role before anything depends on it. The call is
+        # unsigned -- the token is the proof -- so a trust policy that does
+        # not match fails here, named, rather than as an opaque
+        # CloudCredentialsInvalid two steps later.
+        token="$(oc -n "${ns}" create token "${sa}" --audience=openshift --duration=1h)"
+
+        # Retried because a role is not usable the instant it exists: IAM
+        # is eventually consistent and the first assume after a create
+        # comes back AccessDenied, which is indistinguishable from a
+        # trust policy that is simply wrong. Six attempts over a minute
+        # tells the two apart.
+        assumed=""
+        for attempt in $(seq 1 6); do
+          if assumed="$(aws sts assume-role-with-web-identity --role-arn "${arn}" \
+                --role-session-name verify --web-identity-token "${token}" \
+                --query 'AssumedRoleUser.Arn' --output text 2>&1)"; then
+            echo "assumed ${assumed} on attempt ${attempt}"
+            break
+          fi
+          echo "attempt ${attempt}: ${assumed}"
+          assumed=""
+          sleep 10
+        done
+
+        # Everything needed to tell which half is wrong, printed once,
+        # rather than left for whoever reads the failure to reconstruct.
+        # AccessDenied means the provider is registered and the condition
+        # did not match; InvalidIdentityToken means no provider for this
+        # issuer.
+        if [[ -z "${assumed}" ]]; then
+          echo "--- token claims ---" >&2
+          printf '%s' "${token}" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq . >&2 || true
+          echo "--- trust policy ---" >&2
+          aws iam get-role --role-name "${role}" \
+            --query 'Role.AssumeRolePolicyDocument' >&2 || true
+          echo "--- oidc providers in the account ---" >&2
+          aws iam list-open-id-connect-providers >&2 || true
+          echo "could not assume ${arn} with a token from this cluster" >&2
+          exit 1
+        fi
+
+        # ROLEARN on the Subscription is what the console sets when the CSV
+        # declares token-auth-aws. The operator then adds stsIAMRoleARN and
+        # cloudTokenPath to its CredentialsRequest and CCO writes the
+        # secret. It reconciles that request rather than only creating it,
+        # so arriving after the operator has already asked is expected.
+        sub="$(oc -n "${ns}" get subscription -o name | head -1)"
+        oc -n "${ns}" patch "${sub}" --type=merge \
+          -p "{\"spec\":{\"config\":{\"env\":[{\"name\":\"ROLEARN\",\"value\":\"${arn}\"}]}}}"
+
+        oc -n "${ns}" rollout status \
+          deployment/openshift-cudn-bgp-routing-controller-manager --timeout=5m
+
+        # Everything above proves the role from AWS's side. It says nothing
+        # about the operator's own path -- CCO writing the secret, the SDK
+        # reading it, GetCallerIdentity succeeding -- because the operator
+        # asks for credentials only while reconciling a CUDNBgpConfig, and
+        # nothing creates one until the suite does.
+        #
+        # So drive it with a throwaway carrying a route server id that
+        # cannot exist. Credentials working is then proved by the failure
+        # moving on: CloudCredentialsInvalid means the role is wrong,
+        # anything else means AWS accepted us and discovery is what failed,
+        # which is the expected outcome for an id nobody minted.
+        oc apply -f - <<EOF
+        apiVersion: networking.openshift.io/v1alpha1
+        kind: CUDNBgpConfig
+        metadata:
+          name: cluster
+        spec:
+          platform: AWS
+          bgp:
+            localASN: 65001
+            livenessDetection: bgp-keepalive
+          routerNodeSelector:
+            bgp_router: "true"
+          aws:
+            region: ${region}
+            routeServerIDs:
+            - rs-00000000000000000
+        EOF
+
+        echo "waiting for the operator to get past credentials..."
+        deadline=$((SECONDS + 600))
+        reason=""
+        while (( SECONDS < deadline )); do
+          reason="$(oc get cudnbgpconfig cluster \
+            -o jsonpath='{.status.conditions[?(@.type=="CloudEndpointsDiscovered")].reason}' 2>/dev/null || true)"
+          case "${reason}" in
+            CloudCredentialsInvalid)
+              oc get cudnbgpconfig cluster -o yaml >&2
+              echo "the operator could not use the role; see the condition above" >&2
+              exit 1 ;;
+            ""|WaitingForCloudCredentials) ;;
+            *)
+              echo "credentials accepted; reason is now ${reason}"
+              break ;;
+          esac
+          sleep 10
+        done
+        if [[ -z "${reason}" || "${reason}" == WaitingForCloudCredentials ]]; then
+          oc get cudnbgpconfig cluster -o yaml >&2
+          oc -n "${ns}" logs deployment/openshift-cudn-bgp-routing-controller-manager --tail=50 >&2
+          echo "timed out before the operator resolved credentials" >&2
+          exit 1
+        fi
+
+        # The suite applies its own, from a profile naming a route server
+        # that exists.
+        oc delete cudnbgpconfig cluster --wait=false
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: hack/ci-e2e-aws.sh
+      from: src
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: rosa-aws-sts-hcp
 zz_generated_metadata:
   branch: main
   org: openshift
