@@ -267,10 +267,21 @@ tests:
         oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_B_NAME}
 
         echo "Extracting Cluster B kubeconfig..."
+        KUBECONFIG_B_NAME=""
         for i in $(seq 1 60); do
-          KUBECONFIG_B_NAME=$(oc get hc/${CLUSTER_B_NAME} -n clusters -o jsonpath='{ .status.kubeconfig.name }') && [[ -n "${KUBECONFIG_B_NAME}" ]] && break
+          KUBECONFIG_B_NAME=$(oc get hc/${CLUSTER_B_NAME} -n clusters -o jsonpath='{ .status.kubeconfig.name }' 2>/dev/null || true)
+          if [[ -n "${KUBECONFIG_B_NAME}" ]]; then
+            echo "Cluster B kubeconfig secret available: ${KUBECONFIG_B_NAME}"
+            break
+          fi
+          echo "Waiting for Cluster B kubeconfig secret name (attempt ${i}/60)..."
           sleep 10
         done
+        if [[ -z "${KUBECONFIG_B_NAME}" ]]; then
+          echo "ERROR: Cluster B kubeconfig name not available after 10 minutes"
+          oc get hostedcluster/${CLUSTER_B_NAME} -n clusters -o yaml || true
+          exit 1
+        fi
         /usr/bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_B_NAME} > "${SHARED_DIR}/nested_kubeconfig_b"
 
         echo "Waiting for Cluster B clusteroperators..."
