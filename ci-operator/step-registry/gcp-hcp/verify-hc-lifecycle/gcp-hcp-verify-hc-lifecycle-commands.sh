@@ -10,6 +10,11 @@ if [[ ! -f "/usr/bin/gcphcpctl" ]]; then
   echo "The gcp-hcp-e2e-tests image must include gcphcpctl"
   exit 1
 fi
+if [[ ! -x "/usr/bin/test-e2e" ]]; then
+  echo "ERROR: test-e2e binary not found or not executable at /usr/bin/test-e2e"
+  echo "The gcp-hcp-e2e-tests image must include test-e2e"
+  exit 1
+fi
 
 # Verify required SHARED_DIR files exist
 for f in api-endpoint oidc-endpoint customer-project-id; do

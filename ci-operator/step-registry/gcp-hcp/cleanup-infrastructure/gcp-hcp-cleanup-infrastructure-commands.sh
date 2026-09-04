@@ -3,6 +3,7 @@ set -euo pipefail
 
 LOG="${ARTIFACT_DIR}/cleanup.log"
 log() { echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') | $*" | tee -a "${LOG}"; }
+CLEANUP_FAILED=0
 
 # Validate required dependencies
 for cmd in jq gcloud curl; do
@@ -96,7 +97,9 @@ build_kubeconfig() {
   local token
   token=$(gcloud auth print-access-token)
 
-  cat > "${output_path}" <<EOF
+  (
+    umask 077
+    cat > "${output_path}" <<EOF
 apiVersion: v1
 kind: Config
 clusters:
@@ -114,6 +117,8 @@ users:
   user:
     token: ${token}
 EOF
+  )
+  chmod 600 "${output_path}"
 }
 
 # Helper: kubectl/oc wrapper
@@ -288,8 +293,11 @@ delete_project() {
 
   local output
   local exit_code
-  output=$(gcloud projects delete "${project}" --quiet 2>&1)
-  exit_code=$?
+  if output=$(gcloud projects delete "${project}" --quiet 2>&1); then
+    exit_code=0
+  else
+    exit_code=$?
+  fi
   
   echo "${output}" | tee -a "${LOG}"
   
@@ -365,7 +373,8 @@ clear_tfc_workspace() {
   if ! curl -fsSL --max-time 120 \
     "https://releases.hashicorp.com/terraform/${tf_version}/terraform_${tf_version}_linux_amd64.zip" \
     -o /tmp/terraform.zip; then
-    log "  WARNING: Failed to download terraform, skipping TFC cleanup"
+    log "  ERROR: Failed to download terraform; TFC cleanup is incomplete"
+    CLEANUP_FAILED=1
     return 0
   fi
   if command -v unzip &>/dev/null; then
@@ -402,7 +411,8 @@ TFRC
 
   log "  Initializing terraform against workspace ${workspace_name}..."
   if ! /tmp/terraform -chdir="${tf_dir}" init -no-color 2>&1 | tee -a "${LOG}"; then
-    log "  WARNING: terraform init failed, skipping TFC cleanup"
+    log "  ERROR: terraform init failed; TFC cleanup is incomplete"
+    CLEANUP_FAILED=1
     return 0
   fi
 
@@ -434,34 +444,42 @@ TFRC
     # for individual removal).
     local addresses
     addresses=$(/tmp/terraform -chdir="${tf_dir}" state list -no-color 2>/dev/null | \
-      sed -E \
+      sed -n -E \
         -e 's/^(module\.[^.]+)\..*/\1/p' \
         -e 's/^(data\.[^.]+\.[^.]+)(\[.*\])?$/\1/p' \
         -e 's/^([^.[:space:]]+\.[^.[:space:]]+)(\[.*\])?$/\1/p' | \
       sort -u)
     if [[ -n "${addresses}" ]]; then
       log "  Removing: ${addresses//$'\n'/, }"
-      echo "${addresses}" | xargs /tmp/terraform -chdir="${tf_dir}" state rm -no-color 2>&1 | \
-        tail -5 | tee -a "${LOG}" || true
+      if ! printf '%s\n' "${addresses}" | \
+        xargs /tmp/terraform -chdir="${tf_dir}" state rm -no-color >>"${LOG}" 2>&1; then
+        log "  ERROR: terraform state rm failed; workspace may not be safe-deletable"
+        CLEANUP_FAILED=1
+      fi
     fi
   fi
 
   # Safe-delete the workspace (should succeed with 0 resources)
   log "  Deleting workspace..."
   local http_code
-  http_code=$(curl -sS -o /dev/null -w "%{http_code}" \
+  if http_code=$(curl -sS -o /dev/null -w "%{http_code}" \
     --max-time 30 \
     --connect-timeout 10 \
     --header "Authorization: Bearer ${tfc_token}" \
     --header "Content-Type: application/vnd.api+json" \
     --request POST \
-    "https://app.terraform.io/api/v2/workspaces/${workspace_id}/actions/safe-delete" 2>/dev/null || echo "000")
-
-  if [[ "${http_code}" == "204" || "${http_code}" == "200" ]]; then
-    log "  TFC workspace deleted: ${workspace_name}"
+    "https://app.terraform.io/api/v2/workspaces/${workspace_id}/actions/safe-delete" 2>>"${LOG}"); then
+    if [[ "${http_code}" == "204" || "${http_code}" == "200" ]]; then
+      log "  TFC workspace deleted: ${workspace_name}"
+    else
+      log "  ERROR: Could not delete TFC workspace (HTTP ${http_code})"
+      log "  Workspace: https://app.terraform.io/app/${tfc_org}/workspaces/${workspace_name}"
+      CLEANUP_FAILED=1
+    fi
   else
-    log "  WARNING: Could not delete TFC workspace (HTTP ${http_code}). Manual cleanup may be needed."
+    log "  ERROR: TFC workspace deletion request failed; manual cleanup may be needed"
     log "  Workspace: https://app.terraform.io/app/${tfc_org}/workspaces/${workspace_name}"
+    CLEANUP_FAILED=1
   fi
 }
 
@@ -469,9 +487,16 @@ TFRC
 # Execute cleanup
 # ========================================================================
 
-# Build kubeconfigs with fresh tokens
-REGION_KC="/tmp/region-kubeconfig"
-MC_KC="/tmp/mc-kubeconfig"
+# Build kubeconfigs with fresh tokens. Keep them private and remove them on
+# every exit path because they contain live access tokens.
+REGION_KC=""
+MC_KC=""
+cleanup_kubeconfigs() {
+  rm -f "${REGION_KC}" "${MC_KC}"
+}
+trap cleanup_kubeconfigs EXIT
+REGION_KC="$(mktemp "${TMPDIR:-/tmp}/gcp-hcp-region-kubeconfig.XXXXXX")"
+MC_KC="$(mktemp "${TMPDIR:-/tmp}/gcp-hcp-mc-kubeconfig.XXXXXX")"
 
 if [[ -n "${REGION_PROJECT_NUMBER}" ]]; then
   build_kubeconfig "${REGION_PROJECT_NUMBER}" "${REGION_CLUSTER}" "${REGION_KC}"
@@ -542,20 +567,26 @@ fi
 log ""
 log "=== Force-deleting GCP projects ==="
 log "This bypasses terraform destroy for reliability — project deletion cascades to all resources"
-delete_project "${MC_PROJECT}" "MC"
-delete_project "${REGION_PROJECT}" "Region"
+delete_project "${MC_PROJECT}" "MC" || CLEANUP_FAILED=1
+delete_project "${REGION_PROJECT}" "Region" || CLEANUP_FAILED=1
 if [[ -n "${SERVICE_PROJECT}" ]]; then
-  delete_project "${SERVICE_PROJECT}" "Service"
+  delete_project "${SERVICE_PROJECT}" "Service" || CLEANUP_FAILED=1
 fi
 if [[ -n "${CUSTOMER_PROJECT}" ]]; then
-  delete_project "${CUSTOMER_PROJECT}" "Customer"
+  delete_project "${CUSTOMER_PROJECT}" "Customer" || CLEANUP_FAILED=1
 fi
 
 # Phase 6: Clear TFC workspace state
 log ""
-clear_tfc_workspace
+clear_tfc_workspace || CLEANUP_FAILED=1
 
 log ""
+if [[ "${CLEANUP_FAILED}" -ne 0 ]]; then
+  log "=== Cleanup completed with errors ==="
+  log "One or more resources could not be cleaned up; manual cleanup may be required"
+  exit 1
+fi
+
 log "=== Cleanup complete ==="
 log "Projects are now in PENDING_DELETE state (30-day soft delete)"
 log "TFC workspace state has been cleared"
