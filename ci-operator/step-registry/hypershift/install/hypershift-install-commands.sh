@@ -219,16 +219,42 @@ case "${CLOUD_PROVIDER}" in
 esac
 
 # --- HyperShift Operator image verification ---
-# Helper: extract only the sha256 digest from an image reference, or classify it.
+# Disable xtrace for the entire verification block so that raw image pullspecs
+# and imageIDs (which may contain internal registry hostnames) are never logged
+# via set -x. Only safe digest-only values reach stdout and public artifacts.
+[[ $- == *x* ]] && _XTRACE_WAS_ON=true || _XTRACE_WAS_ON=false
+set +x
+
+# Helper: extract a sha256 digest from an image reference or runtime imageID.
+# Handles two common formats:
+#   - pullspec with digest: "registry/repo@sha256:abc…"
+#   - CRI-O / runtime imageID: "docker://sha256:abc…"
 # Returns "sha256:…", "tag-only", or "unavailable" — never a raw pullspec.
 _safe_digest() {
   local ref="$1"
   if [[ "${ref}" == *@sha256:* ]]; then
+    # docker-pullable://registry/repo@sha256:… or registry/repo@sha256:…
     echo "${ref##*@}"
+  elif [[ "${ref}" == docker://sha256:* ]]; then
+    # CRI-O runtime imageID: docker://sha256:…
+    echo "${ref#docker://}"
   elif [[ "${ref}" == "unavailable" ]]; then
     echo "unavailable"
   else
     echo "tag-only"
+  fi
+}
+
+# Helper: extract a sha256 digest from a raw image reference for comparison.
+# Like _safe_digest but also handles the docker:// prefix for digest extraction.
+_extract_digest() {
+  local ref="$1"
+  if [[ "${ref}" == *@sha256:* ]]; then
+    echo "${ref##*@}"
+  elif [[ "${ref}" == docker://sha256:* ]]; then
+    echo "${ref#docker://}"
+  else
+    echo "${ref}"
   fi
 }
 
@@ -300,16 +326,19 @@ echo "  Pod: ${POD_SAFE}"
 # is clear. This only fires on the opt-in override path; ordinary e2e jobs that
 # use the default pipeline image are unaffected.
 if [[ "${OVERRIDE_SUPPLIED}" == "true" ]] && [[ "${POD_IMAGE_ID}" != "unavailable" ]]; then
-  # Extract sha256 digest from the pod's imageID (e.g. docker-pullable://...@sha256:abc)
-  DEPLOYED_DIGEST="${POD_IMAGE_ID##*@}"
-  # Extract sha256 digest from the intended override image if it contains one
-  INTENDED_DIGEST="${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE##*@}"
+  # Extract sha256 digest from the pod's imageID.
+  # Handles both "docker-pullable://…@sha256:abc" and "docker://sha256:abc".
+  DEPLOYED_DIGEST=$(_extract_digest "${POD_IMAGE_ID}")
+  # Extract sha256 digest from the intended override image if it contains one.
+  INTENDED_DIGEST=$(_extract_digest "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}")
 
   if [[ "${INTENDED_DIGEST}" == sha256:* ]] && [[ "${DEPLOYED_DIGEST}" == sha256:* ]]; then
     if [[ "${INTENDED_DIGEST}" != "${DEPLOYED_DIGEST}" ]]; then
       echo "ERROR: HyperShift Operator image digest mismatch"
       echo "  Intended digest: ${INTENDED_DIGEST}"
       echo "  Deployed digest: ${DEPLOYED_DIGEST}"
+      # Restore xtrace before exiting so post-step cleanup is visible.
+      ${_XTRACE_WAS_ON} && set -x
       exit 1
     else
       echo "INFO: HyperShift Operator image digest verified"
@@ -317,3 +346,6 @@ if [[ "${OVERRIDE_SUPPLIED}" == "true" ]] && [[ "${POD_IMAGE_ID}" != "unavailabl
     fi
   fi
 fi
+
+# Restore xtrace to its previous state.
+${_XTRACE_WAS_ON} && set -x
