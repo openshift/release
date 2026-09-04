@@ -1,0 +1,97 @@
+ref:
+  as: telcov10n-functional-cnf-ran-oran-setup
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-oran-setup-commands.sh
+  timeout: 2h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: VERSION
+    default: "4.22"
+    documentation: OCP version
+  - name: CLUSTER_NAME
+    default: "kni-qe-129"
+    documentation: Hub cluster name (also used as the root CA common name)
+  - name: ORAN_CLUSTERS_REPO_URL
+    default: "https://gitlab.cee.redhat.com/rdiazcam/ztp-site-configs-ci.git"
+    documentation: |-
+      Git repo holding the O-RAN ArgoCD clustertemplates (ClusterTemplate,
+      HardwarePlugin/Template/Profile, BareMetalHosts). The gitops setup
+      repoints the ZTP clusters app at this repo's clustertemplates path.
+  - name: ORAN_CLUSTERS_REPO_BRANCH
+    default: "oran"
+    documentation: Branch of the O-RAN clusters repo
+  - name: ORAN_POLICIES_REPO_URL
+    default: ""
+    documentation: |-
+      Git repo holding the O-RAN ArgoCD policytemplates. Defaults to
+      ORAN_CLUSTERS_REPO_URL when empty.
+  - name: ORAN_POLICIES_REPO_BRANCH
+    default: ""
+    documentation: |-
+      Branch of the O-RAN policies repo. Defaults to ORAN_CLUSTERS_REPO_BRANCH
+      when empty.
+  - name: ORAN_CLUSTERS_REPO_PATH
+    default: ""
+    documentation: |-
+      ArgoCD source path for the clusters app. Defaults to
+      clustertemplates/<VERSION> (the per-version repo layout) when empty.
+  - name: ORAN_POLICIES_REPO_PATH
+    default: ""
+    documentation: |-
+      ArgoCD source path for the policies app. Defaults to
+      policytemplates/<VERSION> when empty.
+  - name: CONFIGURE_ACM_OBSERVABILITY
+    default: "false"
+    documentation: |-
+      When true, deploy a minimal Alertmanager in the
+      open-cluster-management-observability namespace so the o-cloud-manager
+      alarms-server can start. This runs in oran-setup when hub-config has not
+      run (standalone rehearsal) or as a complement when hub-config runs first.
+  - name: ORAN_SETUP_FIRMWARE
+    default: "false"
+    documentation: When true, download Dell firmware onto the bastion
+  - name: ORAN_FIRMWARE_SERVER_MODEL
+    default: "r750"
+    documentation: Dell server model to download firmware for (e.g. r750)
+  credentials:
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-all
+      mount_path: /var/group_variables/common/all
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-bastions
+      mount_path: /var/group_variables/common/bastions
+    # kni-qe-129 host_vars — fallback when hub-deploy hasn't run (standalone rehearsal)
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-129-bastion
+      mount_path: /var/host_variables/kni-qe-129/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-129-master0
+      mount_path: /var/host_variables/kni-qe-129/master0
+    # Keycloak "oran" realm export (client secrets + realm signing keys). Stored
+    # in Vault and synced to test-credentials; NOT committed to eco-ci-cd. The
+    # mounted secret must contain a key/file named oran-realm.json.
+    - namespace: test-credentials
+      name: telcov10n-oran-mtls-oauth
+      mount_path: /var/oran-secrets
+  documentation: |-
+    Special O-RAN setup on the hub cluster. Runs after hub-config, which
+    extracts the ztp-site-generate ArgoCD deployment artifacts and installs the
+    cert-manager, rhbk (Keycloak) and o-cloud-manager operators.
+
+    Two eco-ci-cd playbooks run on the bastion:
+      1. hub-sno-configure-oran-gitops.yml — repoints the ZTP ArgoCD clusters
+         and policies apps at the O-RAN clustertemplates / policytemplates and
+         whitelists the O-RAN CRDs in the app projects.
+      2. hub-sno-oran-setup.yml — bootstraps the cluster PKI (root CA +
+         cert-manager ClusterIssuer), deploys Keycloak with the O-RAN realm,
+         the oran-mock-smo, and configures the oran-o2ims Inventory CR with
+         mTLS + OAuth.
+
+    The spoke itself is provisioned inside the eco-gotests oran-provision suite,
+    not by this step.
