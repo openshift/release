@@ -379,6 +379,56 @@ tests:
     - ref: dpf-hypervisor-load-kubeconfig
     - ref: dpf-hypervisor-sanity
     - ref: openshift-qe-node-density-cni
+- always_run: false
+  as: e2e
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca8
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+    - ref: dpf-hypervisor-e2e
+- always_run: false
+  as: e2e-doca4
+  capabilities:
+  - intranet
+  reporter_config:
+    channel: '#wg-nvidia-dpf-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- if .Spec.Refs.Pulls }}{{- $pull := index .Spec.Refs.Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-dpf-doca4
+    test:
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: dpf-hypervisor-sanity
+    - ref: dpf-hypervisor-e2e
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
