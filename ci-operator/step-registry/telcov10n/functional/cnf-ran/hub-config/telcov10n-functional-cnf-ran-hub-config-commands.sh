@@ -100,7 +100,8 @@ echo "Configuring LVM storage"
 ansible-playbook playbooks/ran/hub-sno-configure-lvm-storage.yml \
   -i ./inventories/ocp-deployment/build-inventory.py \
   --private-key="${PROJECT_DIR}/ansible_ssh_key" \
-  --extra-vars "kubeconfig=${KUBECONFIG_PATH}" -vv
+  --extra-vars "kubeconfig=${KUBECONFIG_PATH}" \
+  --extra-vars "{\"lvm_local_volumes\": ${LVM_LOCAL_VOLUMES}}" -vv
 
 echo "Configuring ACM"
 ansible-playbook playbooks/ran/hub-sno-configure-acm.yml \
