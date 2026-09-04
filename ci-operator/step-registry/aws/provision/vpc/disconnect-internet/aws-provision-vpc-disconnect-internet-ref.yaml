@@ -1,0 +1,38 @@
+ref:
+  as: aws-provision-vpc-disconnect-internet
+  from_image:
+    namespace: ocp
+    name: "4.12"
+    tag: upi-installer
+  grace_period: 10m
+  commands: aws-provision-vpc-disconnect-internet-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: REGION
+    default: ""
+    documentation: |-
+      AWS region to operate in. Defaults to the value of the LEASED_RESOURCE
+      environment variable set by the lease system.
+  documentation: |-
+    Remove internet access from the disconnected VPC after the mirror-to-disk
+    and disk-to-mirror phases have completed.
+
+    Deletes the 0.0.0.0/0 (and ::/0 for dual-stack) routes that point to the
+    Internet Gateway on both the public and private route tables of the VPC
+    created by aws-provision-vpc-disconnected. This enforces a true air-gap:
+    neither the bastion host nor the cluster nodes can initiate connections to
+    the public internet after this step runs.
+
+    The Internet Gateway itself is NOT detached or deleted because the VPC
+    CloudFormation stack owns it; it will be torn down by the post-deprovision
+    step. Removing only the routes is sufficient to cut internet access and is
+    fully reversible by re-adding the routes if needed.
+
+    Reads:
+      SHARED_DIR/public_route_table_id   - public route table ID
+      SHARED_DIR/private_route_table_id  - first private route table ID
+      SHARED_DIR/vpc_stack_output        - full CloudFormation stack output JSON
+                                           (used to enumerate all private route tables)
