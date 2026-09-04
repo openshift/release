@@ -13,11 +13,35 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 typeset ODF_NAMESPACE="${ODF_NAMESPACE:-openshift-storage}"
 typeset NOOBAA_S3_TIMEOUT="${NOOBAA_S3_TIMEOUT:-30}"
+typeset RESOURCE_BIND_TIMEOUT="${RESOURCE_BIND_TIMEOUT:-60}"
+typeset -ri maxResourceBindTimeout=300
+
+# Validate RESOURCE_BIND_TIMEOUT is a positive integer
+if ! [[ "${RESOURCE_BIND_TIMEOUT}" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "Error: RESOURCE_BIND_TIMEOUT must be a positive integer (got '${RESOURCE_BIND_TIMEOUT}')" >&2
+    exit 1
+fi
+
+if (( RESOURCE_BIND_TIMEOUT > maxResourceBindTimeout )); then
+    printf '%s\n' "Warning: RESOURCE_BIND_TIMEOUT=${RESOURCE_BIND_TIMEOUT} exceeds maximum ${maxResourceBindTimeout}s; clamping" >&2
+    RESOURCE_BIND_TIMEOUT="${maxResourceBindTimeout}"
+fi
+if (( RESOURCE_BIND_TIMEOUT < 1 )); then
+    printf '%s\n' "Error: RESOURCE_BIND_TIMEOUT must be >= 1s (got ${RESOURCE_BIND_TIMEOUT})" >&2
+    exit 1
+fi
 typeset ODF_READY_TIMEOUT="${ODF_READY_TIMEOUT:-720}"
-typeset -ri MAX_ODF_READY_TIMEOUT=780
-if (( ODF_READY_TIMEOUT > MAX_ODF_READY_TIMEOUT )); then
-    printf '%s\n' "Warning: ODF_READY_TIMEOUT=${ODF_READY_TIMEOUT} exceeds maximum ${MAX_ODF_READY_TIMEOUT}s; clamping" >&2
-    ODF_READY_TIMEOUT="${MAX_ODF_READY_TIMEOUT}"
+typeset -ri maxOdfReadyTimeout=750
+if (( ODF_READY_TIMEOUT > maxOdfReadyTimeout )); then
+    printf '%s\n' "Warning: ODF_READY_TIMEOUT=${ODF_READY_TIMEOUT} exceeds maximum ${maxOdfReadyTimeout}s; clamping" >&2
+    ODF_READY_TIMEOUT="${maxOdfReadyTimeout}"
+fi
+
+# Validate combined timeout budget: 3 bind cycles + ODF ready + buffer < 1800s (step timeout)
+typeset -i totalBudget=$(( 3 * RESOURCE_BIND_TIMEOUT + ODF_READY_TIMEOUT + 150 ))
+if (( totalBudget >= 1800 )); then
+    printf '%s\n' "Error: timeout budget (3*${RESOURCE_BIND_TIMEOUT} + ${ODF_READY_TIMEOUT} + 150 = ${totalBudget}s) exceeds step timeout (1800s)" >&2
+    exit 1
 fi
 
 typeset junitFile="${ARTIFACT_DIR}/junit_odf_health.xml"
@@ -251,11 +275,12 @@ EOF
             continue
         fi
 
-        typeset -i maxWait=60
+        typeset -i maxWait="${RESOURCE_BIND_TIMEOUT}"
         typeset -i elapsed=0
         typeset phase=""
         while (( elapsed < maxWait )); do
-            phase="$(oc get pvc "${pvcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")"
+            typeset -i remaining=$(( maxWait - elapsed ))
+            phase="$(oc get pvc "${pvcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' --request-timeout="${remaining}s" 2>/dev/null || echo "")"
             if [[ "${phase}" == "Bound" ]]; then
                 break
             fi
@@ -322,11 +347,12 @@ EOF
         return
     fi
 
-    typeset -i maxWait=60
+    typeset -i maxWait="${RESOURCE_BIND_TIMEOUT}"
     typeset -i elapsed=0
     typeset obcPhase=""
     while (( elapsed < maxWait )); do
-        obcPhase="$(oc get obc "${obcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")"
+        typeset -i remaining=$(( maxWait - elapsed ))
+        obcPhase="$(oc get obc "${obcName}" -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' --request-timeout="${remaining}s" 2>/dev/null || echo "")"
         if [[ "${obcPhase}" == "Bound" ]]; then
             break
         fi
@@ -354,11 +380,13 @@ EOF
     fi
 
     typeset s3Endpoint=""
-    s3Endpoint="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | python3 -c "
+    if ! s3Endpoint="$(oc get noobaa -n "${ODF_NAMESPACE}" -o json | python3 -c "
 import sys,json; d=json.load(sys.stdin)
 v=d['items'][0].get('status',{}).get('services',{}).get('serviceS3',{}).get('internalDNS',[])
 print(v[0] if v else '')
-")" || true
+")"; then
+        s3Endpoint=""
+    fi
     if [[ -z "${s3Endpoint}" ]]; then
         s3Endpoint="https://s3.${ODF_NAMESPACE}.svc:443"
     fi
@@ -479,10 +507,12 @@ for k,v in details.items():
     fi
 
     typeset cephHealth=""
-    cephHealth="$(oc get cephcluster -n "${ODF_NAMESPACE}" -o json | python3 -c "
+    if ! cephHealth="$(oc get cephcluster -n "${ODF_NAMESPACE}" -o json | python3 -c "
 import sys,json; d=json.load(sys.stdin)
 print(d['items'][0].get('status',{}).get('ceph',{}).get('health','unknown') if d.get('items') else 'unknown')
-")" || true
+")"; then
+        cephHealth=""
+    fi
 
     if [[ "${cephHealth}" == "HEALTH_OK" ]]; then
         : "PASS: Ceph health=HEALTH_OK"

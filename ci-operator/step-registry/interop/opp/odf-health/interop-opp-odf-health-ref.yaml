@@ -3,7 +3,7 @@ ref:
   from: cli
   grace_period: 30s
   commands: interop-opp-odf-health-commands.sh
-  timeout: 18m
+  timeout: 30m
   env:
   - name: ODF_NAMESPACE
     default: "openshift-storage"
@@ -11,6 +11,15 @@ ref:
   - name: NOOBAA_S3_TIMEOUT
     default: "30"
     documentation: Timeout in seconds for the NooBaa S3 functional check pod
+  - name: RESOURCE_BIND_TIMEOUT
+    default: "60"
+    documentation: |-
+      Seconds to wait for PVCs and ObjectBucketClaims to reach Bound phase.
+      Budget: consumed 3x per run (2 PVC checks + 1 OBC check).
+      Ensure 3 * RESOURCE_BIND_TIMEOUT + ODF_READY_TIMEOUT + 150 < step timeout.
+      On AWS resources bind in seconds; on vSphere the NooBaa bucket
+      provisioner may need additional time after ODF reports Ready.
+      Override in ci-operator config for slower platforms. Max 300s (clamped).
   - name: ODF_READY_TIMEOUT
     default: "720"
     documentation: |-
