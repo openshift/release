@@ -8,8 +8,11 @@ fi
 
 echo "[setup] Starting oape-review-handler for ${REPO_OWNER}/${REPO_NAME} PR#${PULL_NUMBER:-unknown}"
 
-# pj-rehearse runs against openshift/release, not the target repo.
-if [[ "${REPO_NAME}" == "release" && "${REPO_OWNER}" == "openshift" && -n "${REHEARSAL_TARGET_REPO:-}" ]]; then
+REHEARSING=false
+[[ "${JOB_NAME:-}" == rehearse-* ]] && REHEARSING=true
+
+# pj-rehearse runs against openshift/release, not the target operator repo.
+if [[ "${REHEARSING}" == "true" && "${REPO_NAME}" == "release" && "${REPO_OWNER}" == "openshift" && -n "${REHEARSAL_TARGET_REPO:-}" ]]; then
   echo "[setup] Detected openshift/release context — switching to rehearsal target"
   export REPO_OWNER="${REHEARSAL_TARGET_OWNER:-openshift}"
   export REPO_NAME="${REHEARSAL_TARGET_REPO}"
@@ -72,7 +75,7 @@ fi
 $WAS_TRACING && set -x
 
 # pj-rehearse may set PULL_NUMBER to the release PR; fall back to rehearsal target.
-if ! gh pr view "${PULL_NUMBER}" --repo "${REPO_OWNER}/${REPO_NAME}" --json number >/dev/null 2>&1; then
+if [[ "${REHEARSING}" == "true" ]] && ! gh pr view "${PULL_NUMBER}" --repo "${REPO_OWNER}/${REPO_NAME}" --json number >/dev/null 2>&1; then
   if [[ -n "${REHEARSAL_TARGET_PR:-}" ]]; then
     echo "[setup] PR #${PULL_NUMBER} not found on ${REPO_OWNER}/${REPO_NAME} — using rehearsal target"
     export PULL_NUMBER="${REHEARSAL_TARGET_PR}"
