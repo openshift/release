@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-loki-redirect-config
+  namespace: ci
+data:
+  "default.conf": |
+    server {
+      listen 8080;
+      return 302 $scheme://grafana-loki.ci.openshift.org$request_uri;
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: grafana-loki-redirect
+  name: grafana-loki-redirect
+  namespace: ci
+spec:
+  selector:
+    matchLabels:
+      component: grafana-loki-redirect
+  template:
+    metadata:
+      labels:
+        component: grafana-loki-redirect
+    spec:
+      containers:
+      - image: docker.io/nginxinc/nginx-unprivileged:1.17
+        name: nginx
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: config
+        configMap:
+          name: grafana-loki-redirect-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    component: grafana-loki-redirect
+  name: grafana-loki-redirect
+  namespace: ci
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: grafana-loki-redirect
+  sessionAffinity: None
+  type: ClusterIP
