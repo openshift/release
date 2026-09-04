@@ -2,13 +2,14 @@
 
 ## Overview
 
-The `security-adversary-scan` step runs the adversary security scanner (from `openshift-online/rosa-claude-plugins`, requires org membership) against your repo's source code. It covers 17 security domains: SAST, IaC, containers, Kubernetes, CI/CD, secrets, supply chain, web, API, auth, database, mobile, cloud, performance, git, agent/skill, and critical workflows.
+The `security-adversary-scan` step runs the adversary security scanner (from `openshift-online/rosa-claude-plugins`, requires org membership) against your repo's source code. It covers many security domains, including: SAST, IaC, containers, Kubernetes, CI/CD, secrets, supply chain, web, API, auth, database, mobile, cloud, performance, git, agent/skill, and critical workflows.
 
-The scan uses Claude Code with the adversary skill from the `rosa-claude-plugins` marketplace. Results are stored as Prow artifacts and optionally posted to Slack.
+The scan uses Claude Code with the `/adversary` skill from the `rosa-claude-plugins` marketplace. Results are stored as Prow artifacts and optionally posted to Slack.
 
 ## Prerequisites
 
-- The `sa-claude-openshift-ci` credential is already available in the `test-credentials` namespace — no setup needed.
+- The `sa-claude-openshift-ci` credential is already available in the `test-credentials` namespace — no setup needed for Vertex AI auth.
+- **GitHub PAT required:** `openshift-online/rosa-claude-plugins` requires org membership to read, so the scan step needs an authenticated GitHub identity to install the plugin. The `sa-claude-openshift-ci` secret must also contain a `gh-pat` key holding a GitHub PAT for an account with `openshift-online` org membership. If your job doesn't already have this key provisioned, request it be added to that secret, or override `GITHUB_PAT_PATH` in your config to point at a secret of your own containing the PAT.
 - For Slack notifications: request creation of an `adversary-scan-slack-webhook` secret in `test-credentials` containing your team's Slack incoming webhook URL under the key `url`.
 
 ## Quick Start — On-Demand PR Scanning
@@ -116,6 +117,7 @@ Notification colors:
 | `CLAUDE_CODE_USE_VERTEX` | `1` | Use Vertex AI for authentication |
 | `CLOUD_ML_REGION` | `global` | Vertex AI region |
 | `ANTHROPIC_VERTEX_PROJECT_ID` | `openshift-ci-prow-agents` | GCP project for Vertex AI |
+| `GITHUB_PAT_PATH` | `/var/run/claude-code-service-account/gh-pat` | Path to a GitHub PAT (org member) for installing the rosa-claude-plugins marketplace plugin at runtime — see Prerequisites above |
 
 ### Notify Step (`security-adversary-scan-notify`)
 

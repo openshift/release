@@ -7,6 +7,12 @@
 #
 # Required env:
 #   SLACK_WEBHOOK_PATH  -- path to file containing the webhook URL
+#   ADVERSARY_TEST_NAME -- ci-operator test name (the `as:` value) this
+#                          notify step is attached to as a post step, used
+#                          to build the GCS artifact link (e.g.
+#                          "weekly-adversary-scan"). Not derivable from
+#                          JOB_NAME by stripping to the last hyphen, since
+#                          the test name itself contains hyphens.
 #
 # Provided by ci-operator:
 #   SHARED_DIR          -- shared volume with the scan step
@@ -73,7 +79,7 @@ echo "Findings: ${CRITICAL} critical, ${HIGH} high, ${MEDIUM} medium, ${LOW} low
 # -----------------------------------------------------------------------
 JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
 GCS_BASE="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
-REPORT_URL="${GCS_BASE}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME##*-}/security-adversary-scan/artifacts/"
+REPORT_URL="${GCS_BASE}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${ADVERSARY_TEST_NAME}/security-adversary-scan/artifacts/"
 
 REPO="${REPO_OWNER:-unknown}/${REPO_NAME:-unknown}"
 NL=$'\n'
