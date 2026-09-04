@@ -253,7 +253,7 @@ if [[ "${CNI_PROVIDER}" == "cilium" ]]; then
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: virt-launcher-egress
+  name: virt-launcher-ingress
   namespace: ${CONTROL_PLANE_NAMESPACE}
 spec:
   endpointSelector:
@@ -262,6 +262,16 @@ spec:
   ingress:
     - fromEntities:
         - all
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: virt-launcher-egress
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s:kubevirt.io: virt-launcher
   egress:
     # In pure Kubernetes semantics, 0.0.0.0/0 excluding the Pod and Service CIDRs would include 192.168.111.4. However, Cilium classifies this peer as the
     # host identity. CIDR/ipBlock rules do not match Cilium-managed host/node identities by default, and this cluster has policy-cidr-match-mode unset.
