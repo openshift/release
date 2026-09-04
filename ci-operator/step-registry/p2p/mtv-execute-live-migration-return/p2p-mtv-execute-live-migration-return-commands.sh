@@ -7,8 +7,7 @@
 #   MTV_SOURCE_PROVIDER=spoke-2, MTV_DESTINATION_PROVIDER=spoke-1
 #   MTV_SOURCE_SPOKE_INDEX=2, MTV_DEST_SPOKE_INDEX=1
 #
-# Logic is identical to p2p-mtv-execute-live-migration-commands.sh;
-# direction is controlled entirely by env vars set in the ref.yaml.
+# Post-migration verification is handled by p2p-mtv-verify-migration-return.
 #
 set -euxo pipefail; shopt -s inherit_errexit
 
@@ -38,7 +37,6 @@ typeset -i syncStuckMinutes="${MTV_SYNC_STUCK_MINUTES}"
 typeset -i syncPhaseStartedAt=0
 typeset -i vmCount="${MTV_TEST_VM_COUNT}"
 typeset cclmDebugMode="${P2P_CCLM_DEBUG_MODE}"
-typeset vmSshVerify="${MTV_VM_SSH_VERIFY}"
 # Suffix applied to all artifact names (status file, diag dir, JUnit XML, JUnit suite name).
 # Empty string for the forward leg; "-return" for the return leg.
 typeset migrationSuffix="${MTV_MIGRATION_SUFFIX}"
@@ -598,121 +596,6 @@ function WaitMigrationSucceeded () {
     false
 }
 
-# VerifyMigration — all destination VMIs must be Running after migration.
-function VerifyMigration () {
-    typeset -i i
-    typeset vmName destPhase
-
-    for (( i = 1; i <= vmCount; i++ )); do
-        vmName="$(VmName "${i}")"
-        destPhase="$(DestOc get "virtualmachineinstance/${vmName}" -n "${targetNs}" \
-            -o jsonpath='{.status.phase}' || true)"
-        [[ "${destPhase}" == "Running" ]] \
-            || { : "VMI ${vmName} not Running on destination (phase=${destPhase})"; false; }
-    done
-}
-
-# VerifyDestVmsRunStrategy — destination VMs must have runStrategy=Always after migration.
-# Guards against OCPBUGS-101771 where Forklift leaves runStrategy=Halted, silently breaking
-# VM auto-restart (the migrated VM will not recover from a pod crash without manual start).
-function VerifyDestVmsRunStrategy () {
-    typeset -i i
-    typeset vmName strategy
-
-    for (( i = 1; i <= vmCount; i++ )); do
-        vmName="$(VmName "${i}")"
-        strategy="$(DestOc get "virtualmachine/${vmName}" -n "${targetNs}" \
-            -o jsonpath='{.spec.runStrategy}' || true)"
-        [[ "${strategy}" == "Always" ]] \
-            || { : "VM ${vmName} runStrategy='${strategy}', expected 'Always' (OCPBUGS-101771)"; false; }
-    done
-    true
-}
-
-# VerifySourceVmimNotFailed — source VMIMs must not be in Failed phase after migration.
-# Guards against OCPBUGS-99403 where a mid-migration QEMU socket disruption causes the
-# guest to crash on source while Forklift reports Succeeded based on target-side status only.
-# An absent VMIM (phase="") means it was cleaned up after success — that is expected.
-function VerifySourceVmimNotFailed () {
-    typeset -i i
-    typeset vmName srcVmimPhase
-
-    for (( i = 1; i <= vmCount; i++ )); do
-        vmName="$(VmName "${i}")"
-        srcVmimPhase="$(VmimPhase "${sourceKubeconfig}" "${MTV_TEST_VM_NAMESPACE}" "${vmName}")"
-        [[ "${srcVmimPhase}" != "Failed" ]] \
-            || { : "Source VMIM for ${vmName} is Failed — false-positive migration (OCPBUGS-99403)"; false; }
-    done
-    true
-}
-
-# VerifyAllVmsSsh — probe SSH port 22 on each migrated VM via a peer virt-launcher.
-# Uses cross-VM probing: VM[i] is probed from VM[(i+1)%N]'s virt-launcher, so
-# the anchor pod differs from the target VM (avoids hairpin NAT in masquerade mode).
-# Skipped for vmCount=1 (no peer launcher; self-probe is meaningless).
-# Best-effort: caller wraps with || true so failure is logged but doesn't block.
-function VerifyAllVmsSsh () {
-    [[ "${vmSshVerify}" == "true" ]] || return 0
-    [[ "${MTV_PLAN_TYPE}" == "live" ]] || return 0
-    # Self-probe with vmCount=1 would use the same pod as both anchor and target.
-    (( vmCount > 1 )) || return 0
-
-    typeset -i i
-    typeset -a vmNamesArr=()
-    typeset -a launcherPodsArr=()
-
-    # Collect virt-launcher pods for all migrated VMs on destination.
-    # VM IPs and pod names are resolved inside set +x to avoid tracing
-    # internal cluster endpoint identifiers into CI logs.
-    for (( i = 1; i <= vmCount; i++ )); do
-        typeset vmn pod
-        vmn="$(VmName "${i}")"
-        vmNamesArr+=("${vmn}")
-        pod="$(DestOc get pods -n "${targetNs}" -o json \
-            | jq -r --arg d "${vmn}" \
-                'first(.items[]
-                 | select(.metadata.labels["kubevirt.io/domain"]==$d)
-                 | select(.status.phase=="Running")
-                 | .metadata.name) // ""' \
-            || true)"
-        launcherPodsArr+=("${pod}")
-    done
-
-    typeset -i failed=0
-    for (( i = 0; i < vmCount; i++ )); do
-        typeset vmName
-        vmName="${vmNamesArr[${i}]}"
-
-        typeset -i anchorIdx=$(( (i + 1) % vmCount ))
-
-        if [[ -z "${launcherPodsArr[${anchorIdx}]}" ]]; then
-            : "No probe anchor available for SSH check on ${vmName}; skipping"
-            continue
-        fi
-
-        # Resolve VM IP and exec the probe inside a set +x subshell to prevent
-        # internal endpoint identifiers from appearing in the xtrace log.
-        typeset probeRc=0
-        ( set +x
-          vmIp="$(DestOc get "virtualmachineinstance/${vmName}" -n "${targetNs}" \
-              -o jsonpath='{.status.interfaces[0].ipAddress}' || true)"
-          anchorPod="${launcherPodsArr[${anchorIdx}]}"
-          [[ -n "${vmIp}" ]] || exit 2
-          DestOc exec -n "${targetNs}" "${anchorPod}" -c compute -- \
-              timeout 15 bash -c "echo > /dev/tcp/${vmIp}/22"
-        ) || probeRc=$?
-
-        case "${probeRc}" in
-            0) : "SSH port 22 reachable on ${vmName}" ;;
-            2) : "No IP on VMI ${vmName}; skipping SSH probe" ;;
-            *) : "SSH port 22 not reachable on ${vmName} (rc=${probeRc})"
-               (( ++failed )) ;;
-        esac
-    done
-
-    (( failed == 0 ))
-}
-
 # JStep — run a function, append PASS/FAIL record to junitFile, propagate exit code.
 function JStep () {
     typeset name="${1:?}"; shift
@@ -803,13 +686,6 @@ typeset -i cclmStepRc=0
     JStep "Migration: Plan Ready"                        WaitPlanReady
     JStep "Migration: Apply Migration"                   ApplyMigration
     JStep "Migration: Succeeded"                         WaitMigrationSucceeded
-    JStep "Verification: Destination VMIs Running"       VerifyMigration
-    JStep "Verification: Destination VM runStrategy"     VerifyDestVmsRunStrategy
-    JStep "Verification: Source VMIM Not Failed"         VerifySourceVmimNotFailed
-
-    # SSH port probe is best-effort: failure is recorded in JUnit but does not
-    # block overall migration success (|| true prevents ERR trap from firing).
-    JStep "Verification: VM SSH Port Probe" VerifyAllVmsSsh || true
 
     if [[ -n "${ARTIFACT_DIR}" ]]; then
         mkdir -p "${ARTIFACT_DIR}"
@@ -840,7 +716,8 @@ WriteJunit
 if (( cclmStepRc != 0 )); then
     DumpDiagnostics
     if [[ "${cclmDebugMode}" == "true" ]]; then
-        printf 'WARNING: p2p-mtv-execute-live-migration%s failed (rc=%d); not failing job (debug mode)\n' "${migrationSuffix}" "${cclmStepRc}" >&2
+        printf 'WARNING: p2p-mtv-execute-live-migration%s failed (rc=%d); not failing job (debug mode)\n' \
+            "${migrationSuffix}" "${cclmStepRc}" >&2
     else
         exit "${cclmStepRc}"
     fi

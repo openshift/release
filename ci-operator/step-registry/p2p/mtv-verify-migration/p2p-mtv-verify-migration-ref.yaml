@@ -1,0 +1,89 @@
+ref:
+  as: p2p-mtv-verify-migration
+  from: cli
+  commands: p2p-mtv-verify-migration-commands.sh
+  timeout: 30m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Verify post-migration VM state produced by p2p-mtv-execute-live-migration.
+
+    Checks performed (each recorded as a JUnit test case; all are hard failures):
+      1. Destination VMIs Running
+      2. Destination VM runStrategy==Always (OCPBUGS-101771)
+      3. Source VMIM is not Failed (OCPBUGS-99403)
+      4. SSH port 22 reachable from a peer virt-launcher (requires MTV_TEST_VM_COUNT>1)
+      5. Cloud-init marker file intact via QEMU Guest Agent
+      6. Guest disk I/O (write + fsync + checksum + unlink)
+      7. Guest network reachability (ping a peer VM IP from inside the guest)
+
+    Writes ${ARTIFACT_DIR}/junit_cclm_migration_verify.xml (suffix applied when
+    MTV_MIGRATION_SUFFIX is set); diagnostics under mtv-migration-verify-diagnostics/.
+  env:
+  - name: MTV_TEST_VM_COUNT
+    default: "1"
+    documentation: |-
+      Number of VMs to verify after migration.
+      Must match the value used in p2p-mtv-execute-live-migration and
+      p2p-create-migration-test-vm.
+  - name: MTV_TEST_VM_NAME
+    default: "test-vm-1"
+    documentation: VM name to verify (single-VM path; ignored when MTV_TEST_VM_COUNT>1).
+  - name: MTV_TEST_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Source namespace of the migrated VM (used to check source VMIM).
+  - name: MTV_TEST_VM_TARGET_NAMESPACE
+    default: ""
+    documentation: Destination namespace on the destination spoke. Empty uses MTV_TEST_VM_NAMESPACE.
+  - name: MTV_SOURCE_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based SHARED_DIR kubeconfig index for the source spoke.
+  - name: MTV_DEST_SPOKE_INDEX
+    default: "2"
+    documentation: 1-based SHARED_DIR kubeconfig index for the destination spoke.
+  - name: MTV_SOURCE_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional explicit source spoke kubeconfig path. Defaults to SHARED_DIR index.
+  - name: MTV_DEST_SPOKE_KUBECONFIG
+    default: ""
+    documentation: Optional explicit destination spoke kubeconfig path. Defaults to SHARED_DIR index.
+  - name: MTV_CNV_NAMESPACE
+    default: "openshift-cnv"
+    documentation: OpenShift Virtualization namespace on spokes (used for diagnostics).
+  - name: MTV_PLAN_TYPE
+    default: "live"
+    documentation: Plan type — live or cold. SSH probe only runs for live migrations.
+  - name: MTV_VM_SSH_VERIFY
+    default: "true"
+    documentation: |-
+      When true, probe SSH port 22 on each migrated VM from a peer
+      virt-launcher. Failure fails the step. Requires MTV_TEST_VM_COUNT>1.
+  - name: MTV_VM_DATA_INTEGRITY
+    default: "true"
+    documentation: |-
+      When true, verify cloud-init marker files survive migration via QEMU Guest Agent.
+      Failure or "skipped on all VMs" fails the step. Set false for cirros guests.
+  - name: MTV_VM_GUEST_EXEC
+    default: "true"
+    documentation: |-
+      When true, run QEMU Guest Agent checks: guest disk I/O (VerifyGuestDiskIo) and
+      guest network reachability (VerifyGuestNetwork). Set false for cirros or other
+      guest images that do not ship a QEMU Guest Agent; the checks are recorded as
+      SKIPPED in JUnit instead of FAILED.
+  - name: MTV_MIGRATION_SUFFIX
+    default: ""
+    documentation: |-
+      Suffix applied to artifact names (JUnit XML, diagnostics dir). Empty for the
+      forward leg; set to "-return" when this step verifies the return migration.
+  - name: MTV_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where MTV Plan and Migration CRs live (used for diagnostics).
+  - name: MTV_PLAN_NAME
+    default: "cclm-plan"
+    documentation: Plan metadata.name on the hub (used for diagnostics).
+  - name: MTV_MIGRATION_NAME
+    default: "cclm-run-1"
+    documentation: Migration metadata.name on the hub (used for diagnostics).

@@ -11,11 +11,11 @@ ref:
   documentation: |-
     Execute MTV cross-cluster live migration (CCLM) from source spoke to destination spoke.
 
-    Runs on the ACM hub (KUBECONFIG). Creates Plan and Migration CRs, waits for Succeeded,
-    and verifies the VM is Running on the destination spoke. Requires p2p-mtv-mig-config
-    (providers + maps Ready), p2p-create-migration-test-vm (source VM Running),
-    p2p-acm-cnv-install-policy (DecentralizedLiveMigration + sync controller on spokes),
-    and acm-interop-p2p-submariner-install (no Globalnet).
+    Runs on the ACM hub (KUBECONFIG). Creates Plan and Migration CRs and waits for
+    Succeeded. Requires p2p-mtv-mig-config (providers + maps Ready),
+    p2p-create-migration-test-vm (source VM Running), p2p-acm-cnv-install-policy
+    (DecentralizedLiveMigration + sync controller on spokes), and
+    acm-interop-p2p-submariner-install (no Globalnet).
 
     Live preflight: sync-controller ready, no submariner-globalnet. During migration wait,
     fails early if Synchronization stays stuck (source Synchronizing / dest WaitingForSync).
@@ -24,11 +24,10 @@ ref:
     managed-cluster-kubeconfig-2 (destination).
 
     When MTV_TEST_VM_COUNT>1, all VMs are included in a single MTV Plan and migrated
-    together.  Verification and SSH probing loop over all N VMs.
+    together.
 
-    Post-migration SSH probe: when MTV_VM_SSH_VERIFY=true, TCP-probes port 22 on each
-    migrated VM from a peer virt-launcher pod on the destination spoke.  Probe failure
-    is recorded in JUnit but does not fail the migration step (best-effort).
+    Post-migration verification (VMI health, runStrategy, VMIM status, SSH probe, data
+    integrity) is handled by the separate p2p-mtv-verify-migration step.
 
     Writes ${ARTIFACT_DIR}/mtv-live-migration-status.txt; diagnostics on failure under
     ${ARTIFACT_DIR}/mtv-live-migration-diagnostics/.
@@ -41,13 +40,6 @@ ref:
       When greater than 1, VMs must be named test-vm-1 through test-vm-N
       and must have been created by p2p-create-migration-test-vm with the
       same CNV_TEST_VM_COUNT value.
-  - name: MTV_VM_SSH_VERIFY
-    default: "true"
-    documentation: |-
-      When true, probe SSH port 22 on each migrated VM from a peer
-      virt-launcher compute container on the destination spoke.
-      Failure is recorded in JUnit but does not block overall migration
-      success (best-effort connectivity check).
   - name: MTV_NAMESPACE
     default: "openshift-mtv"
     documentation: Namespace where MTV Plan and Migration CRs live.
