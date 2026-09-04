@@ -57,7 +57,7 @@ propagate_tags=$(yq-go r "${CONFIG}" 'platform.aws.propagateUserTags')
 install_config_tags=${ARTIFACT_DIR}/install_config_tags.json
 yq-go r "${CONFIG}" platform.aws.userTags -j | jq 'to_entries[] | {(.key):(.value|tostring)}' | jq -s 'add' | jq 'to_entries | sort_by(.key)' > ${install_config_tags}
 
-if [[ ${propagate_tags} == "true" ]]; then
+if [[ "${propagate_tags}" == "true" ]]; then
   cluster_inf_tags=${ARTIFACT_DIR}/cluster_inf_tags.json
   oc get infrastructures.config.openshift.io -o json | jq -r '.items[].status.platformStatus.aws.resourceTags | sort_by(.key)' > ${cluster_inf_tags}
   
@@ -144,7 +144,12 @@ check_resource ".*security-group/sg-.*"
 check_resource ".*volume/vol-.*"
 check_resource ".*loadbalancer/net/${INFRA_ID}-ext/.*"
 check_resource ".*loadbalancer/net/${INFRA_ID}-int/.*"
-check_resource ".*loadbalancer/[0-9a-z]{32}"
+
+# Operator-managed resources (e.g. the ingress "router-default" Classic ELB)
+# only receive the userTags when propagateUserTags is enabled in the install-config.
+if [[ "${propagate_tags}" == "true" ]]; then
+  check_resource ".*loadbalancer/[0-9a-z]{32}"
+fi
 
 # The following resources are owned by the VPC. With a BYO VPC they are
 # provisioned (and tagged) outside the installer, so only check them when the
