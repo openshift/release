@@ -48,6 +48,10 @@ case "${SIZE_VARIANT}" in
 	;;
 esac
 
+# If CONTROL_PLANE_INSTANCE_TYPE is set, use it for the master type
+if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then
+    master_type="${CONTROL_PLANE_INSTANCE_TYPE}"
+fi
 
 # Select zone(s) based on REGION and ZONE_COUNT
 REGION="${LEASED_RESOURCE}"
@@ -73,7 +77,32 @@ cat >> "${CONFIG}" << EOF
 EOF
 fi
 
+if [[ "${CONTROL_PLANE_BOOT_VOLUME_IOPS}" ]]; then
+    echo "Custom boot volume configuration for control plane nodes"
 cat >> "${CONFIG}" << EOF
+controlPlane:
+  name: master
+  platform:
+    ibmcloud:
+      type: ${master_type}
+      zones: ${ZONES_STR}
+      # Custom boot volume configuration for control plane nodes
+      bootVolume:
+        iops: ${CONTROL_PLANE_BOOT_VOLUME_IOPS}
+        size: ${CONTROL_PLANE_BOOT_VOLUME_SIZE}
+        profile: ${CONTROL_PLANE_BOOT_VOLUME_PROFILE}
+  replicas: ${CONTROL_PLANE_REPLICAS}
+compute:
+- name: worker
+  platform:
+    ibmcloud:
+      type: ${COMPUTE_NODE_TYPE}
+      zones: ${ZONES_STR}
+  replicas: ${workers}
+EOF
+else 
+    echo "Default boot volume configuration for control plane nodes"
+    cat >> "${CONFIG}" << EOF
 controlPlane:
   name: master
   platform:
@@ -89,6 +118,8 @@ compute:
       zones: ${ZONES_STR}
   replicas: ${workers}
 EOF
+fi
+
 
 if [ ${RT_ENABLED} = "true" ]; then
 	cat > "${SHARED_DIR}/manifest_mc-kernel-rt.yml" << EOF
