@@ -14,10 +14,14 @@ when the ratio exceeds SKIP_RATIO_THRESHOLD (unless FAIL_ON_BREACH
 is "false").
 """
 
+import math
 import os
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+# Global counter for XML parse failures
+_parse_failures = 0
 
 
 def parse_junit(path):
@@ -31,6 +35,8 @@ def parse_junit(path):
     try:
         tree = ET.parse(path)
     except ET.ParseError as exc:
+        global _parse_failures
+        _parse_failures += 1
         print(f"WARNING: skipping {path} — XML parse error: {exc}", file=sys.stderr)
         return suites
 
@@ -104,6 +110,10 @@ def write_gate_junit(artifact_dir, total, passed, failed, skipped, errored,
 
 def main():
     threshold = float(os.environ.get("SKIP_RATIO_THRESHOLD", "0.10"))
+    if not math.isfinite(threshold) or threshold < 0 or threshold > 1:
+        print(f"ERROR: SKIP_RATIO_THRESHOLD must be a finite number in [0, 1], got {threshold!r}",
+              file=sys.stderr)
+        sys.exit(1)
     junit_dir = os.environ.get("JUNIT_DIR", "") or os.environ.get("ARTIFACT_DIR", "")
     fail_on_breach = os.environ.get("FAIL_ON_BREACH", "true").lower() != "false"
     artifact_dir = os.environ.get("ARTIFACT_DIR", junit_dir)
@@ -134,6 +144,12 @@ def main():
     all_suites = []
     for xf in xml_files:
         all_suites.extend(parse_junit(xf))
+
+    if _parse_failures:
+        print(f"ERROR: {_parse_failures} JUnit XML file(s) failed to parse",
+              file=sys.stderr)
+        write_gate_junit(artifact_dir, 0, 0, 0, 0, 0, 0.0, threshold, True)
+        sys.exit(1)
 
     if not all_suites:
         print("ERROR: XML files found but no <testsuite> elements parsed",
@@ -180,8 +196,8 @@ def main():
     elif breach:
         print(f"ADVISORY: skip ratio {skip_ratio:.4f} exceeds threshold {threshold:.4f} "
               f"(FAIL_ON_BREACH=false, not failing)")
-
-    print("PASS: skip ratio within threshold")
+    else:
+        print("PASS: skip ratio within threshold")
 
 
 if __name__ == "__main__":

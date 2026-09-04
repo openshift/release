@@ -97,7 +97,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
   }
   # Filter out skipped policies (grep no-match is tolerated via || true)
   typeset applyPolicies=""
-  applyPolicies="$(printf '%s\n' "${policyList}" | grep -Ev "(${skipRegex})")" || true
+  applyPolicies="$(printf '%s\n' "${policyList}" | grep -Ev "/(${skipRegex})$")" || true
 
   if [[ -n "${applyPolicies}" ]]; then
     printf '[%s] Waiting for %d non-skipped polic(ies) to become Compliant…\n' \
@@ -107,7 +107,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
         --for jsonpath='{.status.compliant}'=Compliant \
         --timeout=40m; then
       : "Non-skipped policies failed to become compliant:"
-      oc get policies -n policies --ignore-not-found | grep -Ev "(${skipRegex})"
+      oc get policies -n policies --ignore-not-found | grep -Ev "/(${skipRegex})$"
       oc get policies -n policies --ignore-not-found -o yaml
       oc describe policies --all -n policies
       exit 1
