@@ -1,0 +1,55 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibi-eco-gotests-seed
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibi-eco-gotests-seed-commands.sh
+  documentation: |-
+    Prepare IBI seed SNO (bare metal), run eco-gotests seedgeneration suite,
+    then power off the seed spoke (helix81) via Redfish BMC.
+
+    Flow:
+    1. Retrieve seed spoke kubeconfig from hub cluster ACM
+    2. Generate eco-gotests run script (deploy-run-eco-gotests.yaml)
+    3. Run seedgeneration via ibu-run-seedgeneration.yml
+    4. Collect junit artifacts
+    5. Power off seed spoke (helix81) via Redfish BMC (not virsh)
+
+    Unlike IBU, no VM disk attachment is needed — helix81 uses LSO from ZTP policies.
+  timeout: 150m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+
+  env:
+  - name: CLUSTER_NAME
+    default: "kni-qe-127"
+    documentation: Seed hub cluster name (manages the seed spoke via ACM)
+  - name: SEED_SPOKE_CLUSTER
+    default: "helix81"
+    documentation: Seed spoke SNO cluster name (where seed image is generated)
+  - name: ECO_GOTESTS_FEATURES
+    default: "seedgeneration"
+    documentation: Space-separated list of eco-gotests features
+  - name: MIRROR_REGISTRY
+    default: "disconnected.registry.local:5000"
+    documentation: Disconnected mirror registry address for seed image
+  - name: VERSION
+    default: "4.20"
+    documentation: OCP version used to tag the seed image
+  - name: SEED_SPOKE_BMC_ADDRESS
+    default: "https://[2620:52:9:1686:20af:1d95:d175:5317]"
+    documentation: Redfish BMC address for helix81 power-off
+
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-group-all
+    mount_path: /var/group_variables/common/all
+  - namespace: test-credentials
+    name: telcov10n-ansible-group-bastions
+    mount_path: /var/group_variables/common/bastions
+  - namespace: test-credentials
+    name: telcov10n-ansible-kni-qe-127-bastion
+    mount_path: /var/host_variables/kni-qe-127/bastion
