@@ -17,7 +17,7 @@ Lets a CI job testing one repo's PR also pull in an unmerged PR from one or more
 
 Written generically to cover the N-repo case tracked by [openshift/oadp-operator#2389](https://github.com/openshift/oadp-operator/issues/2389) ("test oadp-operator + kdm-controller + kdm-plugin + velero-plugin-for-aws etc. together"). Consumed by:
 
-- The 4 `migtools/kubevirt-datamover-{controller,plugin}` (KDM) e2e configs (`oadp-dev`/`oadp-1.6`), each declaring exactly one candidate: its own sibling repo. See [openshift/oadp-operator#1832](https://github.com/openshift/oadp-operator/issues/1832) for that coverage.
+- The 4 `migtools/kubevirt-datamover-{controller,plugin}` (KDM) e2e configs (`oadp-dev`/`oadp-1.6`). The plugin configs declare 2 candidates (the sibling controller repo, and `openshift/velero` itself -- e.g. testing a plugin PR against an unmerged velero PR that changes how it calls `Execute()`/other plugin-interface functions); the controller configs declare 2 as well (the sibling plugin repo, and `openshift/oadp-operator` via the `MANAGER_IMAGE` sentinel below). See [openshift/oadp-operator#1832](https://github.com/openshift/oadp-operator/issues/1832) for the KDM e2e coverage this builds on.
 - `openshift/oadp-operator`'s own `e2e-test-aws` (`oadp-dev`, 5.0 variant), declaring one candidate per `RELATED_IMAGE_*` its bundle substitutes -- see [`oadp-apply-depends-on-images`](../apply-depends-on-images/README.md) for how a resolved image actually takes effect there (an OLMv0 Subscription patch, with an explicit seam for future OLMv1/operator-controller support).
 
 ## Process
@@ -40,13 +40,24 @@ Building runs entirely inside the target cluster as a normal OpenShift `Build` (
 
 Say a CRD field is being added in lockstep across two repos: `migtools/oadp-non-admin` PR #456 adds the field to its CRD, and a companion `openshift/oadp-operator` PR #789 updates the DPA-to-CRD sync logic to read it. Neither PR alone is fully testable -- the operator PR's new sync code has nothing to read without the CRD's new field, and the CRD PR alone has no consumer.
 
-To test them together: add to oadp-operator PR #789's description --
+To test them together: add to oadp-operator PR #789's description -- a full PR description might look like this:
 
-```text
-Depends-On: https://github.com/migtools/oadp-non-admin/pull/456
-```
+> ## Summary
+>
+> Reads the new `spec.backupSpec.excludedResources` field on `NonAdminBackup` and
+> forwards it to the generated DPA, so non-admin users can exclude resources from
+> their own backups the same way cluster-admins already can.
+>
+> Needs the CRD's own new field, added in a companion oadp-non-admin PR.
+>
+> Depends-On: https://github.com/migtools/oadp-non-admin/pull/456
+>
+> ## Test plan
+>
+> - [ ] e2e (`oadp-operator`'s `e2e-test-aws`, this PR's Depends-On resolves
+>       oadp-non-admin#456 automatically)
 
-`oadp-operator`'s `e2e-test-aws` job then: builds oadp-operator PR #789 (as it always does, via ci-operator's own `OO_INDEX` dependency -- unrelated to Depends-On), notices the Depends-On line matches its `migtools/oadp-non-admin` candidate, builds oadp-non-admin PR #456's source as an image, and (via `oadp-apply-depends-on-images`) patches the Subscription so `RELATED_IMAGE_NON_ADMIN_CONTROLLER` points at that PR-built image instead of whatever the released bundle ships -- before `make test-e2e` runs. The oadp-non-admin PR #456 itself needs no changes.
+`oadp-operator`'s `e2e-test-aws` job then: builds oadp-operator PR #789 (as it always does, via ci-operator's own `OO_INDEX` dependency -- unrelated to Depends-On), notices the Depends-On line matches its `migtools/oadp-non-admin` candidate, builds oadp-non-admin PR #456's source as an image, and (via `oadp-apply-depends-on-images`) patches the Subscription so `RELATED_IMAGE_NON_ADMIN_CONTROLLER` points at that PR-built image instead of whatever the released bundle ships -- before `make test-e2e` runs. The oadp-non-admin PR #456 itself needs no changes -- the `Depends-On:` line can sit anywhere in the description (own paragraph, bullet, wherever reads naturally); the resolver only looks for the line, not its surrounding structure.
 
 ### Environment Variables
 
@@ -54,6 +65,7 @@ Depends-On: https://github.com/migtools/oadp-non-admin/pull/456
   - The namespace to build the depended-on image(s) into. Should match the namespace the operator under test is installed into.
 - `DEPENDS_ON_CANDIDATES`
   - One line per `(repo, image)` pair this job is willing to resolve, `<org>/<name> <RELATED_IMAGE_ENV_VAR_NAME> [<dockerfile-path>]`. Plain text, not JSON -- this image has no guaranteed `jq` (same reasoning as `oadp-operator-sdk-bundle-image`). `<dockerfile-path>` is optional (defaults to `Dockerfile` at the repo root); set it when a repo's own ci-operator config builds with something else (`Dockerfile.ubi`, `Containerfile`, etc). The same repo may appear on more than one line -- a repo producing several images (e.g. `migtools/oadp-vm-file-restore`, which builds 3 separate `RELATED_IMAGE_*` targets from 3 different Dockerfiles) gets its source fetched once and built once per matching line. Add more lines to test more repos (or more images per repo) together in the same job; this script does not change.
+  - The second field is normally a real `RELATED_IMAGE_*` env var name, but the sentinel value `MANAGER_IMAGE` is special-cased by consumers that install oadp-operator itself (the 4 KDM configs) -- it means "this candidate is oadp-operator's own manager image, not a component oadp-operator deploys," and gets applied by patching the manager Deployment's own container image directly (`oc set image`) instead of a Subscription env var. This resolver step itself treats `MANAGER_IMAGE` like any other value (just writes the line to the manifest); only the *apply* side (KDM's own `set-related-image`) knows what to do with it. Covers oadp-operator PRs that change reconcile logic (e.g. how it builds a managed Deployment's spec) -- an oadp-operator PR that changes RBAC/CSV/CRD manifests still needs the alternate-bundle mechanism described in Known limitations below.
 
 ### Output
 
@@ -63,7 +75,7 @@ For each resolved candidate, one line is appended to `${SHARED_DIR}/depends-on-i
 
 - **Unauthenticated GitHub API calls**: same as `openstack-k8s-operators-kuttl-commands.sh`, no token is used, so this is subject to GitHub's unauthenticated rate limit (60/hr per IP). Acceptable for now given the existing precedent; would need a credentialed step if this becomes a bottleneck.
 - **First real run still pending**: rehearsal only exercises the no-Depends-On (default) path, since no real PR carries the marker yet. The positive path needs a real pair of PRs to verify end-to-end -- one carrying a `Depends-On:` line, the other just existing as a normal open PR (no reciprocal marker needed, per the trigger semantics above) -- e.g. a KDM controller/plugin pair, or an oadp-operator PR against any one of its 17 sibling repos.
-- **The reverse direction (a sibling repo's e2e depending on an oadp-operator PR) is not wired, and can't reuse this mechanism as-is.** E.g. `migtools/oadp-non-admin`'s own e2e job wanting to test against an unmerged oadp-operator PR that updates `NonAdminBackup` CRD manifests: that's not a `RELATED_IMAGE_*` component swap (what this resolver + `oadp-apply-depends-on-images` do), it's a change to the operator's own bundle/CRDs. Testing it needs building an *alternate oadp-operator index/bundle* from that PR and installing it in place of the released one -- the same thing ci-operator's own `OO_INDEX` dependency already does natively for oadp-operator's own PRs, not an extension of `oadp-apply-depends-on-images`'s Subscription-patch approach. Would need its own resolver step (parse `Depends-On:` the same way, but build+install a full index/bundle rather than one image) in each sibling repo's e2e config. Tracked as unimplemented follow-up alongside [openshift/oadp-operator#2389](https://github.com/openshift/oadp-operator/issues/2389); not attempted in this PR.
+- **Always put `Depends-On:` on the oadp-operator PR, never the sibling's, for any scenario touching oadp-operator's own RBAC/CSV/CRD manifests.** `MANAGER_IMAGE` (above) covers reconcile-logic-level oadp-operator dependencies from a *sibling's* job (kdm-controller's own configs use it), but a change to oadp-operator's RBAC/CSV/CRDs themselves isn't a container-image swap at all -- it needs the operator's *own* bundle build, RBAC/CSV/CRDs and all, which only oadp-operator's own `e2e-test-aws` produces natively (via ci-operator's `OO_INDEX` dependency, entirely separate from this resolver). There is no gap here in practice: this resolver is already wired into oadp-operator's own job with `migtools/oadp-non-admin` as one of its candidates, so testing "an oadp-operator PR that changes RBAC together with a companion oadp-non-admin PR" is fully supported today -- just author/edit the **oadp-operator PR's** description with `Depends-On: https://github.com/migtools/oadp-non-admin/pull/<N>` (exactly the worked example above), not the other way around. A sibling repo's own e2e attempting to pull in an unmerged oadp-operator PR directly has no way to build that alternate bundle (see the worked example's own direction) -- don't attempt it from that side.
 
 ## Provenance
 
