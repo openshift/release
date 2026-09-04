@@ -105,10 +105,16 @@ fi
 
 export EVENTUALLY_VERBOSE="false"
 
+export E2E_AWS_CREDENTIALS_FILE="/etc/hypershift-pool-aws-credentials/credentials"
+export E2E_EXTERNAL_DNS_CREDENTIALS="${E2E_AWS_CREDENTIALS_FILE}"
+if [[ "${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT:-false}" == "true" ]]; then
+  export E2E_AWS_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+fi
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-''} \
   -test.parallel=20 \
-  --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
+  --e2e.aws-credentials-file="${E2E_AWS_CREDENTIALS_FILE}" \
   --e2e.aws-zones=us-east-1a,us-east-1b,us-east-1c \
   ${AWS_OBJECT_PARAMS:-} \
   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
@@ -123,6 +129,7 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
   --e2e.aws-endpoint-access=PublicAndPrivate \
   --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com \
+  --e2e.external-dns-credentials="${E2E_EXTERNAL_DNS_CREDENTIALS}" \
   ${AWS_MULTI_ARCH_PARAMS:-} \
   ${REQUEST_SERVING_COMPONENT_PARAMS:-} \
   ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
