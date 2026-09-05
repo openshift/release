@@ -1,6 +1,6 @@
 base_images:
   upi-installer:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -14,26 +14,26 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipsec-24nodes
-  cron: 0 0 5 * *
+- always_run: false
+  as: aws-ipsec-24nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -45,8 +45,9 @@ tests:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-aws-ovn-ipsec
-  timeout: 7h0m0s
-- as: gcp-etcd-fips-24nodes
+  timeout: 8h0m0s
+- always_run: false
+  as: gcp-etcd-fips-24nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-perfscale-qe
@@ -57,8 +58,8 @@ tests:
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 7h0m0s
-- as: azure-multi-24nodes
-  cron: 0 1 12,26 * *
+- always_run: false
+  as: azure-multi-24nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-perfscale-qe
@@ -84,7 +85,8 @@ tests:
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-azure
   timeout: 8h0m0s
-- as: baremetal-multi-3nodes
+- always_run: false
+  as: baremetal-multi-3nodes
   capabilities:
   - intranet
   steps:
@@ -103,8 +105,9 @@ tests:
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: baremetal-lab-upi
-  timeout: 8h0m0s
-- as: vsphere-24nodes
+  timeout: 7h0m0s
+- always_run: false
+  as: vsphere-24nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: vsphere-connected-2
@@ -117,9 +120,9 @@ tests:
     - chain: workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-vsphere-ipi-ovn
-  timeout: 8h0m0s
-- as: ibmcloud-24nodes
-  cron: 0 2 5 * *
+  timeout: 7h0m0s
+- always_run: false
+  as: ibmcloud-24nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
@@ -130,11 +133,11 @@ tests:
     - ref: workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
-  timeout: 8h0m0s
-- as: nutanix-24nodes
+  timeout: 7h0m0s
+- always_run: false
+  as: nutanix-24nodes
   capabilities:
   - sshd-bastion
-  cron: 0 2 12 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: nutanix-qe-zone
@@ -209,4 +212,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-eng
   repo: ocp-qe-perfscale-ci
-  variant: 4.22-nightly-node-density-heavy
+  variant: 5.0-nightly-node-density-heavy
